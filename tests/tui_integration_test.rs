@@ -358,12 +358,80 @@ fn test_context_subsection_lifecycle() {
     }
 }
 
+// Helper function to create test UnifiedDebtItem
+fn create_test_unified_debt_item(
+    location: debtmap::priority::Location,
+    debt_type: debtmap::priority::DebtType,
+) -> debtmap::priority::UnifiedDebtItem {
+    use debtmap::priority::{
+        ActionableRecommendation, FunctionRole, ImpactMetrics, UnifiedDebtItem, UnifiedScore,
+    };
+
+    UnifiedDebtItem {
+        location,
+        debt_type,
+        unified_score: UnifiedScore {
+            complexity_factor: 5.0,
+            coverage_factor: 5.0,
+            dependency_factor: 3.0,
+            role_multiplier: 1.0,
+            final_score: 5.0,
+            base_score: None,
+            exponential_factor: None,
+            risk_boost: None,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
+        },
+        function_role: FunctionRole::Unknown,
+        recommendation: ActionableRecommendation {
+            primary_action: "Test action".to_string(),
+            rationale: "Test rationale".to_string(),
+            implementation_steps: vec![],
+            related_items: vec![],
+            steps: None,
+            estimated_effort_hours: None,
+        },
+        expected_impact: ImpactMetrics {
+            coverage_improvement: 0.0,
+            lines_reduction: 0,
+            complexity_reduction: 0.0,
+            risk_reduction: 0.0,
+        },
+        transitive_coverage: None,
+        upstream_dependencies: 0,
+        downstream_dependencies: 0,
+        upstream_callers: vec![],
+        downstream_callees: vec![],
+        nesting_depth: 1,
+        function_length: 10,
+        cyclomatic_complexity: 5,
+        cognitive_complexity: 5,
+        is_pure: None,
+        purity_confidence: None,
+        purity_level: None,
+        entropy_details: None,
+        entropy_adjusted_cyclomatic: None,
+        entropy_adjusted_cognitive: None,
+        entropy_dampening_factor: None,
+        god_object_indicators: None,
+        tier: None,
+        function_context: None,
+        context_confidence: None,
+        contextual_recommendation: None,
+        pattern_analysis: None,
+        file_context: None,
+        context_multiplier: None,
+        context_type: None,
+        language_specific: None,
+        detected_pattern: None,
+        contextual_risk: None,
+    }
+}
+
 #[test]
 fn test_data_flow_page_rendering_with_mutations() {
     use debtmap::data_flow::{DataFlowGraph, MutationInfo};
-    use debtmap::priority::{
-        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
-    };
+    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
     use std::path::PathBuf;
 
     // Create test data flow graph
@@ -386,23 +454,17 @@ fn test_data_flow_page_rendering_with_mutations() {
     let mutation_info = MutationInfo {
         total_mutations: 5,
         live_mutations: vec!["x".to_string(), "y".to_string()],
-        dead_stores: vec!["z".to_string()],
+        dead_stores: [String::from("z")].iter().cloned().collect(),
+        escaping_mutations: [String::from("x")].iter().cloned().collect(),
     };
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
 
-    // Create test item
-    let item = UnifiedDebtItem {
-        location,
-        debt_type: DebtType::Complexity,
-        unified_score: UnifiedScore::default(),
-        downstream_dependencies: 0,
-        test_score: 0.0,
-        god_object_indicators: None,
-        contextual_factors: None,
-        prioritization_reasoning: String::new(),
-        recommendation: None,
-        function_role: None,
-    };
+    // Create test item (unused in this test, but demonstrates integration)
+    let _item = create_test_unified_debt_item(location, DebtType::ComplexityHotspot {
+        cyclomatic: 10,
+        cognitive: 15,
+        adjusted_cyclomatic: None,
+    });
 
     // Verify mutation data is accessible
     let retrieved_mutation = data_flow.get_mutation_info(&func_id);
@@ -436,32 +498,28 @@ fn test_data_flow_page_rendering_with_io_operations() {
     );
 
     // Add I/O operations
-    let io_ops = vec![
+    data_flow.add_io_operation(
+        func_id.clone(),
         IoOperation {
             operation_type: "File Read".to_string(),
             line: 105,
             variables: vec!["file".to_string()],
         },
+    );
+    data_flow.add_io_operation(
+        func_id.clone(),
         IoOperation {
             operation_type: "Network Call".to_string(),
             line: 110,
             variables: vec!["socket".to_string()],
         },
-    ];
-    data_flow.set_io_operations(func_id.clone(), io_ops);
+    );
 
-    let item = UnifiedDebtItem {
-        location,
-        debt_type: DebtType::SideEffects,
-        unified_score: UnifiedScore::default(),
-        downstream_dependencies: 0,
-        test_score: 0.0,
-        god_object_indicators: None,
-        contextual_factors: None,
-        prioritization_reasoning: String::new(),
-        recommendation: None,
-        function_role: None,
-    };
+    let _item = create_test_unified_debt_item(location, DebtType::ComplexityHotspot {
+        cyclomatic: 8,
+        cognitive: 12,
+        adjusted_cyclomatic: None,
+    });
 
     // Verify I/O operations are accessible
     let io_operations = data_flow.get_io_operations(&func_id);
@@ -474,10 +532,10 @@ fn test_data_flow_page_rendering_with_io_operations() {
 
 #[test]
 fn test_data_flow_page_rendering_with_escape_analysis() {
-    use debtmap::data_flow::{CfgAnalysis, DataFlowGraph, EscapeInfo, VarId};
-    use debtmap::priority::{
-        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
-    };
+    use debtmap::analysis::data_flow::DataFlowAnalysis;
+    use debtmap::analysis::VarId;
+    use debtmap::data_flow::DataFlowGraph;
+    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
     use std::path::PathBuf;
 
     let mut data_flow = DataFlowGraph::new();
@@ -494,31 +552,47 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
         location.line,
     );
 
-    // Add escape analysis
-    let escape_info = EscapeInfo {
-        escaping_vars: vec![VarId(1), VarId(2)],
-        return_dependencies: vec![VarId(1)],
+    // Add escape analysis - create a minimal DataFlowAnalysis
+    use debtmap::analysis::data_flow::{
+        EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+    };
+    use std::collections::HashSet;
+
+    let var1 = VarId { name_id: 1, version: 0 };
+    let var2 = VarId { name_id: 2, version: 0 };
+
+    let escape_info = EscapeAnalysis {
+        escaping_vars: [var1, var2].iter().copied().collect(),
+        captured_vars: HashSet::new(),
+        return_dependencies: [var1].iter().copied().collect(),
     };
 
-    let cfg_analysis = CfgAnalysis {
+    let cfg_analysis = DataFlowAnalysis {
+        liveness: LivenessInfo {
+            live_in: Default::default(),
+            live_out: Default::default(),
+            dead_stores: Default::default(),
+        },
+        reaching_defs: ReachingDefinitions {
+            reach_in: Default::default(),
+            reach_out: Default::default(),
+            def_use_chains: Default::default(),
+        },
         escape_info,
-        dominance_frontier: Default::default(),
+        taint_info: TaintAnalysis {
+            tainted_vars: Default::default(),
+            taint_sources: Default::default(),
+            return_tainted: false,
+        },
     };
 
     data_flow.set_cfg_analysis(func_id.clone(), cfg_analysis);
 
-    let item = UnifiedDebtItem {
-        location,
-        debt_type: DebtType::Complexity,
-        unified_score: UnifiedScore::default(),
-        downstream_dependencies: 0,
-        test_score: 0.0,
-        god_object_indicators: None,
-        contextual_factors: None,
-        prioritization_reasoning: String::new(),
-        recommendation: None,
-        function_role: None,
-    };
+    let _item = create_test_unified_debt_item(location, DebtType::ComplexityHotspot {
+        cyclomatic: 12,
+        cognitive: 18,
+        adjusted_cyclomatic: None,
+    });
 
     // Verify escape analysis is accessible
     let cfg = data_flow.get_cfg_analysis(&func_id);
@@ -530,10 +604,8 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
 
 #[test]
 fn test_data_flow_markdown_formatting() {
-    use debtmap::data_flow::{DataFlowGraph, MutationInfo, IoOperation};
-    use debtmap::priority::{
-        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
-    };
+    use debtmap::data_flow::{DataFlowGraph, IoOperation, MutationInfo};
+    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
     use std::path::PathBuf;
 
     let mut data_flow = DataFlowGraph::new();
@@ -556,17 +628,21 @@ fn test_data_flow_markdown_formatting() {
         MutationInfo {
             total_mutations: 10,
             live_mutations: vec!["counter".to_string(), "state".to_string()],
-            dead_stores: vec!["temp".to_string(), "unused".to_string()],
+            dead_stores: ["temp".to_string(), "unused".to_string()]
+                .iter()
+                .cloned()
+                .collect(),
+            escaping_mutations: ["counter".to_string()].iter().cloned().collect(),
         },
     );
 
-    data_flow.set_io_operations(
+    data_flow.add_io_operation(
         func_id.clone(),
-        vec![IoOperation {
+        IoOperation {
             operation_type: "Database Query".to_string(),
             line: 55,
             variables: vec!["db".to_string()],
-        }],
+        },
     );
 
     // Verify all data is present for markdown formatting
