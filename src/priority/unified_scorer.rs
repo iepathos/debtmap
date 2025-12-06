@@ -346,9 +346,9 @@ pub fn calculate_unified_priority_with_debt(
         risk_boost: None,         // Set later in debt item construction (spec 171)
         pre_adjustment_score: pre_adjustment,
         adjustment_applied: adjustment,
-        purity_factor: None,             // Set by calculate_unified_priority_with_data_flow (spec 218)
-        refactorability_factor: None,    // Set by calculate_unified_priority_with_data_flow (spec 218)
-        pattern_factor: None,            // Set by calculate_unified_priority_with_data_flow (spec 218)
+        purity_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
+        refactorability_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
+        pattern_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
     }
 }
 
@@ -782,7 +782,7 @@ fn calculate_refactorability_factor(
     let mutation_info = data_flow.get_mutation_info(func_id);
 
     match mutation_info {
-        None => 1.0, // No data - no boost
+        None => 1.0,                                    // No data - no boost
         Some(info) if info.total_mutations == 0 => 1.0, // No mutations - no boost
         Some(info) => {
             let dead_store_ratio = info.dead_stores.len() as f64 / info.total_mutations as f64;

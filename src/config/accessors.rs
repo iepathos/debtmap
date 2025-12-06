@@ -235,8 +235,5 @@ pub fn get_state_detection_config() -> crate::analyzers::state_field_detector::S
 
 /// Get data flow scoring configuration (spec 218)
 pub fn get_data_flow_scoring_config() -> super::scoring::DataFlowScoringConfig {
-    get_config()
-        .data_flow_scoring
-        .clone()
-        .unwrap_or_default()
+    get_config().data_flow_scoring.clone().unwrap_or_default()
 }
