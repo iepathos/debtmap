@@ -408,7 +408,7 @@ impl FileDebtMetrics {
         if self
             .god_object_analysis
             .as_ref()
-            .map_or(false, |a| a.is_god_object)
+            .is_some_and(|a| a.is_god_object)
         {
             // Analyze the file path to provide context-specific recommendations
             let file_name = self

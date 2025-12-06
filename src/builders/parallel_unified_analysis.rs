@@ -2,11 +2,10 @@ use crate::{
     analyzers::FileAnalyzer,
     core::FunctionMetrics,
     data_flow::DataFlowGraph,
-    organization::god_object::{DetectionType, GodObjectAnalysis, GodObjectConfidence},
     priority::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
-        file_metrics::{FileDebtItem, FileDebtMetrics},
+        file_metrics::FileDebtItem,
         UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     },
     progress::ProgressManager,

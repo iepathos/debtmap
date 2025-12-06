@@ -312,7 +312,7 @@ fn categorize_debt_item(item: &DebtItem) -> DebtCategory {
                 .metrics
                 .god_object_analysis
                 .as_ref()
-                .map_or(false, |a| a.is_god_object)
+                .is_some_and(|a| a.is_god_object)
             {
                 DebtCategory::Architecture
             } else if file.metrics.coverage_percent < 0.5 {
@@ -449,7 +449,7 @@ fn get_debt_type_key(item: &DebtItem) -> String {
                 .metrics
                 .god_object_analysis
                 .as_ref()
-                .map_or(false, |a| a.is_god_object)
+                .is_some_and(|a| a.is_god_object)
             {
                 "God Object File".to_string()
             } else if file.metrics.total_lines > 1000 {
@@ -474,7 +474,7 @@ fn is_critical_item(item: &DebtItem) -> bool {
             file.metrics
                 .god_object_analysis
                 .as_ref()
-                .map_or(false, |a| a.is_god_object)
+                .is_some_and(|a| a.is_god_object)
                 || file.metrics.total_lines > 2000
                 || file.score >= 95.0
         }
@@ -520,7 +520,7 @@ fn identify_cross_category_dependencies(
                     .metrics
                     .god_object_analysis
                     .as_ref()
-                    .map_or(false, |a| a.is_god_object),
+                    .is_some_and(|a| a.is_god_object),
             });
 
             if has_god_objects {

@@ -187,7 +187,7 @@ pub(crate) fn format_file_debt_item(output: &mut String, item: &FileDebtItem, ve
         .metrics
         .god_object_analysis
         .as_ref()
-        .map_or(false, |a| a.is_god_object);
+        .is_some_and(|a| a.is_god_object);
 
     if is_god_object {
         let god_analysis = item.metrics.god_object_analysis.as_ref().unwrap();

@@ -1509,49 +1509,6 @@ fn calculate_function_scores(
     Vec::new()
 }
 
-/// Convert file_metrics::SplitAnalysisMethod to organization::SplitAnalysisMethod
-fn convert_to_org_split_method(
-    method: crate::priority::file_metrics::SplitAnalysisMethod,
-) -> crate::organization::SplitAnalysisMethod {
-    match method {
-        crate::priority::file_metrics::SplitAnalysisMethod::None => {
-            crate::organization::SplitAnalysisMethod::None
-        }
-        crate::priority::file_metrics::SplitAnalysisMethod::CrossDomain => {
-            crate::organization::SplitAnalysisMethod::CrossDomain
-        }
-        crate::priority::file_metrics::SplitAnalysisMethod::MethodBased => {
-            crate::organization::SplitAnalysisMethod::MethodBased
-        }
-        crate::priority::file_metrics::SplitAnalysisMethod::Hybrid => {
-            crate::organization::SplitAnalysisMethod::Hybrid
-        }
-        crate::priority::file_metrics::SplitAnalysisMethod::TypeBased => {
-            crate::organization::SplitAnalysisMethod::TypeBased
-        }
-    }
-}
-
-/// Convert file_metrics::RecommendationSeverity to organization::RecommendationSeverity
-fn convert_to_org_severity(
-    severity: crate::priority::file_metrics::RecommendationSeverity,
-) -> crate::organization::RecommendationSeverity {
-    match severity {
-        crate::priority::file_metrics::RecommendationSeverity::Critical => {
-            crate::organization::RecommendationSeverity::Critical
-        }
-        crate::priority::file_metrics::RecommendationSeverity::High => {
-            crate::organization::RecommendationSeverity::High
-        }
-        crate::priority::file_metrics::RecommendationSeverity::Medium => {
-            crate::organization::RecommendationSeverity::Medium
-        }
-        crate::priority::file_metrics::RecommendationSeverity::Low => {
-            crate::organization::RecommendationSeverity::Low
-        }
-    }
-}
-
 // Pure function to create god object analysis
 fn create_god_object_analysis(
     file_metrics: &FileDebtMetrics,

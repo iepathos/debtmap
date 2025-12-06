@@ -49,7 +49,7 @@ pub(crate) fn format_file_priority_item_markdown(
         .metrics
         .god_object_analysis
         .as_ref()
-        .map_or(false, |a| a.is_god_object);
+        .is_some_and(|a| a.is_god_object);
 
     let type_label = if is_god_object {
         "FILE - GOD OBJECT"

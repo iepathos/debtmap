@@ -6,49 +6,6 @@ use crate::risk::lcov::LcovData;
 use anyhow::Result;
 use std::path::Path;
 
-/// Convert between god_object_analysis and file_metrics SplitAnalysisMethod enums
-fn convert_split_analysis_method(
-    method: crate::organization::SplitAnalysisMethod,
-) -> crate::priority::file_metrics::SplitAnalysisMethod {
-    match method {
-        crate::organization::SplitAnalysisMethod::None => {
-            crate::priority::file_metrics::SplitAnalysisMethod::None
-        }
-        crate::organization::SplitAnalysisMethod::CrossDomain => {
-            crate::priority::file_metrics::SplitAnalysisMethod::CrossDomain
-        }
-        crate::organization::SplitAnalysisMethod::MethodBased => {
-            crate::priority::file_metrics::SplitAnalysisMethod::MethodBased
-        }
-        crate::organization::SplitAnalysisMethod::Hybrid => {
-            crate::priority::file_metrics::SplitAnalysisMethod::Hybrid
-        }
-        crate::organization::SplitAnalysisMethod::TypeBased => {
-            crate::priority::file_metrics::SplitAnalysisMethod::TypeBased
-        }
-    }
-}
-
-/// Convert between god_object_analysis and file_metrics RecommendationSeverity enums
-fn convert_recommendation_severity(
-    severity: crate::organization::RecommendationSeverity,
-) -> crate::priority::file_metrics::RecommendationSeverity {
-    match severity {
-        crate::organization::RecommendationSeverity::Critical => {
-            crate::priority::file_metrics::RecommendationSeverity::Critical
-        }
-        crate::organization::RecommendationSeverity::High => {
-            crate::priority::file_metrics::RecommendationSeverity::High
-        }
-        crate::organization::RecommendationSeverity::Medium => {
-            crate::priority::file_metrics::RecommendationSeverity::Medium
-        }
-        crate::organization::RecommendationSeverity::Low => {
-            crate::priority::file_metrics::RecommendationSeverity::Low
-        }
-    }
-}
-
 /// Helper struct for complexity calculation results
 struct ComplexityMetrics {
     total_complexity: u32,
