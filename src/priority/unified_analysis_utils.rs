@@ -6,6 +6,24 @@
 use super::{DebtType, FileDebtItem, UnifiedAnalysis, UnifiedDebtItem};
 use crate::data_flow::{DataFlowGraph, IoOperation, PurityInfo};
 use crate::priority::call_graph::FunctionId;
+use std::cmp::Ordering;
+
+// Pure comparison functions for zero-copy sorting (spec 204)
+
+/// Compare debt items by score (pure function).
+/// Returns descending order (highest scores first).
+fn compare_debt_items_by_score(a: &UnifiedDebtItem, b: &UnifiedDebtItem) -> Ordering {
+    b.unified_score
+        .final_score
+        .partial_cmp(&a.unified_score.final_score)
+        .unwrap_or(Ordering::Equal)
+}
+
+/// Compare file items by score (pure function).
+/// Returns descending order (highest scores first).
+fn compare_file_items_by_score(a: &FileDebtItem, b: &FileDebtItem) -> Ordering {
+    b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal)
+}
 
 /// Extension trait providing utility operations for UnifiedAnalysis
 pub trait UnifiedAnalysisUtils {
@@ -128,24 +146,11 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     }
 
     fn sort_by_priority(&mut self) {
-        // Sort function items by score (highest first)
-        let mut items_vec: Vec<UnifiedDebtItem> = self.items.iter().cloned().collect();
-        items_vec.sort_by(|a, b| {
-            b.unified_score
-                .final_score
-                .partial_cmp(&a.unified_score.final_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        self.items = items_vec.into_iter().collect();
+        // Sort function items by score (highest first) - zero-copy with im::Vector (spec 204)
+        self.items.sort_by(compare_debt_items_by_score);
 
-        // Sort file items by score (highest first)
-        let mut file_items_vec: Vec<FileDebtItem> = self.file_items.iter().cloned().collect();
-        file_items_vec.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        self.file_items = file_items_vec.into_iter().collect();
+        // Sort file items by score (highest first) - zero-copy with im::Vector (spec 204)
+        self.file_items.sort_by(compare_file_items_by_score);
     }
 
     fn data_flow_graph(&self) -> &DataFlowGraph {

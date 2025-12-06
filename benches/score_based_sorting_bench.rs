@@ -89,6 +89,7 @@ fn create_test_item(
         file_context: None,
         detected_pattern: None, // spec 204
         contextual_risk: None,
+        file_line_count: None,
     }
 }
 

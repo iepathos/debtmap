@@ -148,6 +148,7 @@ mod tests {
             language_specific: None, // spec 190
             detected_pattern: None,
             contextual_risk: None, // spec 203
+            file_line_count: None,
         }
     }
 

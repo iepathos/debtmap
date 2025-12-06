@@ -558,8 +558,8 @@ impl UnifiedAnalysis {
         let mut _functions_to_test = 0;
         let mut total_debt_score = 0.0;
 
-        // Track unique files to avoid double-counting LOC
-        // Use a HashMap to store file path -> total lines
+        // Track unique files to avoid double-counting LOC (spec 204 optimization)
+        // Use cached line counts from items instead of file I/O
         let mut unique_files: std::collections::HashMap<std::path::PathBuf, usize> =
             std::collections::HashMap::new();
 
@@ -567,9 +567,12 @@ impl UnifiedAnalysis {
             // Sum up all final scores as the total debt score
             total_debt_score += item.unified_score.final_score;
 
-            // Track unique file and its line count (will be deduplicated)
-            // We'll use the actual file line count later, not function_length
-            unique_files.entry(item.location.file.clone()).or_insert(0);
+            // Use cached file line count from item if available (spec 204)
+            if let Some(line_count) = item.file_line_count {
+                unique_files
+                    .entry(item.location.file.clone())
+                    .or_insert(line_count);
+            }
 
             // Only count functions that actually need testing
             if item.expected_impact.coverage_improvement > 0.0 {
@@ -603,21 +606,7 @@ impl UnifiedAnalysis {
             }
         }
 
-        // Calculate total LOC by reading actual file contents for any files
-        // that weren't in file_items (i.e., only appeared in function items)
-        use crate::metrics::LocCounter;
-        let loc_counter = LocCounter::default();
-
-        for (file_path, stored_lines) in unique_files.iter_mut() {
-            // If we don't have a line count yet (value is 0), read the file
-            if *stored_lines == 0 {
-                if let Ok(count) = loc_counter.count_file(file_path) {
-                    *stored_lines = count.physical_lines;
-                }
-            }
-        }
-
-        // Sum up unique file line counts
+        // Sum up unique file line counts (no file I/O needed - spec 204)
         let total_lines_of_code: usize = unique_files.values().sum();
 
         // Coverage improvement is the estimated overall project coverage gain
@@ -1034,6 +1023,7 @@ mod tests {
             language_specific: None, // spec 190
             detected_pattern: None,
             contextual_risk: None, // spec 203
+            file_line_count: None,
         }
     }
 
