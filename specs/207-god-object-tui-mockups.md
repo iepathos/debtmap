@@ -85,6 +85,12 @@ When selecting a god object in the list, the detail view shows file-level metric
 │   2. Input/parsing module (18 functions)                                 │
 │   3. Output formatting module (15 functions)                             │
 │                                                                          │
+│ EXPECTED IMPACT                                                          │
+│   Complexity Reduction: -66 points (200 → 134 across 3 modules, 33%)    │
+│   Maintainability: +248.4 points improvement                            │
+│   Risk Reduction: -87.3 points (reduced coupling)                       │
+│   Effort: HIGH (1616 LOC, 91 functions)                                 │
+│                                                                          │
 │ RECOMMENDATION                                                           │
 │   Action: URGENT: Split file by data flow boundaries                    │
 │                                                                          │
@@ -350,68 +356,70 @@ Shows detected patterns and responsibility breakdown:
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Detail View - Impact & Recommendations (Page 5/5)
+## Detail View - Data Flow (Page 5/5)
 
-**Note:** For god objects, page 5 shows impact analysis instead of data flow (which only applies to functions).
+**Note:** For god objects, page 5 shows **aggregated data flow** across all functions in the file.
 
-Shows expected impact of fixing the god object:
+Shows accumulated data flow patterns across all 91 functions:
 
 ```
-┌─ Item Details (5/5: Impact & Recommendations) ──────────────────────────┐
+┌─ Item Details (5/5: Data Flow Analysis) ────────────────────────────────┐
 │                                                                          │
-│ EXPECTED IMPACT                                                          │
-│   Complexity Reduction: -66 (200 → 134 across 3 modules)                │
-│   Maintainability Improvement: +248.4 points                            │
-│   Risk Reduction: -87.3 points (high coupling → loose coupling)         │
-│   Effort Estimate: HIGH (1616 LOC, 91 functions to refactor)            │
+│ AGGREGATED MUTATION ANALYSIS (91 functions)                             │
+│   Total Mutations: 847                                                   │
+│   Live Mutations: 623 (73.5%)                                            │
+│   Dead Stores: 224 (26.5%)                                               │
+│   Functions with Mutations: 68 of 91 (75%)                              │
 │                                                                          │
-│ COMPLEXITY BREAKDOWN                                                     │
-│   Current Total Complexity: 200                                          │
-│   After Split (estimated):                                               │
-│     Module 1 (input_handler): 73 complexity (36 funcs, avg: 2.0)        │
-│     Module 2 (core_processor): 36 complexity (26 funcs, avg: 1.4)       │
-│     Module 3 (output_writer): 25 complexity (20 funcs, avg: 1.3)        │
-│   Total Reduction: 66 points (33%)                                       │
+│ PURITY ANALYSIS                                                          │
+│   Pure Functions: 23 (25%)                                               │
+│   Impure Functions: 68 (75%)                                             │
+│   Purity Score: 0.25 (LOW - high mutation rate)                         │
 │                                                                          │
-│ MAINTAINABILITY FACTORS                                                  │
-│   Current State:                                                         │
-│     - 8 responsibilities in single file                                  │
-│     - 49 methods sharing 87 fields (high state coupling)                │
-│     - Average function sees 65% of all fields (tight coupling)          │
-│     - 23 module imports (high dependency fanout)                        │
+│   Top 5 Most Impure Functions:                                           │
+│     1. process_request (127 mutations) - line 342                        │
+│     2. update_state (89 mutations) - line 567                            │
+│     3. handle_error (72 mutations) - line 1203                           │
+│     4. transform_data (58 mutations) - line 892                          │
+│     5. validate_input (43 mutations) - line 156                          │
 │                                                                          │
-│   After Split:                                                           │
-│     - 3 focused modules with 2-3 responsibilities each                  │
-│     - Reduced method-to-field ratios (better encapsulation)             │
-│     - Clear module boundaries and interfaces                            │
-│     - Each module imports ~8 dependencies (reduced coupling)            │
+│ I/O OPERATIONS                                                           │
+│   Functions with I/O: 34 of 91 (37%)                                    │
+│   Total I/O Operations: 156                                              │
 │                                                                          │
-│ RISK REDUCTION                                                           │
-│   Current Risks:                                                         │
-│     - Changes impact multiple unrelated features                        │
-│     - Testing requires understanding entire file (1616 lines)           │
-│     - Merge conflicts highly likely (12 changes/month)                  │
-│     - Bug fix in one area can break unrelated features                  │
+│   I/O Categories:                                                        │
+│     File I/O: 67 operations (43%)                                        │
+│     Network I/O: 28 operations (18%)                                     │
+│     Console/Logging: 45 operations (29%)                                 │
+│     Database: 16 operations (10%)                                        │
 │                                                                          │
-│   After Split:                                                           │
-│     - Changes isolated to specific modules                              │
-│     - Testing focused on single responsibility                          │
-│     - Reduced merge conflict probability (~60% reduction)               │
-│     - Clearer boundaries prevent cascading failures                     │
+│   Most I/O-Heavy Functions:                                              │
+│     1. write_output (23 file ops) - line 1405                            │
+│     2. read_config (18 file ops) - line 89                               │
+│     3. send_telemetry (15 network ops) - line 1534                       │
 │                                                                          │
-│ IMPLEMENTATION STRATEGY                                                  │
-│   1. Create three new module files                                       │
-│   2. Move functions by responsibility grouping                           │
-│   3. Extract shared data structures to common types module              │
-│   4. Define clear interfaces between modules                            │
-│   5. Update tests to match new module structure                         │
-│   6. Gradual migration (can be done incrementally)                      │
+│ FUNCTIONAL PURITY BY RESPONSIBILITY                                      │
+│   Input/Argument Parsing: 13% pure (3/23)                               │
+│   Data Processing: 67% pure (12/18)                                      │
+│   Output Formatting: 7% pure (1/15)                                      │
+│   Error Handling: 8% pure (1/12)                                         │
+│   File I/O Operations: 0% pure (0/10)                                    │
+│   Analysis Coordination: 25% pure (2/8)                                  │
+│   Caching/Memoization: 33% pure (1/3)                                    │
+│   Logging/Telemetry: 0% pure (0/2)                                       │
 │                                                                          │
-│ ESTIMATED TIMELINE                                                       │
-│   Phase 1 - Module Structure: 2-3 days                                   │
-│   Phase 2 - Function Migration: 3-5 days                                │
-│   Phase 3 - Testing & Integration: 2-3 days                             │
-│   Total: 7-11 days of focused work                                       │
+│ SPLITTING RECOMMENDATIONS BASED ON DATA FLOW                             │
+│   Module 1 (Data Processing): 67% pure - Good candidate for pure module │
+│   Module 2 (I/O Operations): 0% pure - Isolate impure operations        │
+│   Module 3 (Coordination): 25% pure - Mixed, needs careful separation   │
+│                                                                          │
+│ ESCAPE ANALYSIS                                                          │
+│   Functions returning mutable references: 23 (25%)                      │
+│   Functions with escaped allocations: 41 (45%)                          │
+│   Potential memory leaks detected: 3                                     │
+│                                                                          │
+│ NOTE: High mutation rate and low purity score suggest splitting along   │
+│       pure/impure boundaries will improve testability and maintainability│
 │                                                                          │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Press ◀▶/hl:Pages  ↑↓/jk:Scroll  ←/q:Back  ?:Help                       │
@@ -543,23 +551,30 @@ The TUI detail view has 5 pages that adapt for god objects:
 
 | Page | Title | What It Shows for God Objects | Regular Function Shows |
 |------|-------|-------------------------------|----------------------|
-| **1/5** | Overview | Score, GOD OBJECT METRICS (methods, fields, responsibilities), FILE METRICS, recommended splits, recommendation | Score, complexity metrics, coverage, recommendation |
+| **1/5** | Overview | Score, GOD OBJECT METRICS (methods, fields, responsibilities), FILE METRICS, recommended splits, **expected impact**, recommendation | Score, complexity metrics, coverage, recommendation |
 | **2/5** | Dependencies | FILE DEPENDENCIES (imports/exports), blast radius, coupling analysis | Function callers/callees, call graph depth |
 | **3/5** | Git Context | File-level git history, change frequency, contributors, hotspot analysis | Same (file-level for both) |
 | **4/5** | Patterns | DETECTED ANTI-PATTERNS, RESPONSIBILITY BREAKDOWN, suggested organization | Entropy analysis, purity, framework patterns |
-| **5/5** | Impact & Recommendations | Expected impact of splitting, complexity breakdown, implementation strategy, timeline | Data flow analysis, mutations, I/O operations |
+| **5/5** | Data Flow Analysis | **Aggregated data flow** across all functions: total mutations, purity analysis by responsibility, I/O operations breakdown, escape analysis | Single function data flow: mutations, I/O operations, escape analysis |
 
 ### Key Differences
 
 **God Objects (File-Level Items):**
 - Page 2: Shows file-level dependencies (which files import this file)
 - Page 4: Shows responsibility breakdown and organizational patterns
-- Page 5: Shows **impact analysis** instead of data flow
+- Page 5: Shows **aggregated data flow** across all 91 functions in the file
+  - Total mutations, purity percentages
+  - Top 5 most impure functions
+  - Purity breakdown by responsibility
+  - Helps guide splitting decisions (pure vs impure boundaries)
 
 **Regular Functions:**
-- Page 2: Shows function-level call graph
+- Page 2: Shows function-level call graph (callers/callees)
 - Page 4: Shows code patterns like entropy and purity
-- Page 5: Shows **data flow analysis** (mutations, I/O)
+- Page 5: Shows **single function data flow**
+  - Mutations within that function
+  - I/O operations in that function
+  - Parameter flow and escape analysis
 
 **Same for Both:**
 - Page 1: Core metrics and recommendations (adapted to context)
