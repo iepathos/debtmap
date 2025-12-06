@@ -88,11 +88,13 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         KeyCode::Char('e') => {
             if let Some(item) = app.selected_item() {
                 super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;
+                app.request_redraw(); // Force redraw after editor suspends/resumes TUI
             }
         }
         KeyCode::Char('o') => {
             if let Some(item) = app.selected_item() {
                 super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;
+                app.request_redraw(); // Force redraw after editor suspends/resumes TUI
             }
         }
 
@@ -127,6 +129,7 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         KeyCode::Char('e') | KeyCode::Char('o') => {
             if let Some(item) = app.selected_item() {
                 super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;
+                app.request_redraw(); // Force redraw after editor suspends/resumes TUI
             }
         }
 

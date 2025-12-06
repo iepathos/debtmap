@@ -60,6 +60,11 @@ impl ResultsExplorer {
     /// Run the interactive TUI event loop
     pub fn run(&mut self) -> Result<()> {
         loop {
+            // Check if we need to force a full redraw (e.g., after external editor)
+            if self.app.take_needs_redraw() {
+                self.terminal.clear()?;
+            }
+
             // Render current state
             self.terminal.draw(|f| self.app.render(f))?;
 

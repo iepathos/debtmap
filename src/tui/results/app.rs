@@ -52,6 +52,8 @@ pub struct ResultsApp {
     sort_by: SortCriteria,
     /// Terminal size
     terminal_size: (u16, u16),
+    /// Force full redraw on next render (set after external editor)
+    needs_redraw: bool,
 }
 
 impl ResultsApp {
@@ -70,6 +72,7 @@ impl ResultsApp {
             filters: Vec::new(),
             sort_by: SortCriteria::Score,
             terminal_size: (80, 24),
+            needs_redraw: false,
         }
     }
 
@@ -246,5 +249,17 @@ impl ResultsApp {
     /// Get terminal size
     pub fn terminal_size(&self) -> (u16, u16) {
         self.terminal_size
+    }
+
+    /// Request a full redraw on next render (used after external editor)
+    pub fn request_redraw(&mut self) {
+        self.needs_redraw = true;
+    }
+
+    /// Check if a full redraw is needed and clear the flag
+    pub fn take_needs_redraw(&mut self) -> bool {
+        let needs = self.needs_redraw;
+        self.needs_redraw = false;
+        needs
     }
 }
