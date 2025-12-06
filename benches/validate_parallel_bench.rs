@@ -113,7 +113,7 @@ fn bench_validate_parallel(c: &mut Criterion) {
                     let result = parallel_call_graph::build_call_graph_parallel(
                         black_box(project_path),
                         base_graph,
-                        None, // Use all cores
+                        None,   // Use all cores
                         |_| {}, // No-op progress callback for benchmark
                     );
 

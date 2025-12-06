@@ -115,8 +115,8 @@ fn test_cross_file_call_resolution_detects_callers() {
     let result = call_graph::process_rust_files_for_call_graph(
         project_path,
         &mut call_graph,
-        false, // verbose_macro_warnings
-        false, // show_macro_stats
+        false,  // verbose_macro_warnings
+        false,  // show_macro_stats
         |_| {}, // No-op progress callback
     );
 
