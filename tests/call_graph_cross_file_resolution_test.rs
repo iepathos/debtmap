@@ -115,8 +115,9 @@ fn test_cross_file_call_resolution_detects_callers() {
     let result = call_graph::process_rust_files_for_call_graph(
         project_path,
         &mut call_graph,
-        false, // verbose_macro_warnings
-        false, // show_macro_stats
+        false,  // verbose_macro_warnings
+        false,  // show_macro_stats
+        |_| {}, // No-op progress callback
     );
 
     assert!(
@@ -164,8 +165,13 @@ fn test_qualified_call_resolution() {
     // Build the call graph
     let mut call_graph = CallGraph::new();
 
-    let result =
-        call_graph::process_rust_files_for_call_graph(project_path, &mut call_graph, false, false);
+    let result = call_graph::process_rust_files_for_call_graph(
+        project_path,
+        &mut call_graph,
+        false,
+        false,
+        |_| {}, // No-op progress callback
+    );
 
     assert!(result.is_ok());
 
@@ -243,6 +249,7 @@ pub mod module_b;
         &mut call_graph,
         false,
         false,
+        |_| {}, // No-op progress callback
     );
 
     assert!(result.is_ok());
@@ -328,6 +335,7 @@ pub mod commands;
         &mut call_graph,
         false,
         false,
+        |_| {}, // No-op progress callback
     );
 
     assert!(result.is_ok());

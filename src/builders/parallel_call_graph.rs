@@ -15,6 +15,23 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Call graph construction phases for progress tracking
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallGraphPhase {
+    DiscoveringFiles,
+    ParsingASTs,
+    ExtractingCalls,
+    LinkingModules,
+}
+
+/// Progress information for call graph construction
+#[derive(Debug, Clone)]
+pub struct CallGraphProgress {
+    pub phase: CallGraphPhase,
+    pub current: usize,
+    pub total: usize,
+}
+
 /// Parallel call graph builder for Rust projects
 pub struct ParallelCallGraphBuilder {
     config: ParallelConfig,
@@ -38,11 +55,15 @@ impl ParallelCallGraphBuilder {
     }
 
     /// Build call graph with parallel processing
-    pub fn build_parallel(
+    pub fn build_parallel<F>(
         &self,
         project_path: &Path,
         base_graph: CallGraph,
-    ) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)> {
+        mut progress_callback: F,
+    ) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)>
+    where
+        F: FnMut(CallGraphProgress) + Send + Sync,
+    {
         // Configure Rayon thread pool if specified
         if self.config.num_threads > 0 {
             rayon::ThreadPoolBuilder::new()
@@ -50,6 +71,13 @@ impl ParallelCallGraphBuilder {
                 .build_global()
                 .ok(); // Ignore if already configured
         }
+
+        // Phase 1: Discover files
+        progress_callback(CallGraphProgress {
+            phase: CallGraphPhase::DiscoveringFiles,
+            current: 0,
+            total: 0,
+        });
 
         // Find all Rust files
         let config = config::get_config();
@@ -66,13 +94,44 @@ impl ParallelCallGraphBuilder {
         // Initialize with base graph
         parallel_graph.merge_concurrent(base_graph);
 
-        // Phase 1: Parallel file parsing and initial extraction
-        let parsed_files = self.parallel_parse_files(&rust_files, &parallel_graph)?;
+        // Add minimum visibility pause
+        std::thread::sleep(std::time::Duration::from_millis(150));
 
-        // Phase 2: Parallel multi-file call graph extraction
+        // Phase 2: Parse ASTs
+        progress_callback(CallGraphProgress {
+            phase: CallGraphPhase::ParsingASTs,
+            current: 0,
+            total: total_files,
+        });
+
+        let parsed_files = self.parallel_parse_files_with_progress(
+            &rust_files,
+            &parallel_graph,
+            &mut progress_callback,
+        )?;
+
+        // Add minimum visibility pause
+        std::thread::sleep(std::time::Duration::from_millis(150));
+
+        // Phase 3: Extract calls
+        progress_callback(CallGraphProgress {
+            phase: CallGraphPhase::ExtractingCalls,
+            current: 0,
+            total: total_files,
+        });
+
         self.parallel_multi_file_extraction(&parsed_files, &parallel_graph)?;
 
-        // Phase 3: Parallel enhanced analysis
+        // Add minimum visibility pause
+        std::thread::sleep(std::time::Duration::from_millis(150));
+
+        // Phase 4: Link modules
+        progress_callback(CallGraphProgress {
+            phase: CallGraphPhase::LinkingModules,
+            current: 0,
+            total: 0,
+        });
+
         let (framework_exclusions, function_pointer_used) =
             self.parallel_enhanced_analysis(&parsed_files, &parallel_graph)?;
 
@@ -94,23 +153,17 @@ impl ParallelCallGraphBuilder {
         Ok((final_graph, framework_exclusions, function_pointer_used))
     }
 
-    /// Phase 1: Read and parse files, returning parsed ASTs
-    ///
-    /// This function reads files in parallel and parses them to syn::File objects.
-    /// Each file is parsed exactly once, eliminating redundant parsing
-    /// across multiple phases.
-    ///
-    /// # Performance
-    ///
-    /// Files are read in parallel, then parsed. The parsed ASTs are stored
-    /// in memory and reused in subsequent phases without re-parsing.
-    fn parallel_parse_files(
+    /// Phase 1: Read and parse files with progress tracking
+    fn parallel_parse_files_with_progress<F>(
         &self,
         rust_files: &[PathBuf],
         parallel_graph: &Arc<ParallelCallGraph>,
-    ) -> Result<Vec<(PathBuf, syn::File)>> {
-        // Suppress old progress bars when unified progress system is active
-        // The unified system already shows "3/4 Building call graph"
+        progress_callback: &mut F,
+    ) -> Result<Vec<(PathBuf, syn::File)>>
+    where
+        F: FnMut(CallGraphProgress) + Send + Sync,
+    {
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
         // Step 1: Read file contents in parallel (I/O bound)
         let file_contents: Vec<_> = rust_files
@@ -121,14 +174,27 @@ impl ParallelCallGraphBuilder {
             })
             .collect();
 
-        // Step 2: Parse files to AST (cannot be parallelized due to syn::File not being Send)
+        // Step 2: Parse files to AST with progress tracking
         let total_files = file_contents.len();
+        let parsed_count = Arc::new(AtomicUsize::new(0));
+
         let parsed_files: Vec<_> = file_contents
             .iter()
             .enumerate()
             .filter_map(|(idx, (file_path, content))| {
                 let parsed = syn::parse_file(content).ok()?;
                 parallel_graph.stats().increment_files();
+
+                let count = parsed_count.fetch_add(1, Ordering::Relaxed) + 1;
+
+                // Throttled progress updates (every 10 files or at completion)
+                if count % 10 == 0 || count == total_files {
+                    progress_callback(CallGraphProgress {
+                        phase: CallGraphPhase::ParsingASTs,
+                        current: count,
+                        total: total_files,
+                    });
+                }
 
                 // Update unified progress
                 crate::io::progress::AnalysisProgress::with_global(|p| {
@@ -234,11 +300,15 @@ impl ParallelCallGraphBuilder {
 }
 
 /// Parallel processing entry point for call graph construction
-pub fn build_call_graph_parallel(
+pub fn build_call_graph_parallel<F>(
     project_path: &Path,
     base_graph: CallGraph,
     num_threads: Option<usize>,
-) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)> {
+    progress_callback: F,
+) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)>
+where
+    F: FnMut(CallGraphProgress) + Send + Sync,
+{
     let mut config = ParallelConfig::default();
 
     if let Some(threads) = num_threads {
@@ -246,5 +316,5 @@ pub fn build_call_graph_parallel(
     }
 
     let builder = ParallelCallGraphBuilder::with_config(config);
-    builder.build_parallel(project_path, base_graph)
+    builder.build_parallel(project_path, base_graph, progress_callback)
 }

@@ -399,6 +399,8 @@ fn build_parallel_call_graph(
     call_graph: &mut CallGraph,
     jobs: usize,
 ) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    use crate::builders::parallel_call_graph::CallGraphPhase;
+
     let thread_count = if jobs == 0 { None } else { Some(jobs) };
     log_parallel_execution(jobs);
 
@@ -406,6 +408,80 @@ fn build_parallel_call_graph(
         project_path,
         call_graph.clone(),
         thread_count,
+        |progress| {
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                match progress.phase {
+                    CallGraphPhase::DiscoveringFiles => {
+                        manager.tui_update_subtask(
+                            2,
+                            0,
+                            crate::tui::app::StageStatus::Active,
+                            None,
+                        );
+                    }
+                    CallGraphPhase::ParsingASTs => {
+                        if progress.current == 0 {
+                            manager.tui_update_subtask(
+                                2,
+                                0,
+                                crate::tui::app::StageStatus::Completed,
+                                None,
+                            );
+                            manager.tui_update_subtask(
+                                2,
+                                1,
+                                crate::tui::app::StageStatus::Active,
+                                Some((0, progress.total)),
+                            );
+                        } else {
+                            manager.tui_update_subtask(
+                                2,
+                                1,
+                                crate::tui::app::StageStatus::Active,
+                                Some((progress.current, progress.total)),
+                            );
+                        }
+                    }
+                    CallGraphPhase::ExtractingCalls => {
+                        if progress.current == 0 {
+                            manager.tui_update_subtask(
+                                2,
+                                1,
+                                crate::tui::app::StageStatus::Completed,
+                                None,
+                            );
+                            manager.tui_update_subtask(
+                                2,
+                                2,
+                                crate::tui::app::StageStatus::Active,
+                                Some((0, progress.total)),
+                            );
+                        } else {
+                            manager.tui_update_subtask(
+                                2,
+                                2,
+                                crate::tui::app::StageStatus::Active,
+                                Some((progress.current, progress.total)),
+                            );
+                        }
+                    }
+                    CallGraphPhase::LinkingModules => {
+                        manager.tui_update_subtask(
+                            2,
+                            2,
+                            crate::tui::app::StageStatus::Completed,
+                            None,
+                        );
+                        manager.tui_update_subtask(
+                            2,
+                            3,
+                            crate::tui::app::StageStatus::Active,
+                            None,
+                        );
+                    }
+                }
+            }
+        },
     )?;
 
     *call_graph = parallel_graph;
@@ -420,11 +496,87 @@ fn build_sequential_call_graph(
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
 ) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    use crate::builders::parallel_call_graph::CallGraphPhase;
+
     let (exclusions, used_funcs) = call_graph::process_rust_files_for_call_graph(
         project_path,
         call_graph,
         verbose_macro_warnings,
         show_macro_stats,
+        |progress| {
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                match progress.phase {
+                    CallGraphPhase::DiscoveringFiles => {
+                        manager.tui_update_subtask(
+                            2,
+                            0,
+                            crate::tui::app::StageStatus::Active,
+                            None,
+                        );
+                    }
+                    CallGraphPhase::ParsingASTs => {
+                        if progress.current == 0 {
+                            manager.tui_update_subtask(
+                                2,
+                                0,
+                                crate::tui::app::StageStatus::Completed,
+                                None,
+                            );
+                            manager.tui_update_subtask(
+                                2,
+                                1,
+                                crate::tui::app::StageStatus::Active,
+                                Some((0, progress.total)),
+                            );
+                        } else {
+                            manager.tui_update_subtask(
+                                2,
+                                1,
+                                crate::tui::app::StageStatus::Active,
+                                Some((progress.current, progress.total)),
+                            );
+                        }
+                    }
+                    CallGraphPhase::ExtractingCalls => {
+                        if progress.current == 0 {
+                            manager.tui_update_subtask(
+                                2,
+                                1,
+                                crate::tui::app::StageStatus::Completed,
+                                None,
+                            );
+                            manager.tui_update_subtask(
+                                2,
+                                2,
+                                crate::tui::app::StageStatus::Active,
+                                Some((0, progress.total)),
+                            );
+                        } else {
+                            manager.tui_update_subtask(
+                                2,
+                                2,
+                                crate::tui::app::StageStatus::Active,
+                                Some((progress.current, progress.total)),
+                            );
+                        }
+                    }
+                    CallGraphPhase::LinkingModules => {
+                        manager.tui_update_subtask(
+                            2,
+                            2,
+                            crate::tui::app::StageStatus::Completed,
+                            None,
+                        );
+                        manager.tui_update_subtask(
+                            2,
+                            3,
+                            crate::tui::app::StageStatus::Active,
+                            None,
+                        );
+                    }
+                }
+            }
+        },
     )?;
 
     Ok((exclusions, used_funcs))

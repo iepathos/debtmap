@@ -82,6 +82,7 @@ fn bench_validate_sequential(c: &mut Criterion) {
                         &mut call_graph,
                         false,
                         false,
+                        |_| {}, // No-op progress callback for benchmark
                     );
 
                     black_box(result)
@@ -112,7 +113,8 @@ fn bench_validate_parallel(c: &mut Criterion) {
                     let result = parallel_call_graph::build_call_graph_parallel(
                         black_box(project_path),
                         base_graph,
-                        None, // Use all cores
+                        None,   // Use all cores
+                        |_| {}, // No-op progress callback for benchmark
                     );
 
                     black_box(result)
@@ -139,6 +141,7 @@ fn bench_validate_thread_scaling(c: &mut Criterion) {
                 &mut call_graph,
                 false,
                 false,
+                |_| {}, // No-op progress callback for benchmark
             );
             black_box(result)
         });
@@ -168,6 +171,7 @@ fn bench_validate_thread_scaling(c: &mut Criterion) {
                         black_box(temp_dir.path()),
                         base_graph,
                         thread_count,
+                        |_| {}, // No-op progress callback for benchmark
                     );
                     black_box(result)
                 });
@@ -195,6 +199,7 @@ fn bench_validate_performance_target(c: &mut Criterion) {
                 &mut call_graph,
                 false,
                 false,
+                |_| {}, // No-op progress callback for benchmark
             );
             black_box(result)
         });
@@ -208,6 +213,7 @@ fn bench_validate_performance_target(c: &mut Criterion) {
                 black_box(temp_dir.path()),
                 base_graph,
                 None,
+                |_| {}, // No-op progress callback for benchmark
             );
             black_box(result)
         });
