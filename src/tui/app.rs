@@ -133,7 +133,31 @@ impl App {
     /// Create the default 8-stage pipeline structure
     fn create_default_stages() -> Vec<PipelineStage> {
         vec![
-            PipelineStage::new("files parse"),
+            PipelineStage::with_subtasks(
+                "files parse",
+                vec![
+                    SubTask {
+                        name: "discover files".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "parse metrics".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "extract data".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "detect duplications".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                ],
+            ),
             PipelineStage::with_subtasks(
                 "call graph",
                 vec![

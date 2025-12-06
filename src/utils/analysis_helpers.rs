@@ -43,13 +43,59 @@ pub fn analyze_project(
     })
 }
 
-pub fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<DuplicationBlock> {
-    let files_with_content = prepare_files_for_duplication_check(files);
+/// Detect duplications with progress callback for TUI updates
+pub fn detect_duplications_with_progress<F>(
+    files: &[PathBuf],
+    threshold: usize,
+    mut progress_callback: F,
+) -> Vec<DuplicationBlock>
+where
+    F: FnMut(usize, usize),
+{
+    let total_files = files.len();
+    let mut last_update = std::time::Instant::now();
+
+    // Prepare files with progress tracking
+    let files_with_content: Vec<(PathBuf, String)> = files
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, path)| {
+            let result = match io::read_file(path) {
+                Ok(content) => Some((path.clone(), content)),
+                Err(e) => {
+                    log::debug!(
+                        "Skipping file {} for duplication check: {}",
+                        path.display(),
+                        e
+                    );
+                    None
+                }
+            };
+
+            // Throttled progress updates (every 10 files or 100ms)
+            if (idx + 1) % 10 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100)
+            {
+                progress_callback(idx + 1, total_files);
+                last_update = std::time::Instant::now();
+            }
+
+            result
+        })
+        .collect();
+
+    // Final progress update
+    progress_callback(total_files, total_files);
+
     debt::duplication::detect_duplication(
         files_with_content,
         threshold,
         DEFAULT_SIMILARITY_THRESHOLD,
     )
+}
+
+/// Detect duplications without progress tracking (compatibility wrapper)
+pub fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<DuplicationBlock> {
+    detect_duplications_with_progress(files, threshold, |_, _| {})
 }
 
 pub fn prepare_files_for_duplication_check(files: &[PathBuf]) -> Vec<(PathBuf, String)> {
