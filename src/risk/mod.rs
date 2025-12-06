@@ -8,6 +8,7 @@ pub mod evidence;
 pub mod evidence_calculator;
 pub mod insights;
 pub mod lcov;
+pub mod path_normalization;
 pub mod priority;
 pub mod roi;
 pub mod strategy;

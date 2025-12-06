@@ -1062,8 +1062,10 @@ fn test_calculate_unified_priority_with_data_flow_disabled() {
     let func = create_test_metrics();
     let call_graph = CallGraph::new();
     let data_flow = DataFlowGraph::from_call_graph(call_graph.clone());
-    let mut config = DataFlowScoringConfig::default();
-    config.enabled = false;
+    let config = DataFlowScoringConfig {
+        enabled: false,
+        ..Default::default()
+    };
 
     let score = calculate_unified_priority_with_data_flow(
         &func,

@@ -1,9 +1,20 @@
 use super::lcov::{normalize_demangled_name, strip_trailing_generics, FunctionCoverage, LcovData};
+use super::path_normalization::normalize_path_components;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 /// Normalize a path by removing leading ./
+///
+/// # Deprecated
+///
+/// This function is deprecated in favor of `normalize_path_components()` which
+/// provides better cross-platform support. It is kept for backward compatibility
+/// and will be removed in a future version.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use normalize_path_components() for better cross-platform support"
+)]
 pub fn normalize_path(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
     let cleaned = path_str.strip_prefix("./").unwrap_or(&path_str);
@@ -367,110 +378,127 @@ impl CoverageIndex {
     /// 375 iterations vs 1,500, a 4x speedup.
     ///
     /// Matching strategies in order:
-    /// 1. Exact name match (query path matches file path)
-    /// 2. Method name match (for Rust methods, match just the final segment)
-    /// 3. Suffix/path matching strategies
+    /// 1. Component-based suffix matching (robust cross-platform)
+    /// 2. Legacy path suffix matching (backward compatibility)
+    /// 3. Component-based exact match
     fn find_by_path_strategies(
         &self,
         query_path: &Path,
         function_name: &str,
     ) -> Option<&FunctionCoverage> {
-        let normalized_query = normalize_path(query_path);
+        let query_components = normalize_path_components(query_path);
 
-        log::debug!("Strategy 1: Suffix matching (query.ends_with(lcov_file))");
-        // Strategy 1: Suffix matching - iterate over FILES not functions
+        log::debug!("Strategy 1: Component-based suffix matching");
+        // Strategy 1: Component-based suffix matching - cross-platform robust
         for file_path in &self.file_paths {
-            if query_path.ends_with(file_path) {
-                log::debug!("  Found path match: '{}'", file_path.display());
-                // O(1) lookup once we find the file
-                if let Some(file_functions) = self.by_file.get(file_path) {
-                    // Try exact match first
-                    if let Some(coverage) = file_functions.get(function_name) {
-                        log::debug!(
-                            "  ✓ Matched function name exactly: {}%",
-                            coverage.coverage_percentage
-                        );
-                        return Some(coverage);
-                    }
-                    // Try function name suffix match (for querying with short form)
-                    // Allows querying "ResumeExecutor::method" to match stored "prodigy::cook::resume::ResumeExecutor::method"
-                    for func in file_functions.values() {
-                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name)
-                        {
+            let file_components = normalize_path_components(file_path);
+
+            // Check if query components are a suffix of file components
+            if !query_components.is_empty() && query_components.len() <= file_components.len() {
+                let file_suffix =
+                    &file_components[file_components.len() - query_components.len()..];
+                if query_components == file_suffix {
+                    log::debug!("  Found path match: '{}'", file_path.display());
+                    // O(1) lookup once we find the file
+                    if let Some(file_functions) = self.by_file.get(file_path) {
+                        // Try exact match first
+                        if let Some(coverage) = file_functions.get(function_name) {
                             log::debug!(
-                                "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
-                                function_name,
-                                func.name,
-                                func.coverage_percentage
+                                "  ✓ Matched function name exactly: {}%",
+                                coverage.coverage_percentage
                             );
-                            return Some(func);
+                            return Some(coverage);
                         }
-                    }
-                    // Try method name match (for Rust methods)
-                    for func in file_functions.values() {
-                        if func.normalized.method_name == function_name {
-                            log::debug!(
-                                "  ✓ Matched method name '{}' -> '{}': {}%",
-                                func.name,
-                                func.normalized.method_name,
-                                func.coverage_percentage
-                            );
-                            return Some(func);
+                        // Try function name suffix match (for querying with short form)
+                        // Allows querying "ResumeExecutor::method" to match stored "prodigy::cook::resume::ResumeExecutor::method"
+                        for func in file_functions.values() {
+                            if func.name.ends_with(function_name)
+                                || function_name.ends_with(&func.name)
+                            {
+                                log::debug!(
+                                    "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
+                                    function_name,
+                                    func.name,
+                                    func.coverage_percentage
+                                );
+                                return Some(func);
+                            }
                         }
+                        // Try method name match (for Rust methods)
+                        for func in file_functions.values() {
+                            if func.normalized.method_name == function_name {
+                                log::debug!(
+                                    "  ✓ Matched method name '{}' -> '{}': {}%",
+                                    func.name,
+                                    func.normalized.method_name,
+                                    func.coverage_percentage
+                                );
+                                return Some(func);
+                            }
+                        }
+                        log::debug!("  ✗ No function match in this file");
                     }
-                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
-        log::debug!("Strategy 2: Reverse suffix matching (lcov_file.ends_with(query))");
-        // Strategy 2: Reverse suffix matching - iterate over FILES
+        log::debug!("Strategy 2: Component-based reverse suffix matching");
+        // Strategy 2: Reverse suffix matching - file is suffix of query
         for file_path in &self.file_paths {
-            if file_path.ends_with(&normalized_query) {
-                log::debug!("  Found path match: '{}'", file_path.display());
-                if let Some(file_functions) = self.by_file.get(file_path) {
-                    // Try exact match first
-                    if let Some(coverage) = file_functions.get(function_name) {
-                        log::debug!(
-                            "  ✓ Matched function name exactly: {}%",
-                            coverage.coverage_percentage
-                        );
-                        return Some(coverage);
-                    }
-                    // Try function name suffix match (for querying with short form)
-                    for func in file_functions.values() {
-                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name)
-                        {
+            let file_components = normalize_path_components(file_path);
+
+            // Check if file components are a suffix of query components
+            if !file_components.is_empty() && file_components.len() <= query_components.len() {
+                let query_suffix =
+                    &query_components[query_components.len() - file_components.len()..];
+                if file_components == query_suffix {
+                    log::debug!("  Found path match: '{}'", file_path.display());
+                    if let Some(file_functions) = self.by_file.get(file_path) {
+                        // Try exact match first
+                        if let Some(coverage) = file_functions.get(function_name) {
                             log::debug!(
-                                "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
-                                function_name,
-                                func.name,
-                                func.coverage_percentage
+                                "  ✓ Matched function name exactly: {}%",
+                                coverage.coverage_percentage
                             );
-                            return Some(func);
+                            return Some(coverage);
                         }
-                    }
-                    // Try method name match (for Rust methods)
-                    for func in file_functions.values() {
-                        if func.normalized.method_name == function_name {
-                            log::debug!(
-                                "  ✓ Matched method name '{}' -> '{}': {}%",
-                                func.name,
-                                func.normalized.method_name,
-                                func.coverage_percentage
-                            );
-                            return Some(func);
+                        // Try function name suffix match (for querying with short form)
+                        for func in file_functions.values() {
+                            if func.name.ends_with(function_name)
+                                || function_name.ends_with(&func.name)
+                            {
+                                log::debug!(
+                                    "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
+                                    function_name,
+                                    func.name,
+                                    func.coverage_percentage
+                                );
+                                return Some(func);
+                            }
                         }
+                        // Try method name match (for Rust methods)
+                        for func in file_functions.values() {
+                            if func.normalized.method_name == function_name {
+                                log::debug!(
+                                    "  ✓ Matched method name '{}' -> '{}': {}%",
+                                    func.name,
+                                    func.normalized.method_name,
+                                    func.coverage_percentage
+                                );
+                                return Some(func);
+                            }
+                        }
+                        log::debug!("  ✗ No function match in this file");
                     }
-                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
-        log::debug!("Strategy 3: Normalized path equality");
-        // Strategy 3: Normalized equality - iterate over FILES
+        log::debug!("Strategy 3: Component-based exact equality");
+        // Strategy 3: Exact component match
         for file_path in &self.file_paths {
-            if normalize_path(file_path) == normalized_query {
+            let file_components = normalize_path_components(file_path);
+            if query_components == file_components {
                 log::debug!("  Found path match: '{}'", file_path.display());
                 if let Some(file_functions) = self.by_file.get(file_path) {
                     // Try exact match first

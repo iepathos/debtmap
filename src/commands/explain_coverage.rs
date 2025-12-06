@@ -195,11 +195,11 @@ fn try_path_strategies(
         }
     }
 
-    // Strategy: Normalized path equality
-    let normalized_query = crate::risk::coverage_index::normalize_path(file_path);
+    // Strategy: Normalized path equality (component-based)
+    let query_components = crate::risk::path_normalization::normalize_path_components(file_path);
     for (lcov_file, functions) in &lcov_data.functions {
-        let normalized_lcov = crate::risk::coverage_index::normalize_path(lcov_file);
-        if normalized_lcov == normalized_query {
+        let lcov_components = crate::risk::path_normalization::normalize_path_components(lcov_file);
+        if lcov_components == query_components {
             if let Some(coverage_data) = functions.iter().find(|f| f.name == function_name) {
                 attempts.push(StrategyAttempt {
                     strategy: "normalized_path_match".to_string(),
