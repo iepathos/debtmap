@@ -1892,13 +1892,11 @@ mod tests {
         #[test]
         fn test_handler_composition_with_errors() {
             // Simulate a Result from analyze domain
-            let analyze_result: Result<(), anyhow::Error> =
-                Err(anyhow::anyhow!("analysis failed"));
+            let analyze_result: Result<(), anyhow::Error> = Err(anyhow::anyhow!("analysis failed"));
 
             // Map to CLI error domain
-            let cli_result: Result<(), CliError> = analyze_result.map_err(|e| {
-                CliError::Config(ConfigError::ValidationFailed(e.to_string()))
-            });
+            let cli_result: Result<(), CliError> = analyze_result
+                .map_err(|e| CliError::Config(ConfigError::ValidationFailed(e.to_string())));
 
             // Verify error was properly mapped
             assert!(cli_result.is_err());
@@ -1942,9 +1940,8 @@ mod tests {
                 .context("Command failed");
 
             // Map to CLI error preserving context chain
-            let cli_result: Result<(), CliError> = result.map_err(|e| {
-                CliError::Config(ConfigError::ValidationFailed(format!("{:#}", e)))
-            });
+            let cli_result: Result<(), CliError> = result
+                .map_err(|e| CliError::Config(ConfigError::ValidationFailed(format!("{:#}", e))));
 
             // Verify context is preserved
             assert!(cli_result.is_err());
@@ -1971,9 +1968,7 @@ mod tests {
             };
 
             // Compose handlers
-            let composed = |s: String| -> Result<String, String> {
-                handler1(s).and_then(handler2)
-            };
+            let composed = |s: String| -> Result<String, String> { handler1(s).and_then(handler2) };
 
             // Test successful composition
             let result = composed("42".to_string());
