@@ -47,10 +47,10 @@ impl SeverityFilter {
     pub fn matches(&self, item: &UnifiedDebtItem) -> bool {
         let item_severity = calculate_severity(item.unified_score.final_score);
         match self {
-            SeverityFilter::Critical => item_severity == "CRITICAL",
-            SeverityFilter::High => item_severity == "HIGH",
-            SeverityFilter::Medium => item_severity == "MEDIUM",
-            SeverityFilter::Low => item_severity == "LOW",
+            SeverityFilter::Critical => item_severity == "critical",
+            SeverityFilter::High => item_severity == "high",
+            SeverityFilter::Medium => item_severity == "medium",
+            SeverityFilter::Low => item_severity == "low",
         }
     }
 
@@ -126,13 +126,13 @@ impl CoverageFilter {
 /// Calculate severity level from score
 fn calculate_severity(score: f64) -> &'static str {
     if score >= 100.0 {
-        "CRITICAL"
+        "critical"
     } else if score >= 50.0 {
-        "HIGH"
+        "high"
     } else if score >= 10.0 {
-        "MEDIUM"
+        "medium"
     } else {
-        "LOW"
+        "low"
     }
 }
 
@@ -158,10 +158,10 @@ mod tests {
 
     #[test]
     fn test_calculate_severity() {
-        assert_eq!(calculate_severity(150.0), "CRITICAL");
-        assert_eq!(calculate_severity(75.0), "HIGH");
-        assert_eq!(calculate_severity(25.0), "MEDIUM");
-        assert_eq!(calculate_severity(5.0), "LOW");
+        assert_eq!(calculate_severity(150.0), "critical");
+        assert_eq!(calculate_severity(75.0), "high");
+        assert_eq!(calculate_severity(25.0), "medium");
+        assert_eq!(calculate_severity(5.0), "low");
     }
 
     #[test]

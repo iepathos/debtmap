@@ -328,7 +328,7 @@ fn format_grouped_item(
             Style::default().fg(theme.muted),
         ),
         Span::styled(
-            format!("{:<10}", group.max_severity),
+            format!("{:<8}", group.max_severity),
             Style::default().fg(severity_color),
         ),
         Span::styled(
@@ -471,7 +471,7 @@ fn format_list_item(
             Style::default().fg(theme.muted),
         ),
         Span::styled(
-            format!("{:<10}", severity),
+            format!("{:<8}", severity),
             Style::default().fg(severity_color),
         ),
         Span::styled(
@@ -530,23 +530,23 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
 /// Calculate severity level from score
 fn calculate_severity(score: f64) -> &'static str {
     if score >= 100.0 {
-        "CRITICAL"
+        "critical"
     } else if score >= 50.0 {
-        "HIGH"
+        "high"
     } else if score >= 10.0 {
-        "MEDIUM"
+        "medium"
     } else {
-        "LOW"
+        "low"
     }
 }
 
 /// Get color for severity level
 fn severity_color(severity: &str) -> Color {
     match severity {
-        "CRITICAL" => Color::Red,
-        "HIGH" => Color::LightRed,
-        "MEDIUM" => Color::Yellow,
-        "LOW" => Color::Green,
+        "critical" => Color::Red,
+        "high" => Color::LightRed,
+        "medium" => Color::Yellow,
+        "low" => Color::Green,
         _ => Color::White,
     }
 }
