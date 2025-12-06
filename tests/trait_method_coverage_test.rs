@@ -243,4 +243,3 @@ fn test_explain_coverage_finds_trait_method() {
         "Should not report 'No coverage found' for visit_expr"
     );
 }
-

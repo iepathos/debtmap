@@ -6,6 +6,7 @@ pub mod delegation;
 pub mod effects;
 pub mod evidence;
 pub mod evidence_calculator;
+pub mod function_name_matching;
 pub mod insights;
 pub mod lcov;
 pub mod path_normalization;
