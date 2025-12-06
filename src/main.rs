@@ -882,30 +882,74 @@ mod analyze_config {
     }
 
     impl PathConfig {
+        #[allow(dead_code)]
         pub fn builder(path: PathBuf) -> PathConfigBuilder {
-            PathConfigBuilder { path, output: None, coverage_file: None, max_files: None,
-                min_priority: None, min_score: None, filter_categories: None, min_problematic: None }
+            PathConfigBuilder {
+                path,
+                output: None,
+                coverage_file: None,
+                max_files: None,
+                min_priority: None,
+                min_score: None,
+                filter_categories: None,
+                min_problematic: None,
+            }
         }
     }
 
+    #[allow(dead_code)]
     pub struct PathConfigBuilder {
-        path: PathBuf, output: Option<PathBuf>, coverage_file: Option<PathBuf>, max_files: Option<usize>,
-        min_priority: Option<String>, min_score: Option<f64>, filter_categories: Option<Vec<String>>,
+        path: PathBuf,
+        output: Option<PathBuf>,
+        coverage_file: Option<PathBuf>,
+        max_files: Option<usize>,
+        min_priority: Option<String>,
+        min_score: Option<f64>,
+        filter_categories: Option<Vec<String>>,
         min_problematic: Option<usize>,
     }
 
+    #[allow(dead_code)]
     impl PathConfigBuilder {
-        pub fn output(mut self, output: Option<PathBuf>) -> Self { self.output = output; self }
-        pub fn coverage_file(mut self, file: Option<PathBuf>) -> Self { self.coverage_file = file; self }
-        pub fn max_files(mut self, max: Option<usize>) -> Self { self.max_files = max; self }
-        pub fn min_priority(mut self, priority: Option<String>) -> Self { self.min_priority = priority; self }
-        pub fn min_score(mut self, score: Option<f64>) -> Self { self.min_score = score; self }
-        pub fn filter_categories(mut self, categories: Option<Vec<String>>) -> Self { self.filter_categories = categories; self }
-        pub fn min_problematic(mut self, min: Option<usize>) -> Self { self.min_problematic = min; self }
+        pub fn output(mut self, output: Option<PathBuf>) -> Self {
+            self.output = output;
+            self
+        }
+        pub fn coverage_file(mut self, file: Option<PathBuf>) -> Self {
+            self.coverage_file = file;
+            self
+        }
+        pub fn max_files(mut self, max: Option<usize>) -> Self {
+            self.max_files = max;
+            self
+        }
+        pub fn min_priority(mut self, priority: Option<String>) -> Self {
+            self.min_priority = priority;
+            self
+        }
+        pub fn min_score(mut self, score: Option<f64>) -> Self {
+            self.min_score = score;
+            self
+        }
+        pub fn filter_categories(mut self, categories: Option<Vec<String>>) -> Self {
+            self.filter_categories = categories;
+            self
+        }
+        pub fn min_problematic(mut self, min: Option<usize>) -> Self {
+            self.min_problematic = min;
+            self
+        }
         pub fn build(self) -> PathConfig {
-            PathConfig { path: self.path, output: self.output, coverage_file: self.coverage_file,
-                max_files: self.max_files, min_priority: self.min_priority, min_score: self.min_score,
-                filter_categories: self.filter_categories, min_problematic: self.min_problematic }
+            PathConfig {
+                path: self.path,
+                output: self.output,
+                coverage_file: self.coverage_file,
+                max_files: self.max_files,
+                min_priority: self.min_priority,
+                min_score: self.min_score,
+                filter_categories: self.filter_categories,
+                min_problematic: self.min_problematic,
+            }
         }
     }
 
@@ -919,21 +963,42 @@ mod analyze_config {
     }
 
     impl ThresholdConfig {
+        #[allow(dead_code)]
         pub fn builder(complexity: u32, duplication: usize) -> ThresholdConfigBuilder {
-            ThresholdConfigBuilder { complexity, duplication, preset: None, public_api_threshold: 0.5 }
+            ThresholdConfigBuilder {
+                complexity,
+                duplication,
+                preset: None,
+                public_api_threshold: 0.5,
+            }
         }
     }
 
+    #[allow(dead_code)]
     pub struct ThresholdConfigBuilder {
-        complexity: u32, duplication: usize, preset: Option<debtmap::cli::ThresholdPreset>, public_api_threshold: f32,
+        complexity: u32,
+        duplication: usize,
+        preset: Option<debtmap::cli::ThresholdPreset>,
+        public_api_threshold: f32,
     }
 
+    #[allow(dead_code)]
     impl ThresholdConfigBuilder {
-        pub fn preset(mut self, preset: Option<debtmap::cli::ThresholdPreset>) -> Self { self.preset = preset; self }
-        pub fn public_api_threshold(mut self, threshold: f32) -> Self { self.public_api_threshold = threshold; self }
+        pub fn preset(mut self, preset: Option<debtmap::cli::ThresholdPreset>) -> Self {
+            self.preset = preset;
+            self
+        }
+        pub fn public_api_threshold(mut self, threshold: f32) -> Self {
+            self.public_api_threshold = threshold;
+            self
+        }
         pub fn build(self) -> ThresholdConfig {
-            ThresholdConfig { complexity: self.complexity, duplication: self.duplication,
-                preset: self.preset, public_api_threshold: self.public_api_threshold }
+            ThresholdConfig {
+                complexity: self.complexity,
+                duplication: self.duplication,
+                preset: self.preset,
+                public_api_threshold: self.public_api_threshold,
+            }
         }
     }
 
@@ -958,47 +1023,114 @@ mod analyze_config {
     }
 
     impl AnalysisFeatureConfig {
+        #[allow(dead_code)]
         pub fn builder() -> AnalysisFeatureConfigBuilder {
             AnalysisFeatureConfigBuilder::default()
         }
     }
 
     #[derive(Default)]
+    #[allow(dead_code)]
     pub struct AnalysisFeatureConfigBuilder {
-        enable_context: bool, context_providers: Option<Vec<String>>, disable_context: Option<Vec<String>>,
-        semantic_off: bool, no_pattern_detection: bool, patterns: Option<Vec<String>>, pattern_threshold: f32,
-        no_god_object: bool, no_public_api_detection: bool, ast_functional_analysis: bool,
+        enable_context: bool,
+        context_providers: Option<Vec<String>>,
+        disable_context: Option<Vec<String>>,
+        semantic_off: bool,
+        no_pattern_detection: bool,
+        patterns: Option<Vec<String>>,
+        pattern_threshold: f32,
+        no_god_object: bool,
+        no_public_api_detection: bool,
+        ast_functional_analysis: bool,
         functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
-        min_split_methods: usize, min_split_lines: usize, validate_loc: bool, validate_call_graph: bool,
+        min_split_methods: usize,
+        min_split_lines: usize,
+        validate_loc: bool,
+        validate_call_graph: bool,
     }
 
+    #[allow(dead_code)]
     impl AnalysisFeatureConfigBuilder {
-        pub fn enable_context(mut self, enable: bool) -> Self { self.enable_context = enable; self }
-        pub fn context_providers(mut self, providers: Option<Vec<String>>) -> Self { self.context_providers = providers; self }
-        pub fn disable_context(mut self, disable: Option<Vec<String>>) -> Self { self.disable_context = disable; self }
-        pub fn semantic_off(mut self, off: bool) -> Self { self.semantic_off = off; self }
-        pub fn no_pattern_detection(mut self, no: bool) -> Self { self.no_pattern_detection = no; self }
-        pub fn patterns(mut self, patterns: Option<Vec<String>>) -> Self { self.patterns = patterns; self }
-        pub fn pattern_threshold(mut self, threshold: f32) -> Self { self.pattern_threshold = threshold; self }
-        pub fn no_god_object(mut self, no: bool) -> Self { self.no_god_object = no; self }
-        pub fn no_public_api_detection(mut self, no: bool) -> Self { self.no_public_api_detection = no; self }
-        pub fn ast_functional_analysis(mut self, enable: bool) -> Self { self.ast_functional_analysis = enable; self }
-        pub fn functional_analysis_profile(mut self, profile: Option<debtmap::cli::FunctionalAnalysisProfile>) -> Self {
-            self.functional_analysis_profile = profile; self
+        pub fn enable_context(mut self, enable: bool) -> Self {
+            self.enable_context = enable;
+            self
         }
-        pub fn min_split_methods(mut self, min: usize) -> Self { self.min_split_methods = min; self }
-        pub fn min_split_lines(mut self, min: usize) -> Self { self.min_split_lines = min; self }
-        pub fn validate_loc(mut self, validate: bool) -> Self { self.validate_loc = validate; self }
-        pub fn validate_call_graph(mut self, validate: bool) -> Self { self.validate_call_graph = validate; self }
+        pub fn context_providers(mut self, providers: Option<Vec<String>>) -> Self {
+            self.context_providers = providers;
+            self
+        }
+        pub fn disable_context(mut self, disable: Option<Vec<String>>) -> Self {
+            self.disable_context = disable;
+            self
+        }
+        pub fn semantic_off(mut self, off: bool) -> Self {
+            self.semantic_off = off;
+            self
+        }
+        pub fn no_pattern_detection(mut self, no: bool) -> Self {
+            self.no_pattern_detection = no;
+            self
+        }
+        pub fn patterns(mut self, patterns: Option<Vec<String>>) -> Self {
+            self.patterns = patterns;
+            self
+        }
+        pub fn pattern_threshold(mut self, threshold: f32) -> Self {
+            self.pattern_threshold = threshold;
+            self
+        }
+        pub fn no_god_object(mut self, no: bool) -> Self {
+            self.no_god_object = no;
+            self
+        }
+        pub fn no_public_api_detection(mut self, no: bool) -> Self {
+            self.no_public_api_detection = no;
+            self
+        }
+        pub fn ast_functional_analysis(mut self, enable: bool) -> Self {
+            self.ast_functional_analysis = enable;
+            self
+        }
+        pub fn functional_analysis_profile(
+            mut self,
+            profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
+        ) -> Self {
+            self.functional_analysis_profile = profile;
+            self
+        }
+        pub fn min_split_methods(mut self, min: usize) -> Self {
+            self.min_split_methods = min;
+            self
+        }
+        pub fn min_split_lines(mut self, min: usize) -> Self {
+            self.min_split_lines = min;
+            self
+        }
+        pub fn validate_loc(mut self, validate: bool) -> Self {
+            self.validate_loc = validate;
+            self
+        }
+        pub fn validate_call_graph(mut self, validate: bool) -> Self {
+            self.validate_call_graph = validate;
+            self
+        }
         pub fn build(self) -> AnalysisFeatureConfig {
             AnalysisFeatureConfig {
-                enable_context: self.enable_context, context_providers: self.context_providers,
-                disable_context: self.disable_context, semantic_off: self.semantic_off,
-                no_pattern_detection: self.no_pattern_detection, patterns: self.patterns,
-                pattern_threshold: self.pattern_threshold, no_god_object: self.no_god_object,
-                no_public_api_detection: self.no_public_api_detection, ast_functional_analysis: self.ast_functional_analysis,
-                functional_analysis_profile: self.functional_analysis_profile, min_split_methods: self.min_split_methods,
-                min_split_lines: self.min_split_lines, validate_loc: self.validate_loc, validate_call_graph: self.validate_call_graph,
+                enable_context: self.enable_context,
+                context_providers: self.context_providers,
+                disable_context: self.disable_context,
+                semantic_off: self.semantic_off,
+                no_pattern_detection: self.no_pattern_detection,
+                patterns: self.patterns,
+                pattern_threshold: self.pattern_threshold,
+                no_god_object: self.no_god_object,
+                no_public_api_detection: self.no_public_api_detection,
+                ast_functional_analysis: self.ast_functional_analysis,
+                functional_analysis_profile: self.functional_analysis_profile,
+                min_split_methods: self.min_split_methods,
+                min_split_lines: self.min_split_lines,
+                validate_loc: self.validate_loc,
+                validate_call_graph: self.validate_call_graph,
             }
         }
     }
@@ -1058,29 +1190,74 @@ mod analyze_config {
 
 /// Build analyze configuration from grouped configuration structs (spec 204)
 fn build_analyze_config(
-    p: analyze_config::PathConfig, t: analyze_config::ThresholdConfig, f: analyze_config::AnalysisFeatureConfig,
-    d: analyze_config::DisplayConfig, pf: analyze_config::PerformanceConfig,
-    db: analyze_config::DebugConfig, l: analyze_config::LanguageConfig,
+    p: analyze_config::PathConfig,
+    t: analyze_config::ThresholdConfig,
+    f: analyze_config::AnalysisFeatureConfig,
+    d: analyze_config::DisplayConfig,
+    pf: analyze_config::PerformanceConfig,
+    db: analyze_config::DebugConfig,
+    l: analyze_config::LanguageConfig,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
-        path: p.path, output: p.output, coverage_file: p.coverage_file, max_files: p.max_files,
-        min_priority: convert_min_priority(p.min_priority), min_score: p.min_score,
-        filter_categories: convert_filter_categories(p.filter_categories), min_problematic: p.min_problematic,
-        threshold_complexity: t.complexity, threshold_duplication: t.duplication, threshold_preset: convert_threshold_preset(t.preset),
-        public_api_threshold: t.public_api_threshold, format: convert_output_format(d.format), verbosity: d.verbosity,
-        summary: d.summary, top: d.top, tail: d.tail, group_by_category: d.group_by_category, show_attribution: d.show_attribution,
-        detail_level: d.detail_level, no_tui: d.no_tui, show_filter_stats: d.show_filter_stats, _formatting_config: d.formatting_config,
-        no_context_aware: d.no_context_aware, enable_context: f.enable_context, context_providers: convert_context_providers(f.context_providers),
-        disable_context: convert_disable_context(f.disable_context), semantic_off: f.semantic_off, no_pattern_detection: f.no_pattern_detection,
-        patterns: f.patterns, pattern_threshold: f.pattern_threshold, no_god_object: f.no_god_object, no_public_api_detection: f.no_public_api_detection,
-        validate_loc: f.validate_loc, validate_call_graph: f.validate_call_graph, ast_functional_analysis: f.ast_functional_analysis,
-        functional_analysis_profile: f.functional_analysis_profile, min_split_methods: f.min_split_methods, min_split_lines: f.min_split_lines,
-        parallel: pf.parallel, jobs: pf.jobs, multi_pass: pf.multi_pass, aggregate_only: pf.aggregate_only, no_aggregation: pf.no_aggregation,
-        verbose_macro_warnings: db.verbose_macro_warnings, show_macro_stats: db.show_macro_stats, debug_call_graph: db.debug_call_graph,
-        trace_functions: db.trace_functions, call_graph_stats_only: db.call_graph_stats_only, debug_format: db.debug_format,
-        show_pattern_warnings: db.show_pattern_warnings, show_dependencies: db.show_dependencies, no_dependencies: db.no_dependencies,
-        languages: convert_languages(l.languages), aggregation_method: l.aggregation_method, max_callers: l.max_callers,
-        max_callees: l.max_callees, show_external: l.show_external, show_std_lib: l.show_std_lib,
+        path: p.path,
+        output: p.output,
+        coverage_file: p.coverage_file,
+        max_files: p.max_files,
+        min_priority: convert_min_priority(p.min_priority),
+        min_score: p.min_score,
+        filter_categories: convert_filter_categories(p.filter_categories),
+        min_problematic: p.min_problematic,
+        threshold_complexity: t.complexity,
+        threshold_duplication: t.duplication,
+        threshold_preset: convert_threshold_preset(t.preset),
+        public_api_threshold: t.public_api_threshold,
+        format: convert_output_format(d.format),
+        verbosity: d.verbosity,
+        summary: d.summary,
+        top: d.top,
+        tail: d.tail,
+        group_by_category: d.group_by_category,
+        show_attribution: d.show_attribution,
+        detail_level: d.detail_level,
+        no_tui: d.no_tui,
+        show_filter_stats: d.show_filter_stats,
+        _formatting_config: d.formatting_config,
+        no_context_aware: d.no_context_aware,
+        enable_context: f.enable_context,
+        context_providers: convert_context_providers(f.context_providers),
+        disable_context: convert_disable_context(f.disable_context),
+        semantic_off: f.semantic_off,
+        no_pattern_detection: f.no_pattern_detection,
+        patterns: f.patterns,
+        pattern_threshold: f.pattern_threshold,
+        no_god_object: f.no_god_object,
+        no_public_api_detection: f.no_public_api_detection,
+        validate_loc: f.validate_loc,
+        validate_call_graph: f.validate_call_graph,
+        ast_functional_analysis: f.ast_functional_analysis,
+        functional_analysis_profile: f.functional_analysis_profile,
+        min_split_methods: f.min_split_methods,
+        min_split_lines: f.min_split_lines,
+        parallel: pf.parallel,
+        jobs: pf.jobs,
+        multi_pass: pf.multi_pass,
+        aggregate_only: pf.aggregate_only,
+        no_aggregation: pf.no_aggregation,
+        verbose_macro_warnings: db.verbose_macro_warnings,
+        show_macro_stats: db.show_macro_stats,
+        debug_call_graph: db.debug_call_graph,
+        trace_functions: db.trace_functions,
+        call_graph_stats_only: db.call_graph_stats_only,
+        debug_format: db.debug_format,
+        show_pattern_warnings: db.show_pattern_warnings,
+        show_dependencies: db.show_dependencies,
+        no_dependencies: db.no_dependencies,
+        languages: convert_languages(l.languages),
+        aggregation_method: l.aggregation_method,
+        max_callers: l.max_callers,
+        max_callees: l.max_callees,
+        show_external: l.show_external,
+        show_std_lib: l.show_std_lib,
     }
 }
 
