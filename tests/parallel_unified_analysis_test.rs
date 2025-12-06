@@ -457,8 +457,8 @@ fn test_data_flow_graph_population_integration() {
 #[test]
 fn test_god_objects_created_in_parallel_analysis() {
     // Spec 207: God objects should be created as UnifiedDebtItems in parallel analysis path
-    use tempfile::TempDir;
     use std::fs::write;
+    use tempfile::TempDir;
 
     // Create temporary directory with test files
     let temp_dir = TempDir::new().unwrap();
@@ -466,9 +466,13 @@ fn test_god_objects_created_in_parallel_analysis() {
 
     // Write a test file with enough content to trigger god object detection
     let content = "pub struct GodStruct {\n".to_string()
-        + &(0..100).map(|i| format!("    field_{}: i32,\n", i)).collect::<String>()
+        + &(0..100)
+            .map(|i| format!("    field_{}: i32,\n", i))
+            .collect::<String>()
         + "}\n\nimpl GodStruct {\n"
-        + &(0..60).map(|i| format!("    pub fn method_{}(&self) {{ }}\n", i)).collect::<String>()
+        + &(0..60)
+            .map(|i| format!("    pub fn method_{}(&self) {{ }}\n", i))
+            .collect::<String>()
         + "}";
     write(&god_file_path, content).unwrap();
 
@@ -546,7 +550,10 @@ fn test_god_objects_created_in_parallel_analysis() {
     // Verify the god object has correct properties
     for god_item in god_items {
         let indicators = god_item.god_object_indicators.as_ref().unwrap();
-        assert!(indicators.is_god_object, "God object indicator should be true");
+        assert!(
+            indicators.is_god_object,
+            "God object indicator should be true"
+        );
         assert!(
             indicators.method_count > 0 || indicators.field_count > 0,
             "God object should have methods or fields"
@@ -566,7 +573,12 @@ fn test_god_objects_created_in_parallel_analysis() {
     let file_god_objects: Vec<_> = unified
         .file_items
         .iter()
-        .filter(|item| item.metrics.god_object_indicators.is_god_object)
+        .filter(|item| {
+            item.metrics
+                .god_object_analysis
+                .as_ref()
+                .map_or(false, |a| a.is_god_object)
+        })
         .collect();
 
     assert!(
@@ -578,8 +590,8 @@ fn test_god_objects_created_in_parallel_analysis() {
 #[test]
 fn test_god_objects_not_created_when_disabled() {
     // Test that god objects are NOT created when no_god_object flag is true
-    use tempfile::TempDir;
     use std::fs::write;
+    use tempfile::TempDir;
 
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("test.rs");
@@ -650,15 +662,17 @@ fn test_god_objects_not_created_when_disabled() {
 fn test_god_objects_visible_in_tui() {
     // Test that god objects created in parallel analysis are visible to TUI (via ResultsApp)
     use debtmap::tui::results::app::ResultsApp;
-    use tempfile::TempDir;
     use std::fs::write;
+    use tempfile::TempDir;
 
     let temp_dir = TempDir::new().unwrap();
     let god_file_path = temp_dir.path().join("god.rs");
 
     // Create a god object file
     let content = "pub struct God { }\nimpl God {\n".to_string()
-        + &(0..60).map(|i| format!("    pub fn method_{}(&self) {{ }}\n", i)).collect::<String>()
+        + &(0..60)
+            .map(|i| format!("    pub fn method_{}(&self) {{ }}\n", i))
+            .collect::<String>()
         + "}";
     write(&god_file_path, content).unwrap();
 

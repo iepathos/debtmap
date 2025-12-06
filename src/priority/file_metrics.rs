@@ -12,7 +12,8 @@ pub struct FileDebtMetrics {
     pub total_complexity: u32,
     pub coverage_percent: f64,
     pub uncovered_lines: usize,
-    pub god_object_indicators: GodObjectIndicators,
+    #[serde(alias = "god_object_indicators")]
+    pub god_object_analysis: Option<crate::organization::GodObjectAnalysis>,
     pub function_scores: Vec<f64>,
     /// The specific type of god object detected (if any).
     ///
@@ -255,8 +256,12 @@ impl FileDebtMetrics {
         };
 
         // God object multiplier
-        let god_object_multiplier = if self.god_object_indicators.is_god_object {
-            2.0 + self.god_object_indicators.god_object_score
+        let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
+            if analysis.is_god_object {
+                2.0 + analysis.god_object_score
+            } else {
+                1.0
+            }
         } else {
             1.0
         };
@@ -320,8 +325,12 @@ impl FileDebtMetrics {
         };
 
         // God object multiplier
-        let god_object_multiplier = if self.god_object_indicators.is_god_object {
-            2.0 + self.god_object_indicators.god_object_score
+        let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
+            if analysis.is_god_object {
+                2.0 + analysis.god_object_score
+            } else {
+                1.0
+            }
         } else {
             1.0
         };
@@ -329,6 +338,13 @@ impl FileDebtMetrics {
         // Aggregate function scores
         let function_score_sum: f64 = self.function_scores.iter().sum();
         let function_factor = (function_score_sum / 10.0).max(1.0);
+
+        let (god_object_score, is_god_object) = if let Some(ref analysis) = self.god_object_analysis
+        {
+            (analysis.god_object_score, analysis.is_god_object)
+        } else {
+            (0.0, false)
+        };
 
         FileScoreFactors {
             size_factor,
@@ -342,8 +358,8 @@ impl FileDebtMetrics {
             density_factor,
             function_count: self.function_count,
             god_object_multiplier,
-            god_object_score: self.god_object_indicators.god_object_score,
-            is_god_object: self.god_object_indicators.is_god_object,
+            god_object_score,
+            is_god_object,
             function_factor,
             function_score_sum,
         }
@@ -365,7 +381,7 @@ impl FileDebtMetrics {
     ///    - Example: Error code registries, configuration tables
     ///
     /// 3. **God Object**
-    ///    - Detected when file has too many responsibilities (via god_object_indicators)
+    ///    - Detected when file has too many responsibilities (via god_object_analysis)
     ///    - Recommendation: Split into multiple focused modules
     ///    - Context-specific advice based on file type (parser, cache, analyzer, etc.)
     ///
@@ -389,7 +405,11 @@ impl FileDebtMetrics {
             return recommendation.clone();
         }
 
-        if self.god_object_indicators.is_god_object {
+        if self
+            .god_object_analysis
+            .as_ref()
+            .map_or(false, |a| a.is_god_object)
+        {
             // Analyze the file path to provide context-specific recommendations
             let file_name = self
                 .path
@@ -452,7 +472,7 @@ impl Default for FileDebtMetrics {
             total_complexity: 0,
             coverage_percent: 0.0,
             uncovered_lines: 0,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: Vec::new(),
             god_object_type: None,
             file_type: None,
@@ -479,6 +499,53 @@ impl Default for GodObjectIndicators {
             domain_diversity_metrics: None,
             detection_type: None,
         }
+    }
+}
+
+impl From<crate::organization::GodObjectAnalysis> for GodObjectIndicators {
+    fn from(analysis: crate::organization::GodObjectAnalysis) -> Self {
+        Self {
+            methods_count: analysis.method_count,
+            fields_count: analysis.field_count,
+            responsibilities: analysis.responsibility_count,
+            is_god_object: analysis.is_god_object,
+            god_object_score: analysis.god_object_score / 100.0, // Convert back from percentage
+            responsibility_names: analysis.responsibilities,
+            recommended_splits: Vec::new(), // GodObjectAnalysis uses different split structure
+            module_structure: analysis.module_structure,
+            domain_count: analysis.domain_count,
+            domain_diversity: analysis.domain_diversity,
+            struct_ratio: analysis.struct_ratio,
+            analysis_method: convert_from_org_split_method(analysis.analysis_method),
+            cross_domain_severity: analysis
+                .cross_domain_severity
+                .map(convert_from_org_severity),
+            domain_diversity_metrics: analysis.domain_diversity_metrics,
+            detection_type: Some(analysis.detection_type),
+        }
+    }
+}
+
+fn convert_from_org_split_method(
+    method: crate::organization::SplitAnalysisMethod,
+) -> SplitAnalysisMethod {
+    match method {
+        crate::organization::SplitAnalysisMethod::None => SplitAnalysisMethod::None,
+        crate::organization::SplitAnalysisMethod::CrossDomain => SplitAnalysisMethod::CrossDomain,
+        crate::organization::SplitAnalysisMethod::MethodBased => SplitAnalysisMethod::MethodBased,
+        crate::organization::SplitAnalysisMethod::Hybrid => SplitAnalysisMethod::Hybrid,
+        crate::organization::SplitAnalysisMethod::TypeBased => SplitAnalysisMethod::TypeBased,
+    }
+}
+
+fn convert_from_org_severity(
+    severity: crate::organization::RecommendationSeverity,
+) -> RecommendationSeverity {
+    match severity {
+        crate::organization::RecommendationSeverity::Low => RecommendationSeverity::Low,
+        crate::organization::RecommendationSeverity::Medium => RecommendationSeverity::Medium,
+        crate::organization::RecommendationSeverity::High => RecommendationSeverity::High,
+        crate::organization::RecommendationSeverity::Critical => RecommendationSeverity::Critical,
     }
 }
 
@@ -559,7 +626,7 @@ mod tests {
             total_complexity: 25,
             coverage_percent: 0.8,
             uncovered_lines: 20,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: vec![1.0, 2.0, 3.0],
             god_object_type: None,
             file_type: None,
@@ -572,6 +639,8 @@ mod tests {
 
     #[test]
     fn test_calculate_score_with_god_object() {
+        use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
+
         let metrics = FileDebtMetrics {
             path: PathBuf::from("god.rs"),
             total_lines: 1000,
@@ -582,24 +651,28 @@ mod tests {
             total_complexity: 900,
             coverage_percent: 0.3,
             uncovered_lines: 700,
-            god_object_indicators: GodObjectIndicators {
-                methods_count: 60,
-                fields_count: 30,
-                responsibilities: 10,
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: true,
+                method_count: 60,
+                field_count: 30,
+                responsibility_count: 10,
+                lines_of_code: 1000,
+                complexity_sum: 900,
                 god_object_score: 0.8,
-                responsibility_names: Vec::new(),
                 recommended_splits: Vec::new(),
+                confidence: GodObjectConfidence::Definite,
+                responsibilities: Vec::new(),
+                purity_distribution: None,
                 module_structure: None,
-
+                detection_type: DetectionType::GodClass,
+                visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
                 struct_ratio: 0.0,
-                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                analysis_method: Default::default(),
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
-                detection_type: None,
-            },
+            }),
             function_scores: vec![5.0; 60],
             god_object_type: None,
             file_type: None,
@@ -621,7 +694,7 @@ mod tests {
             total_complexity: 30,
             coverage_percent: 0.1,
             uncovered_lines: 180,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: vec![1.0; 10],
             god_object_type: None,
             file_type: None,
@@ -650,7 +723,7 @@ mod tests {
             total_complexity: 300,
             coverage_percent: 0.7,
             uncovered_lines: 90,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: vec![3.0; 15],
             god_object_type: None,
             file_type: None,
@@ -672,7 +745,7 @@ mod tests {
             total_complexity: 300,
             coverage_percent: 0.6,
             uncovered_lines: 200,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: vec![2.0; 75],
             god_object_type: None,
             file_type: None,
@@ -684,11 +757,31 @@ mod tests {
 
     #[test]
     fn test_generate_recommendation_god_object() {
+        use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
+
         let metrics = FileDebtMetrics {
-            god_object_indicators: GodObjectIndicators {
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: true,
-                ..Default::default()
-            },
+                method_count: 50,
+                field_count: 10,
+                responsibility_count: 5,
+                lines_of_code: 500,
+                complexity_sum: 200,
+                god_object_score: 0.8,
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                responsibilities: Vec::new(),
+                recommended_splits: Vec::new(),
+                purity_distribution: None,
+                module_structure: None,
+                visibility_breakdown: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: Default::default(),
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+            }),
             function_count: 50,
             ..Default::default()
         };
@@ -757,11 +850,13 @@ mod tests {
         assert_eq!(metrics.function_count, 0);
         assert_eq!(metrics.avg_complexity, 0.0);
         assert_eq!(metrics.coverage_percent, 0.0);
-        assert!(!metrics.god_object_indicators.is_god_object);
+        assert!(metrics.god_object_analysis.is_none());
     }
 
     #[test]
     fn test_score_factors_multiplication() {
+        use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
+
         let mut metrics = FileDebtMetrics {
             path: PathBuf::from("test.rs"),
             total_lines: 400,
@@ -774,8 +869,28 @@ mod tests {
 
         let score1 = metrics.calculate_score();
 
-        metrics.god_object_indicators.is_god_object = true;
-        metrics.god_object_indicators.god_object_score = 0.5;
+        metrics.god_object_analysis = Some(GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 20,
+            field_count: 10,
+            responsibility_count: 5,
+            lines_of_code: 400,
+            complexity_sum: 200,
+            god_object_score: 0.5,
+            confidence: GodObjectConfidence::Definite,
+            detection_type: DetectionType::GodClass,
+            responsibilities: Vec::new(),
+            recommended_splits: Vec::new(),
+            purity_distribution: None,
+            module_structure: None,
+            visibility_breakdown: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: Default::default(),
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+        });
         let score2 = metrics.calculate_score();
 
         assert!(
@@ -825,7 +940,9 @@ mod tests {
     #[test]
     fn test_boilerplate_recommendation_used() {
         use crate::organization::boilerplate_detector::BoilerplatePattern;
-        use crate::organization::GodObjectType;
+        use crate::organization::{
+            DetectionType, GodObjectAnalysis, GodObjectConfidence, GodObjectType,
+        };
 
         let boilerplate_type = GodObjectType::BoilerplatePattern {
             pattern: BoilerplatePattern::TraitImplementation {
@@ -839,24 +956,28 @@ mod tests {
         };
 
         let metrics = FileDebtMetrics {
-            god_object_indicators: GodObjectIndicators {
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: true,
-                methods_count: 888,
-                fields_count: 0,
-                responsibilities: 1,
+                method_count: 888,
+                field_count: 0,
+                responsibility_count: 1,
+                lines_of_code: 7775,
+                complexity_sum: 888,
                 god_object_score: 0.878,
-                responsibility_names: Vec::new(),
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                responsibilities: Vec::new(),
                 recommended_splits: Vec::new(),
+                purity_distribution: None,
                 module_structure: None,
-
+                visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
                 struct_ratio: 0.0,
-                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                analysis_method: crate::organization::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
-                detection_type: None,
-            },
+            }),
             god_object_type: Some(boilerplate_type),
             total_lines: 7775,
             function_count: 888,
@@ -872,7 +993,9 @@ mod tests {
 
     #[test]
     fn test_regular_god_object_still_gets_splitting_advice() {
-        use crate::organization::GodObjectType;
+        use crate::organization::{
+            DetectionType, GodObjectAnalysis, GodObjectConfidence, GodObjectType,
+        };
 
         let god_file_type = GodObjectType::GodModule {
             total_structs: 20,
@@ -888,24 +1011,28 @@ mod tests {
         };
 
         let metrics = FileDebtMetrics {
-            god_object_indicators: GodObjectIndicators {
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: true,
-                methods_count: 100,
-                fields_count: 30,
-                responsibilities: 5,
+                method_count: 100,
+                field_count: 30,
+                responsibility_count: 5,
+                lines_of_code: 2000,
+                complexity_sum: 500,
                 god_object_score: 0.8,
-                responsibility_names: Vec::new(),
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                responsibilities: Vec::new(),
                 recommended_splits: Vec::new(),
+                purity_distribution: None,
                 module_structure: None,
-
+                visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
                 struct_ratio: 0.0,
-                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                analysis_method: crate::organization::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
-                detection_type: None,
-            },
+            }),
             god_object_type: Some(god_file_type),
             total_lines: 2000,
             function_count: 100,
@@ -922,7 +1049,9 @@ mod tests {
     #[test]
     fn test_boilerplate_takes_precedence_over_god_object() {
         use crate::organization::boilerplate_detector::BoilerplatePattern;
-        use crate::organization::GodObjectType;
+        use crate::organization::{
+            DetectionType, GodObjectAnalysis, GodObjectConfidence, GodObjectType,
+        };
 
         let boilerplate_type = GodObjectType::BoilerplatePattern {
             pattern: BoilerplatePattern::TestBoilerplate {
@@ -934,24 +1063,28 @@ mod tests {
         };
 
         let metrics = FileDebtMetrics {
-            god_object_indicators: GodObjectIndicators {
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: true,
-                methods_count: 200,
-                fields_count: 100,
-                responsibilities: 10,
+                method_count: 200,
+                field_count: 100,
+                responsibility_count: 10,
+                lines_of_code: 5000,
+                complexity_sum: 1000,
                 god_object_score: 0.95,
-                responsibility_names: Vec::new(),
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                responsibilities: Vec::new(),
                 recommended_splits: Vec::new(),
+                purity_distribution: None,
                 module_structure: None,
-
+                visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
                 struct_ratio: 0.0,
-                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                analysis_method: crate::organization::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
-                detection_type: None,
-            },
+            }),
             god_object_type: Some(boilerplate_type),
             total_lines: 5000,
             function_count: 200,
@@ -968,6 +1101,8 @@ mod tests {
 
     #[test]
     fn test_get_score_factors_extraction() {
+        use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
+
         let metrics = FileDebtMetrics {
             path: PathBuf::from("test.rs"),
             total_lines: 354,
@@ -975,23 +1110,28 @@ mod tests {
             avg_complexity: 8.0,
             total_complexity: 56,
             coverage_percent: 0.0,
-            god_object_indicators: GodObjectIndicators {
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: true,
+                method_count: 60,
+                field_count: 30,
+                responsibility_count: 10,
+                lines_of_code: 354,
+                complexity_sum: 56,
                 god_object_score: 7.0,
-                methods_count: 60,
-                fields_count: 30,
-                responsibilities: 10,
-                responsibility_names: Vec::new(),
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                responsibilities: Vec::new(),
                 recommended_splits: Vec::new(),
+                purity_distribution: None,
                 module_structure: None,
+                visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
                 struct_ratio: 0.0,
-                analysis_method: SplitAnalysisMethod::None,
+                analysis_method: crate::organization::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
-                detection_type: None,
-            },
+            }),
             function_scores: vec![1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
             god_object_type: None,
             file_type: None,
@@ -1010,6 +1150,8 @@ mod tests {
 
     #[test]
     fn test_score_calculation_matches_factors() {
+        use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
+
         let metrics = FileDebtMetrics {
             path: PathBuf::from("test.rs"),
             total_lines: 400,
@@ -1017,23 +1159,28 @@ mod tests {
             avg_complexity: 10.0,
             total_complexity: 200,
             coverage_percent: 0.5,
-            god_object_indicators: GodObjectIndicators {
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: true,
+                method_count: 40,
+                field_count: 20,
+                responsibility_count: 5,
+                lines_of_code: 400,
+                complexity_sum: 200,
                 god_object_score: 3.0,
-                methods_count: 40,
-                fields_count: 20,
-                responsibilities: 5,
-                responsibility_names: Vec::new(),
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                responsibilities: Vec::new(),
                 recommended_splits: Vec::new(),
+                purity_distribution: None,
                 module_structure: None,
+                visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
                 struct_ratio: 0.0,
-                analysis_method: SplitAnalysisMethod::None,
+                analysis_method: crate::organization::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
-                detection_type: None,
-            },
+            }),
             function_scores: vec![5.0; 20],
             god_object_type: None,
             file_type: None,
@@ -1060,7 +1207,7 @@ mod tests {
             total_lines: 200,
             function_count: 10,
             coverage_percent: 0.75,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: vec![],
             god_object_type: None,
             file_type: None,
@@ -1080,7 +1227,7 @@ mod tests {
             path: PathBuf::from("test.rs"),
             total_lines: 200,
             function_count: 45,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: vec![],
             god_object_type: None,
             file_type: None,
@@ -1097,15 +1244,34 @@ mod tests {
 
     #[test]
     fn test_factors_god_object_multiplier() {
+        use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
+
         let mut metrics = FileDebtMetrics {
             path: PathBuf::from("test.rs"),
             total_lines: 200,
             function_count: 10,
-            god_object_indicators: GodObjectIndicators {
+            god_object_analysis: Some(GodObjectAnalysis {
                 is_god_object: false,
+                method_count: 10,
+                field_count: 5,
+                responsibility_count: 2,
+                lines_of_code: 200,
+                complexity_sum: 50,
                 god_object_score: 0.0,
-                ..Default::default()
-            },
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                responsibilities: Vec::new(),
+                recommended_splits: Vec::new(),
+                purity_distribution: None,
+                module_structure: None,
+                visibility_breakdown: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: Default::default(),
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+            }),
             function_scores: vec![],
             god_object_type: None,
             file_type: None,
@@ -1115,8 +1281,28 @@ mod tests {
         let factors = metrics.get_score_factors();
         assert_eq!(factors.god_object_multiplier, 1.0); // Not flagged
 
-        metrics.god_object_indicators.is_god_object = true;
-        metrics.god_object_indicators.god_object_score = 8.5;
+        metrics.god_object_analysis = Some(GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 10,
+            field_count: 5,
+            responsibility_count: 2,
+            lines_of_code: 200,
+            complexity_sum: 50,
+            god_object_score: 8.5,
+            confidence: GodObjectConfidence::Definite,
+            detection_type: DetectionType::GodClass,
+            responsibilities: Vec::new(),
+            recommended_splits: Vec::new(),
+            purity_distribution: None,
+            module_structure: None,
+            visibility_breakdown: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: Default::default(),
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+        });
         let factors = metrics.get_score_factors();
         assert_eq!(factors.god_object_multiplier, 10.5); // 2.0 + 8.5
     }
@@ -1134,7 +1320,7 @@ mod tests {
             total_complexity: 86,
             coverage_percent: 0.0,
             uncovered_lines: 354,
-            god_object_indicators: GodObjectIndicators::default(),
+            god_object_analysis: None,
             function_scores: vec![],
             god_object_type: None,
             file_type: None,

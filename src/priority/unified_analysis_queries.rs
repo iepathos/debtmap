@@ -308,7 +308,12 @@ fn categorize_debt_item(item: &DebtItem) -> DebtCategory {
         DebtItem::Function(func) => DebtCategory::from_debt_type(&func.debt_type),
         DebtItem::File(file) => {
             // File-level items typically indicate architectural issues
-            if file.metrics.god_object_indicators.is_god_object {
+            if file
+                .metrics
+                .god_object_analysis
+                .as_ref()
+                .map_or(false, |a| a.is_god_object)
+            {
                 DebtCategory::Architecture
             } else if file.metrics.coverage_percent < 0.5 {
                 DebtCategory::Testing
@@ -440,7 +445,12 @@ fn get_debt_type_key(item: &DebtItem) -> String {
             _ => "Technical Debt".to_string(),
         },
         DebtItem::File(file) => {
-            if file.metrics.god_object_indicators.is_god_object {
+            if file
+                .metrics
+                .god_object_analysis
+                .as_ref()
+                .map_or(false, |a| a.is_god_object)
+            {
                 "God Object File".to_string()
             } else if file.metrics.total_lines > 1000 {
                 "Large File".to_string()
@@ -461,7 +471,10 @@ fn is_critical_item(item: &DebtItem) -> bool {
                 || func.unified_score.final_score >= 95.0
         }
         DebtItem::File(file) => {
-            file.metrics.god_object_indicators.is_god_object
+            file.metrics
+                .god_object_analysis
+                .as_ref()
+                .map_or(false, |a| a.is_god_object)
                 || file.metrics.total_lines > 2000
                 || file.score >= 95.0
         }
@@ -503,7 +516,11 @@ fn identify_cross_category_dependencies(
                 DebtItem::Function(func) => {
                     matches!(func.debt_type, DebtType::GodObject { .. })
                 }
-                DebtItem::File(file) => file.metrics.god_object_indicators.is_god_object,
+                DebtItem::File(file) => file
+                    .metrics
+                    .god_object_analysis
+                    .as_ref()
+                    .map_or(false, |a| a.is_god_object),
             });
 
             if has_god_objects {

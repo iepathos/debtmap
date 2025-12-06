@@ -19,34 +19,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-/// Convert GodObjectIndicators to GodObjectAnalysis for god object debt item creation (spec 207)
-fn convert_indicators_to_analysis(file_metrics: &FileDebtMetrics) -> GodObjectAnalysis {
-    let indicators = &file_metrics.god_object_indicators;
-
-    GodObjectAnalysis {
-        is_god_object: indicators.is_god_object,
-        method_count: indicators.methods_count,
-        field_count: indicators.fields_count,
-        responsibility_count: indicators.responsibilities,
-        lines_of_code: file_metrics.total_lines,
-        complexity_sum: file_metrics.total_complexity,
-        god_object_score: indicators.god_object_score,
-        recommended_splits: Vec::new(), // Type mismatch - will be populated from file indicators
-        confidence: GodObjectConfidence::Definite,
-        responsibilities: indicators.responsibility_names.clone(),
-        purity_distribution: None,
-        module_structure: None, // Type mismatch - using file-level data instead
-        detection_type: indicators.detection_type.clone().unwrap_or(DetectionType::GodFile),
-        visibility_breakdown: None,
-        domain_count: indicators.domain_count,
-        domain_diversity: indicators.domain_diversity,
-        struct_ratio: indicators.struct_ratio,
-        analysis_method: Default::default(), // Type mismatch - using default
-        cross_domain_severity: None, // Type mismatch - using None
-        domain_diversity_metrics: None, // Type mismatch - using None
-    }
-}
-
 // Pure functional transformations module
 mod transformations {
     use super::*;
@@ -161,7 +133,7 @@ mod predicates {
 mod file_analysis {
     use super::*;
     use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
-    use crate::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators};
+    use crate::priority::file_metrics::FileDebtMetrics;
 
     /// Pure function to aggregate function metrics into file metrics
     pub fn aggregate_file_metrics(
@@ -172,38 +144,17 @@ mod file_analysis {
         file_analyzer.aggregate_functions(functions)
     }
 
-    /// Pure function to analyze god object indicators from file content
-    pub fn analyze_god_object_indicators(
+    /// Pure function to analyze god object from file content
+    pub fn analyze_god_object(
         content: &str,
         file_path: &Path,
         coverage_data: Option<&LcovData>,
-    ) -> Result<GodObjectIndicators, String> {
+    ) -> Result<Option<crate::organization::GodObjectAnalysis>, String> {
         let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
         file_analyzer
             .analyze_file(file_path, content)
-            .map(|analyzed| analyzed.god_object_indicators)
+            .map(|analyzed| analyzed.god_object_analysis)
             .map_err(|e| format!("Failed to analyze god object: {}", e))
-    }
-
-    /// Pure function to create default god object indicators
-    pub fn default_god_object_indicators() -> GodObjectIndicators {
-        GodObjectIndicators {
-            methods_count: 0,
-            fields_count: 0,
-            responsibilities: 0,
-            is_god_object: false,
-            god_object_score: 0.0,
-            responsibility_names: Vec::new(),
-            recommended_splits: Vec::new(),
-            module_structure: None,
-            domain_count: 0,
-            domain_diversity: 0.0,
-            struct_ratio: 0.0,
-            analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
-            cross_domain_severity: None,
-            domain_diversity_metrics: None,
-            detection_type: None,
-        }
     }
 
     /// Pure function to determine if file should be included based on score
@@ -974,29 +925,47 @@ impl ParallelUnifiedAnalysisBuilder {
                 ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
 
             // Handle god object detection with accurate line count
-            file_metrics.god_object_indicators = if no_god_object {
-                file_analysis::default_god_object_indicators()
+            file_metrics.god_object_analysis = if no_god_object {
+                None
             } else {
-                file_analysis::analyze_god_object_indicators(&content, file_path, coverage_data)
+                file_analysis::analyze_god_object(&content, file_path, coverage_data)
                     .unwrap_or_else(|_| {
-                        let mut indicators = file_analysis::default_god_object_indicators();
-                        // Update based on actual line count
+                        // Fallback to heuristic detection if analysis fails
                         if actual_line_count > 2000 || file_metrics.function_count > 50 {
-                            indicators.is_god_object = true;
-                            indicators.god_object_score =
-                                (file_metrics.function_count as f64 / 50.0).min(2.0);
-                            indicators.methods_count = file_metrics.function_count;
+                            Some(crate::organization::GodObjectAnalysis {
+                                is_god_object: true,
+                                method_count: file_metrics.function_count,
+                                field_count: 0,
+                                responsibility_count: 5,
+                                lines_of_code: actual_line_count,
+                                complexity_sum: file_metrics.total_complexity,
+                                god_object_score: (file_metrics.function_count as f64 / 50.0)
+                                    .min(2.0),
+                                recommended_splits: Vec::new(),
+                                confidence: crate::organization::GodObjectConfidence::Probable,
+                                responsibilities: Vec::new(),
+                                purity_distribution: None,
+                                module_structure: None,
+                                detection_type: crate::organization::DetectionType::GodFile,
+                                visibility_breakdown: None,
+                                domain_count: 0,
+                                domain_diversity: 0.0,
+                                struct_ratio: 0.0,
+                                analysis_method: Default::default(),
+                                cross_domain_severity: None,
+                                domain_diversity_metrics: None,
+                            })
+                        } else {
+                            None
                         }
-                        indicators
                     })
             };
         } else {
             // Fallback to estimated metrics if file can't be read
-            file_metrics.god_object_indicators = if no_god_object {
-                file_analysis::default_god_object_indicators()
+            file_metrics.god_object_analysis = if no_god_object {
+                None
             } else {
                 self.analyze_god_object_with_io(file_path, coverage_data)
-                    .unwrap_or_else(file_analysis::default_god_object_indicators)
             };
         }
 
@@ -1028,7 +997,7 @@ impl ParallelUnifiedAnalysisBuilder {
         &self,
         file_path: &Path,
         coverage_data: Option<&LcovData>,
-    ) -> Option<crate::priority::file_metrics::GodObjectIndicators> {
+    ) -> Option<crate::organization::GodObjectAnalysis> {
         // I/O: Read file content
         let content = std::fs::read_to_string(file_path)
             .map_err(|e| {
@@ -1042,16 +1011,17 @@ impl ParallelUnifiedAnalysisBuilder {
             .ok()?;
 
         // Pure: Analyze content
-        file_analysis::analyze_god_object_indicators(&content, file_path, coverage_data)
+        file_analysis::analyze_god_object(&content, file_path, coverage_data)
             .map_err(|e| {
                 eprintln!(
-                    "Warning: Failed to analyze god object indicators for {}: {}",
+                    "Warning: Failed to analyze god object for {}: {}",
                     file_path.display(),
                     e
                 );
                 e
             })
             .ok()
+            .flatten() // Flatten Option<Option<GodObjectAnalysis>> to Option<GodObjectAnalysis>
     }
 
     /// Build the final unified analysis from parallel results
@@ -1091,18 +1061,17 @@ impl ParallelUnifiedAnalysisBuilder {
 
         // Add file items and create god object UnifiedDebtItems (spec 207)
         for file_item in file_items {
-            // Check if this file has god object indicators
-            if file_item.metrics.god_object_indicators.is_god_object {
-                // Convert GodObjectIndicators to GodObjectAnalysis for god item creation
-                let god_analysis = convert_indicators_to_analysis(&file_item.metrics);
-
-                // Create god object UnifiedDebtItem using same function as sequential path
-                let god_item = crate::builders::unified_analysis::create_god_object_debt_item(
-                    &file_item.metrics.path,
-                    &file_item.metrics,
-                    &god_analysis,
-                );
-                unified.add_item(god_item);
+            // Check if this file has god object analysis
+            if let Some(ref god_analysis) = file_item.metrics.god_object_analysis {
+                if god_analysis.is_god_object {
+                    // Create god object UnifiedDebtItem using same function as sequential path
+                    let god_item = crate::builders::unified_analysis::create_god_object_debt_item(
+                        &file_item.metrics.path,
+                        &file_item.metrics,
+                        god_analysis,
+                    );
+                    unified.add_item(god_item);
+                }
             }
 
             unified.add_file_item(file_item);

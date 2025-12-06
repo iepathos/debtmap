@@ -1423,7 +1423,7 @@ fn enhance_metrics_with_content(
 
     // Apply god object detection if enabled
     if !no_god_object {
-        file_metrics.god_object_indicators = detect_god_object_indicators(
+        file_metrics.god_object_analysis = detect_god_object_analysis(
             file_analyzer,
             file_path,
             content,
@@ -1431,7 +1431,7 @@ fn enhance_metrics_with_content(
             actual_line_count,
         );
     } else {
-        file_metrics.god_object_indicators = create_empty_god_object_indicators();
+        file_metrics.god_object_analysis = None;
     }
 
     Ok(file_metrics)
@@ -1442,50 +1442,58 @@ fn calculate_uncovered_lines(coverage_percent: f64, line_count: usize) -> usize 
     ((1.0 - coverage_percent) * line_count as f64) as usize
 }
 
-// Pure function to detect god object indicators
-fn detect_god_object_indicators(
+// Pure function to detect god object analysis
+fn detect_god_object_analysis(
     file_analyzer: &crate::analyzers::file_analyzer::UnifiedFileAnalyzer,
     file_path: &Path,
     content: &str,
     file_metrics: &FileDebtMetrics,
     actual_line_count: usize,
-) -> crate::priority::file_metrics::GodObjectIndicators {
-    let mut god_indicators = file_analyzer
+) -> Option<crate::organization::GodObjectAnalysis> {
+    // Get analysis from file analyzer or existing analysis
+    let mut god_analysis = file_analyzer
         .analyze_file(file_path, content)
         .ok()
-        .map(|m| m.god_object_indicators)
-        .unwrap_or_else(|| file_metrics.god_object_indicators.clone());
+        .and_then(|m| m.god_object_analysis)
+        .or_else(|| file_metrics.god_object_analysis.clone());
 
     // Apply size-based god object detection
     if actual_line_count > 2000 || file_metrics.function_count > 50 {
-        god_indicators.is_god_object = true;
-        if god_indicators.god_object_score == 0.0 {
-            god_indicators.god_object_score = (file_metrics.function_count as f64 / 50.0).min(2.0);
+        // If we have an existing analysis, update it
+        if let Some(ref mut analysis) = god_analysis {
+            analysis.is_god_object = true;
+            if analysis.god_object_score == 0.0 {
+                analysis.god_object_score =
+                    ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0;
+            }
+        } else {
+            // Create new minimal analysis for size-based detection
+            god_analysis = Some(crate::organization::GodObjectAnalysis {
+                is_god_object: true,
+                method_count: file_metrics.function_count,
+                field_count: 0,
+                responsibility_count: 0,
+                lines_of_code: actual_line_count,
+                complexity_sum: file_metrics.total_complexity,
+                god_object_score: ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0,
+                recommended_splits: Vec::new(),
+                confidence: crate::organization::GodObjectConfidence::Probable,
+                responsibilities: Vec::new(),
+                purity_distribution: None,
+                module_structure: None,
+                detection_type: crate::organization::DetectionType::GodFile,
+                visibility_breakdown: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: crate::organization::SplitAnalysisMethod::None,
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+            });
         }
     }
 
-    god_indicators
-}
-
-// Pure function to create empty god object indicators
-fn create_empty_god_object_indicators() -> crate::priority::file_metrics::GodObjectIndicators {
-    crate::priority::file_metrics::GodObjectIndicators {
-        methods_count: 0,
-        fields_count: 0,
-        responsibilities: 0,
-        is_god_object: false,
-        god_object_score: 0.0,
-        responsibility_names: Vec::new(),
-        recommended_splits: Vec::new(),
-        module_structure: None,
-        domain_count: 0,
-        domain_diversity: 0.0,
-        struct_ratio: 0.0,
-        analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
-        cross_domain_severity: None,
-        domain_diversity_metrics: None,
-        detection_type: None,
-    }
+    god_analysis
 }
 
 // Pure function to calculate function scores
@@ -1548,37 +1556,8 @@ fn convert_to_org_severity(
 fn create_god_object_analysis(
     file_metrics: &FileDebtMetrics,
 ) -> Option<crate::organization::GodObjectAnalysis> {
-    if !file_metrics.god_object_indicators.is_god_object {
-        return None;
-    }
-
-    Some(crate::organization::GodObjectAnalysis {
-        is_god_object: file_metrics.god_object_indicators.is_god_object,
-        method_count: file_metrics.god_object_indicators.methods_count,
-        field_count: file_metrics.god_object_indicators.fields_count,
-        responsibility_count: file_metrics.god_object_indicators.responsibilities,
-        lines_of_code: file_metrics.total_lines,
-        complexity_sum: file_metrics.total_complexity,
-        god_object_score: file_metrics.god_object_indicators.god_object_score * 100.0,
-        recommended_splits: Vec::new(),
-        confidence: crate::organization::GodObjectConfidence::Definite,
-        responsibilities: Vec::new(),
-        purity_distribution: None,
-        module_structure: file_metrics.god_object_indicators.module_structure.clone(),
-        detection_type: crate::organization::DetectionType::GodFile,
-        visibility_breakdown: None, // Spec 134: Added for compatibility
-        domain_count: file_metrics.god_object_indicators.domain_count,
-        domain_diversity: file_metrics.god_object_indicators.domain_diversity,
-        struct_ratio: file_metrics.god_object_indicators.struct_ratio,
-        analysis_method: convert_to_org_split_method(
-            file_metrics.god_object_indicators.analysis_method,
-        ),
-        cross_domain_severity: file_metrics
-            .god_object_indicators
-            .cross_domain_severity
-            .map(convert_to_org_severity),
-        domain_diversity_metrics: None, // Spec 152: Added for struct-based analysis
-    })
+    // Simply return the existing analysis if present
+    file_metrics.god_object_analysis.clone()
 }
 
 /// Pure function to create a UnifiedDebtItem from god object indicators (spec 207)

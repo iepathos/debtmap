@@ -299,7 +299,7 @@ impl FileDebtItemOutput {
                 coverage: item.metrics.coverage_percent,
                 uncovered_lines: item.metrics.uncovered_lines,
             },
-            god_object_indicators: Some(item.metrics.god_object_indicators.clone()),
+            god_object_indicators: item.metrics.god_object_analysis.clone().map(|a| a.into()),
             recommendation: RecommendationOutput {
                 action: item.recommendation.clone(),
                 priority: None,

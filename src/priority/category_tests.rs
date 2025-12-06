@@ -90,13 +90,31 @@ mod tests {
                 total_complexity: if is_god_object { 400 } else { 100 },
                 coverage_percent: 0.5,
                 uncovered_lines: 250,
-                god_object_indicators: GodObjectIndicators {
-                    methods_count: if is_god_object { 40 } else { 10 },
-                    fields_count: if is_god_object { 20 } else { 5 },
-                    responsibilities: if is_god_object { 8 } else { 2 },
-                    is_god_object,
-                    god_object_score: if is_god_object { 3.5 } else { 0.0 },
-                    ..Default::default()
+                god_object_analysis: if is_god_object {
+                    Some(crate::organization::GodObjectAnalysis {
+                        method_count: 40,
+                        field_count: 20,
+                        responsibility_count: 8,
+                        is_god_object: true,
+                        god_object_score: 350.0,
+                        lines_of_code: 500,
+                        complexity_sum: 400,
+                        responsibilities: vec![],
+                        recommended_splits: vec![],
+                        confidence: crate::organization::GodObjectConfidence::Definite,
+                        purity_distribution: None,
+                        module_structure: None,
+                        detection_type: crate::organization::DetectionType::GodFile,
+                        visibility_breakdown: None,
+                        domain_count: 0,
+                        domain_diversity: 0.0,
+                        struct_ratio: 0.0,
+                        analysis_method: crate::organization::SplitAnalysisMethod::None,
+                        cross_domain_severity: None,
+                        domain_diversity_metrics: None,
+                    })
+                } else {
+                    None
                 },
                 function_scores: vec![],
                 god_object_type: None,
