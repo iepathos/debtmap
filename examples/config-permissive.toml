@@ -1,0 +1,85 @@
+# Permissive Configuration Preset
+# Use this for legacy codebases or complex domains
+# Recommended for: Legacy projects, complex business logic, gradual migration
+
+version = "1.0"
+
+# ============================================================================
+# Permissive Thresholds - Higher tolerance for complexity
+# ============================================================================
+
+[thresholds]
+# High complexity threshold - only flag very complex functions
+complexity = 100
+
+# Higher duplication tolerance
+duplication = 20
+
+# Longer file and function limits
+max_file_length = 2000
+max_function_length = 100
+
+# Relaxed parameter and nesting limits
+max_function_params = 6
+max_nesting_depth = 5
+
+# ============================================================================
+# Permissive Scoring - De-emphasize coverage, focus on complexity
+# ============================================================================
+
+[scoring]
+# Lower coverage weight - recognize legacy code may lack tests
+coverage = 0.40
+complexity = 0.40  # Higher complexity weight
+dependency = 0.20
+semantic = 0.00
+security = 0.00
+organization = 0.00
+
+# ============================================================================
+# Permissive Analysis Settings
+# ============================================================================
+
+[analysis]
+# Optional validation checks
+validate_loc = false
+ast_functional_analysis = false
+
+# Higher pattern threshold - only very confident detections
+pattern_threshold = 0.6
+
+# ============================================================================
+# Permissive Display Settings
+# ============================================================================
+
+[display]
+format = "terminal"
+verbosity = 1  # Standard verbosity
+detail_level = "standard"
+show_attribution = false
+group_by_category = false
+
+[filters]
+min_score = 5.0  # Higher threshold - focus on critical issues only
+
+# ============================================================================
+# Permissive Validation for CI/CD
+# ============================================================================
+
+[thresholds.validation]
+max_average_complexity = 15.0  # More lenient
+max_debt_density = 100.0       # Higher debt density allowed
+max_codebase_risk_score = 10.0 # Higher risk tolerance
+min_coverage_percentage = 0.0  # No coverage requirement
+
+# ============================================================================
+# Ignore Patterns (same for all presets)
+# ============================================================================
+
+[ignore]
+patterns = [
+    "tests/**/*",
+    "examples/**/*",
+    "benches/**/*",
+    "**/target/**",
+]

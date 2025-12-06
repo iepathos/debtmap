@@ -1,0 +1,85 @@
+# Strict Configuration Preset
+# Use this for projects with high code quality standards
+# Recommended for: New projects, critical systems, high-reliability software
+
+version = "1.0"
+
+# ============================================================================
+# Strict Thresholds - Low tolerance for complexity
+# ============================================================================
+
+[thresholds]
+# Low complexity threshold - flag functions early
+complexity = 20
+
+# Low duplication tolerance
+duplication = 5
+
+# Shorter file and function limits
+max_file_length = 500
+max_function_length = 30
+
+# Strict parameter and nesting limits
+max_function_params = 3
+max_nesting_depth = 3
+
+# ============================================================================
+# Strict Scoring - Emphasize coverage
+# ============================================================================
+
+[scoring]
+# Higher coverage weight - well-tested code is critical
+coverage = 0.55
+complexity = 0.30
+dependency = 0.15
+semantic = 0.00
+security = 0.00
+organization = 0.00
+
+# ============================================================================
+# Strict Analysis Settings
+# ============================================================================
+
+[analysis]
+# Enable all validation checks
+validate_loc = true
+ast_functional_analysis = true
+
+# Lower pattern threshold - more confident detections only
+pattern_threshold = 0.8
+
+# ============================================================================
+# Strict Display Settings
+# ============================================================================
+
+[display]
+format = "terminal"
+verbosity = 2  # More verbose output
+detail_level = "comprehensive"
+show_attribution = true
+group_by_category = true
+
+[filters]
+min_score = 2.0  # Lower threshold - show more issues
+
+# ============================================================================
+# Strict Validation for CI/CD
+# ============================================================================
+
+[thresholds.validation]
+max_average_complexity = 7.0  # Stricter than default
+max_debt_density = 30.0       # Lower debt density allowed
+max_codebase_risk_score = 5.0 # Lower risk tolerance
+min_coverage_percentage = 80.0 # Require good coverage
+
+# ============================================================================
+# Ignore Patterns (same for all presets)
+# ============================================================================
+
+[ignore]
+patterns = [
+    "tests/**/*",
+    "examples/**/*",
+    "benches/**/*",
+    "**/target/**",
+]

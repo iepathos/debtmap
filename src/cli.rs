@@ -55,20 +55,34 @@ pub enum Commands {
         path: PathBuf,
 
         /// Output format
-        #[arg(short, long, value_enum, default_value = "terminal")]
+        #[arg(
+            short,
+            long,
+            value_enum,
+            default_value = "terminal",
+            help_heading = "Output Options"
+        )]
         format: OutputFormat,
 
         /// Output file (defaults to stdout)
-        #[arg(short, long)]
+        #[arg(short, long, help_heading = "Output Options")]
         output: Option<PathBuf>,
 
         /// Complexity threshold
-        #[arg(long, default_value = "10")]
+        #[arg(long, default_value = "10", help_heading = "Threshold Options")]
         threshold_complexity: u32,
 
         /// Duplication threshold (lines)
-        #[arg(long, default_value = "50")]
+        #[arg(long, default_value = "50", help_heading = "Threshold Options")]
         threshold_duplication: usize,
+
+        /// Complexity threshold preset (strict, balanced, lenient)
+        #[arg(
+            long = "threshold-preset",
+            value_enum,
+            help_heading = "Threshold Options"
+        )]
+        threshold_preset: Option<ThresholdPreset>,
 
         /// Languages to analyze
         #[arg(long, value_delimiter = ',')]
@@ -77,11 +91,19 @@ pub enum Commands {
         /// LCOV coverage file for risk analysis and score dampening.
         /// Coverage data dampens debt scores for well-tested code (multiplier = 1.0 - coverage),
         /// surfacing untested complex functions. Total debt score with coverage ≤ score without.
-        #[arg(long = "coverage-file", visible_alias = "lcov")]
+        #[arg(
+            long = "coverage-file",
+            visible_alias = "lcov",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         coverage_file: Option<PathBuf>,
 
         /// Enable context-aware risk analysis
-        #[arg(long = "context", visible_alias = "enable-context")]
+        #[arg(
+            long = "context",
+            visible_alias = "enable-context",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         enable_context: bool,
 
         /// Context providers to use (critical_path, dependency, git_history)
@@ -108,33 +130,6 @@ pub enum Commands {
         #[arg(long = "semantic-off")]
         semantic_off: bool,
 
-        /// Show score breakdown for debugging (deprecated: use -v instead)
-        #[arg(long = "explain-score", hide = true)]
-        explain_score: bool,
-
-        /// Increase verbosity level (can be repeated: -v, -vv, -vvv)
-        /// -v: Show main score factors
-        /// -vv: Show detailed calculations
-        /// -vvv: Show all debug information
-        #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
-        verbosity: u8,
-
-        /// Use compact output format (minimal details, top metrics only)
-        #[arg(short = 'c', long = "compact", conflicts_with = "verbosity")]
-        compact: bool,
-
-        /// Show verbose macro parsing warnings
-        #[arg(long = "verbose-macro-warnings")]
-        verbose_macro_warnings: bool,
-
-        /// Show macro expansion statistics at the end of analysis
-        #[arg(long = "show-macro-stats")]
-        show_macro_stats: bool,
-
-        /// Group output by debt category
-        #[arg(long = "group-by-category")]
-        group_by_category: bool,
-
         /// Minimum priority to display (low, medium, high, critical)
         #[arg(long = "min-priority")]
         min_priority: Option<String>,
@@ -149,37 +144,48 @@ pub enum Commands {
         #[arg(long = "filter", value_delimiter = ',')]
         filter_categories: Option<Vec<String>>,
 
-        /// Disable context-aware false positive reduction (enabled by default)
-        #[arg(long = "no-context-aware")]
-        no_context_aware: bool,
+        /// Group output by debt category
+        #[arg(long = "group-by-category")]
+        group_by_category: bool,
 
-        /// Complexity threshold preset (strict, balanced, lenient)
-        #[arg(long = "threshold-preset", value_enum)]
-        threshold_preset: Option<ThresholdPreset>,
+        /// Show filter statistics (how many items filtered and why)
+        #[arg(long = "show-filter-stats")]
+        show_filter_stats: bool,
+
+        /// Increase verbosity level (can be repeated: -v, -vv, -vvv)
+        /// -v: Show main score factors
+        /// -vv: Show detailed calculations
+        /// -vvv: Show all debug information
+        #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
+        verbosity: u8,
+
+        /// Use compact output format (minimal details, top metrics only)
+        #[arg(short = 'c', long = "compact", conflicts_with = "verbosity")]
+        compact: bool,
 
         /// Plain output mode: ASCII-only, no colors, no emoji, machine-parseable
         #[arg(long = "plain")]
         plain: bool,
 
-        /// Disable parallel call graph construction (enabled by default)
-        #[arg(long = "no-parallel")]
-        no_parallel: bool,
+        /// Detail level for diagnostic reports (summary, standard, comprehensive, debug)
+        #[arg(long = "detail-level", default_value = "standard")]
+        detail_level: Option<String>,
 
-        /// Number of threads for parallel processing (0 = use all cores)
-        #[arg(long = "jobs", short = 'j', default_value = "0")]
-        jobs: usize,
+        /// Disable TUI progress visualization (use simple progress bars)
+        #[arg(long = "no-tui")]
+        no_tui: bool,
 
-        /// Disable multi-pass analysis (use single-pass for performance)
-        #[arg(long = "no-multi-pass")]
-        no_multi_pass: bool,
+        /// Suppress progress output (quiet mode)
+        #[arg(long = "quiet", short = 'q')]
+        quiet: bool,
+
+        /// Disable context-aware false positive reduction (enabled by default)
+        #[arg(long = "no-context-aware")]
+        no_context_aware: bool,
 
         /// Show complexity attribution details
         #[arg(long = "attribution")]
         show_attribution: bool,
-
-        /// Detail level for diagnostic reports (summary, standard, comprehensive, debug)
-        #[arg(long = "detail-level", default_value = "standard")]
-        detail_level: Option<String>,
 
         /// Show only aggregated file-level scores
         #[arg(long = "aggregate-only")]
@@ -197,6 +203,22 @@ pub enum Commands {
         #[arg(long = "min-problematic")]
         min_problematic: Option<usize>,
 
+        /// Disable parallel call graph construction (enabled by default)
+        #[arg(long = "no-parallel")]
+        no_parallel: bool,
+
+        /// Number of threads for parallel processing (0 = use all cores)
+        #[arg(long = "jobs", short = 'j', default_value = "0")]
+        jobs: usize,
+
+        /// Disable multi-pass analysis (use single-pass for performance)
+        #[arg(long = "no-multi-pass")]
+        no_multi_pass: bool,
+
+        /// Maximum number of files to analyze (0 = no limit, default: no limit)
+        #[arg(long = "max-files")]
+        max_files: Option<usize>,
+
         /// Disable god object detection
         #[arg(long = "no-god-object")]
         no_god_object: bool,
@@ -209,13 +231,11 @@ pub enum Commands {
         #[arg(long = "min-split-lines", default_value = "150")]
         min_split_lines: usize,
 
-        /// Maximum number of files to analyze (0 = no limit, default: no limit)
-        #[arg(long = "max-files")]
-        max_files: Option<usize>,
-
-        /// Validate LOC consistency across analysis modes (with/without coverage)
-        #[arg(long = "validate-loc")]
-        validate_loc: bool,
+        /// Show detailed module split recommendations for god objects and large files.
+        /// This experimental feature suggests how to decompose large files into
+        /// smaller, focused modules. Hidden by default.
+        #[arg(long = "show-splits")]
+        show_splits: bool,
 
         /// Disable public API detection heuristics for dead code analysis
         #[arg(long = "no-public-api-detection")]
@@ -237,37 +257,13 @@ pub enum Commands {
         #[arg(long = "pattern-threshold", default_value = "0.7")]
         pattern_threshold: f32,
 
-        /// Show pattern warnings for uncertain detections
-        #[arg(long = "show-pattern-warnings")]
-        show_pattern_warnings: bool,
+        /// Enable AST-based functional composition analysis (spec 111)
+        #[arg(long = "ast-functional-analysis")]
+        ast_functional_analysis: bool,
 
-        /// Show filter statistics (how many items filtered and why)
-        #[arg(long = "show-filter-stats")]
-        show_filter_stats: bool,
-
-        /// Explain metric definitions and formulas (measured vs estimated)
-        #[arg(long = "explain-metrics")]
-        explain_metrics: bool,
-
-        /// Enable call graph debugging with detailed resolution information
-        #[arg(long = "debug-call-graph")]
-        debug_call_graph: bool,
-
-        /// Trace specific functions during call resolution (comma-separated)
-        #[arg(long = "trace-function", value_delimiter = ',')]
-        trace_functions: Option<Vec<String>>,
-
-        /// Show only call graph statistics (no detailed failure list)
-        #[arg(long = "call-graph-stats")]
-        call_graph_stats_only: bool,
-
-        /// Debug output format (text or json)
-        #[arg(long = "debug-format", value_enum, default_value = "text")]
-        debug_format: DebugFormatArg,
-
-        /// Validate call graph structure and report issues
-        #[arg(long = "validate-call-graph")]
-        validate_call_graph: bool,
+        /// Functional analysis profile (strict, balanced, lenient)
+        #[arg(long = "functional-analysis-profile", value_enum)]
+        functional_analysis_profile: Option<FunctionalAnalysisProfile>,
 
         /// Show dependency information (callers/callees) in output
         #[arg(long = "show-dependencies")]
@@ -293,27 +289,49 @@ pub enum Commands {
         #[arg(long = "show-std-lib-calls")]
         show_std_lib: bool,
 
-        /// Enable AST-based functional composition analysis (spec 111)
-        #[arg(long = "ast-functional-analysis")]
-        ast_functional_analysis: bool,
+        /// Explain metric definitions and formulas (measured vs estimated)
+        #[arg(long = "explain-metrics")]
+        explain_metrics: bool,
 
-        /// Functional analysis profile (strict, balanced, lenient)
-        #[arg(long = "functional-analysis-profile", value_enum)]
-        functional_analysis_profile: Option<FunctionalAnalysisProfile>,
+        /// Show verbose macro parsing warnings
+        #[arg(long = "verbose-macro-warnings")]
+        verbose_macro_warnings: bool,
 
-        /// Show detailed module split recommendations for god objects and large files.
-        /// This experimental feature suggests how to decompose large files into
-        /// smaller, focused modules. Hidden by default.
-        #[arg(long = "show-splits")]
-        show_splits: bool,
+        /// Show macro expansion statistics at the end of analysis
+        #[arg(long = "show-macro-stats")]
+        show_macro_stats: bool,
 
-        /// Disable TUI progress visualization (use simple progress bars)
-        #[arg(long = "no-tui")]
-        no_tui: bool,
+        /// Show pattern warnings for uncertain detections
+        #[arg(long = "show-pattern-warnings")]
+        show_pattern_warnings: bool,
 
-        /// Suppress progress output (quiet mode)
-        #[arg(long = "quiet", short = 'q')]
-        quiet: bool,
+        /// Validate LOC consistency across analysis modes (with/without coverage)
+        #[arg(long = "validate-loc")]
+        validate_loc: bool,
+
+        /// Enable call graph debugging with detailed resolution information
+        #[arg(long = "debug-call-graph")]
+        debug_call_graph: bool,
+
+        /// Trace specific functions during call resolution (comma-separated)
+        #[arg(long = "trace-function", value_delimiter = ',')]
+        trace_functions: Option<Vec<String>>,
+
+        /// Show only call graph statistics (no detailed failure list)
+        #[arg(long = "call-graph-stats")]
+        call_graph_stats_only: bool,
+
+        /// Debug output format (text or json)
+        #[arg(long = "debug-format", value_enum, default_value = "text")]
+        debug_format: DebugFormatArg,
+
+        /// Validate call graph structure and report issues
+        #[arg(long = "validate-call-graph")]
+        validate_call_graph: bool,
+
+        /// Show score breakdown for debugging (deprecated: use -v instead)
+        #[arg(long = "explain-score", hide = true)]
+        explain_score: bool,
     },
 
     /// Initialize configuration file
@@ -335,7 +353,11 @@ pub enum Commands {
         /// LCOV coverage file for risk analysis and score dampening.
         /// Coverage data dampens debt scores for well-tested code (multiplier = 1.0 - coverage),
         /// surfacing untested complex functions. Total debt score with coverage ≤ score without.
-        #[arg(long = "coverage-file", visible_alias = "lcov")]
+        #[arg(
+            long = "coverage-file",
+            visible_alias = "lcov",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         coverage_file: Option<PathBuf>,
 
         /// Output format
@@ -347,7 +369,11 @@ pub enum Commands {
         output: Option<PathBuf>,
 
         /// Enable context-aware risk analysis
-        #[arg(long = "context", visible_alias = "enable-context")]
+        #[arg(
+            long = "context",
+            visible_alias = "enable-context",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         enable_context: bool,
 
         /// Context providers to use (critical_path, dependency, git_history)
@@ -485,7 +511,11 @@ pub enum Commands {
         path: PathBuf,
 
         /// LCOV coverage file
-        #[arg(long = "coverage-file", visible_alias = "lcov")]
+        #[arg(
+            long = "coverage-file",
+            visible_alias = "lcov",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         coverage_file: PathBuf,
 
         /// Function name to explain (e.g., "create_auto_commit")
