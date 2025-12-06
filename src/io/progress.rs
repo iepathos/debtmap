@@ -7,12 +7,11 @@
 //! # Example Output
 //!
 //! ```text
-//! → 1/3 Discovering files...        511 found
-//! ✓ 1/3 Discovering files...        511 found - 0s
-//! → 2/3 Analyzing complexity...     511/511 (100%) - 2s
-//! ✓ 2/3 Analyzing complexity...     511/511 (100%) - 2s
-//! → 3/3 Building call graph...      511/511 (100%) - 1s
-//! ✓ 3/3 Building call graph...      511/511 (100%) - 1s
+//! → 1/2 files parse...              511 found
+//! → 1/2 files parse...              511/511 (100%) - 2s
+//! ✓ 1/2 files parse...              511/511 (100%) - 2s
+//! → 2/2 Building call graph...      511/511 (100%) - 1s
+//! ✓ 2/2 Building call graph...      511/511 (100%) - 1s
 //!
 //! Analysis complete in 3.2s
 //! ```
@@ -68,8 +67,7 @@ impl AnalysisProgress {
 
         Self {
             phases: vec![
-                AnalysisPhase::new("Discovering files", PhaseProgress::Indeterminate),
-                AnalysisPhase::new("Analyzing complexity", PhaseProgress::Indeterminate),
+                AnalysisPhase::new("files parse", PhaseProgress::Indeterminate),
                 AnalysisPhase::new("Building call graph", PhaseProgress::Indeterminate),
             ],
             current_phase: 0,

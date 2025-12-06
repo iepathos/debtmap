@@ -5,7 +5,7 @@
 //!
 //! # Features
 //!
-//! - **Full pipeline visibility**: All 9 analysis stages displayed at once
+//! - **Full pipeline visibility**: All 7 analysis stages displayed at once
 //! - **Hierarchical progress**: Active stages expand to show sub-tasks
 //! - **Rich context**: Counts, percentages, and real-time statistics
 //! - **Smooth animations**: 60 FPS rendering with progress bars and sliding arrows
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn test_app_initialization() {
         let app = App::new();
-        assert_eq!(app.stages.len(), 8);
+        assert_eq!(app.stages.len(), 7); // 7 stages (files and parse combined)
         assert_eq!(app.overall_progress, 0.0);
     }
 }

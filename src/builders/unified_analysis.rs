@@ -168,10 +168,10 @@ fn perform_unified_analysis_computation(
     // Progress tracking
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
 
-    // Phase 3: Building call graph (spec 195)
-    crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(2));
+    // Phase 2: Building call graph (spec 195)
+    crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(1));
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(2); // call graph stage
+        manager.tui_start_stage(1); // call graph stage (index decreased by 1 after combining files+parse)
     }
 
     // Time call graph building
@@ -197,7 +197,7 @@ fn perform_unified_analysis_computation(
     });
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(2, format!("{} functions", call_graph.node_count()));
+        manager.tui_complete_stage(1, format!("{} functions", call_graph.node_count()));
         manager.tui_set_progress(0.33); // ~3/9 stages complete
     }
 

@@ -128,7 +128,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config._formatting_config,
     )?;
 
-    // Note: Phase 3 (Building call graph) is tracked inside perform_unified_analysis_with_options
+    // Note: Phase 2 (Building call graph) is tracked inside perform_unified_analysis_with_options
     let mut unified_analysis = unified_analysis::perform_unified_analysis_with_options(
         unified_analysis::UnifiedAnalysisOptions {
             results: &results,
@@ -283,7 +283,7 @@ pub fn analyze_project(
         io::progress::AnalysisProgress::init_global();
     }
 
-    // Phase 1: Discovering files
+    // Phase 1: files parse (discovery + parsing combined)
     io::progress::AnalysisProgress::with_global(|p| p.start_phase(0));
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_start_stage(0);
@@ -292,28 +292,19 @@ pub fn analyze_project(
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
 
+    // Update progress with file count (still in phase 0)
     io::progress::AnalysisProgress::with_global(|p| {
         p.update_progress(io::progress::PhaseProgress::Count(files.len()));
-        p.complete_phase();
     });
-
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(0, format!("{} files", files.len()));
-        manager.tui_set_progress(0.11); // ~1/9 stages complete
-    }
 
     // Analyze project size and apply graduated optimizations
     analyze_and_configure_project_size(&files, parallel_enabled, _formatting_config)?;
 
-    // Phase 2: Analyzing complexity (parsing)
-    io::progress::AnalysisProgress::with_global(|p| p.start_phase(1));
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(1); // parse stage
-    }
-
+    // Continue phase 0 for parsing (no phase transition needed)
     // Collect file metrics directly without caching
     let file_metrics = analysis_utils::collect_file_metrics(&files);
 
+    // Update progress to show parsing completion (still in phase 0)
     io::progress::AnalysisProgress::with_global(|p| {
         p.update_progress(io::progress::PhaseProgress::Progress {
             current: files.len(),
@@ -323,7 +314,7 @@ pub fn analyze_project(
     });
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(1, format!("{} files parsed", files.len()));
+        manager.tui_complete_stage(0, format!("{} files parsed", files.len()));
         manager.tui_set_progress(0.22); // ~2/9 stages complete
     }
 
