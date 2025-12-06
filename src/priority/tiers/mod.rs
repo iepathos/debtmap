@@ -1,9 +1,28 @@
 /// Tier classification for recommendation prioritization
 ///
-/// This module implements a tiered prioritization strategy to surface
-/// architectural issues above testing gaps, preventing "walls of similar-scored items".
-use crate::priority::{DebtType, UnifiedDebtItem};
+/// This module implements a tiered prioritization strategy using pure functional
+/// composition of predicate functions, following the "Pure Core, Imperative Shell"
+/// principle from the Stillwater philosophy.
+///
+/// ## Architecture
+///
+/// - **predicates.rs**: Pure predicate functions (2-5 lines each, single responsibility)
+/// - **pure.rs**: Pure classification logic (composes predicates)
+/// - **mod.rs**: Public API and configuration
+///
+/// ## Design Principles
+///
+/// - Small, pure functions with no side effects
+/// - Clear predicate composition using boolean operators
+/// - All functions < 10 lines, cyclomatic complexity < 5
+/// - 100% testable without mocks
 use serde::{Deserialize, Serialize};
+
+pub mod predicates;
+pub mod pure;
+
+// Re-export main classification function for backward compatibility
+pub use pure::classify_tier;
 
 /// Recommendation tier for strategic remediation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -127,185 +146,12 @@ impl TierConfig {
     }
 }
 
-/// Classify a debt item into a recommendation tier
-/// Uses sophisticated scoring metrics (weighted complexity, entropy, cognitive load)
-/// rather than raw cyclomatic complexity
-pub fn classify_tier(item: &UnifiedDebtItem, config: &TierConfig) -> RecommendationTier {
-    // Tier 1: Architectural issues OR very high scores
-    // Use final_score (includes exponential scaling, risk boosts, all sophisticated analysis)
-    if is_architectural_issue(item, &item.debt_type, config) {
-        return RecommendationTier::T1CriticalArchitecture;
-    }
-
-    // Tier 2: Complex untested code
-    if is_complex_untested(item, config) {
-        return RecommendationTier::T2ComplexUntested;
-    }
-
-    // Tier 2: Moderate complexity hotspots using sophisticated scoring
-    // This now considers weighted complexity, cognitive load, nesting, entropy dampening
-    if is_moderate_complexity_hotspot(item, config) {
-        return RecommendationTier::T2ComplexUntested;
-    }
-
-    // Tier 3: Moderate testing gaps
-    if is_moderate_untested(item, config) {
-        return RecommendationTier::T3TestingGaps;
-    }
-
-    // Tier 4: Everything else
-    RecommendationTier::T4Maintenance
-}
-
-/// Check if debt type is an architectural issue
-/// Uses sophisticated scoring: final_score, complexity_factor, cognitive, nesting
-fn is_architectural_issue(
-    item: &UnifiedDebtItem,
-    debt_type: &DebtType,
-    _config: &TierConfig,
-) -> bool {
-    // God objects and modules are always T1
-    if matches!(
-        debt_type,
-        DebtType::GodObject { .. } | DebtType::GodModule { .. }
-    ) {
-        return true;
-    }
-
-    // Critical patterns are always T1
-    if matches!(
-        debt_type,
-        DebtType::AsyncMisuse { .. } | DebtType::ErrorSwallowing { .. }
-    ) {
-        return true;
-    }
-
-    // For complexity hotspots, use SOPHISTICATED METRICS not raw cyclomatic
-    if let DebtType::ComplexityHotspot {
-        adjusted_cyclomatic,
-        cyclomatic,
-        cognitive,
-    } = debt_type
-    {
-        // Use entropy-dampened complexity if available
-        let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
-
-        // T1 if: extreme cyclomatic (raw) OR high weighted score OR extreme cognitive OR extreme nesting
-        // The final_score already includes weighted complexity, so check it first
-        if item.unified_score.final_score > 10.0 {
-            return true; // High final score after exponential scaling = critical
-        }
-
-        // Also check individual metrics for extreme values
-        if effective_cyclomatic > 50 {
-            return true; // Extremely high cyclomatic even after dampening
-        }
-
-        if *cognitive >= 20 {
-            return true; // Extreme cognitive load
-        }
-
-        if item.nesting_depth >= 5 {
-            return true; // Very deep nesting
-        }
-
-        // Check complexity_factor (includes weighted scoring: 30% cyclo + 70% cognitive)
-        if item.unified_score.complexity_factor > 5.0 {
-            return true; // High weighted complexity score
-        }
-    }
-
-    false
-}
-
-/// Check if item is complex untested code
-fn is_complex_untested(item: &UnifiedDebtItem, config: &TierConfig) -> bool {
-    // Must be a testing gap
-    let is_testing_gap = matches!(item.debt_type, DebtType::TestingGap { .. });
-    if !is_testing_gap {
-        return false;
-    }
-
-    // High complexity threshold
-    let high_complexity = item.cyclomatic_complexity >= config.t2_complexity_threshold;
-
-    // High dependency count
-    let total_deps = item.upstream_dependencies + item.downstream_dependencies;
-    let high_dependencies = total_deps >= config.t2_dependency_threshold;
-
-    // Entry point function
-    let is_critical_function = matches!(
-        item.function_role,
-        crate::priority::FunctionRole::EntryPoint
-    );
-
-    high_complexity || high_dependencies || is_critical_function
-}
-
-/// Check if item is moderate untested code
-fn is_moderate_untested(item: &UnifiedDebtItem, config: &TierConfig) -> bool {
-    // Must be a testing gap
-    let is_testing_gap = matches!(item.debt_type, DebtType::TestingGap { .. });
-    if !is_testing_gap {
-        return false;
-    }
-
-    // Moderate complexity
-    item.cyclomatic_complexity >= config.t3_complexity_threshold
-}
-
-/// Check if item is a moderate complexity hotspot (T2, not extreme enough for T1)
-/// Uses sophisticated metrics: weighted complexity, cognitive load, nesting, entropy dampening
-fn is_moderate_complexity_hotspot(item: &UnifiedDebtItem, _config: &TierConfig) -> bool {
-    // Only apply to complexity hotspots
-    if !matches!(&item.debt_type, DebtType::ComplexityHotspot { .. }) {
-        return false;
-    }
-
-    // T2 if the item has meaningful complexity that warrants attention
-    // Use multiple sophisticated signals, not just raw cyclomatic
-
-    // Signal 1: complexity_factor (weighted: 30% cyclo + 70% cognitive, scaled 0-10)
-    // Threshold: >= 2.0 indicates meaningful complexity
-    let has_meaningful_weighted_complexity = item.unified_score.complexity_factor >= 2.0;
-
-    // Signal 2: High cognitive complexity (mental load)
-    // Threshold: >= 12 indicates moderate to high cognitive load
-    let has_high_cognitive = item.cognitive_complexity >= 12;
-
-    // Signal 3: Deep nesting (indicates nested conditionals / loops)
-    // Threshold: >= 3 indicates meaningful nesting
-    let has_deep_nesting = item.nesting_depth >= 3;
-
-    // Signal 4: Adjusted cyclomatic after entropy dampening
-    // This respects the entropy analysis that identified repetitive patterns
-    if let DebtType::ComplexityHotspot {
-        adjusted_cyclomatic,
-        cyclomatic,
-        ..
-    } = &item.debt_type
-    {
-        let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
-
-        // For dampened complexity, use lower threshold since dampening already filtered out noise
-        let has_meaningful_dampened_complexity = (8..=50).contains(&effective_cyclomatic);
-
-        // T2 if ANY of the sophisticated signals indicate meaningful complexity
-        has_meaningful_weighted_complexity
-            || has_high_cognitive
-            || has_deep_nesting
-            || has_meaningful_dampened_complexity
-    } else {
-        // Fallback: use weighted and cognitive signals
-        has_meaningful_weighted_complexity || has_high_cognitive || has_deep_nesting
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::priority::{
-        ActionableRecommendation, FunctionRole, ImpactMetrics, Location, UnifiedScore,
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location,
+        UnifiedDebtItem, UnifiedScore,
     };
 
     fn create_test_item(debt_type: DebtType, complexity: u32, deps: usize) -> UnifiedDebtItem {
@@ -368,9 +214,9 @@ mod tests {
             pattern_analysis: None,
             context_multiplier: None,
             context_type: None,
-            language_specific: None, // spec 190
+            language_specific: None,
             detected_pattern: None,
-            contextual_risk: None, // spec 203
+            contextual_risk: None,
         }
     }
 
