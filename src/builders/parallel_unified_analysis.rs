@@ -561,6 +561,13 @@ impl ParallelUnifiedAnalysisBuilder {
                 &metrics,
             );
 
+            // Populate data transformations
+            progress.set_message("Detecting data transformations...");
+            let trans_count = crate::data_flow::population::populate_data_transformations(
+                &mut data_flow,
+                &metrics,
+            );
+
             if let Ok(mut t) = timings.lock() {
                 t.data_flow_creation = start.elapsed();
             }
@@ -568,10 +575,11 @@ impl ParallelUnifiedAnalysisBuilder {
                 *r = Some(data_flow);
             }
             progress.finish_with_message(format!(
-                "Data flow complete: {} purity, {} I/O ops, {} variable deps",
+                "Data flow complete: {} purity, {} I/O ops, {} variable deps, {} transformations",
                 purity_results.len(),
                 io_count,
-                dep_count
+                dep_count,
+                trans_count
             ));
         });
     }
