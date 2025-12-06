@@ -36,14 +36,17 @@ fn convert_indicators_to_analysis(file_metrics: &FileDebtMetrics) -> GodObjectAn
         responsibilities: indicators.responsibility_names.clone(),
         purity_distribution: None,
         module_structure: None, // Type mismatch - using file-level data instead
-        detection_type: indicators.detection_type.clone().unwrap_or(DetectionType::GodFile),
+        detection_type: indicators
+            .detection_type
+            .clone()
+            .unwrap_or(DetectionType::GodFile),
         visibility_breakdown: None,
         domain_count: indicators.domain_count,
         domain_diversity: indicators.domain_diversity,
         struct_ratio: indicators.struct_ratio,
         analysis_method: Default::default(), // Type mismatch - using default
-        cross_domain_severity: None, // Type mismatch - using None
-        domain_diversity_metrics: None, // Type mismatch - using None
+        cross_domain_severity: None,         // Type mismatch - using None
+        domain_diversity_metrics: None,      // Type mismatch - using None
     }
 }
 

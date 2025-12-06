@@ -1,0 +1,8 @@
+error[E0599]: no method named `execute` found for struct `debtmap::commands::AnalyzeConfig` in the current scope
+  --> tests/ui/unvalidated_execute.rs:75:12
+   |
+75 |     config.execute().unwrap();
+   |            ^^^^^^^ method not found in `debtmap::commands::AnalyzeConfig`
+   |
+   = note: the method was found for
+           - `debtmap::commands::AnalyzeConfig<Validated>`
