@@ -157,13 +157,40 @@ fn add_provider_to_aggregator(
     provider_name: &str,
     project_path: &Path,
 ) -> risk::context::ContextAggregator {
-    match create_provider(provider_name, project_path) {
+    // Map provider names to subsection indices (spec 219)
+    // 0 = critical_path, 1 = dependency, 2 = git_history
+    let subsection_index = match provider_name {
+        "critical_path" => Some(0),
+        "dependency" => Some(1),
+        "git_history" => Some(2),
+        _ => None,
+    };
+
+    // Update subsection to Active state
+    if let Some(index) = subsection_index {
+        if let Some(manager) = crate::progress::ProgressManager::global() {
+            manager.tui_update_subtask(6, index, crate::tui::app::StageStatus::Active, None);
+        }
+    }
+
+    let result = match create_provider(provider_name, project_path) {
         Some(provider) => aggregator.with_provider(provider),
         None => {
             eprintln!("Warning: Unknown context provider: {provider_name}");
             aggregator
         }
+    };
+
+    // Update subsection to Completed state and add visibility pause (spec 219)
+    if let Some(index) = subsection_index {
+        if let Some(manager) = crate::progress::ProgressManager::global() {
+            manager.tui_update_subtask(6, index, crate::tui::app::StageStatus::Completed, None);
+            // 150ms visibility pause for user feedback
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
     }
+
+    result
 }
 
 fn create_provider(
