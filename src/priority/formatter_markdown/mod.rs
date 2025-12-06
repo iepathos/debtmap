@@ -215,3 +215,65 @@ pub fn format_priorities_tiered_markdown(
 
     output
 }
+
+/// Formats filter metrics for display.
+///
+/// Pure function that generates markdown output showing filtering statistics.
+pub fn format_filter_metrics(metrics: &crate::priority::FilterMetrics) -> String {
+    let mut output = String::new();
+
+    writeln!(output, "## Filtering Summary\n").unwrap();
+    writeln!(
+        output,
+        "- **Total items analyzed**: {}",
+        metrics.total_items
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "- **Items included**: {} ({:.1}%)",
+        metrics.included,
+        metrics.inclusion_rate()
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "- **Items filtered**: {}\n",
+        metrics.total_filtered()
+    )
+    .unwrap();
+
+    if metrics.total_filtered() > 0 {
+        writeln!(output, "### Filtering Breakdown\n").unwrap();
+
+        if metrics.filtered_t4_maintenance > 0 {
+            writeln!(
+                output,
+                "- **Low-priority (T4)**: {} items (use `--min-score 0` to see)",
+                metrics.filtered_t4_maintenance
+            )
+            .unwrap();
+        }
+
+        if metrics.filtered_below_score > 0 {
+            writeln!(
+                output,
+                "- **Below score threshold**: {} items (threshold: {:.1})",
+                metrics.filtered_below_score, metrics.min_score_threshold
+            )
+            .unwrap();
+        }
+
+        if metrics.filtered_by_debt_type > 0 {
+            writeln!(
+                output,
+                "- **Disabled debt types**: {} items",
+                metrics.filtered_by_debt_type
+            )
+            .unwrap();
+        }
+    }
+
+    writeln!(output).unwrap();
+    output
+}

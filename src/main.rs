@@ -620,6 +620,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         show_splits,
         no_tui,
         quiet: _,
+        show_filter_stats,
     } = command
     {
         // Apply side effects first
@@ -702,6 +703,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             min_split_methods,
             min_split_lines,
             no_tui,
+            show_filter_stats,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -860,6 +862,7 @@ fn build_analyze_config(
     min_split_methods: usize,
     min_split_lines: usize,
     no_tui: bool,
+    show_filter_stats: bool,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     // Compute effective verbosity: compact mode sets verbosity to a special low value
     let effective_verbosity = if compact {
@@ -933,6 +936,7 @@ fn build_analyze_config(
         min_split_methods,
         min_split_lines,
         no_tui,
+        show_filter_stats,
     }
 }
 

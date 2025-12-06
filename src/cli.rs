@@ -240,6 +240,10 @@ pub enum Commands {
         #[arg(long = "show-pattern-warnings")]
         show_pattern_warnings: bool,
 
+        /// Show filter statistics (how many items filtered and why)
+        #[arg(long = "show-filter-stats")]
+        show_filter_stats: bool,
+
         /// Explain metric definitions and formulas (measured vs estimated)
         #[arg(long = "explain-metrics")]
         explain_metrics: bool,

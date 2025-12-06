@@ -20,6 +20,7 @@ pub struct OutputConfig {
     pub output_file: Option<PathBuf>,
     pub output_format: Option<crate::cli::OutputFormat>,
     pub formatting_config: FormattingConfig,
+    pub show_filter_stats: bool,
 }
 
 pub use evidence_formatter::*;
@@ -69,6 +70,7 @@ pub fn output_unified_priorities_with_config(
         config.output_format,
         config.formatting_config,
         results,
+        config.show_filter_stats,
     )
 }
 
@@ -93,6 +95,7 @@ pub fn output_unified_priorities(
         output_format,
         formatting_config,
         results,
+        false, // default to not showing filter stats
     )
 }
 
@@ -107,6 +110,7 @@ pub fn output_unified_priorities_with_summary(
     output_format: Option<crate::cli::OutputFormat>,
     formatting_config: FormattingConfig,
     results: &AnalysisResults,
+    show_filter_stats: bool,
 ) -> Result<()> {
     match output_format {
         Some(crate::cli::OutputFormat::Json) => {
@@ -126,6 +130,7 @@ pub fn output_unified_priorities_with_summary(
             verbosity,
             output_file,
             formatting_config,
+            show_filter_stats,
         ),
         Some(crate::cli::OutputFormat::Html) => match output_file {
             Some(path) => {
@@ -152,6 +157,7 @@ pub fn output_unified_priorities_with_summary(
                     verbosity,
                     output_file,
                     formatting_config,
+                    show_filter_stats,
                 )
             } else {
                 terminal::output_terminal_with_mode(
