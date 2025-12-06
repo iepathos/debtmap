@@ -889,10 +889,12 @@ impl ParallelUnifiedAnalysisBuilder {
             .par_iter()
             .progress_with(progress.clone())
             .filter_map(|(file_path, functions)| {
-                let result = self.analyze_file_parallel(file_path, functions, coverage_data, no_god_object);
+                let result =
+                    self.analyze_file_parallel(file_path, functions, coverage_data, no_god_object);
 
                 // Update progress (throttled to maintain 60 FPS - DESIGN.md:179)
-                let current = processed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                let current =
+                    processed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
 
                 if let Ok(mut last) = last_update.try_lock() {
                     if current % 10 == 0 || last.elapsed() > std::time::Duration::from_millis(100) {

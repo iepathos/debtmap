@@ -43,13 +43,59 @@ pub fn analyze_project(
     })
 }
 
-pub fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<DuplicationBlock> {
-    let files_with_content = prepare_files_for_duplication_check(files);
+/// Detect duplications with progress callback for TUI updates
+pub fn detect_duplications_with_progress<F>(
+    files: &[PathBuf],
+    threshold: usize,
+    mut progress_callback: F,
+) -> Vec<DuplicationBlock>
+where
+    F: FnMut(usize, usize),
+{
+    let total_files = files.len();
+    let mut last_update = std::time::Instant::now();
+
+    // Prepare files with progress tracking
+    let files_with_content: Vec<(PathBuf, String)> = files
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, path)| {
+            let result = match io::read_file(path) {
+                Ok(content) => Some((path.clone(), content)),
+                Err(e) => {
+                    log::debug!(
+                        "Skipping file {} for duplication check: {}",
+                        path.display(),
+                        e
+                    );
+                    None
+                }
+            };
+
+            // Throttled progress updates (every 10 files or 100ms)
+            if (idx + 1) % 10 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100)
+            {
+                progress_callback(idx + 1, total_files);
+                last_update = std::time::Instant::now();
+            }
+
+            result
+        })
+        .collect();
+
+    // Final progress update
+    progress_callback(total_files, total_files);
+
     debt::duplication::detect_duplication(
         files_with_content,
         threshold,
         DEFAULT_SIMILARITY_THRESHOLD,
     )
+}
+
+/// Detect duplications without progress tracking (compatibility wrapper)
+pub fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<DuplicationBlock> {
+    detect_duplications_with_progress(files, threshold, |_, _| {})
 }
 
 pub fn prepare_files_for_duplication_check(files: &[PathBuf]) -> Vec<(PathBuf, String)> {
@@ -157,5 +203,139 @@ mod tests {
     fn test_is_in_current_project_nested_relative() {
         let path = Path::new("src/subdir/nested/file.rs");
         assert!(is_in_current_project(path));
+    }
+
+    #[test]
+    fn test_detect_duplications_with_progress_calls_callback() {
+        use std::sync::{Arc, Mutex};
+
+        // Create temporary test files
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file1 = temp_dir.path().join("file1.rs");
+        let file2 = temp_dir.path().join("file2.rs");
+        let file3 = temp_dir.path().join("file3.rs");
+
+        std::fs::write(&file1, "fn test() { println!(\"hello\"); }").unwrap();
+        std::fs::write(&file2, "fn test() { println!(\"world\"); }").unwrap();
+        std::fs::write(&file3, "fn test() { println!(\"foo\"); }").unwrap();
+
+        let files = vec![file1, file2, file3];
+
+        // Track progress callback invocations
+        let progress_calls = Arc::new(Mutex::new(Vec::new()));
+        let progress_calls_clone = progress_calls.clone();
+
+        detect_duplications_with_progress(&files, 50, |current, total| {
+            progress_calls_clone.lock().unwrap().push((current, total));
+        });
+
+        let calls = progress_calls.lock().unwrap();
+
+        // Should have at least one call (final update)
+        assert!(!calls.is_empty(), "Progress callback should be called");
+
+        // Final call should report completion
+        let final_call = calls.last().unwrap();
+        assert_eq!(final_call.0, 3, "Final current should be total files");
+        assert_eq!(final_call.1, 3, "Final total should be total files");
+    }
+
+    #[test]
+    fn test_detect_duplications_with_progress_throttling() {
+        use std::sync::{Arc, Mutex};
+
+        // Create many temporary test files to test throttling
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mut files = Vec::new();
+
+        for i in 0..25 {
+            let file = temp_dir.path().join(format!("file{}.rs", i));
+            std::fs::write(&file, format!("fn test{}() {{}}", i)).unwrap();
+            files.push(file);
+        }
+
+        // Track progress callback invocations
+        let progress_calls = Arc::new(Mutex::new(Vec::new()));
+        let progress_calls_clone = progress_calls.clone();
+
+        detect_duplications_with_progress(&files, 50, |current, total| {
+            progress_calls_clone.lock().unwrap().push((current, total));
+        });
+
+        let calls = progress_calls.lock().unwrap();
+
+        // With 25 files and throttling every 10 files, we expect:
+        // - Update at file 10
+        // - Update at file 20
+        // - Final update at file 25
+        // (May have more if 100ms elapsed between files)
+        assert!(
+            calls.len() >= 3,
+            "Should have at least 3 progress updates with throttling"
+        );
+        assert!(
+            calls.len() <= 10,
+            "Throttling should limit excessive updates"
+        );
+
+        // Verify counts are monotonically increasing
+        for i in 1..calls.len() {
+            assert!(
+                calls[i].0 >= calls[i - 1].0,
+                "Progress should be monotonically increasing"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detect_duplications_with_progress_correct_values() {
+        use std::sync::{Arc, Mutex};
+
+        // Create temporary test files
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mut files = Vec::new();
+
+        for i in 0..15 {
+            let file = temp_dir.path().join(format!("file{}.rs", i));
+            std::fs::write(&file, format!("fn test{}() {{}}", i)).unwrap();
+            files.push(file);
+        }
+
+        let total_files = files.len();
+        let progress_calls = Arc::new(Mutex::new(Vec::new()));
+        let progress_calls_clone = progress_calls.clone();
+
+        detect_duplications_with_progress(&files, 50, |current, total| {
+            progress_calls_clone.lock().unwrap().push((current, total));
+        });
+
+        let calls = progress_calls.lock().unwrap();
+
+        // All calls should report correct total
+        for (current, total) in calls.iter() {
+            assert_eq!(
+                *total, total_files,
+                "Total should always be {}",
+                total_files
+            );
+            assert!(*current <= total_files, "Current should never exceed total");
+            assert!(*current > 0, "Current should be positive");
+        }
+    }
+
+    #[test]
+    fn test_detect_duplications_without_progress_works() {
+        // Test the compatibility wrapper
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file1 = temp_dir.path().join("file1.rs");
+        let file2 = temp_dir.path().join("file2.rs");
+
+        std::fs::write(&file1, "fn test() { println!(\"hello\"); }").unwrap();
+        std::fs::write(&file2, "fn test() { println!(\"hello\"); }").unwrap();
+
+        let files = vec![file1, file2];
+
+        // Should not panic or fail
+        let _result = detect_duplications(&files, 50);
     }
 }

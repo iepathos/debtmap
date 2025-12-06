@@ -7,6 +7,7 @@ use crate::{
     formatting::FormattingConfig,
     io,
     progress::{ProgressConfig, ProgressManager},
+    tui::app::StageStatus,
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -289,6 +290,11 @@ pub fn analyze_project(
         manager.tui_start_stage(0);
     }
 
+    // Subtask 0: discover files
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(0, 0, StageStatus::Active, None);
+    }
+
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
 
@@ -296,6 +302,16 @@ pub fn analyze_project(
     io::progress::AnalysisProgress::with_global(|p| {
         p.update_progress(io::progress::PhaseProgress::Count(files.len()));
     });
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(0, 0, StageStatus::Completed, None);
+        std::thread::sleep(std::time::Duration::from_millis(150)); // Visual consistency
+    }
+
+    // Subtask 1: parse metrics
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(0, 1, StageStatus::Active, None);
+    }
 
     // Analyze project size and apply graduated optimizations
     analyze_and_configure_project_size(&files, parallel_enabled, _formatting_config)?;
@@ -314,13 +330,17 @@ pub fn analyze_project(
     });
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(0, format!("{} files parsed", files.len()));
-        manager.tui_set_progress(0.22); // ~2/9 stages complete
+        manager.tui_update_subtask(0, 1, StageStatus::Completed, None);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 2: extract data
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(0, 2, StageStatus::Active, None);
     }
 
     let all_functions = analysis_utils::extract_all_functions(&file_metrics);
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);
-    let duplications = analysis_helpers::detect_duplications(&files, duplication_threshold);
 
     // Update TUI stats with function and debt counts
     if let Some(manager) = crate::progress::ProgressManager::global() {
@@ -329,6 +349,37 @@ pub fn analyze_project(
 
     // Extract file contexts for test file detection (spec 166)
     let file_contexts = analysis_utils::extract_file_contexts(&file_metrics);
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(0, 2, StageStatus::Completed, None);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 3: detect duplications (THE SLOW ONE)
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(0, 3, StageStatus::Active, Some((0, files.len())));
+    }
+
+    let duplications = analysis_helpers::detect_duplications_with_progress(
+        &files,
+        duplication_threshold,
+        |current, total| {
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                manager.tui_update_subtask(0, 3, StageStatus::Active, Some((current, total)));
+            }
+        },
+    );
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(
+            0,
+            3,
+            StageStatus::Completed,
+            Some((files.len(), files.len())),
+        );
+        manager.tui_complete_stage(0, format!("{} files parsed", files.len()));
+        manager.tui_set_progress(0.22); // ~2/9 stages complete
+    }
 
     let complexity_report =
         analysis_helpers::build_complexity_report(&all_functions, complexity_threshold);
