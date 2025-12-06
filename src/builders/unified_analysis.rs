@@ -1727,7 +1727,7 @@ fn apply_file_analysis_results(
                 &file_data.file_metrics,
                 god_analysis,
             );
-            unified.add_item(god_item); // Add as UnifiedDebtItem for TUI
+            unified.add_item(god_item); // Exempt from complexity filtering (spec 207)
         }
 
         // Create and add file debt item
