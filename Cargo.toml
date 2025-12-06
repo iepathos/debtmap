@@ -193,3 +193,7 @@ harness = false
 [[bench]]
 name = "batch_analysis"
 harness = false
+
+[[bench]]
+name = "tier_classification_bench"
+harness = false
