@@ -192,44 +192,57 @@ For comparison, here's how a **God Module** (file with many functions, not a cla
 
 ## Detail View - Dependencies Page (Page 2/5)
 
-Shows file-level dependencies for the god object:
+Shows both file-level AND aggregated function-level dependencies:
 
 ```
 ┌─ Item Details (2/5: Dependencies) ──────────────────────────────────────┐
 │                                                                          │
-│ FILE DEPENDENCIES                                                        │
-│   Files that import/use src/main.rs: 0                                  │
-│   Files imported by src/main.rs: 23                                     │
-│                                                                          │
-│ IMPORTED MODULES                                                         │
-│   1. src/analyzers/rust.rs                                               │
-│   2. src/analyzers/python.rs                                             │
-│   3. src/builders/unified_analysis.rs                                    │
-│   4. src/priority/mod.rs                                                 │
-│   5. src/io/writers/markdown.rs                                          │
-│   6. src/tui/mod.rs                                                      │
-│   7. src/config.rs                                                       │
-│   8. clap (external)                                                     │
-│   9. anyhow (external)                                                   │
-│   ... 14 more                                                            │
-│                                                                          │
-│ DEPENDENCY METRICS                                                       │
-│   Internal Dependencies: 15                                              │
-│   External Dependencies: 8                                               │
-│   Blast Radius: 23 files (changes to main.rs affect 0 files)            │
-│                                                                          │
-│ COUPLING ANALYSIS                                                        │
-│   Import Fanout: 23 (imports many modules)                              │
+│ FILE-LEVEL DEPENDENCIES                                                  │
+│   Files that import this file: 0                                        │
+│   Files imported by this file: 23                                       │
+│   Import Fanout: 23 (HIGH - imports many modules)                       │
 │   Export Fanin: 0 (entry point, not imported)                           │
-│   Coupling Level: HIGH (entry points typically high)                    │
+│                                                                          │
+│ AGGREGATED FUNCTION DEPENDENCIES (91 functions)                         │
+│   Total Upstream Callers: 247                                           │
+│   Total Downstream Callees: 412                                         │
+│   Aggregated Blast Radius: 659 (HIGH)                                   │
+│   Functions on Critical Path: 34 (37%)                                  │
+│                                                                          │
+│ TOP 5 MOST CONNECTED FUNCTIONS                                           │
+│   1. process_request (67 callers, 45 callees) - line 342                │
+│   2. validate_input (52 callers, 18 callees) - line 156                 │
+│   3. transform_data (48 callers, 31 callees) - line 892                 │
+│   4. handle_error (43 callers, 12 callees) - line 1203                  │
+│   5. write_output (39 callers, 23 callees) - line 1405                  │
+│                                                                          │
+│ DEPENDENCY DISTRIBUTION BY RESPONSIBILITY                                │
+│   Input/Argument Parsing: 89 upstream, 142 downstream                   │
+│   Data Processing: 67 upstream, 98 downstream                           │
+│   Output Formatting: 45 upstream, 87 downstream                         │
+│   Error Handling: 23 upstream, 45 downstream                            │
+│   File I/O Operations: 12 upstream, 23 downstream                       │
+│   Analysis Coordination: 8 upstream, 12 downstream                      │
+│   Caching/Memoization: 2 upstream, 3 downstream                         │
+│   Logging/Telemetry: 1 upstream, 2 downstream                           │
+│                                                                          │
+│ COUPLING HOTSPOTS                                                        │
+│   High Fanin (many callers):                                            │
+│     - process_request (67) - Central coordination function              │
+│     - validate_input (52) - Called by all input paths                   │
+│                                                                          │
+│   High Fanout (many callees):                                           │
+│     - process_request (45) - Orchestrates many operations               │
+│     - write_output (23) - Calls many formatters                         │
 │                                                                          │
 │ IMPACT OF SPLITTING                                                      │
-│   Current: Single file imports 23 modules                                │
-│   After Split: 3 focused files importing ~8 modules each                │
-│   Benefit: Reduced coupling, clearer module boundaries                  │
-│                                                                          │
-│ NOTE: This is an entry point file (main.rs), so it's not imported by    │
-│       other files. High import count suggests too many responsibilities.│
+│   Current: 659 total dependencies in single file                        │
+│   After Split (estimated):                                               │
+│     Module 1: ~220 dependencies (contained within module)               │
+│     Module 2: ~180 dependencies (contained within module)               │
+│     Module 3: ~140 dependencies (contained within module)               │
+│     Cross-module: ~119 dependencies (reduced from 659)                  │
+│   Benefit: 82% reduction in cross-cutting dependencies                  │
 │                                                                          │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Press ◀▶/hl:Pages  ↑↓/jk:Scroll  ←/q:Back  ?:Help                       │
@@ -552,7 +565,7 @@ The TUI detail view has 5 pages that adapt for god objects:
 | Page | Title | What It Shows for God Objects | Regular Function Shows |
 |------|-------|-------------------------------|----------------------|
 | **1/5** | Overview | Score, GOD OBJECT METRICS (methods, fields, responsibilities), FILE METRICS, recommended splits, **expected impact**, recommendation | Score, complexity metrics, coverage, recommendation |
-| **2/5** | Dependencies | FILE DEPENDENCIES (imports/exports), blast radius, coupling analysis | Function callers/callees, call graph depth |
+| **2/5** | Dependencies | FILE-LEVEL deps (imports/exports) + AGGREGATED FUNCTION deps (total upstream/downstream, blast radius: 659, top 5 most connected functions, dependency distribution by responsibility) | Single function callers/callees, call graph depth |
 | **3/5** | Git Context | File-level git history, change frequency, contributors, hotspot analysis | Same (file-level for both) |
 | **4/5** | Patterns | DETECTED ANTI-PATTERNS, RESPONSIBILITY BREAKDOWN, suggested organization | Entropy analysis, purity, framework patterns |
 | **5/5** | Data Flow Analysis | **Aggregated data flow** across all functions: total mutations, purity analysis by responsibility, I/O operations breakdown, escape analysis | Single function data flow: mutations, I/O operations, escape analysis |
@@ -560,7 +573,12 @@ The TUI detail view has 5 pages that adapt for god objects:
 ### Key Differences
 
 **God Objects (File-Level Items):**
-- Page 2: Shows file-level dependencies (which files import this file)
+- Page 2: Shows **both** file-level AND aggregated function dependencies
+  - File-level: Which files import this file (0), which files this imports (23)
+  - Aggregated: Total upstream callers (247), downstream callees (412), blast radius (659)
+  - Top 5 most connected functions with fanin/fanout
+  - Dependency distribution by responsibility
+  - Impact of splitting on dependency reduction
 - Page 4: Shows responsibility breakdown and organizational patterns
 - Page 5: Shows **aggregated data flow** across all 91 functions in the file
   - Total mutations, purity percentages
@@ -569,7 +587,10 @@ The TUI detail view has 5 pages that adapt for god objects:
   - Helps guide splitting decisions (pure vs impure boundaries)
 
 **Regular Functions:**
-- Page 2: Shows function-level call graph (callers/callees)
+- Page 2: Shows **single function** call graph
+  - That function's callers and callees
+  - Position in call graph
+  - Critical path analysis for that function
 - Page 4: Shows code patterns like entropy and purity
 - Page 5: Shows **single function data flow**
   - Mutations within that function
