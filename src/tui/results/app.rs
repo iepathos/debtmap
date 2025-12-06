@@ -32,6 +32,68 @@ pub enum ViewMode {
     Help,
 }
 
+/// Detail page selection for multi-page detail view
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetailPage {
+    Overview,
+    Dependencies,
+    GitContext,
+    Patterns,
+}
+
+impl DetailPage {
+    /// Get next page with wrapping
+    pub fn next(self) -> Self {
+        match self {
+            DetailPage::Overview => DetailPage::Dependencies,
+            DetailPage::Dependencies => DetailPage::GitContext,
+            DetailPage::GitContext => DetailPage::Patterns,
+            DetailPage::Patterns => DetailPage::Overview,
+        }
+    }
+
+    /// Get previous page with wrapping
+    pub fn prev(self) -> Self {
+        match self {
+            DetailPage::Overview => DetailPage::Patterns,
+            DetailPage::Dependencies => DetailPage::Overview,
+            DetailPage::GitContext => DetailPage::Dependencies,
+            DetailPage::Patterns => DetailPage::GitContext,
+        }
+    }
+
+    /// Create from 0-based index
+    pub fn from_index(idx: usize) -> Option<Self> {
+        match idx {
+            0 => Some(DetailPage::Overview),
+            1 => Some(DetailPage::Dependencies),
+            2 => Some(DetailPage::GitContext),
+            3 => Some(DetailPage::Patterns),
+            _ => None,
+        }
+    }
+
+    /// Get 0-based index
+    pub fn index(self) -> usize {
+        match self {
+            DetailPage::Overview => 0,
+            DetailPage::Dependencies => 1,
+            DetailPage::GitContext => 2,
+            DetailPage::Patterns => 3,
+        }
+    }
+
+    /// Get display name for page
+    pub fn name(self) -> &'static str {
+        match self {
+            DetailPage::Overview => "Overview",
+            DetailPage::Dependencies => "Dependencies",
+            DetailPage::GitContext => "Git Context",
+            DetailPage::Patterns => "Patterns",
+        }
+    }
+}
+
 /// Main application state
 pub struct ResultsApp {
     /// Full analysis results
@@ -54,6 +116,8 @@ pub struct ResultsApp {
     terminal_size: (u16, u16),
     /// Force full redraw on next render (set after external editor)
     needs_redraw: bool,
+    /// Current detail page (for multi-page detail view)
+    detail_page: DetailPage,
 }
 
 impl ResultsApp {
@@ -73,6 +137,7 @@ impl ResultsApp {
             sort_by: SortCriteria::Score,
             terminal_size: (80, 24),
             needs_redraw: false,
+            detail_page: DetailPage::Overview,
         }
     }
 
@@ -261,5 +326,100 @@ impl ResultsApp {
         let needs = self.needs_redraw;
         self.needs_redraw = false;
         needs
+    }
+
+    /// Get current detail page
+    pub fn detail_page(&self) -> DetailPage {
+        self.detail_page
+    }
+
+    /// Set detail page
+    pub fn set_detail_page(&mut self, page: DetailPage) {
+        self.detail_page = page;
+    }
+
+    /// Check if git context data is available for current item
+    fn has_git_context(&self) -> bool {
+        self.selected_item()
+            .and_then(|item| item.contextual_risk.as_ref())
+            .is_some()
+    }
+
+    /// Check if pattern data is available for current item
+    fn has_pattern_data(&self) -> bool {
+        self.selected_item()
+            .map(|item| {
+                item.pattern_analysis.is_some()
+                    || item.detected_pattern.is_some()
+                    || item.is_pure.is_some()
+                    || item.language_specific.is_some()
+            })
+            .unwrap_or(false)
+    }
+
+    /// Get available pages for current item (skip pages with no data)
+    pub fn available_pages(&self) -> Vec<DetailPage> {
+        let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
+
+        if self.has_git_context() {
+            pages.push(DetailPage::GitContext);
+        }
+
+        if self.has_pattern_data() {
+            pages.push(DetailPage::Patterns);
+        }
+
+        pages
+    }
+
+    /// Get total page count for current item
+    pub fn page_count(&self) -> usize {
+        self.available_pages().len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detail_page_next_wraps_forward() {
+        assert_eq!(DetailPage::Overview.next(), DetailPage::Dependencies);
+        assert_eq!(DetailPage::Dependencies.next(), DetailPage::GitContext);
+        assert_eq!(DetailPage::GitContext.next(), DetailPage::Patterns);
+        assert_eq!(DetailPage::Patterns.next(), DetailPage::Overview);
+    }
+
+    #[test]
+    fn test_detail_page_prev_wraps_backward() {
+        assert_eq!(DetailPage::Overview.prev(), DetailPage::Patterns);
+        assert_eq!(DetailPage::Dependencies.prev(), DetailPage::Overview);
+        assert_eq!(DetailPage::GitContext.prev(), DetailPage::Dependencies);
+        assert_eq!(DetailPage::Patterns.prev(), DetailPage::GitContext);
+    }
+
+    #[test]
+    fn test_detail_page_from_index() {
+        assert_eq!(DetailPage::from_index(0), Some(DetailPage::Overview));
+        assert_eq!(DetailPage::from_index(1), Some(DetailPage::Dependencies));
+        assert_eq!(DetailPage::from_index(2), Some(DetailPage::GitContext));
+        assert_eq!(DetailPage::from_index(3), Some(DetailPage::Patterns));
+        assert_eq!(DetailPage::from_index(4), None);
+    }
+
+    #[test]
+    fn test_detail_page_index() {
+        assert_eq!(DetailPage::Overview.index(), 0);
+        assert_eq!(DetailPage::Dependencies.index(), 1);
+        assert_eq!(DetailPage::GitContext.index(), 2);
+        assert_eq!(DetailPage::Patterns.index(), 3);
+    }
+
+    #[test]
+    fn test_detail_page_name() {
+        assert_eq!(DetailPage::Overview.name(), "Overview");
+        assert_eq!(DetailPage::Dependencies.name(), "Dependencies");
+        assert_eq!(DetailPage::GitContext.name(), "Git Context");
+        assert_eq!(DetailPage::Patterns.name(), "Patterns");
     }
 }
