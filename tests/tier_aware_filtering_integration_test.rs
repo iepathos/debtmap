@@ -112,8 +112,8 @@ edition = "2021"
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // Parse JSON output to extract debt items
-    let json: serde_json::Value = serde_json::from_str(&stdout)
-        .expect("Failed to parse JSON output");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse JSON output");
 
     let debt_items = json["items"]
         .as_array()
@@ -191,7 +191,8 @@ edition = "2021"
     for item in &error_swallowing_items {
         if let Some(tier) = item["tier"].as_str() {
             assert_eq!(
-                tier, "T1",
+                tier,
+                "T1",
                 "Error swallowing items should be classified as T1 Critical Architecture.\n\
                  Item: {}",
                 serde_json::to_string_pretty(item).unwrap_or_default()
@@ -226,7 +227,10 @@ fn extract_pattern_name(location: &str) -> Option<String> {
     if location.contains("pattern_") {
         for word in location.split_whitespace() {
             if word.starts_with("pattern_") {
-                return Some(word.trim_matches(|c: char| !c.is_alphanumeric() && c != '_').to_string());
+                return Some(
+                    word.trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
+                        .to_string(),
+                );
             }
         }
     }
@@ -237,8 +241,13 @@ fn extract_pattern_name(location: &str) -> Option<String> {
 /// Determine which patterns are missing
 fn missing_patterns(found: &[String]) -> Vec<String> {
     let expected = vec![
-        "pattern_1", "pattern_2", "pattern_3", "pattern_4",
-        "pattern_5", "pattern_6", "pattern_7",
+        "pattern_1",
+        "pattern_2",
+        "pattern_3",
+        "pattern_4",
+        "pattern_5",
+        "pattern_6",
+        "pattern_7",
     ];
 
     expected
@@ -325,8 +334,7 @@ edition = "2021"
     // Check for filter metrics output indicating tier bypass
     // The exact format may vary, but we should see some indication that
     // items were included despite low scores due to tier classification
-    let has_tier_bypass_metric = stdout.contains("tier")
-        && stdout.contains("bypass")
+    let has_tier_bypass_metric = stdout.contains("tier") && stdout.contains("bypass")
         || stdout.contains("T1")
         || stdout.contains("Critical Architecture");
 
@@ -401,8 +409,8 @@ edition = "2021"
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout)
-        .expect("Failed to parse JSON output");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse JSON output");
 
     let debt_items = json["items"]
         .as_array()
