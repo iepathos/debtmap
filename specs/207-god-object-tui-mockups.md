@@ -85,12 +85,6 @@ When selecting a god object in the list, the detail view shows file-level metric
 │   2. Input/parsing module (18 functions)                                 │
 │   3. Output formatting module (15 functions)                             │
 │                                                                          │
-│ EXPECTED IMPACT                                                          │
-│   Complexity Reduction: -66 points (200 → 134 across 3 modules, 33%)    │
-│   Maintainability: +248.4 points improvement                            │
-│   Risk Reduction: -87.3 points (reduced coupling)                       │
-│   Effort: HIGH (1616 LOC, 91 functions)                                 │
-│                                                                          │
 │ RECOMMENDATION                                                           │
 │   Action: URGENT: Split file by data flow boundaries                    │
 │                                                                          │
@@ -305,10 +299,12 @@ Shows git history and change patterns for the god object file:
 
 ## Detail View - Patterns Page (Page 4/5)
 
-Shows detected patterns and responsibility breakdown:
+Shows aggregated patterns across all functions, grouped by responsibility:
 
 ```
 ┌─ Item Details (4/5: Patterns) ──────────────────────────────────────────┐
+│                                                                          │
+│ AGGREGATED PATTERN ANALYSIS (91 functions)                              │
 │                                                                          │
 │ DETECTED ANTI-PATTERNS                                                   │
 │   1. God Object (Definite)                                               │
@@ -322,6 +318,12 @@ Shows detected patterns and responsibility breakdown:
 │   3. Long File                                                           │
 │      - 1616 lines (threshold: 500)                                       │
 │      - Difficult to navigate and understand                             │
+│                                                                          │
+│ COMPLEXITY PATTERNS                                                      │
+│   Functions with High Complexity (>10): 12 (13%)                        │
+│   Functions with Deep Nesting (>3): 8 (9%)                              │
+│   Functions with Many Parameters (>4): 15 (16%)                         │
+│   Long Functions (>50 LOC): 23 (25%)                                    │
 │                                                                          │
 │ RESPONSIBILITY BREAKDOWN                                                 │
 │   The file has 8 distinct responsibilities:                              │
@@ -558,47 +560,41 @@ Mapping to unified score:
 - god_object_score >= 30.0 → Tier 2 (High)
 - god_object_score < 30.0 → Tier 3 (Medium)
 
-## Summary: All 5 Detail Pages for God Objects
+## Summary: All 5 Detail Pages - Same Structure, Aggregated for God Objects
 
-The TUI detail view has 5 pages that adapt for god objects:
+**Design Principle**: God objects use the SAME 5 pages as functions, but show aggregated data across all functions within the file.
 
-| Page | Title | What It Shows for God Objects | Regular Function Shows |
-|------|-------|-------------------------------|----------------------|
-| **1/5** | Overview | Score, GOD OBJECT METRICS (methods, fields, responsibilities), FILE METRICS, recommended splits, **expected impact**, recommendation | Score, complexity metrics, coverage, recommendation |
-| **2/5** | Dependencies | FILE-LEVEL deps (imports/exports) + AGGREGATED FUNCTION deps (total upstream/downstream, blast radius: 659, top 5 most connected functions, dependency distribution by responsibility) | Single function callers/callees, call graph depth |
-| **3/5** | Git Context | File-level git history, change frequency, contributors, hotspot analysis | Same (file-level for both) |
-| **4/5** | Patterns | DETECTED ANTI-PATTERNS, RESPONSIBILITY BREAKDOWN, suggested organization | Entropy analysis, purity, framework patterns |
-| **5/5** | Data Flow Analysis | **Aggregated data flow** across all functions: total mutations, purity analysis by responsibility, I/O operations breakdown, escape analysis | Single function data flow: mutations, I/O operations, escape analysis |
+| Page | Title | God Objects (Aggregated) | Regular Functions (Single) |
+|------|-------|--------------------------|---------------------------|
+| **1/5** | Overview | File-level metrics, god object indicators, recommended splits | Function metrics, coverage, complexity |
+| **2/5** | Dependencies | File imports + **aggregated** upstream/downstream (247/412), blast radius (659) | Single function callers/callees |
+| **3/5** | Git Context | File-level git history, change frequency, hotspot analysis | File-level git history (same) |
+| **4/5** | Patterns | **Aggregated** patterns across 91 functions, responsibility breakdown | Single function patterns (entropy, purity) |
+| **5/5** | Data Flow | **Aggregated** mutations (847), purity by responsibility, I/O breakdown | Single function mutations, I/O operations |
 
-### Key Differences
+### God Objects = Aggregate of Their Functions
 
-**God Objects (File-Level Items):**
-- Page 2: Shows **both** file-level AND aggregated function dependencies
-  - File-level: Which files import this file (0), which files this imports (23)
-  - Aggregated: Total upstream callers (247), downstream callees (412), blast radius (659)
-  - Top 5 most connected functions with fanin/fanout
-  - Dependency distribution by responsibility
-  - Impact of splitting on dependency reduction
-- Page 4: Shows responsibility breakdown and organizational patterns
-- Page 5: Shows **aggregated data flow** across all 91 functions in the file
-  - Total mutations, purity percentages
-  - Top 5 most impure functions
-  - Purity breakdown by responsibility
-  - Helps guide splitting decisions (pure vs impure boundaries)
+**Page 1 (Overview)**:
+- Regular Function: Shows that function's complexity, coverage
+- God Object: Shows file-level metrics aggregated across 91 functions
 
-**Regular Functions:**
-- Page 2: Shows **single function** call graph
-  - That function's callers and callees
-  - Position in call graph
-  - Critical path analysis for that function
-- Page 4: Shows code patterns like entropy and purity
-- Page 5: Shows **single function data flow**
-  - Mutations within that function
-  - I/O operations in that function
-  - Parameter flow and escape analysis
+**Page 2 (Dependencies)**:
+- Regular Function: Shows that function's callers and callees
+- God Object: Shows **sum** of all 91 functions' callers (247) and callees (412)
 
-**Same for Both:**
-- Page 1: Core metrics and recommendations (adapted to context)
-- Page 3: Git context (both use file-level git data)
+**Page 3 (Git Context)**:
+- Same for both (git data is file-level anyway)
+
+**Page 4 (Patterns)**:
+- Regular Function: Shows patterns for that function (entropy, purity)
+- God Object: Shows **aggregated** patterns across all functions, grouped by responsibility
+
+**Page 5 (Data Flow)**:
+- Regular Function: Shows mutations and I/O for that function
+- God Object: Shows **total** mutations (847) and I/O (156) across all 91 functions
+
+### No Separate Impact Page
+
+Impact analysis (if added later) would be a feature for BOTH god objects and functions, not a separate page. The 5-page structure remains consistent.
 
 This design ensures god objects have relevant, actionable information on all 5 pages while maintaining consistent navigation and structure.
