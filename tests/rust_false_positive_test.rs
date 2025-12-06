@@ -124,8 +124,8 @@ mod tests {
         "DependencyGraph::calculate_coupling_metrics should NOT be marked as dead code because it has 2 callers: analyze_dependencies() and tests::test_coupling_analysis()"
     );
 
-    // Also check the debt type classification
-    let debt_type = classify_debt_type_with_exclusions(
+    // Also check the debt type classification (spec 228: returns Vec now)
+    let debt_types = classify_debt_type_with_exclusions(
         method_func,
         &call_graph,
         &func_id,
@@ -135,12 +135,14 @@ mod tests {
     );
 
     // It should NOT be classified as DeadCode
-    match debt_type {
-        DebtType::DeadCode { .. } => {
-            panic!("DependencyGraph::calculate_coupling_metrics should not be classified as DeadCode! This is the false positive we're testing for.");
-        }
-        _ => {
-            // Good - it's not dead code
+    for debt_type in debt_types {
+        match debt_type {
+            DebtType::DeadCode { .. } => {
+                panic!("DependencyGraph::calculate_coupling_metrics should not be classified as DeadCode! This is the false positive we're testing for.");
+            }
+            _ => {
+                // Good - it's not dead code
+            }
         }
     }
 }

@@ -54,9 +54,9 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
     );
 
     // Even without framework exclusions, test functions should be excluded
-    // by the hardcoded logic (is_test flag)
+    // by the hardcoded logic (is_test flag) (spec 228: returns Vec)
     let framework_patterns = HashSet::new(); // Empty framework patterns for this test
-    let debt_type = classify_debt_type_with_exclusions(
+    let debt_types = classify_debt_type_with_exclusions(
         &test_func,
         &call_graph,
         &func_id,
@@ -66,12 +66,14 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
     );
 
     // Verify it's not dead code
-    match debt_type {
-        DebtType::DeadCode { .. } => {
-            panic!("Test function should not be classified as dead code");
-        }
-        _ => {
-            // Success - test functions are excluded from dead code detection
+    for debt_type in debt_types {
+        match debt_type {
+            DebtType::DeadCode { .. } => {
+                panic!("Test function should not be classified as dead code");
+            }
+            _ => {
+                // Success - test functions are excluded from dead code detection
+            }
         }
     }
 }
@@ -130,8 +132,8 @@ fn test_visit_trait_pattern_exclusion() {
     let exclusions_im = detector.get_exclusions();
     let exclusions: HashSet<FunctionId> = exclusions_im.into_iter().collect();
 
-    // The function should not be classified as dead code when using exclusions
-    let debt_type = classify_debt_type_with_exclusions(
+    // The function should not be classified as dead code when using exclusions (spec 228)
+    let debt_types = classify_debt_type_with_exclusions(
         &visit_func,
         &call_graph,
         &func_id,
@@ -140,12 +142,14 @@ fn test_visit_trait_pattern_exclusion() {
         None,
     );
 
-    match debt_type {
-        DebtType::DeadCode { .. } => {
-            panic!("Visit trait implementation should not be classified as dead code");
-        }
-        _ => {
-            // Success - Visit trait methods are excluded
+    for debt_type in debt_types {
+        match debt_type {
+            DebtType::DeadCode { .. } => {
+                panic!("Visit trait implementation should not be classified as dead code");
+            }
+            _ => {
+                // Success - Visit trait methods are excluded
+            }
         }
     }
 }

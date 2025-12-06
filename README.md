@@ -1105,6 +1105,24 @@ show_external = false   # Show external crate calls (default: false)
 show_std_lib = false    # Show stdlib calls (default: false)
 ```
 
+### Multi-Debt Type Accumulation (Experimental)
+
+Debtmap can identify multiple independent debt types for a single function, providing comprehensive technical debt assessment. For example, a function might be flagged as both a complexity hotspot (high cognitive complexity) and having testing gaps (low coverage).
+
+**Enable multi-debt accumulation:**
+
+```bash
+export DEBTMAP_ACCUMULATE_DEBT=true
+debtmap analyze .
+```
+
+When enabled, functions can accumulate multiple debt classifications:
+- **Testing Gaps** - Low test coverage on critical code
+- **Complexity Hotspots** - High cyclomatic or cognitive complexity
+- **Dead Code** - Unused functions with no callers
+
+This feature is disabled by default for backward compatibility. Set `DEBTMAP_ACCUMULATE_DEBT=true` or `DEBTMAP_ACCUMULATE_DEBT=1` to enable.
+
 ### Understanding Dependency Impact
 
 Dependency information helps prioritize refactoring:

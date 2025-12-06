@@ -780,39 +780,39 @@ impl ParallelUnifiedAnalysisBuilder {
                     .cloned()
                     .unwrap_or_else(indicatif::ProgressBar::hidden),
             )
-            .filter_map(|metric| self.process_single_metric(metric, test_only_functions, context))
+            .flat_map(|metric| self.process_single_metric(metric, test_only_functions, context))
             .collect()
     }
 
-    /// Process a single metric through the filtering and transformation pipeline
+    /// Process a single metric through the filtering and transformation pipeline (spec 228)
     fn process_single_metric(
         &self,
         metric: &FunctionMetrics,
         test_only_functions: &HashSet<FunctionId>,
         context: &FunctionAnalysisContext,
-    ) -> Option<UnifiedDebtItem> {
+    ) -> Vec<UnifiedDebtItem> {
         // Get callee count for triviality check
         let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
         let callee_count = self.call_graph.get_callees(&func_id).len();
 
         // Apply filtering predicates
         if !predicates::should_process_metric(metric, test_only_functions, callee_count) {
-            return None;
+            return Vec::new();
         }
 
-        // Transform metric to debt item (spec 201: may return None for clean dispatchers)
-        self.metric_to_debt_item(metric, context)
+        // Transform metric to debt items (spec 228: returns Vec for multi-debt)
+        self.metric_to_debt_items(metric, context)
     }
 
-    /// Transform a metric into a debt item (pure transformation)
-    fn metric_to_debt_item(
+    /// Transform a metric into debt items (spec 228: multi-debt support)
+    fn metric_to_debt_items(
         &self,
         metric: &FunctionMetrics,
         context: &FunctionAnalysisContext,
-    ) -> Option<UnifiedDebtItem> {
+    ) -> Vec<UnifiedDebtItem> {
         // Clone risk analyzer for thread-safe parallel execution
         let risk_analyzer_clone = context.risk_analyzer.cloned();
-        // Returns None for clean dispatchers (spec 201)
+        // Returns Vec<UnifiedDebtItem> - one per debt type found (spec 228)
         crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
             metric,
             context.call_graph,
