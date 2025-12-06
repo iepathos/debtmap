@@ -74,7 +74,8 @@ pub fn normalize_path_components(path: &Path) -> Vec<String> {
 /// Pure function: Normalize path separators to forward slash
 ///
 /// Converts all backslashes to forward slashes for consistent
-/// cross-platform matching. Also trims trailing slashes.
+/// cross-platform matching. Also trims trailing slashes and strips
+/// leading './' for consistent normalization.
 ///
 /// # Examples
 ///
@@ -83,6 +84,9 @@ pub fn normalize_path_components(path: &Path) -> Vec<String> {
 /// use debtmap::risk::path_normalization::normalize_path_separators;
 ///
 /// let normalized = normalize_path_separators(Path::new("src/lib.rs"));
+/// assert_eq!(normalized, "src/lib.rs");
+///
+/// let normalized = normalize_path_separators(Path::new("./src/lib.rs"));
 /// assert_eq!(normalized, "src/lib.rs");
 /// ```
 ///
@@ -99,6 +103,7 @@ pub fn normalize_path_separators(path: &Path) -> String {
     path.to_string_lossy()
         .replace('\\', "/")
         .trim_end_matches('/')
+        .trim_start_matches("./")
         .to_string()
 }
 
@@ -438,7 +443,7 @@ mod tests {
     fn test_normalized_path_from_path() {
         let normalized = NormalizedPath::from_path(Path::new("./src/lib.rs"));
         assert_eq!(normalized.components, vec!["src", "lib.rs"]);
-        assert_eq!(normalized.normalized_str, "./src/lib.rs"); // Preserves original form
+        assert_eq!(normalized.normalized_str, "src/lib.rs"); // Strips leading './'
         assert_eq!(normalized.original, PathBuf::from("./src/lib.rs"));
     }
 
