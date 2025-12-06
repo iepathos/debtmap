@@ -470,6 +470,15 @@ pub enum Commands {
         quiet: bool,
     },
 
+    /// Diagnose and validate LCOV coverage file
+    DiagnoseCoverage {
+        /// LCOV coverage file to diagnose
+        coverage_file: PathBuf,
+        /// Output format (text or json)
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
+
     /// Explain coverage detection for a specific function (debugging tool)
     ExplainCoverage {
         /// Path to the codebase to analyze

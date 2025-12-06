@@ -238,17 +238,20 @@ pub(crate) fn create_function_id(func: &FunctionMetrics) -> FunctionId {
     FunctionId::new(func.file.clone(), func.name.clone(), func.line)
 }
 
-// Pure function: Calculate coverage data
+// Pure function: Calculate coverage data (Spec 203)
+// ALWAYS returns Some when coverage is provided, never None
 fn calculate_coverage_data(
     func_id: &FunctionId,
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
 ) -> Option<TransitiveCoverage> {
-    coverage.and_then(|lcov| {
+    coverage.map(|lcov| {
         let end_line = func.line + func.length.saturating_sub(1);
-        lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line)
-            .map(|_| calculate_transitive_coverage(func_id, call_graph, lcov))
+        // get_function_coverage_with_bounds now returns Some(0.0) when not found
+        let _direct_coverage =
+            lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line);
+        calculate_transitive_coverage(func_id, call_graph, lcov)
     })
 }
 
@@ -567,12 +570,16 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
 ) -> Option<UnifiedDebtItem> {
     let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
-    // Calculate transitive coverage if direct coverage is available
+    // Calculate transitive coverage if coverage file is provided (Spec 203)
     // Use exact AST boundaries for more accurate coverage matching
-    let transitive_coverage = coverage.and_then(|lcov| {
+    // ALWAYS return Some when coverage is provided, never None (eliminates Cov:N/A)
+    let transitive_coverage = coverage.map(|lcov| {
         let end_line = func.line + func.length.saturating_sub(1);
-        lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line)
-            .map(|_direct| calculate_transitive_coverage(&func_id, call_graph, lcov))
+        // get_function_coverage_with_bounds now returns Some(0.0) when not found
+        // So we always get a value, even if it's 0%
+        let _direct_coverage =
+            lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line);
+        calculate_transitive_coverage(&func_id, call_graph, lcov)
     });
 
     // Use the enhanced debt type classification with framework exclusions

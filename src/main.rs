@@ -516,6 +516,13 @@ fn main() -> Result<()> {
             debtmap::commands::validate_improvement::validate_improvement(config)?;
             Ok(())
         }
+        Commands::DiagnoseCoverage {
+            coverage_file,
+            format,
+        } => {
+            debtmap::commands::diagnose_coverage::diagnose_coverage_file(&coverage_file, &format)?;
+            Ok(())
+        }
         Commands::ExplainCoverage {
             path,
             coverage_file,
