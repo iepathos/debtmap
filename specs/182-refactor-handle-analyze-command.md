@@ -4,8 +4,9 @@ title: Refactor handle_analyze_command into Composable Functions
 category: optimization
 priority: high
 status: draft
-dependencies: []
+dependencies: [204]
 created: 2025-11-30
+updated: 2025-12-06
 ---
 
 # Specification 182: Refactor handle_analyze_command into Composable Functions
@@ -13,7 +14,17 @@ created: 2025-11-30
 **Category**: optimization
 **Priority**: high
 **Status**: draft
-**Dependencies**: None
+**Dependencies**: Spec 204 (Refactor build_analyze_config)
+
+## IMPORTANT NOTE
+
+This specification has been revised based on code review. The original spec proposed creating an `AnalyzeParams` struct, but analysis revealed that:
+
+1. `AnalyzeConfig` already exists and serves the same purpose
+2. Creating `AnalyzeParams` would duplicate the existing structure
+3. The deeper issue is in `build_analyze_config` (139 lines, 60+ params) - now addressed in spec 204
+
+**This spec now focuses solely on refactoring the command handler coordination logic**, while spec 204 handles the parameter transformation complexity.
 
 ## Context
 
@@ -98,17 +109,18 @@ Each extracted function should be pure (where possible) or clearly marked as per
 
 ## Acceptance Criteria
 
-- [ ] `handle_analyze_command` reduced to 5-15 lines (pipeline)
-- [ ] `extract_analyze_params` created (10-20 lines)
-- [ ] `setup_environment` created (10-20 lines)
-- [ ] `build_analyze_config` is pure function (15-30 lines)
-- [ ] `run_analysis` created (5-10 lines, delegates to commands::analyze)
-- [ ] `format_and_output` created (10-20 lines)
+- [ ] `handle_analyze_command` reduced to 30-40 lines (coordination only)
+- [ ] ~~`extract_analyze_params` created~~ - **REMOVED**: Use existing `AnalyzeConfig` directly (no duplication)
+- [ ] `setup_environment` remains as-is (already exists and is 7 lines)
+- [ ] ~~`build_analyze_config` refactored~~ - **DEFERRED** to spec 204 (this is the bigger problem)
+- [ ] Configuration building uses grouped configs from spec 204
+- [ ] `run_analysis_pipeline` created (5-10 lines, thin wrapper)
 - [ ] Each function has doc comments
 - [ ] All existing tests pass
 - [ ] No clippy warnings
-- [ ] Function complexity < 5 for each function
+- [ ] Function complexity < 5 for main handler
 - [ ] Pure functions clearly separated from I/O
+- [ ] Nested `Result<Result<()>>` addressed (see spec 206 for full solution)
 
 ## Technical Details
 
@@ -146,60 +158,70 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
 }
 ```
 
-**Target Structure:**
+**Target Structure (Revised):**
 ```rust
 fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
-    let params = extract_analyze_params(command)?;
+    if let Commands::Analyze {
+        path,
+        format,
+        output,
+        explain_metrics,
+        no_context_aware,
+        // ... all 65 parameters
+    } = command {
+        // Apply environment setup first (side effect)
+        apply_environment_setup(no_context_aware)?;
 
-    if params.explain_metrics {
-        print_metrics_explanation();
-        return Ok(Ok(()));
+        // Handle special cases early
+        if explain_metrics {
+            print_metrics_explanation();
+            return Ok(Ok(()));
+        }
+
+        // Build configuration using grouped configs (from spec 204)
+        let path_cfg = build_path_config(path, output, coverage_file, max_files)?;
+        let threshold_cfg = build_threshold_config(
+            threshold_complexity,
+            threshold_duplication,
+            threshold_preset,
+            public_api_threshold,
+        );
+        // ... build other 6 config groups
+
+        let formatting_config = create_formatting_config(/* ... */);
+
+        // Delegate to refactored build_analyze_config (spec 204)
+        let config = build_analyze_config(
+            path_cfg,
+            threshold_cfg,
+            feature_cfg,
+            display_cfg,
+            filter_cfg,
+            perf_cfg,
+            debug_cfg,
+            lang_cfg,
+        );
+
+        // Run analysis
+        Ok(debtmap::commands::analyze::handle_analyze(config))
+    } else {
+        Err(anyhow::anyhow!("Invalid command"))
     }
-
-    let config = build_config_from_params(&params)?;
-    apply_environment_setup(&config)?;
-    run_analysis_pipeline(config)
 }
 ```
 
-### Extracted Functions
+### Key Changes from Original Spec
 
-**1. Parameter Extraction (10-20 lines)**
+**REMOVED: `AnalyzeParams` struct** - This would duplicate the existing `AnalyzeConfig` structure in `src/commands/analyze.rs:15-75`. Instead:
+- Keep parameter destructuring in the command handler
+- Build configuration groups directly (from spec 204)
+- Pass grouped configs to `build_analyze_config`
 
-```rust
-/// Extracts analyze command parameters into structured data.
-///
-/// This is a pure transformation from Commands enum to AnalyzeParams struct.
-fn extract_analyze_params(command: Commands) -> Result<AnalyzeParams> {
-    match command {
-        Commands::Analyze {
-            paths,
-            exclude,
-            output,
-            format,
-            // ... all parameters
-        } => Ok(AnalyzeParams {
-            paths,
-            exclude,
-            output,
-            format,
-            // ... all fields
-        }),
-        _ => Err(anyhow!("Expected Analyze command")),
-    }
-}
+**DEFERRED: `build_analyze_config` refactoring** - This is now spec 204, which is the deeper and more important refactoring (139 lines → <20 lines).
 
-struct AnalyzeParams {
-    paths: Vec<PathBuf>,
-    exclude: Vec<String>,
-    output: Option<PathBuf>,
-    format: Option<OutputFormat>,
-    explain_metrics: bool,
-    // ... all other fields (50+)
-}
-```
+### Configuration Group Builders (New from Spec 204)
 
-**2. Configuration Building (Pure, 15-30 lines)**
+**These builders are defined in spec 204:**
 
 ```rust
 /// Builds analysis configuration from parameters.
@@ -594,22 +616,24 @@ If issues arise:
 
 ## Success Metrics
 
-- ✅ `handle_analyze_command` reduced from 150+ to 5-15 lines
-- ✅ 5-6 extracted functions, each under 20 lines
-- ✅ Pure functions separated from I/O
+- ✅ `handle_analyze_command` reduced from 155 to 30-40 lines (coordination only)
+- ✅ Configuration building delegated to spec 204's grouped builders
+- ✅ Environment setup remains as-is (already 7 lines)
+- ✅ Clear separation of concerns (coordination vs transformation)
 - ✅ All tests pass
 - ✅ No clippy warnings
-- ✅ Cyclomatic complexity < 5 per function
+- ✅ Cyclomatic complexity < 5 for main handler
 - ✅ 100% backward compatible
 
 ## Follow-up Work
 
 After this refactoring:
 
-- Apply same pattern to `handle_compare_command` (spec 182b)
-- Apply same pattern to other command handlers
-- Extract common validation logic
-- Consider command handler trait
+- **Spec 204**: Refactor `build_analyze_config` (REQUIRED - the deeper issue)
+- **Spec 205**: CLI parameter grouping and config files (improves usability)
+- **Spec 206**: Command handler type system improvements (fixes `Result<Result<()>>`)
+- Apply same pattern to `handle_compare_command`
+- Extract common command handler patterns
 
 ## References
 
