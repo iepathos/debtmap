@@ -620,6 +620,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         show_splits,
         no_tui,
         quiet: _,
+        show_filter_stats: _,
     } = command
     {
         // Apply side effects first

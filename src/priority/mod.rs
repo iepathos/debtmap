@@ -6,6 +6,7 @@ pub mod debt_aggregator;
 pub mod detected_pattern;
 pub mod external_api_detector;
 pub mod file_metrics;
+pub mod filtering;
 pub mod formatted_output;
 pub mod formatter;
 pub mod formatter_markdown;
@@ -26,6 +27,9 @@ pub use call_graph::{CallGraph, FunctionCall};
 pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage};
 pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
 pub use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+pub use filtering::{
+    filter_with_metrics, ClassifiedItem, FilterConfig, FilterMetrics, FilterResult,
+};
 pub use formatter::{format_priorities, OutputFormat};
 pub use formatter_markdown::{
     format_priorities_categorical_markdown, format_priorities_markdown,
