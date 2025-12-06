@@ -151,10 +151,11 @@ Enable god objects to appear in the TUI by:
    - God objects must appear in TUI list view alongside other items
    - Display in correct tier (Tier 1 - Critical)
    - Show proper suffix for god objects: "(God Object)" or "(God Module)"
-   - Format metrics consistently with existing pattern:
-     - God Objects: `(LOC:1616 Resp:8 Fns:91)` - shows lines, responsibilities, total functions
-     - God Modules: `(LOC:850 Fns:116)` - shows lines and function count (no responsibilities)
-     - Regular items: `(Cov:15% Cog:45)` - shows coverage and cognitive complexity
+   - Format metrics consistently with standardized abbreviations:
+     - God Objects: `(LOC:1616 Resp:8 Fns:91)` - lines of code, responsibilities, total functions
+     - God Modules: `(LOC:850 Fns:116)` - lines of code and function count (no responsibilities)
+     - Regular items: `(Cov:15% Cog:45 LOC:120)` - coverage, cognitive complexity, lines of code
+     - **NOTE**: Use `LOC:` for all line counts (not `Len:`) for consistency across all item types
    - Detail view should show god object-specific metrics (methods, fields, responsibilities)
 
 5. **Consistency with --no-tui Output**
@@ -178,6 +179,7 @@ Enable god objects to appear in the TUI by:
 - [ ] TUI displays god objects with correct tier (Tier 1 - Critical)
 - [ ] List view shows god objects with proper suffix: `main.rs (God Object)` or `formatter.rs (God Module)`
 - [ ] List view metrics formatted consistently: `(LOC:1616 Resp:8 Fns:91)` for God Objects, `(LOC:850 Fns:116)` for God Modules
+- [ ] All line counts use `LOC:` abbreviation (change existing `Len:` to `LOC:` for function length)
 - [ ] Detail view shows god object-specific metrics (methods, fields, responsibilities)
 - [ ] Detection type (GodClass vs GodFile) is preserved and displayed
 - [ ] Recommended splits appear in detail view
@@ -394,7 +396,7 @@ fn add_file_item(&mut self, item: UnifiedDebtItem) {
 
 **Example list view formatting code**:
 ```rust
-fn format_god_object_metrics(item: &UnifiedDebtItem) -> String {
+fn format_item_metrics(item: &UnifiedDebtItem) -> String {
     match &item.debt_type {
         DebtType::GodObject { methods, fields, responsibilities, .. } => {
             // God Object: show LOC, Responsibilities, Functions
@@ -414,12 +416,21 @@ fn format_god_object_metrics(item: &UnifiedDebtItem) -> String {
             )
         }
         _ => {
-            // Regular items: show Cov and Cog
-            format!(
-                "(Cov:{} Cog:{})",
-                format_coverage(item),
-                item.cognitive_complexity
-            )
+            // Regular function items: show Cov, Cog, and optionally LOC
+            let coverage_str = format_coverage(item);
+            let complexity_str = format_complexity_metric(item); // Handles entropy adjustment
+
+            let mut parts = vec![
+                format!("Cov:{}", coverage_str),
+                complexity_str,
+            ];
+
+            // Add LOC for functions (replaces current "Len:")
+            if item.function_length > 0 {
+                parts.push(format!("LOC:{}", item.function_length));
+            }
+
+            format!("({})", parts.join(" "))
         }
     }
 }
@@ -439,6 +450,9 @@ fn format_god_object_metrics(item: &UnifiedDebtItem) -> String {
 3. `src/tui/results/list_view.rs`:
    - Merge file-level items into TUI display list
    - Add god object icon/indicator
+   - **IMPORTANT**: Change `Len:` to `LOC:` for function length (line 319) for consistency
+     - Currently: `format!("Len:{}", metrics.function_length)`
+     - Should be: `format!("LOC:{}", metrics.function_length)`
 
 4. `src/tui/results/detail_pages/overview.rs`:
    - Verify existing god object display code works with new items

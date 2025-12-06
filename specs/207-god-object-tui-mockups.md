@@ -514,7 +514,9 @@ The help screen will be updated to explain god objects:
 |-----------|------------------|-------------|---------------|
 | God Object (God Class) | `main.rs (God Object)` | "(God Object)" | `(LOC:1616 Resp:8 Fns:91)` |
 | God Module (God File) | `formatter.rs (God Module)` | "(God Module)" | `(LOC:850 Fns:116)` |
-| Regular Function | `handle_request::request.rs` | None | `(Cov:15% Cog:45)` |
+| Regular Function | `handle_request::request.rs` | None | `(Cov:15% Cog:45)` or `(Cov:15% Cog:45 LOC:120)` |
+
+**Note**: All line counts use `LOC:` for consistency (not `Len:`). Functions may optionally show LOC if available.
 
 ## Color Coding
 
