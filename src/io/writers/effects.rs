@@ -773,7 +773,7 @@ mod tests {
     fn create_test_results() -> AnalysisResults {
         let items = vec![DebtItem {
             id: "test-1".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Medium,
             file: PathBuf::from("test.rs"),
             line: 5,

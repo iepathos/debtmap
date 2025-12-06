@@ -35,8 +35,13 @@ impl<'a> AsyncErrorDetector<'a> {
 
     fn add_debt_item(&mut self, line: usize, pattern: AsyncErrorPattern, context: &str) {
         // Check if this item is suppressed
+        let debt_type = DebtType::ErrorSwallowing {
+            pattern: pattern.to_string(),
+            context: Some(context.to_string()),
+        };
+
         if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &DebtType::ErrorSwallowing) {
+            if checker.is_suppressed(line, &debt_type) {
                 return;
             }
         }
@@ -46,7 +51,7 @@ impl<'a> AsyncErrorDetector<'a> {
 
         self.items.push(DebtItem {
             id: format!("async-error-{}-{}", self.current_file.display(), line),
-            debt_type: DebtType::ErrorSwallowing,
+            debt_type,
             priority,
             file: self.current_file.to_path_buf(),
             line,
@@ -232,6 +237,12 @@ impl AsyncErrorPattern {
             Self::SelectBranchIgnored => "Handle errors in all select! branches",
             Self::SpawnWithoutJoin => "Store JoinHandle and await or handle task completion",
         }
+    }
+}
+
+impl std::fmt::Display for AsyncErrorPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
 

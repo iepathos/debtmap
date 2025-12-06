@@ -46,7 +46,7 @@ fn main() {
     let todos = metrics
         .debt_items
         .iter()
-        .filter(|item| matches!(item.debt_type, debtmap::core::DebtType::Todo))
+        .filter(|item| matches!(item.debt_type, debtmap::core::DebtType::Todo { .. }))
         .count();
 
     assert!(todos > 0, "Should have found at least one TODO");

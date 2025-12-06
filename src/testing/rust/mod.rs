@@ -149,7 +149,9 @@ pub fn convert_rust_test_issue_to_debt_item(issue: RustTestQualityIssue, path: &
                 "{}\n\nSuggestion: {}",
                 issue.explanation, issue.suggestion
             )),
-            DebtType::TestQuality,
+            DebtType::TestQuality {
+                issue_type: Some("no_assertions".to_string()),
+            },
         ),
         RustTestIssueType::TooComplex(score) => (
             Priority::Medium,
@@ -161,7 +163,10 @@ pub fn convert_rust_test_issue_to_debt_item(issue: RustTestQualityIssue, path: &
                 "{}\n\nSuggestion: {}",
                 issue.explanation, issue.suggestion
             )),
-            DebtType::TestComplexity,
+            DebtType::TestComplexity {
+                cyclomatic: score,
+                cognitive: score,
+            },
         ),
         RustTestIssueType::FlakyPattern(ref flakiness_type) => (
             Priority::High,
@@ -173,7 +178,9 @@ pub fn convert_rust_test_issue_to_debt_item(issue: RustTestQualityIssue, path: &
                 "{}\n\nSuggestion: {}",
                 issue.explanation, issue.suggestion
             )),
-            DebtType::TestQuality,
+            DebtType::TestQuality {
+                issue_type: Some(format!("flaky_{:?}", flakiness_type)),
+            },
         ),
         RustTestIssueType::ExcessiveMocking(count) => (
             Priority::Medium,
@@ -185,7 +192,10 @@ pub fn convert_rust_test_issue_to_debt_item(issue: RustTestQualityIssue, path: &
                 "{}\n\nSuggestion: {}",
                 issue.explanation, issue.suggestion
             )),
-            DebtType::TestComplexity,
+            DebtType::TestComplexity {
+                cyclomatic: count as u32,
+                cognitive: count as u32,
+            },
         ),
         RustTestIssueType::IsolationIssue => (
             Priority::High,
@@ -194,7 +204,9 @@ pub fn convert_rust_test_issue_to_debt_item(issue: RustTestQualityIssue, path: &
                 "{}\n\nSuggestion: {}",
                 issue.explanation, issue.suggestion
             )),
-            DebtType::TestQuality,
+            DebtType::TestQuality {
+                issue_type: Some("isolation_issue".to_string()),
+            },
         ),
         RustTestIssueType::TestsTooMuch => (
             Priority::Medium,
@@ -203,7 +215,9 @@ pub fn convert_rust_test_issue_to_debt_item(issue: RustTestQualityIssue, path: &
                 "{}\n\nSuggestion: {}",
                 issue.explanation, issue.suggestion
             )),
-            DebtType::TestQuality,
+            DebtType::TestQuality {
+                issue_type: Some("tests_too_much".to_string()),
+            },
         ),
         RustTestIssueType::SlowTest => (
             Priority::Low,
@@ -212,7 +226,10 @@ pub fn convert_rust_test_issue_to_debt_item(issue: RustTestQualityIssue, path: &
                 "{}\n\nSuggestion: {}",
                 issue.explanation, issue.suggestion
             )),
-            DebtType::TestComplexity,
+            DebtType::TestComplexity {
+                cyclomatic: 0,
+                cognitive: 0,
+            },
         ),
     };
 

@@ -102,6 +102,8 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::ScatteredType { .. } => "SCATTERED TYPE",
         DebtType::OrphanedFunctions { .. } => "ORPHANED FUNCTIONS",
         DebtType::UtilitiesSprawl { .. } => "UTILITIES SPRAWL",
+        // Default for legacy variants
+        _ => "OTHER",
     }
 }
 

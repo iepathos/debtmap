@@ -27,13 +27,13 @@ fn test_context_aware_filters_parameter_analyzer() {
         .technical_debt
         .items
         .iter()
-        .filter(|item| matches!(item.debt_type, DebtType::Complexity))
+        .filter(|item| matches!(item.debt_type, DebtType::Complexity { .. }))
         .count();
     let complexity_with = results_with
         .technical_debt
         .items
         .iter()
-        .filter(|item| matches!(item.debt_type, DebtType::Complexity))
+        .filter(|item| matches!(item.debt_type, DebtType::Complexity { .. }))
         .count();
 
     println!(
@@ -121,7 +121,7 @@ fn test_context_aware_filters_rust_call_graph() {
         .technical_debt
         .items
         .iter()
-        .filter(|item| matches!(item.debt_type, DebtType::Complexity))
+        .filter(|item| matches!(item.debt_type, DebtType::Complexity { .. }))
         .count();
     println!(
         "Total complexity issues in rust_call_graph.rs: {}",

@@ -33,7 +33,9 @@ impl CodeSmell {
                 self.location.display(),
                 self.line
             ),
-            debt_type: DebtType::CodeSmell,
+            debt_type: DebtType::CodeSmell {
+                smell_type: Some(format!("{:?}", self.smell_type)),
+            },
             priority: self.severity,
             file: self.location.clone(),
             line: self.line,
@@ -913,7 +915,7 @@ mod tests {
         };
 
         let debt_item = smell.to_debt_item();
-        assert_eq!(debt_item.debt_type, DebtType::CodeSmell);
+        assert!(matches!(debt_item.debt_type, DebtType::CodeSmell { .. }));
         assert_eq!(debt_item.file, PathBuf::from("src/test.rs"));
         assert_eq!(debt_item.line, 42);
         assert_eq!(debt_item.message, "Test message");

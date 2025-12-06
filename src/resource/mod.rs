@@ -235,7 +235,7 @@ pub fn convert_resource_issue_to_debt_item(
 
     DebtItem {
         id: format!("resource-{}-{}", path.display(), line),
-        debt_type: DebtType::ResourceManagement,
+        debt_type: DebtType::ResourceManagement { issue_type: None },
         priority,
         file: path.to_path_buf(),
         line,

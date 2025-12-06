@@ -53,10 +53,10 @@ pub fn analyze_as_text(path: &Path, context_aware: bool) -> Result<String> {
 
     for item in &results.technical_debt.items {
         let type_str = match &item.debt_type {
-            DebtType::Complexity => "COMPLEXITY",
-            DebtType::Todo => "TODO",
-            DebtType::CodeSmell => "SMELL",
-            DebtType::Duplication => "DUPLICATION",
+            DebtType::Complexity { .. } => "COMPLEXITY",
+            DebtType::Todo { .. } => "TODO",
+            DebtType::CodeSmell { .. } => "SMELL",
+            DebtType::Duplication { .. } => "DUPLICATION",
             _ => "DEBT",
         };
 
@@ -103,7 +103,7 @@ pub fn analyze_directory(dir: &Path, context_aware: bool) -> Result<String> {
 
             for item in &results.technical_debt.items {
                 let type_str = match &item.debt_type {
-                    DebtType::Complexity => "COMPLEXITY",
+                    DebtType::Complexity { .. } => "COMPLEXITY",
                     _ => "DEBT",
                 };
 

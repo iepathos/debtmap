@@ -218,7 +218,7 @@ fn test_code_smell_to_debt_item() {
 
     let debt_item = smell.to_debt_item();
 
-    assert_eq!(debt_item.debt_type, DebtType::CodeSmell);
+    assert!(matches!(debt_item.debt_type, DebtType::CodeSmell { .. }));
     assert_eq!(debt_item.priority, Priority::High);
     assert_eq!(debt_item.line, 100);
     assert_eq!(debt_item.message, "Method is too long");

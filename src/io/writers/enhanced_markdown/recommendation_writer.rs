@@ -248,7 +248,10 @@ mod tests {
                         column: None,
                         message: "Test debt".to_string(),
                         priority: Priority::Medium,
-                        debt_type: DebtType::Complexity,
+                        debt_type: DebtType::Complexity {
+                            cyclomatic: 10,
+                            cognitive: 8,
+                        },
                         context: None,
                     })
                     .collect(),

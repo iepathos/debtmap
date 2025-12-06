@@ -248,7 +248,10 @@ mod tests {
                         column: None,
                         message: "High complexity function".to_string(),
                         priority: Priority::High,
-                        debt_type: DebtType::Complexity,
+                        debt_type: DebtType::Complexity {
+                            cyclomatic: 10,
+                            cognitive: 8,
+                        },
                         context: None,
                     },
                     DebtItem {
@@ -258,7 +261,10 @@ mod tests {
                         column: None,
                         message: "Low test coverage".to_string(),
                         priority: Priority::Medium,
-                        debt_type: DebtType::Complexity,
+                        debt_type: DebtType::Complexity {
+                            cyclomatic: 10,
+                            cognitive: 8,
+                        },
                         context: None,
                     },
                 ],

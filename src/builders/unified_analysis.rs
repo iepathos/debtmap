@@ -1098,7 +1098,12 @@ fn convert_error_swallowing_to_unified(
 ) -> Vec<UnifiedDebtItem> {
     debt_items
         .iter()
-        .filter(|item| item.debt_type == crate::core::DebtType::ErrorSwallowing)
+        .filter(|item| {
+            matches!(
+                item.debt_type,
+                crate::core::DebtType::ErrorSwallowing { .. }
+            )
+        })
         .map(|item| {
             let unified_score = UnifiedScore {
                 complexity_factor: 3.0,

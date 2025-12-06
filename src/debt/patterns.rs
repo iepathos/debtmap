@@ -50,21 +50,34 @@ pub fn find_todos_and_fixmes_with_suppression(
 }
 
 fn classify_marker(marker: &str) -> (DebtType, Priority) {
-    const MARKER_CLASSIFICATIONS: &[(&str, DebtType, Priority)] = &[
-        ("FIXME", DebtType::Fixme, Priority::High),
-        ("BUG", DebtType::Fixme, Priority::High),
-        ("TODO", DebtType::Todo, Priority::Medium),
-        ("HACK", DebtType::CodeSmell, Priority::High),
-        ("XXX", DebtType::CodeSmell, Priority::High),
-        ("OPTIMIZE", DebtType::CodeSmell, Priority::Low),
-        ("REFACTOR", DebtType::CodeSmell, Priority::Medium),
-    ];
-
-    MARKER_CLASSIFICATIONS
-        .iter()
-        .find(|(m, _, _)| *m == marker)
-        .map(|(_, dt, p)| (*dt, *p))
-        .unwrap_or((DebtType::Todo, Priority::Low))
+    match marker {
+        "FIXME" | "BUG" => (
+            DebtType::Fixme {
+                reason: Some(marker.to_string()),
+            },
+            Priority::High,
+        ),
+        "TODO" => (DebtType::Todo { reason: None }, Priority::Medium),
+        "HACK" | "XXX" => (
+            DebtType::CodeSmell {
+                smell_type: Some(marker.to_string()),
+            },
+            Priority::High,
+        ),
+        "OPTIMIZE" => (
+            DebtType::CodeSmell {
+                smell_type: Some("optimization".to_string()),
+            },
+            Priority::Low,
+        ),
+        "REFACTOR" => (
+            DebtType::CodeSmell {
+                smell_type: Some("refactoring".to_string()),
+            },
+            Priority::Medium,
+        ),
+        _ => (DebtType::Todo { reason: None }, Priority::Low),
+    }
 }
 
 pub fn find_code_smells(content: &str, file: &Path) -> Vec<DebtItem> {
@@ -88,7 +101,7 @@ pub fn find_code_smells_with_suppression(
 
             // Check if this line is suppressed for code smells
             if let Some(ctx) = suppression {
-                if ctx.is_suppressed(line_number, &DebtType::CodeSmell) {
+                if ctx.is_suppressed(line_number, &DebtType::CodeSmell { smell_type: None }) {
                     return vec![];
                 }
             }
@@ -112,7 +125,9 @@ fn check_line_length(
 ) -> Option<DebtItem> {
     (line.len() > threshold).then(|| DebtItem {
         id: format!("long-line-{}-{}", file_path.display(), line_number),
-        debt_type: DebtType::CodeSmell,
+        debt_type: DebtType::CodeSmell {
+            smell_type: Some("long_line".to_string()),
+        },
         priority: Priority::Low,
         file: file_path.to_path_buf(),
         line: line_number,
@@ -132,7 +147,9 @@ fn check_nesting_level(
 
     (indent_count > threshold).then(|| DebtItem {
         id: format!("deep-nesting-{}-{}", file_path.display(), line_number),
-        debt_type: DebtType::CodeSmell,
+        debt_type: DebtType::CodeSmell {
+            smell_type: Some("deep_nesting".to_string()),
+        },
         priority: Priority::Medium,
         file: file_path.to_path_buf(),
         line: line_number,
@@ -193,7 +210,10 @@ fn create_duplicate_string_item(string: &str, lines: &[usize], file: &Path) -> D
 
     DebtItem {
         id: format!("duplicate-string-{}-{}", file.display(), lines[0]),
-        debt_type: DebtType::Duplication,
+        debt_type: DebtType::Duplication {
+            instances: lines.len() as u32,
+            total_lines: lines.len() as u32,
+        },
         priority: Priority::Low,
         file: file.to_path_buf(),
         line: lines[0],

@@ -33,9 +33,14 @@ impl<'a> PanicPatternDetector<'a> {
     }
 
     fn add_debt_item(&mut self, line: usize, pattern: PanicPattern, context: &str) {
+        let debt_type = DebtType::ErrorSwallowing {
+            pattern: pattern.to_string(),
+            context: Some(context.to_string()),
+        };
+
         // Check if this item is suppressed
         if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &DebtType::ErrorSwallowing) {
+            if checker.is_suppressed(line, &debt_type) {
                 return;
             }
         }
@@ -45,7 +50,7 @@ impl<'a> PanicPatternDetector<'a> {
 
         self.items.push(DebtItem {
             id: format!("panic-pattern-{}-{}", self.current_file.display(), line),
-            debt_type: DebtType::ErrorSwallowing,
+            debt_type,
             priority,
             file: self.current_file.to_path_buf(),
             line,
@@ -214,6 +219,12 @@ pub enum PanicPattern {
     TodoInProduction,
 }
 
+impl std::fmt::Display for PanicPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
 impl PanicPattern {
     fn description(&self) -> &'static str {
         match self {
@@ -266,7 +277,10 @@ mod tests {
         let items = detect_panic_patterns(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
         assert!(items[0].message.contains("unwrap"));
     }
 
@@ -387,7 +401,10 @@ mod tests {
 
         assert!(!items.is_empty());
         assert!(items[0].message.contains("unimplemented"));
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
     }
 
     #[test]

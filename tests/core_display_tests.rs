@@ -2,43 +2,89 @@ use debtmap::core::{DebtType, Language, Priority};
 
 #[test]
 fn test_debt_type_display_todo() {
-    assert_eq!(format!("{}", DebtType::Todo), "TODO");
+    assert_eq!(format!("{}", DebtType::Todo { reason: None }), "TODO");
 }
 
 #[test]
 fn test_debt_type_display_fixme() {
-    assert_eq!(format!("{}", DebtType::Fixme), "FIXME");
+    assert_eq!(format!("{}", DebtType::Fixme { reason: None }), "FIXME");
 }
 
 #[test]
 fn test_debt_type_display_code_smell() {
-    assert_eq!(format!("{}", DebtType::CodeSmell), "Code Smell");
+    assert_eq!(
+        format!("{}", DebtType::CodeSmell { smell_type: None }),
+        "Code Smell"
+    );
 }
 
 #[test]
 fn test_debt_type_display_duplication() {
-    assert_eq!(format!("{}", DebtType::Duplication), "Duplication");
+    assert_eq!(
+        format!(
+            "{}",
+            DebtType::Duplication {
+                instances: 2,
+                total_lines: 20
+            }
+        ),
+        "Duplication"
+    );
 }
 
 #[test]
 fn test_debt_type_display_complexity() {
-    assert_eq!(format!("{}", DebtType::Complexity), "Complexity");
+    assert_eq!(
+        format!(
+            "{}",
+            DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8
+            }
+        ),
+        "Complexity"
+    );
 }
 
 #[test]
 fn test_debt_type_display_dependency() {
-    assert_eq!(format!("{}", DebtType::Dependency), "Dependency");
+    assert_eq!(
+        format!(
+            "{}",
+            DebtType::Dependency {
+                dependency_type: None
+            }
+        ),
+        "Dependency"
+    );
 }
 
 #[test]
 fn test_debt_type_display_all_variants() {
     let types = vec![
-        (DebtType::Todo, "TODO"),
-        (DebtType::Fixme, "FIXME"),
-        (DebtType::CodeSmell, "Code Smell"),
-        (DebtType::Duplication, "Duplication"),
-        (DebtType::Complexity, "Complexity"),
-        (DebtType::Dependency, "Dependency"),
+        (DebtType::Todo { reason: None }, "TODO"),
+        (DebtType::Fixme { reason: None }, "FIXME"),
+        (DebtType::CodeSmell { smell_type: None }, "Code Smell"),
+        (
+            DebtType::Duplication {
+                instances: 2,
+                total_lines: 20,
+            },
+            "Duplication",
+        ),
+        (
+            DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
+            "Complexity",
+        ),
+        (
+            DebtType::Dependency {
+                dependency_type: None,
+            },
+            "Dependency",
+        ),
     ];
 
     for (debt_type, expected) in types {

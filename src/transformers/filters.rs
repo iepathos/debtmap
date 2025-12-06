@@ -269,7 +269,7 @@ mod tests {
             debt_items: vec![
                 DebtItem {
                     id: "debt1".to_string(),
-                    debt_type: DebtType::Todo,
+                    debt_type: DebtType::Todo { reason: None },
                     priority: Priority::Low,
                     file: PathBuf::from("test.rs"),
                     line: 5,
@@ -279,7 +279,7 @@ mod tests {
                 },
                 DebtItem {
                     id: "debt2".to_string(),
-                    debt_type: DebtType::Fixme,
+                    debt_type: DebtType::Fixme { reason: None },
                     priority: Priority::High,
                     file: PathBuf::from("test.rs"),
                     line: 50,
@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn test_apply_debt_types_filter() {
         let config = FilterConfig {
-            debt_types: Some(vec![DebtType::Fixme]),
+            debt_types: Some(vec![DebtType::Fixme { reason: None }]),
             ..Default::default()
         };
 
@@ -393,7 +393,10 @@ mod tests {
         let result = config.apply(metrics);
 
         assert_eq!(result.debt_items.len(), 1);
-        assert_eq!(result.debt_items[0].debt_type, DebtType::Fixme);
+        assert_eq!(
+            result.debt_items[0].debt_type,
+            DebtType::Fixme { reason: None }
+        );
     }
 
     #[test]
@@ -401,7 +404,7 @@ mod tests {
         let config = FilterConfig {
             min_complexity: Some(10),
             min_priority: Some(Priority::High),
-            debt_types: Some(vec![DebtType::Fixme]),
+            debt_types: Some(vec![DebtType::Fixme { reason: None }]),
             ..Default::default()
         };
 
@@ -411,7 +414,10 @@ mod tests {
         assert_eq!(result.complexity.functions.len(), 1);
         assert_eq!(result.complexity.functions[0].name, "high_complexity");
         assert_eq!(result.debt_items.len(), 1);
-        assert_eq!(result.debt_items[0].debt_type, DebtType::Fixme);
+        assert_eq!(
+            result.debt_items[0].debt_type,
+            DebtType::Fixme { reason: None }
+        );
         assert_eq!(result.debt_items[0].priority, Priority::High);
     }
 

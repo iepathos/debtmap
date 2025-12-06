@@ -8,23 +8,20 @@ pub fn categorize_debt(items: &[DebtItem]) -> HashMap<&'static str, Vec<&DebtIte
 
     for item in items {
         let category = match item.debt_type {
-            crate::core::DebtType::Complexity | crate::core::DebtType::TestComplexity => {
-                "Complexity Issues"
-            }
-            crate::core::DebtType::Todo
-            | crate::core::DebtType::Fixme
-            | crate::core::DebtType::TestTodo => "TODOs and FIXMEs",
-            crate::core::DebtType::Duplication | crate::core::DebtType::TestDuplication => {
-                "Duplication"
-            }
-            crate::core::DebtType::CodeSmell | crate::core::DebtType::CodeOrganization => {
-                "Code Quality"
-            }
-            crate::core::DebtType::Dependency => "Dependencies",
-            crate::core::DebtType::ErrorSwallowing | crate::core::DebtType::ResourceManagement => {
-                "Error Handling"
-            }
-            crate::core::DebtType::TestQuality => "Test Quality",
+            crate::core::DebtType::Complexity { .. }
+            | crate::core::DebtType::TestComplexity { .. } => "Complexity Issues",
+            crate::core::DebtType::Todo { .. }
+            | crate::core::DebtType::Fixme { .. }
+            | crate::core::DebtType::TestTodo { .. } => "TODOs and FIXMEs",
+            crate::core::DebtType::Duplication { .. }
+            | crate::core::DebtType::TestDuplication { .. } => "Duplication",
+            crate::core::DebtType::CodeSmell { .. }
+            | crate::core::DebtType::CodeOrganization { .. } => "Code Quality",
+            crate::core::DebtType::Dependency { .. } => "Dependencies",
+            crate::core::DebtType::ErrorSwallowing { .. }
+            | crate::core::DebtType::ResourceManagement { .. } => "Error Handling",
+            crate::core::DebtType::TestQuality { .. } => "Test Quality",
+            _ => "Other", // Catch-all for any other debt types
         };
 
         categories.entry(category).or_default().push(item);
@@ -126,6 +123,8 @@ fn calculate_base_effort(debt_type: &crate::priority::DebtType) -> u32 {
             // Breaking up utilities is moderate effort
             (distinct_types / 2).clamp(4, 12) as u32
         }
+        // Default for legacy variants
+        _ => 3,
     }
 }
 
@@ -533,7 +532,10 @@ mod tests {
         let items = vec![
             DebtItem {
                 id: "1".to_string(),
-                debt_type: DebtType::Complexity,
+                debt_type: DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
                 priority: Priority::High,
                 file: PathBuf::from("test1.rs"),
                 line: 10,
@@ -543,7 +545,7 @@ mod tests {
             },
             DebtItem {
                 id: "2".to_string(),
-                debt_type: DebtType::Todo,
+                debt_type: DebtType::Todo { reason: None },
                 priority: Priority::Medium,
                 file: PathBuf::from("test2.rs"),
                 line: 20,
@@ -553,7 +555,10 @@ mod tests {
             },
             DebtItem {
                 id: "3".to_string(),
-                debt_type: DebtType::Duplication,
+                debt_type: DebtType::Duplication {
+                    instances: 2,
+                    total_lines: 20,
+                },
                 priority: Priority::Medium,
                 file: PathBuf::from("test3.rs"),
                 line: 30,

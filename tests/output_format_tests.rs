@@ -45,7 +45,7 @@ fn test_output_json_format() {
         technical_debt: TechnicalDebtReport {
             items: vec![DebtItem {
                 id: "test-1".to_string(),
-                debt_type: DebtType::Todo,
+                debt_type: DebtType::Todo { reason: None },
                 priority: Priority::Medium,
                 file: PathBuf::from("test.rs"),
                 line: 5,
@@ -55,7 +55,7 @@ fn test_output_json_format() {
             }],
             by_type: {
                 let mut map = HashMap::new();
-                map.insert(DebtType::Todo, vec![]);
+                map.insert(DebtType::Todo { reason: None }, vec![]);
                 map
             },
             priorities: vec![Priority::Medium],

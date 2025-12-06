@@ -166,7 +166,7 @@ impl Analyzer for ContextAwareAnalyzer {
 /// Convert a debt type to a debt pattern for rule matching
 fn debt_type_to_pattern(debt_type: &DebtType, _message: &str) -> DebtPattern {
     // All debt types are mapped directly to DebtPattern::DebtType
-    DebtPattern::DebtType(*debt_type)
+    DebtPattern::DebtType(debt_type.clone())
 }
 
 /// Adjust priority based on severity adjustment
@@ -223,31 +223,68 @@ mod tests {
     #[test]
     fn test_debt_type_to_pattern_other_types() {
         // Test Todo debt type
-        let pattern = debt_type_to_pattern(&DebtType::Todo, "Implement this feature");
-        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Todo));
+        let pattern =
+            debt_type_to_pattern(&DebtType::Todo { reason: None }, "Implement this feature");
+        assert_eq!(
+            pattern,
+            DebtPattern::DebtType(DebtType::Todo { reason: None })
+        );
 
         // Test Fixme debt type
-        let pattern = debt_type_to_pattern(&DebtType::Fixme, "Fix this bug");
-        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Fixme));
+        let pattern = debt_type_to_pattern(&DebtType::Fixme { reason: None }, "Fix this bug");
+        assert_eq!(
+            pattern,
+            DebtPattern::DebtType(DebtType::Fixme { reason: None })
+        );
 
         // Test CodeSmell debt type
-        let pattern = debt_type_to_pattern(&DebtType::CodeSmell, "Code smell detected");
-        assert_eq!(pattern, DebtPattern::DebtType(DebtType::CodeSmell));
+        let pattern = debt_type_to_pattern(
+            &DebtType::CodeSmell { smell_type: None },
+            "Code smell detected",
+        );
+        assert_eq!(
+            pattern,
+            DebtPattern::DebtType(DebtType::CodeSmell { smell_type: None })
+        );
 
         // Test Complexity debt type
-        let pattern = debt_type_to_pattern(&DebtType::Complexity, "High cyclomatic complexity");
-        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Complexity));
+        let pattern = debt_type_to_pattern(
+            &DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
+            "High cyclomatic complexity",
+        );
+        assert_eq!(
+            pattern,
+            DebtPattern::DebtType(DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8
+            })
+        );
 
         // Test Duplication debt type
-        let pattern = debt_type_to_pattern(&DebtType::Duplication, "Duplicate code detected");
-        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Duplication));
+        let pattern = debt_type_to_pattern(
+            &DebtType::Duplication {
+                instances: 2,
+                total_lines: 20,
+            },
+            "Duplicate code detected",
+        );
+        assert_eq!(
+            pattern,
+            DebtPattern::DebtType(DebtType::Duplication {
+                instances: 2,
+                total_lines: 20
+            })
+        );
     }
 
     #[test]
     fn test_process_rule_action_allow() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
-        let pattern = DebtPattern::DebtType(DebtType::Todo);
+        let pattern = DebtPattern::DebtType(DebtType::Todo { reason: None });
         let context = FunctionContext::new();
 
         // RuleAction::Allow should filter out the item
@@ -259,7 +296,7 @@ mod tests {
     fn test_process_rule_action_skip() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
-        let pattern = DebtPattern::DebtType(DebtType::Todo);
+        let pattern = DebtPattern::DebtType(DebtType::Todo { reason: None });
         let context = FunctionContext::new();
 
         // RuleAction::Skip should filter out the item
@@ -272,7 +309,7 @@ mod tests {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let original_priority = item.priority;
-        let pattern = DebtPattern::DebtType(DebtType::Todo);
+        let pattern = DebtPattern::DebtType(DebtType::Todo { reason: None });
         let context = FunctionContext::new();
 
         // RuleAction::Warn should reduce severity by 2 and keep the item
@@ -290,7 +327,7 @@ mod tests {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let original_priority = item.priority;
-        let pattern = DebtPattern::DebtType(DebtType::Todo);
+        let pattern = DebtPattern::DebtType(DebtType::Todo { reason: None });
         let context = FunctionContext::new();
 
         // RuleAction::ReduceSeverity should reduce by specified amount
@@ -313,7 +350,7 @@ mod tests {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let original_priority = item.priority;
-        let pattern = DebtPattern::DebtType(DebtType::Todo);
+        let pattern = DebtPattern::DebtType(DebtType::Todo { reason: None });
         let context = FunctionContext::new();
 
         // RuleAction::Deny should keep the item unchanged
@@ -329,7 +366,7 @@ mod tests {
     fn test_add_context_note() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
-        let pattern = DebtPattern::DebtType(DebtType::Todo);
+        let pattern = DebtPattern::DebtType(DebtType::Todo { reason: None });
         let context = FunctionContext::new();
 
         // Test adding context note
@@ -376,7 +413,7 @@ mod tests {
     fn create_test_debt_item() -> DebtItem {
         DebtItem {
             id: "test-item".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             message: "Test debt item".to_string(),
             line: 42,
             column: Some(0),

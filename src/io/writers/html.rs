@@ -225,7 +225,10 @@ mod tests {
     fn create_test_results() -> AnalysisResults {
         let items = vec![DebtItem {
             id: "test-1".to_string(),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
             priority: Priority::High,
             file: PathBuf::from("test.rs"),
             line: 5,
@@ -378,7 +381,10 @@ mod tests {
         let items = vec![
             DebtItem {
                 id: "critical-1".to_string(),
-                debt_type: DebtType::Complexity,
+                debt_type: DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
                 priority: Priority::Critical,
                 file: PathBuf::from("test1.rs"),
                 line: 1,
@@ -388,7 +394,10 @@ mod tests {
             },
             DebtItem {
                 id: "critical-2".to_string(),
-                debt_type: DebtType::ErrorSwallowing,
+                debt_type: DebtType::ErrorSwallowing {
+                    pattern: "unwrap".to_string(),
+                    context: None,
+                },
                 priority: Priority::Critical,
                 file: PathBuf::from("test2.rs"),
                 line: 2,
@@ -398,7 +407,7 @@ mod tests {
             },
             DebtItem {
                 id: "high-1".to_string(),
-                debt_type: DebtType::CodeSmell,
+                debt_type: DebtType::CodeSmell { smell_type: None },
                 priority: Priority::High,
                 file: PathBuf::from("test3.rs"),
                 line: 3,
@@ -408,7 +417,7 @@ mod tests {
             },
             DebtItem {
                 id: "medium-1".to_string(),
-                debt_type: DebtType::Todo,
+                debt_type: DebtType::Todo { reason: None },
                 priority: Priority::Medium,
                 file: PathBuf::from("test4.rs"),
                 line: 4,
@@ -418,7 +427,10 @@ mod tests {
             },
             DebtItem {
                 id: "low-1".to_string(),
-                debt_type: DebtType::Duplication,
+                debt_type: DebtType::Duplication {
+                    instances: 2,
+                    total_lines: 50,
+                },
                 priority: Priority::Low,
                 file: PathBuf::from("test5.rs"),
                 line: 5,
@@ -723,7 +735,10 @@ mod tests {
         for i in 0..1000 {
             results.technical_debt.items.push(DebtItem {
                 id: format!("item-{}", i),
-                debt_type: DebtType::Complexity,
+                debt_type: DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
                 priority: Priority::Medium,
                 file: PathBuf::from(format!("test{}.rs", i)),
                 line: i,

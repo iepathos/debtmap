@@ -64,7 +64,7 @@ pub fn analyze_file_directly(file_path: &Path) -> Result<AnalysisResults> {
     let mut by_type: HashMap<DebtType, Vec<DebtItem>> = HashMap::new();
     for item in &all_debt_items {
         by_type
-            .entry(item.debt_type)
+            .entry(item.debt_type.clone())
             .or_default()
             .push(item.clone());
     }

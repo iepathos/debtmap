@@ -3,12 +3,13 @@
 //! Validates that tier classification has acceptable performance
 //! and ensures no regression after refactoring to smaller functions.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::priority::tiers::pure::classify_tier;
 use debtmap::priority::{
     ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, TierConfig,
     UnifiedDebtItem, UnifiedScore,
 };
+use std::hint::black_box;
 use std::path::PathBuf;
 
 fn create_test_item(
@@ -266,8 +267,8 @@ fn bench_classify_batch(c: &mut Criterion) {
             .map(|i| {
                 let debt_type = match i % 4 {
                     0 => DebtType::GodObject {
-                        methods: 50 + (i % 50) as usize,
-                        fields: 20 + (i % 30) as usize,
+                        methods: 50 + (i % 50),
+                        fields: 20 + (i % 30),
                         responsibilities: 5,
                         god_object_score: 85.0,
                     },
