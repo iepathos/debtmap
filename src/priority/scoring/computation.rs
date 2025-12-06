@@ -13,7 +13,7 @@ use crate::priority::{
 
 /// Helper function to calculate entropy details from FunctionMetrics
 /// Pure function - transforms function metrics into entropy details
-pub(super) fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
+pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
     func.entropy_score.as_ref().map(|entropy_score| {
         // Use the new framework's dampening calculation
         let calculator = crate::complexity::entropy_core::UniversalEntropyCalculator::new(
@@ -23,7 +23,7 @@ pub(super) fn calculate_entropy_details(func: &FunctionMetrics) -> Option<Entrop
         let dampening_factor = (dampening_value / 2.0).clamp(0.5, 1.0); // Normalize to 0.5-1.0 range
 
         let adjusted_cyclomatic = (func.cyclomatic as f64 * dampening_factor) as u32;
-        let _adjusted_cognitive = (func.cognitive as f64 * dampening_factor) as u32;
+        let adjusted_cognitive = (func.cognitive as f64 * dampening_factor) as u32;
 
         EntropyDetails {
             entropy_score: entropy_score.token_entropy,
@@ -31,6 +31,7 @@ pub(super) fn calculate_entropy_details(func: &FunctionMetrics) -> Option<Entrop
             original_complexity: func.cyclomatic,
             adjusted_complexity: adjusted_cyclomatic,
             dampening_factor,
+            adjusted_cognitive,
         }
     })
 }
