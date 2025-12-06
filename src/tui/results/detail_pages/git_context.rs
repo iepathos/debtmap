@@ -39,7 +39,7 @@ pub fn render(
             } = &ctx.details
             {
                 // Change Patterns section
-                add_section_header(&mut lines, "CHANGE PATTERNS", theme);
+                add_section_header(&mut lines, "change patterns", theme);
                 add_label_value(
                     &mut lines,
                     "Change Frequency",
@@ -63,7 +63,7 @@ pub fn render(
         }
 
         // Risk Impact section
-        add_section_header(&mut lines, "RISK IMPACT", theme);
+        add_section_header(&mut lines, "risk impact", theme);
         add_label_value(
             &mut lines,
             "Base Risk Score",
@@ -93,7 +93,7 @@ pub fn render(
 
     // Context Dampening section (if applicable)
     if let Some(ref file_type) = item.context_type {
-        add_section_header(&mut lines, "CONTEXT DAMPENING", theme);
+        add_section_header(&mut lines, "context dampening", theme);
         add_label_value(&mut lines, "File Type", format!("{:?}", file_type), theme);
 
         if let Some(multiplier) = item.context_multiplier {

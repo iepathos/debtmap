@@ -26,7 +26,7 @@ pub fn render(
     // Entropy Analysis section
     if let Some(ref entropy) = item.entropy_details {
         has_any_data = true;
-        add_section_header(&mut lines, "ENTROPY ANALYSIS", theme);
+        add_section_header(&mut lines, "entropy analysis", theme);
 
         add_label_value(
             &mut lines,
@@ -82,7 +82,7 @@ pub fn render(
     // Pattern Analysis section
     if let Some(ref pattern_analysis) = item.pattern_analysis {
         has_any_data = true;
-        add_section_header(&mut lines, "PATTERN ANALYSIS", theme);
+        add_section_header(&mut lines, "pattern analysis", theme);
 
         // Framework patterns
         if pattern_analysis.frameworks.has_patterns() {
@@ -110,7 +110,7 @@ pub fn render(
     // Detected Pattern section
     if let Some(ref detected_pattern) = item.detected_pattern {
         has_any_data = true;
-        add_section_header(&mut lines, "DETECTED PATTERNS", theme);
+        add_section_header(&mut lines, "detected patterns", theme);
 
         add_label_value(
             &mut lines,
@@ -132,7 +132,7 @@ pub fn render(
     // Language-Specific section
     if let Some(ref lang_specific) = item.language_specific {
         has_any_data = true;
-        add_section_header(&mut lines, "LANGUAGE-SPECIFIC (RUST)", theme);
+        add_section_header(&mut lines, "language-specific (rust)", theme);
 
         match lang_specific {
             crate::core::LanguageSpecificData::Rust(rust_data) => {

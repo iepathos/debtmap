@@ -33,7 +33,7 @@ pub fn render(
 
     // Mutation Analysis Section
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
-        add_section_header(&mut lines, "MUTATION ANALYSIS", theme);
+        add_section_header(&mut lines, "mutation analysis", theme);
 
         add_label_value(
             &mut lines,
@@ -93,7 +93,7 @@ pub fn render(
     // I/O Operations Section
     if let Some(io_ops) = data_flow.get_io_operations(&func_id) {
         if !io_ops.is_empty() {
-            add_section_header(&mut lines, "I/O OPERATIONS", theme);
+            add_section_header(&mut lines, "i/o operations", theme);
 
             for op in io_ops {
                 lines.push(Line::from(vec![
@@ -116,7 +116,7 @@ pub fn render(
 
     // Escape Analysis Section
     if let Some(cfg_analysis) = data_flow.get_cfg_analysis(&func_id) {
-        add_section_header(&mut lines, "ESCAPE ANALYSIS", theme);
+        add_section_header(&mut lines, "escape analysis", theme);
 
         let escaping_count = cfg_analysis.escape_info.escaping_vars.len();
         add_label_value(
@@ -145,7 +145,7 @@ pub fn render(
 
     // Purity Analysis Section
     if let Some(purity_info) = data_flow.get_purity_info(&func_id) {
-        add_section_header(&mut lines, "PURITY ANALYSIS", theme);
+        add_section_header(&mut lines, "purity analysis", theme);
 
         add_label_value(
             &mut lines,

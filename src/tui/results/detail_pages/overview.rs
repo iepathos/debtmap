@@ -23,7 +23,7 @@ pub fn render(
     let mut lines = Vec::new();
 
     // Location section
-    add_section_header(&mut lines, "LOCATION", theme);
+    add_section_header(&mut lines, "location", theme);
     add_label_value(
         &mut lines,
         "File",
@@ -43,7 +43,7 @@ pub fn render(
     let location_items = get_items_at_location(app, item);
 
     // Score section
-    add_section_header(&mut lines, "SCORE", theme);
+    add_section_header(&mut lines, "score", theme);
 
     if location_items.len() > 1 {
         // Multiple debt types - show combined score
@@ -83,7 +83,7 @@ pub fn render(
     add_blank_line(&mut lines);
 
     // Metrics section
-    add_section_header(&mut lines, "METRICS", theme);
+    add_section_header(&mut lines, "metrics", theme);
     add_label_value(
         &mut lines,
         "Cyclomatic Complexity",
@@ -112,7 +112,7 @@ pub fn render(
 
     // Entropy section
     if item.entropy_details.is_some() || item.entropy_dampening_factor.is_some() {
-        add_section_header(&mut lines, "ENTROPY", theme);
+        add_section_header(&mut lines, "entropy", theme);
 
         if let Some(ref entropy) = item.entropy_details {
             add_label_value(
@@ -161,7 +161,7 @@ pub fn render(
     }
 
     // Coverage section
-    add_section_header(&mut lines, "COVERAGE", theme);
+    add_section_header(&mut lines, "coverage", theme);
     if let Some(coverage) = item.transitive_coverage.as_ref().map(|c| c.direct) {
         lines.push(Line::from(vec![
             Span::raw("  Coverage: "),
@@ -179,7 +179,7 @@ pub fn render(
     add_blank_line(&mut lines);
 
     // Recommendation section
-    add_section_header(&mut lines, "RECOMMENDATION", theme);
+    add_section_header(&mut lines, "recommendation", theme);
     add_label_value(
         &mut lines,
         "Action",
@@ -200,7 +200,7 @@ pub fn render(
     // Debt type section
     if location_items.len() > 1 {
         // Multiple debt types - show all
-        add_section_header(&mut lines, "DEBT TYPES", theme);
+        add_section_header(&mut lines, "debt types", theme);
         for (idx, debt_item) in location_items.iter().enumerate() {
             let debt_name = format_debt_type_name(&debt_item.debt_type);
             lines.push(Line::from(vec![
@@ -226,7 +226,7 @@ pub fn render(
         }
     } else {
         // Single debt type - show as before
-        add_section_header(&mut lines, "DEBT TYPE", theme);
+        add_section_header(&mut lines, "debt type", theme);
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(

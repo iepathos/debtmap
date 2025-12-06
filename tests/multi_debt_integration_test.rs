@@ -117,7 +117,6 @@ fn test_multi_debt_end_to_end() {
     }
 }
 
-
 #[test]
 fn test_single_debt_only() {
     // Function with only one debt type: complexity hotspot
