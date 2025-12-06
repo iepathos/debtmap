@@ -150,8 +150,8 @@ impl TierConfig {
 mod tests {
     use super::*;
     use crate::priority::{
-        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location,
-        UnifiedDebtItem, UnifiedScore,
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedDebtItem,
+        UnifiedScore,
     };
 
     fn create_test_item(debt_type: DebtType, complexity: u32, deps: usize) -> UnifiedDebtItem {
