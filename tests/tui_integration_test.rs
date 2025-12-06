@@ -11,19 +11,18 @@ use debtmap::{
 fn test_tui_app_initialization() {
     let app = App::new();
 
-    // Verify all 9 stages are created
-    assert_eq!(app.stages.len(), 9);
+    // Verify all 8 stages are created
+    assert_eq!(app.stages.len(), 8);
 
     // Verify stage names
     assert_eq!(app.stages[0].name, "files");
     assert_eq!(app.stages[1].name, "parse");
     assert_eq!(app.stages[2].name, "call graph");
-    assert_eq!(app.stages[3].name, "trait resolution");
-    assert_eq!(app.stages[4].name, "coverage");
-    assert_eq!(app.stages[5].name, "purity analysis");
-    assert_eq!(app.stages[6].name, "context");
-    assert_eq!(app.stages[7].name, "debt scoring");
-    assert_eq!(app.stages[8].name, "prioritization");
+    assert_eq!(app.stages[3].name, "coverage");
+    assert_eq!(app.stages[4].name, "purity analysis");
+    assert_eq!(app.stages[5].name, "context");
+    assert_eq!(app.stages[6].name, "debt scoring");
+    assert_eq!(app.stages[7].name, "prioritization");
 
     // All stages should be pending initially
     for stage in &app.stages {
@@ -82,17 +81,17 @@ fn test_tui_progress_updates() {
 fn test_tui_subtask_updates() {
     let mut app = App::new();
 
-    // Purity analysis stage (index 5) has subtasks
-    assert!(!app.stages[5].sub_tasks.is_empty());
+    // Purity analysis stage (index 4) has subtasks
+    assert!(!app.stages[4].sub_tasks.is_empty());
 
     // Update first subtask
-    app.update_subtask(5, 0, StageStatus::Completed, None);
-    assert_eq!(app.stages[5].sub_tasks[0].status, StageStatus::Completed);
+    app.update_subtask(4, 0, StageStatus::Completed, None);
+    assert_eq!(app.stages[4].sub_tasks[0].status, StageStatus::Completed);
 
     // Update second subtask with progress
-    app.update_subtask(5, 1, StageStatus::Active, Some((50, 100)));
-    assert_eq!(app.stages[5].sub_tasks[1].status, StageStatus::Active);
-    assert_eq!(app.stages[5].sub_tasks[1].progress, Some((50, 100)));
+    app.update_subtask(4, 1, StageStatus::Active, Some((50, 100)));
+    assert_eq!(app.stages[4].sub_tasks[1].status, StageStatus::Active);
+    assert_eq!(app.stages[4].sub_tasks[1].progress, Some((50, 100)));
 }
 
 #[test]
@@ -174,53 +173,47 @@ fn test_full_pipeline_simulation() {
     app.complete_stage(2, "5432 functions");
     app.set_overall_progress(0.33);
 
-    // Stage 4: Trait resolution
+    // Stage 4: Coverage
     app.start_stage(3);
     app.tick();
-    app.complete_stage(3, "148 traits resolved");
-    app.set_overall_progress(0.44);
-
-    // Stage 5: Coverage
-    app.start_stage(4);
-    app.tick();
-    app.complete_stage(4, "loaded");
+    app.complete_stage(3, "loaded");
     app.set_overall_progress(0.55);
 
-    // Stage 6: Purity analysis
-    app.start_stage(5);
+    // Stage 5: Purity analysis
+    app.start_stage(4);
 
     // Update subtasks
-    app.update_subtask(5, 0, StageStatus::Completed, None);
+    app.update_subtask(4, 0, StageStatus::Completed, None);
     app.tick();
-    app.update_subtask(5, 1, StageStatus::Active, Some((50, 100)));
+    app.update_subtask(4, 1, StageStatus::Active, Some((50, 100)));
     app.tick();
-    app.update_subtask(5, 1, StageStatus::Completed, None);
+    app.update_subtask(4, 1, StageStatus::Completed, None);
     app.tick();
 
-    app.complete_stage(5, "5432 functions analyzed");
+    app.complete_stage(4, "5432 functions analyzed");
     app.set_overall_progress(0.66);
 
-    // Stage 7: Context
-    app.start_stage(6);
+    // Stage 6: Context
+    app.start_stage(5);
     app.tick();
-    app.complete_stage(6, "loaded");
+    app.complete_stage(5, "loaded");
     app.set_overall_progress(0.77);
 
-    // Stage 8: Debt scoring
-    app.start_stage(7);
+    // Stage 7: Debt scoring
+    app.start_stage(6);
     app.tick();
-    app.complete_stage(7, "123 items scored");
+    app.complete_stage(6, "123 items scored");
     app.set_overall_progress(0.88);
 
-    // Stage 9: Prioritization
-    app.start_stage(8);
+    // Stage 8: Prioritization
+    app.start_stage(7);
     app.tick();
-    app.complete_stage(8, "complete");
+    app.complete_stage(7, "complete");
     app.set_overall_progress(1.0);
 
     // Verify final state
     assert_eq!(app.overall_progress, 1.0);
-    assert_eq!(app.current_stage, 8);
+    assert_eq!(app.current_stage, 7);
 
     // All stages should be completed
     for stage in &app.stages {
@@ -250,8 +243,8 @@ fn test_stage_metric_updates() {
 fn test_purity_analysis_subtasks() {
     let app = App::new();
 
-    // Verify purity analysis stage (index 5) has the correct subtasks
-    let purity_stage = &app.stages[5];
+    // Verify purity analysis stage (index 4) has the correct subtasks
+    let purity_stage = &app.stages[4];
     assert_eq!(purity_stage.name, "purity analysis");
     assert_eq!(purity_stage.sub_tasks.len(), 4);
 
@@ -273,7 +266,7 @@ fn test_context_analysis_subtasks() {
     let app = App::new();
 
     // Verify context stage (index 6) has the correct subtasks
-    let context_stage = &app.stages[6];
+    let context_stage = &app.stages[5];
     assert_eq!(context_stage.name, "context");
     assert_eq!(context_stage.sub_tasks.len(), 3);
 
@@ -294,21 +287,21 @@ fn test_context_subsections_when_disabled() {
     let mut app = App::new();
 
     // Context subsections exist in the App structure
-    assert_eq!(app.stages[6].sub_tasks.len(), 3);
+    assert_eq!(app.stages[5].sub_tasks.len(), 3);
 
     // Simulate context stage being skipped (enable_context=false)
     // When context is disabled, the stage starts and completes immediately
     // with "skipped" metric, and subsections are not updated
-    app.start_stage(6);
-    assert_eq!(app.stages[6].status, StageStatus::Active);
+    app.start_stage(5);
+    assert_eq!(app.stages[5].status, StageStatus::Active);
 
     // Complete the context stage as "skipped" without updating subsections
-    app.complete_stage(6, "skipped");
-    assert_eq!(app.stages[6].status, StageStatus::Completed);
-    assert_eq!(app.stages[6].metric, Some("skipped".to_string()));
+    app.complete_stage(5, "skipped");
+    assert_eq!(app.stages[5].status, StageStatus::Completed);
+    assert_eq!(app.stages[5].metric, Some("skipped".to_string()));
 
     // All subsections should remain in Pending state when context is disabled
-    for subtask in &app.stages[6].sub_tasks {
+    for subtask in &app.stages[5].sub_tasks {
         assert_eq!(subtask.status, StageStatus::Pending);
         assert!(subtask.progress.is_none());
     }
@@ -319,48 +312,48 @@ fn test_context_subsection_lifecycle() {
     let mut app = App::new();
 
     // Start the context stage
-    app.start_stage(6);
-    assert_eq!(app.stages[6].status, StageStatus::Active);
+    app.start_stage(5);
+    assert_eq!(app.stages[5].status, StageStatus::Active);
 
     // All subsections should start as Pending
-    for subtask in &app.stages[6].sub_tasks {
+    for subtask in &app.stages[5].sub_tasks {
         assert_eq!(subtask.status, StageStatus::Pending);
     }
 
     // Subsection 0: Critical path analysis - Pending → Active → Completed
-    app.update_subtask(6, 0, StageStatus::Active, None);
-    assert_eq!(app.stages[6].sub_tasks[0].status, StageStatus::Active);
-    assert_eq!(app.stages[6].sub_tasks[0].name, "critical path");
+    app.update_subtask(5, 0, StageStatus::Active, None);
+    assert_eq!(app.stages[5].sub_tasks[0].status, StageStatus::Active);
+    assert_eq!(app.stages[5].sub_tasks[0].name, "critical path");
     app.tick();
 
-    app.update_subtask(6, 0, StageStatus::Completed, None);
-    assert_eq!(app.stages[6].sub_tasks[0].status, StageStatus::Completed);
+    app.update_subtask(5, 0, StageStatus::Completed, None);
+    assert_eq!(app.stages[5].sub_tasks[0].status, StageStatus::Completed);
 
     // Subsection 1: Dependencies - Pending → Active → Completed
-    app.update_subtask(6, 1, StageStatus::Active, None);
-    assert_eq!(app.stages[6].sub_tasks[1].status, StageStatus::Active);
-    assert_eq!(app.stages[6].sub_tasks[1].name, "dependencies");
+    app.update_subtask(5, 1, StageStatus::Active, None);
+    assert_eq!(app.stages[5].sub_tasks[1].status, StageStatus::Active);
+    assert_eq!(app.stages[5].sub_tasks[1].name, "dependencies");
     app.tick();
 
-    app.update_subtask(6, 1, StageStatus::Completed, None);
-    assert_eq!(app.stages[6].sub_tasks[1].status, StageStatus::Completed);
+    app.update_subtask(5, 1, StageStatus::Completed, None);
+    assert_eq!(app.stages[5].sub_tasks[1].status, StageStatus::Completed);
 
     // Subsection 2: Git history - Pending → Active → Completed
-    app.update_subtask(6, 2, StageStatus::Active, None);
-    assert_eq!(app.stages[6].sub_tasks[2].status, StageStatus::Active);
-    assert_eq!(app.stages[6].sub_tasks[2].name, "git history");
+    app.update_subtask(5, 2, StageStatus::Active, None);
+    assert_eq!(app.stages[5].sub_tasks[2].status, StageStatus::Active);
+    assert_eq!(app.stages[5].sub_tasks[2].name, "git history");
     app.tick();
 
-    app.update_subtask(6, 2, StageStatus::Completed, None);
-    assert_eq!(app.stages[6].sub_tasks[2].status, StageStatus::Completed);
+    app.update_subtask(5, 2, StageStatus::Completed, None);
+    assert_eq!(app.stages[5].sub_tasks[2].status, StageStatus::Completed);
 
     // Complete the overall context stage
-    app.complete_stage(6, "loaded");
-    assert_eq!(app.stages[6].status, StageStatus::Completed);
-    assert_eq!(app.stages[6].metric, Some("loaded".to_string()));
+    app.complete_stage(5, "loaded");
+    assert_eq!(app.stages[5].status, StageStatus::Completed);
+    assert_eq!(app.stages[5].metric, Some("loaded".to_string()));
 
     // All subsections should be completed
-    for subtask in &app.stages[6].sub_tasks {
+    for subtask in &app.stages[5].sub_tasks {
         assert_eq!(subtask.status, StageStatus::Completed);
     }
 }

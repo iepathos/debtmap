@@ -111,13 +111,12 @@ impl App {
         }
     }
 
-    /// Create the default 9-stage pipeline structure
+    /// Create the default 8-stage pipeline structure
     fn create_default_stages() -> Vec<PipelineStage> {
         vec![
             PipelineStage::new("files"),
             PipelineStage::new("parse"),
             PipelineStage::new("call graph"),
-            PipelineStage::new("trait resolution"),
             PipelineStage::new("coverage"),
             PipelineStage::with_subtasks(
                 "purity analysis",
@@ -243,7 +242,7 @@ mod tests {
     #[test]
     fn test_app_creation() {
         let app = App::new();
-        assert_eq!(app.stages.len(), 9);
+        assert_eq!(app.stages.len(), 8);
         assert_eq!(app.overall_progress, 0.0);
         assert_eq!(app.current_stage, 0);
     }
@@ -268,13 +267,13 @@ mod tests {
     fn test_subtask_updates() {
         let mut app = App::new();
 
-        // Purity analysis stage has subtasks (index 5)
-        app.update_subtask(5, 0, StageStatus::Completed, None);
-        assert_eq!(app.stages[5].sub_tasks[0].status, StageStatus::Completed);
+        // Purity analysis stage has subtasks (index 4)
+        app.update_subtask(4, 0, StageStatus::Completed, None);
+        assert_eq!(app.stages[4].sub_tasks[0].status, StageStatus::Completed);
 
-        app.update_subtask(5, 1, StageStatus::Active, Some((50, 100)));
-        assert_eq!(app.stages[5].sub_tasks[1].status, StageStatus::Active);
-        assert_eq!(app.stages[5].sub_tasks[1].progress, Some((50, 100)));
+        app.update_subtask(4, 1, StageStatus::Active, Some((50, 100)));
+        assert_eq!(app.stages[4].sub_tasks[1].status, StageStatus::Active);
+        assert_eq!(app.stages[4].sub_tasks[1].progress, Some((50, 100)));
     }
 
     #[test]

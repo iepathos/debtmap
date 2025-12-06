@@ -399,15 +399,14 @@ impl ParallelUnifiedAnalysisBuilder {
         self
     }
 
-    /// Set preliminary timing values (call graph, trait resolution, coverage loading)
+    /// Set preliminary timing values (call graph and coverage loading)
     pub fn set_preliminary_timings(
         &mut self,
         call_graph_building: Duration,
-        trait_resolution: Duration,
         coverage_loading: Duration,
     ) {
         self.timings.call_graph_building = call_graph_building;
-        self.timings.trait_resolution = trait_resolution;
+        self.timings.trait_resolution = Duration::from_secs(0);
         self.timings.coverage_loading = coverage_loading;
     }
 

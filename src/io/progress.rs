@@ -1,22 +1,20 @@
 //! Unified progress display for debtmap analysis.
 //!
 //! Provides a clean, phase-based progress flow that shows users exactly what's happening
-//! during analysis. Progress is displayed as numbered phases (1/4, 2/4, etc.) with
+//! during analysis. Progress is displayed as numbered phases (1/3, 2/3, etc.) with
 //! consistent formatting and time tracking.
 //!
 //! # Example Output
 //!
 //! ```text
-//! → 1/4 Discovering files...        511 found
-//! ✓ 1/4 Discovering files...        511 found - 0s
-//! → 2/4 Analyzing complexity...     511/511 (100%) - 2s
-//! ✓ 2/4 Analyzing complexity...     511/511 (100%) - 2s
-//! → 3/4 Building call graph...      511/511 (100%) - 1s
-//! ✓ 3/4 Building call graph...      511/511 (100%) - 1s
-//! → 4/4 Refining analysis...   148769/148769 (100%) - 3s
-//! ✓ 4/4 Refining analysis...   148769/148769 (100%) - 3s
+//! → 1/3 Discovering files...        511 found
+//! ✓ 1/3 Discovering files...        511 found - 0s
+//! → 2/3 Analyzing complexity...     511/511 (100%) - 2s
+//! ✓ 2/3 Analyzing complexity...     511/511 (100%) - 2s
+//! → 3/3 Building call graph...      511/511 (100%) - 1s
+//! ✓ 3/3 Building call graph...      511/511 (100%) - 1s
 //!
-//! Analysis complete in 6.2s
+//! Analysis complete in 3.2s
 //! ```
 
 use once_cell::sync::Lazy;
@@ -73,7 +71,6 @@ impl AnalysisProgress {
                 AnalysisPhase::new("Discovering files", PhaseProgress::Indeterminate),
                 AnalysisPhase::new("Analyzing complexity", PhaseProgress::Indeterminate),
                 AnalysisPhase::new("Building call graph", PhaseProgress::Indeterminate),
-                AnalysisPhase::new("Refining analysis", PhaseProgress::Indeterminate),
             ],
             current_phase: 0,
             start_time: Instant::now(),

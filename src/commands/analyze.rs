@@ -127,8 +127,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config._formatting_config,
     )?;
 
-    // Note: Phase 3 (Building call graph) and Phase 4 (Resolving dependencies)
-    // are tracked inside perform_unified_analysis_with_options
+    // Note: Phase 3 (Building call graph) is tracked inside perform_unified_analysis_with_options
     let mut unified_analysis = unified_analysis::perform_unified_analysis_with_options(
         unified_analysis::UnifiedAnalysisOptions {
             results: &results,

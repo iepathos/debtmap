@@ -201,57 +201,20 @@ fn perform_unified_analysis_computation(
         manager.tui_set_progress(0.33); // ~3/9 stages complete
     }
 
-    // Phase 4: Refining analysis (trait resolution) (spec 195, spec 201)
-    crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(3));
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(3); // trait resolution stage
-    }
-
-    // Integrate trait resolution to reduce false positives
-    let trait_resolution_start = std::time::Instant::now();
-    let trait_resolution_stats =
-        integrate_trait_resolution(project_path, &mut call_graph, verbose_macro_warnings)?;
-    let trait_resolution_time = trait_resolution_start.elapsed();
-
-    crate::io::progress::AnalysisProgress::with_global(|p| {
-        // Show meaningful progress: resolved/total_examined (spec 201)
-        // Use indeterminate progress if there are no trait calls to examine
-        if trait_resolution_stats.total_calls_examined > 0 {
-            p.update_progress(crate::io::progress::PhaseProgress::Progress {
-                current: trait_resolution_stats.resolved_calls,
-                total: trait_resolution_stats.total_calls_examined,
-            });
-        } else {
-            p.update_progress(crate::io::progress::PhaseProgress::Indeterminate);
-        }
-        p.complete_phase();
-    });
-
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(
-            3,
-            format!("{} traits resolved", trait_resolution_stats.resolved_calls),
-        );
-        manager.tui_set_progress(0.44); // ~4/9 stages complete
-    }
-
-    // Display trait resolution statistics in verbose mode
-    if !quiet_mode && verbose_macro_warnings {
-        log::debug!(
-            "Resolved {} trait method calls",
-            trait_resolution_stats.resolved_calls
-        );
-        log::debug!(
-            "Marked {} trait implementations as callable",
-            trait_resolution_stats.marked_implementations
-        );
+    // Apply trait pattern detection to the merged call graph
+    // This ensures trait methods (Default, Clone, constructors, etc.) are marked as entry points
+    // after the enhanced graph has been merged in
+    {
+        use crate::analysis::call_graph::TraitRegistry;
+        let trait_registry = TraitRegistry::new();
+        trait_registry.detect_common_trait_patterns(&mut call_graph);
     }
 
     let coverage_loading_start = std::time::Instant::now();
 
-    // Stage 5: Coverage loading
+    // Stage 4: Coverage loading
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(4); // coverage stage
+        manager.tui_start_stage(3); // coverage stage
     }
 
     // Show spinner for coverage loading if coverage file provided (spec 201)
@@ -285,7 +248,7 @@ fn perform_unified_analysis_computation(
         } else {
             "skipped".to_string()
         };
-        manager.tui_complete_stage(4, metric);
+        manager.tui_complete_stage(3, metric);
         manager.tui_set_progress(0.55); // ~5/9 stages complete
 
         // Update TUI stats with coverage percentage (preserves existing function/debt counts)
@@ -315,9 +278,9 @@ fn perform_unified_analysis_computation(
     );
 
     // Run inter-procedural purity propagation (spec 156)
-    // Stage 6: Purity analysis
+    // Stage 5: Purity analysis
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(5); // purity analysis stage
+        manager.tui_start_stage(4); // purity analysis stage
     }
 
     let purity_spinner = crate::progress::ProgressManager::global()
@@ -331,16 +294,16 @@ fn perform_unified_analysis_computation(
     purity_spinner.finish_and_clear();
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(5, format!("{} functions analyzed", enriched_metrics.len()));
+        manager.tui_complete_stage(4, format!("{} functions analyzed", enriched_metrics.len()));
         manager.tui_set_progress(0.66); // ~6/9 stages complete
     }
 
     // Progress is already tracked by unified AnalysisProgress system
 
     // Create context aggregator and risk analyzer for priority scoring (spec 202)
-    // Stage 7: Context loading
+    // Stage 6: Context loading
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(6); // context stage
+        manager.tui_start_stage(5); // context stage
     }
 
     let context_spinner = if enable_context {
@@ -380,13 +343,13 @@ fn perform_unified_analysis_computation(
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
         let metric = if enable_context { "loaded" } else { "skipped" };
-        manager.tui_complete_stage(6, metric);
+        manager.tui_complete_stage(5, metric);
         manager.tui_set_progress(0.77); // ~7/9 stages complete
     }
 
-    // Stage 8: Debt scoring
+    // Stage 7: Debt scoring
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(7); // debt scoring stage
+        manager.tui_start_stage(6); // debt scoring stage
     }
 
     // Show spinner for the main debt analysis computation
@@ -406,7 +369,6 @@ fn perform_unified_analysis_computation(
         min_problematic,
         no_god_object,
         call_graph_time,
-        trait_resolution_time,
         coverage_loading_time,
         risk_analyzer,
         project_path,
@@ -417,14 +379,14 @@ fn perform_unified_analysis_computation(
     analysis_spinner.finish_and_clear();
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(7, format!("{} items scored", result.items.len()));
+        manager.tui_complete_stage(6, format!("{} items scored", result.items.len()));
         manager.tui_set_progress(0.88); // ~8/9 stages complete
     }
 
-    // Stage 9: Prioritization (final stage)
+    // Stage 7: Prioritization (final stage)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(8); // prioritization stage
-        manager.tui_complete_stage(8, "complete");
+        manager.tui_start_stage(7); // prioritization stage
+        manager.tui_complete_stage(7, "complete");
         manager.tui_set_progress(1.0); // 100% complete
     }
 
@@ -526,7 +488,6 @@ pub fn create_unified_analysis_with_exclusions(
         no_god_object,
         Duration::from_secs(0),
         Duration::from_secs(0),
-        Duration::from_secs(0),
         None,           // No risk analyzer in wrapper function
         Path::new("."), // Default project path
         false,          // Default to sequential (for compatibility)
@@ -547,7 +508,6 @@ fn create_unified_analysis_with_exclusions_and_timing(
     min_problematic: Option<usize>,
     no_god_object: bool,
     call_graph_time: std::time::Duration,
-    trait_resolution_time: std::time::Duration,
     coverage_loading_time: std::time::Duration,
     risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
@@ -583,7 +543,6 @@ fn create_unified_analysis_with_exclusions_and_timing(
             no_god_object,
             jobs_count,
             call_graph_time,
-            trait_resolution_time,
             coverage_loading_time,
             risk_analyzer,
             project_path,
@@ -673,7 +632,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     // but we can attach the preliminary timings that were passed in
     unified.timings = Some(parallel_unified_analysis::AnalysisPhaseTimings {
         call_graph_building: call_graph_time,
-        trait_resolution: trait_resolution_time,
+        trait_resolution: std::time::Duration::from_secs(0),
         coverage_loading: coverage_loading_time,
         data_flow_creation: std::time::Duration::from_secs(0),
         purity_analysis: std::time::Duration::from_secs(0),
@@ -703,7 +662,6 @@ fn create_unified_analysis_parallel(
     no_god_object: bool,
     jobs: Option<usize>,
     call_graph_time: std::time::Duration,
-    trait_resolution_time: std::time::Duration,
     coverage_loading_time: std::time::Duration,
     risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
@@ -727,10 +685,9 @@ fn create_unified_analysis_parallel(
         builder = builder.with_risk_analyzer(analyzer);
     }
 
-    // Set preliminary timing values from call graph building, trait resolution, and coverage loading
+    // Set preliminary timing values from call graph building and coverage loading
     builder.set_preliminary_timings(
         call_graph_time,
-        trait_resolution_time,
         coverage_loading_time,
     );
 
@@ -1327,47 +1284,6 @@ fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
     )
 }
 
-/// Statistics about trait resolution (spec 201)
-#[derive(Debug, Clone, Default)]
-struct TraitResolutionStats {
-    total_calls_examined: usize,   // Total trait method calls found
-    resolved_calls: usize,         // Successfully resolved calls
-    marked_implementations: usize, // Trait impls marked as callable
-}
-
-/// Integrate trait resolution into the call graph to reduce false positives
-fn integrate_trait_resolution(
-    _project_path: &Path,
-    call_graph: &mut crate::priority::call_graph::CallGraph,
-    _verbose: bool,
-) -> Result<TraitResolutionStats> {
-    use crate::analysis::call_graph::TraitRegistry;
-
-    // Build trait registry from the project
-    let trait_registry = TraitRegistry::new();
-
-    // Detect common trait patterns (Default, Clone, etc.) and mark them as entry points
-    trait_registry.detect_common_trait_patterns(call_graph);
-
-    // Get total calls before resolving (spec 201)
-    let total_examined = trait_registry.count_trait_method_calls(call_graph);
-
-    // Suppress spinner - unified progress system already shows "4/4 Refining analysis"
-    let progress = indicatif::ProgressBar::hidden();
-
-    // Resolve trait method calls to concrete implementations
-    let resolved_count =
-        trait_registry.resolve_trait_method_calls_with_progress(call_graph, &progress);
-
-    // Get statistics about trait usage
-    let trait_stats = trait_registry.get_statistics();
-
-    Ok(TraitResolutionStats {
-        total_calls_examined: total_examined,
-        resolved_calls: resolved_count,
-        marked_implementations: trait_stats.total_implementations,
-    })
-}
 
 /// Run inter-procedural purity propagation on function metrics (spec 156)
 fn run_purity_propagation(
@@ -1381,6 +1297,11 @@ fn run_purity_propagation(
     use crate::analysis::purity_analysis::PurityAnalyzer;
     use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
 
+    // Subtask 0: Build data flow graph
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Active, None);
+    }
+
     // Create RustCallGraph wrapper around the base call graph
     let rust_graph = RustCallGraph {
         base_graph: call_graph.clone(),
@@ -1393,18 +1314,54 @@ fn run_purity_propagation(
     // Create call graph adapter
     let adapter = PurityCallGraphAdapter::from_rust_graph(rust_graph);
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Completed, None);
+        // Brief pause to ensure subtask update is visible
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 1: Initial purity detection
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 1, crate::tui::app::StageStatus::Active, Some((0, metrics.len())));
+    }
+
     // Create purity analyzer and propagator
     let purity_analyzer = PurityAnalyzer::new();
     let mut propagator = PurityPropagator::new(adapter, purity_analyzer);
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 1, crate::tui::app::StageStatus::Completed, Some((metrics.len(), metrics.len())));
+        // Brief pause to ensure subtask update is visible
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 2: Purity propagation
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Active, None);
+    }
+
     // Run propagation
     if let Err(e) = propagator.propagate(metrics) {
         log::warn!("Purity propagation failed: {}", e);
+        if let Some(manager) = crate::progress::ProgressManager::global() {
+            manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Completed, None);
+        }
         return metrics.to_vec();
     }
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Completed, None);
+        // Brief pause to ensure subtask update is visible
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 3: Side effects analysis
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 3, crate::tui::app::StageStatus::Active, Some((0, metrics.len())));
+    }
+
     // Apply results to metrics
-    metrics
+    let result = metrics
         .iter()
         .map(|metric| {
             let func_id = priority::call_graph::FunctionId::new(
@@ -1425,5 +1382,11 @@ fn run_purity_propagation(
                 metric.clone()
             }
         })
-        .collect()
+        .collect();
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(5, 3, crate::tui::app::StageStatus::Completed, Some((metrics.len(), metrics.len())));
+    }
+
+    result
 }
