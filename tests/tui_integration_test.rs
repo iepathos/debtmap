@@ -357,3 +357,25 @@ fn test_context_subsection_lifecycle() {
         assert_eq!(subtask.status, StageStatus::Completed);
     }
 }
+
+#[test]
+fn test_debt_scoring_subtasks() {
+    let app = App::new();
+
+    // Verify debt scoring stage (index 6) has the correct subtasks
+    let debt_stage = &app.stages[6];
+    assert_eq!(debt_stage.name, "debt scoring");
+    assert_eq!(debt_stage.sub_tasks.len(), 4);
+
+    // Verify subtask names
+    assert_eq!(debt_stage.sub_tasks[0].name, "initialize");
+    assert_eq!(debt_stage.sub_tasks[1].name, "aggregate debt");
+    assert_eq!(debt_stage.sub_tasks[2].name, "score functions");
+    assert_eq!(debt_stage.sub_tasks[3].name, "filter results");
+
+    // All subtasks should be pending initially
+    for subtask in &debt_stage.sub_tasks {
+        assert_eq!(subtask.status, StageStatus::Pending);
+        assert!(subtask.progress.is_none());
+    }
+}

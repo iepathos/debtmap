@@ -163,7 +163,37 @@ impl App {
                     },
                 ],
             ),
-            PipelineStage::new("debt scoring"),
+            // Stage 7: Debt scoring (index 6 due to 0-based indexing)
+            // Breaks down the debt scoring process into 4 subsections:
+            // 1. Initialize scoring structures
+            // 2. Aggregate debt from all sources
+            // 3. Score individual functions based on debt
+            // 4. Filter and rank results by severity
+            PipelineStage::with_subtasks(
+                "debt scoring",
+                vec![
+                    SubTask {
+                        name: "initialize".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "aggregate debt".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "score functions".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "filter results".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                ],
+            ),
             PipelineStage::new("prioritization"),
         ]
     }

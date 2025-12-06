@@ -554,6 +554,11 @@ fn create_unified_analysis_with_exclusions_and_timing(
 
     // Progress is tracked by unified AnalysisProgress system - no individual step output needed
 
+    // Subtask 0: Initialize (data flow graph, purity, test detection)
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Active, None);
+    }
+
     // Step 1: Initialize unified analysis with data flow graph
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
@@ -563,6 +568,16 @@ fn create_unified_analysis_with_exclusions_and_timing(
     // Step 3: Find test-only functions
     let test_only_functions: HashSet<_> =
         call_graph.find_test_only_functions().into_iter().collect();
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Completed, None);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 1: Aggregate debt
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Active, None);
+    }
 
     // Step 4: Setup debt aggregator
     let mut debt_aggregator = DebtAggregator::new();
@@ -579,9 +594,38 @@ fn create_unified_analysis_with_exclusions_and_timing(
         debt_aggregator.aggregate_debt(debt_items_vec, &function_mappings);
     }
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Completed, None);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 2: Score functions (main computational loop with progress)
+    let total_metrics = metrics.len();
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(
+            6,
+            2,
+            crate::tui::app::StageStatus::Active,
+            Some((0, total_metrics)),
+        );
+    }
+
     // Step 5: Per-function debt analysis (main loop)
-    for metric in metrics {
+    let mut last_update = Instant::now();
+    for (idx, metric) in metrics.iter().enumerate() {
         if should_skip_metric_for_debt_analysis(metric, call_graph, &test_only_functions) {
+            // Throttled progress update
+            if idx % 100 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100) {
+                if let Some(manager) = crate::progress::ProgressManager::global() {
+                    manager.tui_update_subtask(
+                        6,
+                        2,
+                        crate::tui::app::StageStatus::Active,
+                        Some((idx + 1, total_metrics)),
+                    );
+                }
+                last_update = Instant::now();
+            }
             continue;
         }
         // Create debt item (spec 201: returns None for clean dispatchers)
@@ -599,6 +643,34 @@ fn create_unified_analysis_with_exclusions_and_timing(
             unified.add_item(item);
         }
         // If None (clean dispatcher), skip adding the item - no debt to report
+
+        // Throttled progress update
+        if idx % 100 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100) {
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                manager.tui_update_subtask(
+                    6,
+                    2,
+                    crate::tui::app::StageStatus::Active,
+                    Some((idx + 1, total_metrics)),
+                );
+            }
+            last_update = Instant::now();
+        }
+    }
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(
+            6,
+            2,
+            crate::tui::app::StageStatus::Completed,
+            Some((total_metrics, total_metrics)),
+        );
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
+
+    // Subtask 3: Filter results (error analysis, file analysis, sorting, filtering)
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Active, None);
     }
 
     // Step 6: Error swallowing analysis
@@ -617,6 +689,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
     // Step 9: Final sorting and impact calculation
     unified.sort_by_priority();
     unified.calculate_total_impact();
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Completed, None);
+    }
 
     // Set coverage data availability flag (spec 108)
     unified.has_coverage_data = coverage_data.is_some();
@@ -686,10 +762,7 @@ fn create_unified_analysis_parallel(
     }
 
     // Set preliminary timing values from call graph building and coverage loading
-    builder.set_preliminary_timings(
-        call_graph_time,
-        coverage_loading_time,
-    );
+    builder.set_preliminary_timings(call_graph_time, coverage_loading_time);
 
     // Phase 1: Parallel initialization
     let (data_flow_graph, _purity, test_only_functions, debt_aggregator) =
@@ -705,6 +778,11 @@ fn create_unified_analysis_parallel(
         framework_exclusions,
         function_pointer_used_functions,
     );
+
+    // Subtask 3: Filter results (error analysis, file analysis, sorting, filtering) - PARALLEL
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Active, None);
+    }
 
     // Add error swallowing items
     let mut all_items = items;
@@ -729,6 +807,10 @@ fn create_unified_analysis_parallel(
     unified.timings = Some(timings);
 
     // Aggregation has been removed - no longer needed
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Completed, None);
+    }
 
     unified
 }
@@ -1284,7 +1366,6 @@ fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
     )
 }
 
-
 /// Run inter-procedural purity propagation on function metrics (spec 156)
 fn run_purity_propagation(
     metrics: &[FunctionMetrics],
@@ -1322,7 +1403,12 @@ fn run_purity_propagation(
 
     // Subtask 1: Initial purity detection
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 1, crate::tui::app::StageStatus::Active, Some((0, metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            1,
+            crate::tui::app::StageStatus::Active,
+            Some((0, metrics.len())),
+        );
     }
 
     // Create purity analyzer and propagator
@@ -1330,7 +1416,12 @@ fn run_purity_propagation(
     let mut propagator = PurityPropagator::new(adapter, purity_analyzer);
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 1, crate::tui::app::StageStatus::Completed, Some((metrics.len(), metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            1,
+            crate::tui::app::StageStatus::Completed,
+            Some((metrics.len(), metrics.len())),
+        );
         // Brief pause to ensure subtask update is visible
         std::thread::sleep(std::time::Duration::from_millis(150));
     }
@@ -1357,7 +1448,12 @@ fn run_purity_propagation(
 
     // Subtask 3: Side effects analysis
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 3, crate::tui::app::StageStatus::Active, Some((0, metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            3,
+            crate::tui::app::StageStatus::Active,
+            Some((0, metrics.len())),
+        );
     }
 
     // Apply results to metrics
@@ -1385,7 +1481,12 @@ fn run_purity_propagation(
         .collect();
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 3, crate::tui::app::StageStatus::Completed, Some((metrics.len(), metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            3,
+            crate::tui::app::StageStatus::Completed,
+            Some((metrics.len(), metrics.len())),
+        );
     }
 
     result
