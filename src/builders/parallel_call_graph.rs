@@ -33,9 +33,7 @@ pub struct CallGraphProgress {
 }
 
 /// Parallel call graph builder for Rust projects
-pub struct ParallelCallGraphBuilder {
-    config: ParallelConfig,
-}
+pub struct ParallelCallGraphBuilder;
 
 impl Default for ParallelCallGraphBuilder {
     fn default() -> Self {
@@ -45,13 +43,12 @@ impl Default for ParallelCallGraphBuilder {
 
 impl ParallelCallGraphBuilder {
     pub fn new() -> Self {
-        Self {
-            config: ParallelConfig::default(),
-        }
+        Self
     }
 
-    pub fn with_config(config: ParallelConfig) -> Self {
-        Self { config }
+    pub fn with_config(_config: ParallelConfig) -> Self {
+        // Config is no longer used as thread pool is configured globally
+        Self
     }
 
     /// Build call graph with parallel processing
@@ -64,14 +61,6 @@ impl ParallelCallGraphBuilder {
     where
         F: FnMut(CallGraphProgress) + Send + Sync,
     {
-        // Configure Rayon thread pool if specified
-        if self.config.num_threads > 0 {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(self.config.num_threads)
-                .build_global()
-                .ok(); // Ignore if already configured
-        }
-
         // Phase 1: Discover files
         progress_callback(CallGraphProgress {
             phase: CallGraphPhase::DiscoveringFiles,

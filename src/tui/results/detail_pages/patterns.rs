@@ -83,12 +83,7 @@ pub fn render(
                 ),
             ]));
         } else {
-            add_label_value(
-                &mut lines,
-                "Dampening Applied",
-                "No".to_string(),
-                theme,
-            );
+            add_label_value(&mut lines, "Dampening Applied", "No".to_string(), theme);
         }
 
         add_blank_line(&mut lines);

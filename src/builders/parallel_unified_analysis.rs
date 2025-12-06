@@ -380,21 +380,6 @@ pub struct ParallelUnifiedAnalysisBuilder {
 
 impl ParallelUnifiedAnalysisBuilder {
     pub fn new(call_graph: CallGraph, options: ParallelUnifiedAnalysisOptions) -> Self {
-        // Configure rayon thread pool if specified
-        if let Some(jobs) = options.jobs {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(jobs)
-                .build_global()
-                .map_err(|e| {
-                    eprintln!(
-                        "Warning: Failed to configure thread pool with {} threads: {}",
-                        jobs, e
-                    );
-                    e
-                })
-                .ok();
-        }
-
         Self {
             call_graph: Arc::new(call_graph),
             options,

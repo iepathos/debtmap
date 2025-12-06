@@ -389,6 +389,19 @@ fn print_metrics_explanation() {
     println!("For more details, see: https://docs.debtmap.dev/metrics-reference\n");
 }
 
+// Configure rayon global thread pool once at startup
+fn configure_thread_pool(jobs: usize) {
+    if jobs > 0 {
+        if let Err(e) = rayon::ThreadPoolBuilder::new()
+            .num_threads(jobs)
+            .build_global()
+        {
+            // Already configured - this is fine, just ignore
+            eprintln!("Note: Thread pool already configured: {}", e);
+        }
+    }
+}
+
 // Main orchestrator function
 fn main() -> Result<()> {
     // Support ARGUMENTS environment variable for backward compatibility
@@ -404,6 +417,15 @@ fn main() -> Result<()> {
     } else {
         Cli::parse()
     };
+
+    // Configure rayon thread pool early based on CLI arguments
+    // Extract jobs parameter from whichever command is being run
+    let jobs = match &cli.command {
+        Commands::Analyze { jobs, .. } => *jobs,
+        Commands::Validate { jobs, .. } => *jobs,
+        _ => 0,
+    };
+    configure_thread_pool(get_worker_count(jobs));
 
     // Handle --show-config-sources flag (spec 201)
     if cli.show_config_sources {
