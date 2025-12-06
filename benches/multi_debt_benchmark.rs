@@ -51,7 +51,11 @@ fn benchmark_single_debt_classification(c: &mut Criterion) {
 
     let func = create_test_function("benchmark_func", "src/lib.rs", 12, 18, 80);
     let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(PathBuf::from("src/lib.rs"), "benchmark_func".to_string(), 10);
+    let func_id = FunctionId::new(
+        PathBuf::from("src/lib.rs"),
+        "benchmark_func".to_string(),
+        10,
+    );
     let framework_exclusions = HashSet::new();
     let coverage = Some(TransitiveCoverage {
         direct: 0.15,
@@ -80,7 +84,11 @@ fn benchmark_multi_debt_classification(c: &mut Criterion) {
 
     let func = create_test_function("benchmark_func", "src/lib.rs", 12, 18, 80);
     let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(PathBuf::from("src/lib.rs"), "benchmark_func".to_string(), 10);
+    let func_id = FunctionId::new(
+        PathBuf::from("src/lib.rs"),
+        "benchmark_func".to_string(),
+        10,
+    );
     let framework_exclusions = HashSet::new();
     let coverage = Some(TransitiveCoverage {
         direct: 0.15,

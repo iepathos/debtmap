@@ -476,7 +476,7 @@ fn build_unified_debt_item(
 }
 
 // Main function using functional composition (spec 201, spec 228: multi-debt)
-/// Returns Vec<UnifiedDebtItem> - one per debt type found (spec 228)
+/// Returns `Vec<UnifiedDebtItem>` - one per debt type found (spec 228)
 #[allow(clippy::too_many_arguments)]
 pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     func: &FunctionMetrics,
@@ -689,7 +689,9 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 cyclomatic_complexity: func.cyclomatic,
                 cognitive_complexity: func.cognitive,
                 entropy_details: entropy_details.clone(),
-                entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
+                entropy_adjusted_cyclomatic: entropy_details
+                    .as_ref()
+                    .map(|e| e.adjusted_complexity),
                 entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
                 entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
                 is_pure: func.is_pure,

@@ -344,7 +344,7 @@ pub fn classify_all_debt_types(
 }
 
 /// Enhanced version of debt type classification with framework pattern exclusions
-/// Returns Vec<DebtType> for multi-debt accumulation (spec 228)
+/// Returns `Vec<DebtType>` for multi-debt accumulation (spec 228)
 ///
 /// # Configuration
 /// Multi-debt accumulation is controlled via the DEBTMAP_ACCUMULATE_DEBT environment variable:
@@ -379,7 +379,12 @@ pub fn classify_debt_type_with_exclusions(
         // Legacy single-debt classification for backward compatibility
         // Convert Option<&TransitiveCoverage> to &Option<TransitiveCoverage>
         let coverage_owned = coverage.cloned();
-        vec![determine_debt_type(func, &coverage_owned, call_graph, func_id)]
+        vec![determine_debt_type(
+            func,
+            &coverage_owned,
+            call_graph,
+            func_id,
+        )]
     }
 }
 

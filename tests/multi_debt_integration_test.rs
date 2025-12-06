@@ -172,7 +172,11 @@ fn test_multi_debt_with_env_var_true() {
 
     let func = create_test_function("complex_untested", "src/lib.rs", 15, 20, 100);
     let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(PathBuf::from("src/lib.rs"), "complex_untested".to_string(), 10);
+    let func_id = FunctionId::new(
+        PathBuf::from("src/lib.rs"),
+        "complex_untested".to_string(),
+        10,
+    );
     let framework_exclusions = HashSet::new();
 
     let coverage = Some(TransitiveCoverage {
@@ -206,7 +210,11 @@ fn test_multi_debt_with_env_var_1() {
 
     let func = create_test_function("another_complex", "src/lib.rs", 14, 19, 90);
     let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(PathBuf::from("src/lib.rs"), "another_complex".to_string(), 10);
+    let func_id = FunctionId::new(
+        PathBuf::from("src/lib.rs"),
+        "another_complex".to_string(),
+        10,
+    );
     let framework_exclusions = HashSet::new();
 
     let coverage = Some(TransitiveCoverage {
