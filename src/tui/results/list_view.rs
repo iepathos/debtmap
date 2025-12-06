@@ -403,7 +403,9 @@ fn severity_color(severity: &str) -> Color {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::{ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedScore};
+    use crate::priority::{
+        ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedScore,
+    };
     use std::path::PathBuf;
 
     fn create_test_item(
