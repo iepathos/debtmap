@@ -37,23 +37,26 @@ pub fn render(
 
         add_label_value(
             &mut lines,
-            "Total Mutations",
+            "total",
             mutation_info.total_mutations.to_string(),
             theme,
+            area.width,
         );
 
         add_label_value(
             &mut lines,
-            "Live Mutations",
+            "live",
             mutation_info.live_mutations.len().to_string(),
             theme,
+            area.width,
         );
 
         add_label_value(
             &mut lines,
-            "Dead Stores",
+            "dead stores",
             mutation_info.dead_stores.len().to_string(),
             theme,
+            area.width,
         );
 
         if !mutation_info.live_mutations.is_empty() {
@@ -121,9 +124,10 @@ pub fn render(
         let escaping_count = cfg_analysis.escape_info.escaping_vars.len();
         add_label_value(
             &mut lines,
-            "Escaping Variables",
+            "escaping",
             escaping_count.to_string(),
             theme,
+            area.width,
         );
 
         if escaping_count > 0 {
@@ -149,16 +153,18 @@ pub fn render(
 
         add_label_value(
             &mut lines,
-            "Is Pure",
+            "pure",
             if purity_info.is_pure { "Yes" } else { "No" }.to_string(),
             theme,
+            area.width,
         );
 
         add_label_value(
             &mut lines,
-            "Confidence",
+            "confidence",
             format!("{:.1}%", purity_info.confidence * 100.0),
             theme,
+            area.width,
         );
 
         if !purity_info.impurity_reasons.is_empty() {
