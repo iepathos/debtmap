@@ -165,43 +165,44 @@ pub fn render_with_filter_menu(frame: &mut Frame, app: &ResultsApp) {
     frame.render_widget(paragraph, menu_area);
 }
 
-/// Render header with summary metrics
+/// Render header with summary metrics (minimal lowercase style)
 fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     let analysis = app.analysis();
     let count_display = app.count_display();
 
     let header_text = vec![
         Line::from(vec![
-            Span::styled("Debtmap Results", Style::default().fg(theme.accent())),
+            Span::raw("debtmap results"),
             Span::raw("  "),
             Span::styled(
-                format!("Total: {}", count_display),
+                count_display.to_string(),
                 Style::default().fg(theme.primary),
             ),
-            Span::raw("  "),
+            Span::raw("  │  "),
+            Span::raw("score "),
             Span::styled(
-                format!("Debt Score: {:.0}", analysis.total_debt_score),
+                format!("{:.0}", analysis.total_debt_score),
                 Style::default().fg(theme.secondary()),
             ),
-            Span::raw("  "),
+            Span::raw("  │  "),
             Span::styled(
-                format!("Density: {:.2}/1K LOC", analysis.debt_density),
+                format!("{:.2}/1K loc", analysis.debt_density),
                 Style::default().fg(theme.muted),
             ),
         ]),
         Line::from(vec![
             Span::styled(
-                format!("Sort: {}", app.sort_by().display_name()),
+                format!("sort {}", app.sort_by().display_name()),
                 Style::default().fg(theme.muted),
             ),
-            Span::raw("  "),
+            Span::raw("  │  "),
             Span::styled(
-                format!("Filters: {}", app.filters().len()),
+                format!("filters {}", app.filters().len()),
                 Style::default().fg(theme.muted),
             ),
-            Span::raw("  "),
+            Span::raw("  │  "),
             Span::styled(
-                format!("Grouping: {}", if app.is_grouped() { "ON" } else { "OFF" }),
+                format!("grouping {}", if app.is_grouped() { "on" } else { "off" }),
                 Style::default().fg(theme.muted),
             ),
         ]),
