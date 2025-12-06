@@ -345,6 +345,13 @@ pub fn classify_all_debt_types(
 
 /// Enhanced version of debt type classification with framework pattern exclusions
 /// Returns Vec<DebtType> for multi-debt accumulation (spec 228)
+///
+/// # Configuration
+/// Multi-debt accumulation is controlled via the DEBTMAP_ACCUMULATE_DEBT environment variable:
+/// - "true" or "1": Enable multi-debt accumulation (returns Vec with all applicable debt types)
+/// - Any other value or unset: Use legacy single-debt classification
+///
+/// This allows gradual rollout and A/B testing of the multi-debt feature.
 pub fn classify_debt_type_with_exclusions(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
@@ -353,14 +360,27 @@ pub fn classify_debt_type_with_exclusions(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     coverage: Option<&TransitiveCoverage>,
 ) -> Vec<DebtType> {
-    classify_all_debt_types(
-        func,
-        call_graph,
-        func_id,
-        framework_exclusions,
-        function_pointer_used_functions,
-        coverage,
-    )
+    // Check environment variable for multi-debt accumulation opt-in (spec 228)
+    let enable_multi_debt = std::env::var("DEBTMAP_ACCUMULATE_DEBT")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
+    if enable_multi_debt {
+        // Use new multi-debt accumulation logic
+        classify_all_debt_types(
+            func,
+            call_graph,
+            func_id,
+            framework_exclusions,
+            function_pointer_used_functions,
+            coverage,
+        )
+    } else {
+        // Legacy single-debt classification for backward compatibility
+        // Convert Option<&TransitiveCoverage> to &Option<TransitiveCoverage>
+        let coverage_owned = coverage.cloned();
+        vec![determine_debt_type(func, &coverage_owned, call_graph, func_id)]
+    }
 }
 
 /// Classify test function debt type based on complexity

@@ -2047,6 +2047,82 @@ This two-stage approach ensures:
 - Role-based coverage adjustments don't interfere with the role multiplier
 - Both mechanisms contribute independently to the final score
 - Clamping prevents extreme multiplier values from distorting priorities
+
+### Multi-Debt Type Accumulation (Spec 228)
+
+DebtMap supports accumulating multiple independent debt types for a single function, providing comprehensive technical debt assessment. This feature is controlled via the `DEBTMAP_ACCUMULATE_DEBT` environment variable for gradual rollout.
+
+#### Design Philosophy
+
+Traditional debt classification uses early-return logic, stopping at the first match:
+```rust
+// Legacy approach (single debt type)
+if has_testing_gap() { return TestingGap }
+if is_complex() { return ComplexityHotspot }
+if is_dead_code() { return DeadCode }
+```
+
+Multi-debt accumulation applies all independent checks:
+```rust
+// Multi-debt approach (accumulates all applicable types)
+let debt_types = [
+    check_testing_gap(),
+    check_complexity_hotspot(),
+    check_dead_code(),
+].into_iter().flatten().collect()
+```
+
+#### Independent Debt Classifications
+
+Three debt types are evaluated independently:
+
+1. **Testing Gaps**: Coverage-based testing debt
+   - Low test coverage (< 20% direct coverage)
+   - Complex untested code (cyclomatic > 5, coverage < 80%)
+   - Independent of complexity or usage
+
+2. **Complexity Hotspots**: Code complexity issues
+   - High cyclomatic complexity (> 10)
+   - High cognitive complexity (> 15)
+   - Independent of coverage or usage
+
+3. **Dead Code**: Unused code detection
+   - No incoming calls in call graph
+   - Not excluded by framework patterns
+   - Independent of complexity or coverage
+
+#### Configuration
+
+Enable via environment variable:
+```bash
+export DEBTMAP_ACCUMULATE_DEBT=true  # or "1"
+debtmap analyze .
+```
+
+Default behavior (disabled) uses legacy single-debt classification for backward compatibility.
+
+#### Implementation
+
+Located in `src/priority/scoring/classification.rs`:
+
+- `classify_all_debt_types()`: Functional composition of all debt checks
+- `classify_debt_type_with_exclusions()`: Public API with env var gate
+- Individual predicates: `check_testing_gap_predicate()`, `check_complexity_hotspot_predicate()`, `check_dead_code_with_exclusions_predicate()`
+
+#### Benefits
+
+- **Comprehensive assessment**: No hidden issues due to early-return logic
+- **Better prioritization**: Functions with multiple issues get appropriate attention
+- **Gradual rollout**: Opt-in flag allows A/B testing and validation
+- **Functional purity**: All predicates are pure functions, easily testable
+
+#### Testing
+
+Integration tests in `tests/multi_debt_integration_test.rs` verify:
+- Multi-debt accumulation with env var enabled
+- Legacy single-debt behavior with env var disabled
+- Correct identification of multiple independent debt types
+- Environment variable handling ("true" and "1" both enable)
 - Configuration flexibility for different project needs
 
 #### Function Role Detection
