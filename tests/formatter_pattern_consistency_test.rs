@@ -43,6 +43,9 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
             risk_boost: None,
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,
@@ -123,6 +126,9 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
             risk_boost: None,
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,

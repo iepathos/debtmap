@@ -1,4 +1,5 @@
 use crate::core::{FunctionMetrics, PurityLevel};
+use crate::data_flow::DataFlowGraph;
 use crate::organization::GodObjectAnalysis;
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
@@ -19,6 +20,38 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+/// Purity spectrum classification for functions (spec 218).
+/// Classifies functions on a spectrum from strictly pure to impure,
+/// with score multipliers that reduce priority for purer functions.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum PuritySpectrum {
+    /// Strictly pure - no mutations, no I/O, referentially transparent
+    StrictlyPure,
+    /// Locally pure - pure interface but uses local mutations internally
+    LocallyPure,
+    /// I/O isolated - I/O operations clearly separated from logic
+    IOIsolated,
+    /// I/O mixed - I/O mixed with business logic
+    IOMixed,
+    /// Impure - mutable state, side effects throughout
+    Impure,
+}
+
+impl PuritySpectrum {
+    /// Returns a score multiplier for this purity level.
+    /// Lower multipliers reduce priority (less technical debt).
+    /// Range: 0.0 (best - strictly pure) to 1.0 (worst - impure)
+    pub fn score_multiplier(&self) -> f64 {
+        match self {
+            PuritySpectrum::StrictlyPure => 0.0,
+            PuritySpectrum::LocallyPure => 0.3,
+            PuritySpectrum::IOIsolated => 0.6,
+            PuritySpectrum::IOMixed => 0.9,
+            PuritySpectrum::Impure => 1.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
     pub complexity_factor: f64, // 0-10, configurable weight (default 35%)
@@ -37,6 +70,13 @@ pub struct UnifiedScore {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_applied:
         Option<crate::priority::scoring::orchestration_adjustment::ScoreAdjustment>, // Orchestration adjustment details (spec 110)
+    // Data flow factors (spec 218)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purity_factor: Option<f64>, // Purity spectrum score (0.0-1.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refactorability_factor: Option<f64>, // Dead stores and escape analysis (1.0-1.5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_factor: Option<f64>, // Data flow vs business logic (0.7-1.0)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +213,9 @@ pub fn calculate_unified_score_with_patterns(
         risk_boost: base_score.risk_boost,
         pre_adjustment_score: base_score.pre_adjustment_score,
         adjustment_applied: base_score.adjustment_applied,
+        purity_factor: base_score.purity_factor,
+        refactorability_factor: base_score.refactorability_factor,
+        pattern_factor: base_score.pattern_factor,
     }
 }
 
@@ -211,6 +254,9 @@ pub fn calculate_unified_priority_with_debt(
             risk_boost: Some(1.0),
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         };
     }
 
@@ -300,6 +346,9 @@ pub fn calculate_unified_priority_with_debt(
         risk_boost: None,         // Set later in debt item construction (spec 171)
         pre_adjustment_score: pre_adjustment,
         adjustment_applied: adjustment,
+        purity_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
+        refactorability_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
+        pattern_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
     }
 }
 
@@ -658,6 +707,200 @@ pub fn is_dead_code_with_exclusions(
 
     // Use the enhanced dead code detection with function pointer information
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
+}
+
+// Data flow scoring functions (spec 218)
+
+/// Calculate purity factor from data flow analysis (spec 218).
+/// Returns a factor in range 0.0-1.0 where lower values reduce priority.
+/// Based on PuritySpectrum classification derived from data flow graph.
+fn calculate_purity_factor(func_id: &FunctionId, data_flow: &DataFlowGraph) -> f64 {
+    // Get purity info from data flow analysis
+    let purity_info = data_flow.get_purity_info(func_id);
+
+    // Get mutation analysis
+    let mutation_info = data_flow.get_mutation_info(func_id);
+
+    // Get I/O operations
+    let io_ops = data_flow.get_io_operations(func_id);
+
+    // Classify on purity spectrum
+    let spectrum = if let Some(purity) = purity_info {
+        if purity.is_pure && purity.confidence > 0.8 {
+            // Check if truly pure or just locally pure
+            if let Some(mutations) = mutation_info {
+                if !mutations.live_mutations.is_empty() {
+                    // Has local mutations but doesn't escape
+                    PuritySpectrum::LocallyPure
+                } else {
+                    // No mutations at all
+                    PuritySpectrum::StrictlyPure
+                }
+            } else {
+                PuritySpectrum::StrictlyPure
+            }
+        } else if purity.is_pure {
+            // Lower confidence purity
+            PuritySpectrum::LocallyPure
+        } else {
+            // Not pure - check I/O isolation
+            classify_io_isolation(io_ops)
+        }
+    } else {
+        // No purity info - assume impure
+        PuritySpectrum::Impure
+    };
+
+    spectrum.score_multiplier()
+}
+
+/// Classify I/O isolation level based on I/O operations
+fn classify_io_isolation(io_ops: Option<&Vec<crate::data_flow::IoOperation>>) -> PuritySpectrum {
+    match io_ops {
+        None => PuritySpectrum::Impure,
+        Some(ops) if ops.is_empty() => PuritySpectrum::Impure,
+        Some(ops) => {
+            // If I/O operations are concentrated (few unique types), likely isolated
+            let unique_types: HashSet<&String> = ops.iter().map(|op| &op.operation_type).collect();
+            if unique_types.len() <= 2 && ops.len() <= 3 {
+                PuritySpectrum::IOIsolated
+            } else {
+                PuritySpectrum::IOMixed
+            }
+        }
+    }
+}
+
+/// Calculate refactorability factor from dead stores (spec 218).
+/// Returns a boost factor >= 1.0 where higher values increase priority.
+/// Functions with many dead stores are easier to refactor, so get higher priority.
+fn calculate_refactorability_factor(
+    func_id: &FunctionId,
+    data_flow: &DataFlowGraph,
+    config: &crate::config::DataFlowScoringConfig,
+) -> f64 {
+    let mutation_info = data_flow.get_mutation_info(func_id);
+
+    match mutation_info {
+        None => 1.0,                                    // No data - no boost
+        Some(info) if info.total_mutations == 0 => 1.0, // No mutations - no boost
+        Some(info) => {
+            let dead_store_ratio = info.dead_stores.len() as f64 / info.total_mutations as f64;
+
+            // Only boost if dead store ratio exceeds threshold
+            if dead_store_ratio >= config.min_dead_store_ratio {
+                // Linear boost based on dead store ratio
+                1.0 + (dead_store_ratio * config.dead_store_boost)
+            } else {
+                1.0
+            }
+        }
+    }
+}
+
+/// Calculate pattern factor to distinguish data flow from business logic (spec 218).
+/// Returns a factor in range 0.7-1.0 where lower values reduce priority.
+/// Pure data transformation pipelines get reduced priority (less debt).
+fn calculate_pattern_factor(func_id: &FunctionId, data_flow: &DataFlowGraph) -> f64 {
+    // Count data transformations
+    let transform_count = count_data_transformations(func_id, data_flow);
+
+    // Get variable dependencies
+    let var_deps = data_flow.get_variable_dependencies(func_id);
+    let dep_count = var_deps.map(|deps| deps.len()).unwrap_or(0);
+
+    // Data flow functions have many transformations relative to dependencies
+    if transform_count > 0 && dep_count > 0 {
+        let transform_ratio = transform_count as f64 / dep_count as f64;
+
+        if transform_ratio > 0.5 {
+            // High transformation ratio - likely data flow pipeline
+            0.7
+        } else if transform_ratio > 0.3 {
+            // Medium ratio - mixed
+            0.85
+        } else {
+            // Low ratio - business logic
+            1.0
+        }
+    } else {
+        // No transformation data - assume business logic
+        1.0
+    }
+}
+
+/// Count data transformations involving this function
+fn count_data_transformations(func_id: &FunctionId, data_flow: &DataFlowGraph) -> usize {
+    // This is a simplified count - in reality we'd need to iterate through
+    // all transformations in the graph to find those involving this function
+    // For now, check if this function has any outgoing transformations
+    let call_graph = data_flow.call_graph();
+    let callees = call_graph.get_callees(func_id);
+
+    // Count how many callees have data transformations
+    callees
+        .iter()
+        .filter(|callee| data_flow.get_data_transformation(func_id, callee).is_some())
+        .count()
+}
+
+/// Calculate unified priority with data flow analysis (spec 218).
+/// This is the main entry point for data flow-aware scoring.
+pub fn calculate_unified_priority_with_data_flow(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    data_flow: &DataFlowGraph,
+    coverage: Option<&LcovData>,
+    organization_issues: Option<f64>,
+    debt_aggregator: Option<&DebtAggregator>,
+    config: &crate::config::DataFlowScoringConfig,
+) -> UnifiedScore {
+    // Get base score from existing scoring
+    let has_coverage_data = coverage.is_some();
+    let mut base_score = calculate_unified_priority_with_debt(
+        func,
+        call_graph,
+        coverage,
+        organization_issues,
+        debt_aggregator,
+        has_coverage_data,
+    );
+
+    // If data flow scoring is disabled, return base score
+    if !config.enabled {
+        return base_score;
+    }
+
+    // Calculate data flow factors
+    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+
+    let purity_factor = calculate_purity_factor(&func_id, data_flow);
+    let refactorability_factor = calculate_refactorability_factor(&func_id, data_flow, config);
+    let pattern_factor = calculate_pattern_factor(&func_id, data_flow);
+
+    // Apply factors to final score with configurable weights
+    let purity_adjustment = purity_factor * config.purity_weight;
+    let refactorability_adjustment = refactorability_factor * config.refactorability_weight;
+    let pattern_adjustment = pattern_factor * config.pattern_weight;
+
+    // Combine adjustments (weighted average)
+    let total_weight = config.purity_weight + config.refactorability_weight + config.pattern_weight;
+    let combined_adjustment = if total_weight > 0.0 {
+        (purity_adjustment + refactorability_adjustment + pattern_adjustment) / total_weight
+    } else {
+        1.0
+    };
+
+    // Apply adjustment to final score
+    let adjusted_score = base_score.final_score * combined_adjustment;
+
+    // Update score with data flow factors
+    base_score.final_score = adjusted_score;
+    base_score.purity_factor = Some(purity_factor);
+    base_score.refactorability_factor = Some(refactorability_factor);
+    base_score.pattern_factor = Some(pattern_factor);
+
+    base_score
 }
 
 #[cfg(test)]

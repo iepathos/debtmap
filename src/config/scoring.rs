@@ -560,3 +560,68 @@ pub fn default_documentation_multiplier() -> f64 {
 pub fn default_enable_context_dampening() -> bool {
     true // Enable by default
 }
+
+/// Data flow scoring configuration (spec 218)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataFlowScoringConfig {
+    /// Whether data flow scoring is enabled (default: true)
+    #[serde(default = "default_data_flow_enabled")]
+    pub enabled: bool,
+
+    /// Weight for purity factor (0.0-1.0, default: 0.4)
+    #[serde(default = "default_purity_weight")]
+    pub purity_weight: f64,
+
+    /// Weight for refactorability factor (0.0-1.0, default: 0.3)
+    #[serde(default = "default_refactorability_weight")]
+    pub refactorability_weight: f64,
+
+    /// Weight for pattern factor (0.0-1.0, default: 0.3)
+    #[serde(default = "default_pattern_weight")]
+    pub pattern_weight: f64,
+
+    /// Minimum dead store ratio to trigger refactorability boost (default: 0.3)
+    #[serde(default = "default_min_dead_store_ratio")]
+    pub min_dead_store_ratio: f64,
+
+    /// Dead store boost multiplier (default: 0.5 = up to 50% boost)
+    #[serde(default = "default_dead_store_boost")]
+    pub dead_store_boost: f64,
+}
+
+impl Default for DataFlowScoringConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_data_flow_enabled(),
+            purity_weight: default_purity_weight(),
+            refactorability_weight: default_refactorability_weight(),
+            pattern_weight: default_pattern_weight(),
+            min_dead_store_ratio: default_min_dead_store_ratio(),
+            dead_store_boost: default_dead_store_boost(),
+        }
+    }
+}
+
+pub fn default_data_flow_enabled() -> bool {
+    true
+}
+
+pub fn default_purity_weight() -> f64 {
+    0.4
+}
+
+pub fn default_refactorability_weight() -> f64 {
+    0.3
+}
+
+pub fn default_pattern_weight() -> f64 {
+    0.3
+}
+
+pub fn default_min_dead_store_ratio() -> f64 {
+    0.3 // 30% of mutations must be dead stores
+}
+
+pub fn default_dead_store_boost() -> f64 {
+    0.5 // Up to 50% boost for high dead store ratio
+}

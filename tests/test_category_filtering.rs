@@ -28,6 +28,9 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             risk_boost: None,
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

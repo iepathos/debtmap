@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::DataFlowScoringConfig;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::CallGraph;
 use crate::risk::lcov::{FunctionCoverage, LcovData};
@@ -852,4 +853,271 @@ fn test_normalize_complexity_with_entropy_dampening() {
         score_with_entropy.complexity_factor,
         score_without_entropy.complexity_factor
     );
+}
+
+// Data flow scoring tests (spec 218)
+
+#[test]
+fn test_purity_spectrum_score_multipliers() {
+    assert_eq!(PuritySpectrum::StrictlyPure.score_multiplier(), 0.0);
+    assert_eq!(PuritySpectrum::LocallyPure.score_multiplier(), 0.3);
+    assert_eq!(PuritySpectrum::IOIsolated.score_multiplier(), 0.6);
+    assert_eq!(PuritySpectrum::IOMixed.score_multiplier(), 0.9);
+    assert_eq!(PuritySpectrum::Impure.score_multiplier(), 1.0);
+}
+
+#[test]
+fn test_calculate_purity_factor_strictly_pure() {
+    use crate::data_flow::{DataFlowGraph, MutationInfo, PurityInfo};
+
+    let mut data_flow = DataFlowGraph::new();
+    let func_id = FunctionId::new(PathBuf::from("test.rs"), "pure_func".to_string(), 10);
+
+    // Add strictly pure function info
+    data_flow.set_purity_info(
+        func_id.clone(),
+        PurityInfo {
+            is_pure: true,
+            confidence: 0.9,
+            impurity_reasons: vec![],
+        },
+    );
+
+    // No mutations
+    data_flow.set_mutation_info(
+        func_id.clone(),
+        MutationInfo {
+            live_mutations: vec![],
+            total_mutations: 0,
+            dead_stores: std::collections::HashSet::new(),
+            escaping_mutations: std::collections::HashSet::new(),
+        },
+    );
+
+    let purity_factor = calculate_purity_factor(&func_id, &data_flow);
+
+    // Strictly pure functions should get 0.0 (minimal priority)
+    assert_eq!(purity_factor, 0.0);
+}
+
+#[test]
+fn test_calculate_purity_factor_locally_pure() {
+    use crate::data_flow::{DataFlowGraph, MutationInfo, PurityInfo};
+
+    let mut data_flow = DataFlowGraph::new();
+    let func_id = FunctionId::new(PathBuf::from("test.rs"), "locally_pure".to_string(), 20);
+
+    // Pure with high confidence
+    data_flow.set_purity_info(
+        func_id.clone(),
+        PurityInfo {
+            is_pure: true,
+            confidence: 0.9,
+            impurity_reasons: vec![],
+        },
+    );
+
+    // Has local mutations
+    data_flow.set_mutation_info(
+        func_id.clone(),
+        MutationInfo {
+            live_mutations: vec!["local_var".to_string()],
+            total_mutations: 1,
+            dead_stores: std::collections::HashSet::new(),
+            escaping_mutations: std::collections::HashSet::new(),
+        },
+    );
+
+    let purity_factor = calculate_purity_factor(&func_id, &data_flow);
+
+    // Locally pure functions should get 0.3
+    assert_eq!(purity_factor, 0.3);
+}
+
+#[test]
+fn test_calculate_refactorability_factor_high_dead_stores() {
+    use crate::config::DataFlowScoringConfig;
+    use crate::data_flow::{DataFlowGraph, MutationInfo};
+
+    let mut data_flow = DataFlowGraph::new();
+    let func_id = FunctionId::new(PathBuf::from("test.rs"), "refactorable".to_string(), 30);
+
+    // High dead store ratio
+    let mut dead_stores = std::collections::HashSet::new();
+    dead_stores.insert("unused1".to_string());
+    dead_stores.insert("unused2".to_string());
+    dead_stores.insert("unused3".to_string());
+
+    data_flow.set_mutation_info(
+        func_id.clone(),
+        MutationInfo {
+            live_mutations: vec!["live1".to_string()],
+            total_mutations: 4, // 3 dead, 1 live = 75% dead
+            dead_stores,
+            escaping_mutations: std::collections::HashSet::new(),
+        },
+    );
+
+    let config = DataFlowScoringConfig::default();
+    let refactor_factor = calculate_refactorability_factor(&func_id, &data_flow, &config);
+
+    // 75% dead store ratio with default boost of 0.5 should give 1.0 + (0.75 * 0.5) = 1.375
+    assert!((refactor_factor - 1.375).abs() < 0.01);
+}
+
+#[test]
+fn test_calculate_refactorability_factor_no_boost_below_threshold() {
+    use crate::config::DataFlowScoringConfig;
+    use crate::data_flow::{DataFlowGraph, MutationInfo};
+
+    let mut data_flow = DataFlowGraph::new();
+    let func_id = FunctionId::new(PathBuf::from("test.rs"), "low_dead".to_string(), 40);
+
+    // Low dead store ratio (below 30% threshold)
+    let mut dead_stores = std::collections::HashSet::new();
+    dead_stores.insert("unused1".to_string());
+
+    data_flow.set_mutation_info(
+        func_id.clone(),
+        MutationInfo {
+            live_mutations: vec![
+                "live1".to_string(),
+                "live2".to_string(),
+                "live3".to_string(),
+            ],
+            total_mutations: 4, // 1 dead, 3 live = 25% dead (below 30% threshold)
+            dead_stores,
+            escaping_mutations: std::collections::HashSet::new(),
+        },
+    );
+
+    let config = DataFlowScoringConfig::default();
+    let refactor_factor = calculate_refactorability_factor(&func_id, &data_flow, &config);
+
+    // Below threshold - no boost
+    assert_eq!(refactor_factor, 1.0);
+}
+
+#[test]
+fn test_calculate_pattern_factor_data_flow_pipeline() {
+    use crate::data_flow::{DataFlowGraph, DataTransformation};
+
+    use crate::priority::call_graph::{CallType, FunctionCall};
+
+    // Create call graph with callees
+    let mut call_graph = CallGraph::new();
+    let func_id = FunctionId::new(PathBuf::from("test.rs"), "pipeline".to_string(), 50);
+    let callee1 = FunctionId::new(PathBuf::from("test.rs"), "map_fn".to_string(), 60);
+    let callee2 = FunctionId::new(PathBuf::from("test.rs"), "filter_fn".to_string(), 70);
+
+    // Add call relationships
+    call_graph.add_call(FunctionCall {
+        caller: func_id.clone(),
+        callee: callee1.clone(),
+        call_type: CallType::Direct,
+    });
+    call_graph.add_call(FunctionCall {
+        caller: func_id.clone(),
+        callee: callee2.clone(),
+        call_type: CallType::Direct,
+    });
+
+    let mut data_flow = DataFlowGraph::from_call_graph(call_graph);
+
+    // Add variable dependencies
+    let mut vars = std::collections::HashSet::new();
+    vars.insert("input".to_string());
+    vars.insert("output".to_string());
+    data_flow.add_variable_dependencies(func_id.clone(), vars);
+
+    // Add data transformations to callees
+    data_flow.add_data_transformation(
+        func_id.clone(),
+        callee1,
+        DataTransformation {
+            input_vars: vec!["input".to_string()],
+            output_vars: vec!["mapped".to_string()],
+            transformation_type: "map".to_string(),
+        },
+    );
+
+    data_flow.add_data_transformation(
+        func_id.clone(),
+        callee2,
+        DataTransformation {
+            input_vars: vec!["mapped".to_string()],
+            output_vars: vec!["output".to_string()],
+            transformation_type: "filter".to_string(),
+        },
+    );
+
+    let pattern_factor = calculate_pattern_factor(&func_id, &data_flow);
+
+    // High transformation ratio (2 transforms / 2 vars = 1.0) should give 0.7
+    assert_eq!(pattern_factor, 0.7);
+}
+
+#[test]
+fn test_calculate_unified_priority_with_data_flow_disabled() {
+    let func = create_test_metrics();
+    let call_graph = CallGraph::new();
+    let data_flow = DataFlowGraph::from_call_graph(call_graph.clone());
+    let mut config = DataFlowScoringConfig::default();
+    config.enabled = false;
+
+    let score = calculate_unified_priority_with_data_flow(
+        &func,
+        &call_graph,
+        &data_flow,
+        None,
+        None,
+        None,
+        &config,
+    );
+
+    // With data flow scoring disabled, factors should be None
+    assert!(score.purity_factor.is_none());
+    assert!(score.refactorability_factor.is_none());
+    assert!(score.pattern_factor.is_none());
+}
+
+#[test]
+fn test_calculate_unified_priority_with_data_flow_enabled() {
+    use crate::data_flow::{DataFlowGraph, PurityInfo};
+
+    let func = create_test_metrics();
+    let call_graph = CallGraph::new();
+    let mut data_flow = DataFlowGraph::from_call_graph(call_graph.clone());
+
+    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+
+    // Add some purity info
+    data_flow.set_purity_info(
+        func_id,
+        PurityInfo {
+            is_pure: false,
+            confidence: 0.5,
+            impurity_reasons: vec!["mutation detected".to_string()],
+        },
+    );
+
+    let config = DataFlowScoringConfig::default();
+
+    let score = calculate_unified_priority_with_data_flow(
+        &func,
+        &call_graph,
+        &data_flow,
+        None,
+        None,
+        None,
+        &config,
+    );
+
+    // With data flow scoring enabled, factors should be populated
+    assert!(score.purity_factor.is_some());
+    assert!(score.refactorability_factor.is_some());
+    assert!(score.pattern_factor.is_some());
+
+    // Impure function should have purity_factor = 1.0
+    assert_eq!(score.purity_factor.unwrap(), 1.0);
 }

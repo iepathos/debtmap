@@ -1111,6 +1111,9 @@ fn convert_error_swallowing_to_unified(
                 risk_boost: None,
                 pre_adjustment_score: None,
                 adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
             };
 
             let pattern = item.message.split(':').next().unwrap_or("Error swallowing");

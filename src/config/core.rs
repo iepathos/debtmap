@@ -144,6 +144,10 @@ pub struct DebtmapConfig {
     /// State field detection configuration (spec 202)
     #[serde(default)]
     pub state_detection: Option<crate::analyzers::state_field_detector::StateDetectionConfig>,
+
+    /// Data flow scoring configuration (spec 218)
+    #[serde(default)]
+    pub data_flow_scoring: Option<super::scoring::DataFlowScoringConfig>,
 }
 
 /// Advanced analysis settings for call graph and dead code detection (Spec 207).
