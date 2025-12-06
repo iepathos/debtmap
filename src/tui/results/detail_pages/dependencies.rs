@@ -25,7 +25,7 @@ pub fn render(
     if !item.upstream_callers.is_empty() {
         add_list_section(&mut lines, "", &item.upstream_callers, 10, theme);
     } else {
-        add_label_value(&mut lines, "Count", "0".to_string(), theme);
+        add_label_value(&mut lines, "count", "0".to_string(), theme, area.width);
         add_blank_line(&mut lines);
     }
 
@@ -34,7 +34,7 @@ pub fn render(
     if !item.downstream_callees.is_empty() {
         add_list_section(&mut lines, "", &item.downstream_callees, 10, theme);
     } else {
-        add_label_value(&mut lines, "Count", "0".to_string(), theme);
+        add_label_value(&mut lines, "count", "0".to_string(), theme, area.width);
         add_blank_line(&mut lines);
     }
 
@@ -42,27 +42,36 @@ pub fn render(
     add_section_header(&mut lines, "dependency metrics", theme);
     add_label_value(
         &mut lines,
-        "Upstream Dependencies",
+        "upstream",
         item.upstream_dependencies.to_string(),
         theme,
+        area.width,
     );
     add_label_value(
         &mut lines,
-        "Downstream Dependencies",
+        "downstream",
         item.downstream_dependencies.to_string(),
         theme,
+        area.width,
     );
 
     let blast_radius = item.upstream_dependencies + item.downstream_dependencies;
-    add_label_value(&mut lines, "Blast Radius", blast_radius.to_string(), theme);
+    add_label_value(
+        &mut lines,
+        "blast radius",
+        blast_radius.to_string(),
+        theme,
+        area.width,
+    );
 
     // Critical path indicator (simplified - based on high dependency count)
     let is_critical = item.upstream_dependencies > 5 || item.downstream_dependencies > 10;
     add_label_value(
         &mut lines,
-        "Critical Path",
+        "critical",
         if is_critical { "Yes" } else { "No" }.to_string(),
         theme,
+        area.width,
     );
 
     let paragraph = Paragraph::new(lines)

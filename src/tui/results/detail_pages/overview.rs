@@ -26,17 +26,25 @@ pub fn render(
     add_section_header(&mut lines, "location", theme);
     add_label_value(
         &mut lines,
-        "File",
+        "file",
         item.location.file.display().to_string(),
         theme,
+        area.width,
     );
     add_label_value(
         &mut lines,
-        "Function",
+        "function",
         item.location.function.clone(),
         theme,
+        area.width,
     );
-    add_label_value(&mut lines, "Line", item.location.line.to_string(), theme);
+    add_label_value(
+        &mut lines,
+        "line",
+        item.location.line.to_string(),
+        theme,
+        area.width,
+    );
     add_blank_line(&mut lines);
 
     // Get all items at this location
@@ -86,29 +94,87 @@ pub fn render(
     add_section_header(&mut lines, "metrics", theme);
     add_label_value(
         &mut lines,
-        "Cyclomatic Complexity",
+        "cyclomatic",
         item.cyclomatic_complexity.to_string(),
         theme,
+        area.width,
     );
     add_label_value(
         &mut lines,
-        "Cognitive Complexity",
+        "cognitive",
         item.cognitive_complexity.to_string(),
         theme,
+        area.width,
     );
     add_label_value(
         &mut lines,
-        "Nesting Depth",
+        "nesting",
         item.nesting_depth.to_string(),
         theme,
+        area.width,
     );
     add_label_value(
         &mut lines,
-        "Function Length",
+        "length",
         item.function_length.to_string(),
         theme,
+        area.width,
     );
     add_blank_line(&mut lines);
+
+    // Entropy section
+    if item.entropy_details.is_some() || item.entropy_dampening_factor.is_some() {
+        add_section_header(&mut lines, "entropy", theme);
+
+        if let Some(ref entropy) = item.entropy_details {
+            add_label_value(
+                &mut lines,
+                "entropy",
+                format!("{:.3}", entropy.entropy_score),
+                theme,
+                area.width,
+            );
+            add_label_value(
+                &mut lines,
+                "repetition",
+                format!("{:.3}", entropy.pattern_repetition),
+                theme,
+                area.width,
+            );
+            add_label_value(
+                &mut lines,
+                "dampening",
+                format!("{:.3}x", entropy.dampening_factor),
+                theme,
+                area.width,
+            );
+
+            // Show original vs adjusted cognitive complexity
+            // Note: Only cognitive is dampened, not cyclomatic (structural metric)
+            if entropy.dampening_factor < 1.0 {
+                lines.push(Line::from(vec![
+                    Span::raw("  Cognitive Reduction: "),
+                    Span::styled(
+                        format!(
+                            "{} → {}",
+                            entropy.original_complexity, entropy.adjusted_cognitive
+                        ),
+                        Style::default().fg(theme.primary),
+                    ),
+                ]));
+            }
+        } else if let Some(dampening) = item.entropy_dampening_factor {
+            add_label_value(
+                &mut lines,
+                "dampening",
+                format!("{:.3}x", dampening),
+                theme,
+                area.width,
+            );
+        }
+
+        add_blank_line(&mut lines);
+    }
 
     // Coverage section
     add_section_header(&mut lines, "coverage", theme);
@@ -132,9 +198,10 @@ pub fn render(
     add_section_header(&mut lines, "recommendation", theme);
     add_label_value(
         &mut lines,
-        "Action",
+        "action",
         item.recommendation.primary_action.clone(),
         theme,
+        area.width,
     );
     add_blank_line(&mut lines);
 

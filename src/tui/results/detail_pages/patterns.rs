@@ -33,9 +33,10 @@ pub fn render(
 
         add_label_value(
             &mut lines,
-            "Token Entropy",
+            "entropy",
             format!("{:.3}", entropy.entropy_score),
             theme,
+            area.width,
         );
 
         let entropy_desc = if entropy.entropy_score < 0.3 {
@@ -52,17 +53,19 @@ pub fn render(
 
         add_label_value(
             &mut lines,
-            "Pattern Repetition",
+            "repetition",
             format!("{:.3}", entropy.pattern_repetition),
             theme,
+            area.width,
         );
 
         if entropy.dampening_factor < 1.0 {
             add_label_value(
                 &mut lines,
-                "Dampening Applied",
+                "dampening",
                 format!("{:.3}x reduction", entropy.dampening_factor),
                 theme,
+                area.width,
             );
 
             lines.push(Line::from(vec![
@@ -76,7 +79,7 @@ pub fn render(
                 ),
             ]));
         } else {
-            add_label_value(&mut lines, "Dampening Applied", "No".to_string(), theme);
+            add_label_value(&mut lines, "dampening", "No".to_string(), theme, area.width);
         }
 
         add_blank_line(&mut lines);
@@ -91,9 +94,10 @@ pub fn render(
         if pattern_analysis.frameworks.has_patterns() {
             add_label_value(
                 &mut lines,
-                "Framework Patterns",
+                "frameworks",
                 "Detected".to_string(),
                 theme,
+                area.width,
             );
         }
 
@@ -101,9 +105,10 @@ pub fn render(
         if !pattern_analysis.rust_patterns.trait_impls.is_empty() {
             add_label_value(
                 &mut lines,
-                "Trait Implementations",
+                "traits",
                 pattern_analysis.rust_patterns.trait_impls.len().to_string(),
                 theme,
+                area.width,
             );
         }
 
@@ -117,16 +122,18 @@ pub fn render(
 
         add_label_value(
             &mut lines,
-            "Pattern Type",
+            "pattern",
             format!("{:?}", detected_pattern.pattern_type),
             theme,
+            area.width,
         );
 
         add_label_value(
             &mut lines,
-            "Confidence",
+            "confidence",
             format!("{:.1}%", detected_pattern.confidence * 100.0),
             theme,
+            area.width,
         );
 
         add_blank_line(&mut lines);
@@ -142,33 +149,37 @@ pub fn render(
                 if let Some(ref trait_impl) = rust_data.trait_impl {
                     add_label_value(
                         &mut lines,
-                        "Trait Implementation",
+                        "trait",
                         format!("{:?}", trait_impl),
                         theme,
+                        area.width,
                     );
                 }
                 if !rust_data.async_patterns.is_empty() {
                     add_label_value(
                         &mut lines,
-                        "Async Patterns",
+                        "async",
                         format!("{} detected", rust_data.async_patterns.len()),
                         theme,
+                        area.width,
                     );
                 }
                 if !rust_data.error_patterns.is_empty() {
                     add_label_value(
                         &mut lines,
-                        "Error Patterns",
+                        "errors",
                         format!("{} detected", rust_data.error_patterns.len()),
                         theme,
+                        area.width,
                     );
                 }
                 if !rust_data.builder_patterns.is_empty() {
                     add_label_value(
                         &mut lines,
-                        "Builder Patterns",
+                        "builders",
                         format!("{} detected", rust_data.builder_patterns.len()),
                         theme,
+                        area.width,
                     );
                 }
             }

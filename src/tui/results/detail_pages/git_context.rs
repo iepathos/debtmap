@@ -42,22 +42,42 @@ pub fn render(
                 add_section_header(&mut lines, "change patterns", theme);
                 add_label_value(
                     &mut lines,
-                    "Change Frequency",
+                    "frequency",
                     format!("{:.2} changes/month", change_frequency),
                     theme,
+                    area.width,
                 );
 
                 let stability = classify_stability(*change_frequency);
-                add_label_value(&mut lines, "Stability", stability.to_string(), theme);
+                add_label_value(
+                    &mut lines,
+                    "stability",
+                    stability.to_string(),
+                    theme,
+                    area.width,
+                );
 
                 add_label_value(
                     &mut lines,
-                    "Bug Density",
+                    "bugs",
                     format!("{:.1}%", bug_density * 100.0),
                     theme,
+                    area.width,
                 );
-                add_label_value(&mut lines, "Code Age", format!("{} days", age_days), theme);
-                add_label_value(&mut lines, "Contributors", author_count.to_string(), theme);
+                add_label_value(
+                    &mut lines,
+                    "age",
+                    format!("{} days", age_days),
+                    theme,
+                    area.width,
+                );
+                add_label_value(
+                    &mut lines,
+                    "contributors",
+                    author_count.to_string(),
+                    theme,
+                    area.width,
+                );
                 add_blank_line(&mut lines);
             }
         }
@@ -66,15 +86,17 @@ pub fn render(
         add_section_header(&mut lines, "risk impact", theme);
         add_label_value(
             &mut lines,
-            "Base Risk Score",
+            "base",
             format!("{:.1}", contextual_risk.base_risk),
             theme,
+            area.width,
         );
         add_label_value(
             &mut lines,
-            "Contextual Risk Score",
+            "contextual",
             format!("{:.1}", contextual_risk.contextual_risk),
             theme,
+            area.width,
         );
 
         let multiplier = if contextual_risk.base_risk > 0.0 {
@@ -84,9 +106,10 @@ pub fn render(
         };
         add_label_value(
             &mut lines,
-            "Risk Multiplier",
+            "multiplier",
             format!("{:.2}x", multiplier),
             theme,
+            area.width,
         );
         add_blank_line(&mut lines);
     }
@@ -94,15 +117,22 @@ pub fn render(
     // Context Dampening section (if applicable)
     if let Some(ref file_type) = item.context_type {
         add_section_header(&mut lines, "context dampening", theme);
-        add_label_value(&mut lines, "File Type", format!("{:?}", file_type), theme);
+        add_label_value(
+            &mut lines,
+            "file type",
+            format!("{:?}", file_type),
+            theme,
+            area.width,
+        );
 
         if let Some(multiplier) = item.context_multiplier {
             let reduction = (1.0 - multiplier) * 100.0;
             add_label_value(
                 &mut lines,
-                "Score Reduction",
+                "reduction",
                 format!("{:.1}%", reduction),
                 theme,
+                area.width,
             );
         }
         add_blank_line(&mut lines);
