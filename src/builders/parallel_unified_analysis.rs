@@ -865,15 +865,50 @@ impl ParallelUnifiedAnalysisBuilder {
                 .push(metric);
         }
 
-        // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
+        let total_files = files_map.len();
+
+        // Initialize TUI progress tracking (design consistency - DESIGN.md:179)
+        if let Some(manager) = crate::progress::ProgressManager::global() {
+            manager.tui_update_subtask(
+                6,
+                3,
+                crate::tui::app::StageStatus::Active,
+                Some((0, total_files)),
+            );
+        }
+
+        // Shared progress counter for parallel processing
+        let processed_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let last_update = std::sync::Arc::new(std::sync::Mutex::new(Instant::now()));
+
+        // Suppress old progress bar - unified system already shows subtask progress
         let progress = indicatif::ProgressBar::hidden();
 
-        // Analyze files in parallel with progress tracking
+        // Analyze files in parallel with TUI progress updates
         let file_items: Vec<FileDebtItem> = files_map
             .par_iter()
             .progress_with(progress.clone())
             .filter_map(|(file_path, functions)| {
-                self.analyze_file_parallel(file_path, functions, coverage_data, no_god_object)
+                let result = self.analyze_file_parallel(file_path, functions, coverage_data, no_god_object);
+
+                // Update progress (throttled to maintain 60 FPS - DESIGN.md:179)
+                let current = processed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+
+                if let Ok(mut last) = last_update.try_lock() {
+                    if current % 10 == 0 || last.elapsed() > std::time::Duration::from_millis(100) {
+                        if let Some(manager) = crate::progress::ProgressManager::global() {
+                            manager.tui_update_subtask(
+                                6,
+                                3,
+                                crate::tui::app::StageStatus::Active,
+                                Some((current, total_files)),
+                            );
+                        }
+                        *last = Instant::now();
+                    }
+                }
+
+                result
             })
             .collect();
 

@@ -1296,17 +1296,45 @@ fn analyze_files_for_debt(
 
     // Pure functional pipeline for file analysis
     let file_groups = group_functions_by_file(metrics);
+    let total_files = file_groups.len();
     let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
 
-    // Process each file using functional composition
-    let processed_files: Vec<ProcessedFileData> = file_groups
-        .into_iter()
-        .map(|(file_path, functions)| {
+    // Initialize progress tracking (maintaining design consistency with subtask 2)
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask(
+            6,
+            3,
+            crate::tui::app::StageStatus::Active,
+            Some((0, total_files)),
+        );
+    }
+
+    // Process files with progress updates (preserving functional style)
+    let mut processed_files = Vec::new();
+    let mut last_update = std::time::Instant::now();
+
+    for (idx, (file_path, functions)) in file_groups.into_iter().enumerate() {
+        if let Ok(data) =
             process_single_file(file_path, functions, &file_analyzer, no_god_object, unified)
-        })
-        .filter_map(|result| result.ok())
-        .filter(|data| data.file_metrics.calculate_score() > 50.0) // Filter significant files
-        .collect();
+        {
+            if data.file_metrics.calculate_score() > 50.0 {
+                processed_files.push(data);
+            }
+        }
+
+        // Throttled progress updates (100ms intervals maintain 60 FPS - spec DESIGN.md:179)
+        if (idx + 1) % 10 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100) {
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                manager.tui_update_subtask(
+                    6,
+                    3,
+                    crate::tui::app::StageStatus::Active,
+                    Some((idx + 1, total_files)),
+                );
+            }
+            last_update = std::time::Instant::now();
+        }
+    }
 
     // Apply results to unified analysis (I/O at edges)
     apply_file_analysis_results(unified, processed_files);
