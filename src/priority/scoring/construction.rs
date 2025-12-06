@@ -859,6 +859,9 @@ mod tests {
             risk_boost: None,
             pre_adjustment_score: Some(22.0),
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         };
 
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
@@ -887,6 +890,9 @@ mod tests {
             risk_boost: None,
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         };
 
         // Test with all file types

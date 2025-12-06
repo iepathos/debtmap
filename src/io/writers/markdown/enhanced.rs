@@ -344,6 +344,9 @@ mod tests {
                 risk_boost: None,
                 pre_adjustment_score: None,
                 adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
@@ -486,6 +489,9 @@ mod tests {
             risk_boost: None,
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         };
 
         let result = format_score_factors(&score);
@@ -584,6 +590,9 @@ mod tests {
             risk_boost: None,
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         };
 
         let result = format_score_factors(&score);

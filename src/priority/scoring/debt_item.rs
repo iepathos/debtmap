@@ -1490,6 +1490,9 @@ mod tests {
             risk_boost: None,
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         };
 
         let coverage = TransitiveCoverage {

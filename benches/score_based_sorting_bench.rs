@@ -42,6 +42,9 @@ fn create_test_item(
             risk_boost: Some(1.0),
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         },
         function_role: role,
         recommendation: ActionableRecommendation {

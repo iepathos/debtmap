@@ -37,6 +37,13 @@ pub struct UnifiedScore {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_applied:
         Option<crate::priority::scoring::orchestration_adjustment::ScoreAdjustment>, // Orchestration adjustment details (spec 110)
+    // Data flow factors (spec 218)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purity_factor: Option<f64>, // Purity spectrum score (0.0-1.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refactorability_factor: Option<f64>, // Dead stores and escape analysis (1.0-1.5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_factor: Option<f64>, // Data flow vs business logic (0.7-1.0)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +180,9 @@ pub fn calculate_unified_score_with_patterns(
         risk_boost: base_score.risk_boost,
         pre_adjustment_score: base_score.pre_adjustment_score,
         adjustment_applied: base_score.adjustment_applied,
+        purity_factor: base_score.purity_factor,
+        refactorability_factor: base_score.refactorability_factor,
+        pattern_factor: base_score.pattern_factor,
     }
 }
 
@@ -211,6 +221,9 @@ pub fn calculate_unified_priority_with_debt(
             risk_boost: Some(1.0),
             pre_adjustment_score: None,
             adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
         };
     }
 
@@ -300,6 +313,9 @@ pub fn calculate_unified_priority_with_debt(
         risk_boost: None,         // Set later in debt item construction (spec 171)
         pre_adjustment_score: pre_adjustment,
         adjustment_applied: adjustment,
+        purity_factor: None,             // Set by calculate_unified_priority_with_data_flow (spec 218)
+        refactorability_factor: None,    // Set by calculate_unified_priority_with_data_flow (spec 218)
+        pattern_factor: None,            // Set by calculate_unified_priority_with_data_flow (spec 218)
     }
 }
 
