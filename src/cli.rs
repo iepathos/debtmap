@@ -139,8 +139,9 @@ pub enum Commands {
         #[arg(long = "min-priority")]
         min_priority: Option<String>,
 
-        /// Minimum score threshold to show recommendations (0.0 = show all, spec 193)
-        /// Overrides config file setting. Default: 3.0 (hide LOW severity items)
+        /// Minimum score threshold for filtering T3/T4 recommendations (default: 3.0).
+        /// T1 Critical Architecture and T2 Complex Untested items bypass this filter and are always shown.
+        /// Overrides config file setting. Spec 193, 205.
         #[arg(long = "min-score")]
         min_score: Option<f64>,
 
