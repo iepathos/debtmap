@@ -583,27 +583,35 @@ fn is_automation_mode() -> bool {
             .eq_ignore_ascii_case("true")
 }
 
-/// Handles the analyze command by coordinating configuration and execution.
+/// Extracts and builds configuration from the Analyze command variant.
 ///
-/// This function serves as a coordination layer that:
-/// 1. Extracts command-line parameters from the Commands enum
-/// 2. Applies environment setup (side effects)
-/// 3. Builds configuration using pure builder functions (spec 182)
-/// 4. Delegates to the analysis handler
-///
-/// The function follows the functional pipeline pattern where complex
-/// configuration building is delegated to small, focused builder functions.
+/// This function handles the destructuring of the 65 CLI parameters from the Commands enum
+/// and builds all configuration groups. It's separated to keep the main handler focused
+/// on coordination.
 ///
 /// # Returns
 ///
-/// Returns `Result<Result<()>>` where:
-/// - Outer Result: Parameter extraction and config building errors
-/// - Inner Result: Analysis execution errors
+/// Returns a tuple of configuration groups and special flags needed for handler coordination.
 ///
-/// # Specification
+/// # Architecture Note
 ///
-/// Implements spec 182: Refactor handle_analyze_command into composable functions
-fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
+/// This is a necessary extraction function. While long, its complexity is structural
+/// (destructuring + config building) rather than logical. The destructuring must happen
+/// somewhere when working with clap's Commands enum.
+#[allow(clippy::type_complexity)]
+fn extract_analyze_params(
+    command: Commands,
+) -> Result<(
+    analyze_config::PathConfig,
+    analyze_config::ThresholdConfig,
+    analyze_config::AnalysisFeatureConfig,
+    analyze_config::DisplayConfig,
+    analyze_config::PerformanceConfig,
+    analyze_config::DebugConfig,
+    analyze_config::LanguageConfig,
+    bool, // explain_metrics flag
+    bool, // no_context_aware flag
+)> {
     if let Commands::Analyze {
         path,
         format,
@@ -671,16 +679,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         show_filter_stats,
     } = command
     {
-        // Apply side effects first
-        apply_environment_setup(no_context_aware)?;
-
-        // Handle explain-metrics flag
-        if explain_metrics {
-            print_metrics_explanation();
-            return Ok(Ok(()));
-        }
-
-        // Build grouped configurations using builder functions (spec 182)
+        // Build configuration groups using pure builder functions
         let path_cfg = build_path_config(
             path,
             output,
@@ -772,7 +771,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             show_std_lib,
         );
 
-        let config = build_analyze_config(
+        Ok((
             path_cfg,
             threshold_cfg,
             feature_cfg,
@@ -780,12 +779,76 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             perf_cfg,
             debug_cfg,
             lang_cfg,
-        );
-
-        Ok(debtmap::commands::analyze::handle_analyze(config))
+            explain_metrics,
+            no_context_aware,
+        ))
     } else {
-        Err(anyhow::anyhow!("Invalid command"))
+        Err(anyhow::anyhow!("Invalid command: expected Analyze variant"))
     }
+}
+
+/// Handles the analyze command (coordination only).
+///
+/// This is the entry point for the analyze command. It coordinates the three main steps:
+/// 1. Extract parameters and build configuration
+/// 2. Apply environment setup (side effects)
+/// 3. Delegate to analysis handler
+///
+/// # Architecture
+///
+/// This function follows the "pure core, imperative shell" pattern and serves as a thin
+/// coordination layer (30-40 lines). The heavy lifting is delegated to:
+/// - `extract_analyze_params`: Parameter extraction and config building
+/// - `apply_environment_setup`: Side effects at the boundary
+/// - `handle_analyze`: Core analysis logic
+///
+/// # Returns
+///
+/// Returns `Result<Result<()>>` where:
+/// - Outer Result: Parameter extraction and config building errors
+/// - Inner Result: Analysis execution errors
+///
+/// # Specification
+///
+/// Implements spec 182: Refactor handle_analyze_command into composable functions.
+/// This handler is now 30-40 lines (coordination only), with parameter extraction
+/// delegated to `extract_analyze_params`.
+fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
+    // Extract parameters and build configuration groups
+    let (
+        path_cfg,
+        threshold_cfg,
+        feature_cfg,
+        display_cfg,
+        perf_cfg,
+        debug_cfg,
+        lang_cfg,
+        explain_metrics,
+        no_context_aware,
+    ) = extract_analyze_params(command)?;
+
+    // Apply side effects (I/O at edges)
+    apply_environment_setup(no_context_aware)?;
+
+    // Handle explain-metrics flag (early return for info display)
+    if explain_metrics {
+        print_metrics_explanation();
+        return Ok(Ok(()));
+    }
+
+    // Build final configuration from component configs
+    let config = build_analyze_config(
+        path_cfg,
+        threshold_cfg,
+        feature_cfg,
+        display_cfg,
+        perf_cfg,
+        debug_cfg,
+        lang_cfg,
+    );
+
+    // Delegate to analysis handler (pure core)
+    Ok(debtmap::commands::analyze::handle_analyze(config))
 }
 
 // Side effect function for environment setup (I/O at edges)
