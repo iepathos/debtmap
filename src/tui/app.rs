@@ -1,6 +1,20 @@
 //! TUI application state management.
 
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+/// A parsing or analysis warning (pure data)
+#[derive(Debug, Clone)]
+pub struct ParseWarning {
+    /// File path where the warning occurred
+    pub file: PathBuf,
+    /// Warning message
+    pub message: String,
+}
+
+/// Shared warning collector for thread-safe warning collection
+pub type WarningCollector = Arc<Mutex<Vec<ParseWarning>>>;
 
 /// Visual status of a pipeline stage
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,6 +103,12 @@ pub struct App {
     pub animation_frame: usize,
     /// Last update time
     pub last_update: Instant,
+
+    // Warnings
+    /// Collected parsing/analysis warnings
+    pub warnings: Vec<ParseWarning>,
+    /// Whether warnings overlay is visible
+    pub warnings_visible: bool,
 }
 
 impl App {
@@ -105,6 +125,8 @@ impl App {
             coverage_percent: 0.0,
             animation_frame: 0,
             last_update: Instant::now(),
+            warnings: Vec::new(),
+            warnings_visible: false,
         }
     }
 
@@ -294,6 +316,21 @@ impl App {
         self.functions_count = functions;
         self.debt_count = debt;
         self.coverage_percent = coverage;
+    }
+
+    /// Add a warning to the collection
+    pub fn add_warning(&mut self, file: PathBuf, message: String) {
+        self.warnings.push(ParseWarning { file, message });
+    }
+
+    /// Toggle warnings overlay visibility
+    pub fn toggle_warnings(&mut self) {
+        self.warnings_visible = !self.warnings_visible;
+    }
+
+    /// Get count of warnings
+    pub fn warning_count(&self) -> usize {
+        self.warnings.len()
     }
 }
 

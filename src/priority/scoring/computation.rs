@@ -34,8 +34,8 @@ pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetail
         EntropyDetails {
             entropy_score: entropy_score.token_entropy,
             pattern_repetition: entropy_score.pattern_repetition,
-            original_complexity: func.cognitive,  // Store original cognitive, not cyclomatic
-            adjusted_complexity: adjusted_cognitive,  // Deprecated: same as adjusted_cognitive
+            original_complexity: func.cognitive, // Store original cognitive, not cyclomatic
+            adjusted_complexity: adjusted_cognitive, // Deprecated: same as adjusted_cognitive
             dampening_factor,
             adjusted_cognitive,
         }
@@ -186,10 +186,7 @@ pub(super) fn calculate_complexity_reduction(debt_type: &DebtType, is_complex: b
             ..
         } => (*cyclomatic + *cognitive) as f64 * 0.5,
         DebtType::TestingGap { cyclomatic, .. } if is_complex => *cyclomatic as f64 * 0.3,
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            ..
-        } => {
+        DebtType::ComplexityHotspot { cyclomatic, .. } => {
             // Use raw cyclomatic - complexity reduction potential is based on structural complexity
             *cyclomatic as f64 * 0.5
         }

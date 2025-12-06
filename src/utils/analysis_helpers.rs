@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.8;
 
@@ -85,4 +85,77 @@ pub fn build_technical_debt_report(
 
 pub fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {
     analysis_utils::create_dependency_report(file_metrics)
+}
+
+/// Check if a file path is within the current project directory.
+///
+/// Returns false for files outside the project (e.g., in sibling directories like ../prodigy).
+///
+/// This is used to filter parsing warnings - we only show warnings for files in the current
+/// project to avoid cluttering the TUI with errors from external codebases. External files
+/// may appear in the analysis due to cross-project references or symlinks.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+/// use debtmap::utils::is_in_current_project;
+///
+/// // Files in the current project
+/// assert!(is_in_current_project(Path::new("src/lib.rs")));
+/// assert!(is_in_current_project(Path::new("./tests/integration.rs")));
+///
+/// // Files outside the current project
+/// assert!(!is_in_current_project(Path::new("../other-project/src/lib.rs")));
+/// ```
+pub fn is_in_current_project(path: &Path) -> bool {
+    // Quick check: if path starts with "../", it's clearly outside
+    if path.starts_with("..") {
+        return false;
+    }
+
+    // If it's already an absolute path, check if it's under current directory
+    if path.is_absolute() {
+        if let Ok(current_dir) = std::env::current_dir() {
+            if let (Ok(canonical_path), Ok(canonical_cwd)) =
+                (path.canonicalize(), current_dir.canonicalize())
+            {
+                return canonical_path.starts_with(canonical_cwd);
+            }
+        }
+        // If we can't determine, assume it's external for safety
+        return false;
+    }
+
+    // Relative paths that don't start with ".." are assumed to be in project
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_in_current_project_relative_path() {
+        let path = Path::new("src/lib.rs");
+        assert!(is_in_current_project(path));
+    }
+
+    #[test]
+    fn test_is_in_current_project_parent_directory() {
+        let path = Path::new("../other-project/file.rs");
+        assert!(!is_in_current_project(path));
+    }
+
+    #[test]
+    fn test_is_in_current_project_nested_parent() {
+        let path = Path::new("../../another-project/src/file.rs");
+        assert!(!is_in_current_project(path));
+    }
+
+    #[test]
+    fn test_is_in_current_project_nested_relative() {
+        let path = Path::new("src/subdir/nested/file.rs");
+        assert!(is_in_current_project(path));
+    }
 }

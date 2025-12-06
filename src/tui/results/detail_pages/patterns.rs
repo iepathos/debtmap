@@ -72,20 +72,6 @@ pub fn render(
                     Style::default().fg(theme.primary),
                 ),
             ]));
-            lines.push(Line::from(vec![
-                Span::raw("  Cyclomatic Complexity: "),
-                Span::styled(
-                    format!("{} (unchanged)", item.cyclomatic_complexity),
-                    Style::default().fg(theme.muted),
-                ),
-            ]));
-            lines.push(Line::from(vec![
-                Span::raw("    "),
-                Span::styled(
-                    "Pattern repetition reduces cognitive load, not path count",
-                    Style::default().fg(theme.muted),
-                ),
-            ]));
         } else {
             add_label_value(&mut lines, "Dampening Applied", "No".to_string(), theme);
         }

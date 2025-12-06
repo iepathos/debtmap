@@ -366,12 +366,7 @@ fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn
     use syn::{parse_str, Item, ItemFn};
 
     // Parse the entire file
-    let file = parse_str::<syn::File>(source)
-        .map_err(|e| {
-            eprintln!("Warning: Failed to parse {}: {}", func.file.display(), e);
-            e
-        })
-        .ok()?;
+    let file = parse_str::<syn::File>(source).ok()?;
 
     // Find the function by name and approximate line number
     for item in &file.items {

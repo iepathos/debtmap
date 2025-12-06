@@ -180,12 +180,7 @@ impl ParallelCallGraphBuilder {
             .iter()
             .enumerate()
             .filter_map(|(idx, (file_path, content))| {
-                let parsed = syn::parse_file(content)
-                    .map_err(|e| {
-                        eprintln!("Warning: Failed to parse {}: {}", file_path.display(), e);
-                        e
-                    })
-                    .ok()?;
+                let parsed = syn::parse_file(content).ok()?;
                 parallel_graph.stats().increment_files();
 
                 let count = parsed_count.fetch_add(1, Ordering::Relaxed) + 1;

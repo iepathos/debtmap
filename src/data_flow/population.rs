@@ -174,10 +174,7 @@ fn extract_variable_deps(metric: &FunctionMetrics) -> HashSet<String> {
 
     let file_ast = match syn::parse_file(&content) {
         Ok(ast) => ast,
-        Err(e) => {
-            eprintln!("Warning: Failed to parse {}: {}", metric.file.display(), e);
-            return HashSet::new();
-        }
+        Err(_) => return HashSet::new(),
     };
 
     // Find the function by name and line number
@@ -230,10 +227,7 @@ pub fn populate_data_transformations(
 
         let file_ast = match syn::parse_file(&content) {
             Ok(ast) => ast,
-            Err(e) => {
-                eprintln!("Warning: Failed to parse {}: {}", metric.file.display(), e);
-                continue;
-            }
+            Err(_) => continue,
         };
 
         // Find the function by name and line number

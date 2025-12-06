@@ -133,10 +133,7 @@ pub fn has_t3_cyclomatic(cyclomatic: u32, threshold: u32) -> bool {
 /// Note: Returns raw cyclomatic (not dampened) as it's a structural metric.
 pub fn extract_effective_cyclomatic(debt_type: &DebtType) -> Option<u32> {
     match debt_type {
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            ..
-        } => Some(*cyclomatic),
+        DebtType::ComplexityHotspot { cyclomatic, .. } => Some(*cyclomatic),
         _ => None,
     }
 }
@@ -325,13 +322,13 @@ mod tests {
 
     #[test]
     fn test_extract_effective_cyclomatic() {
-        // With adjusted cyclomatic
+        // Returns raw cyclomatic (adjusted_cyclomatic is ignored)
         let debt = DebtType::ComplexityHotspot {
             adjusted_cyclomatic: Some(20),
             cyclomatic: 25,
             cognitive: 15,
         };
-        assert_eq!(extract_effective_cyclomatic(&debt), Some(20));
+        assert_eq!(extract_effective_cyclomatic(&debt), Some(25));
 
         // Without adjusted cyclomatic
         let debt = DebtType::ComplexityHotspot {

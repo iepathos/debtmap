@@ -61,12 +61,7 @@ mod transformations {
                         e
                     })
                     .ok()?;
-                let file_ast = syn::parse_file(&content)
-                    .map_err(|e| {
-                        eprintln!("Warning: Failed to parse {}: {}", m.file.display(), e);
-                        e
-                    })
-                    .ok()?;
+                let file_ast = syn::parse_file(&content).ok()?;
 
                 // Find the function in the AST by name and line number
                 for item in &file_ast.items {
