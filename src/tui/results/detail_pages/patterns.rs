@@ -201,16 +201,18 @@ pub fn render(
 
         add_label_value(
             &mut lines,
-            "Is Pure",
+            "pure",
             if purity_info.is_pure { "Yes" } else { "No" }.to_string(),
             theme,
+            area.width,
         );
 
         add_label_value(
             &mut lines,
-            "Confidence",
+            "confidence",
             format!("{:.1}%", purity_info.confidence * 100.0),
             theme,
+            area.width,
         );
 
         if !purity_info.impurity_reasons.is_empty() {
