@@ -31,12 +31,16 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         KeyCode::Down | KeyCode::Char('j') => {
             move_selection(app, 1);
         }
-        KeyCode::Char('g') => {
+        KeyCode::Char('g') | KeyCode::Home => {
             // Go to top
             app.set_selected_index(0);
             app.set_scroll_offset(0);
         }
         KeyCode::Char('G') => {
+            // Toggle grouping
+            app.toggle_grouping();
+        }
+        KeyCode::End => {
             // Go to bottom
             let last = app.item_count().saturating_sub(1);
             app.set_selected_index(last);
