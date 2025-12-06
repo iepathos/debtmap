@@ -262,6 +262,7 @@ mod tests {
             language_specific: None,
             detected_pattern: None,
             contextual_risk: None,
+        file_line_count: None,
         }
     }
 

@@ -127,6 +127,10 @@ pub struct UnifiedDebtItem {
     pub detected_pattern: Option<crate::priority::detected_pattern::DetectedPattern>, // Detected complexity pattern (spec 204)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contextual_risk: Option<crate::risk::context::ContextualRisk>, // Git history and context provider risk data
+    /// Cached line count for this item's file (spec 204).
+    /// Populated during item creation to avoid re-reading files during calculate_total_impact.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_line_count: Option<usize>,
 }
 
 impl UnifiedDebtItem {

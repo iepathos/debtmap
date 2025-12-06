@@ -27,6 +27,17 @@ use crate::risk::lcov::LcovData;
 use std::collections::HashSet;
 use std::path::Path;
 
+/// Calculate file line count for caching (spec 204).
+/// Returns None if file cannot be read.
+fn calculate_file_line_count(file_path: &Path) -> Option<usize> {
+    use crate::metrics::LocCounter;
+    let loc_counter = LocCounter::default();
+    loc_counter
+        .count_file(file_path)
+        .ok()
+        .map(|count| count.physical_lines)
+}
+
 /// Calculate context-aware multiplier for a file path (spec 191)
 ///
 /// Returns a tuple of (multiplier, file_type) based on the detected file type.
@@ -151,6 +162,9 @@ pub fn create_unified_debt_item_enhanced(
     // Calculate entropy details once for efficiency (spec 214)
     let entropy_details = calculate_entropy_details(func);
 
+    // Cache file line count during item creation (spec 204)
+    let file_line_count = calculate_file_line_count(&func.file);
+
     let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -190,6 +204,7 @@ pub fn create_unified_debt_item_enhanced(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
+        file_line_count, // Cached line count (spec 204)
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
@@ -420,6 +435,9 @@ fn build_unified_debt_item(
     // Calculate entropy details once for efficiency (spec 214)
     let entropy_details = calculate_entropy_details(func);
 
+    // Cache file line count during item creation (spec 204)
+    let file_line_count = calculate_file_line_count(&func.file);
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -459,6 +477,7 @@ fn build_unified_debt_item(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
+        file_line_count, // Cached line count (spec 204)
     }
 }
 
@@ -636,6 +655,9 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     // Calculate entropy details once for efficiency (spec 214)
     let entropy_details = calculate_entropy_details(func);
 
+    // Cache file line count during item creation (spec 204)
+    let file_line_count = calculate_file_line_count(&func.file);
+
     Some(UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -675,6 +697,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
+        file_line_count, // Cached line count (spec 204)
     })
 }
 
@@ -768,6 +791,9 @@ pub fn create_unified_debt_item_with_data_flow(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
 
+    // Cache file line count during item creation (spec 204)
+    let file_line_count = calculate_file_line_count(&func.file);
+
     Some(UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -807,6 +833,7 @@ pub fn create_unified_debt_item_with_data_flow(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
+        file_line_count, // Cached line count (spec 204)
     })
 }
 

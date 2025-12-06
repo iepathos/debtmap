@@ -443,6 +443,7 @@ fn create_test_unified_debt_item(
         language_specific: None,
         detected_pattern: None,
         contextual_risk: None,
+        file_line_count: None,
     }
 }
 

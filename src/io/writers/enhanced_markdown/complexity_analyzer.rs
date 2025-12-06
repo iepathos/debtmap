@@ -522,6 +522,7 @@ mod tests {
             language_specific: None, // spec 190
             detected_pattern: None,
             contextual_risk: None, // spec 203
+            file_line_count: None,
         };
 
         assert_eq!(estimate_effort(&item), 8); // 4 * 2
@@ -767,6 +768,7 @@ mod tests {
             language_specific: None, // spec 190
             detected_pattern: None,
             contextual_risk: None, // spec 203
+            file_line_count: None,
         }];
 
         let deps = extract_module_dependencies(&items);
