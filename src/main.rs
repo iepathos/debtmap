@@ -842,8 +842,8 @@ fn handle_analyze_command(command: Commands) -> Result<(), CliError> {
         return Ok(());
     }
 
-    // Build final configuration from component configs
-    let config = build_analyze_config(
+    // Build final configuration from component configs (unvalidated)
+    let unvalidated_config = build_analyze_config(
         path_cfg,
         threshold_cfg,
         feature_cfg,
@@ -853,8 +853,14 @@ fn handle_analyze_command(command: Commands) -> Result<(), CliError> {
         lang_cfg,
     );
 
-    // Delegate to analysis handler - map analysis errors to CLI errors
-    debtmap::commands::analyze::handle_analyze(config)
+    // Validate configuration - transition to validated state
+    let validated_config = unvalidated_config
+        .validate()
+        .map_err(|e| CliError::Config(ConfigError::ValidationFailed(e.to_string())))?;
+
+    // Execute with validated configuration - compile-time guarantee of validation
+    validated_config
+        .execute()
         .map_err(|e| CliError::Config(ConfigError::ValidationFailed(e.to_string())))
 }
 
@@ -1475,68 +1481,68 @@ fn build_analyze_config(
     pf: analyze_config::PerformanceConfig,
     db: analyze_config::DebugConfig,
     l: analyze_config::LanguageConfig,
-) -> debtmap::commands::analyze::AnalyzeConfig {
-    debtmap::commands::analyze::AnalyzeConfig {
-        path: p.path,
-        output: p.output,
-        coverage_file: p.coverage_file,
-        max_files: p.max_files,
-        min_priority: convert_min_priority(p.min_priority),
-        min_score: p.min_score,
-        filter_categories: convert_filter_categories(p.filter_categories),
-        min_problematic: p.min_problematic,
-        threshold_complexity: t.complexity,
-        threshold_duplication: t.duplication,
-        threshold_preset: convert_threshold_preset(t.preset),
-        public_api_threshold: t.public_api_threshold,
-        format: convert_output_format(d.format),
-        verbosity: d.verbosity,
-        summary: d.summary,
-        top: d.top,
-        tail: d.tail,
-        group_by_category: d.group_by_category,
-        show_attribution: d.show_attribution,
-        detail_level: d.detail_level,
-        no_tui: d.no_tui,
-        show_filter_stats: d.show_filter_stats,
-        _formatting_config: d.formatting_config,
-        no_context_aware: d.no_context_aware,
-        enable_context: f.enable_context,
-        context_providers: convert_context_providers(f.context_providers),
-        disable_context: convert_disable_context(f.disable_context),
-        semantic_off: f.semantic_off,
-        no_pattern_detection: f.no_pattern_detection,
-        patterns: f.patterns,
-        pattern_threshold: f.pattern_threshold,
-        no_god_object: f.no_god_object,
-        no_public_api_detection: f.no_public_api_detection,
-        validate_loc: f.validate_loc,
-        validate_call_graph: f.validate_call_graph,
-        ast_functional_analysis: f.ast_functional_analysis,
-        functional_analysis_profile: f.functional_analysis_profile,
-        min_split_methods: f.min_split_methods,
-        min_split_lines: f.min_split_lines,
-        parallel: pf.parallel,
-        jobs: pf.jobs,
-        multi_pass: pf.multi_pass,
-        aggregate_only: pf.aggregate_only,
-        no_aggregation: pf.no_aggregation,
-        verbose_macro_warnings: db.verbose_macro_warnings,
-        show_macro_stats: db.show_macro_stats,
-        debug_call_graph: db.debug_call_graph,
-        trace_functions: db.trace_functions,
-        call_graph_stats_only: db.call_graph_stats_only,
-        debug_format: db.debug_format,
-        show_pattern_warnings: db.show_pattern_warnings,
-        show_dependencies: db.show_dependencies,
-        no_dependencies: db.no_dependencies,
-        languages: convert_languages(l.languages),
-        aggregation_method: l.aggregation_method,
-        max_callers: l.max_callers,
-        max_callees: l.max_callees,
-        show_external: l.show_external,
-        show_std_lib: l.show_std_lib,
-    }
+) -> debtmap::commands::AnalyzeConfig<debtmap::commands::Unvalidated> {
+    debtmap::commands::AnalyzeConfig::new(
+        p.path,
+        convert_output_format(d.format),
+        p.output,
+        t.complexity,
+        t.duplication,
+        convert_languages(l.languages),
+        p.coverage_file,
+        f.enable_context,
+        convert_context_providers(f.context_providers),
+        convert_disable_context(f.disable_context),
+        d.top,
+        d.tail,
+        d.summary,
+        f.semantic_off,
+        d.verbosity,
+        db.verbose_macro_warnings,
+        db.show_macro_stats,
+        d.group_by_category,
+        convert_min_priority(p.min_priority),
+        p.min_score,
+        convert_filter_categories(p.filter_categories),
+        d.no_context_aware,
+        convert_threshold_preset(t.preset),
+        d.formatting_config,
+        pf.parallel,
+        pf.jobs,
+        pf.multi_pass,
+        d.show_attribution,
+        d.detail_level,
+        pf.aggregate_only,
+        pf.no_aggregation,
+        l.aggregation_method,
+        p.min_problematic,
+        f.no_god_object,
+        p.max_files,
+        f.validate_loc,
+        f.no_public_api_detection,
+        t.public_api_threshold,
+        f.no_pattern_detection,
+        f.patterns,
+        f.pattern_threshold,
+        db.show_pattern_warnings,
+        db.debug_call_graph,
+        db.trace_functions,
+        db.call_graph_stats_only,
+        db.debug_format,
+        f.validate_call_graph,
+        db.show_dependencies,
+        db.no_dependencies,
+        l.max_callers,
+        l.max_callees,
+        l.show_external,
+        l.show_std_lib,
+        f.ast_functional_analysis,
+        f.functional_analysis_profile,
+        f.min_split_methods,
+        f.min_split_lines,
+        d.no_tui,
+        d.show_filter_stats,
+    )
 }
 
 /// Pure function to convert DebtmapJsonInput to UnifiedAnalysis
@@ -1868,5 +1874,171 @@ mod tests {
     fn test_convert_languages_non_empty() {
         let langs = vec!["rust".to_string()];
         assert_eq!(convert_languages(Some(langs.clone())), Some(langs));
+    }
+
+    // Functional composition tests (spec 206)
+    mod functional_composition {
+        use super::*;
+
+        /// Test error mapping from domain-specific error to CLI error
+        #[test]
+        fn test_error_mapping_cli_to_app() {
+            let cli_error = CliError::InvalidCommand("test error".to_string());
+            let error_string = format!("{}", cli_error);
+            assert!(error_string.contains("test error"));
+        }
+
+        /// Test handler composition with different error types
+        #[test]
+        fn test_handler_composition_with_errors() {
+            // Simulate a Result from analyze domain
+            let analyze_result: Result<(), anyhow::Error> =
+                Err(anyhow::anyhow!("analysis failed"));
+
+            // Map to CLI error domain
+            let cli_result: Result<(), CliError> = analyze_result.map_err(|e| {
+                CliError::Config(ConfigError::ValidationFailed(e.to_string()))
+            });
+
+            // Verify error was properly mapped
+            assert!(cli_result.is_err());
+            match cli_result.unwrap_err() {
+                CliError::Config(ConfigError::ValidationFailed(msg)) => {
+                    assert!(msg.contains("analysis failed"));
+                }
+                _ => panic!("Wrong error type"),
+            }
+        }
+
+        /// Test pipeline-style error handling with multiple transformations
+        #[test]
+        fn test_pipeline_error_handling() {
+            // Create a pipeline of Result transformations
+            let result = Ok::<i32, String>(42)
+                .map(|x| x * 2) // Transform success value
+                .map_err(|e| format!("Stage 1: {}", e)) // Map error at stage 1
+                .and_then(|x| {
+                    // Chain another operation
+                    if x > 50 {
+                        Ok(x)
+                    } else {
+                        Err("Too small".to_string())
+                    }
+                })
+                .map_err(|e| format!("Stage 2: {}", e)); // Map error at stage 2
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), 84);
+        }
+
+        /// Test error mapping with context preservation
+        #[test]
+        fn test_error_context_preservation() {
+            use anyhow::Context;
+
+            // Simulate a nested operation that adds context
+            let result: Result<(), anyhow::Error> = Err(anyhow::anyhow!("root cause"))
+                .context("Operation failed")
+                .context("Command failed");
+
+            // Map to CLI error preserving context chain
+            let cli_result: Result<(), CliError> = result.map_err(|e| {
+                CliError::Config(ConfigError::ValidationFailed(format!("{:#}", e)))
+            });
+
+            // Verify context is preserved
+            assert!(cli_result.is_err());
+            let error_msg = format!("{}", cli_result.unwrap_err());
+            assert!(error_msg.contains("Command failed"));
+        }
+
+        /// Test composition of multiple handlers with type transformations
+        #[test]
+        fn test_handler_type_composition() {
+            // Handler 1: String -> Result<usize>
+            let handler1 = |s: String| -> Result<usize, String> {
+                s.parse::<usize>()
+                    .map_err(|e| format!("Parse error: {}", e))
+            };
+
+            // Handler 2: usize -> Result<String>
+            let handler2 = |n: usize| -> Result<String, String> {
+                if n > 0 {
+                    Ok(format!("Value: {}", n))
+                } else {
+                    Err("Zero not allowed".to_string())
+                }
+            };
+
+            // Compose handlers
+            let composed = |s: String| -> Result<String, String> {
+                handler1(s).and_then(handler2)
+            };
+
+            // Test successful composition
+            let result = composed("42".to_string());
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "Value: 42");
+
+            // Test error propagation
+            let error_result = composed("invalid".to_string());
+            assert!(error_result.is_err());
+            assert!(error_result.unwrap_err().contains("Parse error"));
+        }
+
+        /// Test MapErr pattern for cross-domain error handling
+        #[test]
+        fn test_map_err_pattern() {
+            // Define different error domains
+            #[derive(Debug)]
+            enum DomainA {
+                Failed(String),
+            }
+
+            #[derive(Debug)]
+            enum DomainB {
+                Error(String),
+            }
+
+            // Map error from domain A to domain B
+            let result_a: Result<(), DomainA> = Err(DomainA::Failed("domain A error".to_string()));
+
+            let result_b: Result<(), DomainB> = result_a.map_err(|e| match e {
+                DomainA::Failed(msg) => DomainB::Error(format!("Mapped: {}", msg)),
+            });
+
+            assert!(result_b.is_err());
+            match result_b.unwrap_err() {
+                DomainB::Error(msg) => assert!(msg.contains("Mapped: domain A error")),
+            }
+        }
+
+        /// Test functional error recovery patterns
+        #[test]
+        fn test_error_recovery_pattern() {
+            // Function that might fail
+            let fallible = |x: i32| -> Result<i32, String> {
+                if x > 0 {
+                    Ok(x * 2)
+                } else {
+                    Err("Negative value".to_string())
+                }
+            };
+
+            // Recovery function
+            let recover = |e: String| -> i32 {
+                eprintln!("Recovered from: {}", e);
+                0 // Default value
+            };
+
+            // Compose with recovery
+            let safe_operation = |x: i32| -> i32 { fallible(x).unwrap_or_else(recover) };
+
+            // Test successful case
+            assert_eq!(safe_operation(5), 10);
+
+            // Test recovery case
+            assert_eq!(safe_operation(-1), 0);
+        }
     }
 }

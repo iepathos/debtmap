@@ -130,6 +130,7 @@ proptest = "1.4"
 pretty_assertions = "1.4"
 tempfile = "3.10"
 criterion = "0.8"
+trybuild = "1.0"
 
 # Test data
 indoc = "2.0"
