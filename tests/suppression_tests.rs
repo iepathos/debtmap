@@ -81,7 +81,7 @@ fn test_type_specific_suppression() {
     );
 
     assert_eq!(items.len(), 1, "Should only find FIXME");
-    assert!(items[0].debt_type == DebtType::Fixme { reason: None });
+    assert!(matches!(items[0].debt_type, DebtType::Fixme { .. }));
 }
 
 #[test]

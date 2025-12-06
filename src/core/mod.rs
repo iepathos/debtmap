@@ -195,9 +195,55 @@ impl FunctionMetrics {
     }
 }
 
+mod debt_type_map_serde {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(
+        map: &HashMap<DebtType, Vec<DebtItem>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct Entry<'a> {
+            debt_type: &'a DebtType,
+            items: &'a Vec<DebtItem>,
+        }
+
+        let entries: Vec<Entry> = map
+            .iter()
+            .map(|(debt_type, items)| Entry { debt_type, items })
+            .collect();
+
+        entries.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<HashMap<DebtType, Vec<DebtItem>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Entry {
+            debt_type: DebtType,
+            items: Vec<DebtItem>,
+        }
+
+        let entries = Vec::<Entry>::deserialize(deserializer)?;
+        Ok(entries
+            .into_iter()
+            .map(|e| (e.debt_type, e.items))
+            .collect())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TechnicalDebtReport {
     pub items: Vec<DebtItem>,
+    #[serde(with = "debt_type_map_serde")]
     pub by_type: HashMap<DebtType, Vec<DebtItem>>,
     pub priorities: Vec<Priority>,
     pub duplications: Vec<DuplicationBlock>,
