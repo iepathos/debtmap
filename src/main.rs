@@ -639,7 +639,43 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             return Ok(Ok(()));
         }
 
-        // Build configuration from pure data transformation
+        // Build grouped configurations (spec 204)
+        let path_cfg = analyze_config::PathConfig {
+            path,
+            output,
+            coverage_file,
+            max_files,
+            min_priority,
+            min_score,
+            filter_categories,
+            min_problematic,
+        };
+
+        let threshold_cfg = analyze_config::ThresholdConfig {
+            complexity: threshold_complexity,
+            duplication: threshold_duplication,
+            preset: threshold_preset,
+            public_api_threshold,
+        };
+
+        let feature_cfg = analyze_config::AnalysisFeatureConfig {
+            enable_context,
+            context_providers,
+            disable_context,
+            semantic_off,
+            no_pattern_detection,
+            patterns,
+            pattern_threshold,
+            no_god_object,
+            no_public_api_detection,
+            ast_functional_analysis,
+            functional_analysis_profile,
+            min_split_methods,
+            min_split_lines,
+            validate_loc,
+            validate_call_graph,
+        };
+
         let formatting_config = create_formatting_config(
             plain,
             show_dependencies,
@@ -650,67 +686,63 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             show_std_lib,
             show_splits,
         );
-        let config = build_analyze_config(
-            path,
+
+        let effective_verbosity = compute_verbosity(verbosity, compact);
+
+        let display_cfg = analyze_config::DisplayConfig {
             format,
-            output,
-            threshold_complexity,
-            threshold_duplication,
-            languages,
-            coverage_file,
-            enable_context,
-            context_providers,
-            disable_context,
+            verbosity: effective_verbosity,
+            summary,
             top,
             tail,
-            summary,
-            semantic_off,
-            verbosity,
-            compact,
-            verbose_macro_warnings,
-            show_macro_stats,
             group_by_category,
-            min_priority,
-            min_score,
-            filter_categories,
-            no_context_aware,
-            threshold_preset,
-            formatting_config,
-            no_parallel,
-            jobs,
-            no_multi_pass,
             show_attribution,
             detail_level,
+            no_tui,
+            show_filter_stats,
+            formatting_config,
+            no_context_aware,
+        };
+
+        let multi_pass = compute_multi_pass(no_multi_pass);
+
+        let perf_cfg = analyze_config::PerformanceConfig {
+            parallel: should_use_parallel(no_parallel),
+            jobs: get_worker_count(jobs),
+            multi_pass,
             aggregate_only,
             no_aggregation,
-            aggregation_method,
-            min_problematic,
-            no_god_object,
-            max_files,
-            validate_loc,
-            no_public_api_detection,
-            public_api_threshold,
-            no_pattern_detection,
-            patterns,
-            pattern_threshold,
-            show_pattern_warnings,
+        };
+
+        let debug_cfg = analyze_config::DebugConfig {
+            verbose_macro_warnings,
+            show_macro_stats,
             debug_call_graph,
             trace_functions,
             call_graph_stats_only,
             debug_format,
-            validate_call_graph,
+            show_pattern_warnings,
             show_dependencies,
             no_dependencies,
+        };
+
+        let lang_cfg = analyze_config::LanguageConfig {
+            languages,
+            aggregation_method,
             max_callers,
             max_callees,
             show_external,
             show_std_lib,
-            ast_functional_analysis,
-            functional_analysis_profile,
-            min_split_methods,
-            min_split_lines,
-            no_tui,
-            show_filter_stats,
+        };
+
+        let config = build_analyze_config(
+            path_cfg,
+            threshold_cfg,
+            feature_cfg,
+            display_cfg,
+            perf_cfg,
+            debug_cfg,
+            lang_cfg,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -742,6 +774,30 @@ fn get_worker_count(jobs: usize) -> usize {
     } else {
         jobs
     }
+}
+
+// Pure function to compute effective verbosity (spec 204)
+fn compute_verbosity(verbosity: u8, compact: bool) -> u8 {
+    if compact {
+        0 // Compact mode uses minimum verbosity
+    } else {
+        verbosity
+    }
+}
+
+// Pure function to compute multi-pass setting (spec 204)
+fn compute_multi_pass(no_multi_pass: bool) -> bool {
+    if no_multi_pass {
+        return false;
+    }
+
+    // Check for DEBTMAP_SINGLE_PASS environment variable (spec 202)
+    let single_pass_env = std::env::var("DEBTMAP_SINGLE_PASS")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok().or_else(|| Some(v == "1")))
+        .unwrap_or(false);
+
+    !single_pass_env
 }
 
 // Pure functions for data transformation
@@ -807,143 +863,175 @@ fn create_formatting_config(
     FormattingConfig::with_caller_callee(color_mode, caller_callee).with_show_splits(show_splits)
 }
 
-// Pure function to build analyze configuration
-#[allow(clippy::too_many_arguments)]
+/// Configuration groups for analyze command (spec 204)
+mod analyze_config {
+    use std::path::PathBuf;
+
+    /// Path and file configuration for analysis
+    #[derive(Debug, Clone)]
+    pub struct PathConfig {
+        pub path: PathBuf,
+        pub output: Option<PathBuf>,
+        pub coverage_file: Option<PathBuf>,
+        pub max_files: Option<usize>,
+        pub min_priority: Option<String>,
+        pub min_score: Option<f64>,
+        pub filter_categories: Option<Vec<String>>,
+        pub min_problematic: Option<usize>,
+    }
+
+    /// Analysis thresholds configuration
+    #[derive(Debug, Clone)]
+    pub struct ThresholdConfig {
+        pub complexity: u32,
+        pub duplication: usize,
+        pub preset: Option<debtmap::cli::ThresholdPreset>,
+        pub public_api_threshold: f32,
+    }
+
+    /// Feature flags for analysis options
+    #[derive(Debug, Clone)]
+    pub struct AnalysisFeatureConfig {
+        pub enable_context: bool,
+        pub context_providers: Option<Vec<String>>,
+        pub disable_context: Option<Vec<String>>,
+        pub semantic_off: bool,
+        pub no_pattern_detection: bool,
+        pub patterns: Option<Vec<String>>,
+        pub pattern_threshold: f32,
+        pub no_god_object: bool,
+        pub no_public_api_detection: bool,
+        pub ast_functional_analysis: bool,
+        pub functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
+        pub min_split_methods: usize,
+        pub min_split_lines: usize,
+        pub validate_loc: bool,
+        pub validate_call_graph: bool,
+    }
+
+    /// Display and output formatting configuration
+    #[derive(Debug, Clone)]
+    pub struct DisplayConfig {
+        pub format: debtmap::cli::OutputFormat,
+        pub verbosity: u8,
+        pub summary: bool,
+        pub top: Option<usize>,
+        pub tail: Option<usize>,
+        pub group_by_category: bool,
+        pub show_attribution: bool,
+        pub detail_level: Option<String>,
+        pub no_tui: bool,
+        pub show_filter_stats: bool,
+        pub formatting_config: super::FormattingConfig,
+        pub no_context_aware: bool,
+    }
+
+    /// Performance and parallelization settings
+    #[derive(Debug, Clone)]
+    pub struct PerformanceConfig {
+        pub parallel: bool,
+        pub jobs: usize,
+        pub multi_pass: bool,
+        pub aggregate_only: bool,
+        pub no_aggregation: bool,
+    }
+
+    /// Debug and diagnostic settings
+    #[derive(Debug, Clone)]
+    pub struct DebugConfig {
+        pub verbose_macro_warnings: bool,
+        pub show_macro_stats: bool,
+        pub debug_call_graph: bool,
+        pub trace_functions: Option<Vec<String>>,
+        pub call_graph_stats_only: bool,
+        pub debug_format: debtmap::cli::DebugFormatArg,
+        pub show_pattern_warnings: bool,
+        pub show_dependencies: bool,
+        pub no_dependencies: bool,
+    }
+
+    /// Language-specific settings
+    #[derive(Debug, Clone)]
+    pub struct LanguageConfig {
+        pub languages: Option<Vec<String>>,
+        pub aggregation_method: Option<String>,
+        pub max_callers: usize,
+        pub max_callees: usize,
+        pub show_external: bool,
+        pub show_std_lib: bool,
+    }
+}
+
+/// Build analyze configuration from grouped configuration structs (spec 204)
 fn build_analyze_config(
-    path: std::path::PathBuf,
-    format: debtmap::cli::OutputFormat,
-    output: Option<std::path::PathBuf>,
-    threshold_complexity: u32,
-    threshold_duplication: usize,
-    languages: Option<Vec<String>>,
-    coverage_file: Option<std::path::PathBuf>,
-    enable_context: bool,
-    context_providers: Option<Vec<String>>,
-    disable_context: Option<Vec<String>>,
-    top: Option<usize>,
-    tail: Option<usize>,
-    summary: bool,
-    semantic_off: bool,
-    verbosity: u8,
-    compact: bool,
-    verbose_macro_warnings: bool,
-    show_macro_stats: bool,
-    group_by_category: bool,
-    min_priority: Option<String>,
-    min_score: Option<f64>,
-    filter_categories: Option<Vec<String>>,
-    no_context_aware: bool,
-    threshold_preset: Option<debtmap::cli::ThresholdPreset>,
-    formatting_config: FormattingConfig,
-    no_parallel: bool,
-    jobs: usize,
-    no_multi_pass: bool,
-    show_attribution: bool,
-    detail_level: Option<String>,
-    aggregate_only: bool,
-    no_aggregation: bool,
-    aggregation_method: Option<String>,
-    min_problematic: Option<usize>,
-    no_god_object: bool,
-    max_files: Option<usize>,
-    validate_loc: bool,
-    no_public_api_detection: bool,
-    public_api_threshold: f32,
-    no_pattern_detection: bool,
-    patterns: Option<Vec<String>>,
-    pattern_threshold: f32,
-    show_pattern_warnings: bool,
-    debug_call_graph: bool,
-    trace_functions: Option<Vec<String>>,
-    call_graph_stats_only: bool,
-    debug_format: debtmap::cli::DebugFormatArg,
-    validate_call_graph: bool,
-    show_dependencies: bool,
-    no_dependencies: bool,
-    max_callers: usize,
-    max_callees: usize,
-    show_external: bool,
-    show_std_lib: bool,
-    ast_functional_analysis: bool,
-    functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
-    min_split_methods: usize,
-    min_split_lines: usize,
-    no_tui: bool,
-    show_filter_stats: bool,
+    path_cfg: analyze_config::PathConfig,
+    threshold_cfg: analyze_config::ThresholdConfig,
+    feature_cfg: analyze_config::AnalysisFeatureConfig,
+    display_cfg: analyze_config::DisplayConfig,
+    perf_cfg: analyze_config::PerformanceConfig,
+    debug_cfg: analyze_config::DebugConfig,
+    lang_cfg: analyze_config::LanguageConfig,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
-    // Compute effective verbosity: compact mode sets verbosity to a special low value
-    let effective_verbosity = if compact {
-        0 // Compact mode uses minimum verbosity
-    } else {
-        verbosity
-    };
-
-    // Check for DEBTMAP_SINGLE_PASS environment variable (spec 202)
-    let single_pass_env = std::env::var("DEBTMAP_SINGLE_PASS")
-        .ok()
-        .and_then(|v| v.parse::<bool>().ok().or_else(|| Some(v == "1")))
-        .unwrap_or(false);
-
     debtmap::commands::analyze::AnalyzeConfig {
-        path,
-        format: convert_output_format(format),
-        output,
-        threshold_complexity,
-        threshold_duplication,
-        languages: convert_languages(languages),
-        coverage_file,
-        enable_context,
-        context_providers: convert_context_providers(context_providers),
-        disable_context: convert_disable_context(disable_context),
-        top,
-        tail,
-        summary,
-        semantic_off,
-        verbosity: effective_verbosity,
-        verbose_macro_warnings,
-        show_macro_stats,
-        group_by_category,
-        min_priority: convert_min_priority(min_priority),
-        min_score,
-        filter_categories: convert_filter_categories(filter_categories),
-        no_context_aware,
-        threshold_preset: convert_threshold_preset(threshold_preset),
-        _formatting_config: formatting_config,
-        parallel: should_use_parallel(no_parallel),
-        jobs: get_worker_count(jobs),
-        multi_pass: !no_multi_pass && !single_pass_env,
-        show_attribution,
-        detail_level,
-        aggregate_only,
-        no_aggregation,
-        aggregation_method,
-        min_problematic,
-        no_god_object,
-        max_files,
-        validate_loc,
-        no_public_api_detection,
-        public_api_threshold,
-        no_pattern_detection,
-        patterns,
-        pattern_threshold,
-        show_pattern_warnings,
-        debug_call_graph,
-        trace_functions,
-        call_graph_stats_only,
-        debug_format,
-        validate_call_graph,
-        show_dependencies,
-        no_dependencies,
-        max_callers,
-        max_callees,
-        show_external,
-        show_std_lib,
-        ast_functional_analysis,
-        functional_analysis_profile,
-        min_split_methods,
-        min_split_lines,
-        no_tui,
-        show_filter_stats,
+        path: path_cfg.path,
+        format: convert_output_format(display_cfg.format),
+        output: path_cfg.output,
+        threshold_complexity: threshold_cfg.complexity,
+        threshold_duplication: threshold_cfg.duplication,
+        languages: convert_languages(lang_cfg.languages),
+        coverage_file: path_cfg.coverage_file,
+        enable_context: feature_cfg.enable_context,
+        context_providers: convert_context_providers(feature_cfg.context_providers),
+        disable_context: convert_disable_context(feature_cfg.disable_context),
+        top: display_cfg.top,
+        tail: display_cfg.tail,
+        summary: display_cfg.summary,
+        semantic_off: feature_cfg.semantic_off,
+        verbosity: display_cfg.verbosity,
+        verbose_macro_warnings: debug_cfg.verbose_macro_warnings,
+        show_macro_stats: debug_cfg.show_macro_stats,
+        group_by_category: display_cfg.group_by_category,
+        min_priority: convert_min_priority(path_cfg.min_priority),
+        min_score: path_cfg.min_score,
+        filter_categories: convert_filter_categories(path_cfg.filter_categories),
+        no_context_aware: display_cfg.no_context_aware,
+        threshold_preset: convert_threshold_preset(threshold_cfg.preset),
+        _formatting_config: display_cfg.formatting_config,
+        parallel: perf_cfg.parallel,
+        jobs: perf_cfg.jobs,
+        multi_pass: perf_cfg.multi_pass,
+        show_attribution: display_cfg.show_attribution,
+        detail_level: display_cfg.detail_level,
+        aggregate_only: perf_cfg.aggregate_only,
+        no_aggregation: perf_cfg.no_aggregation,
+        aggregation_method: lang_cfg.aggregation_method,
+        min_problematic: path_cfg.min_problematic,
+        no_god_object: feature_cfg.no_god_object,
+        max_files: path_cfg.max_files,
+        validate_loc: feature_cfg.validate_loc,
+        no_public_api_detection: feature_cfg.no_public_api_detection,
+        public_api_threshold: threshold_cfg.public_api_threshold,
+        no_pattern_detection: feature_cfg.no_pattern_detection,
+        patterns: feature_cfg.patterns,
+        pattern_threshold: feature_cfg.pattern_threshold,
+        show_pattern_warnings: debug_cfg.show_pattern_warnings,
+        debug_call_graph: debug_cfg.debug_call_graph,
+        trace_functions: debug_cfg.trace_functions,
+        call_graph_stats_only: debug_cfg.call_graph_stats_only,
+        debug_format: debug_cfg.debug_format,
+        validate_call_graph: feature_cfg.validate_call_graph,
+        show_dependencies: debug_cfg.show_dependencies,
+        no_dependencies: debug_cfg.no_dependencies,
+        max_callers: lang_cfg.max_callers,
+        max_callees: lang_cfg.max_callees,
+        show_external: lang_cfg.show_external,
+        show_std_lib: lang_cfg.show_std_lib,
+        ast_functional_analysis: feature_cfg.ast_functional_analysis,
+        functional_analysis_profile: feature_cfg.functional_analysis_profile,
+        min_split_methods: feature_cfg.min_split_methods,
+        min_split_lines: feature_cfg.min_split_lines,
+        no_tui: display_cfg.no_tui,
+        show_filter_stats: display_cfg.show_filter_stats,
     }
 }
 
