@@ -19,14 +19,14 @@ pub enum SortCriteria {
 }
 
 impl SortCriteria {
-    /// Get display name
+    /// Get display name (minimal lowercase style)
     pub fn display_name(&self) -> &'static str {
         match self {
-            SortCriteria::Score => "Score (High to Low)",
-            SortCriteria::Coverage => "Coverage (Low to High)",
-            SortCriteria::Complexity => "Complexity (High to Low)",
-            SortCriteria::FilePath => "File Path (A-Z)",
-            SortCriteria::FunctionName => "Function Name (A-Z)",
+            SortCriteria::Score => "score",
+            SortCriteria::Coverage => "coverage",
+            SortCriteria::Complexity => "complexity",
+            SortCriteria::FilePath => "file path",
+            SortCriteria::FunctionName => "function name",
         }
     }
 
@@ -177,15 +177,11 @@ mod tests {
 
     #[test]
     fn test_sort_criteria_display() {
-        assert_eq!(SortCriteria::Score.display_name(), "Score (High to Low)");
-        assert_eq!(
-            SortCriteria::Coverage.display_name(),
-            "Coverage (Low to High)"
-        );
-        assert_eq!(
-            SortCriteria::Complexity.display_name(),
-            "Complexity (High to Low)"
-        );
+        assert_eq!(SortCriteria::Score.display_name(), "score");
+        assert_eq!(SortCriteria::Coverage.display_name(), "coverage");
+        assert_eq!(SortCriteria::Complexity.display_name(), "complexity");
+        assert_eq!(SortCriteria::FilePath.display_name(), "file path");
+        assert_eq!(SortCriteria::FunctionName.display_name(), "function name");
     }
 
     #[test]
