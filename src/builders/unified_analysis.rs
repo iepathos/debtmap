@@ -445,19 +445,84 @@ fn log_parallel_execution(jobs: usize) {
 
 /// Loads coverage data from the specified file
 fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lcov::LcovData>> {
+    use std::time::Duration;
+
     match coverage_file {
         Some(lcov_path) => {
-            // Create progress bar if global progress manager is available
-            let progress = crate::progress::ProgressManager::global()
-                .map(|pm| pm.create_spinner("Loading coverage data"))
-                .unwrap_or_else(indicatif::ProgressBar::hidden);
+            // Start subsection 0: open file
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                manager.tui_update_subtask(3, 0, crate::tui::app::StageStatus::Active, None);
+            }
 
-            let data = risk::lcov::parse_lcov_file_with_progress(&lcov_path, &progress)
-                .context("Failed to parse LCOV file")?;
+            let data = risk::lcov::parse_lcov_file_with_callback(&lcov_path, |progress| {
+                if let Some(manager) = crate::progress::ProgressManager::global() {
+                    match progress {
+                        risk::lcov::CoverageProgress::Initializing => {
+                            // Subtask 0 complete: open file
+                            manager.tui_update_subtask(
+                                3,
+                                0,
+                                crate::tui::app::StageStatus::Completed,
+                                None,
+                            );
+                            std::thread::sleep(Duration::from_millis(150));
+                            // Subtask 1 start: parse coverage
+                            manager.tui_update_subtask(
+                                3,
+                                1,
+                                crate::tui::app::StageStatus::Active,
+                                None,
+                            );
+                        }
+                        risk::lcov::CoverageProgress::Parsing { current, total } => {
+                            manager.tui_update_subtask(
+                                3,
+                                1,
+                                crate::tui::app::StageStatus::Active,
+                                Some((current, total)),
+                            );
+                        }
+                        risk::lcov::CoverageProgress::ComputingStats => {
+                            // Subtask 1 complete
+                            manager.tui_update_subtask(
+                                3,
+                                1,
+                                crate::tui::app::StageStatus::Completed,
+                                None,
+                            );
+                            std::thread::sleep(Duration::from_millis(150));
+                            // Subtask 2 start: compute stats
+                            manager.tui_update_subtask(
+                                3,
+                                2,
+                                crate::tui::app::StageStatus::Active,
+                                None,
+                            );
+                        }
+                        risk::lcov::CoverageProgress::Complete => {
+                            manager.tui_update_subtask(
+                                3,
+                                2,
+                                crate::tui::app::StageStatus::Completed,
+                                None,
+                            );
+                        }
+                    }
+                }
+            })
+            .context("Failed to parse LCOV file")?;
 
             Ok(Some(data))
         }
-        None => Ok(None),
+        None => {
+            // No coverage file provided - skip all subsections
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                manager.tui_update_subtask(3, 0, crate::tui::app::StageStatus::Completed, None);
+                manager.tui_update_subtask(3, 1, crate::tui::app::StageStatus::Completed, None);
+                manager.tui_update_subtask(3, 2, crate::tui::app::StageStatus::Completed, None);
+            }
+            Ok(None)
+        }
     }
 }
 
