@@ -374,13 +374,50 @@ fn add_file_item(&mut self, item: UnifiedDebtItem) {
    - Maintain separate tracking for proper filtering/sorting
 
 2. **Display god object icon/indicator**:
-   - Use appropriate icon for god objects in list view
-   - Show "God Object" or "God Module" based on detection type
+   - Use appropriate suffix for god objects in list view: "(God Object)" or "(God Module)"
+   - Format metrics consistently with regular items:
+     - Regular items: `(Cov:15% Cog:45)`
+     - God Objects: `(LOC:1616 Resp:8 Fns:91)`
+     - God Modules: `(LOC:850 Fns:116)`
+   - Show detection type based on analysis (God Class vs God File/Module)
 
 3. **Detail view formatting** (likely already works):
    - Verify `src/tui/results/detail_pages/overview.rs` displays god objects correctly
    - Show methods, fields, responsibilities counts
    - Display recommended splits
+
+**Example list view formatting code**:
+```rust
+fn format_god_object_metrics(item: &UnifiedDebtItem) -> String {
+    match &item.debt_type {
+        DebtType::GodObject { methods, fields, responsibilities, .. } => {
+            // God Object: show LOC, Responsibilities, Functions
+            format!(
+                "(LOC:{} Resp:{} Fns:{})",
+                item.file_line_count.unwrap_or(0),
+                responsibilities,
+                methods
+            )
+        }
+        DebtType::GodModule { function_count, .. } => {
+            // God Module: show LOC, Functions (no responsibilities since it's not a class)
+            format!(
+                "(LOC:{} Fns:{})",
+                item.file_line_count.unwrap_or(0),
+                function_count
+            )
+        }
+        _ => {
+            // Regular items: show Cov and Cog
+            format!(
+                "(Cov:{} Cog:{})",
+                format_coverage(item),
+                item.cognitive_complexity
+            )
+        }
+    }
+}
+```
 
 ### Architecture Changes
 
