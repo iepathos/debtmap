@@ -357,3 +357,228 @@ fn test_context_subsection_lifecycle() {
         assert_eq!(subtask.status, StageStatus::Completed);
     }
 }
+
+#[test]
+fn test_data_flow_page_rendering_with_mutations() {
+    use debtmap::data_flow::{DataFlowGraph, MutationInfo};
+    use debtmap::priority::{
+        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
+    };
+    use std::path::PathBuf;
+
+    // Create test data flow graph
+    let mut data_flow = DataFlowGraph::new();
+
+    // Create test function
+    let location = Location {
+        file: PathBuf::from("src/test.rs"),
+        line: 42,
+        function: "test_function".to_string(),
+    };
+
+    let func_id = FunctionId::new(
+        location.file.clone(),
+        location.function.clone(),
+        location.line,
+    );
+
+    // Add mutation info
+    let mutation_info = MutationInfo {
+        total_mutations: 5,
+        live_mutations: vec!["x".to_string(), "y".to_string()],
+        dead_stores: vec!["z".to_string()],
+    };
+    data_flow.set_mutation_info(func_id.clone(), mutation_info);
+
+    // Create test item
+    let item = UnifiedDebtItem {
+        location,
+        debt_type: DebtType::Complexity,
+        unified_score: UnifiedScore::default(),
+        downstream_dependencies: 0,
+        test_score: 0.0,
+        god_object_indicators: None,
+        contextual_factors: None,
+        prioritization_reasoning: String::new(),
+        recommendation: None,
+        function_role: None,
+    };
+
+    // Verify mutation data is accessible
+    let retrieved_mutation = data_flow.get_mutation_info(&func_id);
+    assert!(retrieved_mutation.is_some());
+    let mutation = retrieved_mutation.unwrap();
+    assert_eq!(mutation.total_mutations, 5);
+    assert_eq!(mutation.live_mutations.len(), 2);
+    assert_eq!(mutation.dead_stores.len(), 1);
+}
+
+#[test]
+fn test_data_flow_page_rendering_with_io_operations() {
+    use debtmap::data_flow::{DataFlowGraph, IoOperation};
+    use debtmap::priority::{
+        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
+    };
+    use std::path::PathBuf;
+
+    let mut data_flow = DataFlowGraph::new();
+
+    let location = Location {
+        file: PathBuf::from("src/test.rs"),
+        line: 100,
+        function: "io_function".to_string(),
+    };
+
+    let func_id = FunctionId::new(
+        location.file.clone(),
+        location.function.clone(),
+        location.line,
+    );
+
+    // Add I/O operations
+    let io_ops = vec![
+        IoOperation {
+            operation_type: "File Read".to_string(),
+            line: 105,
+            variables: vec!["file".to_string()],
+        },
+        IoOperation {
+            operation_type: "Network Call".to_string(),
+            line: 110,
+            variables: vec!["socket".to_string()],
+        },
+    ];
+    data_flow.set_io_operations(func_id.clone(), io_ops);
+
+    let item = UnifiedDebtItem {
+        location,
+        debt_type: DebtType::SideEffects,
+        unified_score: UnifiedScore::default(),
+        downstream_dependencies: 0,
+        test_score: 0.0,
+        god_object_indicators: None,
+        contextual_factors: None,
+        prioritization_reasoning: String::new(),
+        recommendation: None,
+        function_role: None,
+    };
+
+    // Verify I/O operations are accessible
+    let io_operations = data_flow.get_io_operations(&func_id);
+    assert!(io_operations.is_some());
+    let ops = io_operations.unwrap();
+    assert_eq!(ops.len(), 2);
+    assert_eq!(ops[0].operation_type, "File Read");
+    assert_eq!(ops[1].operation_type, "Network Call");
+}
+
+#[test]
+fn test_data_flow_page_rendering_with_escape_analysis() {
+    use debtmap::data_flow::{CfgAnalysis, DataFlowGraph, EscapeInfo, VarId};
+    use debtmap::priority::{
+        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
+    };
+    use std::path::PathBuf;
+
+    let mut data_flow = DataFlowGraph::new();
+
+    let location = Location {
+        file: PathBuf::from("src/test.rs"),
+        line: 200,
+        function: "escape_test".to_string(),
+    };
+
+    let func_id = FunctionId::new(
+        location.file.clone(),
+        location.function.clone(),
+        location.line,
+    );
+
+    // Add escape analysis
+    let escape_info = EscapeInfo {
+        escaping_vars: vec![VarId(1), VarId(2)],
+        return_dependencies: vec![VarId(1)],
+    };
+
+    let cfg_analysis = CfgAnalysis {
+        escape_info,
+        dominance_frontier: Default::default(),
+    };
+
+    data_flow.set_cfg_analysis(func_id.clone(), cfg_analysis);
+
+    let item = UnifiedDebtItem {
+        location,
+        debt_type: DebtType::Complexity,
+        unified_score: UnifiedScore::default(),
+        downstream_dependencies: 0,
+        test_score: 0.0,
+        god_object_indicators: None,
+        contextual_factors: None,
+        prioritization_reasoning: String::new(),
+        recommendation: None,
+        function_role: None,
+    };
+
+    // Verify escape analysis is accessible
+    let cfg = data_flow.get_cfg_analysis(&func_id);
+    assert!(cfg.is_some());
+    let analysis = cfg.unwrap();
+    assert_eq!(analysis.escape_info.escaping_vars.len(), 2);
+    assert_eq!(analysis.escape_info.return_dependencies.len(), 1);
+}
+
+#[test]
+fn test_data_flow_markdown_formatting() {
+    use debtmap::data_flow::{DataFlowGraph, MutationInfo, IoOperation};
+    use debtmap::priority::{
+        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
+    };
+    use std::path::PathBuf;
+
+    let mut data_flow = DataFlowGraph::new();
+
+    let location = Location {
+        file: PathBuf::from("src/example.rs"),
+        line: 50,
+        function: "complex_function".to_string(),
+    };
+
+    let func_id = FunctionId::new(
+        location.file.clone(),
+        location.function.clone(),
+        location.line,
+    );
+
+    // Add comprehensive data flow information
+    data_flow.set_mutation_info(
+        func_id.clone(),
+        MutationInfo {
+            total_mutations: 10,
+            live_mutations: vec!["counter".to_string(), "state".to_string()],
+            dead_stores: vec!["temp".to_string(), "unused".to_string()],
+        },
+    );
+
+    data_flow.set_io_operations(
+        func_id.clone(),
+        vec![IoOperation {
+            operation_type: "Database Query".to_string(),
+            line: 55,
+            variables: vec!["db".to_string()],
+        }],
+    );
+
+    // Verify all data is present for markdown formatting
+    assert!(data_flow.get_mutation_info(&func_id).is_some());
+    assert!(data_flow.get_io_operations(&func_id).is_some());
+
+    let mutation = data_flow.get_mutation_info(&func_id).unwrap();
+    assert_eq!(mutation.total_mutations, 10);
+    assert_eq!(mutation.live_mutations.len(), 2);
+    assert_eq!(mutation.dead_stores.len(), 2);
+
+    let io_ops = data_flow.get_io_operations(&func_id).unwrap();
+    assert_eq!(io_ops.len(), 1);
+    assert_eq!(io_ops[0].operation_type, "Database Query");
+}
