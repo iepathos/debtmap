@@ -218,7 +218,7 @@ pub fn create_unified_debt_item_with_aggregator(
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
-) -> Option<UnifiedDebtItem> {
+) -> Vec<UnifiedDebtItem> {
     use std::path::Path;
     create_unified_debt_item_with_aggregator_and_data_flow(
         func,
@@ -255,7 +255,7 @@ fn calculate_coverage_data(
     })
 }
 
-// Pure function: Build debt analysis context
+// Pure function: Build debt analysis context (spec 228: multi-debt support)
 struct DebtAnalysisContext {
     #[allow(dead_code)]
     func_id: FunctionId,
@@ -267,33 +267,20 @@ struct DebtAnalysisContext {
     expected_impact: ImpactMetrics,
 }
 
-// Pure function: Perform debt analysis (spec 201)
+// Pure function: Analyze a single debt type and create context (spec 228)
 /// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 #[allow(clippy::too_many_arguments)]
-fn analyze_debt(
+fn analyze_single_debt_type(
     func: &FunctionMetrics,
     func_id: &FunctionId,
+    debt_type: DebtType,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    framework_exclusions: &HashSet<FunctionId>,
-    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
+    transitive_coverage: Option<&TransitiveCoverage>,
 ) -> Option<DebtAnalysisContext> {
-    // Calculate transitive coverage
-    let transitive_coverage = calculate_coverage_data(func_id, func, call_graph, coverage);
-
-    // Classify debt type
-    let debt_type = classify_debt_type_with_exclusions(
-        func,
-        call_graph,
-        func_id,
-        framework_exclusions,
-        function_pointer_used_functions,
-        transitive_coverage.as_ref(),
-    );
-
-    // Calculate unified score
+    // Calculate unified score for this specific debt type
     let has_coverage_data = coverage.is_some();
     let unified_score = if let Some(df) = data_flow {
         // Use data flow scoring when available (spec 218)
@@ -321,13 +308,16 @@ fn analyze_debt(
     // Determine function role
     let function_role = classify_function_role(func, func_id, call_graph);
 
+    // Clone transitive coverage for the recommendation function
+    let coverage_for_rec = transitive_coverage.cloned();
+
     // Generate recommendation (spec 201: may return None for clean dispatchers)
     let recommendation = generate_recommendation_with_coverage_and_data_flow(
         func,
         &debt_type,
         function_role,
         &unified_score,
-        &transitive_coverage,
+        &coverage_for_rec,
         data_flow,
     )?;
 
@@ -339,13 +329,14 @@ fn analyze_debt(
         debt_type,
         unified_score,
         function_role,
-        transitive_coverage,
+        transitive_coverage: transitive_coverage.cloned(),
         recommendation,
         expected_impact,
     })
 }
 
 // Pure function: Extract dependency metrics
+#[derive(Clone)]
 struct DependencyMetrics {
     upstream_count: usize,
     downstream_count: usize,
@@ -484,8 +475,8 @@ fn build_unified_debt_item(
     }
 }
 
-// Main function using functional composition (spec 201)
-/// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
+// Main function using functional composition (spec 201, spec 228: multi-debt)
+/// Returns Vec<UnifiedDebtItem> - one per debt type found (spec 228)
 #[allow(clippy::too_many_arguments)]
 pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     func: &FunctionMetrics,
@@ -497,50 +488,69 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
     risk_analyzer: Option<&crate::risk::RiskAnalyzer>,
     project_path: &Path,
-) -> Option<UnifiedDebtItem> {
+) -> Vec<UnifiedDebtItem> {
     // Step 1: Create function ID (pure)
     let func_id = create_function_id(func);
 
-    // Step 2: Analyze debt (pure) - may return None for clean dispatchers (spec 201)
-    let context = analyze_debt(
+    // Step 2: Calculate coverage data once (reused for all debt types)
+    let transitive_coverage = calculate_coverage_data(&func_id, func, call_graph, coverage);
+
+    // Step 3: Get all debt types for this function (spec 228)
+    let debt_types = classify_debt_type_with_exclusions(
         func,
-        &func_id,
         call_graph,
-        coverage,
+        &func_id,
         framework_exclusions,
         function_pointer_used_functions,
-        debt_aggregator,
-        data_flow,
-    )?;
+        transitive_coverage.as_ref(),
+    );
 
-    // Step 3: Extract dependencies (pure)
+    // Step 4: Extract dependencies once (shared across all debt items)
     let deps = extract_dependency_metrics(func, &func_id, call_graph);
 
-    // Step 4: Build final item (pure)
-    let mut item = build_unified_debt_item(func, context, deps);
+    // Step 5: Create one UnifiedDebtItem per debt type (functional transformation)
+    debt_types
+        .into_iter()
+        .filter_map(|debt_type| {
+            // Analyze this specific debt type
+            let context = analyze_single_debt_type(
+                func,
+                &func_id,
+                debt_type,
+                call_graph,
+                coverage,
+                debt_aggregator,
+                data_flow,
+                transitive_coverage.as_ref(),
+            )?;
 
-    // Step 4.5: Analyze contextual risk if risk analyzer is provided (spec 202)
-    if let Some(analyzer) = risk_analyzer {
-        let complexity_metrics = crate::core::ComplexityMetrics::from_function(func);
-        let func_coverage = coverage
-            .and_then(|cov| cov.get_function_coverage_with_line(&func.file, &func.name, func.line));
+            // Build debt item
+            let mut item = build_unified_debt_item(func, context, deps.clone());
 
-        // Call analyze_function_with_context to get contextual risk
-        let (_, contextual_risk) = analyzer.analyze_function_with_context(
-            func.file.clone(),
-            func.name.clone(),
-            (func.line, func.line + func.length),
-            &complexity_metrics,
-            func_coverage,
-            func.is_test,
-            project_path.to_path_buf(),
-        );
+            // Analyze contextual risk if risk analyzer is provided (spec 202)
+            if let Some(analyzer) = risk_analyzer {
+                let complexity_metrics = crate::core::ComplexityMetrics::from_function(func);
+                let func_coverage = coverage.and_then(|cov| {
+                    cov.get_function_coverage_with_line(&func.file, &func.name, func.line)
+                });
 
-        item.contextual_risk = contextual_risk;
-    }
+                let (_, contextual_risk) = analyzer.analyze_function_with_context(
+                    func.file.clone(),
+                    func.name.clone(),
+                    (func.line, func.line + func.length),
+                    &complexity_metrics,
+                    func_coverage,
+                    func.is_test,
+                    project_path.to_path_buf(),
+                );
 
-    // Step 5: Apply exponential scaling and risk boosting (spec 171)
-    Some(apply_score_scaling(item))
+                item.contextual_risk = contextual_risk;
+            }
+
+            // Apply exponential scaling and risk boosting (spec 171)
+            Some(apply_score_scaling(item))
+        })
+        .collect()
 }
 
 pub fn create_unified_debt_item_with_exclusions(
@@ -549,7 +559,7 @@ pub fn create_unified_debt_item_with_exclusions(
     coverage: Option<&LcovData>,
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
-) -> Option<UnifiedDebtItem> {
+) -> Vec<UnifiedDebtItem> {
     create_unified_debt_item_with_exclusions_and_data_flow(
         func,
         call_graph,
@@ -567,7 +577,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> Option<UnifiedDebtItem> {
+) -> Vec<UnifiedDebtItem> {
     let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Calculate transitive coverage if coverage file is provided (Spec 203)
@@ -582,8 +592,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         calculate_transitive_coverage(&func_id, call_graph, lcov)
     });
 
-    // Use the enhanced debt type classification with framework exclusions
-    let debt_type = classify_debt_type_with_exclusions(
+    // Use the enhanced debt type classification with framework exclusions (spec 228)
+    let debt_types = classify_debt_type_with_exclusions(
         func,
         call_graph,
         &func_id,
@@ -592,10 +602,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         transitive_coverage.as_ref(),
     );
 
-    // Calculate unified score
-    // Security factor removed per spec 64
-    // Organization factor removed per spec 58 - redundant with complexity factor
-
+    // Pre-calculate shared data (extracted once, reused for all debt items)
     let mut unified_score = calculate_unified_priority(
         func, call_graph, coverage, None, // Organization factor no longer used
     );
@@ -604,24 +611,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
     unified_score = apply_context_multiplier_to_score(unified_score, context_multiplier);
 
-    // Determine function role for more accurate analysis
-    let function_role = classify_function_role(func, &func_id, call_graph);
-
-    // Generate contextual recommendation based on debt type and metrics (spec 201)
-    // May return None for clean dispatchers
-    let recommendation = generate_recommendation_with_coverage_and_data_flow(
-        func,
-        &debt_type,
-        function_role,
-        &unified_score,
-        &transitive_coverage,
-        data_flow,
-    )?;
-
-    // Calculate expected impact
-    let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
-
-    // Use pre-populated call graph data from FunctionMetrics if available
+    // Pre-extract dependencies (shared across all debt items)
     let (upstream_caller_names, downstream_callee_names) =
         if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
             (
@@ -638,11 +628,12 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
             )
         };
 
-    // Detect function context (spec 122)
+    // Pre-calculate shared context data
     let context_detector = crate::analysis::ContextDetector::new();
     let context_analysis = context_detector.detect_context(func, &func.file);
 
-    // Generate contextual recommendation if confidence is high enough (spec 122)
+    let function_role = classify_function_role(func, &func_id, call_graph);
+
     let contextual_recommendation = if context_analysis.confidence > 0.6 {
         let engine = crate::priority::scoring::ContextRecommendationEngine::new();
         Some(engine.generate_recommendation(
@@ -655,57 +646,71 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         None
     };
 
-    // Detect complexity pattern once during construction (spec 204)
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
-
-    // Calculate entropy details once for efficiency (spec 214)
     let entropy_details = calculate_entropy_details(func);
-
-    // Cache file line count during item creation (spec 204)
     let file_line_count = calculate_file_line_count(&func.file);
 
-    Some(UnifiedDebtItem {
-        location: Location {
-            file: func.file.clone(),
-            function: func.name.clone(),
-            line: func.line,
-        },
-        debt_type,
-        unified_score,
-        function_role,
-        recommendation,
-        expected_impact,
-        transitive_coverage,
-        upstream_dependencies: upstream_caller_names.len(),
-        downstream_dependencies: downstream_callee_names.len(),
-        upstream_callers: upstream_caller_names,
-        downstream_callees: downstream_callee_names,
-        nesting_depth: func.nesting,
-        function_length: func.length,
-        cyclomatic_complexity: func.cyclomatic,
-        cognitive_complexity: func.cognitive,
-        entropy_details: entropy_details.clone(),
-        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
-        entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
-        entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
-        is_pure: func.is_pure,
-        purity_confidence: func.purity_confidence,
-        purity_level: None,
-        god_object_indicators: None,
-        tier: None,
-        function_context: Some(context_analysis.context),
-        context_confidence: Some(context_analysis.confidence),
-        contextual_recommendation,
-        pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
-        file_context: None,
-        context_multiplier: Some(context_multiplier),
-        context_type: Some(context_type),
-        language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
-        detected_pattern,                                  // Detected complexity pattern (spec 204)
-        contextual_risk: None,
-        file_line_count, // Cached line count (spec 204)
-    })
+    // Create one UnifiedDebtItem per debt type (spec 228)
+    debt_types
+        .into_iter()
+        .filter_map(|debt_type| {
+            // Generate debt-type-specific recommendation
+            let recommendation = generate_recommendation_with_coverage_and_data_flow(
+                func,
+                &debt_type,
+                function_role,
+                &unified_score,
+                &transitive_coverage,
+                data_flow,
+            )?;
+
+            // Calculate debt-type-specific impact
+            let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
+
+            Some(UnifiedDebtItem {
+                location: Location {
+                    file: func.file.clone(),
+                    function: func.name.clone(),
+                    line: func.line,
+                },
+                debt_type,
+                unified_score: unified_score.clone(),
+                function_role,
+                recommendation,
+                expected_impact,
+                transitive_coverage: transitive_coverage.clone(),
+                upstream_dependencies: upstream_caller_names.len(),
+                downstream_dependencies: downstream_callee_names.len(),
+                upstream_callers: upstream_caller_names.clone(),
+                downstream_callees: downstream_callee_names.clone(),
+                nesting_depth: func.nesting,
+                function_length: func.length,
+                cyclomatic_complexity: func.cyclomatic,
+                cognitive_complexity: func.cognitive,
+                entropy_details: entropy_details.clone(),
+                entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
+                entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
+                entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
+                is_pure: func.is_pure,
+                purity_confidence: func.purity_confidence,
+                purity_level: None,
+                god_object_indicators: None,
+                tier: None,
+                function_context: Some(context_analysis.context),
+                context_confidence: Some(context_analysis.confidence),
+                contextual_recommendation: contextual_recommendation.clone(),
+                pattern_analysis: None,
+                file_context: None,
+                context_multiplier: Some(context_multiplier),
+                context_type: Some(context_type),
+                language_specific: func.language_specific.clone(),
+                detected_pattern: detected_pattern.clone(),
+                contextual_risk: None,
+                file_line_count,
+            })
+        })
+        .collect()
 }
 
 /// Create a unified debt item for a function (spec 201)

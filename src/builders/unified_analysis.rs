@@ -845,8 +845,8 @@ fn create_unified_analysis_with_exclusions_and_timing(
             }
             continue;
         }
-        // Create debt item (spec 201: returns None for clean dispatchers)
-        if let Some(item) = create_debt_item_from_metric_with_aggregator(
+        // Create debt items (spec 228: multi-debt returns Vec)
+        let items = create_debt_item_from_metric_with_aggregator(
             metric,
             call_graph,
             coverage_data,
@@ -856,10 +856,12 @@ fn create_unified_analysis_with_exclusions_and_timing(
             Some(&unified.data_flow_graph),
             risk_analyzer.as_ref(),
             project_path,
-        ) {
+        );
+
+        // Add all debt items for this function (may be multiple)
+        for item in items {
             unified.add_item(item);
         }
-        // If None (clean dispatcher), skip adding the item - no debt to report
 
         // Throttled progress update
         if idx % 100 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100) {
@@ -1076,9 +1078,9 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
-) -> Option<UnifiedDebtItem> {
-    // Use the unified debt item creation which already calculates the score correctly (spec 201)
-    // Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
+) -> Vec<UnifiedDebtItem> {
+    // Use the unified debt item creation (spec 201, spec 228: multi-debt)
+    // Returns Vec<UnifiedDebtItem> - one per debt type found
     debt_item::create_unified_debt_item_with_aggregator_and_data_flow(
         metric,
         call_graph,

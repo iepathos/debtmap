@@ -227,46 +227,47 @@ pub fn is_dead_code_with_exclusions(
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
 
-/// Enhanced version of debt type classification with framework pattern exclusions
-pub fn classify_debt_type_with_exclusions(
+/// Check for testing gap - pure predicate for multi-debt accumulation
+fn check_testing_gap_predicate(
+    func: &FunctionMetrics,
+    coverage: Option<&TransitiveCoverage>,
+) -> Option<DebtType> {
+    coverage.and_then(|cov| {
+        if has_testing_gap(cov.direct, func.is_test)
+            || (cov.direct < 0.8 && func.cyclomatic > 5 && !cov.uncovered_lines.is_empty())
+        {
+            Some(DebtType::TestingGap {
+                coverage: cov.direct,
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
+            })
+        } else {
+            None
+        }
+    })
+}
+
+/// Check for complexity hotspot - pure predicate for multi-debt accumulation
+fn check_complexity_hotspot_predicate(func: &FunctionMetrics) -> Option<DebtType> {
+    if is_complexity_hotspot_by_metrics(func.cyclomatic, func.cognitive) {
+        Some(DebtType::ComplexityHotspot {
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
+        })
+    } else {
+        None
+    }
+}
+
+/// Check for dead code with exclusions - pure predicate for multi-debt accumulation
+fn check_dead_code_with_exclusions_predicate(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     func_id: &FunctionId,
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
-    coverage: Option<&TransitiveCoverage>,
-) -> DebtType {
-    // Test functions are special debt cases
-    if func.is_test {
-        return classify_test_debt(func);
-    }
-
-    // Check for testing gaps first (like in determine_debt_type)
-    if let Some(cov) = coverage {
-        // Classify as testing gap if:
-        // 1. Very low coverage (< 20%), OR
-        // 2. Has moderate coverage gaps (< 80%) with meaningful complexity
-        if has_testing_gap(cov.direct, func.is_test)
-            || (cov.direct < 0.8 && func.cyclomatic > 5 && !cov.uncovered_lines.is_empty())
-        {
-            return DebtType::TestingGap {
-                coverage: cov.direct,
-                cyclomatic: func.cyclomatic,
-                cognitive: func.cognitive,
-            };
-        }
-    }
-
-    // Check for complexity hotspots - include moderate complexity functions
-    if is_complexity_hotspot_by_metrics(func.cyclomatic, func.cognitive) {
-        return DebtType::ComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
-        };
-    }
-
-    // Check for dead code with framework exclusions
+) -> Option<DebtType> {
     if is_dead_code_with_exclusions(
         func,
         call_graph,
@@ -274,31 +275,92 @@ pub fn classify_debt_type_with_exclusions(
         framework_exclusions,
         function_pointer_used_functions,
     ) {
-        return DebtType::DeadCode {
+        Some(DebtType::DeadCode {
             visibility: determine_visibility(func),
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
             usage_hints: generate_usage_hints(func, call_graph, func_id),
-        };
+        })
+    } else {
+        None
+    }
+}
+
+/// Classify all applicable debt types for a function using functional composition (spec 228)
+///
+/// This function accumulates all independent debt classifications rather than
+/// stopping at the first match, providing comprehensive technical debt assessment.
+///
+/// # Independent Debt Checks
+/// - Testing gaps: Coverage-based testing debt
+/// - Complexity hotspots: Cyclomatic/cognitive complexity
+/// - Dead code: Unused code detection
+///
+/// # Test Function Exception
+/// Test functions (`func.is_test == true`) only return test-specific debt types
+/// to avoid noise from legitimate test complexity.
+///
+/// # Returns
+/// A vector of all applicable debt types. May contain 0-3 items depending on
+/// the function's issues.
+pub fn classify_all_debt_types(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+    framework_exclusions: &HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
+    coverage: Option<&TransitiveCoverage>,
+) -> Vec<DebtType> {
+    // Test functions get exclusive test debt (early return preserved for correctness)
+    if func.is_test {
+        return vec![classify_test_debt(func)];
     }
 
-    // Get role for later checks
-    let role = classify_function_role(func, func_id, call_graph);
+    // Compose all independent debt checks using iterator chains (functional style)
+    let debt_types: Vec<DebtType> = vec![
+        check_testing_gap_predicate(func, coverage),
+        check_complexity_hotspot_predicate(func),
+        check_dead_code_with_exclusions_predicate(
+            func,
+            call_graph,
+            func_id,
+            framework_exclusions,
+            function_pointer_used_functions,
+        ),
+    ]
+    .into_iter()
+    .flatten() // Remove None values, keep Some(debt)
+    .collect();
 
-    // Low complexity functions that are I/O wrappers or entry points
-    // should not be flagged as technical debt
-    if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        if let Some(debt) = classify_simple_function_risk(func, &role) {
-            return debt;
-        }
+    // If no specific debt, classify by role (fallback)
+    if debt_types.is_empty() {
+        let role = classify_function_role(func, func_id, call_graph);
+        classify_simple_function_risk(func, &role)
+            .map(|debt| vec![debt])
+            .unwrap_or_default()
+    } else {
+        debt_types
     }
+}
 
-    // At this point, we have simple functions (cyclo <= 5, cog <= 8)
-    // These are not technical debt - return minimal risk
-    DebtType::Risk {
-        risk_score: 0.0,
-        factors: vec!["Well-designed simple function - not technical debt".to_string()],
-    }
+/// Enhanced version of debt type classification with framework pattern exclusions
+/// Returns Vec<DebtType> for multi-debt accumulation (spec 228)
+pub fn classify_debt_type_with_exclusions(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+    framework_exclusions: &HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
+    coverage: Option<&TransitiveCoverage>,
+) -> Vec<DebtType> {
+    classify_all_debt_types(
+        func,
+        call_graph,
+        func_id,
+        framework_exclusions,
+        function_pointer_used_functions,
+        coverage,
+    )
 }
 
 /// Classify test function debt type based on complexity
