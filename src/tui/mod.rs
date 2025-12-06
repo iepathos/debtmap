@@ -5,7 +5,7 @@
 //!
 //! # Features
 //!
-//! - **Full pipeline visibility**: All 9 analysis stages displayed at once
+//! - **Full pipeline visibility**: All 7 analysis stages displayed at once
 //! - **Hierarchical progress**: Active stages expand to show sub-tasks
 //! - **Rich context**: Counts, percentages, and real-time statistics
 //! - **Smooth animations**: 60 FPS rendering with progress bars and sliding arrows
