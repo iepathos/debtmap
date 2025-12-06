@@ -1,4 +1,4 @@
-//! Patterns page (Page 4) - Purity analysis and detected patterns.
+//! Patterns page (Page 4) - Detected patterns and pattern analysis.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
 use crate::priority::UnifiedDebtItem;
@@ -12,7 +12,7 @@ use ratatui::{
     Frame,
 };
 
-/// Render patterns page showing purity analysis and detected patterns
+/// Render patterns page showing detected patterns and pattern analysis
 pub fn render(
     frame: &mut Frame,
     _app: &ResultsApp,
@@ -87,41 +87,6 @@ pub fn render(
                 &mut lines,
                 "Dampening Applied",
                 "No".to_string(),
-                theme,
-            );
-        }
-
-        add_blank_line(&mut lines);
-    }
-
-    // Purity Analysis section
-    if item.is_pure.is_some() || item.purity_level.is_some() {
-        has_any_data = true;
-        add_section_header(&mut lines, "PURITY ANALYSIS", theme);
-
-        if let Some(is_pure) = item.is_pure {
-            add_label_value(
-                &mut lines,
-                "Classification",
-                if is_pure { "Pure" } else { "Impure" }.to_string(),
-                theme,
-            );
-        }
-
-        if let Some(confidence) = item.purity_confidence {
-            add_label_value(
-                &mut lines,
-                "Confidence",
-                format!("{:.1}%", confidence * 100.0),
-                theme,
-            );
-        }
-
-        if let Some(ref purity_level) = item.purity_level {
-            add_label_value(
-                &mut lines,
-                "Purity Level",
-                format!("{:?}", purity_level),
                 theme,
             );
         }
