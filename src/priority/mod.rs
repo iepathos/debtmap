@@ -160,8 +160,39 @@ impl Difficulty {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DebtType {
+    // Legacy variants from core::DebtType (spec 203)
+    Todo {
+        reason: Option<String>,
+    },
+    Fixme {
+        reason: Option<String>,
+    },
+    CodeSmell {
+        smell_type: Option<String>,
+    },
+    Complexity {
+        cyclomatic: u32,
+        cognitive: u32,
+    },
+    Dependency {
+        dependency_type: Option<String>,
+    },
+    ResourceManagement {
+        issue_type: Option<String>,
+    },
+    CodeOrganization {
+        issue_type: Option<String>,
+    },
+    TestComplexity {
+        cyclomatic: u32,
+        cognitive: u32,
+    },
+    TestQuality {
+        issue_type: Option<String>,
+    },
+    // Priority-specific variants
     TestingGap {
         coverage: f64,
         cyclomatic: u32,
@@ -293,6 +324,282 @@ pub enum DebtType {
     },
 }
 
+// Custom Eq implementation that handles f64 fields by comparing their bit representations
+impl Eq for DebtType {}
+
+// Custom Hash implementation that handles f64 fields by hashing their bit representations
+impl std::hash::Hash for DebtType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            DebtType::Todo { reason } => reason.hash(state),
+            DebtType::Fixme { reason } => reason.hash(state),
+            DebtType::CodeSmell { smell_type } => smell_type.hash(state),
+            DebtType::Complexity {
+                cyclomatic,
+                cognitive,
+            } => {
+                cyclomatic.hash(state);
+                cognitive.hash(state);
+            }
+            DebtType::Dependency { dependency_type } => dependency_type.hash(state),
+            DebtType::ResourceManagement { issue_type } => issue_type.hash(state),
+            DebtType::CodeOrganization { issue_type } => issue_type.hash(state),
+            DebtType::TestComplexity {
+                cyclomatic,
+                cognitive,
+            } => {
+                cyclomatic.hash(state);
+                cognitive.hash(state);
+            }
+            DebtType::TestQuality { issue_type } => issue_type.hash(state),
+            DebtType::TestingGap {
+                coverage,
+                cyclomatic,
+                cognitive,
+            } => {
+                coverage.to_bits().hash(state);
+                cyclomatic.hash(state);
+                cognitive.hash(state);
+            }
+            DebtType::ComplexityHotspot {
+                cyclomatic,
+                cognitive,
+                adjusted_cyclomatic,
+            } => {
+                cyclomatic.hash(state);
+                cognitive.hash(state);
+                adjusted_cyclomatic.hash(state);
+            }
+            DebtType::DeadCode {
+                visibility,
+                cyclomatic,
+                cognitive,
+                usage_hints,
+            } => {
+                visibility.hash(state);
+                cyclomatic.hash(state);
+                cognitive.hash(state);
+                usage_hints.hash(state);
+            }
+            DebtType::Duplication {
+                instances,
+                total_lines,
+            } => {
+                instances.hash(state);
+                total_lines.hash(state);
+            }
+            DebtType::Risk {
+                risk_score,
+                factors,
+            } => {
+                risk_score.to_bits().hash(state);
+                factors.hash(state);
+            }
+            DebtType::TestComplexityHotspot {
+                cyclomatic,
+                cognitive,
+                threshold,
+            } => {
+                cyclomatic.hash(state);
+                cognitive.hash(state);
+                threshold.hash(state);
+            }
+            DebtType::TestTodo { priority, reason } => {
+                priority.hash(state);
+                reason.hash(state);
+            }
+            DebtType::TestDuplication {
+                instances,
+                total_lines,
+                similarity,
+            } => {
+                instances.hash(state);
+                total_lines.hash(state);
+                similarity.to_bits().hash(state);
+            }
+            DebtType::ErrorSwallowing { pattern, context } => {
+                pattern.hash(state);
+                context.hash(state);
+            }
+            DebtType::AllocationInefficiency { pattern, impact } => {
+                pattern.hash(state);
+                impact.hash(state);
+            }
+            DebtType::StringConcatenation {
+                loop_type,
+                iterations,
+            } => {
+                loop_type.hash(state);
+                iterations.hash(state);
+            }
+            DebtType::NestedLoops {
+                depth,
+                complexity_estimate,
+            } => {
+                depth.hash(state);
+                complexity_estimate.hash(state);
+            }
+            DebtType::BlockingIO { operation, context } => {
+                operation.hash(state);
+                context.hash(state);
+            }
+            DebtType::SuboptimalDataStructure {
+                current_type,
+                recommended_type,
+            } => {
+                current_type.hash(state);
+                recommended_type.hash(state);
+            }
+            DebtType::MagicValues { value, occurrences } => {
+                value.hash(state);
+                occurrences.hash(state);
+            }
+            DebtType::AssertionComplexity {
+                assertion_count,
+                complexity_score,
+            } => {
+                assertion_count.hash(state);
+                complexity_score.to_bits().hash(state);
+            }
+            DebtType::GodObject {
+                methods,
+                fields,
+                responsibilities,
+                god_object_score,
+            } => {
+                methods.hash(state);
+                fields.hash(state);
+                responsibilities.hash(state);
+                god_object_score.to_bits().hash(state);
+            }
+            DebtType::GodModule {
+                functions,
+                lines,
+                responsibilities,
+            } => {
+                functions.hash(state);
+                lines.hash(state);
+                responsibilities.hash(state);
+            }
+            DebtType::FeatureEnvy {
+                external_class,
+                usage_ratio,
+            } => {
+                external_class.hash(state);
+                usage_ratio.to_bits().hash(state);
+            }
+            DebtType::PrimitiveObsession {
+                primitive_type,
+                domain_concept,
+            } => {
+                primitive_type.hash(state);
+                domain_concept.hash(state);
+            }
+            DebtType::ResourceLeak {
+                resource_type,
+                cleanup_missing,
+            } => {
+                resource_type.hash(state);
+                cleanup_missing.hash(state);
+            }
+            DebtType::CollectionInefficiency {
+                collection_type,
+                inefficiency_type,
+            } => {
+                collection_type.hash(state);
+                inefficiency_type.hash(state);
+            }
+            DebtType::ScatteredType {
+                type_name,
+                total_methods,
+                file_count,
+                severity,
+            } => {
+                type_name.hash(state);
+                total_methods.hash(state);
+                file_count.hash(state);
+                severity.hash(state);
+            }
+            DebtType::OrphanedFunctions {
+                target_type,
+                function_count,
+                file_count,
+            } => {
+                target_type.hash(state);
+                function_count.hash(state);
+                file_count.hash(state);
+            }
+            DebtType::UtilitiesSprawl {
+                function_count,
+                distinct_types,
+            } => {
+                function_count.hash(state);
+                distinct_types.hash(state);
+            }
+            DebtType::FlakyTestPattern {
+                pattern_type,
+                reliability_impact,
+            } => {
+                pattern_type.hash(state);
+                reliability_impact.hash(state);
+            }
+            DebtType::AsyncMisuse {
+                pattern,
+                performance_impact,
+            } => {
+                pattern.hash(state);
+                performance_impact.hash(state);
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for DebtType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            // Legacy variants
+            DebtType::Todo { .. } => write!(f, "TODO"),
+            DebtType::Fixme { .. } => write!(f, "FIXME"),
+            DebtType::CodeSmell { .. } => write!(f, "Code Smell"),
+            DebtType::Complexity { .. } => write!(f, "Complexity"),
+            DebtType::Dependency { .. } => write!(f, "Dependency"),
+            DebtType::ResourceManagement { .. } => write!(f, "Resource Management"),
+            DebtType::CodeOrganization { .. } => write!(f, "Code Organization"),
+            DebtType::TestComplexity { .. } => write!(f, "Test Complexity"),
+            DebtType::TestQuality { .. } => write!(f, "Test Quality"),
+            // Priority-specific variants
+            DebtType::TestingGap { .. } => write!(f, "Testing Gap"),
+            DebtType::ComplexityHotspot { .. } => write!(f, "Complexity Hotspot"),
+            DebtType::DeadCode { .. } => write!(f, "Dead Code"),
+            DebtType::Duplication { .. } => write!(f, "Duplication"),
+            DebtType::Risk { .. } => write!(f, "Risk"),
+            DebtType::TestComplexityHotspot { .. } => write!(f, "Test Complexity Hotspot"),
+            DebtType::TestTodo { .. } => write!(f, "Test TODO"),
+            DebtType::TestDuplication { .. } => write!(f, "Test Duplication"),
+            DebtType::ErrorSwallowing { pattern, .. } => write!(f, "Error Swallowing: {}", pattern),
+            DebtType::AllocationInefficiency { .. } => write!(f, "Allocation Inefficiency"),
+            DebtType::StringConcatenation { .. } => write!(f, "String Concatenation"),
+            DebtType::NestedLoops { .. } => write!(f, "Nested Loops"),
+            DebtType::BlockingIO { .. } => write!(f, "Blocking I/O"),
+            DebtType::SuboptimalDataStructure { .. } => write!(f, "Suboptimal Data Structure"),
+            DebtType::GodObject { .. } => write!(f, "God Object"),
+            DebtType::GodModule { .. } => write!(f, "God Module"),
+            DebtType::FeatureEnvy { .. } => write!(f, "Feature Envy"),
+            DebtType::PrimitiveObsession { .. } => write!(f, "Primitive Obsession"),
+            DebtType::MagicValues { .. } => write!(f, "Magic Values"),
+            DebtType::AssertionComplexity { .. } => write!(f, "Assertion Complexity"),
+            DebtType::FlakyTestPattern { .. } => write!(f, "Flaky Test Pattern"),
+            DebtType::AsyncMisuse { .. } => write!(f, "Async Misuse"),
+            DebtType::ResourceLeak { .. } => write!(f, "Resource Leak"),
+            DebtType::CollectionInefficiency { .. } => write!(f, "Collection Inefficiency"),
+            DebtType::ScatteredType { .. } => write!(f, "Scattered Type"),
+            DebtType::OrphanedFunctions { .. } => write!(f, "Orphaned Functions"),
+            DebtType::UtilitiesSprawl { .. } => write!(f, "Utilities Sprawl"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum DebtCategory {
     Architecture,
@@ -349,6 +656,8 @@ impl DebtCategory {
             DebtType::Risk { .. } => DebtCategory::CodeQuality,
             DebtType::ErrorSwallowing { .. } => DebtCategory::CodeQuality,
             DebtType::MagicValues { .. } => DebtCategory::CodeQuality,
+            // Default for legacy variants
+            _ => DebtCategory::CodeQuality,
         }
     }
 
@@ -443,7 +752,7 @@ pub enum ImpactLevel {
     Low,      // Minor interaction
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FunctionVisibility {
     Private,
     Crate,

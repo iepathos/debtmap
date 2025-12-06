@@ -33,8 +33,13 @@ impl<'a> ErrorSwallowingDetector<'a> {
 
     fn add_debt_item(&mut self, line: usize, pattern: ErrorSwallowingPattern, context: &str) {
         // Check if this item is suppressed
+        let debt_type = DebtType::ErrorSwallowing {
+            pattern: pattern.to_string(),
+            context: Some(context.to_string()),
+        };
+
         if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &DebtType::ErrorSwallowing) {
+            if checker.is_suppressed(line, &debt_type) {
                 return;
             }
         }
@@ -45,7 +50,7 @@ impl<'a> ErrorSwallowingDetector<'a> {
 
         self.items.push(DebtItem {
             id: format!("error-swallow-{}-{}", self.current_file.display(), line),
-            debt_type: DebtType::ErrorSwallowing,
+            debt_type,
             priority,
             file: self.current_file.to_path_buf(),
             line,
@@ -265,6 +270,12 @@ impl ErrorSwallowingPattern {
     }
 }
 
+impl std::fmt::Display for ErrorSwallowingPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
 fn is_empty_block(expr: &Expr) -> bool {
     match expr {
         Expr::Block(block) => block.block.stmts.is_empty(),
@@ -325,7 +336,10 @@ mod tests {
         let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
 
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
         assert!(items[0].message.contains("if let Ok"));
         // Verify we get the correct line number (line 3 in the test code)
         assert_eq!(items[0].line, 3, "Expected detection at line 3");
@@ -343,7 +357,10 @@ mod tests {
         let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
     }
 
     #[test]
@@ -358,7 +375,10 @@ mod tests {
         let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
         assert!(items[0].message.contains(".ok()"));
     }
 
@@ -377,7 +397,10 @@ mod tests {
         let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
         assert!(items[0].message.contains("match"));
     }
 
@@ -393,7 +416,10 @@ mod tests {
         let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
         assert!(items[0].message.contains("unwrap_or"));
     }
 
@@ -508,7 +534,10 @@ mod tests {
         let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
 
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(matches!(
+            items[0].debt_type,
+            DebtType::ErrorSwallowing { .. }
+        ));
         assert!(items[0].message.contains("empty else branch"));
     }
 

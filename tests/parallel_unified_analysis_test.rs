@@ -334,7 +334,10 @@ fn test_parallel_analysis_with_coverage_data() {
         .filter(|m| m.cyclomatic > 5) // Only functions with high complexity
         .map(|m| DebtItem {
             id: format!("debt_{}", m.name),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: m.cyclomatic,
+                cognitive: m.cognitive,
+            },
             priority: Priority::Medium,
             file: m.file.clone(),
             line: m.line,

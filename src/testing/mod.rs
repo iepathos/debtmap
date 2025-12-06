@@ -148,7 +148,7 @@ fn convert_testing_pattern_to_debt_item(
                 suggested_assertions.join(", ")
             )),
             line,
-            DebtType::TestQuality,
+            DebtType::TestQuality { issue_type: None },
         ),
         TestingAntiPattern::OverlyComplexTest {
             test_name,
@@ -164,7 +164,10 @@ fn convert_testing_pattern_to_debt_item(
             ),
             Some(format!("Consider: {:?}", suggested_simplification)),
             line,
-            DebtType::TestComplexity,
+            DebtType::TestComplexity {
+                cyclomatic: 0,
+                cognitive: 0,
+            },
         ),
         TestingAntiPattern::FlakyTestPattern {
             test_name,
@@ -180,7 +183,7 @@ fn convert_testing_pattern_to_debt_item(
             ),
             Some(stabilization_suggestion),
             line,
-            DebtType::TestQuality,
+            DebtType::TestQuality { issue_type: None },
         ),
     };
 

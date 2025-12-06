@@ -290,6 +290,8 @@ fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
         DebtType::ScatteredType { .. } => "Scattered Type".to_string(),
         DebtType::OrphanedFunctions { .. } => "Orphaned Functions".to_string(),
         DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl".to_string(),
+        // Default for legacy variants
+        _ => "Other".to_string(),
     }
 }
 

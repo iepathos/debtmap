@@ -18,7 +18,9 @@ use std::path::PathBuf;
 
 pub fn categorize_debt(items: &[DebtItem]) -> HashMap<DebtType, Vec<DebtItem>> {
     items.iter().fold(HashMap::new(), |mut acc, item| {
-        acc.entry(item.debt_type).or_default().push(item.clone());
+        acc.entry(item.debt_type.clone())
+            .or_default()
+            .push(item.clone());
         acc
     })
 }
@@ -67,14 +69,23 @@ fn priority_weight(priority: &Priority) -> u32 {
 
 fn type_weight(debt_type: &DebtType) -> u32 {
     match debt_type {
-        DebtType::Todo | DebtType::TestTodo => 1,
-        DebtType::Fixme | DebtType::TestComplexity | DebtType::TestDuplication => 2,
-        DebtType::CodeSmell
-        | DebtType::Dependency
-        | DebtType::CodeOrganization
-        | DebtType::TestQuality => 3,
-        DebtType::Duplication | DebtType::ErrorSwallowing | DebtType::ResourceManagement => 4,
-        DebtType::Complexity => 5,
+        DebtType::Todo { .. } | DebtType::TestTodo { .. } => 1,
+        DebtType::Fixme { .. }
+        | DebtType::TestComplexity { .. }
+        | DebtType::TestDuplication { .. } => 2,
+        DebtType::CodeSmell { .. }
+        | DebtType::Dependency { .. }
+        | DebtType::CodeOrganization { .. }
+        | DebtType::TestQuality { .. } => 3,
+        DebtType::Duplication { .. }
+        | DebtType::ErrorSwallowing { .. }
+        | DebtType::ResourceManagement { .. } => 4,
+        DebtType::Complexity { .. } => 5,
+        DebtType::UtilitiesSprawl { .. }
+        | DebtType::MagicValues { .. }
+        | DebtType::FeatureEnvy { .. }
+        | DebtType::PrimitiveObsession { .. } => 3,
+        _ => 3, // Default weight for any other debt types
     }
 }
 
@@ -102,53 +113,149 @@ mod tests {
 
     #[test]
     fn test_type_weight_todo() {
-        assert_eq!(type_weight(&DebtType::Todo), 1);
-        assert_eq!(type_weight(&DebtType::TestTodo), 1);
+        assert_eq!(type_weight(&DebtType::Todo { reason: None }), 1);
+        assert_eq!(
+            type_weight(&DebtType::TestTodo {
+                priority: Priority::Low,
+                reason: None
+            }),
+            1
+        );
     }
 
     #[test]
     fn test_type_weight_fixme() {
-        assert_eq!(type_weight(&DebtType::Fixme), 2);
-        assert_eq!(type_weight(&DebtType::TestComplexity), 2);
-        assert_eq!(type_weight(&DebtType::TestDuplication), 2);
+        assert_eq!(type_weight(&DebtType::Fixme { reason: None }), 2);
+        assert_eq!(
+            type_weight(&DebtType::TestComplexity {
+                cyclomatic: 5,
+                cognitive: 4
+            }),
+            2
+        );
+        assert_eq!(
+            type_weight(&DebtType::TestDuplication {
+                instances: 1,
+                total_lines: 10,
+                similarity: 0.9
+            }),
+            2
+        );
     }
 
     #[test]
     fn test_type_weight_medium() {
-        assert_eq!(type_weight(&DebtType::CodeSmell), 3);
-        assert_eq!(type_weight(&DebtType::Dependency), 3);
-        assert_eq!(type_weight(&DebtType::CodeOrganization), 3);
-        assert_eq!(type_weight(&DebtType::TestQuality), 3);
+        assert_eq!(type_weight(&DebtType::CodeSmell { smell_type: None }), 3);
+        assert_eq!(
+            type_weight(&DebtType::Dependency {
+                dependency_type: None
+            }),
+            3
+        );
+        assert_eq!(
+            type_weight(&DebtType::CodeOrganization { issue_type: None }),
+            3
+        );
+        assert_eq!(type_weight(&DebtType::TestQuality { issue_type: None }), 3);
     }
 
     #[test]
     fn test_type_weight_high() {
-        assert_eq!(type_weight(&DebtType::Duplication), 4);
-        assert_eq!(type_weight(&DebtType::ErrorSwallowing), 4);
-        assert_eq!(type_weight(&DebtType::ResourceManagement), 4);
+        assert_eq!(
+            type_weight(&DebtType::Duplication {
+                instances: 2,
+                total_lines: 20
+            }),
+            4
+        );
+        assert_eq!(
+            type_weight(&DebtType::ErrorSwallowing {
+                pattern: "test_pattern".to_string(),
+                context: None
+            }),
+            4
+        );
+        assert_eq!(
+            type_weight(&DebtType::ResourceManagement { issue_type: None }),
+            4
+        );
     }
 
     #[test]
     fn test_type_weight_complexity() {
-        assert_eq!(type_weight(&DebtType::Complexity), 5);
+        assert_eq!(
+            type_weight(&DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8
+            }),
+            5
+        );
     }
 
     #[test]
     fn test_type_weight_all_variants() {
         // Test all debt type variants to ensure complete coverage
-        assert_eq!(type_weight(&DebtType::Todo), 1);
-        assert_eq!(type_weight(&DebtType::Fixme), 2);
-        assert_eq!(type_weight(&DebtType::CodeSmell), 3);
-        assert_eq!(type_weight(&DebtType::Duplication), 4);
-        assert_eq!(type_weight(&DebtType::Complexity), 5);
-        assert_eq!(type_weight(&DebtType::Dependency), 3);
-        assert_eq!(type_weight(&DebtType::ErrorSwallowing), 4);
-        assert_eq!(type_weight(&DebtType::ResourceManagement), 4);
-        assert_eq!(type_weight(&DebtType::CodeOrganization), 3);
-        assert_eq!(type_weight(&DebtType::TestComplexity), 2);
-        assert_eq!(type_weight(&DebtType::TestTodo), 1);
-        assert_eq!(type_weight(&DebtType::TestDuplication), 2);
-        assert_eq!(type_weight(&DebtType::TestQuality), 3);
+        assert_eq!(type_weight(&DebtType::Todo { reason: None }), 1);
+        assert_eq!(type_weight(&DebtType::Fixme { reason: None }), 2);
+        assert_eq!(type_weight(&DebtType::CodeSmell { smell_type: None }), 3);
+        assert_eq!(
+            type_weight(&DebtType::Duplication {
+                instances: 2,
+                total_lines: 20
+            }),
+            4
+        );
+        assert_eq!(
+            type_weight(&DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8
+            }),
+            5
+        );
+        assert_eq!(
+            type_weight(&DebtType::Dependency {
+                dependency_type: None
+            }),
+            3
+        );
+        assert_eq!(
+            type_weight(&DebtType::ErrorSwallowing {
+                pattern: "test_pattern".to_string(),
+                context: None
+            }),
+            4
+        );
+        assert_eq!(
+            type_weight(&DebtType::ResourceManagement { issue_type: None }),
+            4
+        );
+        assert_eq!(
+            type_weight(&DebtType::CodeOrganization { issue_type: None }),
+            3
+        );
+        assert_eq!(
+            type_weight(&DebtType::TestComplexity {
+                cyclomatic: 5,
+                cognitive: 4
+            }),
+            2
+        );
+        assert_eq!(
+            type_weight(&DebtType::TestTodo {
+                priority: Priority::Low,
+                reason: None
+            }),
+            1
+        );
+        assert_eq!(
+            type_weight(&DebtType::TestDuplication {
+                instances: 1,
+                total_lines: 10,
+                similarity: 0.9
+            }),
+            2
+        );
+        assert_eq!(type_weight(&DebtType::TestQuality { issue_type: None }), 3);
     }
 
     #[test]
@@ -161,25 +268,43 @@ mod tests {
 
     #[test]
     fn test_calculate_debt_score() {
-        let low_todo = create_test_item(DebtType::Todo, Priority::Low);
+        let low_todo = create_test_item(DebtType::Todo { reason: None }, Priority::Low);
         assert_eq!(calculate_debt_score(&low_todo), 1); // 1 * 1
 
-        let critical_complexity = create_test_item(DebtType::Complexity, Priority::Critical);
+        let critical_complexity = create_test_item(
+            DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
+            Priority::Critical,
+        );
         assert_eq!(calculate_debt_score(&critical_complexity), 50); // 10 * 5
 
-        let fixme_medium = create_test_item(DebtType::Fixme, Priority::Medium);
+        let fixme_medium = create_test_item(DebtType::Fixme { reason: None }, Priority::Medium);
         assert_eq!(calculate_debt_score(&fixme_medium), 6); // 3 * 2
 
-        let complexity_high = create_test_item(DebtType::Complexity, Priority::High);
+        let complexity_high = create_test_item(
+            DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
+            Priority::High,
+        );
         assert_eq!(calculate_debt_score(&complexity_high), 25); // 5 * 5
     }
 
     #[test]
     fn test_total_debt_score() {
         let items = vec![
-            create_test_item(DebtType::Todo, Priority::Low),
-            create_test_item(DebtType::Fixme, Priority::Medium),
-            create_test_item(DebtType::Complexity, Priority::Critical),
+            create_test_item(DebtType::Todo { reason: None }, Priority::Low),
+            create_test_item(DebtType::Fixme { reason: None }, Priority::Medium),
+            create_test_item(
+                DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
+                Priority::Critical,
+            ),
         ];
         assert_eq!(total_debt_score(&items), 1 + 6 + 50); // 57
     }
@@ -187,9 +312,15 @@ mod tests {
     #[test]
     fn test_total_debt_score_complex() {
         let items = vec![
-            create_test_item(DebtType::Todo, Priority::Low), // 1
-            create_test_item(DebtType::Fixme, Priority::Medium), // 6
-            create_test_item(DebtType::Complexity, Priority::High), // 25
+            create_test_item(DebtType::Todo { reason: None }, Priority::Low), // 1
+            create_test_item(DebtType::Fixme { reason: None }, Priority::Medium), // 6
+            create_test_item(
+                DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
+                Priority::High,
+            ), // 25
         ];
 
         assert_eq!(total_debt_score(&items), 32);
@@ -203,27 +334,40 @@ mod tests {
 
     #[test]
     fn test_categorize_debt() {
+        let todo_type = DebtType::Todo { reason: None };
+        let fixme_type = DebtType::Fixme { reason: None };
+        let complexity_type = DebtType::Complexity {
+            cyclomatic: 10,
+            cognitive: 8,
+        };
+
         let items = vec![
-            create_test_item(DebtType::Todo, Priority::Low),
-            create_test_item(DebtType::Todo, Priority::Medium),
-            create_test_item(DebtType::Fixme, Priority::High),
-            create_test_item(DebtType::Complexity, Priority::Critical),
+            create_test_item(todo_type.clone(), Priority::Low),
+            create_test_item(todo_type.clone(), Priority::Medium),
+            create_test_item(fixme_type.clone(), Priority::High),
+            create_test_item(complexity_type.clone(), Priority::Critical),
         ];
 
         let categorized = categorize_debt(&items);
         assert_eq!(categorized.len(), 3);
-        assert_eq!(categorized.get(&DebtType::Todo).unwrap().len(), 2);
-        assert_eq!(categorized.get(&DebtType::Fixme).unwrap().len(), 1);
-        assert_eq!(categorized.get(&DebtType::Complexity).unwrap().len(), 1);
+        assert_eq!(categorized.get(&todo_type).unwrap().len(), 2);
+        assert_eq!(categorized.get(&fixme_type).unwrap().len(), 1);
+        assert_eq!(categorized.get(&complexity_type).unwrap().len(), 1);
     }
 
     #[test]
     fn test_prioritize_debt() {
         let items = vec![
-            create_test_item(DebtType::Todo, Priority::Low),
-            create_test_item(DebtType::Fixme, Priority::Critical),
-            create_test_item(DebtType::CodeSmell, Priority::Medium),
-            create_test_item(DebtType::Complexity, Priority::High),
+            create_test_item(DebtType::Todo { reason: None }, Priority::Low),
+            create_test_item(DebtType::Fixme { reason: None }, Priority::Critical),
+            create_test_item(DebtType::CodeSmell { smell_type: None }, Priority::Medium),
+            create_test_item(
+                DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
+                Priority::High,
+            ),
         ];
 
         let prioritized = prioritize_debt(&items);
@@ -237,10 +381,16 @@ mod tests {
     #[test]
     fn test_filter_by_priority() {
         let items = vec![
-            create_test_item(DebtType::Todo, Priority::Low),
-            create_test_item(DebtType::Fixme, Priority::Medium),
-            create_test_item(DebtType::CodeSmell, Priority::High),
-            create_test_item(DebtType::Complexity, Priority::Critical),
+            create_test_item(DebtType::Todo { reason: None }, Priority::Low),
+            create_test_item(DebtType::Fixme { reason: None }, Priority::Medium),
+            create_test_item(DebtType::CodeSmell { smell_type: None }, Priority::High),
+            create_test_item(
+                DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
+                Priority::Critical,
+            ),
         ];
 
         let filtered = filter_by_priority(items, Priority::Medium);
@@ -253,17 +403,24 @@ mod tests {
 
     #[test]
     fn test_filter_by_type() {
+        let todo_type = DebtType::Todo { reason: None };
         let items = vec![
-            create_test_item(DebtType::Todo, Priority::Low),
-            create_test_item(DebtType::Todo, Priority::Medium),
-            create_test_item(DebtType::Fixme, Priority::High),
-            create_test_item(DebtType::Complexity, Priority::Critical),
+            create_test_item(todo_type.clone(), Priority::Low),
+            create_test_item(todo_type.clone(), Priority::Medium),
+            create_test_item(DebtType::Fixme { reason: None }, Priority::High),
+            create_test_item(
+                DebtType::Complexity {
+                    cyclomatic: 10,
+                    cognitive: 8,
+                },
+                Priority::Critical,
+            ),
         ];
 
-        let filtered = filter_by_type(items, DebtType::Todo);
+        let filtered = filter_by_type(items, todo_type.clone());
 
         assert_eq!(filtered.len(), 2);
-        assert!(filtered.iter().all(|item| item.debt_type == DebtType::Todo));
+        assert!(filtered.iter().all(|item| item.debt_type == todo_type));
     }
 
     #[test]
@@ -271,7 +428,7 @@ mod tests {
         let items = vec![
             DebtItem {
                 id: "file1_todo".to_string(),
-                debt_type: DebtType::Todo,
+                debt_type: DebtType::Todo { reason: None },
                 priority: Priority::Low,
                 file: PathBuf::from("file1.rs"),
                 line: 1,
@@ -281,7 +438,7 @@ mod tests {
             },
             DebtItem {
                 id: "file1_fixme".to_string(),
-                debt_type: DebtType::Fixme,
+                debt_type: DebtType::Fixme { reason: None },
                 priority: Priority::Low,
                 file: PathBuf::from("file1.rs"),
                 line: 10,
@@ -291,7 +448,7 @@ mod tests {
             },
             DebtItem {
                 id: "file2_smell".to_string(),
-                debt_type: DebtType::CodeSmell,
+                debt_type: DebtType::CodeSmell { smell_type: None },
                 priority: Priority::High,
                 file: PathBuf::from("file2.rs"),
                 line: 20,

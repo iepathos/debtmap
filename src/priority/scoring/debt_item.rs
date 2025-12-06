@@ -681,6 +681,12 @@ fn generate_standard_recommendation(
                 "Consider deleting the utilities module once empty".to_string(),
             ],
         ),
+        // Default for legacy variants
+        _ => (
+            "Address technical debt".to_string(),
+            "Review and improve code quality".to_string(),
+            vec!["Refactor to follow best practices".to_string()],
+        ),
     }
 }
 

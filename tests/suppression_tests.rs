@@ -81,7 +81,7 @@ fn test_type_specific_suppression() {
     );
 
     assert_eq!(items.len(), 1, "Should only find FIXME");
-    assert!(items[0].debt_type == DebtType::Fixme);
+    assert!(matches!(items[0].debt_type, DebtType::Fixme { .. }));
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn test_wildcard_suppression() {
     let path = PathBuf::from("test.rs");
     let suppression = parse_suppression_comments(content, Language::Rust, &path);
 
-    assert!(suppression.is_suppressed(2, &DebtType::Todo));
-    assert!(suppression.is_suppressed(2, &DebtType::Fixme));
-    assert!(suppression.is_suppressed(2, &DebtType::CodeSmell));
+    assert!(suppression.is_suppressed(2, &DebtType::Todo { reason: None }));
+    assert!(suppression.is_suppressed(2, &DebtType::Fixme { reason: None }));
+    assert!(suppression.is_suppressed(2, &DebtType::CodeSmell { smell_type: None }));
 }

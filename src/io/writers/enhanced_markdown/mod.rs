@@ -402,7 +402,10 @@ mod tests {
                         column: None,
                         message: format!("Debt issue {}", i),
                         priority: CorePriority::Medium,
-                        debt_type: CoreDebtType::Complexity,
+                        debt_type: CoreDebtType::Complexity {
+                            cyclomatic: 10,
+                            cognitive: 8,
+                        },
                         context: None,
                     })
                     .collect(),

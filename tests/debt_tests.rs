@@ -36,18 +36,21 @@ fn test_todo_fixme_detection() {
     // Verify specific items
     let todo_item = items.iter().find(|i| i.message.contains("TODO")).unwrap();
     assert_eq!(todo_item.priority, Priority::Medium);
-    assert_eq!(todo_item.debt_type, DebtType::Todo);
+    assert!(matches!(todo_item.debt_type, DebtType::Todo { .. }));
 
     let fixme_item = items.iter().find(|i| i.message.contains("FIXME")).unwrap();
     assert_eq!(fixme_item.priority, Priority::High);
-    assert_eq!(fixme_item.debt_type, DebtType::Fixme);
+    assert!(matches!(fixme_item.debt_type, DebtType::Fixme { .. }));
 }
 
 #[test]
 fn test_debt_item_creation() {
     let item = DebtItem {
         id: "test-debt-1".to_string(),
-        debt_type: DebtType::Complexity,
+        debt_type: DebtType::Complexity {
+            cyclomatic: 10,
+            cognitive: 8,
+        },
         priority: Priority::High,
         file: PathBuf::from("complex.rs"),
         line: 42,
@@ -56,7 +59,7 @@ fn test_debt_item_creation() {
         context: Some("fn complex_function() { ... }".to_string()),
     };
 
-    assert_eq!(item.debt_type, DebtType::Complexity);
+    assert!(matches!(item.debt_type, DebtType::Complexity { .. }));
     assert_eq!(item.priority, Priority::High);
     assert_eq!(item.line, 42);
     assert!(item.context.is_some());

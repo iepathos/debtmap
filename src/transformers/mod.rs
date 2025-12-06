@@ -315,7 +315,10 @@ mod tests {
         let mut metrics1 = create_test_file_metrics("test1.rs", 10, 8, 1);
         metrics1.debt_items.push(DebtItem {
             id: "test1".to_string(),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
             priority: Priority::Low,
             file: PathBuf::from("test1.rs"),
             line: 10,
@@ -327,7 +330,10 @@ mod tests {
         let mut metrics2 = create_test_file_metrics("test2.rs", 15, 12, 1);
         metrics2.debt_items.push(DebtItem {
             id: "test2".to_string(),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
             priority: Priority::Medium,
             file: PathBuf::from("test2.rs"),
             line: 20,
@@ -373,7 +379,10 @@ mod tests {
         let mut metrics = create_test_file_metrics("test.rs", 10, 8, 1);
         metrics.debt_items.push(DebtItem {
             id: "test1".to_string(),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
             priority: Priority::Medium,
             file: PathBuf::from("src/main.rs"),
             line: 10,
@@ -399,7 +408,10 @@ mod tests {
         let mut metrics = create_test_file_metrics("test.rs", 10, 8, 1);
         metrics.debt_items.push(DebtItem {
             id: "test2".to_string(),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
             priority: Priority::High,
             file: PathBuf::from("src/lib.rs"),
             line: 20,
@@ -424,7 +436,10 @@ mod tests {
         let mut metrics = create_test_file_metrics("test.rs", 10, 8, 1);
         metrics.debt_items.push(DebtItem {
             id: "item1".to_string(),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
             priority: Priority::Low,
             file: PathBuf::from("src/main.rs"),
             line: 10,
@@ -434,7 +449,7 @@ mod tests {
         });
         metrics.debt_items.push(DebtItem {
             id: "item2".to_string(),
-            debt_type: DebtType::CodeSmell,
+            debt_type: DebtType::CodeSmell { smell_type: None },
             priority: Priority::Medium,
             file: PathBuf::from("src/lib.rs"),
             line: 30,

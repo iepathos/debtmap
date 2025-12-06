@@ -1259,7 +1259,10 @@ fn create_enhanced_debt_item(
 ) -> DebtItem {
     DebtItem {
         id: format!("complexity-{}-{}", func.file.display(), func.line),
-        debt_type: DebtType::Complexity,
+        debt_type: DebtType::Complexity {
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+        },
         priority: classify_priority(func.cyclomatic, threshold),
         file: func.file.clone(),
         line: func.line,
@@ -1317,7 +1320,10 @@ fn extract_debt_items(
 fn create_complexity_debt_item(func: &FunctionMetrics, threshold: u32) -> DebtItem {
     DebtItem {
         id: format!("complexity-{}-{}", func.file.display(), func.line),
-        debt_type: DebtType::Complexity,
+        debt_type: DebtType::Complexity {
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+        },
         priority: classify_priority(func.cyclomatic, threshold),
         file: func.file.clone(),
         line: func.line,
@@ -1509,7 +1515,9 @@ fn convert_organization_pattern_to_debt_item(
 
     DebtItem {
         id: format!("organization-{}-{}", path.display(), line),
-        debt_type: DebtType::CodeOrganization,
+        debt_type: DebtType::CodeOrganization {
+            issue_type: Some(pattern.pattern_type().to_string()),
+        },
         priority,
         file: path.to_path_buf(),
         line,

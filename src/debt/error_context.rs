@@ -35,9 +35,14 @@ impl<'a> ContextLossAnalyzer<'a> {
     }
 
     fn add_debt_item(&mut self, line: usize, pattern: ContextLossPattern, context: &str) {
+        let debt_type = DebtType::ErrorSwallowing {
+            pattern: pattern.to_string(),
+            context: Some(context.to_string()),
+        };
+
         // Check if this item is suppressed
         if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &DebtType::ErrorSwallowing) {
+            if checker.is_suppressed(line, &debt_type) {
                 return;
             }
         }
@@ -47,7 +52,7 @@ impl<'a> ContextLossAnalyzer<'a> {
 
         self.items.push(DebtItem {
             id: format!("context-loss-{}-{}", self.current_file.display(), line),
-            debt_type: DebtType::ErrorSwallowing,
+            debt_type,
             priority,
             file: self.current_file.to_path_buf(),
             line,
@@ -215,6 +220,12 @@ pub enum ContextLossPattern {
     QuestionMarkChain,
     StringErrorConversion,
     IntoErrorConversion,
+}
+
+impl std::fmt::Display for ContextLossPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
 }
 
 impl ContextLossPattern {

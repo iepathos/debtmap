@@ -76,7 +76,7 @@ fn production_code() {
 
     // Check that no complexity issues are in test functions when context-aware is enabled
     let complexity_in_tests = metrics.debt_items.iter().any(|item| {
-        matches!(item.debt_type, debtmap::core::DebtType::Complexity)
+        matches!(item.debt_type, debtmap::core::DebtType::Complexity { .. })
             && item.message.contains("test")
     });
     assert!(

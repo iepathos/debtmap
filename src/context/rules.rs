@@ -410,7 +410,7 @@ impl ContextRuleEngine {
 
     /// Check if a debt type should be analyzed in a context
     pub fn should_analyze(&mut self, debt_type: &DebtType, context: &FunctionContext) -> bool {
-        let pattern = DebtPattern::DebtType(*debt_type);
+        let pattern = DebtPattern::DebtType(debt_type.clone());
         let action = self.evaluate(&pattern, context);
         action != RuleAction::Skip
     }
@@ -421,7 +421,7 @@ impl ContextRuleEngine {
         debt_type: &DebtType,
         context: &FunctionContext,
     ) -> i32 {
-        let pattern = DebtPattern::DebtType(*debt_type);
+        let pattern = DebtPattern::DebtType(debt_type.clone());
         match self.evaluate(&pattern, context) {
             RuleAction::Allow => -999, // Effectively disable
             RuleAction::Warn => -2,

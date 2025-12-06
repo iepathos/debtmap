@@ -195,9 +195,55 @@ impl FunctionMetrics {
     }
 }
 
+mod debt_type_map_serde {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(
+        map: &HashMap<DebtType, Vec<DebtItem>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct Entry<'a> {
+            debt_type: &'a DebtType,
+            items: &'a Vec<DebtItem>,
+        }
+
+        let entries: Vec<Entry> = map
+            .iter()
+            .map(|(debt_type, items)| Entry { debt_type, items })
+            .collect();
+
+        entries.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<HashMap<DebtType, Vec<DebtItem>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Entry {
+            debt_type: DebtType,
+            items: Vec<DebtItem>,
+        }
+
+        let entries = Vec::<Entry>::deserialize(deserializer)?;
+        Ok(entries
+            .into_iter()
+            .map(|e| (e.debt_type, e.items))
+            .collect())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TechnicalDebtReport {
     pub items: Vec<DebtItem>,
+    #[serde(with = "debt_type_map_serde")]
     pub by_type: HashMap<DebtType, Vec<DebtItem>>,
     pub priorities: Vec<Priority>,
     pub duplications: Vec<DuplicationBlock>,
@@ -215,51 +261,9 @@ pub struct DebtItem {
     pub context: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Copy)]
-pub enum DebtType {
-    Todo,
-    Fixme,
-    CodeSmell,
-    Duplication,
-    Complexity,
-    Dependency,
-    ErrorSwallowing,
-    ResourceManagement,
-    CodeOrganization,
-    // Test-specific debt types
-    TestComplexity,
-    TestTodo,
-    TestDuplication,
-    TestQuality,
-}
-
-impl std::fmt::Display for DebtType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        static DISPLAY_STRINGS: &[(DebtType, &str)] = &[
-            (DebtType::Todo, "TODO"),
-            (DebtType::Fixme, "FIXME"),
-            (DebtType::CodeSmell, "Code Smell"),
-            (DebtType::Duplication, "Duplication"),
-            (DebtType::Complexity, "Complexity"),
-            (DebtType::Dependency, "Dependency"),
-            (DebtType::ErrorSwallowing, "Error Swallowing"),
-            (DebtType::ResourceManagement, "Resource Management"),
-            (DebtType::CodeOrganization, "Code Organization"),
-            (DebtType::TestComplexity, "Test Complexity"),
-            (DebtType::TestTodo, "Test TODO"),
-            (DebtType::TestDuplication, "Test Duplication"),
-            (DebtType::TestQuality, "Test Quality"),
-        ];
-
-        let display_str = DISPLAY_STRINGS
-            .iter()
-            .find(|(dt, _)| dt == self)
-            .map(|(_, s)| *s)
-            .unwrap_or("Unknown");
-
-        write!(f, "{display_str}")
-    }
-}
+// Re-export DebtType from priority module (spec 203)
+// This consolidates the duplicate DebtType definitions into a single source of truth
+pub use crate::priority::DebtType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Copy, Ord, PartialOrd)]
 pub enum Priority {

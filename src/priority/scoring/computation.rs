@@ -141,6 +141,8 @@ pub(super) fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::ScatteredType { .. } => 0.25,
         DebtType::OrphanedFunctions { .. } => 0.15,
         DebtType::UtilitiesSprawl { .. } => 0.3,
+        // Default for legacy variants
+        _ => 0.5,
     }
 }
 

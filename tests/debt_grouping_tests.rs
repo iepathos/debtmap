@@ -14,7 +14,7 @@ fn test_group_by_file_single_file() {
     let items = vec![
         DebtItem {
             id: "1".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Medium,
             file: PathBuf::from("src/main.rs"),
             line: 10,
@@ -24,7 +24,7 @@ fn test_group_by_file_single_file() {
         },
         DebtItem {
             id: "2".to_string(),
-            debt_type: DebtType::Fixme,
+            debt_type: DebtType::Fixme { reason: None },
             priority: Priority::High,
             file: PathBuf::from("src/main.rs"),
             line: 20,
@@ -46,7 +46,7 @@ fn test_group_by_file_multiple_files() {
     let items = vec![
         DebtItem {
             id: "1".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Low,
             file: PathBuf::from("src/file1.rs"),
             line: 10,
@@ -56,7 +56,7 @@ fn test_group_by_file_multiple_files() {
         },
         DebtItem {
             id: "2".to_string(),
-            debt_type: DebtType::CodeSmell,
+            debt_type: DebtType::CodeSmell { smell_type: None },
             priority: Priority::Medium,
             file: PathBuf::from("src/file2.rs"),
             line: 20,
@@ -66,7 +66,10 @@ fn test_group_by_file_multiple_files() {
         },
         DebtItem {
             id: "3".to_string(),
-            debt_type: DebtType::Complexity,
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            },
             priority: Priority::High,
             file: PathBuf::from("src/file1.rs"),
             line: 30,
@@ -87,7 +90,10 @@ fn test_group_by_file_multiple_files() {
 fn test_group_by_file_preserves_debt_items() {
     let item = DebtItem {
         id: "unique-id".to_string(),
-        debt_type: DebtType::Duplication,
+        debt_type: DebtType::Duplication {
+            instances: 2,
+            total_lines: 50,
+        },
         priority: Priority::Critical,
         file: PathBuf::from("src/test.rs"),
         line: 42,
@@ -101,7 +107,13 @@ fn test_group_by_file_preserves_debt_items() {
 
     let result = &grouped[&PathBuf::from("src/test.rs")][0];
     assert_eq!(result.id, "unique-id");
-    assert_eq!(result.debt_type, DebtType::Duplication);
+    assert_eq!(
+        result.debt_type,
+        DebtType::Duplication {
+            instances: 2,
+            total_lines: 50
+        }
+    );
     assert_eq!(result.priority, Priority::Critical);
     assert_eq!(result.line, 42);
     assert_eq!(result.message, "Duplicate code detected");
@@ -113,7 +125,7 @@ fn test_filter_by_priority_minimum_threshold() {
     let items = vec![
         DebtItem {
             id: "1".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Low,
             file: PathBuf::from("file.rs"),
             line: 10,
@@ -123,7 +135,7 @@ fn test_filter_by_priority_minimum_threshold() {
         },
         DebtItem {
             id: "2".to_string(),
-            debt_type: DebtType::Fixme,
+            debt_type: DebtType::Fixme { reason: None },
             priority: Priority::High,
             file: PathBuf::from("file.rs"),
             line: 20,
@@ -133,7 +145,7 @@ fn test_filter_by_priority_minimum_threshold() {
         },
         DebtItem {
             id: "3".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Medium,
             file: PathBuf::from("file.rs"),
             line: 30,
@@ -165,7 +177,7 @@ fn test_filter_by_priority_none_match() {
     let items = vec![
         DebtItem {
             id: "1".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Low,
             file: PathBuf::from("file.rs"),
             line: 10,
@@ -175,7 +187,7 @@ fn test_filter_by_priority_none_match() {
         },
         DebtItem {
             id: "2".to_string(),
-            debt_type: DebtType::Fixme,
+            debt_type: DebtType::Fixme { reason: None },
             priority: Priority::Medium,
             file: PathBuf::from("file.rs"),
             line: 20,
@@ -194,7 +206,7 @@ fn test_filter_by_type_single() {
     let items = vec![
         DebtItem {
             id: "1".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Medium,
             file: PathBuf::from("file.rs"),
             line: 10,
@@ -204,7 +216,7 @@ fn test_filter_by_type_single() {
         },
         DebtItem {
             id: "2".to_string(),
-            debt_type: DebtType::CodeSmell,
+            debt_type: DebtType::CodeSmell { smell_type: None },
             priority: Priority::High,
             file: PathBuf::from("file.rs"),
             line: 20,
@@ -214,7 +226,7 @@ fn test_filter_by_type_single() {
         },
         DebtItem {
             id: "3".to_string(),
-            debt_type: DebtType::Todo,
+            debt_type: DebtType::Todo { reason: None },
             priority: Priority::Low,
             file: PathBuf::from("file.rs"),
             line: 30,
@@ -224,21 +236,31 @@ fn test_filter_by_type_single() {
         },
     ];
 
-    let filtered = filter_by_type(items, DebtType::Todo);
+    let filtered = filter_by_type(items, DebtType::Todo { reason: None });
 
     assert_eq!(filtered.len(), 2);
-    assert!(filtered.iter().all(|item| item.debt_type == DebtType::Todo));
+    assert!(filtered
+        .iter()
+        .all(|item| item.debt_type == DebtType::Todo { reason: None }));
 }
 
 #[test]
 fn test_filter_by_type_all_types() {
     let types = vec![
-        DebtType::Todo,
-        DebtType::Fixme,
-        DebtType::CodeSmell,
-        DebtType::Duplication,
-        DebtType::Complexity,
-        DebtType::Dependency,
+        DebtType::Todo { reason: None },
+        DebtType::Fixme { reason: None },
+        DebtType::CodeSmell { smell_type: None },
+        DebtType::Duplication {
+            instances: 2,
+            total_lines: 50,
+        },
+        DebtType::Complexity {
+            cyclomatic: 10,
+            cognitive: 8,
+        },
+        DebtType::Dependency {
+            dependency_type: None,
+        },
     ];
 
     let items: Vec<DebtItem> = types
@@ -246,7 +268,7 @@ fn test_filter_by_type_all_types() {
         .enumerate()
         .map(|(i, dt)| DebtItem {
             id: format!("{i}"),
-            debt_type: *dt,
+            debt_type: dt.clone(),
             priority: Priority::Medium,
             file: PathBuf::from("file.rs"),
             line: i * 10,
@@ -257,7 +279,7 @@ fn test_filter_by_type_all_types() {
         .collect();
 
     for debt_type in types {
-        let filtered = filter_by_type(items.clone(), debt_type);
+        let filtered = filter_by_type(items.clone(), debt_type.clone());
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].debt_type, debt_type);
     }

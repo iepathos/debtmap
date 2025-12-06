@@ -103,6 +103,8 @@ pub(crate) fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::ScatteredType { .. } => "Scattered Type",
         DebtType::OrphanedFunctions { .. } => "Orphaned Functions",
         DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl",
+        // Default for legacy variants
+        _ => "Other",
     }
 }
 

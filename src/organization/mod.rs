@@ -282,6 +282,18 @@ impl OrganizationAntiPattern {
             OrganizationAntiPattern::StructInitialization { location, .. } => vec![location],
         }
     }
+
+    pub fn pattern_type(&self) -> &str {
+        match self {
+            OrganizationAntiPattern::GodObject { .. } => "God Object",
+            OrganizationAntiPattern::MagicValue { .. } => "Magic Value",
+            OrganizationAntiPattern::LongParameterList { .. } => "Long Parameter List",
+            OrganizationAntiPattern::FeatureEnvy { .. } => "Feature Envy",
+            OrganizationAntiPattern::PrimitiveObsession { .. } => "Primitive Obsession",
+            OrganizationAntiPattern::DataClump { .. } => "Data Clump",
+            OrganizationAntiPattern::StructInitialization { .. } => "Struct Initialization",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -196,6 +196,8 @@ pub fn identify_quick_wins(items: &[UnifiedDebtItem]) -> QuickWins {
             DebtType::ScatteredType { .. } => "Scattered Types",
             DebtType::OrphanedFunctions { .. } => "Orphaned Functions",
             DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl",
+            // Default for legacy variants
+            _ => "Other",
         };
         by_type.entry(type_key.to_string()).or_default().push(item);
     }

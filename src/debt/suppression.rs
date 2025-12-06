@@ -106,12 +106,12 @@ impl SuppressionContext {
             .active_blocks
             .iter()
             .filter(|block| block.end_line.is_some())
-            .flat_map(|block| block.debt_types.iter().copied());
+            .flat_map(|block| block.debt_types.iter().cloned());
 
         let line_types = self
             .line_suppressions
             .values()
-            .flat_map(|rule| rule.debt_types.iter().copied());
+            .flat_map(|rule| rule.debt_types.iter().cloned());
 
         block_types.chain(line_types).collect()
     }
@@ -345,14 +345,37 @@ pub fn parse_suppression_comments(
 
 static DEBT_TYPE_MAP: Lazy<HashMap<&'static str, DebtType>> = Lazy::new(|| {
     let mut map = HashMap::new();
-    map.insert("todo", DebtType::Todo);
-    map.insert("fixme", DebtType::Fixme);
-    map.insert("smell", DebtType::CodeSmell);
-    map.insert("codesmell", DebtType::CodeSmell);
-    map.insert("duplication", DebtType::Duplication);
-    map.insert("duplicate", DebtType::Duplication);
-    map.insert("complexity", DebtType::Complexity);
-    map.insert("dependency", DebtType::Dependency);
+    map.insert("todo", DebtType::Todo { reason: None });
+    map.insert("fixme", DebtType::Fixme { reason: None });
+    map.insert("smell", DebtType::CodeSmell { smell_type: None });
+    map.insert("codesmell", DebtType::CodeSmell { smell_type: None });
+    map.insert(
+        "duplication",
+        DebtType::Duplication {
+            instances: 0,
+            total_lines: 0,
+        },
+    );
+    map.insert(
+        "duplicate",
+        DebtType::Duplication {
+            instances: 0,
+            total_lines: 0,
+        },
+    );
+    map.insert(
+        "complexity",
+        DebtType::Complexity {
+            cyclomatic: 0,
+            cognitive: 0,
+        },
+    );
+    map.insert(
+        "dependency",
+        DebtType::Dependency {
+            dependency_type: None,
+        },
+    );
     map
 });
 
@@ -374,7 +397,7 @@ fn parse_debt_types(types_str: Option<&str>) -> Vec<DebtType> {
 }
 
 fn parse_single_debt_type(type_str: &str) -> Option<DebtType> {
-    DEBT_TYPE_MAP.get(type_str.to_lowercase().as_str()).copied()
+    DEBT_TYPE_MAP.get(type_str.to_lowercase().as_str()).cloned()
 }
 
 #[cfg(test)]
@@ -399,9 +422,9 @@ mod tests {
         assert_eq!(context.active_blocks.len(), 1);
         assert_eq!(context.active_blocks[0].start_line, 2);
         assert_eq!(context.active_blocks[0].end_line, Some(5));
-        assert!(context.is_suppressed(3, &DebtType::Todo));
-        assert!(context.is_suppressed(4, &DebtType::Fixme));
-        assert!(!context.is_suppressed(6, &DebtType::Todo));
+        assert!(context.is_suppressed(3, &DebtType::Todo { reason: None }));
+        assert!(context.is_suppressed(4, &DebtType::Fixme { reason: None }));
+        assert!(!context.is_suppressed(6, &DebtType::Todo { reason: None }));
     }
 
     #[test]
@@ -416,9 +439,9 @@ mod tests {
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
-        assert!(!context.is_suppressed(2, &DebtType::Todo));
-        assert!(context.is_suppressed(3, &DebtType::Todo));
-        assert!(!context.is_suppressed(4, &DebtType::Fixme));
+        assert!(!context.is_suppressed(2, &DebtType::Todo { reason: None }));
+        assert!(context.is_suppressed(3, &DebtType::Todo { reason: None }));
+        assert!(!context.is_suppressed(4, &DebtType::Fixme { reason: None }));
     }
 
     #[test]
@@ -433,8 +456,8 @@ mod tests {
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
-        assert!(context.is_suppressed(3, &DebtType::Todo));
-        assert!(!context.is_suppressed(4, &DebtType::Todo));
+        assert!(context.is_suppressed(3, &DebtType::Todo { reason: None }));
+        assert!(!context.is_suppressed(4, &DebtType::Todo { reason: None }));
     }
 
     #[test]
@@ -450,8 +473,8 @@ mod tests {
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
-        assert!(context.is_suppressed(3, &DebtType::Todo));
-        assert!(!context.is_suppressed(4, &DebtType::Fixme));
+        assert!(context.is_suppressed(3, &DebtType::Todo { reason: None }));
+        assert!(!context.is_suppressed(4, &DebtType::Fixme { reason: None }));
     }
 
     #[test]
@@ -499,7 +522,7 @@ mod tests {
         let context = parse_suppression_comments(content, Language::Python, &file);
 
         assert_eq!(context.active_blocks.len(), 1);
-        assert!(context.is_suppressed(3, &DebtType::Todo));
+        assert!(context.is_suppressed(3, &DebtType::Todo { reason: None }));
     }
 
     #[test]
@@ -509,19 +532,29 @@ mod tests {
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
         // Line 1 has the wildcard suppression that applies to the same line
-        assert!(context.is_suppressed(1, &DebtType::Todo));
-        assert!(context.is_suppressed(1, &DebtType::Fixme));
-        assert!(context.is_suppressed(1, &DebtType::CodeSmell));
+        assert!(context.is_suppressed(1, &DebtType::Todo { reason: None }));
+        assert!(context.is_suppressed(1, &DebtType::Fixme { reason: None }));
+        assert!(context.is_suppressed(1, &DebtType::CodeSmell { smell_type: None }));
     }
 
     #[test]
     fn test_create_unclosed_blocks() {
         let open_blocks = vec![
-            (10, vec![DebtType::Todo], Some("reason1".to_string())),
-            (25, vec![DebtType::Fixme], None),
+            (
+                10,
+                vec![DebtType::Todo { reason: None }],
+                Some("reason1".to_string()),
+            ),
+            (25, vec![DebtType::Fixme { reason: None }], None),
             (
                 42,
-                vec![DebtType::CodeSmell, DebtType::Complexity],
+                vec![
+                    DebtType::CodeSmell { smell_type: None },
+                    DebtType::Complexity {
+                        cyclomatic: 10,
+                        cognitive: 8,
+                    },
+                ],
                 Some("reason2".to_string()),
             ),
         ];

@@ -41,7 +41,7 @@ fn test_detects_test_without_assertions() {
     );
     assert!(matches!(
         &no_assertion_patterns[0].debt_type,
-        debtmap::core::DebtType::TestQuality
+        debtmap::core::DebtType::TestQuality { .. }
     ));
 }
 
@@ -83,7 +83,7 @@ fn test_detects_overly_complex_test() {
 
     let complex_pattern = patterns
         .iter()
-        .find(|p| matches!(p.debt_type, debtmap::core::DebtType::TestComplexity));
+        .find(|p| matches!(p.debt_type, debtmap::core::DebtType::TestComplexity { .. }));
 
     assert!(complex_pattern.is_some());
     assert!(complex_pattern.unwrap().message.contains("overly complex"));

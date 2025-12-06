@@ -81,26 +81,51 @@ impl DebtCategory {
 pub fn categorize_debt_type(debt_type: &DebtType) -> DebtCategory {
     match debt_type {
         // Complexity is an organization/maintainability issue
-        DebtType::Complexity => DebtCategory::Organization,
+        DebtType::Complexity { .. } => DebtCategory::Organization,
 
-        // Organization issues
-        DebtType::Todo | DebtType::Fixme => DebtCategory::Organization,
-        DebtType::CodeOrganization => DebtCategory::Organization,
-        DebtType::CodeSmell => DebtCategory::Organization,
-        DebtType::Dependency => DebtCategory::Organization,
+        // Organization issues (legacy variants)
+        DebtType::Todo { .. } | DebtType::Fixme { .. } => DebtCategory::Organization,
+        DebtType::CodeOrganization { .. } => DebtCategory::Organization,
+        DebtType::CodeSmell { .. } => DebtCategory::Organization,
+        DebtType::Dependency { .. } => DebtCategory::Organization,
 
-        // Testing issues
-        DebtType::TestComplexity | DebtType::TestTodo | DebtType::TestDuplication => {
-            DebtCategory::Testing
-        }
-        DebtType::TestQuality => DebtCategory::Testing,
+        // Testing issues (legacy variants)
+        DebtType::TestComplexity { .. }
+        | DebtType::TestTodo { .. }
+        | DebtType::TestDuplication { .. } => DebtCategory::Testing,
+        DebtType::TestQuality { .. } => DebtCategory::Testing,
 
-        // Resource management issues
-        DebtType::ErrorSwallowing => DebtCategory::Resource,
-        DebtType::ResourceManagement => DebtCategory::Resource,
+        // Resource management issues (legacy variants)
+        DebtType::ErrorSwallowing { .. } => DebtCategory::Resource,
+        DebtType::ResourceManagement { .. } => DebtCategory::Resource,
 
         // Duplication issues
-        DebtType::Duplication => DebtCategory::Duplication,
+        DebtType::Duplication { .. } => DebtCategory::Duplication,
+
+        // Priority-specific variants
+        DebtType::TestingGap { .. } => DebtCategory::Testing,
+        DebtType::ComplexityHotspot { .. } => DebtCategory::Organization,
+        DebtType::DeadCode { .. } => DebtCategory::Organization,
+        DebtType::Risk { .. } => DebtCategory::Resource,
+        DebtType::TestComplexityHotspot { .. } => DebtCategory::Testing,
+        DebtType::AllocationInefficiency { .. } => DebtCategory::Resource,
+        DebtType::StringConcatenation { .. } => DebtCategory::Resource,
+        DebtType::NestedLoops { .. } => DebtCategory::Resource,
+        DebtType::BlockingIO { .. } => DebtCategory::Resource,
+        DebtType::SuboptimalDataStructure { .. } => DebtCategory::Resource,
+        DebtType::GodObject { .. } => DebtCategory::Organization,
+        DebtType::GodModule { .. } => DebtCategory::Organization,
+        DebtType::FeatureEnvy { .. } => DebtCategory::Organization,
+        DebtType::PrimitiveObsession { .. } => DebtCategory::Organization,
+        DebtType::MagicValues { .. } => DebtCategory::Organization,
+        DebtType::AssertionComplexity { .. } => DebtCategory::Testing,
+        DebtType::FlakyTestPattern { .. } => DebtCategory::Testing,
+        DebtType::AsyncMisuse { .. } => DebtCategory::Resource,
+        DebtType::ResourceLeak { .. } => DebtCategory::Resource,
+        DebtType::CollectionInefficiency { .. } => DebtCategory::Resource,
+        DebtType::ScatteredType { .. } => DebtCategory::Organization,
+        DebtType::OrphanedFunctions { .. } => DebtCategory::Organization,
+        DebtType::UtilitiesSprawl { .. } => DebtCategory::Organization,
     }
 }
 
@@ -216,23 +241,32 @@ mod tests {
     #[test]
     fn test_debt_categorization() {
         assert_eq!(
-            categorize_debt_type(&DebtType::ErrorSwallowing),
+            categorize_debt_type(&DebtType::ErrorSwallowing {
+                pattern: "test".to_string(),
+                context: None
+            }),
             DebtCategory::Resource
         );
         assert_eq!(
-            categorize_debt_type(&DebtType::Todo),
+            categorize_debt_type(&DebtType::Todo { reason: None }),
             DebtCategory::Organization
         );
         assert_eq!(
-            categorize_debt_type(&DebtType::TestQuality),
+            categorize_debt_type(&DebtType::TestQuality { issue_type: None }),
             DebtCategory::Testing
         );
         assert_eq!(
-            categorize_debt_type(&DebtType::Complexity),
+            categorize_debt_type(&DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 8
+            }),
             DebtCategory::Organization
         );
         assert_eq!(
-            categorize_debt_type(&DebtType::Duplication),
+            categorize_debt_type(&DebtType::Duplication {
+                instances: 2,
+                total_lines: 50
+            }),
             DebtCategory::Duplication
         );
     }
@@ -254,7 +288,7 @@ mod tests {
                 file: PathBuf::from("test.rs"),
                 line: 18,
                 column: None,
-                debt_type: DebtType::Todo,
+                debt_type: DebtType::Todo { reason: None },
                 message: "TODO: fix this".to_string(),
                 priority: crate::core::Priority::Low,
                 context: None,
@@ -265,7 +299,10 @@ mod tests {
                 file: PathBuf::from("test.rs"),
                 line: 25,
                 column: None,
-                debt_type: DebtType::ErrorSwallowing,
+                debt_type: DebtType::ErrorSwallowing {
+                    pattern: "test".to_string(),
+                    context: None,
+                },
                 message: "Error swallowed".to_string(),
                 priority: crate::core::Priority::Medium,
                 context: None,
@@ -297,7 +334,7 @@ mod tests {
                 file: PathBuf::from("test.rs"),
                 line: 10,
                 column: None,
-                debt_type: DebtType::Todo,
+                debt_type: DebtType::Todo { reason: None },
                 message: "Critical todo issue".to_string(),
                 priority: crate::core::Priority::Critical,
                 context: None,
@@ -307,7 +344,7 @@ mod tests {
                 file: PathBuf::from("test.rs"),
                 line: 20,
                 column: None,
-                debt_type: DebtType::Todo,
+                debt_type: DebtType::Todo { reason: None },
                 message: "High todo issue".to_string(),
                 priority: crate::core::Priority::High,
                 context: None,
