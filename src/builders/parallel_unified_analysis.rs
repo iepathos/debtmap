@@ -591,6 +591,23 @@ impl ParallelUnifiedAnalysisBuilder {
                 &metrics,
             );
 
+            // Populate purity info from metrics as fallback (matches sequential behavior)
+            // This ensures consistent scoring when source files aren't available (e.g., in tests)
+            progress.set_message("Populating purity analysis from metrics...");
+            for metric in metrics.iter() {
+                let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+                let purity_info = crate::data_flow::PurityInfo {
+                    is_pure: metric.is_pure.unwrap_or(false),
+                    confidence: metric.purity_confidence.unwrap_or(0.0),
+                    impurity_reasons: if !metric.is_pure.unwrap_or(false) {
+                        vec!["Function may have side effects".to_string()]
+                    } else {
+                        vec![]
+                    },
+                };
+                data_flow.set_purity_info(func_id, purity_info);
+            }
+
             if let Ok(mut t) = timings.lock() {
                 t.data_flow_creation = start.elapsed();
             }
