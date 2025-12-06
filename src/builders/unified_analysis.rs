@@ -198,7 +198,7 @@ fn perform_unified_analysis_computation(
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_complete_stage(1, format!("{} functions", call_graph.node_count()));
-        manager.tui_set_progress(0.33); // ~3/9 stages complete
+        manager.tui_set_progress(0.29); // ~2/7 stages complete
     }
 
     // Apply trait pattern detection to the merged call graph
@@ -212,9 +212,9 @@ fn perform_unified_analysis_computation(
 
     let coverage_loading_start = std::time::Instant::now();
 
-    // Stage 4: Coverage loading
+    // Stage 3: Coverage loading (index 2 in TUI)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(3); // coverage stage
+        manager.tui_start_stage(2); // coverage stage
     }
 
     // Show spinner for coverage loading if coverage file provided (spec 201)
@@ -248,8 +248,8 @@ fn perform_unified_analysis_computation(
         } else {
             "skipped".to_string()
         };
-        manager.tui_complete_stage(3, metric);
-        manager.tui_set_progress(0.55); // ~5/9 stages complete
+        manager.tui_complete_stage(2, metric);
+        manager.tui_set_progress(0.43); // ~3/7 stages complete
 
         // Update TUI stats with coverage percentage (preserves existing function/debt counts)
         manager.tui_update_coverage(coverage_percent);
@@ -278,9 +278,9 @@ fn perform_unified_analysis_computation(
     );
 
     // Run inter-procedural purity propagation (spec 156)
-    // Stage 5: Purity analysis
+    // Stage 4: Purity analysis (index 3 in TUI)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(4); // purity analysis stage
+        manager.tui_start_stage(3); // purity analysis stage
     }
 
     let purity_spinner = crate::progress::ProgressManager::global()
@@ -294,16 +294,16 @@ fn perform_unified_analysis_computation(
     purity_spinner.finish_and_clear();
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(4, format!("{} functions analyzed", enriched_metrics.len()));
-        manager.tui_set_progress(0.66); // ~6/9 stages complete
+        manager.tui_complete_stage(3, format!("{} functions analyzed", enriched_metrics.len()));
+        manager.tui_set_progress(0.57); // ~4/7 stages complete
     }
 
     // Progress is already tracked by unified AnalysisProgress system
 
     // Create context aggregator and risk analyzer for priority scoring (spec 202)
-    // Stage 6: Context loading
+    // Stage 5: Context loading (index 4 in TUI)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(5); // context stage
+        manager.tui_start_stage(4); // context stage
     }
 
     let context_spinner = if enable_context {
@@ -343,13 +343,13 @@ fn perform_unified_analysis_computation(
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
         let metric = if enable_context { "loaded" } else { "skipped" };
-        manager.tui_complete_stage(5, metric);
-        manager.tui_set_progress(0.77); // ~7/9 stages complete
+        manager.tui_complete_stage(4, metric);
+        manager.tui_set_progress(0.71); // ~5/7 stages complete
     }
 
-    // Stage 7: Debt scoring
+    // Stage 6: Debt scoring (index 5 in TUI)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(6); // debt scoring stage
+        manager.tui_start_stage(5); // debt scoring stage
     }
 
     // Show spinner for the main debt analysis computation
@@ -379,14 +379,14 @@ fn perform_unified_analysis_computation(
     analysis_spinner.finish_and_clear();
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(6, format!("{} items scored", result.items.len()));
-        manager.tui_set_progress(0.88); // ~8/9 stages complete
+        manager.tui_complete_stage(5, format!("{} items scored", result.items.len()));
+        manager.tui_set_progress(0.86); // ~6/7 stages complete
     }
 
-    // Stage 7: Prioritization (final stage)
+    // Stage 7: Prioritization (index 6 in TUI - final stage)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(7); // prioritization stage
-        manager.tui_complete_stage(7, "complete");
+        manager.tui_start_stage(6); // prioritization stage
+        manager.tui_complete_stage(6, "complete");
         manager.tui_set_progress(1.0); // 100% complete
     }
 

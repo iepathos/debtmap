@@ -1,6 +1,7 @@
 //! Sort functionality for results.
 
 use crate::priority::UnifiedAnalysis;
+use std::cmp::Ordering;
 
 /// Sort criteria
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,11 +42,34 @@ impl SortCriteria {
     }
 }
 
+/// Stable tiebreaker for items with equal primary sort values.
+/// Compares by file path, then line number to ensure consistent ordering.
+fn tiebreaker(analysis: &UnifiedAnalysis, a: usize, b: usize) -> Ordering {
+    let item_a = analysis.items.get(a);
+    let item_b = analysis.items.get(b);
+
+    match (item_a, item_b) {
+        (Some(a), Some(b)) => {
+            // First compare by file path
+            match a.location.file.cmp(&b.location.file) {
+                Ordering::Equal => {
+                    // If same file, compare by line number
+                    a.location.line.cmp(&b.location.line)
+                }
+                other => other,
+            }
+        }
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+    }
+}
+
 /// Sort item indices based on criteria
 pub fn sort_indices(indices: &mut [usize], analysis: &UnifiedAnalysis, criteria: SortCriteria) {
     match criteria {
         SortCriteria::Score => {
-            // Sort by score descending (highest score first)
+            // Sort by score descending (highest score first), with stable tiebreaker
             indices.sort_by(|&a, &b| {
                 let score_a = analysis
                     .items
@@ -57,9 +81,11 @@ pub fn sort_indices(indices: &mut [usize], analysis: &UnifiedAnalysis, criteria:
                     .get(b)
                     .map(|item| item.unified_score.final_score)
                     .unwrap_or(0.0);
-                score_b
-                    .partial_cmp(&score_a)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+
+                match score_b.partial_cmp(&score_a).unwrap_or(Ordering::Equal) {
+                    Ordering::Equal => tiebreaker(analysis, a, b),
+                    other => other,
+                }
             });
         }
         SortCriteria::Coverage => {
