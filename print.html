@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-6f6cd753.js";
+            window.path_to_searchindex_js = "searchindex-0e79105b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c7b19542.js"></script>
@@ -1884,7 +1884,7 @@ See Prodigy documentation for detailed usage instructions.</p>
 <li><a href="#output-formats-2">Output Formats</a> - Understanding JSON, Markdown, and Terminal output</li>
 <li><a href="#coverage-integration-1">Coverage Integration</a> - Integrating test coverage data</li>
 <li><a href="#context-providers">Context Providers</a> - Understanding context-aware analysis</li>
-<li><a href="#examples-4">Examples</a> - More comprehensive usage examples</li>
+<li><a href="#examples-5">Examples</a> - More comprehensive usage examples</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="analysis-guide"><a class="header" href="#analysis-guide">Analysis Guide</a></h1>
@@ -9214,42 +9214,150 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
    - Current coverage: 35%
    - Target coverage: 80%
    - Estimated effort: 2-3 hours
+
+## Data Flow Analysis
+
+When verbosity is enabled (`-v` or higher), detailed data flow analysis is included in markdown reports for top priority items. This section provides deep insights into mutations, I/O operations, and escape analysis.
+
+### Mutation Analysis
+
+Shows variable mutation patterns within functions:
+
+**Example:**
+
+```markdown
+**Data Flow Analysis**
+
+- Mutations: 10 total, 2 live, 2 dead stores
+  - **Opportunity**: Remove 2 dead store(s) to simplify code
+  - **Almost Pure**: Only 2 live mutation(s), consider extracting pure subset
 </code></pre>
-<h3 id="cli-vs-library-markdown-features"><a class="header" href="#cli-vs-library-markdown-features">CLI vs Library Markdown Features</a></h3>
-<p><strong>CLI Markdown Output (<code>--format markdown</code>):</strong></p>
-<p>When you use <code>debtmap analyze . --format markdown</code>, you get comprehensive reports that include:</p>
+<p><strong>Mutation Metrics:</strong></p>
 <ul>
-<li>Executive summary with health dashboard</li>
-<li>Complexity analysis with refactoring recommendations</li>
-<li>Technical debt categorization by priority</li>
-<li>Dependency analysis with circular reference detection</li>
-<li>Actionable recommendations</li>
+<li><strong>Total Mutations:</strong> Count of all variable assignments and mutations</li>
+<li><strong>Live Mutations:</strong> Mutations where the new value is actually used</li>
+<li><strong>Dead Stores:</strong> Assignments that are never read (can be removed)</li>
 </ul>
-<p>This uses the base <code>MarkdownWriter</code> implementation and provides everything needed for documentation and PR comments.</p>
-<p><strong>Enhanced Library Features:</strong></p>
-<p>If you’re using debtmap as a Rust library in your own tools, additional markdown capabilities are available:</p>
+<p><strong>Refactoring Opportunities:</strong></p>
 <ul>
-<li><strong><code>EnhancedMarkdownWriter</code> trait</strong> (<code>src/io/writers/markdown/enhanced.rs</code>) - Provides advanced formatting and analysis features</li>
-<li><strong>Enhanced markdown modules</strong> (<code>src/io/writers/enhanced_markdown/</code>) - Building blocks for custom visualizations including:
+<li>Functions with many dead stores can be simplified by removing unused assignments</li>
+<li>Functions with few live mutations relative to total mutations are “almost pure” and may benefit from extracting pure subsets</li>
+</ul>
+<h3 id="io-operations"><a class="header" href="#io-operations">I/O Operations</a></h3>
+<p>Detects and lists input/output operations within functions:</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-markdown">- I/O Operations: 3 detected
+  - File Read at line 105
+  - Network Call at line 110
+  - Database Query at line 120
+  - **Recommendation**: Consider isolating I/O in separate functions
+</code></pre>
+<p><strong>Detected I/O Types:</strong></p>
 <ul>
-<li>Priority-based debt rankings with unified scoring</li>
-<li>Dead code detection and reporting</li>
-<li>Call graph insights and dependency visualization</li>
-<li>Testing recommendations with ROI analysis</li>
+<li>File system operations (read, write, open, close)</li>
+<li>Network operations (HTTP, TCP, UDP)</li>
+<li>Database queries and updates</li>
+<li>Standard I/O (print, input)</li>
+<li>System calls</li>
 </ul>
-</li>
+<p><strong>Best Practices:</strong></p>
+<ul>
+<li>Isolate I/O operations in dedicated functions</li>
+<li>Keep business logic pure and separate from I/O</li>
+<li>Easier testing when I/O is at function boundaries</li>
 </ul>
-<p>To use enhanced features in your Rust code:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use debtmap::io::writers::markdown::enhanced::EnhancedMarkdownWriter;
+<h3 id="escape-analysis"><a class="header" href="#escape-analysis">Escape Analysis</a></h3>
+<p>Shows which variables escape the function scope or affect the return value:</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-markdown">- Escape Analysis: 2 variables escape
+  - Return dependencies: result, accumulator
+  - **Insight**: These variables directly affect function output
+</code></pre>
+<p><strong>Escape Metrics:</strong></p>
+<ul>
+<li><strong>Escaping Variables:</strong> Variables whose values leave the function scope</li>
+<li><strong>Return Dependencies:</strong> Variables that contribute to the return value</li>
+</ul>
+<p><strong>Implications:</strong></p>
+<ul>
+<li>Functions with many escaping variables have complex data flow</li>
+<li>Clear return dependencies indicate focused, single-purpose functions</li>
+<li>Excessive escaping may indicate the function is doing too much</li>
+</ul>
+<h3 id="purity-analysis"><a class="header" href="#purity-analysis">Purity Analysis</a></h3>
+<p>Indicates whether a function is pure and reasons for any impurity:</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-markdown">- Purity: Not pure (95% confidence)
+  - Reasons: Mutates shared state, Performs I/O operations
+  - **Benefit**: Converting to pure functions improves testability
+</code></pre>
+<p><strong>Purity Assessment:</strong></p>
+<ul>
+<li><strong>Is Pure:</strong> Boolean indicating if the function is pure (deterministic, no side effects)</li>
+<li><strong>Confidence Level:</strong> Percentage confidence in the assessment (0-100%)</li>
+<li><strong>Impurity Reasons:</strong> Specific reasons why the function is not pure</li>
+</ul>
+<p><strong>Common Impurity Reasons:</strong></p>
+<ul>
+<li>Mutates shared or global state</li>
+<li>Performs I/O operations</li>
+<li>Calls other impure functions</li>
+<li>Uses random number generation</li>
+<li>Depends on system time or external state</li>
+</ul>
+<p><strong>Value of Pure Functions:</strong></p>
+<ul>
+<li>Easier to test (no setup/teardown needed)</li>
+<li>Easier to reason about (same input always gives same output)</li>
+<li>Safe to parallelize and memoize</li>
+<li>More composable and reusable</li>
+</ul>
+<h3 id="enabling-data-flow-analysis"><a class="header" href="#enabling-data-flow-analysis">Enabling Data Flow Analysis</a></h3>
+<p>Data flow analysis appears in markdown output when using verbose mode:</p>
+<pre><code class="language-bash"># Include data flow analysis in markdown reports
+debtmap analyze . --format markdown -v
+
+# Higher verbosity includes more details
+debtmap analyze . --format markdown -vv
+</code></pre>
+<p>The data flow section appears in the score breakdown for each of the top 3 priority items, providing actionable insights for refactoring.</p>
+<pre><code>
+### CLI vs Library Markdown Features
+
+**CLI Markdown Output (`--format markdown`):**
+
+When you use `debtmap analyze . --format markdown`, you get comprehensive reports that include:
+
+- Executive summary with health dashboard
+- Complexity analysis with refactoring recommendations
+- Technical debt categorization by priority
+- Dependency analysis with circular reference detection
+- Actionable recommendations
+
+This uses the base `MarkdownWriter` implementation and provides everything needed for documentation and PR comments.
+
+**Enhanced Library Features:**
+
+If you're using debtmap as a Rust library in your own tools, additional markdown capabilities are available:
+
+- **`EnhancedMarkdownWriter` trait** (`src/io/writers/markdown/enhanced.rs`) - Provides advanced formatting and analysis features
+- **Enhanced markdown modules** (`src/io/writers/enhanced_markdown/`) - Building blocks for custom visualizations including:
+  - Priority-based debt rankings with unified scoring
+  - Dead code detection and reporting
+  - Call graph insights and dependency visualization
+  - Testing recommendations with ROI analysis
+
+To use enhanced features in your Rust code:
+
+```rust
+use debtmap::io::writers::markdown::enhanced::EnhancedMarkdownWriter;
 use debtmap::io::writers::enhanced_markdown::*;
 
 // Create custom reports with enhanced features
 let mut writer = create_enhanced_writer(output)?;
 writer.write_priority_rankings(&amp;analysis)?;
 writer.write_dead_code_analysis(&amp;call_graph)?;
-<span class="boring">}</span></code></pre>
+</code></pre>
 <blockquote>
 <p><strong>Note:</strong> Enhanced markdown features are only available through the library API, not via the CLI. The CLI <code>--format markdown</code> output is comprehensive for most use cases.</p>
 </blockquote>
@@ -10274,7 +10382,7 @@ Implement the <code>OutputFormatter</code> trait for new formats:</p>
 <li><strong>Understand prioritization:</strong> See <a href="#tiered-prioritization-3">Tiered Prioritization</a></li>
 <li><strong>Learn scoring strategies:</strong> See <a href="#scoring-strategies">Scoring Strategies</a></li>
 <li><strong>Configure analysis:</strong> See <a href="#configuration-1">Configuration</a></li>
-<li><strong>View examples:</strong> See <a href="#examples-4">Examples</a></li>
+<li><strong>View examples:</strong> See <a href="#examples-5">Examples</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="architectural-analysis"><a class="header" href="#architectural-analysis">Architectural Analysis</a></h1>
@@ -14366,7 +14474,7 @@ api_functions = ["legacy_api"]
 <ul>
 <li><strong>Documentation</strong>: See <a href="#troubleshooting-22">Troubleshooting Guide</a> for common issues</li>
 <li><strong>Report issues</strong>: https://github.com/anthropics/debtmap/issues</li>
-<li><strong>Examples</strong>: Check the <a href="#examples-4">Examples chapter</a> for more scenarios</li>
+<li><strong>Examples</strong>: Check the <a href="#examples-5">Examples chapter</a> for more scenarios</li>
 <li><strong>Related topics</strong>:
 <ul>
 <li><a href="#coverage-integration-1">Coverage Integration</a> - Detailed coverage setup</li>
@@ -16940,7 +17048,7 @@ let values = items.iter()
     .collect();
 <span class="boring">}</span></code></pre>
 <p>Builder patterns are filtered out to ensure accurate functional composition metrics.</p>
-<h2 id="purity-analysis"><a class="header" href="#purity-analysis">Purity Analysis</a></h2>
+<h2 id="purity-analysis-1"><a class="header" href="#purity-analysis-1">Purity Analysis</a></h2>
 <p>Debtmap analyzes functions to determine their purity level - whether they have side effects and mutable state.</p>
 <h3 id="purity-levels"><a class="header" href="#purity-levels">Purity Levels</a></h3>
 <p>Functions are classified into three purity levels for god object weighting (defined in <code>src/organization/purity_analyzer.rs:19-26</code>):</p>
@@ -18851,7 +18959,7 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li><a href="#analysis-guide">Analysis Guide</a> - General analysis capabilities</li>
 <li><a href="#scoring-strategies">Scoring Strategies</a> - How complexity affects debt scores</li>
 <li><a href="#coverage-integration-1">Coverage Integration</a> - Combining complexity with coverage</li>
-<li><a href="#examples-4">Examples</a> - Real-world multi-pass analysis examples</li>
+<li><a href="#examples-5">Examples</a> - Real-world multi-pass analysis examples</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="parallel-processing"><a class="header" href="#parallel-processing">Parallel Processing</a></h1>
@@ -23174,6 +23282,277 @@ debtmap analyze . --verbose --top 5
 <li><a href="#analysis-guide">Analysis Guide</a> - Detailed metric explanations</li>
 <li><a href="../../ARCHITECTURE.html">ARCHITECTURE.md</a> - Technical details of exponential scaling implementation</li>
 </ul>
+<h2 id="data-flow-scoring-spec-218"><a class="header" href="#data-flow-scoring-spec-218">Data Flow Scoring (Spec 218)</a></h2>
+<p>DebtMap includes advanced data flow analysis that adjusts priority scores based on code purity, refactorability, and separation of concerns. This helps prioritize impure, tightly-coupled code over pure, easily-refactorable functions.</p>
+<h3 id="why-data-flow-scoring"><a class="header" href="#why-data-flow-scoring">Why Data Flow Scoring?</a></h3>
+<p>Traditional complexity metrics treat all complex code equally, but not all complexity is equal:</p>
+<p><strong>Pure functions</strong> (no side effects, deterministic):</p>
+<ul>
+<li>Easy to test in isolation</li>
+<li>Simple to refactor and extract</li>
+<li>Lower maintenance burden</li>
+<li>Less risky to modify</li>
+</ul>
+<p><strong>Impure functions</strong> (side effects, mutations):</p>
+<ul>
+<li>Harder to test (require mocking, state management)</li>
+<li>Complex to refactor (dependencies, order matters)</li>
+<li>Higher maintenance burden</li>
+<li>Riskier to modify</li>
+</ul>
+<p>Data flow scoring reduces the priority of pure code and increases priority for impure code, ensuring refactoring efforts focus where they matter most.</p>
+<h3 id="how-data-flow-scoring-works"><a class="header" href="#how-data-flow-scoring-works">How Data Flow Scoring Works</a></h3>
+<p>When data flow analysis is enabled, DebtMap analyzes each function’s data flow graph to compute three additional factors:</p>
+<ol>
+<li><strong>Purity Factor</strong> (0.0-1.0): Classifies functions on a purity spectrum</li>
+<li><strong>Refactorability Factor</strong> (1.0-1.5): Based on dead stores and escape analysis</li>
+<li><strong>Pattern Factor</strong> (0.7-1.0): Distinguishes data flow from business logic</li>
+</ol>
+<p>These factors are combined with the standard scoring factors (complexity, coverage, dependencies) to produce a final score that reflects both complexity and refactorability.</p>
+<h3 id="purity-spectrum-classification"><a class="header" href="#purity-spectrum-classification">Purity Spectrum Classification</a></h3>
+<p>Functions are classified on a spectrum from strictly pure to impure:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Purity Level</th><th>Score Multiplier</th><th>Description</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr><td>Strictly Pure</td><td>0.0</td><td>No mutations, no I/O, referentially transparent</td><td>Pure math functions</td></tr>
+<tr><td>Locally Pure</td><td>0.3</td><td>Pure interface but uses local mutations internally</td><td>Builder pattern with local state</td></tr>
+<tr><td>I/O Isolated</td><td>0.6</td><td>I/O operations clearly separated from logic</td><td>Function with I/O at boundaries only</td></tr>
+<tr><td>I/O Mixed</td><td>0.9</td><td>I/O mixed with business logic</td><td>Database queries interleaved with calculations</td></tr>
+<tr><td>Impure</td><td>1.0</td><td>Mutable state, side effects throughout</td><td>Functions with global state mutations</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Score Impact</strong>: The purity factor is multiplied with the base score. Lower multipliers reduce priority for purer code.</p>
+<p><strong>Example</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Strictly Pure (multiplier = 0.0) - Priority reduced to near-zero
+fn calculate_discount(price: f64, rate: f64) -&gt; f64 {
+    price * rate
+}
+
+// Impure (multiplier = 1.0) - Full priority maintained
+fn apply_discount_and_save(price: f64, rate: f64) -&gt; Result&lt;()&gt; {
+    let discount = price * rate;
+    DATABASE.save_discount(discount)?;
+    CACHE.invalidate()?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre>
+<h3 id="refactorability-factor"><a class="header" href="#refactorability-factor">Refactorability Factor</a></h3>
+<p>Based on data flow analysis, this factor identifies code that’s hard to refactor:</p>
+<p><strong>Calculation</strong>: <code>1.0 + (dead_store_ratio * 0.5)</code></p>
+<p><strong>Range</strong>: 1.0 (easily refactorable) to 1.5 (difficult to refactor)</p>
+<p><strong>Indicators of Poor Refactorability</strong>:</p>
+<ul>
+<li><strong>Dead stores</strong>: Variables assigned but never read (indicates complex flow)</li>
+<li><strong>Escaped values</strong>: Variables that escape to outer scopes (limits extraction)</li>
+<li><strong>Complex dependencies</strong>: Many input/output dependencies</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Easy to refactor (factor = 1.0)
+fn calculate_total(items: &amp;[Item]) -&gt; f64 {
+    items.iter().map(|i| i.price).sum()
+}
+
+// Hard to refactor (factor = 1.5)
+fn process_order(order: &amp;mut Order) -&gt; Result&lt;()&gt; {
+    let mut temp1 = order.subtotal; // Dead store
+    let mut temp2 = 0.0;            // Dead store
+    temp1 = order.items.iter().map(|i| i.price).sum();
+    order.total = temp1 + order.tax;
+    GLOBAL_STATE.update(order.id)?;  // Escaped to global scope
+    Ok(())
+}
+<span class="boring">}</span></code></pre>
+<h3 id="pattern-factor"><a class="header" href="#pattern-factor">Pattern Factor</a></h3>
+<p>Distinguishes between data flow patterns (simple transformations) and business logic (complex rules):</p>
+<p><strong>Calculation</strong>:</p>
+<ul>
+<li>Data flow patterns: 0.7 (reduced priority)</li>
+<li>Business logic: 1.0 (full priority)</li>
+</ul>
+<p><strong>Data Flow Patterns</strong> (lower priority):</p>
+<ul>
+<li>Map/filter/reduce operations</li>
+<li>Simple transformations</li>
+<li>Pipeline operations</li>
+</ul>
+<p><strong>Business Logic</strong> (higher priority):</p>
+<ul>
+<li>Complex conditional logic</li>
+<li>Business rules and validations</li>
+<li>Stateful computations</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Data flow pattern (factor = 0.7) - Lower priority
+fn filter_active_users(users: &amp;[User]) -&gt; Vec&lt;&amp;User&gt; {
+    users.iter().filter(|u| u.is_active).collect()
+}
+
+// Business logic (factor = 1.0) - Full priority
+fn calculate_user_discount(user: &amp;User, cart: &amp;Cart) -&gt; f64 {
+    if user.is_premium &amp;&amp; cart.total &gt; 100.0 {
+        if user.loyalty_points &gt; 1000 {
+            0.2
+        } else {
+            0.1
+        }
+    } else {
+        0.0
+    }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="combined-scoring-formula"><a class="header" href="#combined-scoring-formula">Combined Scoring Formula</a></h3>
+<p>When data flow scoring is enabled, the final score includes all three factors:</p>
+<pre><code>base_score = (complexity_factor * 0.5) + (coverage_factor * 0.4) + (dependency_factor * 0.1)
+
+data_flow_adjusted_score = base_score * purity_factor * refactorability_factor * pattern_factor
+
+final_score = data_flow_adjusted_score * role_multiplier
+</code></pre>
+<h3 id="configuration-4-1"><a class="header" href="#configuration-4-1">Configuration</a></h3>
+<p>Data flow scoring is configured in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[data_flow_scoring]
+# Enable data flow-based priority adjustments
+enabled = true
+
+# Purity spectrum weights (how much to reduce priority for pure code)
+purity_spectrum_weight = 1.0
+
+# Refactorability weight (how much to increase priority for hard-to-refactor code)
+refactorability_weight = 1.0
+
+# Pattern weight (how much to reduce priority for simple data flow patterns)
+pattern_weight = 1.0
+</code></pre>
+<p><strong>Configuration Parameters</strong>:</p>
+<ul>
+<li><strong>enabled</strong>: Enable/disable data flow scoring (default: true)</li>
+<li><strong>purity_spectrum_weight</strong>: Weight for purity factor (0.0-2.0, default: 1.0)</li>
+<li><strong>refactorability_weight</strong>: Weight for refactorability factor (0.0-2.0, default: 1.0)</li>
+<li><strong>pattern_weight</strong>: Weight for pattern factor (0.0-2.0, default: 1.0)</li>
+</ul>
+<h3 id="examples-4"><a class="header" href="#examples-4">Examples</a></h3>
+<p><strong>Example 1: Pure Complex Function (Low Priority)</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Complex but pure - Priority significantly reduced
+fn fibonacci(n: u32) -&gt; u64 {
+    // Cyclomatic complexity: 15
+    // Cognitive complexity: 25
+    // But: Strictly pure (no side effects)
+
+    // Data flow scoring:
+    // - Purity factor: 0.0 (strictly pure)
+    // - Refactorability factor: 1.0 (easy to extract)
+    // - Pattern factor: 1.0 (business logic)
+    // Final adjustment: base_score * 0.0 = near-zero priority
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Example 2: Impure Complex Function (High Priority)</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Complex and impure - Priority maintained or increased
+fn update_user_profile(user_id: i64, updates: &amp;Updates) -&gt; Result&lt;()&gt; {
+    // Cyclomatic complexity: 15
+    // Cognitive complexity: 25
+    // Impure: database mutations, cache invalidation
+
+    // Data flow scoring:
+    // - Purity factor: 1.0 (impure)
+    // - Refactorability factor: 1.4 (dead stores detected)
+    // - Pattern factor: 1.0 (business logic)
+    // Final adjustment: base_score * 1.4 = 40% priority increase
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Example 3: Data Flow Pattern (Reduced Priority)</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Simple transformation - Priority reduced
+fn map_to_dtos(users: &amp;[User]) -&gt; Vec&lt;UserDTO&gt; {
+    // Cyclomatic complexity: 5
+    // Simple map operation
+
+    // Data flow scoring:
+    // - Purity factor: 0.0 (strictly pure)
+    // - Refactorability factor: 1.0 (easy to extract)
+    // - Pattern factor: 0.7 (data flow pattern)
+    // Final adjustment: base_score * 0.0 = near-zero priority
+}
+<span class="boring">}</span></code></pre>
+<h3 id="score-explanation-output"><a class="header" href="#score-explanation-output">Score Explanation Output</a></h3>
+<p>When data flow scoring is enabled, the score explanation includes data flow factors:</p>
+<pre><code class="language-json">{
+  "function": "process_payment",
+  "scoring_details": {
+    "complexity_score": 8.5,
+    "coverage_score": 9.0,
+    "dependency_score": 6.0,
+    "base_score": 23.5,
+    "purity_factor": 1.0,
+    "refactorability_factor": 1.4,
+    "pattern_factor": 1.0,
+    "final_score": 32.9
+  }
+}
+</code></pre>
+<p><strong>Interpretation</strong>:</p>
+<ul>
+<li>Base score from complexity/coverage/dependencies: 23.5</li>
+<li>Purity factor (1.0): Function is impure, full priority maintained</li>
+<li>Refactorability factor (1.4): 40% increase due to difficult refactorability</li>
+<li>Pattern factor (1.0): Business logic, not just data flow</li>
+<li>Final score: 32.9 (after data flow adjustments)</li>
+</ul>
+<h3 id="when-to-use-data-flow-scoring"><a class="header" href="#when-to-use-data-flow-scoring">When to Use Data Flow Scoring</a></h3>
+<p>✅ <strong>Use data flow scoring when</strong>:</p>
+<ul>
+<li>You have a mix of pure and impure code</li>
+<li>You want to focus refactoring on impure, hard-to-test code</li>
+<li>You’re working in a functional codebase with many pure functions</li>
+<li>You want to avoid false positives from complex but pure algorithms</li>
+</ul>
+<p>❌ <strong>Disable data flow scoring when</strong>:</p>
+<ul>
+<li>Your codebase is primarily imperative (all code is impure)</li>
+<li>You don’t have data flow analysis available (requires language support)</li>
+<li>You want to prioritize all complex code equally regardless of purity</li>
+</ul>
+<h3 id="interpreting-results-3"><a class="header" href="#interpreting-results-3">Interpreting Results</a></h3>
+<p><strong>Before data flow scoring</strong>:</p>
+<pre><code>Top Priority Items:
+1. fibonacci() - Score: 8.5 (complex algorithm)
+2. process_payment() - Score: 8.2 (complex + impure)
+3. map_users() - Score: 7.8 (simple transformation)
+</code></pre>
+<p><strong>After data flow scoring</strong>:</p>
+<pre><code>Top Priority Items:
+1. process_payment() - Score: 11.5 (complex + impure + hard to refactor)
+2. map_users() - Score: 1.2 (pure data flow pattern, deprioritized)
+3. fibonacci() - Score: 0.3 (pure algorithm, deprioritized)
+</code></pre>
+<p><strong>Result</strong>: Impure, hard-to-refactor code rises to the top, while pure functions are deprioritized.</p>
+<h3 id="performance-impact-1-1"><a class="header" href="#performance-impact-1-1">Performance Impact</a></h3>
+<p>Data flow scoring requires data flow analysis, which has moderate performance impact:</p>
+<ul>
+<li><strong>Analysis overhead</strong>: ~15-20% additional analysis time</li>
+<li><strong>Memory usage</strong>: Proportional to function size (data flow graphs)</li>
+<li><strong>Recommended</strong>: Enable for projects &lt;100k LOC, or use selective analysis</li>
+</ul>
+<h3 id="see-also-1-1"><a class="header" href="#see-also-1-1">See Also</a></h3>
+<ul>
+<li><a href="#functional-composition-analysis">Functional Analysis</a> - Purity detection and analysis</li>
+<li><a href="data-flow-analysis.html">Data Flow Analysis</a> - Data flow graph construction (if available)</li>
+<li><a href="#configuration-1">Configuration</a> - Data flow scoring configuration</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="tiered-prioritization-3"><a class="header" href="#tiered-prioritization-3">Tiered Prioritization</a></h1>
 <p>Debtmap uses a sophisticated tiered prioritization system to surface critical architectural issues above simple testing gaps. This chapter explains the tier strategy, how to interpret tier classifications, and how to customize tier thresholds for your project.</p>
@@ -24260,7 +24639,7 @@ max_average_complexity = 10.0
 <p>Next steps:</p>
 <ul>
 <li>Review <a href="#configuration-1">Configuration Reference</a> for detailed threshold options</li>
-<li>See <a href="#examples-4">Examples</a> for more CI/CD integration patterns</li>
+<li>See <a href="#examples-5">Examples</a> for more CI/CD integration patterns</li>
 <li>Check <a href="#cli-reference">CLI Reference</a> for complete command documentation</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -24600,7 +24979,7 @@ debtmap analyze --explain-metrics
 <li><a href="#scoring-strategies">Scoring Strategies</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="examples-4"><a class="header" href="#examples-4">Examples</a></h1>
+<h1 id="examples-5"><a class="header" href="#examples-5">Examples</a></h1>
 <p>This chapter provides practical, real-world examples of using Debtmap across different project types and workflows. All examples use current CLI syntax verified against the source code.</p>
 <blockquote>
 <p><strong>Quick Start</strong>: New to Debtmap? Start with <a href="#basic-rust-analysis">Basic Rust Analysis</a> for the simplest introduction, then explore <a href="#coverage-integration-with-cargo-tarpaulin">Coverage Integration</a> for risk-based prioritization.</p>
@@ -25692,7 +26071,7 @@ debtmap compare \
   --format markdown \
   --output COMPARISON.md
 </code></pre>
-<h3 id="interpreting-results-3"><a class="header" href="#interpreting-results-3">Interpreting Results</a></h3>
+<h3 id="interpreting-results-4"><a class="header" href="#interpreting-results-4">Interpreting Results</a></h3>
 <p><strong>Target Status:</strong></p>
 <ul>
 <li><strong>Resolved</strong>: Function no longer appears (complexity reduced below threshold)</li>
@@ -26306,7 +26685,7 @@ debtmap compare main --show-new-only
 <li><strong>Documentation:</strong> <a href="https://debtmap.dev">debtmap.dev</a></li>
 <li><strong>GitHub Issues:</strong> <a href="https://github.com/prodigy-tools/debtmap/issues">Report bugs or request features</a></li>
 <li><strong>Discussions:</strong> <a href="https://github.com/prodigy-tools/debtmap/discussions">Ask questions</a></li>
-<li><strong>Examples:</strong> See <a href="#examples-4">Examples</a> for real-world use cases</li>
+<li><strong>Examples:</strong> See <a href="#examples-5">Examples</a> for real-world use cases</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="troubleshooting-22"><a class="header" href="#troubleshooting-22">Troubleshooting</a></h1>
@@ -28415,7 +28794,7 @@ debtmap --no-parallel
 <li><strong><a href="#configuration-1">Configuration Guide</a></strong>: Configure debtmap behavior</li>
 <li><strong><a href="#cli-reference">CLI Reference</a></strong>: Complete CLI flag documentation</li>
 <li><strong><a href="#analysis-guide">Analysis Guide</a></strong>: Understanding analysis results</li>
-<li><strong><a href="#examples-4">Examples</a></strong>: Practical usage examples</li>
+<li><strong><a href="#examples-5">Examples</a></strong>: Practical usage examples</li>
 <li><strong><a href="api/index.html">API Documentation</a></strong>: Rust API documentation</li>
 </ul>
 <h2 id="troubleshooting-checklist"><a class="header" href="#troubleshooting-checklist">Troubleshooting Checklist</a></h2>

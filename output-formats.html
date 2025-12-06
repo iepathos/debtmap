@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-6f6cd753.js";
+            window.path_to_searchindex_js = "searchindex-0e79105b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c7b19542.js"></script>
@@ -808,42 +808,150 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
    - Current coverage: 35%
    - Target coverage: 80%
    - Estimated effort: 2-3 hours
+
+## Data Flow Analysis
+
+When verbosity is enabled (`-v` or higher), detailed data flow analysis is included in markdown reports for top priority items. This section provides deep insights into mutations, I/O operations, and escape analysis.
+
+### Mutation Analysis
+
+Shows variable mutation patterns within functions:
+
+**Example:**
+
+```markdown
+**Data Flow Analysis**
+
+- Mutations: 10 total, 2 live, 2 dead stores
+  - **Opportunity**: Remove 2 dead store(s) to simplify code
+  - **Almost Pure**: Only 2 live mutation(s), consider extracting pure subset
 </code></pre>
-<h3 id="cli-vs-library-markdown-features"><a class="header" href="#cli-vs-library-markdown-features">CLI vs Library Markdown Features</a></h3>
-<p><strong>CLI Markdown Output (<code>--format markdown</code>):</strong></p>
-<p>When you use <code>debtmap analyze . --format markdown</code>, you get comprehensive reports that include:</p>
+<p><strong>Mutation Metrics:</strong></p>
 <ul>
-<li>Executive summary with health dashboard</li>
-<li>Complexity analysis with refactoring recommendations</li>
-<li>Technical debt categorization by priority</li>
-<li>Dependency analysis with circular reference detection</li>
-<li>Actionable recommendations</li>
+<li><strong>Total Mutations:</strong> Count of all variable assignments and mutations</li>
+<li><strong>Live Mutations:</strong> Mutations where the new value is actually used</li>
+<li><strong>Dead Stores:</strong> Assignments that are never read (can be removed)</li>
 </ul>
-<p>This uses the base <code>MarkdownWriter</code> implementation and provides everything needed for documentation and PR comments.</p>
-<p><strong>Enhanced Library Features:</strong></p>
-<p>If you’re using debtmap as a Rust library in your own tools, additional markdown capabilities are available:</p>
+<p><strong>Refactoring Opportunities:</strong></p>
 <ul>
-<li><strong><code>EnhancedMarkdownWriter</code> trait</strong> (<code>src/io/writers/markdown/enhanced.rs</code>) - Provides advanced formatting and analysis features</li>
-<li><strong>Enhanced markdown modules</strong> (<code>src/io/writers/enhanced_markdown/</code>) - Building blocks for custom visualizations including:
+<li>Functions with many dead stores can be simplified by removing unused assignments</li>
+<li>Functions with few live mutations relative to total mutations are “almost pure” and may benefit from extracting pure subsets</li>
+</ul>
+<h3 id="io-operations"><a class="header" href="#io-operations">I/O Operations</a></h3>
+<p>Detects and lists input/output operations within functions:</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-markdown">- I/O Operations: 3 detected
+  - File Read at line 105
+  - Network Call at line 110
+  - Database Query at line 120
+  - **Recommendation**: Consider isolating I/O in separate functions
+</code></pre>
+<p><strong>Detected I/O Types:</strong></p>
 <ul>
-<li>Priority-based debt rankings with unified scoring</li>
-<li>Dead code detection and reporting</li>
-<li>Call graph insights and dependency visualization</li>
-<li>Testing recommendations with ROI analysis</li>
+<li>File system operations (read, write, open, close)</li>
+<li>Network operations (HTTP, TCP, UDP)</li>
+<li>Database queries and updates</li>
+<li>Standard I/O (print, input)</li>
+<li>System calls</li>
 </ul>
-</li>
+<p><strong>Best Practices:</strong></p>
+<ul>
+<li>Isolate I/O operations in dedicated functions</li>
+<li>Keep business logic pure and separate from I/O</li>
+<li>Easier testing when I/O is at function boundaries</li>
 </ul>
-<p>To use enhanced features in your Rust code:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use debtmap::io::writers::markdown::enhanced::EnhancedMarkdownWriter;
+<h3 id="escape-analysis"><a class="header" href="#escape-analysis">Escape Analysis</a></h3>
+<p>Shows which variables escape the function scope or affect the return value:</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-markdown">- Escape Analysis: 2 variables escape
+  - Return dependencies: result, accumulator
+  - **Insight**: These variables directly affect function output
+</code></pre>
+<p><strong>Escape Metrics:</strong></p>
+<ul>
+<li><strong>Escaping Variables:</strong> Variables whose values leave the function scope</li>
+<li><strong>Return Dependencies:</strong> Variables that contribute to the return value</li>
+</ul>
+<p><strong>Implications:</strong></p>
+<ul>
+<li>Functions with many escaping variables have complex data flow</li>
+<li>Clear return dependencies indicate focused, single-purpose functions</li>
+<li>Excessive escaping may indicate the function is doing too much</li>
+</ul>
+<h3 id="purity-analysis"><a class="header" href="#purity-analysis">Purity Analysis</a></h3>
+<p>Indicates whether a function is pure and reasons for any impurity:</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-markdown">- Purity: Not pure (95% confidence)
+  - Reasons: Mutates shared state, Performs I/O operations
+  - **Benefit**: Converting to pure functions improves testability
+</code></pre>
+<p><strong>Purity Assessment:</strong></p>
+<ul>
+<li><strong>Is Pure:</strong> Boolean indicating if the function is pure (deterministic, no side effects)</li>
+<li><strong>Confidence Level:</strong> Percentage confidence in the assessment (0-100%)</li>
+<li><strong>Impurity Reasons:</strong> Specific reasons why the function is not pure</li>
+</ul>
+<p><strong>Common Impurity Reasons:</strong></p>
+<ul>
+<li>Mutates shared or global state</li>
+<li>Performs I/O operations</li>
+<li>Calls other impure functions</li>
+<li>Uses random number generation</li>
+<li>Depends on system time or external state</li>
+</ul>
+<p><strong>Value of Pure Functions:</strong></p>
+<ul>
+<li>Easier to test (no setup/teardown needed)</li>
+<li>Easier to reason about (same input always gives same output)</li>
+<li>Safe to parallelize and memoize</li>
+<li>More composable and reusable</li>
+</ul>
+<h3 id="enabling-data-flow-analysis"><a class="header" href="#enabling-data-flow-analysis">Enabling Data Flow Analysis</a></h3>
+<p>Data flow analysis appears in markdown output when using verbose mode:</p>
+<pre><code class="language-bash"># Include data flow analysis in markdown reports
+debtmap analyze . --format markdown -v
+
+# Higher verbosity includes more details
+debtmap analyze . --format markdown -vv
+</code></pre>
+<p>The data flow section appears in the score breakdown for each of the top 3 priority items, providing actionable insights for refactoring.</p>
+<pre><code>
+### CLI vs Library Markdown Features
+
+**CLI Markdown Output (`--format markdown`):**
+
+When you use `debtmap analyze . --format markdown`, you get comprehensive reports that include:
+
+- Executive summary with health dashboard
+- Complexity analysis with refactoring recommendations
+- Technical debt categorization by priority
+- Dependency analysis with circular reference detection
+- Actionable recommendations
+
+This uses the base `MarkdownWriter` implementation and provides everything needed for documentation and PR comments.
+
+**Enhanced Library Features:**
+
+If you're using debtmap as a Rust library in your own tools, additional markdown capabilities are available:
+
+- **`EnhancedMarkdownWriter` trait** (`src/io/writers/markdown/enhanced.rs`) - Provides advanced formatting and analysis features
+- **Enhanced markdown modules** (`src/io/writers/enhanced_markdown/`) - Building blocks for custom visualizations including:
+  - Priority-based debt rankings with unified scoring
+  - Dead code detection and reporting
+  - Call graph insights and dependency visualization
+  - Testing recommendations with ROI analysis
+
+To use enhanced features in your Rust code:
+
+```rust
+use debtmap::io::writers::markdown::enhanced::EnhancedMarkdownWriter;
 use debtmap::io::writers::enhanced_markdown::*;
 
 // Create custom reports with enhanced features
 let mut writer = create_enhanced_writer(output)?;
 writer.write_priority_rankings(&amp;analysis)?;
 writer.write_dead_code_analysis(&amp;call_graph)?;
-<span class="boring">}</span></code></pre>
+</code></pre>
 <blockquote>
 <p><strong>Note:</strong> Enhanced markdown features are only available through the library API, not via the CLI. The CLI <code>--format markdown</code> output is comprehensive for most use cases.</p>
 </blockquote>
