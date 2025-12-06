@@ -63,23 +63,27 @@ pub fn render(
             );
 
             lines.push(Line::from(vec![
-                Span::raw("  Adjusted Complexity: "),
+                Span::raw("  Cognitive Complexity: "),
                 Span::styled(
                     format!(
-                        "{} → {} (cyclomatic)",
-                        entropy.original_complexity, entropy.adjusted_complexity
+                        "{} → {} (dampened)",
+                        entropy.original_complexity, entropy.adjusted_cognitive
                     ),
                     Style::default().fg(theme.primary),
                 ),
             ]));
             lines.push(Line::from(vec![
-                Span::raw("                       "),
+                Span::raw("  Cyclomatic Complexity: "),
                 Span::styled(
-                    format!(
-                        "{} → {} (cognitive)",
-                        item.cognitive_complexity, entropy.adjusted_cognitive
-                    ),
-                    Style::default().fg(theme.primary),
+                    format!("{} (unchanged)", item.cyclomatic_complexity),
+                    Style::default().fg(theme.muted),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(
+                    "Pattern repetition reduces cognitive load, not path count",
+                    Style::default().fg(theme.muted),
                 ),
             ]));
         } else {

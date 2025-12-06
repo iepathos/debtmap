@@ -129,15 +129,14 @@ pub fn has_t3_cyclomatic(cyclomatic: u32, threshold: u32) -> bool {
 // HELPER FUNCTIONS (Pure, for extracting values from debt types)
 // ============================================================================
 
-/// Extract effective cyclomatic from complexity hotspot debt type.
-/// Returns adjusted_cyclomatic if available, otherwise raw cyclomatic.
+/// Extract cyclomatic complexity from complexity hotspot debt type.
+/// Note: Returns raw cyclomatic (not dampened) as it's a structural metric.
 pub fn extract_effective_cyclomatic(debt_type: &DebtType) -> Option<u32> {
     match debt_type {
         DebtType::ComplexityHotspot {
-            adjusted_cyclomatic,
             cyclomatic,
             ..
-        } => Some(adjusted_cyclomatic.unwrap_or(*cyclomatic)),
+        } => Some(*cyclomatic),
         _ => None,
     }
 }

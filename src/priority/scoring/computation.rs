@@ -13,6 +13,11 @@ use crate::priority::{
 
 /// Helper function to calculate entropy details from FunctionMetrics
 /// Pure function - transforms function metrics into entropy details
+///
+/// Note: Entropy dampening only applies to cognitive complexity, not cyclomatic.
+/// Cyclomatic complexity is a structural metric (number of execution paths) that
+/// doesn't change based on pattern repetition. Cognitive complexity is a perceptual
+/// metric (how hard to understand) that is reduced by repetitive patterns.
 pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
     func.entropy_score.as_ref().map(|entropy_score| {
         // Use the new framework's dampening calculation
@@ -22,14 +27,15 @@ pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetail
         let dampening_value = calculator.apply_dampening(entropy_score);
         let dampening_factor = (dampening_value / 2.0).clamp(0.5, 1.0); // Normalize to 0.5-1.0 range
 
-        let adjusted_cyclomatic = (func.cyclomatic as f64 * dampening_factor) as u32;
+        // Only apply dampening to cognitive complexity (perceptual metric)
+        // NOT to cyclomatic complexity (structural metric - path count doesn't change)
         let adjusted_cognitive = (func.cognitive as f64 * dampening_factor) as u32;
 
         EntropyDetails {
             entropy_score: entropy_score.token_entropy,
             pattern_repetition: entropy_score.pattern_repetition,
-            original_complexity: func.cyclomatic,
-            adjusted_complexity: adjusted_cyclomatic,
+            original_complexity: func.cognitive,  // Store original cognitive, not cyclomatic
+            adjusted_complexity: adjusted_cognitive,  // Deprecated: same as adjusted_cognitive
             dampening_factor,
             adjusted_cognitive,
         }
@@ -180,12 +186,10 @@ pub(super) fn calculate_complexity_reduction(debt_type: &DebtType, is_complex: b
         DebtType::TestingGap { cyclomatic, .. } if is_complex => *cyclomatic as f64 * 0.3,
         DebtType::ComplexityHotspot {
             cyclomatic,
-            adjusted_cyclomatic,
             ..
         } => {
-            // Use adjusted complexity if available (spec 182)
-            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
-            effective_cyclomatic as f64 * 0.5
+            // Use raw cyclomatic - complexity reduction potential is based on structural complexity
+            *cyclomatic as f64 * 0.5
         }
         DebtType::TestComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.3,
         // Organization debt types - significant complexity reduction potential

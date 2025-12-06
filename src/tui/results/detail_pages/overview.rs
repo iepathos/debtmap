@@ -134,14 +134,15 @@ pub fn render(
                 theme,
             );
 
-            // Show original vs adjusted complexity
+            // Show original vs adjusted cognitive complexity
+            // Note: Only cognitive is dampened, not cyclomatic (structural metric)
             if entropy.dampening_factor < 1.0 {
                 lines.push(Line::from(vec![
-                    Span::raw("  Complexity Reduction: "),
+                    Span::raw("  Cognitive Reduction: "),
                     Span::styled(
                         format!(
-                            "{} → {} (cyclomatic)",
-                            entropy.original_complexity, entropy.adjusted_complexity
+                            "{} → {} (cognitive)",
+                            entropy.original_complexity, entropy.adjusted_cognitive
                         ),
                         Style::default().fg(theme.primary),
                     ),
@@ -149,11 +150,8 @@ pub fn render(
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled(
-                        format!(
-                            "{} → {} (cognitive)",
-                            item.cognitive_complexity, entropy.adjusted_cognitive
-                        ),
-                        Style::default().fg(theme.primary),
+                        "(Cyclomatic unchanged - structural metric)",
+                        Style::default().fg(theme.muted),
                     ),
                 ]));
             }
