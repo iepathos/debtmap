@@ -105,16 +105,26 @@ pub fn create_unified_debt_item_enhanced(
     let recommendation = generate_recommendation(func, &debt_type, role, &unified_score)?;
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-    // Get caller and callee names
-    let upstream_callers = call_graph.get_callers(&func_id);
-    let downstream_callees = call_graph.get_callees(&func_id);
-
-    let upstream_caller_names: Vec<String> =
-        upstream_callers.iter().map(|id| id.name.clone()).collect();
-    let downstream_callee_names: Vec<String> = downstream_callees
-        .iter()
-        .map(|id| id.name.clone())
-        .collect();
+    // Use pre-populated call graph data from FunctionMetrics if available,
+    // otherwise fall back to querying the call graph directly
+    let (upstream_caller_names, downstream_callee_names) =
+        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
+            (
+                func.upstream_callers.clone().unwrap_or_default(),
+                func.downstream_callees.clone().unwrap_or_default(),
+            )
+        } else {
+            // Fallback: query call graph directly
+            let upstream_callers = call_graph.get_callers(&func_id);
+            let downstream_callees = call_graph.get_callees(&func_id);
+            (
+                upstream_callers.iter().map(|id| id.name.clone()).collect(),
+                downstream_callees
+                    .iter()
+                    .map(|id| id.name.clone())
+                    .collect(),
+            )
+        };
 
     // Detect function context (spec 122)
     let context_detector = crate::analysis::ContextDetector::new();
@@ -152,8 +162,8 @@ pub fn create_unified_debt_item_enhanced(
         recommendation,
         expected_impact,
         transitive_coverage,
-        upstream_dependencies: upstream_callers.len(),
-        downstream_dependencies: downstream_callees.len(),
+        upstream_dependencies: upstream_caller_names.len(),
+        downstream_dependencies: downstream_callee_names.len(),
         upstream_callers: upstream_caller_names,
         downstream_callees: downstream_callee_names,
         nesting_depth: func.nesting,
@@ -310,15 +320,33 @@ struct DependencyMetrics {
     downstream_names: Vec<String>,
 }
 
-fn extract_dependency_metrics(func_id: &FunctionId, call_graph: &CallGraph) -> DependencyMetrics {
-    let upstream = call_graph.get_callers(func_id);
-    let downstream = call_graph.get_callees(func_id);
+fn extract_dependency_metrics(
+    func: &FunctionMetrics,
+    func_id: &FunctionId,
+    call_graph: &CallGraph,
+) -> DependencyMetrics {
+    // Use pre-populated call graph data from FunctionMetrics if available
+    let (upstream_names, downstream_names) =
+        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
+            (
+                func.upstream_callers.clone().unwrap_or_default(),
+                func.downstream_callees.clone().unwrap_or_default(),
+            )
+        } else {
+            // Fallback: query call graph directly
+            let upstream = call_graph.get_callers(func_id);
+            let downstream = call_graph.get_callees(func_id);
+            (
+                upstream.iter().map(|f| f.name.clone()).collect(),
+                downstream.iter().map(|f| f.name.clone()).collect(),
+            )
+        };
 
     DependencyMetrics {
-        upstream_count: upstream.len(),
-        downstream_count: downstream.len(),
-        upstream_names: upstream.iter().map(|f| f.name.clone()).collect(),
-        downstream_names: downstream.iter().map(|f| f.name.clone()).collect(),
+        upstream_count: upstream_names.len(),
+        downstream_count: downstream_names.len(),
+        upstream_names,
+        downstream_names,
     }
 }
 
@@ -449,7 +477,7 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     )?;
 
     // Step 3: Extract dependencies (pure)
-    let deps = extract_dependency_metrics(&func_id, call_graph);
+    let deps = extract_dependency_metrics(func, &func_id, call_graph);
 
     // Step 4: Build final item (pure)
     let mut item = build_unified_debt_item(func, context, deps);
@@ -552,9 +580,22 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     // Calculate expected impact
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-    // Get dependency information
-    let upstream = call_graph.get_callers(&func_id);
-    let downstream = call_graph.get_callees(&func_id);
+    // Use pre-populated call graph data from FunctionMetrics if available
+    let (upstream_caller_names, downstream_callee_names) =
+        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
+            (
+                func.upstream_callers.clone().unwrap_or_default(),
+                func.downstream_callees.clone().unwrap_or_default(),
+            )
+        } else {
+            // Fallback: query call graph directly
+            let upstream = call_graph.get_callers(&func_id);
+            let downstream = call_graph.get_callees(&func_id);
+            (
+                upstream.iter().map(|f| f.name.clone()).collect(),
+                downstream.iter().map(|f| f.name.clone()).collect(),
+            )
+        };
 
     // Detect function context (spec 122)
     let context_detector = crate::analysis::ContextDetector::new();
@@ -592,10 +633,10 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         recommendation,
         expected_impact,
         transitive_coverage,
-        upstream_dependencies: upstream.len(),
-        downstream_dependencies: downstream.len(),
-        upstream_callers: upstream.iter().map(|f| f.name.clone()).collect(),
-        downstream_callees: downstream.iter().map(|f| f.name.clone()).collect(),
+        upstream_dependencies: upstream_caller_names.len(),
+        downstream_dependencies: downstream_callee_names.len(),
+        upstream_callers: upstream_caller_names,
+        downstream_callees: downstream_callee_names,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
@@ -668,16 +709,25 @@ pub fn create_unified_debt_item_with_data_flow(
     )?;
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-    // Get dependency counts and names from call graph
-    let upstream_callers = call_graph.get_callers(&func_id);
-    let downstream_callees = call_graph.get_callees(&func_id);
-
-    let upstream_caller_names: Vec<String> =
-        upstream_callers.iter().map(|id| id.name.clone()).collect();
-    let downstream_callee_names: Vec<String> = downstream_callees
-        .iter()
-        .map(|id| id.name.clone())
-        .collect();
+    // Use pre-populated call graph data from FunctionMetrics if available
+    let (upstream_caller_names, downstream_callee_names) =
+        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
+            (
+                func.upstream_callers.clone().unwrap_or_default(),
+                func.downstream_callees.clone().unwrap_or_default(),
+            )
+        } else {
+            // Fallback: query call graph directly
+            let upstream_callers = call_graph.get_callers(&func_id);
+            let downstream_callees = call_graph.get_callees(&func_id);
+            (
+                upstream_callers.iter().map(|id| id.name.clone()).collect(),
+                downstream_callees
+                    .iter()
+                    .map(|id| id.name.clone())
+                    .collect(),
+            )
+        };
 
     // Calculate entropy details
     let entropy_details = calculate_entropy_details(func);
@@ -715,8 +765,8 @@ pub fn create_unified_debt_item_with_data_flow(
         recommendation,
         expected_impact,
         transitive_coverage,
-        upstream_dependencies: upstream_callers.len(),
-        downstream_dependencies: downstream_callees.len(),
+        upstream_dependencies: upstream_caller_names.len(),
+        downstream_dependencies: downstream_callee_names.len(),
         upstream_callers: upstream_caller_names,
         downstream_callees: downstream_callee_names,
         nesting_depth: func.nesting,
