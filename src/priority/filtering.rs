@@ -7,11 +7,13 @@
 use super::tiers::RecommendationTier;
 use super::DebtItem;
 
-/// Metrics tracking filtering decisions.
+/// Metrics tracking filtering decisions with tier awareness.
 ///
 /// Pure, immutable data structure that records what was filtered and why.
 /// This enables transparency in filtering decisions, making it clear to users
 /// what items were excluded from the analysis output.
+///
+/// Tracks items filtered by tier (T4), score (T3/T4), and tier bypass (T1/T2).
 #[derive(Debug, Clone, PartialEq)]
 pub struct FilterMetrics {
     /// Total items before filtering
@@ -25,6 +27,9 @@ pub struct FilterMetrics {
 
     /// Items filtered because debt type disabled
     pub filtered_by_debt_type: usize,
+
+    /// Items with T1/T2 tier included despite score below threshold
+    pub tier_critical_bypass: usize,
 
     /// Items included in final output
     pub included: usize,
@@ -44,6 +49,7 @@ impl FilterMetrics {
             filtered_t4_maintenance: 0,
             filtered_below_score: 0,
             filtered_by_debt_type: 0,
+            tier_critical_bypass: 0,
             included: 0,
             min_score_threshold: 0.0,
             show_t4: false,
@@ -134,6 +140,34 @@ impl FilterResult {
     }
 }
 
+/// Checks if a tier is architecturally critical (T1 or T2).
+///
+/// Critical tier items bypass score threshold filtering because they
+/// represent architectural issues (error handling, god objects, extreme
+/// complexity) that should always be visible regardless of calculated score.
+///
+/// # Arguments
+/// * `tier` - The recommendation tier to check
+///
+/// # Returns
+/// `true` if tier is T1CriticalArchitecture or T2ComplexUntested
+///
+/// # Examples
+/// ```
+/// use debtmap::priority::filtering::is_critical_tier;
+/// use debtmap::priority::tiers::RecommendationTier;
+///
+/// assert!(is_critical_tier(RecommendationTier::T1CriticalArchitecture));
+/// assert!(is_critical_tier(RecommendationTier::T2ComplexUntested));
+/// assert!(!is_critical_tier(RecommendationTier::T3TestingGaps));
+/// ```
+pub fn is_critical_tier(tier: RecommendationTier) -> bool {
+    matches!(
+        tier,
+        RecommendationTier::T1CriticalArchitecture | RecommendationTier::T2ComplexUntested
+    )
+}
+
 /// Filters items with metric collection (pure, functional).
 ///
 /// This is a pure function that partitions items and tracks filtering decisions.
@@ -162,16 +196,25 @@ pub fn filter_with_metrics(items: Vec<ClassifiedItem>, config: &FilterConfig) ->
     let total = items.len();
     let mut metrics = FilterMetrics::new(total, config.min_score, config.show_t4);
 
-    // Partition items into included/excluded (pure)
+    // Partition items into included/excluded with tier-aware filtering
     let included: Vec<_> = items
         .into_iter()
         .filter_map(|classified_item| {
-            // Track why items are filtered
+            // Step 1: Critical tiers (T1/T2) bypass score filter
+            if is_critical_tier(classified_item.tier) {
+                if classified_item.score < config.min_score {
+                    metrics.tier_critical_bypass += 1;
+                }
+                return Some(classified_item.item);
+            }
+
+            // Step 2: T4 maintenance filtered by tier flag
             if !tier_passes(classified_item.tier, config) {
                 metrics.filtered_t4_maintenance += 1;
                 return None;
             }
 
+            // Step 3: T3 (and T4 if shown) filtered by score
             if !score_passes(classified_item.score, config.min_score) {
                 metrics.filtered_below_score += 1;
                 return None;
@@ -261,5 +304,289 @@ mod tests {
         assert!(score_passes(3.0, 3.0));
         assert!(!score_passes(2.9, 3.0));
         assert!(!score_passes(0.0, 3.0));
+    }
+
+    // Helper function for creating test debt items
+    fn create_test_debt_item() -> super::super::DebtItem {
+        use super::super::{
+            ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedDebtItem,
+            UnifiedScore,
+        };
+        use crate::priority::semantic_classifier::FunctionRole;
+
+        super::super::DebtItem::Function(Box::new(UnifiedDebtItem {
+            location: Location {
+                file: "test.rs".into(),
+                function: "test_fn".to_string(),
+                line: 1,
+            },
+            debt_type: DebtType::Complexity,
+            unified_score: UnifiedScore {
+                complexity_factor: 0.0,
+                coverage_factor: 0.0,
+                dependency_factor: 0.0,
+                role_multiplier: 1.0,
+                final_score: 5.0,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+            },
+            function_role: FunctionRole::CoreLogic,
+            recommendation: ActionableRecommendation {
+                action: "Refactor".to_string(),
+                rationale: "Test".to_string(),
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                maintainability_gain: 0.0,
+                test_effort: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 0,
+            function_length: 10,
+            cyclomatic_complexity: 1,
+            cognitive_complexity: 1,
+            entropy_details: None,
+            entropy_adjusted_cyclomatic: None,
+            entropy_adjusted_cognitive: None,
+            entropy_dampening_factor: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+        }))
+    }
+
+    // Tier-aware filtering tests (Spec 205)
+
+    #[test]
+    fn test_t1_bypasses_score_filter() {
+        let items = vec![ClassifiedItem {
+            item: create_test_debt_item(),
+            tier: RecommendationTier::T1CriticalArchitecture,
+            score: 2.5, // Below default threshold of 3.0
+        }];
+
+        let config = FilterConfig::default();
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(result.metrics.included, 1, "T1 item should be included");
+        assert_eq!(
+            result.metrics.tier_critical_bypass, 1,
+            "Should track bypass"
+        );
+        assert_eq!(
+            result.metrics.filtered_below_score, 0,
+            "Score filter not applied"
+        );
+    }
+
+    #[test]
+    fn test_t2_bypasses_high_threshold() {
+        let items = vec![ClassifiedItem {
+            item: create_test_debt_item(),
+            tier: RecommendationTier::T2ComplexUntested,
+            score: 2.0, // Far below threshold
+        }];
+
+        let config = FilterConfig {
+            min_score: 5.0, // High threshold
+            show_t4: false,
+        };
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(
+            result.metrics.included, 1,
+            "T2 item should bypass threshold"
+        );
+        assert_eq!(result.metrics.tier_critical_bypass, 1);
+    }
+
+    #[test]
+    fn test_t3_respects_score_threshold() {
+        let items = vec![ClassifiedItem {
+            item: create_test_debt_item(),
+            tier: RecommendationTier::T3TestingGaps,
+            score: 2.5, // Below threshold
+        }];
+
+        let config = FilterConfig::default(); // threshold 3.0
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(result.metrics.included, 0, "T3 should be filtered by score");
+        assert_eq!(result.metrics.filtered_below_score, 1);
+        assert_eq!(result.metrics.tier_critical_bypass, 0);
+    }
+
+    #[test]
+    fn test_t4_filtered_by_tier_flag() {
+        let items = vec![ClassifiedItem {
+            item: create_test_debt_item(),
+            tier: RecommendationTier::T4Maintenance,
+            score: 5.0, // High score, but T4
+        }];
+
+        let config = FilterConfig {
+            min_score: 3.0,
+            show_t4: false, // T4 hidden
+        };
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(result.metrics.included, 0, "T4 should be filtered by tier");
+        assert_eq!(result.metrics.filtered_t4_maintenance, 1);
+        assert_eq!(result.metrics.filtered_below_score, 0);
+    }
+
+    #[test]
+    fn test_metrics_track_tier_bypass() {
+        let items = vec![
+            ClassifiedItem {
+                tier: RecommendationTier::T1CriticalArchitecture,
+                score: 1.0,
+                item: create_test_debt_item(),
+            },
+            ClassifiedItem {
+                tier: RecommendationTier::T1CriticalArchitecture,
+                score: 2.0,
+                item: create_test_debt_item(),
+            },
+            ClassifiedItem {
+                tier: RecommendationTier::T2ComplexUntested,
+                score: 1.5,
+                item: create_test_debt_item(),
+            },
+        ];
+
+        let config = FilterConfig::default();
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(
+            result.metrics.included, 3,
+            "All critical tier items included"
+        );
+        assert_eq!(
+            result.metrics.tier_critical_bypass, 3,
+            "All 3 bypassed score"
+        );
+        assert_eq!(result.metrics.filtered_below_score, 0);
+    }
+
+    #[test]
+    fn test_is_critical_tier_predicate() {
+        assert!(is_critical_tier(RecommendationTier::T1CriticalArchitecture));
+        assert!(is_critical_tier(RecommendationTier::T2ComplexUntested));
+        assert!(!is_critical_tier(RecommendationTier::T3TestingGaps));
+        assert!(!is_critical_tier(RecommendationTier::T4Maintenance));
+    }
+
+    #[test]
+    fn test_mixed_tiers_filtered_correctly() {
+        let items = vec![
+            // T1 with low score → included
+            ClassifiedItem {
+                tier: RecommendationTier::T1CriticalArchitecture,
+                score: 1.0,
+                item: create_test_debt_item(),
+            },
+            // T2 with low score → included
+            ClassifiedItem {
+                tier: RecommendationTier::T2ComplexUntested,
+                score: 2.0,
+                item: create_test_debt_item(),
+            },
+            // T3 with low score → excluded
+            ClassifiedItem {
+                tier: RecommendationTier::T3TestingGaps,
+                score: 2.5,
+                item: create_test_debt_item(),
+            },
+            // T3 with high score → included
+            ClassifiedItem {
+                tier: RecommendationTier::T3TestingGaps,
+                score: 5.0,
+                item: create_test_debt_item(),
+            },
+            // T4 with show_t4=false → excluded
+            ClassifiedItem {
+                tier: RecommendationTier::T4Maintenance,
+                score: 10.0,
+                item: create_test_debt_item(),
+            },
+        ];
+
+        let config = FilterConfig {
+            min_score: 3.0,
+            show_t4: false,
+        };
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(result.metrics.included, 3, "T1, T2, and high-score T3");
+        assert_eq!(result.metrics.tier_critical_bypass, 2, "T1 and T2 bypassed");
+        assert_eq!(result.metrics.filtered_below_score, 1, "Low-score T3");
+        assert_eq!(result.metrics.filtered_t4_maintenance, 1, "T4 by tier");
+    }
+
+    #[test]
+    fn test_t1_above_threshold_not_counted_as_bypass() {
+        let items = vec![ClassifiedItem {
+            item: create_test_debt_item(),
+            tier: RecommendationTier::T1CriticalArchitecture,
+            score: 5.0, // Above threshold
+        }];
+
+        let config = FilterConfig::default();
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(result.metrics.included, 1, "T1 item should be included");
+        assert_eq!(
+            result.metrics.tier_critical_bypass, 0,
+            "No bypass needed for high score"
+        );
+        assert_eq!(result.metrics.filtered_below_score, 0);
+    }
+
+    #[test]
+    fn test_t4_shown_respects_score_threshold() {
+        let items = vec![ClassifiedItem {
+            item: create_test_debt_item(),
+            tier: RecommendationTier::T4Maintenance,
+            score: 2.0, // Below threshold
+        }];
+
+        let config = FilterConfig {
+            min_score: 3.0,
+            show_t4: true, // T4 shown, so subject to score filter
+        };
+        let result = filter_with_metrics(items, &config);
+
+        assert_eq!(
+            result.metrics.included, 0,
+            "T4 with show_t4=true should be filtered by score"
+        );
+        assert_eq!(result.metrics.filtered_t4_maintenance, 0);
+        assert_eq!(
+            result.metrics.filtered_below_score, 1,
+            "T4 filtered by score, not tier"
+        );
     }
 }
