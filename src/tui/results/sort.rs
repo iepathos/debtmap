@@ -89,7 +89,7 @@ pub fn sort_indices(indices: &mut [usize], analysis: &UnifiedAnalysis, criteria:
             });
         }
         SortCriteria::Coverage => {
-            // Sort by coverage ascending (lowest coverage first, None first)
+            // Sort by coverage ascending (lowest coverage first, None first), with stable tiebreaker
             indices.sort_by(|&a, &b| {
                 let cov_a = analysis
                     .items
@@ -100,21 +100,29 @@ pub fn sort_indices(indices: &mut [usize], analysis: &UnifiedAnalysis, criteria:
                     .get(b)
                     .and_then(|item| item.transitive_coverage.as_ref().map(|c| c.direct));
 
-                match (cov_a, cov_b) {
-                    (None, None) => std::cmp::Ordering::Equal,
-                    (None, Some(_)) => std::cmp::Ordering::Less, // No coverage is worst
-                    (Some(_), None) => std::cmp::Ordering::Greater,
-                    (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
+                let primary = match (cov_a, cov_b) {
+                    (None, None) => Ordering::Equal,
+                    (None, Some(_)) => Ordering::Less, // No coverage is worst
+                    (Some(_), None) => Ordering::Greater,
+                    (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Equal),
+                };
+
+                match primary {
+                    Ordering::Equal => tiebreaker(analysis, a, b),
+                    other => other,
                 }
             });
         }
         SortCriteria::Complexity => {
-            // Sort by complexity descending (highest complexity first)
+            // Sort by complexity descending (highest complexity first), with stable tiebreaker
             indices.sort_by(|&a, &b| {
                 let comp_a = analysis.items.get(a).map(|item| item.cyclomatic_complexity);
                 let comp_b = analysis.items.get(b).map(|item| item.cyclomatic_complexity);
 
-                comp_b.cmp(&comp_a)
+                match comp_b.cmp(&comp_a) {
+                    Ordering::Equal => tiebreaker(analysis, a, b),
+                    other => other,
+                }
             });
         }
         SortCriteria::FilePath => {
