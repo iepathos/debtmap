@@ -112,7 +112,31 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             app.set_view_mode(ViewMode::List);
         }
 
-        // Navigate to next/previous item
+        // Page navigation
+        KeyCode::Tab | KeyCode::Right => {
+            let next_page = app.detail_page().next();
+            app.set_detail_page(next_page);
+        }
+        KeyCode::BackTab | KeyCode::Left => {
+            let prev_page = app.detail_page().prev();
+            app.set_detail_page(prev_page);
+        }
+
+        // Jump to specific page
+        KeyCode::Char('1') => {
+            app.set_detail_page(super::app::DetailPage::Overview);
+        }
+        KeyCode::Char('2') => {
+            app.set_detail_page(super::app::DetailPage::Dependencies);
+        }
+        KeyCode::Char('3') => {
+            app.set_detail_page(super::app::DetailPage::GitContext);
+        }
+        KeyCode::Char('4') => {
+            app.set_detail_page(super::app::DetailPage::Patterns);
+        }
+
+        // Navigate to next/previous item (preserve page)
         KeyCode::Char('n') | KeyCode::Down | KeyCode::Char('j') => {
             move_selection(app, 1);
         }

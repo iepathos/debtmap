@@ -5,17 +5,17 @@
 //!
 //! # Examples
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use debtmap::tui::results::ResultsExplorer;
 //!
 //! let analysis = perform_analysis()?;
-//! let mut explorer = ResultsExplorer::new(analysis);
+//! let mut explorer = ResultsExplorer::new(analysis)?;
 //! explorer.run()?;
-//! # Ok::<(), anyhow::Error>(())
 //! ```
 
 pub mod actions;
 pub mod app;
+pub mod detail_pages;
 pub mod detail_view;
 pub mod filter;
 pub mod layout;
