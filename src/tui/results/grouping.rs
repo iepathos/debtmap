@@ -163,23 +163,23 @@ pub fn aggregate_metrics<'a>(group: &LocationGroup<'a>) -> AggregatedMetrics<'a>
 /// Calculate severity level from score
 fn calculate_severity(score: f64) -> &'static str {
     if score >= 100.0 {
-        "CRITICAL"
+        "critical"
     } else if score >= 50.0 {
-        "HIGH"
+        "high"
     } else if score >= 10.0 {
-        "MEDIUM"
+        "medium"
     } else {
-        "LOW"
+        "low"
     }
 }
 
 /// Get numeric rank for severity (higher = more severe)
 fn severity_rank(severity: &str) -> u8 {
     match severity {
-        "CRITICAL" => 4,
-        "HIGH" => 3,
-        "MEDIUM" => 2,
-        "LOW" => 1,
+        "critical" => 4,
+        "high" => 3,
+        "medium" => 2,
+        "low" => 1,
         _ => 0,
     }
 }
@@ -316,11 +316,11 @@ mod tests {
     #[test]
     fn test_max_severity() {
         let items = vec![
-            create_test_item("file.rs", "func", 10, 75.0),  // HIGH
-            create_test_item("file.rs", "func", 10, 120.0), // CRITICAL
-            create_test_item("file.rs", "func", 10, 45.0),  // MEDIUM
+            create_test_item("file.rs", "func", 10, 75.0),  // high
+            create_test_item("file.rs", "func", 10, 120.0), // critical
+            create_test_item("file.rs", "func", 10, 45.0),  // medium
         ];
         let groups = group_by_location(items.iter(), SortCriteria::Score);
-        assert_eq!(groups[0].max_severity, "CRITICAL");
+        assert_eq!(groups[0].max_severity, "critical");
     }
 }
