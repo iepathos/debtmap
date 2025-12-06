@@ -184,12 +184,180 @@ For comparison, here's how a **God Module** (file with many functions, not a cla
 - Methods: 0 (indicates no dominant struct)
 - Recommendation focuses on module organization instead of class extraction
 
-## Detail View - Impact Page (Page 2/5)
+## Detail View - Dependencies Page (Page 2/5)
 
-Shows the expected impact of fixing the god object:
+Shows file-level dependencies for the god object:
 
 ```
-┌─ Item Details (2/5: Impact) ────────────────────────────────────────────┐
+┌─ Item Details (2/5: Dependencies) ──────────────────────────────────────┐
+│                                                                          │
+│ FILE DEPENDENCIES                                                        │
+│   Files that import/use src/main.rs: 0                                  │
+│   Files imported by src/main.rs: 23                                     │
+│                                                                          │
+│ IMPORTED MODULES                                                         │
+│   1. src/analyzers/rust.rs                                               │
+│   2. src/analyzers/python.rs                                             │
+│   3. src/builders/unified_analysis.rs                                    │
+│   4. src/priority/mod.rs                                                 │
+│   5. src/io/writers/markdown.rs                                          │
+│   6. src/tui/mod.rs                                                      │
+│   7. src/config.rs                                                       │
+│   8. clap (external)                                                     │
+│   9. anyhow (external)                                                   │
+│   ... 14 more                                                            │
+│                                                                          │
+│ DEPENDENCY METRICS                                                       │
+│   Internal Dependencies: 15                                              │
+│   External Dependencies: 8                                               │
+│   Blast Radius: 23 files (changes to main.rs affect 0 files)            │
+│                                                                          │
+│ COUPLING ANALYSIS                                                        │
+│   Import Fanout: 23 (imports many modules)                              │
+│   Export Fanin: 0 (entry point, not imported)                           │
+│   Coupling Level: HIGH (entry points typically high)                    │
+│                                                                          │
+│ IMPACT OF SPLITTING                                                      │
+│   Current: Single file imports 23 modules                                │
+│   After Split: 3 focused files importing ~8 modules each                │
+│   Benefit: Reduced coupling, clearer module boundaries                  │
+│                                                                          │
+│ NOTE: This is an entry point file (main.rs), so it's not imported by    │
+│       other files. High import count suggests too many responsibilities.│
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ Press ◀▶/hl:Pages  ↑↓/jk:Scroll  ←/q:Back  ?:Help                       │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+## Detail View - Git Context Page (Page 3/5)
+
+Shows git history and change patterns for the god object file:
+
+```
+┌─ Item Details (3/5: Git Context) ───────────────────────────────────────┐
+│                                                                          │
+│ GIT HISTORY                                                              │
+│   Total Commits: 247                                                     │
+│   First Commit: 2023-01-15 (Initial implementation)                     │
+│   Last Modified: 2025-12-01 (2 days ago)                                │
+│   File Age: 687 days                                                     │
+│                                                                          │
+│ CHANGE FREQUENCY                                                         │
+│   Commits per Month: 10.8                                                │
+│   Changes Last 30 Days: 12                                               │
+│   Changes Last 90 Days: 34                                               │
+│   Change Trend: INCREASING (high churn)                                 │
+│                                                                          │
+│ CONTRIBUTORS                                                             │
+│   Total Contributors: 8                                                  │
+│   Primary Author: alice@example.com (142 commits, 57%)                  │
+│   Recent Contributors:                                                   │
+│     - bob@example.com (45 commits, 18%)                                 │
+│     - charlie@example.com (28 commits, 11%)                             │
+│     - diana@example.com (18 commits, 7%)                                │
+│     ... 4 more                                                           │
+│                                                                          │
+│ HOTSPOT ANALYSIS                                                         │
+│   This file is a HOTSPOT (high churn + high complexity)                 │
+│   Risk Level: CRITICAL                                                   │
+│   Priority for Refactoring: URGENT                                      │
+│                                                                          │
+│ CHANGE IMPACT                                                            │
+│   Lines Added: 3,247                                                     │
+│   Lines Deleted: 1,631                                                   │
+│   Net Growth: +1,616 lines                                               │
+│   Growth Rate: Steady increase (indicates accumulating responsibility)  │
+│                                                                          │
+│ RECENT COMMIT MESSAGES (Last 5)                                          │
+│   1. [2 days ago] Fix bug in request handling logic                     │
+│   2. [1 week ago] Add new data processing pipeline                      │
+│   3. [2 weeks ago] Refactor configuration parsing                       │
+│   4. [3 weeks ago] Update error handling                                │
+│   5. [1 month ago] Add support for new file format                      │
+│                                                                          │
+│ NOTE: High churn on this god object indicates ongoing pain. Splitting   │
+│       will reduce future merge conflicts and make changes safer.        │
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ Press ◀▶/hl:Pages  ↑↓/jk:Scroll  ←/q:Back  ?:Help                       │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+## Detail View - Patterns Page (Page 4/5)
+
+Shows detected patterns and responsibility breakdown:
+
+```
+┌─ Item Details (4/5: Patterns) ──────────────────────────────────────────┐
+│                                                                          │
+│ DETECTED ANTI-PATTERNS                                                   │
+│   1. God Object (Definite)                                               │
+│      - 49 methods, 87 fields, 8 responsibilities                        │
+│      - Violates Single Responsibility Principle                         │
+│                                                                          │
+│   2. High Coupling                                                       │
+│      - Imports 23 modules                                                │
+│      - Many methods share large portion of fields                       │
+│                                                                          │
+│   3. Long File                                                           │
+│      - 1616 lines (threshold: 500)                                       │
+│      - Difficult to navigate and understand                             │
+│                                                                          │
+│ RESPONSIBILITY BREAKDOWN                                                 │
+│   The file has 8 distinct responsibilities:                              │
+│                                                                          │
+│   1. Input/Argument Parsing (23 functions)                               │
+│      - parse_cli_args, validate_input, setup_config                     │
+│      - Process command line arguments and configuration                 │
+│                                                                          │
+│   2. Data Processing (18 functions)                                      │
+│      - process_file, transform_data, aggregate_results                  │
+│      - Core business logic and transformations                          │
+│                                                                          │
+│   3. Output Formatting (15 functions)                                    │
+│      - format_markdown, write_json, render_tui                          │
+│      - Various output format generators                                 │
+│                                                                          │
+│   4. Error Handling (12 functions)                                       │
+│      - handle_error, log_warning, recover_from_failure                  │
+│      - Error recovery and logging                                       │
+│                                                                          │
+│   5. File I/O Operations (10 functions)                                  │
+│      - read_file, write_output, scan_directory                          │
+│      - Filesystem interactions                                          │
+│                                                                          │
+│   6. Analysis Coordination (8 functions)                                 │
+│      - run_analysis, coordinate_workers, merge_results                  │
+│      - Orchestration logic                                              │
+│                                                                          │
+│   7. Caching/Memoization (3 functions)                                   │
+│      - cache_result, invalidate_cache, load_cached                      │
+│      - Performance optimization                                         │
+│                                                                          │
+│   8. Logging/Telemetry (2 functions)                                     │
+│      - log_metric, send_telemetry                                       │
+│      - Observability                                                    │
+│                                                                          │
+│ SUGGESTED ORGANIZATION                                                   │
+│   Split into 3 focused modules:                                          │
+│     - input_handler: Responsibilities 1, 4, 5                           │
+│     - core_processor: Responsibilities 2, 6                             │
+│     - output_writer: Responsibilities 3, 7, 8                           │
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ Press ◀▶/hl:Pages  ↑↓/jk:Scroll  ←/q:Back  ?:Help                       │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+## Detail View - Impact & Recommendations (Page 5/5)
+
+**Note:** For god objects, page 5 shows impact analysis instead of data flow (which only applies to functions).
+
+Shows expected impact of fixing the god object:
+
+```
+┌─ Item Details (5/5: Impact & Recommendations) ──────────────────────────┐
 │                                                                          │
 │ EXPECTED IMPACT                                                          │
 │   Complexity Reduction: -66 (200 → 134 across 3 modules)                │
@@ -200,9 +368,9 @@ Shows the expected impact of fixing the god object:
 │ COMPLEXITY BREAKDOWN                                                     │
 │   Current Total Complexity: 200                                          │
 │   After Split (estimated):                                               │
-│     Module 1: 73 complexity (23 functions, avg: 3.2)                    │
-│     Module 2: 36 complexity (18 functions, avg: 2.0)                    │
-│     Module 3: 25 complexity (15 functions, avg: 1.7)                    │
+│     Module 1 (input_handler): 73 complexity (36 funcs, avg: 2.0)        │
+│     Module 2 (core_processor): 36 complexity (26 funcs, avg: 1.4)       │
+│     Module 3 (output_writer): 25 complexity (20 funcs, avg: 1.3)        │
 │   Total Reduction: 66 points (33%)                                       │
 │                                                                          │
 │ MAINTAINABILITY FACTORS                                                  │
@@ -210,22 +378,40 @@ Shows the expected impact of fixing the god object:
 │     - 8 responsibilities in single file                                  │
 │     - 49 methods sharing 87 fields (high state coupling)                │
 │     - Average function sees 65% of all fields (tight coupling)          │
+│     - 23 module imports (high dependency fanout)                        │
 │                                                                          │
 │   After Split:                                                           │
 │     - 3 focused modules with 2-3 responsibilities each                  │
 │     - Reduced method-to-field ratios (better encapsulation)             │
 │     - Clear module boundaries and interfaces                            │
+│     - Each module imports ~8 dependencies (reduced coupling)            │
 │                                                                          │
 │ RISK REDUCTION                                                           │
 │   Current Risks:                                                         │
 │     - Changes impact multiple unrelated features                        │
-│     - Testing requires understanding entire file                        │
-│     - Merge conflicts highly likely                                     │
+│     - Testing requires understanding entire file (1616 lines)           │
+│     - Merge conflicts highly likely (12 changes/month)                  │
+│     - Bug fix in one area can break unrelated features                  │
 │                                                                          │
 │   After Split:                                                           │
 │     - Changes isolated to specific modules                              │
 │     - Testing focused on single responsibility                          │
-│     - Reduced merge conflict probability                                │
+│     - Reduced merge conflict probability (~60% reduction)               │
+│     - Clearer boundaries prevent cascading failures                     │
+│                                                                          │
+│ IMPLEMENTATION STRATEGY                                                  │
+│   1. Create three new module files                                       │
+│   2. Move functions by responsibility grouping                           │
+│   3. Extract shared data structures to common types module              │
+│   4. Define clear interfaces between modules                            │
+│   5. Update tests to match new module structure                         │
+│   6. Gradual migration (can be done incrementally)                      │
+│                                                                          │
+│ ESTIMATED TIMELINE                                                       │
+│   Phase 1 - Module Structure: 2-3 days                                   │
+│   Phase 2 - Function Migration: 3-5 days                                │
+│   Phase 3 - Testing & Integration: 2-3 days                             │
+│   Total: 7-11 days of focused work                                       │
 │                                                                          │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Press ◀▶/hl:Pages  ↑↓/jk:Scroll  ←/q:Back  ?:Help                       │
@@ -343,3 +529,38 @@ God objects typically score 30-100 based on:
 - Number of fields (for God Classes)
 - Total lines of code
 - Complexity distribution
+
+Mapping to unified score:
+- god_object_score >= 50.0 → Tier 1 (Critical)
+- god_object_score >= 30.0 → Tier 2 (High)
+- god_object_score < 30.0 → Tier 3 (Medium)
+
+## Summary: All 5 Detail Pages for God Objects
+
+The TUI detail view has 5 pages that adapt for god objects:
+
+| Page | Title | What It Shows for God Objects | Regular Function Shows |
+|------|-------|-------------------------------|----------------------|
+| **1/5** | Overview | Score, GOD OBJECT METRICS (methods, fields, responsibilities), FILE METRICS, recommended splits, recommendation | Score, complexity metrics, coverage, recommendation |
+| **2/5** | Dependencies | FILE DEPENDENCIES (imports/exports), blast radius, coupling analysis | Function callers/callees, call graph depth |
+| **3/5** | Git Context | File-level git history, change frequency, contributors, hotspot analysis | Same (file-level for both) |
+| **4/5** | Patterns | DETECTED ANTI-PATTERNS, RESPONSIBILITY BREAKDOWN, suggested organization | Entropy analysis, purity, framework patterns |
+| **5/5** | Impact & Recommendations | Expected impact of splitting, complexity breakdown, implementation strategy, timeline | Data flow analysis, mutations, I/O operations |
+
+### Key Differences
+
+**God Objects (File-Level Items):**
+- Page 2: Shows file-level dependencies (which files import this file)
+- Page 4: Shows responsibility breakdown and organizational patterns
+- Page 5: Shows **impact analysis** instead of data flow
+
+**Regular Functions:**
+- Page 2: Shows function-level call graph
+- Page 4: Shows code patterns like entropy and purity
+- Page 5: Shows **data flow analysis** (mutations, I/O)
+
+**Same for Both:**
+- Page 1: Core metrics and recommendations (adapted to context)
+- Page 3: Git context (both use file-level git data)
+
+This design ensures god objects have relevant, actionable information on all 5 pages while maintaining consistent navigation and structure.
