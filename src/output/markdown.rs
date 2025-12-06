@@ -1,5 +1,6 @@
 use crate::formatting::FormattingConfig;
 use crate::priority;
+use crate::priority::formatter_markdown::format_filter_metrics;
 use anyhow::Result;
 use std::fs;
 use std::io::Write;
@@ -12,6 +13,7 @@ pub fn output_markdown(
     verbosity: u8,
     output_file: Option<PathBuf>,
     formatting_config: FormattingConfig,
+    show_filter_stats: bool,
 ) -> Result<()> {
     // Filter the analysis based on top/tail parameters
     let filtered_analysis = apply_filters(analysis, top, tail);
@@ -25,8 +27,40 @@ pub fn output_markdown(
         .len()
         .max(filtered_analysis.file_items.len());
 
+    // Get the main output with optional filter metrics
     let output = if display_config.tiered {
-        priority::format_priorities_tiered_markdown(&filtered_analysis, limit, verbosity)
+        if show_filter_stats {
+            use priority::tiers::TierConfig;
+            use priority::UnifiedAnalysisQueries;
+            let tier_config = TierConfig::default();
+            let result =
+                filtered_analysis.get_top_mixed_priorities_with_metrics(limit, &tier_config);
+            let base_output =
+                priority::format_priorities_tiered_markdown(&filtered_analysis, limit, verbosity);
+            format!(
+                "{}\n\n{}",
+                base_output,
+                format_filter_metrics(&result.metrics)
+            )
+        } else {
+            priority::format_priorities_tiered_markdown(&filtered_analysis, limit, verbosity)
+        }
+    } else if show_filter_stats {
+        use priority::tiers::TierConfig;
+        use priority::UnifiedAnalysisQueries;
+        let tier_config = TierConfig::default();
+        let result = filtered_analysis.get_top_mixed_priorities_with_metrics(limit, &tier_config);
+        let base_output = priority::format_priorities_markdown(
+            &filtered_analysis,
+            limit,
+            verbosity,
+            formatting_config,
+        );
+        format!(
+            "{}\n\n{}",
+            base_output,
+            format_filter_metrics(&result.metrics)
+        )
     } else {
         priority::format_priorities_markdown(
             &filtered_analysis,
@@ -192,6 +226,7 @@ mod tests {
             0,
             Some(output_path.clone()),
             FormattingConfig::default(),
+            false,
         );
         assert!(
             result.is_ok(),
@@ -229,6 +264,7 @@ mod tests {
             0,
             Some(output_path.clone()),
             FormattingConfig::default(),
+            false,
         );
         assert!(
             result.is_ok(),
@@ -267,6 +303,7 @@ mod tests {
             0,
             Some(output_path.clone()),
             FormattingConfig::default(),
+            false,
         );
         assert!(
             result.is_ok(),
@@ -298,6 +335,7 @@ mod tests {
             0,
             Some(output_path.clone()),
             FormattingConfig::default(),
+            false,
         );
         assert!(
             result.is_ok(),
@@ -329,6 +367,7 @@ mod tests {
             0,
             Some(output_path.clone()),
             FormattingConfig::default(),
+            false,
         );
         assert!(
             result.is_ok(),
@@ -342,6 +381,46 @@ mod tests {
         assert!(
             content.contains("**Total Debt Items:** 5"),
             "Expected 5 items (all available)"
+        );
+    }
+
+    #[test]
+    fn test_output_markdown_with_filter_stats() {
+        let temp_dir = TempDir::new().unwrap();
+        let output_path = temp_dir.path().join("output.md");
+
+        let analysis = create_test_analysis_with_items(10);
+
+        // Test with show_filter_stats enabled
+        let result = output_markdown(
+            &analysis,
+            Some(5),
+            None,
+            0,
+            Some(output_path.clone()),
+            FormattingConfig::default(),
+            true,
+        );
+        assert!(
+            result.is_ok(),
+            "Failed to write markdown: {:?}",
+            result.err()
+        );
+
+        let content = fs::read_to_string(&output_path).unwrap();
+
+        // Verify filter stats section appears
+        assert!(
+            content.contains("## Filtering Summary"),
+            "Expected filter stats section in output"
+        );
+        assert!(
+            content.contains("Total items analyzed"),
+            "Expected total items count in filter stats"
+        );
+        assert!(
+            content.contains("Items included"),
+            "Expected included items count in filter stats"
         );
     }
 

@@ -71,6 +71,7 @@ pub struct AnalyzeConfig {
     pub min_split_methods: usize,
     pub min_split_lines: usize,
     pub no_tui: bool,
+    pub show_filter_stats: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
@@ -209,6 +210,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             output_file: config.output,
             output_format: Some(config.format),
             formatting_config: config._formatting_config,
+            show_filter_stats: config.show_filter_stats,
         };
 
         output::output_unified_priorities_with_config(
