@@ -460,11 +460,14 @@ fn test_data_flow_page_rendering_with_mutations() {
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
 
     // Create test item (unused in this test, but demonstrates integration)
-    let _item = create_test_unified_debt_item(location, DebtType::ComplexityHotspot {
-        cyclomatic: 10,
-        cognitive: 15,
-        adjusted_cyclomatic: None,
-    });
+    let _item = create_test_unified_debt_item(
+        location,
+        DebtType::ComplexityHotspot {
+            cyclomatic: 10,
+            cognitive: 15,
+            adjusted_cyclomatic: None,
+        },
+    );
 
     // Verify mutation data is accessible
     let retrieved_mutation = data_flow.get_mutation_info(&func_id);
@@ -515,11 +518,14 @@ fn test_data_flow_page_rendering_with_io_operations() {
         },
     );
 
-    let _item = create_test_unified_debt_item(location, DebtType::ComplexityHotspot {
-        cyclomatic: 8,
-        cognitive: 12,
-        adjusted_cyclomatic: None,
-    });
+    let _item = create_test_unified_debt_item(
+        location,
+        DebtType::ComplexityHotspot {
+            cyclomatic: 8,
+            cognitive: 12,
+            adjusted_cyclomatic: None,
+        },
+    );
 
     // Verify I/O operations are accessible
     let io_operations = data_flow.get_io_operations(&func_id);
@@ -558,8 +564,14 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
     };
     use std::collections::HashSet;
 
-    let var1 = VarId { name_id: 1, version: 0 };
-    let var2 = VarId { name_id: 2, version: 0 };
+    let var1 = VarId {
+        name_id: 1,
+        version: 0,
+    };
+    let var2 = VarId {
+        name_id: 2,
+        version: 0,
+    };
 
     let escape_info = EscapeAnalysis {
         escaping_vars: [var1, var2].iter().copied().collect(),
@@ -588,11 +600,14 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
 
     data_flow.set_cfg_analysis(func_id.clone(), cfg_analysis);
 
-    let _item = create_test_unified_debt_item(location, DebtType::ComplexityHotspot {
-        cyclomatic: 12,
-        cognitive: 18,
-        adjusted_cyclomatic: None,
-    });
+    let _item = create_test_unified_debt_item(
+        location,
+        DebtType::ComplexityHotspot {
+            cyclomatic: 12,
+            cognitive: 18,
+            adjusted_cyclomatic: None,
+        },
+    );
 
     // Verify escape analysis is accessible
     let cfg = data_flow.get_cfg_analysis(&func_id);
