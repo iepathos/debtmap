@@ -441,6 +441,7 @@ impl ParallelUnifiedAnalysisBuilder {
             self.spawn_data_flow_task(
                 s,
                 Arc::clone(&call_graph),
+                Arc::clone(&metrics_arc),
                 Arc::clone(&data_flow_result),
                 Arc::clone(&timings),
                 Arc::clone(&df_progress),
@@ -493,6 +494,7 @@ impl ParallelUnifiedAnalysisBuilder {
         &self,
         scope: &rayon::Scope<'a>,
         call_graph: Arc<CallGraph>,
+        metrics: Arc<Vec<FunctionMetrics>>,
         result: Arc<Mutex<Option<DataFlowGraph>>>,
         timings: Arc<Mutex<AnalysisPhaseTimings>>,
         progress: Arc<indicatif::ProgressBar>,
@@ -500,14 +502,30 @@ impl ParallelUnifiedAnalysisBuilder {
         scope.spawn(move |_| {
             progress.tick();
             let start = Instant::now();
-            let data_flow = DataFlowGraph::from_call_graph((*call_graph).clone());
+            let mut data_flow = DataFlowGraph::from_call_graph((*call_graph).clone());
+
+            // Populate I/O operations from metrics
+            progress.set_message("Detecting I/O operations...");
+            let io_count =
+                crate::data_flow::population::populate_io_operations(&mut data_flow, &metrics);
+
+            // Populate variable dependencies
+            progress.set_message("Analyzing variable dependencies...");
+            let dep_count = crate::data_flow::population::populate_variable_dependencies(
+                &mut data_flow,
+                &metrics,
+            );
+
             if let Ok(mut t) = timings.lock() {
                 t.data_flow_creation = start.elapsed();
             }
             if let Ok(mut r) = result.lock() {
                 *r = Some(data_flow);
             }
-            progress.finish_with_message("Data flow graph complete");
+            progress.finish_with_message(format!(
+                "Data flow complete: {} I/O ops, {} variable deps",
+                io_count, dep_count
+            ));
         });
     }
 
