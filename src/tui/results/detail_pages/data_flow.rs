@@ -62,7 +62,7 @@ pub fn render(
         if !mutation_info.live_mutations.is_empty() {
             add_blank_line(&mut lines);
             lines.push(Line::from(vec![Span::styled(
-                "  Live Mutations:",
+                "  live mutations",
                 Style::default().fg(theme.secondary()),
             )]));
             for mutation in &mutation_info.live_mutations {
@@ -76,7 +76,7 @@ pub fn render(
         if !mutation_info.dead_stores.is_empty() {
             add_blank_line(&mut lines);
             lines.push(Line::from(vec![Span::styled(
-                "  Dead Stores:",
+                "  dead stores",
                 Style::default().fg(theme.secondary()),
             )]));
             for dead in &mutation_info.dead_stores {
@@ -133,7 +133,7 @@ pub fn render(
         if escaping_count > 0 {
             add_blank_line(&mut lines);
             lines.push(Line::from(vec![Span::styled(
-                "  Variables affecting return value:",
+                "  variables affecting return value",
                 Style::default().fg(theme.secondary()),
             )]));
             for var in &cfg_analysis.escape_info.return_dependencies {

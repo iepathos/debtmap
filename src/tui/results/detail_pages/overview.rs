@@ -63,7 +63,7 @@ pub fn render(
         let severity_color = severity_color(severity);
 
         lines.push(Line::from(vec![
-            Span::raw("  Combined: "),
+            Span::raw("  combined  "),
             Span::styled(
                 format!("{:.1}", combined_score),
                 Style::default().fg(theme.primary),
@@ -78,7 +78,7 @@ pub fn render(
         let severity_color = severity_color(severity);
 
         lines.push(Line::from(vec![
-            Span::raw("  Total: "),
+            Span::raw("  total  "),
             Span::styled(
                 format!("{:.1}", item.unified_score.final_score),
                 Style::default().fg(theme.primary),
@@ -153,7 +153,7 @@ pub fn render(
             // Note: Only cognitive is dampened, not cyclomatic (structural metric)
             if entropy.dampening_factor < 1.0 {
                 lines.push(Line::from(vec![
-                    Span::raw("  Cognitive Reduction: "),
+                    Span::raw("  cognitive reduction  "),
                     Span::styled(
                         format!(
                             "{} → {}",
@@ -180,7 +180,7 @@ pub fn render(
     add_section_header(&mut lines, "coverage", theme);
     if let Some(coverage) = item.transitive_coverage.as_ref().map(|c| c.direct) {
         lines.push(Line::from(vec![
-            Span::raw("  Coverage: "),
+            Span::raw("  coverage              "),
             Span::styled(
                 format!("{:.1}%", coverage),
                 Style::default().fg(coverage_color(coverage)),
@@ -188,7 +188,7 @@ pub fn render(
         ]));
     } else {
         lines.push(Line::from(vec![
-            Span::raw("  Coverage: "),
+            Span::raw("  coverage              "),
             Span::styled("No data", Style::default().fg(theme.muted)),
         ]));
     }
@@ -205,13 +205,13 @@ pub fn render(
     );
     add_blank_line(&mut lines);
 
-    lines.push(Line::from(vec![
-        Span::raw("  Rationale: "),
-        Span::styled(
-            item.recommendation.rationale.clone(),
-            Style::default().fg(theme.secondary()),
-        ),
-    ]));
+    add_label_value(
+        &mut lines,
+        "rationale",
+        item.recommendation.rationale.clone(),
+        theme,
+        area.width,
+    );
     add_blank_line(&mut lines);
 
     // Debt type section

@@ -69,7 +69,7 @@ pub fn render(
             );
 
             lines.push(Line::from(vec![
-                Span::raw("  Cognitive Complexity: "),
+                Span::raw("  cognitive complexity  "),
                 Span::styled(
                     format!(
                         "{} → {} (dampened)",
@@ -218,7 +218,7 @@ pub fn render(
         if !purity_info.impurity_reasons.is_empty() {
             add_blank_line(&mut lines);
             lines.push(Line::from(vec![Span::styled(
-                "  Impurity Reasons:",
+                "  impurity reasons",
                 Style::default().fg(theme.secondary()),
             )]));
             for reason in &purity_info.impurity_reasons {

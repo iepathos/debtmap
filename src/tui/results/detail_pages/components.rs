@@ -14,42 +14,36 @@ pub fn add_section_header(lines: &mut Vec<Line<'static>>, title: &str, theme: &T
     )]));
 }
 
-/// Add label-value pair with dotted leader connection
+/// Add label-value pair with aligned columns
 ///
-/// Creates a visual connection from label to value using dotted leaders (middle dots).
-/// The dots are muted to recede visually while values use primary color for prominence.
+/// Creates clean label-value pairs using whitespace for visual separation.
+/// Labels are left-aligned in a fixed-width column, with generous spacing
+/// before the value. Embodies zen minimalism through restraint and space.
 ///
 /// # Example
 /// ```text
-/// cyclomatic ················ 15
-/// cognitive ················· 22
-/// nesting ··················· 4
+/// cyclomatic    15
+/// cognitive     22
+/// nesting       4
 /// ```
 pub fn add_label_value(
     lines: &mut Vec<Line<'static>>,
     label: &str,
     value: String,
     theme: &Theme,
-    width: u16,
+    _width: u16,
 ) {
     const INDENT: usize = 2;
-    const MIN_DOTS: usize = 3;
+    const LABEL_WIDTH: usize = 20; // Fixed column width for alignment
+    const GAP: usize = 4; // Breathing room between label and value
 
     let label_with_indent = format!("{}{}", " ".repeat(INDENT), label);
-    let value_len = value.len();
-    let label_len = label_with_indent.len();
-
-    // Calculate dots: total_width - (label + space + value + space)
-    let total_content_len = label_len + 1 + value_len + 1;
-    let dots_needed = (width as usize)
-        .saturating_sub(total_content_len)
-        .max(MIN_DOTS); // Ensure minimum dots for visual consistency
+    let padded_label = format!("{:width$}", label_with_indent, width = LABEL_WIDTH);
+    let gap = " ".repeat(GAP);
 
     lines.push(Line::from(vec![
-        Span::raw(label_with_indent),
-        Span::raw(" "),
-        Span::styled("·".repeat(dots_needed), Style::default().fg(theme.muted)),
-        Span::raw(" "),
+        Span::raw(padded_label),
+        Span::raw(gap),
         Span::styled(value, Style::default().fg(theme.primary)),
     ]));
 }
