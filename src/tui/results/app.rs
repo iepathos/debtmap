@@ -39,6 +39,7 @@ pub enum DetailPage {
     Dependencies,
     GitContext,
     Patterns,
+    DataFlow,
 }
 
 impl DetailPage {
@@ -48,17 +49,19 @@ impl DetailPage {
             DetailPage::Overview => DetailPage::Dependencies,
             DetailPage::Dependencies => DetailPage::GitContext,
             DetailPage::GitContext => DetailPage::Patterns,
-            DetailPage::Patterns => DetailPage::Overview,
+            DetailPage::Patterns => DetailPage::DataFlow,
+            DetailPage::DataFlow => DetailPage::Overview,
         }
     }
 
     /// Get previous page with wrapping
     pub fn prev(self) -> Self {
         match self {
-            DetailPage::Overview => DetailPage::Patterns,
+            DetailPage::Overview => DetailPage::DataFlow,
             DetailPage::Dependencies => DetailPage::Overview,
             DetailPage::GitContext => DetailPage::Dependencies,
             DetailPage::Patterns => DetailPage::GitContext,
+            DetailPage::DataFlow => DetailPage::Patterns,
         }
     }
 
@@ -69,6 +72,7 @@ impl DetailPage {
             1 => Some(DetailPage::Dependencies),
             2 => Some(DetailPage::GitContext),
             3 => Some(DetailPage::Patterns),
+            4 => Some(DetailPage::DataFlow),
             _ => None,
         }
     }
@@ -80,6 +84,7 @@ impl DetailPage {
             DetailPage::Dependencies => 1,
             DetailPage::GitContext => 2,
             DetailPage::Patterns => 3,
+            DetailPage::DataFlow => 4,
         }
     }
 
@@ -90,6 +95,7 @@ impl DetailPage {
             DetailPage::Dependencies => "Dependencies",
             DetailPage::GitContext => "Git Context",
             DetailPage::Patterns => "Patterns",
+            DetailPage::DataFlow => "Data Flow",
         }
     }
 }
@@ -357,6 +363,38 @@ impl ResultsApp {
             .unwrap_or(false)
     }
 
+    fn has_data_flow_data(&self) -> bool {
+        self.selected_item()
+            .map(|item| {
+                let func_id = crate::priority::call_graph::FunctionId::new(
+                    item.location.file.clone(),
+                    item.location.function.clone(),
+                    item.location.line,
+                );
+
+                self.analysis
+                    .data_flow_graph
+                    .get_mutation_info(&func_id)
+                    .is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_io_operations(&func_id)
+                        .is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_cfg_analysis(&func_id)
+                        .is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_purity_info(&func_id)
+                        .is_some()
+            })
+            .unwrap_or(false)
+    }
+
     /// Get available pages for current item (skip pages with no data)
     pub fn available_pages(&self) -> Vec<DetailPage> {
         let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
@@ -367,6 +405,10 @@ impl ResultsApp {
 
         if self.has_pattern_data() {
             pages.push(DetailPage::Patterns);
+        }
+
+        if self.has_data_flow_data() {
+            pages.push(DetailPage::DataFlow);
         }
 
         pages
@@ -387,15 +429,17 @@ mod tests {
         assert_eq!(DetailPage::Overview.next(), DetailPage::Dependencies);
         assert_eq!(DetailPage::Dependencies.next(), DetailPage::GitContext);
         assert_eq!(DetailPage::GitContext.next(), DetailPage::Patterns);
-        assert_eq!(DetailPage::Patterns.next(), DetailPage::Overview);
+        assert_eq!(DetailPage::Patterns.next(), DetailPage::DataFlow);
+        assert_eq!(DetailPage::DataFlow.next(), DetailPage::Overview);
     }
 
     #[test]
     fn test_detail_page_prev_wraps_backward() {
-        assert_eq!(DetailPage::Overview.prev(), DetailPage::Patterns);
+        assert_eq!(DetailPage::Overview.prev(), DetailPage::DataFlow);
         assert_eq!(DetailPage::Dependencies.prev(), DetailPage::Overview);
         assert_eq!(DetailPage::GitContext.prev(), DetailPage::Dependencies);
         assert_eq!(DetailPage::Patterns.prev(), DetailPage::GitContext);
+        assert_eq!(DetailPage::DataFlow.prev(), DetailPage::Patterns);
     }
 
     #[test]
@@ -404,7 +448,8 @@ mod tests {
         assert_eq!(DetailPage::from_index(1), Some(DetailPage::Dependencies));
         assert_eq!(DetailPage::from_index(2), Some(DetailPage::GitContext));
         assert_eq!(DetailPage::from_index(3), Some(DetailPage::Patterns));
-        assert_eq!(DetailPage::from_index(4), None);
+        assert_eq!(DetailPage::from_index(4), Some(DetailPage::DataFlow));
+        assert_eq!(DetailPage::from_index(5), None);
     }
 
     #[test]
@@ -413,6 +458,7 @@ mod tests {
         assert_eq!(DetailPage::Dependencies.index(), 1);
         assert_eq!(DetailPage::GitContext.index(), 2);
         assert_eq!(DetailPage::Patterns.index(), 3);
+        assert_eq!(DetailPage::DataFlow.index(), 4);
     }
 
     #[test]
@@ -421,5 +467,6 @@ mod tests {
         assert_eq!(DetailPage::Dependencies.name(), "Dependencies");
         assert_eq!(DetailPage::GitContext.name(), "Git Context");
         assert_eq!(DetailPage::Patterns.name(), "Patterns");
+        assert_eq!(DetailPage::DataFlow.name(), "Data Flow");
     }
 }

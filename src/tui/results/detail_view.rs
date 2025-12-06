@@ -42,6 +42,14 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
             DetailPage::Patterns => {
                 detail_pages::patterns::render(frame, app, item, chunks[1], &theme)
             }
+            DetailPage::DataFlow => detail_pages::data_flow::render(
+                frame,
+                app,
+                item,
+                &app.analysis().data_flow_graph,
+                chunks[1],
+                &theme,
+            ),
         }
     } else {
         let empty = Paragraph::new("No item selected").style(Style::default().fg(theme.muted));
@@ -81,7 +89,7 @@ fn render_footer(frame: &mut Frame, _app: &ResultsApp, area: Rect, theme: &Theme
     let footer_text = Line::from(vec![
         Span::styled("Tab/←→", Style::default().fg(theme.accent())),
         Span::raw(": Pages  "),
-        Span::styled("1-4", Style::default().fg(theme.accent())),
+        Span::styled("1-5", Style::default().fg(theme.accent())),
         Span::raw(": Jump  "),
         Span::styled("n/p", Style::default().fg(theme.accent())),
         Span::raw(": Items  "),

@@ -823,6 +823,9 @@ pub fn generate_heuristic_recommendations_with_line_estimates(
     let mut all_steps = steps;
     all_steps.extend(generate_purity_recommendations(&characteristics));
 
+    // Add data flow recommendations
+    all_steps.extend(generate_data_flow_recommendations(func, data_flow));
+
     // Add coverage-based steps
     all_steps.extend(generate_heuristic_coverage_steps(
         func,
@@ -955,6 +958,50 @@ fn generate_purity_recommendations(characteristics: &FunctionCharacteristics) ->
         }
         _ => vec![],
     }
+}
+
+// Generate data flow specific recommendations
+fn generate_data_flow_recommendations(
+    func: &FunctionMetrics,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> Vec<String> {
+    use crate::priority::call_graph::FunctionId;
+
+    let mut recommendations = Vec::new();
+
+    if let Some(df) = data_flow {
+        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+
+        // Check for dead stores
+        if let Some(mutation_info) = df.get_mutation_info(&func_id) {
+            if !mutation_info.dead_stores.is_empty() {
+                recommendations.push(format!(
+                    "Remove {} dead store(s) to simplify code",
+                    mutation_info.dead_stores.len()
+                ));
+            }
+
+            if mutation_info.live_mutations.len() <= 2 && mutation_info.total_mutations > 2 {
+                recommendations.push(format!(
+                    "Extract pure subset (only {} live mutations out of {})",
+                    mutation_info.live_mutations.len(),
+                    mutation_info.total_mutations
+                ));
+            }
+        }
+
+        // Check for I/O operations
+        if let Some(io_ops) = df.get_io_operations(&func_id) {
+            if !io_ops.is_empty() {
+                recommendations.push(format!(
+                    "Isolate {} I/O operation(s) to separate function",
+                    io_ops.len()
+                ));
+            }
+        }
+    }
+
+    recommendations
 }
 
 // Generate coverage-based steps for heuristic recommendations

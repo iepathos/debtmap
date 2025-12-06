@@ -560,8 +560,10 @@ impl ParallelUnifiedAnalysisBuilder {
             let mut data_flow = DataFlowGraph::from_call_graph((*call_graph).clone());
 
             // Extract full purity analysis to populate CFG data
-            progress.set_message("Extracting purity analysis data...");
+            progress.set_message("Building data flow graph...");
             let purity_results = transformations::extract_purity_analysis(&metrics);
+
+            progress.set_message("Analyzing mutations and escape analysis...");
             for (func_id, purity) in &purity_results {
                 crate::data_flow::population::populate_from_purity_analysis(
                     &mut data_flow,
@@ -592,12 +594,20 @@ impl ParallelUnifiedAnalysisBuilder {
             if let Ok(mut t) = timings.lock() {
                 t.data_flow_creation = start.elapsed();
             }
+
+            // Count mutations from purity results
+            let mutation_count: usize = purity_results
+                .values()
+                .map(|p| p.total_mutations)
+                .sum();
+
             if let Ok(mut r) = result.lock() {
                 *r = Some(data_flow);
             }
             progress.finish_with_message(format!(
-                "Data flow complete: {} purity, {} I/O ops, {} variable deps, {} transformations",
+                "Data flow complete: {} functions, {} mutations, {} I/O ops, {} deps, {} transforms",
                 purity_results.len(),
+                mutation_count,
                 io_count,
                 dep_count,
                 trans_count

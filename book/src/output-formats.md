@@ -650,6 +650,124 @@ Markdown output includes:
    - Current coverage: 35%
    - Target coverage: 80%
    - Estimated effort: 2-3 hours
+
+## Data Flow Analysis
+
+When verbosity is enabled (`-v` or higher), detailed data flow analysis is included in markdown reports for top priority items. This section provides deep insights into mutations, I/O operations, and escape analysis.
+
+### Mutation Analysis
+
+Shows variable mutation patterns within functions:
+
+**Example:**
+
+```markdown
+**Data Flow Analysis**
+
+- Mutations: 10 total, 2 live, 2 dead stores
+  - **Opportunity**: Remove 2 dead store(s) to simplify code
+  - **Almost Pure**: Only 2 live mutation(s), consider extracting pure subset
+```
+
+**Mutation Metrics:**
+- **Total Mutations:** Count of all variable assignments and mutations
+- **Live Mutations:** Mutations where the new value is actually used
+- **Dead Stores:** Assignments that are never read (can be removed)
+
+**Refactoring Opportunities:**
+- Functions with many dead stores can be simplified by removing unused assignments
+- Functions with few live mutations relative to total mutations are "almost pure" and may benefit from extracting pure subsets
+
+### I/O Operations
+
+Detects and lists input/output operations within functions:
+
+**Example:**
+
+```markdown
+- I/O Operations: 3 detected
+  - File Read at line 105
+  - Network Call at line 110
+  - Database Query at line 120
+  - **Recommendation**: Consider isolating I/O in separate functions
+```
+
+**Detected I/O Types:**
+- File system operations (read, write, open, close)
+- Network operations (HTTP, TCP, UDP)
+- Database queries and updates
+- Standard I/O (print, input)
+- System calls
+
+**Best Practices:**
+- Isolate I/O operations in dedicated functions
+- Keep business logic pure and separate from I/O
+- Easier testing when I/O is at function boundaries
+
+### Escape Analysis
+
+Shows which variables escape the function scope or affect the return value:
+
+**Example:**
+
+```markdown
+- Escape Analysis: 2 variables escape
+  - Return dependencies: result, accumulator
+  - **Insight**: These variables directly affect function output
+```
+
+**Escape Metrics:**
+- **Escaping Variables:** Variables whose values leave the function scope
+- **Return Dependencies:** Variables that contribute to the return value
+
+**Implications:**
+- Functions with many escaping variables have complex data flow
+- Clear return dependencies indicate focused, single-purpose functions
+- Excessive escaping may indicate the function is doing too much
+
+### Purity Analysis
+
+Indicates whether a function is pure and reasons for any impurity:
+
+**Example:**
+
+```markdown
+- Purity: Not pure (95% confidence)
+  - Reasons: Mutates shared state, Performs I/O operations
+  - **Benefit**: Converting to pure functions improves testability
+```
+
+**Purity Assessment:**
+- **Is Pure:** Boolean indicating if the function is pure (deterministic, no side effects)
+- **Confidence Level:** Percentage confidence in the assessment (0-100%)
+- **Impurity Reasons:** Specific reasons why the function is not pure
+
+**Common Impurity Reasons:**
+- Mutates shared or global state
+- Performs I/O operations
+- Calls other impure functions
+- Uses random number generation
+- Depends on system time or external state
+
+**Value of Pure Functions:**
+- Easier to test (no setup/teardown needed)
+- Easier to reason about (same input always gives same output)
+- Safe to parallelize and memoize
+- More composable and reusable
+
+### Enabling Data Flow Analysis
+
+Data flow analysis appears in markdown output when using verbose mode:
+
+```bash
+# Include data flow analysis in markdown reports
+debtmap analyze . --format markdown -v
+
+# Higher verbosity includes more details
+debtmap analyze . --format markdown -vv
+```
+
+The data flow section appears in the score breakdown for each of the top 3 priority items, providing actionable insights for refactoring.
 ```
 
 ### CLI vs Library Markdown Features
