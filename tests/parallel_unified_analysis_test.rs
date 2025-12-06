@@ -455,6 +455,302 @@ fn test_data_flow_graph_population_integration() {
 }
 
 #[test]
+fn test_god_objects_created_in_parallel_analysis() {
+    // Spec 207: God objects should be created as UnifiedDebtItems in parallel analysis path
+    use tempfile::TempDir;
+    use std::fs::write;
+
+    // Create temporary directory with test files
+    let temp_dir = TempDir::new().unwrap();
+    let god_file_path = temp_dir.path().join("god_object.rs");
+
+    // Write a test file with enough content to trigger god object detection
+    let content = "pub struct GodStruct {\n".to_string()
+        + &(0..100).map(|i| format!("    field_{}: i32,\n", i)).collect::<String>()
+        + "}\n\nimpl GodStruct {\n"
+        + &(0..60).map(|i| format!("    pub fn method_{}(&self) {{ }}\n", i)).collect::<String>()
+        + "}";
+    write(&god_file_path, content).unwrap();
+
+    // Create metrics for this god object file
+    let mut metrics: Vec<FunctionMetrics> = (0..60)
+        .map(|i| FunctionMetrics {
+            file: god_file_path.clone(),
+            name: format!("method_{}", i),
+            line: i * 10 + 100,
+            length: 5,
+            cyclomatic: 2,
+            cognitive: 1,
+            nesting: 1,
+            is_test: false,
+            in_test_module: false,
+            visibility: None,
+            is_trait_method: false,
+            entropy_score: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.1),
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            purity_reason: None,
+            call_dependencies: None,
+        })
+        .collect();
+
+    let call_graph = CallGraph::new();
+    let options = ParallelUnifiedAnalysisOptions {
+        parallel: true,
+        jobs: Some(2),
+        batch_size: 50,
+        progress: false,
+    };
+
+    let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
+
+    // Execute all phases
+    let (data_flow, purity, test_funcs, debt_agg) = builder.execute_phase1_parallel(&metrics, None);
+
+    let function_items = builder.execute_phase2_parallel(
+        &metrics,
+        &test_funcs,
+        &debt_agg,
+        &data_flow,
+        None,
+        &Default::default(),
+        None,
+    );
+
+    // Execute phase 3 WITHOUT no_god_object flag (god object detection enabled)
+    let file_items = builder.execute_phase3_parallel(&metrics, None, false);
+
+    // Build final analysis
+    let (unified, _timings) = builder.build(data_flow, purity, function_items, file_items, None);
+
+    // Verify god objects are in analysis.items (not just file_items)
+    let god_items: Vec<_> = unified
+        .items
+        .iter()
+        .filter(|item| item.god_object_indicators.is_some())
+        .collect();
+
+    assert!(
+        !god_items.is_empty(),
+        "God objects should be created as UnifiedDebtItems in parallel analysis"
+    );
+
+    // Verify the god object has correct properties
+    for god_item in god_items {
+        let indicators = god_item.god_object_indicators.as_ref().unwrap();
+        assert!(indicators.is_god_object, "God object indicator should be true");
+        assert!(
+            indicators.method_count > 0 || indicators.field_count > 0,
+            "God object should have methods or fields"
+        );
+
+        // Verify god objects are assigned to T1 (Critical Architecture)
+        if let Some(tier) = god_item.tier {
+            assert_eq!(
+                tier,
+                debtmap::priority::RecommendationTier::T1CriticalArchitecture,
+                "God objects should be classified as T1 Critical Architecture"
+            );
+        }
+    }
+
+    // Verify file_items also contains god object information
+    let file_god_objects: Vec<_> = unified
+        .file_items
+        .iter()
+        .filter(|item| item.metrics.god_object_indicators.is_god_object)
+        .collect();
+
+    assert!(
+        !file_god_objects.is_empty(),
+        "God objects should also be in file_items"
+    );
+}
+
+#[test]
+fn test_god_objects_not_created_when_disabled() {
+    // Test that god objects are NOT created when no_god_object flag is true
+    use tempfile::TempDir;
+    use std::fs::write;
+
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.rs");
+    write(&file_path, "pub struct Test {}").unwrap();
+
+    let metrics: Vec<FunctionMetrics> = (0..60)
+        .map(|i| FunctionMetrics {
+            file: file_path.clone(),
+            name: format!("method_{}", i),
+            line: i * 10,
+            length: 5,
+            cyclomatic: 2,
+            cognitive: 1,
+            nesting: 1,
+            is_test: false,
+            in_test_module: false,
+            visibility: None,
+            is_trait_method: false,
+            entropy_score: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.1),
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            purity_reason: None,
+            call_dependencies: None,
+        })
+        .collect();
+
+    let call_graph = CallGraph::new();
+    let options = ParallelUnifiedAnalysisOptions::default();
+    let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
+
+    let (data_flow, purity, test_funcs, debt_agg) = builder.execute_phase1_parallel(&metrics, None);
+    let function_items = builder.execute_phase2_parallel(
+        &metrics,
+        &test_funcs,
+        &debt_agg,
+        &data_flow,
+        None,
+        &Default::default(),
+        None,
+    );
+
+    // Execute with no_god_object=true
+    let file_items = builder.execute_phase3_parallel(&metrics, None, true);
+    let (unified, _) = builder.build(data_flow, purity, function_items, file_items, None);
+
+    // Verify NO god objects in analysis.items
+    let god_items: Vec<_> = unified
+        .items
+        .iter()
+        .filter(|item| item.god_object_indicators.is_some())
+        .collect();
+
+    assert!(
+        god_items.is_empty(),
+        "God objects should not be created when no_god_object flag is true"
+    );
+}
+
+#[test]
+fn test_god_objects_visible_in_tui() {
+    // Test that god objects created in parallel analysis are visible to TUI (via ResultsApp)
+    use debtmap::tui::results::app::ResultsApp;
+    use tempfile::TempDir;
+    use std::fs::write;
+
+    let temp_dir = TempDir::new().unwrap();
+    let god_file_path = temp_dir.path().join("god.rs");
+
+    // Create a god object file
+    let content = "pub struct God { }\nimpl God {\n".to_string()
+        + &(0..60).map(|i| format!("    pub fn method_{}(&self) {{ }}\n", i)).collect::<String>()
+        + "}";
+    write(&god_file_path, content).unwrap();
+
+    let metrics: Vec<FunctionMetrics> = (0..60)
+        .map(|i| FunctionMetrics {
+            file: god_file_path.clone(),
+            name: format!("method_{}", i),
+            line: i * 10 + 10,
+            length: 5,
+            cyclomatic: 8, // High enough to create debt items
+            cognitive: 5,
+            nesting: 2,
+            is_test: false,
+            in_test_module: false,
+            visibility: None,
+            is_trait_method: false,
+            entropy_score: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.1),
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            purity_reason: None,
+            call_dependencies: None,
+        })
+        .collect();
+
+    let call_graph = CallGraph::new();
+    let options = ParallelUnifiedAnalysisOptions::default();
+    let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
+
+    let (data_flow, purity, test_funcs, debt_agg) = builder.execute_phase1_parallel(&metrics, None);
+    let function_items = builder.execute_phase2_parallel(
+        &metrics,
+        &test_funcs,
+        &debt_agg,
+        &data_flow,
+        None,
+        &Default::default(),
+        None,
+    );
+    let file_items = builder.execute_phase3_parallel(&metrics, None, false);
+    let (unified, _) = builder.build(data_flow, purity, function_items, file_items, None);
+
+    // Create TUI ResultsApp with the analysis
+    let app = ResultsApp::new(unified);
+
+    // Verify TUI can see god objects in its items
+    let total_items = app.item_count();
+    assert!(total_items > 0, "TUI should have items from analysis");
+
+    // Count god objects visible to TUI
+    let god_items_in_tui: Vec<_> = app
+        .filtered_items()
+        .filter(|item| {
+            item.god_object_indicators
+                .as_ref()
+                .map(|i| i.is_god_object)
+                .unwrap_or(false)
+        })
+        .collect();
+
+    assert!(
+        !god_items_in_tui.is_empty(),
+        "God objects should be visible in TUI (via ResultsApp.filtered_items())"
+    );
+
+    // Verify god object appears in the full item list
+    let all_items_with_god: Vec<_> = app
+        .analysis()
+        .items
+        .iter()
+        .filter(|item| {
+            item.god_object_indicators
+                .as_ref()
+                .map(|i| i.is_god_object)
+                .unwrap_or(false)
+        })
+        .collect();
+
+    assert!(
+        !all_items_with_god.is_empty(),
+        "God objects should be in analysis.items (accessible to TUI)"
+    );
+}
+
+#[test]
 #[ignore] // Performance test - run explicitly with --ignored
 fn test_data_flow_population_performance_overhead() {
     // This test validates spec 216 requirement: "Performance: Data flow population must add < 10% to total analysis time"
