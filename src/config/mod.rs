@@ -4,6 +4,7 @@ mod detection;
 mod display;
 mod languages;
 mod parallel;
+pub mod presets;
 pub mod retry;
 mod scoring;
 mod thresholds;
@@ -90,6 +91,9 @@ pub use multi_source::{
 
 // Re-export accessor functions
 pub use accessors::*;
+
+// Re-export preset types (spec 205)
+pub use presets::{merge_preset_with_config, PresetLevel};
 
 #[cfg(test)]
 mod tests {
