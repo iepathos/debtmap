@@ -1,6 +1,7 @@
 //! List view rendering.
 
 use super::app::ResultsApp;
+use super::grouping;
 use crate::priority::UnifiedDebtItem;
 use crate::tui::theme::Theme;
 use ratatui::{
@@ -167,13 +168,14 @@ pub fn render_with_filter_menu(frame: &mut Frame, app: &ResultsApp) {
 /// Render header with summary metrics
 fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     let analysis = app.analysis();
+    let count_display = app.count_display();
 
     let header_text = vec![
         Line::from(vec![
             Span::styled("Debtmap Results", Style::default().fg(theme.accent())),
             Span::raw("  "),
             Span::styled(
-                format!("Total: {} items", app.item_count()),
+                format!("Total: {}", count_display),
                 Style::default().fg(theme.primary),
             ),
             Span::raw("  "),
@@ -197,6 +199,11 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
                 format!("Filters: {}", app.filters().len()),
                 Style::default().fg(theme.muted),
             ),
+            Span::raw("  "),
+            Span::styled(
+                format!("Grouping: {}", if app.is_grouped() { "ON" } else { "OFF" }),
+                Style::default().fg(theme.muted),
+            ),
         ]),
     ];
 
@@ -209,16 +216,11 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
 
 /// Render list of items
 fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
-    let items: Vec<ListItem> = app
-        .filtered_items()
-        .enumerate()
-        .skip(app.scroll_offset())
-        .take(area.height as usize)
-        .map(|(idx, item)| {
-            let is_selected = idx == app.selected_index();
-            format_list_item(item, idx, is_selected, theme)
-        })
-        .collect();
+    let items: Vec<ListItem> = if app.is_grouped() {
+        render_grouped_list(app, area, theme)
+    } else {
+        render_ungrouped_list(app, area, theme)
+    };
 
     if items.is_empty() {
         let empty_text = if app.filters().is_empty() && app.search().query().is_empty() {
@@ -236,6 +238,134 @@ fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
         let list = List::new(items).block(Block::default().borders(Borders::NONE));
         frame.render_widget(list, area);
     }
+}
+
+/// Render ungrouped list (original behavior)
+fn render_ungrouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListItem<'static>> {
+    app.filtered_items()
+        .enumerate()
+        .skip(app.scroll_offset())
+        .take(area.height as usize)
+        .map(|(idx, item)| {
+            let is_selected = idx == app.selected_index();
+            format_list_item(item, idx, is_selected, theme)
+        })
+        .collect()
+}
+
+/// Render grouped list by location
+fn render_grouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListItem<'static>> {
+    let groups = grouping::group_by_location(app.filtered_items());
+
+    let mut list_items = Vec::new();
+
+    for (display_index, group) in groups.iter().skip(app.scroll_offset()).enumerate() {
+        if list_items.len() >= area.height as usize {
+            break;
+        }
+
+        let is_selected = (display_index + app.scroll_offset()) == app.selected_index();
+        list_items.push(format_grouped_item(
+            group,
+            display_index + app.scroll_offset(),
+            is_selected,
+            theme,
+        ));
+
+        // Add spacing between groups (blank line)
+        if list_items.len() < area.height as usize {
+            list_items.push(ListItem::new(Line::from("")));
+        }
+    }
+
+    list_items
+}
+
+/// Format a grouped item with badge and aggregated metrics
+fn format_grouped_item(
+    group: &grouping::LocationGroup,
+    index: usize,
+    is_selected: bool,
+    theme: &Theme,
+) -> ListItem<'static> {
+    let severity_color = severity_color(group.max_severity);
+    let indicator = if is_selected { "▸ " } else { "  " };
+
+    let file_name = group
+        .location
+        .file
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
+    // Badge for multiple issues
+    let badge = if group.items.len() > 1 {
+        format!("[{} issues]", group.items.len())
+    } else {
+        String::new()
+    };
+
+    // First line: indicator, rank, severity, score, location, badge
+    let mut line1 = vec![
+        Span::styled(indicator, Style::default().fg(theme.accent())),
+        Span::styled(
+            format!("#{:<4}", index + 1),
+            Style::default().fg(theme.muted),
+        ),
+        Span::styled(
+            format!("{:<10}", group.max_severity),
+            Style::default().fg(severity_color),
+        ),
+        Span::styled(
+            format!("{:<7.1}", group.combined_score),
+            Style::default().fg(theme.primary),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            format!("{}::{}", file_name, group.location.function),
+            Style::default().fg(theme.secondary()),
+        ),
+    ];
+
+    if !badge.is_empty() {
+        line1.push(Span::raw("  "));
+        line1.push(Span::styled(badge, Style::default().fg(theme.muted)));
+    }
+
+    // Second line: aggregated metrics
+    let metrics = grouping::aggregate_metrics(group);
+    let coverage_str = metrics
+        .coverage
+        .map(|c| format!("{:.0}%", c.direct))
+        .unwrap_or_else(|| "N/A".to_string());
+
+    let mut metric_parts = vec![format!("Cov:{}", coverage_str)];
+
+    if metrics.cognitive_complexity > 0 {
+        metric_parts.push(format!("Cog:{}", metrics.cognitive_complexity));
+    }
+    if metrics.nesting_depth > 0 {
+        metric_parts.push(format!("Nest:{}", metrics.nesting_depth));
+    }
+    if metrics.function_length > 0 {
+        metric_parts.push(format!("Len:{}", metrics.function_length));
+    }
+
+    let line2 = vec![
+        Span::raw("  "), // Indent
+        Span::styled(
+            format!("({})", metric_parts.join(" ")),
+            Style::default().fg(theme.muted),
+        ),
+    ];
+
+    let style = if is_selected {
+        Style::default().bg(Color::DarkGray)
+    } else {
+        Style::default()
+    };
+
+    ListItem::new(vec![Line::from(line1), Line::from(line2)]).style(style)
 }
 
 /// Format complexity metric for list view display.
@@ -357,6 +487,8 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::raw("  |  "),
         Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
         Span::raw(":Nav  "),
+        Span::styled("G", Style::default().fg(theme.accent())),
+        Span::raw(":Group  "),
         Span::styled("/", Style::default().fg(theme.accent())),
         Span::raw(":Search  "),
         Span::styled("s", Style::default().fg(theme.accent())),

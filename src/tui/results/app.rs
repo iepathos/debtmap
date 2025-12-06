@@ -124,6 +124,8 @@ pub struct ResultsApp {
     needs_redraw: bool,
     /// Current detail page (for multi-page detail view)
     detail_page: DetailPage,
+    /// Whether to group items by location
+    show_grouped: bool,
 }
 
 impl ResultsApp {
@@ -144,6 +146,7 @@ impl ResultsApp {
             terminal_size: (80, 24),
             needs_redraw: false,
             detail_page: DetailPage::Overview,
+            show_grouped: true, // Default: grouping enabled
         }
     }
 
@@ -417,6 +420,27 @@ impl ResultsApp {
     /// Get total page count for current item
     pub fn page_count(&self) -> usize {
         self.available_pages().len()
+    }
+
+    /// Toggle grouping on/off
+    pub fn toggle_grouping(&mut self) {
+        self.show_grouped = !self.show_grouped;
+    }
+
+    /// Get grouping state
+    pub fn is_grouped(&self) -> bool {
+        self.show_grouped
+    }
+
+    /// Get count display for header (location count vs item count)
+    pub fn count_display(&self) -> String {
+        if self.show_grouped {
+            let groups = super::grouping::group_by_location(self.filtered_items());
+            let issue_count = self.filtered_indices.len();
+            format!("{} locations ({} issues)", groups.len(), issue_count)
+        } else {
+            format!("{} items", self.filtered_indices.len())
+        }
     }
 }
 
