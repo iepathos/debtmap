@@ -1007,7 +1007,10 @@ impl UnifiedAnalysis {
 
                 // Filter T4 items unless explicitly requested (consistent with display behavior)
                 if !tier_config.show_t4_in_main_report {
-                    let tier = classify_tier(item, &tier_config);
+                    // Use pre-assigned tier if available (e.g., for god objects), otherwise classify
+                    let tier = item
+                        .tier
+                        .unwrap_or_else(|| classify_tier(item, &tier_config));
                     if tier == RecommendationTier::T4Maintenance {
                         return false;
                     }
