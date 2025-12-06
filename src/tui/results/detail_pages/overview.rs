@@ -110,56 +110,6 @@ pub fn render(
     );
     add_blank_line(&mut lines);
 
-    // Entropy section
-    if item.entropy_details.is_some() || item.entropy_dampening_factor.is_some() {
-        add_section_header(&mut lines, "entropy", theme);
-
-        if let Some(ref entropy) = item.entropy_details {
-            add_label_value(
-                &mut lines,
-                "Token Entropy",
-                format!("{:.3}", entropy.entropy_score),
-                theme,
-            );
-            add_label_value(
-                &mut lines,
-                "Pattern Repetition",
-                format!("{:.3}", entropy.pattern_repetition),
-                theme,
-            );
-            add_label_value(
-                &mut lines,
-                "Dampening Factor",
-                format!("{:.3}x", entropy.dampening_factor),
-                theme,
-            );
-
-            // Show original vs adjusted cognitive complexity
-            // Note: Only cognitive is dampened, not cyclomatic (structural metric)
-            if entropy.dampening_factor < 1.0 {
-                lines.push(Line::from(vec![
-                    Span::raw("  Cognitive Reduction: "),
-                    Span::styled(
-                        format!(
-                            "{} → {}",
-                            entropy.original_complexity, entropy.adjusted_cognitive
-                        ),
-                        Style::default().fg(theme.primary),
-                    ),
-                ]));
-            }
-        } else if let Some(dampening) = item.entropy_dampening_factor {
-            add_label_value(
-                &mut lines,
-                "Dampening Factor",
-                format!("{:.3}x", dampening),
-                theme,
-            );
-        }
-
-        add_blank_line(&mut lines);
-    }
-
     // Coverage section
     add_section_header(&mut lines, "coverage", theme);
     if let Some(coverage) = item.transitive_coverage.as_ref().map(|c| c.direct) {
@@ -199,30 +149,14 @@ pub fn render(
 
     // Debt type section
     if location_items.len() > 1 {
-        // Multiple debt types - show all
+        // Multiple debt types - show all (simplified, no detailed metrics)
         add_section_header(&mut lines, "debt types", theme);
         for (idx, debt_item) in location_items.iter().enumerate() {
             let debt_name = format_debt_type_name(&debt_item.debt_type);
             lines.push(Line::from(vec![
                 Span::raw(format!("  {}. ", idx + 1)),
-                Span::styled(
-                    format!("{:<25}", debt_name),
-                    Style::default().fg(theme.secondary()),
-                ),
-                Span::styled(
-                    format!("Score: {:.1}", debt_item.unified_score.final_score),
-                    Style::default().fg(theme.primary),
-                ),
+                Span::styled(debt_name, Style::default().fg(theme.secondary())),
             ]));
-
-            // Show relevant metrics for this debt type
-            let metric_line = format_debt_type_metrics(debt_item);
-            if !metric_line.is_empty() {
-                lines.push(Line::from(vec![
-                    Span::raw("     "),
-                    Span::styled(metric_line, Style::default().fg(theme.muted)),
-                ]));
-            }
         }
     } else {
         // Single debt type - show as before
@@ -292,47 +226,6 @@ fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
         DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl".to_string(),
         // Default for legacy variants
         _ => "Other".to_string(),
-    }
-}
-
-/// Format debt type specific metrics
-fn format_debt_type_metrics(item: &UnifiedDebtItem) -> String {
-    use crate::priority::DebtType;
-    match &item.debt_type {
-        DebtType::ComplexityHotspot {
-            cognitive,
-            cyclomatic,
-            ..
-        } => {
-            format!("Cognitive: {}, Cyclomatic: {}", cognitive, cyclomatic)
-        }
-        DebtType::TestingGap {
-            coverage,
-            cognitive,
-            cyclomatic,
-        } => {
-            format!(
-                "Coverage: {:.1}%, Cog: {}, Cyc: {}",
-                coverage, cognitive, cyclomatic
-            )
-        }
-        DebtType::TestComplexityHotspot {
-            cognitive,
-            cyclomatic,
-            ..
-        } => {
-            format!("Cognitive: {}, Cyclomatic: {}", cognitive, cyclomatic)
-        }
-        DebtType::Duplication {
-            instances,
-            total_lines,
-        } => {
-            format!("{} instances, {} lines total", instances, total_lines)
-        }
-        DebtType::Risk { risk_score, .. } => {
-            format!("Risk score: {:.2}", risk_score)
-        }
-        _ => String::new(),
     }
 }
 

@@ -143,39 +143,6 @@ pub fn render(
         add_blank_line(&mut lines);
     }
 
-    // Purity Analysis Section
-    if let Some(purity_info) = data_flow.get_purity_info(&func_id) {
-        add_section_header(&mut lines, "purity analysis", theme);
-
-        add_label_value(
-            &mut lines,
-            "Is Pure",
-            if purity_info.is_pure { "Yes" } else { "No" }.to_string(),
-            theme,
-        );
-
-        add_label_value(
-            &mut lines,
-            "Confidence",
-            format!("{:.1}%", purity_info.confidence * 100.0),
-            theme,
-        );
-
-        if !purity_info.impurity_reasons.is_empty() {
-            add_blank_line(&mut lines);
-            lines.push(Line::from(vec![Span::styled(
-                "  Impurity Reasons:",
-                Style::default().fg(theme.secondary()),
-            )]));
-            for reason in &purity_info.impurity_reasons {
-                lines.push(Line::from(vec![
-                    Span::raw("    • "),
-                    Span::styled(reason.clone(), Style::default().fg(theme.muted)),
-                ]));
-            }
-        }
-    }
-
     // If no data available
     if lines.is_empty() {
         lines.push(Line::from(vec![Span::styled(

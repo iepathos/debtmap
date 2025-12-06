@@ -358,10 +358,22 @@ impl ResultsApp {
     fn has_pattern_data(&self) -> bool {
         self.selected_item()
             .map(|item| {
+                let func_id = crate::priority::call_graph::FunctionId::new(
+                    item.location.file.clone(),
+                    item.location.function.clone(),
+                    item.location.line,
+                );
+
                 item.pattern_analysis.is_some()
                     || item.detected_pattern.is_some()
                     || item.is_pure.is_some()
                     || item.language_specific.is_some()
+                    || item.entropy_details.is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_purity_info(&func_id)
+                        .is_some()
             })
             .unwrap_or(false)
     }
@@ -388,11 +400,6 @@ impl ResultsApp {
                         .analysis
                         .data_flow_graph
                         .get_cfg_analysis(&func_id)
-                        .is_some()
-                    || self
-                        .analysis
-                        .data_flow_graph
-                        .get_purity_info(&func_id)
                         .is_some()
             })
             .unwrap_or(false)

@@ -1,6 +1,8 @@
 //! Patterns page (Page 4) - Detected patterns and pattern analysis.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
+use crate::data_flow::DataFlowGraph;
+use crate::priority::call_graph::FunctionId;
 use crate::priority::UnifiedDebtItem;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
@@ -17,6 +19,7 @@ pub fn render(
     frame: &mut Frame,
     _app: &ResultsApp,
     item: &UnifiedDebtItem,
+    data_flow: &DataFlowGraph,
     area: Rect,
     theme: &Theme,
 ) {
@@ -168,6 +171,48 @@ pub fn render(
                         theme,
                     );
                 }
+            }
+        }
+
+        add_blank_line(&mut lines);
+    }
+
+    // Purity Analysis section (moved from Data Flow page)
+    let func_id = FunctionId::new(
+        item.location.file.clone(),
+        item.location.function.clone(),
+        item.location.line,
+    );
+
+    if let Some(purity_info) = data_flow.get_purity_info(&func_id) {
+        has_any_data = true;
+        add_section_header(&mut lines, "purity analysis", theme);
+
+        add_label_value(
+            &mut lines,
+            "Is Pure",
+            if purity_info.is_pure { "Yes" } else { "No" }.to_string(),
+            theme,
+        );
+
+        add_label_value(
+            &mut lines,
+            "Confidence",
+            format!("{:.1}%", purity_info.confidence * 100.0),
+            theme,
+        );
+
+        if !purity_info.impurity_reasons.is_empty() {
+            add_blank_line(&mut lines);
+            lines.push(Line::from(vec![Span::styled(
+                "  Impurity Reasons:",
+                Style::default().fg(theme.secondary()),
+            )]));
+            for reason in &purity_info.impurity_reasons {
+                lines.push(Line::from(vec![
+                    Span::raw("    • "),
+                    Span::styled(reason.clone(), Style::default().fg(theme.muted)),
+                ]));
             }
         }
 
