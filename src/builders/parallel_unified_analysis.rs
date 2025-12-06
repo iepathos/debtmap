@@ -61,12 +61,15 @@ mod transformations {
                 // Find the function in the AST by name and line number
                 for item in &file_ast.items {
                     if let syn::Item::Fn(item_fn) = item {
-                        if let Some(ident_span) = item_fn.sig.ident.span().start().line.checked_sub(1) {
+                        if let Some(ident_span) =
+                            item_fn.sig.ident.span().start().line.checked_sub(1)
+                        {
                             if ident_span == m.line {
                                 // Run purity analysis
                                 let mut detector = PurityDetector::new();
                                 let analysis = detector.is_pure_function(item_fn);
-                                let func_id = FunctionId::new(m.file.clone(), m.name.clone(), m.line);
+                                let func_id =
+                                    FunctionId::new(m.file.clone(), m.name.clone(), m.line);
                                 return Some((func_id, analysis));
                             }
                         }

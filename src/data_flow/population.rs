@@ -222,11 +222,8 @@ pub fn populate_data_transformations(
                 if let Some(ident_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
                     if ident_line == metric.line {
                         // Detect transformation patterns in the function body
-                        transformation_count += detect_transformation_patterns(
-                            &item_fn.block,
-                            data_flow,
-                            metric,
-                        );
+                        transformation_count +=
+                            detect_transformation_patterns(&item_fn.block, data_flow, metric);
                     }
                 }
             }
@@ -302,7 +299,8 @@ fn count_transformations_in_expr(expr: &syn::Expr) -> usize {
 fn is_transformation_method(name: &str) -> bool {
     matches!(
         name,
-        "map" | "filter"
+        "map"
+            | "filter"
             | "fold"
             | "reduce"
             | "filter_map"
