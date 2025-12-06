@@ -1571,3 +1571,298 @@ Exponential scaling has negligible performance impact:
 - [Configuration](./configuration.md) - Scoring and aggregation configuration
 - [Analysis Guide](./analysis-guide/index.md) - Detailed metric explanations
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) - Technical details of exponential scaling implementation
+
+## Data Flow Scoring (Spec 218)
+
+DebtMap includes advanced data flow analysis that adjusts priority scores based on code purity, refactorability, and separation of concerns. This helps prioritize impure, tightly-coupled code over pure, easily-refactorable functions.
+
+### Why Data Flow Scoring?
+
+Traditional complexity metrics treat all complex code equally, but not all complexity is equal:
+
+**Pure functions** (no side effects, deterministic):
+- Easy to test in isolation
+- Simple to refactor and extract
+- Lower maintenance burden
+- Less risky to modify
+
+**Impure functions** (side effects, mutations):
+- Harder to test (require mocking, state management)
+- Complex to refactor (dependencies, order matters)
+- Higher maintenance burden
+- Riskier to modify
+
+Data flow scoring reduces the priority of pure code and increases priority for impure code, ensuring refactoring efforts focus where they matter most.
+
+### How Data Flow Scoring Works
+
+When data flow analysis is enabled, DebtMap analyzes each function's data flow graph to compute three additional factors:
+
+1. **Purity Factor** (0.0-1.0): Classifies functions on a purity spectrum
+2. **Refactorability Factor** (1.0-1.5): Based on dead stores and escape analysis
+3. **Pattern Factor** (0.7-1.0): Distinguishes data flow from business logic
+
+These factors are combined with the standard scoring factors (complexity, coverage, dependencies) to produce a final score that reflects both complexity and refactorability.
+
+### Purity Spectrum Classification
+
+Functions are classified on a spectrum from strictly pure to impure:
+
+| Purity Level | Score Multiplier | Description | Example |
+|--------------|------------------|-------------|---------|
+| Strictly Pure | 0.0 | No mutations, no I/O, referentially transparent | Pure math functions |
+| Locally Pure | 0.3 | Pure interface but uses local mutations internally | Builder pattern with local state |
+| I/O Isolated | 0.6 | I/O operations clearly separated from logic | Function with I/O at boundaries only |
+| I/O Mixed | 0.9 | I/O mixed with business logic | Database queries interleaved with calculations |
+| Impure | 1.0 | Mutable state, side effects throughout | Functions with global state mutations |
+
+**Score Impact**: The purity factor is multiplied with the base score. Lower multipliers reduce priority for purer code.
+
+**Example**:
+```rust
+// Strictly Pure (multiplier = 0.0) - Priority reduced to near-zero
+fn calculate_discount(price: f64, rate: f64) -> f64 {
+    price * rate
+}
+
+// Impure (multiplier = 1.0) - Full priority maintained
+fn apply_discount_and_save(price: f64, rate: f64) -> Result<()> {
+    let discount = price * rate;
+    DATABASE.save_discount(discount)?;
+    CACHE.invalidate()?;
+    Ok(())
+}
+```
+
+### Refactorability Factor
+
+Based on data flow analysis, this factor identifies code that's hard to refactor:
+
+**Calculation**: `1.0 + (dead_store_ratio * 0.5)`
+
+**Range**: 1.0 (easily refactorable) to 1.5 (difficult to refactor)
+
+**Indicators of Poor Refactorability**:
+- **Dead stores**: Variables assigned but never read (indicates complex flow)
+- **Escaped values**: Variables that escape to outer scopes (limits extraction)
+- **Complex dependencies**: Many input/output dependencies
+
+**Example**:
+```rust
+// Easy to refactor (factor = 1.0)
+fn calculate_total(items: &[Item]) -> f64 {
+    items.iter().map(|i| i.price).sum()
+}
+
+// Hard to refactor (factor = 1.5)
+fn process_order(order: &mut Order) -> Result<()> {
+    let mut temp1 = order.subtotal; // Dead store
+    let mut temp2 = 0.0;            // Dead store
+    temp1 = order.items.iter().map(|i| i.price).sum();
+    order.total = temp1 + order.tax;
+    GLOBAL_STATE.update(order.id)?;  // Escaped to global scope
+    Ok(())
+}
+```
+
+### Pattern Factor
+
+Distinguishes between data flow patterns (simple transformations) and business logic (complex rules):
+
+**Calculation**:
+- Data flow patterns: 0.7 (reduced priority)
+- Business logic: 1.0 (full priority)
+
+**Data Flow Patterns** (lower priority):
+- Map/filter/reduce operations
+- Simple transformations
+- Pipeline operations
+
+**Business Logic** (higher priority):
+- Complex conditional logic
+- Business rules and validations
+- Stateful computations
+
+**Example**:
+```rust
+// Data flow pattern (factor = 0.7) - Lower priority
+fn filter_active_users(users: &[User]) -> Vec<&User> {
+    users.iter().filter(|u| u.is_active).collect()
+}
+
+// Business logic (factor = 1.0) - Full priority
+fn calculate_user_discount(user: &User, cart: &Cart) -> f64 {
+    if user.is_premium && cart.total > 100.0 {
+        if user.loyalty_points > 1000 {
+            0.2
+        } else {
+            0.1
+        }
+    } else {
+        0.0
+    }
+}
+```
+
+### Combined Scoring Formula
+
+When data flow scoring is enabled, the final score includes all three factors:
+
+```
+base_score = (complexity_factor * 0.5) + (coverage_factor * 0.4) + (dependency_factor * 0.1)
+
+data_flow_adjusted_score = base_score * purity_factor * refactorability_factor * pattern_factor
+
+final_score = data_flow_adjusted_score * role_multiplier
+```
+
+### Configuration
+
+Data flow scoring is configured in `.debtmap.toml`:
+
+```toml
+[data_flow_scoring]
+# Enable data flow-based priority adjustments
+enabled = true
+
+# Purity spectrum weights (how much to reduce priority for pure code)
+purity_spectrum_weight = 1.0
+
+# Refactorability weight (how much to increase priority for hard-to-refactor code)
+refactorability_weight = 1.0
+
+# Pattern weight (how much to reduce priority for simple data flow patterns)
+pattern_weight = 1.0
+```
+
+**Configuration Parameters**:
+- **enabled**: Enable/disable data flow scoring (default: true)
+- **purity_spectrum_weight**: Weight for purity factor (0.0-2.0, default: 1.0)
+- **refactorability_weight**: Weight for refactorability factor (0.0-2.0, default: 1.0)
+- **pattern_weight**: Weight for pattern factor (0.0-2.0, default: 1.0)
+
+### Examples
+
+**Example 1: Pure Complex Function (Low Priority)**
+
+```rust
+// Complex but pure - Priority significantly reduced
+fn fibonacci(n: u32) -> u64 {
+    // Cyclomatic complexity: 15
+    // Cognitive complexity: 25
+    // But: Strictly pure (no side effects)
+
+    // Data flow scoring:
+    // - Purity factor: 0.0 (strictly pure)
+    // - Refactorability factor: 1.0 (easy to extract)
+    // - Pattern factor: 1.0 (business logic)
+    // Final adjustment: base_score * 0.0 = near-zero priority
+}
+```
+
+**Example 2: Impure Complex Function (High Priority)**
+
+```rust
+// Complex and impure - Priority maintained or increased
+fn update_user_profile(user_id: i64, updates: &Updates) -> Result<()> {
+    // Cyclomatic complexity: 15
+    // Cognitive complexity: 25
+    // Impure: database mutations, cache invalidation
+
+    // Data flow scoring:
+    // - Purity factor: 1.0 (impure)
+    // - Refactorability factor: 1.4 (dead stores detected)
+    // - Pattern factor: 1.0 (business logic)
+    // Final adjustment: base_score * 1.4 = 40% priority increase
+}
+```
+
+**Example 3: Data Flow Pattern (Reduced Priority)**
+
+```rust
+// Simple transformation - Priority reduced
+fn map_to_dtos(users: &[User]) -> Vec<UserDTO> {
+    // Cyclomatic complexity: 5
+    // Simple map operation
+
+    // Data flow scoring:
+    // - Purity factor: 0.0 (strictly pure)
+    // - Refactorability factor: 1.0 (easy to extract)
+    // - Pattern factor: 0.7 (data flow pattern)
+    // Final adjustment: base_score * 0.0 = near-zero priority
+}
+```
+
+### Score Explanation Output
+
+When data flow scoring is enabled, the score explanation includes data flow factors:
+
+```json
+{
+  "function": "process_payment",
+  "scoring_details": {
+    "complexity_score": 8.5,
+    "coverage_score": 9.0,
+    "dependency_score": 6.0,
+    "base_score": 23.5,
+    "purity_factor": 1.0,
+    "refactorability_factor": 1.4,
+    "pattern_factor": 1.0,
+    "final_score": 32.9
+  }
+}
+```
+
+**Interpretation**:
+- Base score from complexity/coverage/dependencies: 23.5
+- Purity factor (1.0): Function is impure, full priority maintained
+- Refactorability factor (1.4): 40% increase due to difficult refactorability
+- Pattern factor (1.0): Business logic, not just data flow
+- Final score: 32.9 (after data flow adjustments)
+
+### When to Use Data Flow Scoring
+
+✅ **Use data flow scoring when**:
+- You have a mix of pure and impure code
+- You want to focus refactoring on impure, hard-to-test code
+- You're working in a functional codebase with many pure functions
+- You want to avoid false positives from complex but pure algorithms
+
+❌ **Disable data flow scoring when**:
+- Your codebase is primarily imperative (all code is impure)
+- You don't have data flow analysis available (requires language support)
+- You want to prioritize all complex code equally regardless of purity
+
+### Interpreting Results
+
+**Before data flow scoring**:
+```
+Top Priority Items:
+1. fibonacci() - Score: 8.5 (complex algorithm)
+2. process_payment() - Score: 8.2 (complex + impure)
+3. map_users() - Score: 7.8 (simple transformation)
+```
+
+**After data flow scoring**:
+```
+Top Priority Items:
+1. process_payment() - Score: 11.5 (complex + impure + hard to refactor)
+2. map_users() - Score: 1.2 (pure data flow pattern, deprioritized)
+3. fibonacci() - Score: 0.3 (pure algorithm, deprioritized)
+```
+
+**Result**: Impure, hard-to-refactor code rises to the top, while pure functions are deprioritized.
+
+### Performance Impact
+
+Data flow scoring requires data flow analysis, which has moderate performance impact:
+
+- **Analysis overhead**: ~15-20% additional analysis time
+- **Memory usage**: Proportional to function size (data flow graphs)
+- **Recommended**: Enable for projects <100k LOC, or use selective analysis
+
+### See Also
+
+- [Functional Analysis](./functional-analysis.md) - Purity detection and analysis
+- [Data Flow Analysis](./data-flow-analysis.md) - Data flow graph construction (if available)
+- [Configuration](./configuration.md) - Data flow scoring configuration

@@ -3,11 +3,12 @@
 //! This module contains all the construction and builder functions for creating
 //! UnifiedDebtItem instances from various sources with different configurations.
 
-use crate::config::get_context_multipliers;
+use crate::config::{get_context_multipliers, get_data_flow_scoring_config};
 use crate::context::{detect_file_type, FileType};
 use crate::core::FunctionMetrics;
 use crate::priority::unified_scorer::{
-    calculate_unified_priority, calculate_unified_priority_with_debt,
+    calculate_unified_priority, calculate_unified_priority_with_data_flow,
+    calculate_unified_priority_with_debt,
 };
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
@@ -276,14 +277,28 @@ fn analyze_debt(
 
     // Calculate unified score
     let has_coverage_data = coverage.is_some();
-    let unified_score = calculate_unified_priority_with_debt(
-        func,
-        call_graph,
-        coverage,
-        None,
-        Some(debt_aggregator),
-        has_coverage_data,
-    );
+    let unified_score = if let Some(df) = data_flow {
+        // Use data flow scoring when available (spec 218)
+        let config = get_data_flow_scoring_config();
+        calculate_unified_priority_with_data_flow(
+            func,
+            call_graph,
+            df,
+            coverage,
+            None,
+            Some(debt_aggregator),
+            &config,
+        )
+    } else {
+        calculate_unified_priority_with_debt(
+            func,
+            call_graph,
+            coverage,
+            None,
+            Some(debt_aggregator),
+            has_coverage_data,
+        )
+    };
 
     // Determine function role
     let function_role = classify_function_role(func, func_id, call_graph);

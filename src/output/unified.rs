@@ -253,6 +253,13 @@ pub struct FunctionScoringDetails {
     pub entropy_dampening: Option<f64>,
     pub role_multiplier: f64,
     pub final_score: f64,
+    // Data flow factors (spec 218)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purity_factor: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refactorability_factor: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_factor: Option<f64>,
 }
 
 /// Convert legacy DebtItem to unified format
@@ -377,6 +384,9 @@ impl FunctionDebtItemOutput {
                     entropy_dampening: item.entropy_details.as_ref().map(|e| e.dampening_factor),
                     role_multiplier: item.unified_score.role_multiplier,
                     final_score: item.unified_score.final_score,
+                    purity_factor: item.unified_score.purity_factor,
+                    refactorability_factor: item.unified_score.refactorability_factor,
+                    pattern_factor: item.unified_score.pattern_factor,
                 })
             } else {
                 None
