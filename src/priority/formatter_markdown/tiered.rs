@@ -183,14 +183,19 @@ pub(crate) fn format_file_debt_item(output: &mut String, item: &FileDebtItem, ve
     )
     .unwrap();
 
-    if item.metrics.god_object_indicators.is_god_object {
+    let is_god_object = item
+        .metrics
+        .god_object_analysis
+        .as_ref()
+        .is_some_and(|a| a.is_god_object);
+
+    if is_god_object {
+        let god_analysis = item.metrics.god_object_analysis.as_ref().unwrap();
         writeln!(output, "**Type:** GOD OBJECT").unwrap();
         writeln!(
             output,
             "**Metrics:** {} methods, {} fields, {} responsibilities",
-            item.metrics.god_object_indicators.methods_count,
-            item.metrics.god_object_indicators.fields_count,
-            item.metrics.god_object_indicators.responsibilities
+            god_analysis.method_count, god_analysis.field_count, god_analysis.responsibility_count
         )
         .unwrap();
     } else {

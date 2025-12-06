@@ -1,53 +1,10 @@
 use crate::analyzers::FileAnalyzer;
 use crate::core::FunctionMetrics;
 use crate::organization::GodObjectDetector;
-use crate::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators, ModuleSplit};
+use crate::priority::file_metrics::FileDebtMetrics;
 use crate::risk::lcov::LcovData;
 use anyhow::Result;
 use std::path::Path;
-
-/// Convert between god_object_analysis and file_metrics SplitAnalysisMethod enums
-fn convert_split_analysis_method(
-    method: crate::organization::SplitAnalysisMethod,
-) -> crate::priority::file_metrics::SplitAnalysisMethod {
-    match method {
-        crate::organization::SplitAnalysisMethod::None => {
-            crate::priority::file_metrics::SplitAnalysisMethod::None
-        }
-        crate::organization::SplitAnalysisMethod::CrossDomain => {
-            crate::priority::file_metrics::SplitAnalysisMethod::CrossDomain
-        }
-        crate::organization::SplitAnalysisMethod::MethodBased => {
-            crate::priority::file_metrics::SplitAnalysisMethod::MethodBased
-        }
-        crate::organization::SplitAnalysisMethod::Hybrid => {
-            crate::priority::file_metrics::SplitAnalysisMethod::Hybrid
-        }
-        crate::organization::SplitAnalysisMethod::TypeBased => {
-            crate::priority::file_metrics::SplitAnalysisMethod::TypeBased
-        }
-    }
-}
-
-/// Convert between god_object_analysis and file_metrics RecommendationSeverity enums
-fn convert_recommendation_severity(
-    severity: crate::organization::RecommendationSeverity,
-) -> crate::priority::file_metrics::RecommendationSeverity {
-    match severity {
-        crate::organization::RecommendationSeverity::Critical => {
-            crate::priority::file_metrics::RecommendationSeverity::Critical
-        }
-        crate::organization::RecommendationSeverity::High => {
-            crate::priority::file_metrics::RecommendationSeverity::High
-        }
-        crate::organization::RecommendationSeverity::Medium => {
-            crate::priority::file_metrics::RecommendationSeverity::Medium
-        }
-        crate::organization::RecommendationSeverity::Low => {
-            crate::priority::file_metrics::RecommendationSeverity::Low
-        }
-    }
-}
 
 /// Helper struct for complexity calculation results
 struct ComplexityMetrics {
@@ -85,7 +42,7 @@ impl UnifiedFileAnalyzer {
         path: &Path,
         content: &str,
     ) -> (
-        GodObjectIndicators,
+        Option<crate::organization::GodObjectAnalysis>,
         Option<crate::organization::GodObjectType>,
     ) {
         // Use the comprehensive god object detector for Rust files
@@ -94,60 +51,11 @@ impl UnifiedFileAnalyzer {
                 let detector = GodObjectDetector::with_source_content(content);
                 let enhanced_analysis = detector.analyze_enhanced(path, &ast);
 
-                // Convert recommended splits to our format (Spec 178: including behavioral fields)
-                let recommended_splits: Vec<ModuleSplit> = enhanced_analysis
-                    .file_metrics
-                    .recommended_splits
-                    .iter()
-                    .map(|split| ModuleSplit {
-                        suggested_name: split.suggested_name.clone(),
-                        methods_to_move: split.methods_to_move.clone(),
-                        structs_to_move: split.structs_to_move.clone(),
-                        responsibility: split.responsibility.clone(),
-                        estimated_lines: split.estimated_lines,
-                        method_count: split.method_count,
-                        warning: split.warning.clone(),
-                        priority: split.priority.into(),
-                        domain: split.domain.clone(),
-                        rationale: split.rationale.clone(),
-                        method: convert_split_analysis_method(split.method),
-                        severity: split.severity.map(convert_recommendation_severity),
-                        classification_evidence: split.classification_evidence.clone(),
-                        representative_methods: split.representative_methods.clone(),
-                        fields_needed: split.fields_needed.clone(),
-                        trait_suggestion: split.trait_suggestion.clone(),
-                        behavior_category: split.behavior_category.clone(),
-                    })
-                    .collect();
+                // Normalize score to 0-1 range (from 0-100)
+                let mut analysis = enhanced_analysis.file_metrics;
+                analysis.god_object_score = analysis.god_object_score.min(100.0) / 100.0;
 
-                let indicators = GodObjectIndicators {
-                    methods_count: enhanced_analysis.file_metrics.method_count,
-                    fields_count: enhanced_analysis.file_metrics.field_count,
-                    responsibilities: enhanced_analysis.file_metrics.responsibility_count,
-                    is_god_object: enhanced_analysis.file_metrics.is_god_object,
-                    god_object_score: enhanced_analysis.file_metrics.god_object_score.min(100.0)
-                        / 100.0, // Normalize to 0-1
-                    responsibility_names: enhanced_analysis.file_metrics.responsibilities.clone(),
-                    recommended_splits,
-                    module_structure: enhanced_analysis.file_metrics.module_structure.clone(),
-                    domain_count: enhanced_analysis.file_metrics.domain_count,
-                    domain_diversity: enhanced_analysis.file_metrics.domain_diversity,
-                    struct_ratio: enhanced_analysis.file_metrics.struct_ratio,
-                    analysis_method: convert_split_analysis_method(
-                        enhanced_analysis.file_metrics.analysis_method,
-                    ),
-                    cross_domain_severity: enhanced_analysis
-                        .file_metrics
-                        .cross_domain_severity
-                        .map(convert_recommendation_severity),
-                    domain_diversity_metrics: enhanced_analysis
-                        .file_metrics
-                        .domain_diversity_metrics
-                        .clone(),
-                    detection_type: Some(enhanced_analysis.file_metrics.detection_type),
-                };
-
-                return (indicators, Some(enhanced_analysis.classification));
+                return (Some(analysis), Some(enhanced_analysis.classification));
             }
         }
 
@@ -166,26 +74,35 @@ impl UnifiedFileAnalyzer {
             0.0
         };
 
-        (
-            GodObjectIndicators {
-                methods_count: function_count,
-                fields_count: field_count,
-                responsibilities: if is_god_object { 5 } else { 1 },
-                is_god_object,
-                god_object_score: god_object_score.min(1.0),
-                responsibility_names: Vec::new(),
-                recommended_splits: Vec::new(),
-                module_structure: None,
-                domain_count: 0,
-                domain_diversity: 0.0,
-                struct_ratio: 0.0,
-                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
-                cross_domain_severity: None,
-                domain_diversity_metrics: None,
-                detection_type: None,
-            },
-            None,
-        )
+        if is_god_object {
+            (
+                Some(crate::organization::GodObjectAnalysis {
+                    is_god_object: true,
+                    method_count: function_count,
+                    field_count,
+                    responsibility_count: 5,
+                    lines_of_code: lines,
+                    complexity_sum: 0,
+                    god_object_score: god_object_score.min(1.0),
+                    recommended_splits: Vec::new(),
+                    confidence: crate::organization::GodObjectConfidence::Possible,
+                    responsibilities: Vec::new(),
+                    purity_distribution: None,
+                    module_structure: None,
+                    detection_type: crate::organization::DetectionType::GodFile,
+                    visibility_breakdown: None,
+                    domain_count: 0,
+                    domain_diversity: 0.0,
+                    struct_ratio: 0.0,
+                    analysis_method: Default::default(),
+                    cross_domain_severity: None,
+                    domain_diversity_metrics: None,
+                }),
+                None,
+            )
+        } else {
+            (None, None)
+        }
     }
 
     fn get_file_coverage(&self, path: &Path) -> f64 {
@@ -286,7 +203,10 @@ impl UnifiedFileAnalyzer {
     }
 
     /// Detect god object patterns and calculate indicators
-    fn detect_god_object(function_count: usize, total_lines: usize) -> GodObjectIndicators {
+    fn detect_god_object(
+        function_count: usize,
+        total_lines: usize,
+    ) -> Option<crate::organization::GodObjectAnalysis> {
         const MAX_FUNCTIONS_THRESHOLD: usize = 50;
         const MAX_LINES_THRESHOLD: usize = 2000;
         const ESTIMATED_FIELDS_PER_CLASS: usize = 5;
@@ -299,23 +219,32 @@ impl UnifiedFileAnalyzer {
             0.0
         };
 
-        GodObjectIndicators {
-            methods_count: function_count,
-            fields_count: function_count * ESTIMATED_FIELDS_PER_CLASS
-                / MAX_FUNCTIONS_THRESHOLD.max(1), // Rough estimate
-            responsibilities: if is_god_object { 5 } else { 2 },
-            is_god_object,
-            god_object_score,
-            responsibility_names: Vec::new(),
-            recommended_splits: Vec::new(),
-            module_structure: None,
-            domain_count: 0,
-            domain_diversity: 0.0,
-            struct_ratio: 0.0,
-            analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
-            cross_domain_severity: None,
-            domain_diversity_metrics: None,
-            detection_type: None,
+        if is_god_object {
+            Some(crate::organization::GodObjectAnalysis {
+                is_god_object: true,
+                method_count: function_count,
+                field_count: function_count * ESTIMATED_FIELDS_PER_CLASS
+                    / MAX_FUNCTIONS_THRESHOLD.max(1), // Rough estimate
+                responsibility_count: 5,
+                lines_of_code: total_lines,
+                complexity_sum: 0,
+                god_object_score,
+                recommended_splits: Vec::new(),
+                confidence: crate::organization::GodObjectConfidence::Possible,
+                responsibilities: Vec::new(),
+                purity_distribution: None,
+                module_structure: None,
+                detection_type: crate::organization::DetectionType::GodFile,
+                visibility_breakdown: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: Default::default(),
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+            })
+        } else {
+            None
         }
     }
 }
@@ -323,7 +252,7 @@ impl UnifiedFileAnalyzer {
 impl FileAnalyzer for UnifiedFileAnalyzer {
     fn analyze_file(&self, path: &Path, content: &str) -> Result<FileDebtMetrics> {
         let total_lines = Self::count_lines(content);
-        let (god_object_indicators, god_object_type) = self.analyze_god_object(path, content);
+        let (god_object_analysis, god_object_type) = self.analyze_god_object(path, content);
         let coverage_percent = self.get_file_coverage(path);
         let uncovered_lines = ((1.0 - coverage_percent) * total_lines as f64) as usize;
 
@@ -340,7 +269,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             total_complexity: 0,
             coverage_percent,
             uncovered_lines,
-            god_object_indicators,
+            god_object_analysis,
             function_scores: Vec::new(),
             god_object_type,
             file_type,
@@ -366,14 +295,14 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
         // BUG FIX: Read file content to properly detect boilerplate patterns
         // This was missing - we need to analyze the actual file content to detect
         // boilerplate (like ripgrep's flags/defs.rs trait implementations)
-        let (god_object_indicators, god_object_type) =
+        let (god_object_analysis, god_object_type) =
             if let Ok(content) = std::fs::read_to_string(&path) {
                 self.analyze_god_object(&path, &content)
             } else {
                 // Fallback to simple heuristics if we can't read the file
-                let fallback_indicators =
+                let fallback_analysis =
                     Self::detect_god_object(function_count, line_metrics.total_lines);
-                (fallback_indicators, None)
+                (fallback_analysis, None)
             };
 
         // Calculate individual function scores based on complexity
@@ -396,7 +325,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             total_complexity: complexity_metrics.total_complexity,
             coverage_percent: coverage_metrics.coverage_percent,
             uncovered_lines: line_metrics.uncovered_lines,
-            god_object_indicators,
+            god_object_analysis,
             function_scores,
             god_object_type,
             file_type,
@@ -428,7 +357,7 @@ pub fn analyze_file_with_metrics(
 
     // Override god object detection with aggregated data if more accurate
     if aggregated.function_count > 0 {
-        file_metrics.god_object_indicators = aggregated.god_object_indicators;
+        file_metrics.god_object_analysis = aggregated.god_object_analysis;
     }
 
     Ok(file_metrics)
@@ -582,23 +511,28 @@ mod tests {
     #[test]
     fn test_detect_god_object() {
         // Test non-god object
-        let normal_indicators = UnifiedFileAnalyzer::detect_god_object(20, 500);
-        assert!(!normal_indicators.is_god_object);
-        assert_eq!(normal_indicators.god_object_score, 0.0);
-        assert_eq!(normal_indicators.methods_count, 20);
+        let normal_analysis = UnifiedFileAnalyzer::detect_god_object(20, 500);
+        assert!(normal_analysis.is_none());
 
         // Test god object by function count
         let function_god = UnifiedFileAnalyzer::detect_god_object(60, 500);
+        assert!(function_god.is_some());
+        let function_god = function_god.unwrap();
         assert!(function_god.is_god_object);
         assert_eq!(function_god.god_object_score, 1.2); // 60/50 = 1.2
+        assert_eq!(function_god.method_count, 60);
 
         // Test god object by line count
         let line_god = UnifiedFileAnalyzer::detect_god_object(30, 2500);
+        assert!(line_god.is_some());
+        let line_god = line_god.unwrap();
         assert!(line_god.is_god_object);
-        assert_eq!(line_god.methods_count, 30);
+        assert_eq!(line_god.method_count, 30);
 
         // Test capped god object score
         let extreme_god = UnifiedFileAnalyzer::detect_god_object(150, 5000);
+        assert!(extreme_god.is_some());
+        let extreme_god = extreme_god.unwrap();
         assert!(extreme_god.is_god_object);
         assert_eq!(extreme_god.god_object_score, 2.0); // Capped at 2.0
     }
@@ -622,7 +556,7 @@ mod tests {
         assert_eq!(result.total_lines, 75); // 15+25+20 + 3*5 overhead
         assert_eq!(result.coverage_percent, 0.0);
         assert_eq!(result.uncovered_lines, 75); // All uncovered
-        assert!(!result.god_object_indicators.is_god_object);
+        assert!(result.god_object_analysis.is_none()); // Not a god object
         assert_eq!(result.function_scores.len(), 3);
 
         // Verify function scores are not all zeros

@@ -45,7 +45,13 @@ pub(crate) fn format_file_priority_item_markdown(
     let severity = get_severity_label(item.score);
 
     // Determine file type using context-aware thresholds (spec 135)
-    let type_label = if item.metrics.god_object_indicators.is_god_object {
+    let is_god_object = item
+        .metrics
+        .god_object_analysis
+        .as_ref()
+        .is_some_and(|a| a.is_god_object);
+
+    let type_label = if is_god_object {
         "FILE - GOD OBJECT"
     } else if let Some(ref file_type) = item.metrics.file_type {
         use crate::organization::get_threshold;
@@ -90,41 +96,33 @@ pub(crate) fn format_file_priority_item_markdown(
     .unwrap();
 
     // God object details if applicable
-    if item.metrics.god_object_indicators.is_god_object {
-        writeln!(output, "**God Object Metrics:**").unwrap();
-        writeln!(
-            output,
-            "- Methods: {}",
-            item.metrics.god_object_indicators.methods_count
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "- Fields: {}",
-            item.metrics.god_object_indicators.fields_count
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "- Responsibilities: {}",
-            item.metrics.god_object_indicators.responsibilities
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "- God Object Score: {:.1}",
-            item.metrics.god_object_indicators.god_object_score
-        )
-        .unwrap();
-
-        // Show coverage data if available
-        if item.metrics.coverage_percent > 0.0 {
+    if let Some(ref god_analysis) = item.metrics.god_object_analysis {
+        if god_analysis.is_god_object {
+            writeln!(output, "**God Object Metrics:**").unwrap();
+            writeln!(output, "- Methods: {}", god_analysis.method_count).unwrap();
+            writeln!(output, "- Fields: {}", god_analysis.field_count).unwrap();
             writeln!(
                 output,
-                "- Test Coverage: {:.1}% ({} uncovered lines)",
-                item.metrics.coverage_percent, item.metrics.uncovered_lines
+                "- Responsibilities: {}",
+                god_analysis.responsibility_count
             )
             .unwrap();
+            writeln!(
+                output,
+                "- God Object Score: {:.1}",
+                god_analysis.god_object_score
+            )
+            .unwrap();
+
+            // Show coverage data if available
+            if item.metrics.coverage_percent > 0.0 {
+                writeln!(
+                    output,
+                    "- Test Coverage: {:.1}% ({} uncovered lines)",
+                    item.metrics.coverage_percent, item.metrics.uncovered_lines
+                )
+                .unwrap();
+            }
         }
     }
 
@@ -173,11 +171,16 @@ pub(crate) fn format_split_recommendations_markdown(
     verbosity: u8,
     show_splits: bool,
 ) {
-    let indicators = &item.metrics.god_object_indicators;
     let extension = get_file_extension(&item.metrics.path);
 
+    // Get god object analysis if available
+    let god_analysis = match &item.metrics.god_object_analysis {
+        Some(analysis) => analysis,
+        None => return, // No god object analysis, nothing to show
+    };
+
     // If we have detailed split recommendations, use them
-    if !indicators.recommended_splits.is_empty() {
+    if !god_analysis.recommended_splits.is_empty() {
         // Spec 208: Only show detailed splits when --show-splits flag is provided
         if !show_splits {
             // Show a brief hint that splits are available
@@ -192,7 +195,7 @@ pub(crate) fn format_split_recommendations_markdown(
             writeln!(output).unwrap();
 
             // Use different header based on number of splits
-            if indicators.recommended_splits.len() == 1 {
+            if god_analysis.recommended_splits.len() == 1 {
                 writeln!(
                     output,
                     "**EXTRACTION CANDIDATE** (single cohesive group found):"
@@ -202,21 +205,21 @@ pub(crate) fn format_split_recommendations_markdown(
                 writeln!(
                     output,
                     "**RECOMMENDED SPLITS** ({} modules):",
-                    indicators.recommended_splits.len()
+                    god_analysis.recommended_splits.len()
                 )
                 .unwrap();
             }
 
             writeln!(output).unwrap();
 
-            for split in indicators.recommended_splits.iter() {
+            for split in god_analysis.recommended_splits.iter() {
                 // Show module name and responsibility
                 writeln!(output, "- **{}.{}**", split.suggested_name, extension).unwrap();
 
                 let priority_indicator = match split.priority {
-                    crate::priority::file_metrics::Priority::High => "High",
-                    crate::priority::file_metrics::Priority::Medium => "Medium",
-                    crate::priority::file_metrics::Priority::Low => "Low",
+                    crate::organization::Priority::High => "High",
+                    crate::organization::Priority::Medium => "Medium",
+                    crate::organization::Priority::Low => "Low",
                 };
 
                 writeln!(
@@ -321,7 +324,7 @@ pub(crate) fn format_split_recommendations_markdown(
             }
 
             // Add explanation if only 1 group found
-            if indicators.recommended_splits.len() == 1 {
+            if god_analysis.recommended_splits.len() == 1 {
                 writeln!(
                     output,
                     "*NOTE: Only one cohesive group detected. This suggests methods are tightly coupled.*"
