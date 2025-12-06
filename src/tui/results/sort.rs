@@ -126,30 +126,45 @@ pub fn sort_indices(indices: &mut [usize], analysis: &UnifiedAnalysis, criteria:
             });
         }
         SortCriteria::FilePath => {
-            // Sort by file path alphabetically
+            // Sort by file path alphabetically, then by line number
             indices.sort_by(|&a, &b| {
                 let path_a = analysis.items.get(a).map(|item| &item.location.file);
                 let path_b = analysis.items.get(b).map(|item| &item.location.file);
 
-                match (path_a, path_b) {
+                let primary = match (path_a, path_b) {
                     (Some(a), Some(b)) => a.cmp(b),
-                    (None, None) => std::cmp::Ordering::Equal,
-                    (None, Some(_)) => std::cmp::Ordering::Less,
-                    (Some(_), None) => std::cmp::Ordering::Greater,
+                    (None, None) => Ordering::Equal,
+                    (None, Some(_)) => Ordering::Less,
+                    (Some(_), None) => Ordering::Greater,
+                };
+
+                match primary {
+                    Ordering::Equal => {
+                        // If same file, sort by line number
+                        let line_a = analysis.items.get(a).map(|item| item.location.line);
+                        let line_b = analysis.items.get(b).map(|item| item.location.line);
+                        line_a.cmp(&line_b)
+                    }
+                    other => other,
                 }
             });
         }
         SortCriteria::FunctionName => {
-            // Sort by function name alphabetically
+            // Sort by function name alphabetically, then by file path and line
             indices.sort_by(|&a, &b| {
                 let name_a = analysis.items.get(a).map(|item| &item.location.function);
                 let name_b = analysis.items.get(b).map(|item| &item.location.function);
 
-                match (name_a, name_b) {
+                let primary = match (name_a, name_b) {
                     (Some(a), Some(b)) => a.cmp(b),
-                    (None, None) => std::cmp::Ordering::Equal,
-                    (None, Some(_)) => std::cmp::Ordering::Less,
-                    (Some(_), None) => std::cmp::Ordering::Greater,
+                    (None, None) => Ordering::Equal,
+                    (None, Some(_)) => Ordering::Less,
+                    (Some(_), None) => Ordering::Greater,
+                };
+
+                match primary {
+                    Ordering::Equal => tiebreaker(analysis, a, b),
+                    other => other,
                 }
             });
         }
