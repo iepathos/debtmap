@@ -238,6 +238,49 @@ fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     }
 }
 
+/// Format complexity metric for list view display.
+///
+/// Uses cognitive complexity as the primary metric since it better
+/// represents mental burden than cyclomatic complexity.
+///
+/// When entropy-adjusted complexity is available (from spec 214):
+/// - Shows adjustment if reduction > 5%: "Cog:22→14"
+/// - Otherwise shows raw value: "Cog:22"
+///
+/// # Examples
+/// ```
+/// // With entropy adjustment
+/// let item = create_item_with_entropy(22, 14);
+/// assert_eq!(format_complexity_metric(&item), "Cog:22→14");
+///
+/// // Without entropy or negligible adjustment
+/// let item = create_item_without_entropy(22);
+/// assert_eq!(format_complexity_metric(&item), "Cog:22");
+/// ```
+fn format_complexity_metric(item: &UnifiedDebtItem) -> String {
+    // Check if entropy-adjusted cognitive complexity is available (spec 214)
+    if let Some(adjusted_cog) = item.entropy_adjusted_cognitive {
+        let raw_cog = item.cognitive_complexity;
+
+        // Show adjustment if there's a meaningful difference (>5%)
+        let diff_pct = if raw_cog > 0 {
+            ((raw_cog as f64 - adjusted_cog as f64) / raw_cog as f64).abs()
+        } else {
+            0.0
+        };
+
+        if diff_pct > 0.05 {
+            format!("Cog:{}→{}", raw_cog, adjusted_cog)
+        } else {
+            // Negligible adjustment, just show raw
+            format!("Cog:{}", raw_cog)
+        }
+    } else {
+        // No entropy data, show raw cognitive complexity
+        format!("Cog:{}", item.cognitive_complexity)
+    }
+}
+
 /// Format a single list item
 fn format_list_item(
     item: &UnifiedDebtItem,
@@ -263,7 +306,8 @@ fn format_list_item(
         .map(|c| format!("{:.0}%", c.direct))
         .unwrap_or_else(|| "N/A".to_string());
 
-    let complexity = item.cyclomatic_complexity;
+    // Format complexity with entropy adjustment if available
+    let complexity_str = format_complexity_metric(item);
 
     let line = Line::from(vec![
         Span::styled(indicator, Style::default().fg(theme.accent())),
@@ -276,7 +320,7 @@ fn format_list_item(
             Style::default().fg(severity_color),
         ),
         Span::styled(
-            format!("Score:{:<7.1}", item.unified_score.final_score),
+            format!("{:<7.1}", item.unified_score.final_score),
             Style::default().fg(theme.primary),
         ),
         Span::raw("  "),
@@ -286,7 +330,7 @@ fn format_list_item(
         ),
         Span::raw("  "),
         Span::styled(
-            format!("(Cov:{} Comp:{})", coverage_str, complexity),
+            format!("(Cov:{} {})", coverage_str, complexity_str),
             Style::default().fg(theme.muted),
         ),
     ]);
@@ -353,5 +397,126 @@ fn severity_color(severity: &str) -> Color {
         "MEDIUM" => Color::Yellow,
         "LOW" => Color::Green,
         _ => Color::White,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::{ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedScore};
+    use std::path::PathBuf;
+
+    fn create_test_item(
+        cognitive_complexity: u32,
+        entropy_adjusted: Option<u32>,
+    ) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                function: "test_function".to_string(),
+                line: 1,
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 5,
+                cognitive: cognitive_complexity,
+                adjusted_cyclomatic: None,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 5.0,
+                coverage_factor: 5.0,
+                dependency_factor: 5.0,
+                role_multiplier: 1.0,
+                final_score: 50.0,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+            },
+            function_role: crate::priority::semantic_classifier::FunctionRole::Unknown,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test action".to_string(),
+                rationale: "Test rationale".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.2,
+                lines_reduction: 10,
+                complexity_reduction: 5.0,
+                risk_reduction: 0.1,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 5,
+            cognitive_complexity,
+            entropy_details: None,
+            entropy_adjusted_cyclomatic: None,
+            entropy_adjusted_cognitive: entropy_adjusted,
+            entropy_dampening_factor: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+        }
+    }
+
+    #[test]
+    fn test_format_complexity_no_entropy() {
+        let item = create_test_item(15, None);
+        assert_eq!(format_complexity_metric(&item), "Cog:15");
+    }
+
+    #[test]
+    fn test_format_complexity_with_meaningful_adjustment() {
+        let item = create_test_item(22, Some(14));
+        assert_eq!(format_complexity_metric(&item), "Cog:22→14");
+    }
+
+    #[test]
+    fn test_format_complexity_negligible_adjustment() {
+        // 5% difference = 1 point at complexity 20
+        let item = create_test_item(20, Some(19));
+        // Less than 5% difference, should show raw only
+        assert_eq!(format_complexity_metric(&item), "Cog:20");
+    }
+
+    #[test]
+    fn test_format_complexity_zero_raw() {
+        // Edge case: zero cognitive complexity
+        let item = create_test_item(0, Some(0));
+        assert_eq!(format_complexity_metric(&item), "Cog:0");
+    }
+
+    #[test]
+    fn test_format_complexity_exactly_5_percent() {
+        // Exactly 5% should not show arrow (using > 0.05)
+        let item = create_test_item(100, Some(95));
+        assert_eq!(format_complexity_metric(&item), "Cog:100");
+    }
+
+    #[test]
+    fn test_format_complexity_just_over_5_percent() {
+        // Just over 5% should show arrow
+        let item = create_test_item(100, Some(94));
+        assert_eq!(format_complexity_metric(&item), "Cog:100→94");
     }
 }
