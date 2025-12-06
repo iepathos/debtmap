@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn test_app_initialization() {
         let app = App::new();
-        assert_eq!(app.stages.len(), 8);
+        assert_eq!(app.stages.len(), 7); // 7 stages (files and parse combined)
         assert_eq!(app.overall_progress, 0.0);
     }
 }

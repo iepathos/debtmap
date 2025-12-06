@@ -114,8 +114,7 @@ impl App {
     /// Create the default 8-stage pipeline structure
     fn create_default_stages() -> Vec<PipelineStage> {
         vec![
-            PipelineStage::new("files"),
-            PipelineStage::new("parse"),
+            PipelineStage::new("files parse"),
             PipelineStage::with_subtasks(
                 "call graph",
                 vec![
@@ -315,7 +314,7 @@ mod tests {
     #[test]
     fn test_app_creation() {
         let app = App::new();
-        assert_eq!(app.stages.len(), 8);
+        assert_eq!(app.stages.len(), 7); // 7 stages (files and parse combined)
         assert_eq!(app.overall_progress, 0.0);
         assert_eq!(app.current_stage, 0);
     }

@@ -1,11 +1,11 @@
-//! Integration tests for unified progress display (spec 195).
+//! Integration tests for unified progress display (spec 195, updated by spec 227).
 //!
-//! Verifies that all 3 analysis phases appear in output during real analysis workflow.
+//! Verifies that all 2 analysis phases appear in output during real analysis workflow.
 
 use std::path::PathBuf;
 use std::process::Command;
 
-/// Test that progress display shows all 3 phases during analysis
+/// Test that progress display shows all 2 phases during analysis
 #[test]
 fn test_progress_display_shows_all_phases() {
     // Use the sample codebase fixture for analysis
@@ -36,18 +36,14 @@ fn test_progress_display_shows_all_phases() {
         panic!("debtmap analyze command failed");
     }
 
-    // Verify all 3 phases appear in output
+    // Verify all 2 phases appear in output (files and parse are now combined)
     assert!(
-        stderr.contains("1/3 Discovering files"),
-        "Phase 1 'Discovering files' should appear in output"
+        stderr.contains("1/2 files parse"),
+        "Phase 1 'files parse' should appear in output"
     );
     assert!(
-        stderr.contains("2/3 Analyzing complexity"),
-        "Phase 2 'Analyzing complexity' should appear in output"
-    );
-    assert!(
-        stderr.contains("3/3 Building call graph"),
-        "Phase 3 'Building call graph' should appear in output"
+        stderr.contains("2/2 Building call graph"),
+        "Phase 2 'Building call graph' should appear in output"
     );
 
     // Verify completion message appears
@@ -82,7 +78,7 @@ fn test_progress_display_shows_completion_indicators() {
 
     // Verify completion checkmarks (✓) appear for completed phases
     assert!(
-        stderr.contains("✓ 1/3") || stderr.contains("✓ 2/3") || stderr.contains("✓ 3/3"),
+        stderr.contains("✓ 1/2") || stderr.contains("✓ 2/2"),
         "Completion indicators (✓) should appear for completed phases"
     );
 }
@@ -115,8 +111,8 @@ fn test_progress_display_completes_all_phases() {
     let completed_phases = stderr.matches("✓").count();
 
     assert!(
-        completed_phases >= 3,
-        "Should have at least 3 completed phases, found: {}",
+        completed_phases >= 2,
+        "Should have at least 2 completed phases, found: {}",
         completed_phases
     );
 }
@@ -182,15 +178,15 @@ fn test_progress_display_with_empty_codebase() {
 
     // Even with empty codebase, phases should still appear
     assert!(
-        stderr.contains("1/3 Discovering files"),
+        stderr.contains("1/2 files parse"),
         "Phase 1 should appear even for empty codebase"
     );
 
     // Should complete all phases even with no files
     let completed_phases = stderr.matches("✓").count();
     assert!(
-        completed_phases >= 3,
-        "All 3 phases should complete even for empty codebase, found: {}",
+        completed_phases >= 2,
+        "All 2 phases should complete even for empty codebase, found: {}",
         completed_phases
     );
 }
