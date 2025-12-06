@@ -107,8 +107,7 @@ fn bench_duplication_detection_with_noop_progress(c: &mut Criterion) {
             &files,
             |b, files| {
                 b.iter(|| {
-                    let result =
-                        detect_duplications_with_progress(black_box(files), 50, |_, _| {});
+                    let result = detect_duplications_with_progress(black_box(files), 50, |_, _| {});
                     black_box(result)
                 });
             },

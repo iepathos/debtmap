@@ -226,10 +226,7 @@ mod tests {
         let progress_calls_clone = progress_calls.clone();
 
         detect_duplications_with_progress(&files, 50, |current, total| {
-            progress_calls_clone
-                .lock()
-                .unwrap()
-                .push((current, total));
+            progress_calls_clone.lock().unwrap().push((current, total));
         });
 
         let calls = progress_calls.lock().unwrap();
@@ -262,10 +259,7 @@ mod tests {
         let progress_calls_clone = progress_calls.clone();
 
         detect_duplications_with_progress(&files, 50, |current, total| {
-            progress_calls_clone
-                .lock()
-                .unwrap()
-                .push((current, total));
+            progress_calls_clone.lock().unwrap().push((current, total));
         });
 
         let calls = progress_calls.lock().unwrap();
@@ -275,8 +269,14 @@ mod tests {
         // - Update at file 20
         // - Final update at file 25
         // (May have more if 100ms elapsed between files)
-        assert!(calls.len() >= 3, "Should have at least 3 progress updates with throttling");
-        assert!(calls.len() <= 10, "Throttling should limit excessive updates");
+        assert!(
+            calls.len() >= 3,
+            "Should have at least 3 progress updates with throttling"
+        );
+        assert!(
+            calls.len() <= 10,
+            "Throttling should limit excessive updates"
+        );
 
         // Verify counts are monotonically increasing
         for i in 1..calls.len() {
@@ -306,17 +306,18 @@ mod tests {
         let progress_calls_clone = progress_calls.clone();
 
         detect_duplications_with_progress(&files, 50, |current, total| {
-            progress_calls_clone
-                .lock()
-                .unwrap()
-                .push((current, total));
+            progress_calls_clone.lock().unwrap().push((current, total));
         });
 
         let calls = progress_calls.lock().unwrap();
 
         // All calls should report correct total
         for (current, total) in calls.iter() {
-            assert_eq!(*total, total_files, "Total should always be {}", total_files);
+            assert_eq!(
+                *total, total_files,
+                "Total should always be {}",
+                total_files
+            );
             assert!(*current <= total_files, "Current should never exceed total");
             assert!(*current > 0, "Current should be positive");
         }

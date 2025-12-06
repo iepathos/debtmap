@@ -62,7 +62,11 @@ fn test_progress_values_are_monotonic() {
 
     // Verify progress values
     for (current, total) in &progress_values {
-        assert_eq!(*total, total_files, "Total should always be {}", total_files);
+        assert_eq!(
+            *total, total_files,
+            "Total should always be {}",
+            total_files
+        );
         assert!(*current <= total_files, "Current should never exceed total");
         assert!(*current > 0, "Current should be positive");
     }
