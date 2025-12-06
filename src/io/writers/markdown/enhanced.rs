@@ -46,7 +46,7 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
 
         // Add score breakdown if verbosity is enabled
         if self.verbosity() > 0 {
-            self.write_score_breakdown(&items_vec)?;
+            self.write_score_breakdown(&items_vec, analysis)?;
         }
 
         Ok(())
@@ -115,8 +115,9 @@ impl<W: Write> MarkdownWriter<W> {
     pub(super) fn write_score_breakdown(
         &mut self,
         items: &[UnifiedDebtItem],
+        analysis: &UnifiedAnalysis,
     ) -> anyhow::Result<()> {
-        let breakdown = format_score_breakdown(items);
+        let breakdown = format_score_breakdown(items, &analysis.data_flow_graph);
         write!(self.writer(), "{}", breakdown)?;
         Ok(())
     }
@@ -187,13 +188,17 @@ fn format_priority_table_row(rank: usize, item: &UnifiedDebtItem) -> String {
 }
 
 // Pure functions for formatting score breakdown
-fn format_score_breakdown(items: &[UnifiedDebtItem]) -> String {
+fn format_score_breakdown(
+    items: &[UnifiedDebtItem],
+    data_flow: &crate::data_flow::DataFlowGraph,
+) -> String {
     let mut output = String::new();
     output.push_str("<details>\n");
     output.push_str("<summary>Score Breakdown (click to expand)</summary>\n\n");
 
     for (idx, item) in items.iter().enumerate().take(3) {
         output.push_str(&format_item_breakdown(idx + 1, item));
+        output.push_str(&format_data_flow_section(item, data_flow));
     }
 
     output.push_str("</details>\n\n");
@@ -217,6 +222,86 @@ fn format_item_breakdown(number: usize, item: &UnifiedDebtItem) -> String {
                 god_obj.field_count,
                 god_obj.responsibility_count,
                 god_obj.god_object_score
+            ));
+        }
+    }
+
+    result
+}
+
+/// Format data flow analysis section for an item
+fn format_data_flow_section(
+    item: &UnifiedDebtItem,
+    data_flow: &crate::data_flow::DataFlowGraph,
+) -> String {
+    use crate::priority::call_graph::FunctionId;
+
+    let func_id = FunctionId::new(
+        item.location.file.clone(),
+        item.location.function.clone(),
+        item.location.line,
+    );
+
+    let mut result = String::new();
+
+    // Check if we have any data flow information
+    let has_mutation = data_flow.get_mutation_info(&func_id).is_some();
+    let has_io = data_flow.get_io_operations(&func_id).is_some();
+    let has_cfg = data_flow.get_cfg_analysis(&func_id).is_some();
+    let has_purity = data_flow.get_purity_info(&func_id).is_some();
+
+    if !has_mutation && !has_io && !has_cfg && !has_purity {
+        return result;
+    }
+
+    result.push_str("\n**Data Flow Analysis**\n\n");
+
+    // Mutation analysis
+    if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
+        result.push_str(&format!(
+            "- Mutations: {} total, {} live, {} dead stores\n",
+            mutation_info.total_mutations,
+            mutation_info.live_mutations.len(),
+            mutation_info.dead_stores.len()
+        ));
+
+        if !mutation_info.dead_stores.is_empty() {
+            result.push_str(&format!(
+                "  - **Opportunity**: Remove {} dead store(s) to simplify code\n",
+                mutation_info.dead_stores.len()
+            ));
+        }
+
+        if mutation_info.live_mutations.len() <= 2 && mutation_info.total_mutations > 2 {
+            result.push_str(&format!(
+                "  - **Almost Pure**: Only {} live mutation(s), consider extracting pure subset\n",
+                mutation_info.live_mutations.len()
+            ));
+        }
+    }
+
+    // I/O operations
+    if let Some(io_ops) = data_flow.get_io_operations(&func_id) {
+        if !io_ops.is_empty() {
+            result.push_str(&format!("- I/O Operations: {} detected\n", io_ops.len()));
+            for op in io_ops.iter().take(3) {
+                result.push_str(&format!("  - {} at line {}\n", op.operation_type, op.line));
+            }
+            if io_ops.len() > 3 {
+                result.push_str(&format!("  - ... and {} more\n", io_ops.len() - 3));
+            }
+            result
+                .push_str("  - **Recommendation**: Consider isolating I/O in separate functions\n");
+        }
+    }
+
+    // Escape analysis
+    if let Some(cfg_analysis) = data_flow.get_cfg_analysis(&func_id) {
+        let escaping_count = cfg_analysis.escape_info.escaping_vars.len();
+        if escaping_count > 0 {
+            result.push_str(&format!(
+                "- Escaping Variables: {} affecting return value\n",
+                escaping_count
             ));
         }
     }
@@ -421,10 +506,15 @@ mod tests {
         assert!(result.contains("Complexity Factor**: 0.80"));
     }
 
+    fn create_empty_data_flow_graph() -> crate::data_flow::DataFlowGraph {
+        crate::data_flow::DataFlowGraph::new()
+    }
+
     #[test]
     fn test_format_score_breakdown_empty() {
         let items: Vec<UnifiedDebtItem> = vec![];
-        let result = format_score_breakdown(&items);
+        let data_flow = create_empty_data_flow_graph();
+        let result = format_score_breakdown(&items, &data_flow);
 
         assert!(result.starts_with("<details>\n"));
         assert!(result.contains("<summary>Score Breakdown (click to expand)</summary>"));
@@ -434,7 +524,8 @@ mod tests {
     #[test]
     fn test_format_score_breakdown_single_item() {
         let items = vec![create_test_item("function_one", 9.0)];
-        let result = format_score_breakdown(&items);
+        let data_flow = create_empty_data_flow_graph();
+        let result = format_score_breakdown(&items, &data_flow);
 
         assert!(result.contains("#### 1. function_one"));
         assert!(result.contains("Priority Score**: 9.00"));
@@ -449,7 +540,8 @@ mod tests {
             create_test_item("function_two", 7.5),
             create_test_item("function_three", 6.0),
         ];
-        let result = format_score_breakdown(&items);
+        let data_flow = create_empty_data_flow_graph();
+        let result = format_score_breakdown(&items, &data_flow);
 
         assert!(result.contains("#### 1. function_one"));
         assert!(result.contains("#### 2. function_two"));
@@ -468,7 +560,8 @@ mod tests {
             create_test_item("function_four", 5.0),
             create_test_item("function_five", 4.0),
         ];
-        let result = format_score_breakdown(&items);
+        let data_flow = create_empty_data_flow_graph();
+        let result = format_score_breakdown(&items, &data_flow);
 
         // Should only include first three
         assert!(result.contains("#### 1. function_one"));

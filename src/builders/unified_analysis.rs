@@ -686,10 +686,7 @@ fn create_unified_analysis_parallel(
     }
 
     // Set preliminary timing values from call graph building and coverage loading
-    builder.set_preliminary_timings(
-        call_graph_time,
-        coverage_loading_time,
-    );
+    builder.set_preliminary_timings(call_graph_time, coverage_loading_time);
 
     // Phase 1: Parallel initialization
     let (data_flow_graph, _purity, test_only_functions, debt_aggregator) =
@@ -1284,7 +1281,6 @@ fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
     )
 }
 
-
 /// Run inter-procedural purity propagation on function metrics (spec 156)
 fn run_purity_propagation(
     metrics: &[FunctionMetrics],
@@ -1322,7 +1318,12 @@ fn run_purity_propagation(
 
     // Subtask 1: Initial purity detection
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 1, crate::tui::app::StageStatus::Active, Some((0, metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            1,
+            crate::tui::app::StageStatus::Active,
+            Some((0, metrics.len())),
+        );
     }
 
     // Create purity analyzer and propagator
@@ -1330,7 +1331,12 @@ fn run_purity_propagation(
     let mut propagator = PurityPropagator::new(adapter, purity_analyzer);
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 1, crate::tui::app::StageStatus::Completed, Some((metrics.len(), metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            1,
+            crate::tui::app::StageStatus::Completed,
+            Some((metrics.len(), metrics.len())),
+        );
         // Brief pause to ensure subtask update is visible
         std::thread::sleep(std::time::Duration::from_millis(150));
     }
@@ -1357,7 +1363,12 @@ fn run_purity_propagation(
 
     // Subtask 3: Side effects analysis
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 3, crate::tui::app::StageStatus::Active, Some((0, metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            3,
+            crate::tui::app::StageStatus::Active,
+            Some((0, metrics.len())),
+        );
     }
 
     // Apply results to metrics
@@ -1385,7 +1396,12 @@ fn run_purity_propagation(
         .collect();
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 3, crate::tui::app::StageStatus::Completed, Some((metrics.len(), metrics.len())));
+        manager.tui_update_subtask(
+            5,
+            3,
+            crate::tui::app::StageStatus::Completed,
+            Some((metrics.len(), metrics.len())),
+        );
     }
 
     result

@@ -39,6 +39,7 @@ pub enum DetailPage {
     Dependencies,
     GitContext,
     Patterns,
+    DataFlow,
 }
 
 impl DetailPage {
@@ -48,17 +49,19 @@ impl DetailPage {
             DetailPage::Overview => DetailPage::Dependencies,
             DetailPage::Dependencies => DetailPage::GitContext,
             DetailPage::GitContext => DetailPage::Patterns,
-            DetailPage::Patterns => DetailPage::Overview,
+            DetailPage::Patterns => DetailPage::DataFlow,
+            DetailPage::DataFlow => DetailPage::Overview,
         }
     }
 
     /// Get previous page with wrapping
     pub fn prev(self) -> Self {
         match self {
-            DetailPage::Overview => DetailPage::Patterns,
+            DetailPage::Overview => DetailPage::DataFlow,
             DetailPage::Dependencies => DetailPage::Overview,
             DetailPage::GitContext => DetailPage::Dependencies,
             DetailPage::Patterns => DetailPage::GitContext,
+            DetailPage::DataFlow => DetailPage::Patterns,
         }
     }
 
@@ -69,6 +72,7 @@ impl DetailPage {
             1 => Some(DetailPage::Dependencies),
             2 => Some(DetailPage::GitContext),
             3 => Some(DetailPage::Patterns),
+            4 => Some(DetailPage::DataFlow),
             _ => None,
         }
     }
@@ -80,6 +84,7 @@ impl DetailPage {
             DetailPage::Dependencies => 1,
             DetailPage::GitContext => 2,
             DetailPage::Patterns => 3,
+            DetailPage::DataFlow => 4,
         }
     }
 
@@ -90,6 +95,7 @@ impl DetailPage {
             DetailPage::Dependencies => "Dependencies",
             DetailPage::GitContext => "Git Context",
             DetailPage::Patterns => "Patterns",
+            DetailPage::DataFlow => "Data Flow",
         }
     }
 }
@@ -357,6 +363,38 @@ impl ResultsApp {
             .unwrap_or(false)
     }
 
+    fn has_data_flow_data(&self) -> bool {
+        self.selected_item()
+            .map(|item| {
+                let func_id = crate::priority::call_graph::FunctionId::new(
+                    item.location.file.clone(),
+                    item.location.function.clone(),
+                    item.location.line,
+                );
+
+                self.analysis
+                    .data_flow_graph
+                    .get_mutation_info(&func_id)
+                    .is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_io_operations(&func_id)
+                        .is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_cfg_analysis(&func_id)
+                        .is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_purity_info(&func_id)
+                        .is_some()
+            })
+            .unwrap_or(false)
+    }
+
     /// Get available pages for current item (skip pages with no data)
     pub fn available_pages(&self) -> Vec<DetailPage> {
         let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
@@ -367,6 +405,10 @@ impl ResultsApp {
 
         if self.has_pattern_data() {
             pages.push(DetailPage::Patterns);
+        }
+
+        if self.has_data_flow_data() {
+            pages.push(DetailPage::DataFlow);
         }
 
         pages
