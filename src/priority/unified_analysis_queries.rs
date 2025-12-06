@@ -151,10 +151,8 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
             .collect();
 
         // Stage 3: Combine (pure - iterator chain, no mutation)
-        let classified: Vec<ClassifiedItem> = function_items
-            .into_iter()
-            .chain(file_items)
-            .collect();
+        let classified: Vec<ClassifiedItem> =
+            function_items.into_iter().chain(file_items).collect();
 
         // Stage 4-6: Filter, sort, limit (pure pipeline)
         let config = FilterConfig {

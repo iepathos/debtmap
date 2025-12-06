@@ -134,11 +134,7 @@ pub fn analyze_and_filter(
     let filtered_result = filter_with_metrics(sorted, filter_config);
 
     // Stage 4: Limit (pure, lazy evaluation)
-    let limited: Vec<super::DebtItem> = filtered_result
-        .included
-        .into_iter()
-        .take(limit)
-        .collect();
+    let limited: Vec<super::DebtItem> = filtered_result.included.into_iter().take(limit).collect();
 
     FilterResult {
         included: limited,
@@ -184,11 +180,7 @@ pub fn filter_sort_limit(
     // Stage 3: Limit (pure, lazy evaluation)
     // At this point, filtered_result.included is Vec<DebtItem>
     // We need to limit it directly
-    let limited: Vec<super::DebtItem> = filtered_result
-        .included
-        .into_iter()
-        .take(limit)
-        .collect();
+    let limited: Vec<super::DebtItem> = filtered_result.included.into_iter().take(limit).collect();
 
     FilterResult {
         included: limited,
