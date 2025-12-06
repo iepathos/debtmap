@@ -337,6 +337,14 @@ fn extract_variable_dependencies(
 // Pure function for AST parsing with language dispatch
 fn parse_function_ast(func: &FunctionMetrics, language: &str) -> Option<syn::File> {
     crate::io::read_file(&func.file)
+        .map_err(|e| {
+            eprintln!(
+                "Warning: Failed to read file {}: {}",
+                func.file.display(),
+                e
+            );
+            e
+        })
         .ok()
         .and_then(|source| parse_ast_by_language(&source, func, language))
 }
@@ -358,7 +366,12 @@ fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn
     use syn::{parse_str, Item, ItemFn};
 
     // Parse the entire file
-    let file = parse_str::<syn::File>(source).ok()?;
+    let file = parse_str::<syn::File>(source)
+        .map_err(|e| {
+            eprintln!("Warning: Failed to parse {}: {}", func.file.display(), e);
+            e
+        })
+        .ok()?;
 
     // Find the function by name and approximate line number
     for item in &file.items {

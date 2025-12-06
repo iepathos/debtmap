@@ -291,7 +291,13 @@ impl FrameworkDetector {
                 Ok(regex) => {
                     self.regex_cache.insert(pattern.to_string(), regex);
                 }
-                Err(_) => return false,
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Failed to compile regex pattern '{}': {}",
+                        pattern, e
+                    );
+                    return false;
+                }
             }
         }
 
@@ -326,7 +332,11 @@ fn parse_config_into_patterns(
                                         .or_default()
                                         .push(framework_pattern);
                                 }
-                                Err(_) => {
+                                Err(e) => {
+                                    eprintln!(
+                                        "Warning: Failed to parse framework pattern for {}: {}",
+                                        lang_key, e
+                                    );
                                     // Might be a direct framework definition, try parsing this level
                                     continue;
                                 }
@@ -341,7 +351,10 @@ fn parse_config_into_patterns(
                                     .or_default()
                                     .push(framework_pattern);
                             }
-                            Err(_) => continue,
+                            Err(e) => {
+                                eprintln!("Warning: Failed to parse framework pattern at category level for {}: {}", lang_key, e);
+                                continue;
+                            }
                         }
                     }
                 }

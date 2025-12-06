@@ -207,7 +207,7 @@ fn extract_pattern_name(location: &str) -> Option<String> {
     // or "error_swallowing_patterns.rs:7 (in pattern_1)"
 
     // Try direct format first: "...:pattern_name"
-    if let Some(last_part) = location.split(':').last() {
+    if let Some(last_part) = location.split(':').next_back() {
         if last_part.starts_with("pattern_") {
             return Some(last_part.trim().to_string());
         }

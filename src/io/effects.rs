@@ -284,7 +284,11 @@ where
                 // Try to deserialize the cached value
                 match bincode::deserialize(&bytes) {
                     Ok(value) => Ok(Some(value)),
-                    Err(_) => {
+                    Err(e) => {
+                        eprintln!(
+                            "Warning: Failed to deserialize cache value for key '{}': {}",
+                            key, e
+                        );
                         // Cache value corrupted or wrong type - treat as miss
                         Ok(None)
                     }

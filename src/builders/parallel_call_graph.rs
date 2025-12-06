@@ -169,7 +169,16 @@ impl ParallelCallGraphBuilder {
         let file_contents: Vec<_> = rust_files
             .par_iter()
             .filter_map(|file_path| {
-                let content = io::read_file(file_path).ok()?;
+                let content = io::read_file(file_path)
+                    .map_err(|e| {
+                        eprintln!(
+                            "Warning: Failed to read file {}: {}",
+                            file_path.display(),
+                            e
+                        );
+                        e
+                    })
+                    .ok()?;
                 Some((file_path.clone(), content))
             })
             .collect();
@@ -182,7 +191,12 @@ impl ParallelCallGraphBuilder {
             .iter()
             .enumerate()
             .filter_map(|(idx, (file_path, content))| {
-                let parsed = syn::parse_file(content).ok()?;
+                let parsed = syn::parse_file(content)
+                    .map_err(|e| {
+                        eprintln!("Warning: Failed to parse {}: {}", file_path.display(), e);
+                        e
+                    })
+                    .ok()?;
                 parallel_graph.stats().increment_files();
 
                 let count = parsed_count.fetch_add(1, Ordering::Relaxed) + 1;
