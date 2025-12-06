@@ -55,7 +55,13 @@ pub enum Commands {
         path: PathBuf,
 
         /// Output format
-        #[arg(short, long, value_enum, default_value = "terminal", help_heading = "Output Options")]
+        #[arg(
+            short,
+            long,
+            value_enum,
+            default_value = "terminal",
+            help_heading = "Output Options"
+        )]
         format: OutputFormat,
 
         /// Output file (defaults to stdout)
@@ -71,7 +77,11 @@ pub enum Commands {
         threshold_duplication: usize,
 
         /// Complexity threshold preset (strict, balanced, lenient)
-        #[arg(long = "threshold-preset", value_enum, help_heading = "Threshold Options")]
+        #[arg(
+            long = "threshold-preset",
+            value_enum,
+            help_heading = "Threshold Options"
+        )]
         threshold_preset: Option<ThresholdPreset>,
 
         /// Languages to analyze
@@ -81,11 +91,19 @@ pub enum Commands {
         /// LCOV coverage file for risk analysis and score dampening.
         /// Coverage data dampens debt scores for well-tested code (multiplier = 1.0 - coverage),
         /// surfacing untested complex functions. Total debt score with coverage ≤ score without.
-        #[arg(long = "coverage-file", visible_alias = "lcov", help_heading = "Coverage and Risk Analysis")]
+        #[arg(
+            long = "coverage-file",
+            visible_alias = "lcov",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         coverage_file: Option<PathBuf>,
 
         /// Enable context-aware risk analysis
-        #[arg(long = "context", visible_alias = "enable-context", help_heading = "Coverage and Risk Analysis")]
+        #[arg(
+            long = "context",
+            visible_alias = "enable-context",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         enable_context: bool,
 
         /// Context providers to use (critical_path, dependency, git_history)
@@ -335,7 +353,11 @@ pub enum Commands {
         /// LCOV coverage file for risk analysis and score dampening.
         /// Coverage data dampens debt scores for well-tested code (multiplier = 1.0 - coverage),
         /// surfacing untested complex functions. Total debt score with coverage ≤ score without.
-        #[arg(long = "coverage-file", visible_alias = "lcov", help_heading = "Coverage and Risk Analysis")]
+        #[arg(
+            long = "coverage-file",
+            visible_alias = "lcov",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         coverage_file: Option<PathBuf>,
 
         /// Output format
@@ -347,7 +369,11 @@ pub enum Commands {
         output: Option<PathBuf>,
 
         /// Enable context-aware risk analysis
-        #[arg(long = "context", visible_alias = "enable-context", help_heading = "Coverage and Risk Analysis")]
+        #[arg(
+            long = "context",
+            visible_alias = "enable-context",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         enable_context: bool,
 
         /// Context providers to use (critical_path, dependency, git_history)
@@ -485,7 +511,11 @@ pub enum Commands {
         path: PathBuf,
 
         /// LCOV coverage file
-        #[arg(long = "coverage-file", visible_alias = "lcov", help_heading = "Coverage and Risk Analysis")]
+        #[arg(
+            long = "coverage-file",
+            visible_alias = "lcov",
+            help_heading = "Coverage and Risk Analysis"
+        )]
         coverage_file: PathBuf,
 
         /// Function name to explain (e.g., "create_auto_commit")

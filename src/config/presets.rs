@@ -279,18 +279,12 @@ mod tests {
         assert_eq!(PresetLevel::parse("strict"), Some(PresetLevel::Strict));
         assert_eq!(PresetLevel::parse("Strict"), Some(PresetLevel::Strict));
         assert_eq!(PresetLevel::parse("STRICT"), Some(PresetLevel::Strict));
-        assert_eq!(
-            PresetLevel::parse("balanced"),
-            Some(PresetLevel::Balanced)
-        );
+        assert_eq!(PresetLevel::parse("balanced"), Some(PresetLevel::Balanced));
         assert_eq!(
             PresetLevel::parse("permissive"),
             Some(PresetLevel::Permissive)
         );
-        assert_eq!(
-            PresetLevel::parse("lenient"),
-            Some(PresetLevel::Permissive)
-        );
+        assert_eq!(PresetLevel::parse("lenient"), Some(PresetLevel::Permissive));
         assert_eq!(PresetLevel::parse("invalid"), None);
     }
 
