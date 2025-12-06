@@ -44,9 +44,10 @@ pub fn render_minimal(frame: &mut Frame, app: &App) {
         .split(area);
 
     let progress_text = format!(
-        "{} stage {}/9 - {:.1}s",
+        "{} stage {}/{} - {:.1}s",
         render_progress_bar(app.overall_progress, 30),
         app.current_stage + 1,
+        app.stages.len(),
         app.elapsed_time.as_secs_f64()
     );
 
@@ -91,7 +92,7 @@ fn render_header(frame: &mut Frame, app: &App, theme: &Theme, area: ratatui::lay
     );
 
     // Stage counter
-    let stage_info = format!("stage {}/9", app.current_stage + 1);
+    let stage_info = format!("stage {}/{}", app.current_stage + 1, app.stages.len());
     frame.render_widget(
         Paragraph::new(stage_info).style(theme.metric_style()),
         header_chunks[3],
@@ -198,8 +199,9 @@ fn render_subtask_line(
     match subtask.status {
         StageStatus::Completed => {
             // Dotted leader to "done"
-            // Account for: space (1) + dots + space (1) + "done" (4) = 6 total
-            let dots_needed = width.saturating_sub((name_with_indent.len() + 6) as u16) as usize;
+            // Account for: space (1) + dots + space (1) + "done" (4) + alignment (4) = 10 total
+            // The extra 4 ensures "done" ends at width - 2, matching main section metrics
+            let dots_needed = width.saturating_sub((name_with_indent.len() + 10) as u16) as usize;
             Line::from(vec![
                 Span::raw(name_with_indent),
                 Span::raw(" "),
