@@ -57,15 +57,21 @@ pub struct UnifiedDebtItem {
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
     pub entropy_details: Option<EntropyDetails>, // Store entropy information
-    pub is_pure: Option<bool>,                   // Whether the function is pure
-    pub purity_confidence: Option<f32>,          // Confidence in purity detection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_adjusted_cyclomatic: Option<u32>, // Entropy-adjusted cyclomatic complexity (spec 214)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_adjusted_cognitive: Option<u32>, // Entropy-adjusted cognitive complexity (spec 214)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_dampening_factor: Option<f64>, // Dampening factor applied (spec 214)
+    pub is_pure: Option<bool>,          // Whether the function is pure
+    pub purity_confidence: Option<f32>, // Confidence in purity detection
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purity_level: Option<PurityLevel>, // Refined purity classification (spec 157)
     pub god_object_indicators: Option<GodObjectAnalysis>, // God object detection results
     #[serde(skip)]
     pub tier: Option<crate::priority::RecommendationTier>, // Recommendation tier for prioritization
     pub function_context: Option<crate::analysis::FunctionContext>, // Detected context (spec 122)
-    pub context_confidence: Option<f64>,         // Confidence in context detection (spec 122)
+    pub context_confidence: Option<f64>, // Confidence in context detection (spec 122)
     pub contextual_recommendation: Option<crate::priority::scoring::ContextualRecommendation>, // Context-aware recommendation (spec 122)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)
@@ -101,6 +107,7 @@ pub struct EntropyDetails {
     pub original_complexity: u32,
     pub adjusted_complexity: u32,
     pub dampening_factor: f64,
+    pub adjusted_cognitive: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -211,6 +218,9 @@ pub fn calculate_unified_priority_with_debt(
     // Orchestrators typically have low cognitive complexity relative to cyclomatic
     let is_orchestrator_candidate = role == FunctionRole::Orchestrator;
 
+    // Calculate entropy details if available (spec 214)
+    let entropy_details = crate::priority::scoring::computation::calculate_entropy_details(func);
+
     // Calculate purity adjustment and apply to complexity metrics
     let purity_bonus = calculate_purity_adjustment(func);
     let (purity_adjusted_cyclomatic, purity_adjusted_cognitive) =
@@ -219,6 +229,7 @@ pub fn calculate_unified_priority_with_debt(
     let raw_complexity = normalize_complexity(
         purity_adjusted_cyclomatic,
         purity_adjusted_cognitive,
+        entropy_details.as_ref(),
         is_orchestrator_candidate,
     );
 
@@ -529,11 +540,34 @@ fn apply_orchestration_adjustment(
 /// Uses configurable weights for cyclomatic and cognitive complexity.
 /// Default: 30% cyclomatic, 70% cognitive (research shows cognitive correlates better with bugs).
 /// For orchestrators, cognitive weight may be increased further.
-fn normalize_complexity(cyclomatic: u32, cognitive: u32, is_orchestrator: bool) -> f64 {
+///
+/// Applies entropy-based dampening if entropy_details is provided and enabled in config (spec 214).
+fn normalize_complexity(
+    cyclomatic: u32,
+    cognitive: u32,
+    entropy_details: Option<&EntropyDetails>,
+    is_orchestrator: bool,
+) -> f64 {
     use crate::complexity::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
 
-    // Get weights from configuration (spec 121)
+    // Get configuration
     let config = crate::config::get_config();
+    let entropy_config = crate::config::get_entropy_config();
+
+    // Apply entropy dampening if available and enabled (spec 214)
+    let (adjusted_cyclo, adjusted_cog) = if let Some(entropy) = entropy_details {
+        if entropy_config.enabled {
+            // Use entropy-adjusted complexity values
+            (entropy.adjusted_complexity, entropy.adjusted_cognitive)
+        } else {
+            (cyclomatic, cognitive)
+        }
+    } else {
+        // No entropy data available, use raw complexity
+        (cyclomatic, cognitive)
+    };
+
+    // Get weights from configuration (spec 121)
     let weights = if let Some(weights_config) = config.complexity_weights.as_ref() {
         ComplexityWeights {
             cyclomatic: weights_config.cyclomatic,
@@ -561,8 +595,9 @@ fn normalize_complexity(cyclomatic: u32, cognitive: u32, is_orchestrator: bool) 
         ComplexityNormalization::default()
     };
 
-    // Calculate weighted complexity score (0-100 scale)
-    let weighted = WeightedComplexity::calculate(cyclomatic, cognitive, weights, &normalization);
+    // Calculate weighted complexity score (0-100 scale) using entropy-adjusted values
+    let weighted =
+        WeightedComplexity::calculate(adjusted_cyclo, adjusted_cog, weights, &normalization);
 
     // Convert from 0-100 scale to 0-10 scale for backward compatibility
     weighted.weighted_score / 10.0

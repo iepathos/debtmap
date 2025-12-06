@@ -696,3 +696,160 @@ fn test_locally_pure_scores_higher_than_strictly_pure() {
         score_strictly_pure.final_score
     );
 }
+
+// Tests for entropy dampening integration (spec 214)
+
+#[test]
+fn test_entropy_dampening_reduces_complexity_score() {
+    use crate::complexity::entropy_core::EntropyScore;
+
+    // Create two identical functions - one with high pattern repetition, one without
+    let mut func_with_patterns = create_test_metrics();
+    func_with_patterns.cyclomatic = 10;
+    func_with_patterns.cognitive = 15;
+    func_with_patterns.entropy_score = Some(EntropyScore {
+        token_entropy: 0.5,
+        pattern_repetition: 0.8, // High pattern repetition
+        branch_similarity: 0.6,
+        effective_complexity: 0.3,
+        unique_variables: 5,
+        max_nesting: 2,
+        dampening_applied: 1.0,
+    });
+
+    let mut func_without_patterns = create_test_metrics();
+    func_without_patterns.cyclomatic = 10;
+    func_without_patterns.cognitive = 15;
+    func_without_patterns.entropy_score = None; // No entropy data
+
+    let call_graph = CallGraph::new();
+    let score_with_patterns =
+        calculate_unified_priority(&func_with_patterns, &call_graph, None, None);
+    let score_without_patterns =
+        calculate_unified_priority(&func_without_patterns, &call_graph, None, None);
+
+    // Pattern-heavy code should score lower due to entropy dampening
+    assert!(
+        score_with_patterns.final_score < score_without_patterns.final_score,
+        "Pattern-heavy code (score: {}) should score lower than code without patterns (score: {})",
+        score_with_patterns.final_score,
+        score_without_patterns.final_score
+    );
+}
+
+#[test]
+fn test_entropy_dampening_never_increases_complexity() {
+    use crate::complexity::entropy_core::EntropyScore;
+
+    // Create function with entropy score
+    let mut func = create_test_metrics();
+    func.cyclomatic = 20;
+    func.cognitive = 30;
+    func.entropy_score = Some(EntropyScore {
+        token_entropy: 0.7,
+        pattern_repetition: 0.5,
+        branch_similarity: 0.4,
+        effective_complexity: 0.6,
+        unique_variables: 10,
+        max_nesting: 3,
+        dampening_applied: 1.0,
+    });
+
+    // Calculate entropy details
+    let entropy_details = crate::priority::scoring::computation::calculate_entropy_details(&func);
+
+    assert!(entropy_details.is_some());
+    let details = entropy_details.unwrap();
+
+    // Entropy-adjusted complexity should never exceed raw complexity
+    assert!(
+        details.adjusted_complexity <= func.cyclomatic,
+        "Adjusted cyclomatic ({}) should not exceed raw cyclomatic ({})",
+        details.adjusted_complexity,
+        func.cyclomatic
+    );
+    assert!(
+        details.adjusted_cognitive <= func.cognitive,
+        "Adjusted cognitive ({}) should not exceed raw cognitive ({})",
+        details.adjusted_cognitive,
+        func.cognitive
+    );
+    assert!(
+        details.dampening_factor <= 1.0,
+        "Dampening factor ({}) should not exceed 1.0",
+        details.dampening_factor
+    );
+}
+
+#[test]
+fn test_entropy_details_populated_in_debt_item() {
+    use crate::complexity::entropy_core::EntropyScore;
+    use crate::priority::scoring::construction::create_unified_debt_item;
+
+    let mut func = create_test_metrics();
+    func.cyclomatic = 15;
+    func.cognitive = 20;
+    func.entropy_score = Some(EntropyScore {
+        token_entropy: 0.6,
+        pattern_repetition: 0.7,
+        branch_similarity: 0.5,
+        effective_complexity: 0.4,
+        unique_variables: 8,
+        max_nesting: 2,
+        dampening_applied: 1.0,
+    });
+
+    let call_graph = CallGraph::new();
+    let debt_item = create_unified_debt_item(&func, &call_graph, None);
+
+    assert!(debt_item.is_some());
+    let item = debt_item.unwrap();
+
+    // Verify entropy details are populated
+    assert!(item.entropy_details.is_some());
+    assert!(item.entropy_adjusted_cyclomatic.is_some());
+    assert!(item.entropy_adjusted_cognitive.is_some());
+    assert!(item.entropy_dampening_factor.is_some());
+
+    // Verify adjusted values are reasonable
+    let adjusted_cyclo = item.entropy_adjusted_cyclomatic.unwrap();
+    let adjusted_cog = item.entropy_adjusted_cognitive.unwrap();
+    assert!(adjusted_cyclo <= func.cyclomatic);
+    assert!(adjusted_cog <= func.cognitive);
+}
+
+#[test]
+fn test_normalize_complexity_with_entropy_dampening() {
+    use crate::complexity::entropy_core::EntropyScore;
+
+    // Test that normalize_complexity uses entropy-adjusted values when available
+    let mut func = create_test_metrics();
+    func.cyclomatic = 20;
+    func.cognitive = 30;
+    func.entropy_score = Some(EntropyScore {
+        token_entropy: 0.5,
+        pattern_repetition: 0.8, // High repetition should reduce complexity
+        branch_similarity: 0.6,
+        effective_complexity: 0.3,
+        unique_variables: 5,
+        max_nesting: 2,
+        dampening_applied: 1.0,
+    });
+
+    let call_graph = CallGraph::new();
+
+    // Calculate score with entropy dampening
+    let score_with_entropy = calculate_unified_priority(&func, &call_graph, None, None);
+
+    // Remove entropy data and recalculate
+    func.entropy_score = None;
+    let score_without_entropy = calculate_unified_priority(&func, &call_graph, None, None);
+
+    // Complexity factor should be lower with entropy dampening
+    assert!(
+        score_with_entropy.complexity_factor < score_without_entropy.complexity_factor,
+        "Complexity factor with entropy ({}) should be lower than without entropy ({})",
+        score_with_entropy.complexity_factor,
+        score_without_entropy.complexity_factor
+    );
+}

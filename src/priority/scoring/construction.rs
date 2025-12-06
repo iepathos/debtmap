@@ -137,6 +137,9 @@ pub fn create_unified_debt_item_enhanced(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
 
+    // Calculate entropy details once for efficiency (spec 214)
+    let entropy_details = calculate_entropy_details(func);
+
     let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -157,7 +160,10 @@ pub fn create_unified_debt_item_enhanced(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
-        entropy_details: calculate_entropy_details(func),
+        entropy_details: entropy_details.clone(),
+        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
+        entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
+        entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         purity_level: None,
@@ -368,6 +374,9 @@ fn build_unified_debt_item(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
 
+    // Calculate entropy details once for efficiency (spec 214)
+    let entropy_details = calculate_entropy_details(func);
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -389,7 +398,10 @@ fn build_unified_debt_item(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
-        entropy_details: calculate_entropy_details(func),
+        entropy_details: entropy_details.clone(),
+        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
+        entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
+        entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         purity_level: None,
@@ -565,6 +577,9 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
 
+    // Calculate entropy details once for efficiency (spec 214)
+    let entropy_details = calculate_entropy_details(func);
+
     Some(UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -585,7 +600,10 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
-        entropy_details: calculate_entropy_details(func),
+        entropy_details: entropy_details.clone(),
+        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
+        entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
+        entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         purity_level: None,
@@ -705,7 +723,10 @@ pub fn create_unified_debt_item_with_data_flow(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
-        entropy_details,
+        entropy_details: entropy_details.clone(),
+        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
+        entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
+        entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         purity_level: None,
