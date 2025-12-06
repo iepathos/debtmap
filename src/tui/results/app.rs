@@ -435,7 +435,7 @@ impl ResultsApp {
     /// Get count display for header (location count vs item count)
     pub fn count_display(&self) -> String {
         if self.show_grouped {
-            let groups = super::grouping::group_by_location(self.filtered_items());
+            let groups = super::grouping::group_by_location(self.filtered_items(), self.sort_by());
             let issue_count = self.filtered_indices.len();
             format!("{} locations ({} issues)", groups.len(), issue_count)
         } else {

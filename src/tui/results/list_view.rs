@@ -255,7 +255,7 @@ fn render_ungrouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<Lis
 
 /// Render grouped list by location
 fn render_grouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListItem<'static>> {
-    let groups = grouping::group_by_location(app.filtered_items());
+    let groups = grouping::group_by_location(app.filtered_items(), app.sort_by());
 
     let mut list_items = Vec::new();
 

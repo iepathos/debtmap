@@ -4,8 +4,11 @@
 //! into a single entry for display, while preserving all individual items.
 
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+use super::sort::SortCriteria;
 
 /// A group of debt items at the same location
 #[derive(Debug, Clone)]
@@ -29,9 +32,10 @@ pub struct AggregatedMetrics<'a> {
     pub coverage: Option<&'a TransitiveCoverage>,
 }
 
-/// Group debt items by (file, function, line) location
+/// Group debt items by (file, function, line) location and sort by criteria
 pub fn group_by_location<'a>(
     items: impl Iterator<Item = &'a UnifiedDebtItem>,
+    sort_by: SortCriteria,
 ) -> Vec<LocationGroup<'a>> {
     let mut groups: HashMap<(&PathBuf, &str, usize), Vec<&UnifiedDebtItem>> = HashMap::new();
 
@@ -67,14 +71,59 @@ pub fn group_by_location<'a>(
         })
         .collect();
 
-    // Sort by combined score descending
-    result.sort_by(|a, b| {
-        b.combined_score
-            .partial_cmp(&a.combined_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // Sort groups based on criteria
+    sort_groups(&mut result, sort_by);
 
     result
+}
+
+/// Sort groups based on the given criteria
+fn sort_groups(groups: &mut [LocationGroup], criteria: SortCriteria) {
+    groups.sort_by(|a, b| {
+        let primary = match criteria {
+            SortCriteria::Score => {
+                // Sort by combined score descending
+                b.combined_score
+                    .partial_cmp(&a.combined_score)
+                    .unwrap_or(Ordering::Equal)
+            }
+            SortCriteria::Coverage => {
+                // Sort by coverage ascending (lowest coverage first)
+                let cov_a = aggregate_metrics(a).coverage.map(|c| c.direct);
+                let cov_b = aggregate_metrics(b).coverage.map(|c| c.direct);
+
+                match (cov_a, cov_b) {
+                    (None, None) => Ordering::Equal,
+                    (None, Some(_)) => Ordering::Less, // No coverage is worst
+                    (Some(_), None) => Ordering::Greater,
+                    (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Equal),
+                }
+            }
+            SortCriteria::Complexity => {
+                // Sort by max complexity descending
+                let comp_a = aggregate_metrics(a).cognitive_complexity;
+                let comp_b = aggregate_metrics(b).cognitive_complexity;
+                comp_b.cmp(&comp_a)
+            }
+            SortCriteria::FilePath => {
+                // Sort by file path alphabetically
+                a.location.file.cmp(&b.location.file)
+            }
+            SortCriteria::FunctionName => {
+                // Sort by function name alphabetically
+                a.location.function.cmp(&b.location.function)
+            }
+        };
+
+        // Tiebreaker: compare by file path, then line number for stable ordering
+        match primary {
+            Ordering::Equal => match a.location.file.cmp(&b.location.file) {
+                Ordering::Equal => a.location.line.cmp(&b.location.line),
+                other => other,
+            },
+            other => other,
+        }
+    });
 }
 
 /// Extract all unique metrics across items in group
@@ -166,6 +215,9 @@ mod tests {
                 risk_boost: None,
                 pre_adjustment_score: None,
                 adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
             },
             function_role: crate::priority::semantic_classifier::FunctionRole::Unknown,
             recommendation: ActionableRecommendation {
@@ -216,7 +268,7 @@ mod tests {
     #[test]
     fn test_group_by_location_single_item() {
         let items = vec![create_test_item("file.rs", "func", 10, 50.0)];
-        let groups = group_by_location(items.iter());
+        let groups = group_by_location(items.iter(), SortCriteria::Score);
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].items.len(), 1);
         assert_eq!(groups[0].combined_score, 50.0);
@@ -229,7 +281,7 @@ mod tests {
             create_test_item("file.rs", "func", 10, 60.0),
             create_test_item("file.rs", "func", 10, 45.0),
         ];
-        let groups = group_by_location(items.iter());
+        let groups = group_by_location(items.iter(), SortCriteria::Score);
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].items.len(), 3);
         assert_eq!(groups[0].combined_score, 180.0);
@@ -242,7 +294,7 @@ mod tests {
             create_test_item("file.rs", "func", 10, 60.0),
             create_test_item("file.rs", "func", 10, 45.0),
         ];
-        let groups = group_by_location(items.iter());
+        let groups = group_by_location(items.iter(), SortCriteria::Score);
         assert_eq!(groups[0].combined_score, 180.0);
     }
 
@@ -253,7 +305,7 @@ mod tests {
             create_test_item("file.rs", "func2", 20, 50.0),
             create_test_item("other.rs", "func1", 10, 50.0),
         ];
-        let groups = group_by_location(items.iter());
+        let groups = group_by_location(items.iter(), SortCriteria::Score);
         assert_eq!(groups.len(), 3);
         for group in &groups {
             assert_eq!(group.items.len(), 1);
@@ -267,7 +319,7 @@ mod tests {
             create_test_item("file.rs", "func", 10, 120.0), // CRITICAL
             create_test_item("file.rs", "func", 10, 45.0),  // MEDIUM
         ];
-        let groups = group_by_location(items.iter());
+        let groups = group_by_location(items.iter(), SortCriteria::Score);
         assert_eq!(groups[0].max_severity, "CRITICAL");
     }
 }
