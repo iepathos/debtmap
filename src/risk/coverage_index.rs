@@ -1,3 +1,6 @@
+use super::function_name_matching::{
+    extract_closure_parent, function_names_match, generate_function_name_variants, MatchConfidence,
+};
 use super::lcov::{normalize_demangled_name, strip_trailing_generics, FunctionCoverage, LcovData};
 use super::path_normalization::normalize_path_components;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -401,40 +404,18 @@ impl CoverageIndex {
                     log::debug!("  Found path match: '{}'", file_path.display());
                     // O(1) lookup once we find the file
                     if let Some(file_functions) = self.by_file.get(file_path) {
-                        // Try exact match first
-                        if let Some(coverage) = file_functions.get(function_name) {
+                        // Use enhanced matching to find best match
+                        if let Some((func, confidence)) =
+                            self.find_best_matching_function(file_functions, function_name)
+                        {
                             log::debug!(
-                                "  ✓ Matched function name exactly: {}%",
-                                coverage.coverage_percentage
+                                "  ✓ Matched function via {:?} confidence: query '{}' matches stored '{}': {}%",
+                                confidence,
+                                function_name,
+                                func.name,
+                                func.coverage_percentage
                             );
-                            return Some(coverage);
-                        }
-                        // Try function name suffix match (for querying with short form)
-                        // Allows querying "ResumeExecutor::method" to match stored "prodigy::cook::resume::ResumeExecutor::method"
-                        for func in file_functions.values() {
-                            if func.name.ends_with(function_name)
-                                || function_name.ends_with(&func.name)
-                            {
-                                log::debug!(
-                                    "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
-                                    function_name,
-                                    func.name,
-                                    func.coverage_percentage
-                                );
-                                return Some(func);
-                            }
-                        }
-                        // Try method name match (for Rust methods)
-                        for func in file_functions.values() {
-                            if func.normalized.method_name == function_name {
-                                log::debug!(
-                                    "  ✓ Matched method name '{}' -> '{}': {}%",
-                                    func.name,
-                                    func.normalized.method_name,
-                                    func.coverage_percentage
-                                );
-                                return Some(func);
-                            }
+                            return Some(func);
                         }
                         log::debug!("  ✗ No function match in this file");
                     }
@@ -454,39 +435,18 @@ impl CoverageIndex {
                 if file_components == query_suffix {
                     log::debug!("  Found path match: '{}'", file_path.display());
                     if let Some(file_functions) = self.by_file.get(file_path) {
-                        // Try exact match first
-                        if let Some(coverage) = file_functions.get(function_name) {
+                        // Use enhanced matching to find best match
+                        if let Some((func, confidence)) =
+                            self.find_best_matching_function(file_functions, function_name)
+                        {
                             log::debug!(
-                                "  ✓ Matched function name exactly: {}%",
-                                coverage.coverage_percentage
+                                "  ✓ Matched function via {:?} confidence: query '{}' matches stored '{}': {}%",
+                                confidence,
+                                function_name,
+                                func.name,
+                                func.coverage_percentage
                             );
-                            return Some(coverage);
-                        }
-                        // Try function name suffix match (for querying with short form)
-                        for func in file_functions.values() {
-                            if func.name.ends_with(function_name)
-                                || function_name.ends_with(&func.name)
-                            {
-                                log::debug!(
-                                    "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
-                                    function_name,
-                                    func.name,
-                                    func.coverage_percentage
-                                );
-                                return Some(func);
-                            }
-                        }
-                        // Try method name match (for Rust methods)
-                        for func in file_functions.values() {
-                            if func.normalized.method_name == function_name {
-                                log::debug!(
-                                    "  ✓ Matched method name '{}' -> '{}': {}%",
-                                    func.name,
-                                    func.normalized.method_name,
-                                    func.coverage_percentage
-                                );
-                                return Some(func);
-                            }
+                            return Some(func);
                         }
                         log::debug!("  ✗ No function match in this file");
                     }
@@ -501,38 +461,18 @@ impl CoverageIndex {
             if query_components == file_components {
                 log::debug!("  Found path match: '{}'", file_path.display());
                 if let Some(file_functions) = self.by_file.get(file_path) {
-                    // Try exact match first
-                    if let Some(coverage) = file_functions.get(function_name) {
+                    // Use enhanced matching to find best match
+                    if let Some((func, confidence)) =
+                        self.find_best_matching_function(file_functions, function_name)
+                    {
                         log::debug!(
-                            "  ✓ Matched function name exactly: {}%",
-                            coverage.coverage_percentage
+                            "  ✓ Matched function via {:?} confidence: query '{}' matches stored '{}': {}%",
+                            confidence,
+                            function_name,
+                            func.name,
+                            func.coverage_percentage
                         );
-                        return Some(coverage);
-                    }
-                    // Try function name suffix match (for querying with short form)
-                    for func in file_functions.values() {
-                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name)
-                        {
-                            log::debug!(
-                                "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
-                                function_name,
-                                func.name,
-                                func.coverage_percentage
-                            );
-                            return Some(func);
-                        }
-                    }
-                    // Try method name match (for Rust methods)
-                    for func in file_functions.values() {
-                        if func.normalized.method_name == function_name {
-                            log::debug!(
-                                "  ✓ Matched method name '{}' -> '{}': {}%",
-                                func.name,
-                                func.normalized.method_name,
-                                func.coverage_percentage
-                            );
-                            return Some(func);
-                        }
+                        return Some(func);
                     }
                     log::debug!("  ✗ No function match in this file");
                 }
@@ -579,11 +519,12 @@ impl CoverageIndex {
             return Some(agg.coverage_pct / 100.0);
         }
 
-        // Try name variants (for trait methods where LCOV may use simplified names)
-        for variant in generate_name_variants(function_name) {
+        // Try enhanced name variants (for trait methods, closures, generics)
+        let variants = generate_function_name_variants(function_name);
+        for variant in &variants {
             log::debug!("Trying name variant: '{}'", variant);
             // First try O(1) aggregated lookup
-            if let Some(agg) = self.get_aggregated_coverage(file, &variant) {
+            if let Some(agg) = self.get_aggregated_coverage(file, variant) {
                 log::debug!(
                     "✓ Coverage found via name variant '{}': {:.1}%",
                     variant,
@@ -592,10 +533,31 @@ impl CoverageIndex {
                 return Some(agg.coverage_pct / 100.0);
             }
             // If that fails, try path strategies (handles file path mismatches)
-            if let Some(func) = self.find_by_path_strategies(file, &variant) {
+            if let Some(func) = self.find_by_path_strategies(file, variant) {
                 log::debug!(
                     "✓ Coverage found via name variant '{}' with path strategies: {:.1}%",
                     variant,
+                    func.coverage_percentage
+                );
+                return Some(func.coverage_percentage / 100.0);
+            }
+        }
+
+        // Try closure parent extraction (for async functions)
+        if let Some(parent) = extract_closure_parent(function_name) {
+            log::debug!("Trying closure parent: '{}'", parent);
+            if let Some(agg) = self.get_aggregated_coverage(file, &parent) {
+                log::debug!(
+                    "✓ Coverage found via closure parent '{}': {:.1}%",
+                    parent,
+                    agg.coverage_pct
+                );
+                return Some(agg.coverage_pct / 100.0);
+            }
+            if let Some(func) = self.find_by_path_strategies(file, &parent) {
+                log::debug!(
+                    "✓ Coverage found via closure parent '{}' with path strategies: {:.1}%",
+                    parent,
                     func.coverage_percentage
                 );
                 return Some(func.coverage_percentage / 100.0);
@@ -815,6 +777,42 @@ impl CoverageIndex {
         }
 
         None
+    }
+
+    /// Find best matching function from a set of candidates using enhanced matching
+    ///
+    /// Uses the new function_name_matching module to find the best match with confidence scoring.
+    /// Prefers higher confidence matches (exact > variant > fuzzy).
+    ///
+    /// # Arguments
+    /// * `file_functions` - HashMap of function names to coverage data for a file
+    /// * `query_name` - The function name we're looking for
+    ///
+    /// # Returns
+    /// The best matching function and its confidence level, or None if no match found
+    fn find_best_matching_function<'a>(
+        &self,
+        file_functions: &'a HashMap<String, FunctionCoverage>,
+        query_name: &str,
+    ) -> Option<(&'a FunctionCoverage, MatchConfidence)> {
+        let mut best_match = None;
+        let mut best_confidence = MatchConfidence::None;
+
+        for (lcov_name, func) in file_functions {
+            let (matches, confidence) = function_names_match(query_name, lcov_name);
+
+            if matches && confidence > best_confidence {
+                best_match = Some(func);
+                best_confidence = confidence;
+
+                // Early exit on exact match
+                if confidence == MatchConfidence::High {
+                    break;
+                }
+            }
+        }
+
+        best_match.map(|func| (func, best_confidence))
     }
 }
 
