@@ -1553,6 +1553,164 @@ fn create_god_object_analysis(
     })
 }
 
+/// Pure function to create a UnifiedDebtItem from god object indicators (spec 207)
+///
+/// God objects are file-level technical debt items representing files with
+/// too many responsibilities, methods, or fields. They bypass function-level
+/// complexity filtering since they represent architectural issues rather than
+/// individual function complexity.
+fn create_god_object_debt_item(
+    file_path: &Path,
+    file_metrics: &FileDebtMetrics,
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) -> UnifiedDebtItem {
+    // Calculate unified score based on god object score (0-100 scale)
+    let base_score = god_analysis.god_object_score;
+    let tier = if base_score >= 50.0 { 1 } else { 2 };
+
+    let unified_score = UnifiedScore {
+        final_score: base_score,
+        complexity_factor: file_metrics.total_complexity as f64 / 10.0,
+        coverage_factor: 0.0, // File-level item, no coverage score
+        dependency_factor: calculate_god_object_risk(god_analysis) / 10.0,
+        role_multiplier: 1.0,
+        base_score: Some(base_score),
+        exponential_factor: None,
+        risk_boost: None,
+        pre_adjustment_score: None,
+        adjustment_applied: None,
+        purity_factor: None,
+        refactorability_factor: None,
+        pattern_factor: None,
+    };
+
+    // Determine debt type based on detection type
+    let debt_type = match god_analysis.detection_type {
+        crate::organization::DetectionType::GodClass => DebtType::GodObject {
+            methods: god_analysis.method_count as u32,
+            fields: god_analysis.field_count as u32,
+            responsibilities: god_analysis.responsibility_count as u32,
+            god_object_score: god_analysis.god_object_score,
+        },
+        crate::organization::DetectionType::GodFile
+        | crate::organization::DetectionType::GodModule => DebtType::GodModule {
+            functions: god_analysis.method_count as u32,
+            lines: god_analysis.lines_of_code as u32,
+            responsibilities: god_analysis.responsibility_count as u32,
+        },
+    };
+
+    // Extract file name for display
+    let file_name = file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
+    // Create impact metrics
+    let expected_impact = ImpactMetrics {
+        coverage_improvement: 0.0,
+        lines_reduction: god_analysis.lines_of_code as u32
+            / god_analysis.recommended_splits.len().max(1) as u32,
+        complexity_reduction: file_metrics.total_complexity as f64
+            / god_analysis.recommended_splits.len().max(1) as f64,
+        risk_reduction: calculate_god_object_risk(god_analysis),
+    };
+
+    // Create recommendation
+    let recommendation = create_god_object_recommendation(god_analysis);
+
+    let tier_enum = if tier == 1 {
+        crate::priority::RecommendationTier::T1CriticalArchitecture
+    } else {
+        crate::priority::RecommendationTier::T2ComplexUntested
+    };
+
+    UnifiedDebtItem {
+        location: Location {
+            file: file_path.to_path_buf(),
+            function: file_name.to_string(),
+            line: 1, // File-level item starts at line 1
+        },
+        debt_type,
+        unified_score,
+        function_role: FunctionRole::Unknown, // Not applicable for file-level items
+        recommendation,
+        expected_impact,
+        transitive_coverage: None,
+        upstream_dependencies: 0,
+        downstream_dependencies: 0,
+        upstream_callers: Vec::new(),
+        downstream_callees: Vec::new(),
+        nesting_depth: 0,
+        function_length: god_analysis.lines_of_code,
+        cyclomatic_complexity: 0, // File-level metric, not function-level
+        cognitive_complexity: 0,  // File-level metric, not function-level
+        entropy_details: None,
+        entropy_adjusted_cyclomatic: None,
+        entropy_adjusted_cognitive: None,
+        entropy_dampening_factor: None,
+        is_pure: None,
+        purity_confidence: None,
+        purity_level: None,
+        god_object_indicators: Some(god_analysis.clone()),
+        tier: Some(tier_enum),
+        function_context: None,
+        context_confidence: None,
+        contextual_recommendation: None,
+        pattern_analysis: None,
+        file_context: None,
+        context_multiplier: None,
+        context_type: None,
+        language_specific: None,
+        detected_pattern: None,
+        contextual_risk: None,
+        file_line_count: Some(god_analysis.lines_of_code),
+    }
+}
+
+/// Calculate risk score for god object (spec 207)
+fn calculate_god_object_risk(god_analysis: &crate::organization::GodObjectAnalysis) -> f64 {
+    // More responsibilities and methods = higher risk
+    let responsibility_risk = god_analysis.responsibility_count as f64 * 10.0;
+    let method_risk = (god_analysis.method_count as f64 / 10.0).min(50.0);
+
+    (responsibility_risk + method_risk).min(100.0)
+}
+
+/// Create actionable recommendation for god object (spec 207)
+fn create_god_object_recommendation(
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) -> ActionableRecommendation {
+    let split_count = god_analysis.recommended_splits.len().max(1);
+
+    let primary_action = match god_analysis.detection_type {
+        crate::organization::DetectionType::GodClass => {
+            format!(
+                "Split god object into {} modules by responsibility",
+                split_count
+            )
+        }
+        crate::organization::DetectionType::GodFile
+        | crate::organization::DetectionType::GodModule => {
+            format!("Split god module into {} focused modules", split_count)
+        }
+    };
+
+    let rationale = format!(
+        "{} responsibilities detected with {} methods/functions - splitting will improve maintainability",
+        god_analysis.responsibility_count, god_analysis.method_count
+    );
+
+    ActionableRecommendation {
+        primary_action,
+        rationale,
+        implementation_steps: Vec::new(),
+        related_items: Vec::new(),
+        steps: None,
+        estimated_effort_hours: None,
+    }
+}
+
 // I/O function to apply results to unified analysis
 fn apply_file_analysis_results(
     unified: &mut UnifiedAnalysis,
@@ -1562,6 +1720,14 @@ fn apply_file_analysis_results(
         // Update god object indicators for functions in this file
         if let Some(god_analysis) = &file_data.god_analysis {
             update_function_god_indicators(unified, &file_data.file_path, god_analysis);
+
+            // NEW (spec 207): Create god object debt item for TUI display
+            let god_item = create_god_object_debt_item(
+                &file_data.file_path,
+                &file_data.file_metrics,
+                god_analysis,
+            );
+            unified.add_item(god_item); // Add as UnifiedDebtItem for TUI
         }
 
         // Create and add file debt item

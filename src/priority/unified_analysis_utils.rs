@@ -113,12 +113,15 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
         }
 
         // Filter out trivial functions based on configured complexity thresholds.
-        // Test-related items are exempt as they have different complexity characteristics.
+        // Test-related items and god objects are exempt as they have different complexity characteristics.
+        // God objects are file-level items with cyclomatic/cognitive = 0 (spec 207)
         if !matches!(
             item.debt_type,
             DebtType::TestComplexityHotspot { .. }
                 | DebtType::TestTodo { .. }
                 | DebtType::TestDuplication { .. }
+                | DebtType::GodObject { .. }
+                | DebtType::GodModule { .. }
         ) {
             // Enforce cyclomatic complexity threshold
             if item.cyclomatic_complexity < min_cyclomatic {

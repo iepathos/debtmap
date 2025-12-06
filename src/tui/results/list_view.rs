@@ -2,7 +2,7 @@
 
 use super::app::ResultsApp;
 use super::grouping;
-use crate::priority::UnifiedDebtItem;
+use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -316,7 +316,8 @@ fn format_grouped_item(
         metric_parts.push(format!("Nest:{}", metrics.nesting_depth));
     }
     if metrics.function_length > 0 {
-        metric_parts.push(format!("Len:{}", metrics.function_length));
+        // Changed from "Len:" to "LOC:" for consistency (spec 207)
+        metric_parts.push(format!("LOC:{}", metrics.function_length));
     }
 
     // Single line: indicator, rank, severity, score, location, badge, metrics
@@ -418,14 +419,50 @@ fn format_list_item(
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
 
-    let coverage_str = item
-        .transitive_coverage
-        .as_ref()
-        .map(|c| format!("{:.0}%", c.direct))
-        .unwrap_or_else(|| "N/A".to_string());
+    // Check if this is a god object - format differently (spec 207)
+    let (location_str, metrics_str) = match &item.debt_type {
+        DebtType::GodObject {
+            methods,
+            responsibilities,
+            ..
+        } => {
+            let loc = item.file_line_count.unwrap_or(item.function_length);
+            (
+                format!("{} (God Object)", file_name),
+                format!("(LOC:{} Resp:{} Fns:{})", loc, responsibilities, methods),
+            )
+        }
+        DebtType::GodModule { functions, .. } => {
+            let loc = item.file_line_count.unwrap_or(item.function_length);
+            (
+                format!("{} (God Module)", file_name),
+                format!("(LOC:{} Fns:{})", loc, functions),
+            )
+        }
+        _ => {
+            // Regular function item
+            let coverage_str = item
+                .transitive_coverage
+                .as_ref()
+                .map(|c| format!("{:.0}%", c.direct))
+                .unwrap_or_else(|| "N/A".to_string());
 
-    // Format complexity with entropy adjustment if available
-    let complexity_str = format_complexity_metric(item);
+            // Format complexity with entropy adjustment if available
+            let complexity_str = format_complexity_metric(item);
+
+            let mut metric_parts = vec![format!("Cov:{}", coverage_str), complexity_str];
+
+            // Add LOC for function length (spec 207: changed from Len: to LOC:)
+            if item.function_length > 0 {
+                metric_parts.push(format!("LOC:{}", item.function_length));
+            }
+
+            (
+                format!("{}::{}", file_name, item.location.function),
+                format!("({})", metric_parts.join(" ")),
+            )
+        }
+    };
 
     let line = Line::from(vec![
         Span::styled(indicator, Style::default().fg(theme.accent())),
@@ -442,15 +479,9 @@ fn format_list_item(
             Style::default().fg(theme.primary),
         ),
         Span::raw("  "),
-        Span::styled(
-            format!("{}::{}", file_name, item.location.function),
-            Style::default().fg(theme.secondary()),
-        ),
+        Span::styled(location_str, Style::default().fg(theme.secondary())),
         Span::raw("  "),
-        Span::styled(
-            format!("(Cov:{} {})", coverage_str, complexity_str),
-            Style::default().fg(theme.muted),
-        ),
+        Span::styled(metrics_str, Style::default().fg(theme.muted)),
     ]);
 
     let style = if is_selected {
