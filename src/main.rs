@@ -583,8 +583,35 @@ fn is_automation_mode() -> bool {
             .eq_ignore_ascii_case("true")
 }
 
-// Pure function to handle analyze command with all its complexity
-fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
+/// Extracts and builds configuration from the Analyze command variant.
+///
+/// This function handles the destructuring of the 65 CLI parameters from the Commands enum
+/// and builds all configuration groups. It's separated to keep the main handler focused
+/// on coordination.
+///
+/// # Returns
+///
+/// Returns a tuple of configuration groups and special flags needed for handler coordination.
+///
+/// # Architecture Note
+///
+/// This is a necessary extraction function. While long, its complexity is structural
+/// (destructuring + config building) rather than logical. The destructuring must happen
+/// somewhere when working with clap's Commands enum.
+#[allow(clippy::type_complexity)]
+fn extract_analyze_params(
+    command: Commands,
+) -> Result<(
+    analyze_config::PathConfig,
+    analyze_config::ThresholdConfig,
+    analyze_config::AnalysisFeatureConfig,
+    analyze_config::DisplayConfig,
+    analyze_config::PerformanceConfig,
+    analyze_config::DebugConfig,
+    analyze_config::LanguageConfig,
+    bool, // explain_metrics flag
+    bool, // no_context_aware flag
+)> {
     if let Commands::Analyze {
         path,
         format,
@@ -652,17 +679,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         show_filter_stats,
     } = command
     {
-        // Apply side effects first
-        apply_environment_setup(no_context_aware)?;
-
-        // Handle explain-metrics flag
-        if explain_metrics {
-            print_metrics_explanation();
-            return Ok(Ok(()));
-        }
-
-        // Build grouped configurations (spec 204)
-        let path_cfg = analyze_config::PathConfig {
+        // Build configuration groups using pure builder functions
+        let path_cfg = build_path_config(
             path,
             output,
             coverage_file,
@@ -671,16 +689,16 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             min_score,
             filter_categories,
             min_problematic,
-        };
+        );
 
-        let threshold_cfg = analyze_config::ThresholdConfig {
-            complexity: threshold_complexity,
-            duplication: threshold_duplication,
-            preset: threshold_preset,
+        let threshold_cfg = build_threshold_config(
+            threshold_complexity,
+            threshold_duplication,
+            threshold_preset,
             public_api_threshold,
-        };
+        );
 
-        let feature_cfg = analyze_config::AnalysisFeatureConfig {
+        let feature_cfg = build_feature_config(
             enable_context,
             context_providers,
             disable_context,
@@ -696,7 +714,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             min_split_lines,
             validate_loc,
             validate_call_graph,
-        };
+        );
 
         let formatting_config = create_formatting_config(
             plain,
@@ -709,11 +727,9 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             show_splits,
         );
 
-        let effective_verbosity = compute_verbosity(verbosity, compact);
-
-        let display_cfg = analyze_config::DisplayConfig {
+        let display_cfg = build_display_config(
             format,
-            verbosity: effective_verbosity,
+            compute_verbosity(verbosity, compact),
             summary,
             top,
             tail,
@@ -724,19 +740,17 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             show_filter_stats,
             formatting_config,
             no_context_aware,
-        };
+        );
 
-        let multi_pass = compute_multi_pass(no_multi_pass);
-
-        let perf_cfg = analyze_config::PerformanceConfig {
-            parallel: should_use_parallel(no_parallel),
-            jobs: get_worker_count(jobs),
-            multi_pass,
+        let perf_cfg = build_performance_config(
+            should_use_parallel(no_parallel),
+            get_worker_count(jobs),
+            compute_multi_pass(no_multi_pass),
             aggregate_only,
             no_aggregation,
-        };
+        );
 
-        let debug_cfg = analyze_config::DebugConfig {
+        let debug_cfg = build_debug_config(
             verbose_macro_warnings,
             show_macro_stats,
             debug_call_graph,
@@ -746,18 +760,18 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             show_pattern_warnings,
             show_dependencies,
             no_dependencies,
-        };
+        );
 
-        let lang_cfg = analyze_config::LanguageConfig {
+        let lang_cfg = build_language_config(
             languages,
             aggregation_method,
             max_callers,
             max_callees,
             show_external,
             show_std_lib,
-        };
+        );
 
-        let config = build_analyze_config(
+        Ok((
             path_cfg,
             threshold_cfg,
             feature_cfg,
@@ -765,12 +779,76 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             perf_cfg,
             debug_cfg,
             lang_cfg,
-        );
-
-        Ok(debtmap::commands::analyze::handle_analyze(config))
+            explain_metrics,
+            no_context_aware,
+        ))
     } else {
-        Err(anyhow::anyhow!("Invalid command"))
+        Err(anyhow::anyhow!("Invalid command: expected Analyze variant"))
     }
+}
+
+/// Handles the analyze command (coordination only).
+///
+/// This is the entry point for the analyze command. It coordinates the three main steps:
+/// 1. Extract parameters and build configuration
+/// 2. Apply environment setup (side effects)
+/// 3. Delegate to analysis handler
+///
+/// # Architecture
+///
+/// This function follows the "pure core, imperative shell" pattern and serves as a thin
+/// coordination layer (30-40 lines). The heavy lifting is delegated to:
+/// - `extract_analyze_params`: Parameter extraction and config building
+/// - `apply_environment_setup`: Side effects at the boundary
+/// - `handle_analyze`: Core analysis logic
+///
+/// # Returns
+///
+/// Returns `Result<Result<()>>` where:
+/// - Outer Result: Parameter extraction and config building errors
+/// - Inner Result: Analysis execution errors
+///
+/// # Specification
+///
+/// Implements spec 182: Refactor handle_analyze_command into composable functions.
+/// This handler is now 30-40 lines (coordination only), with parameter extraction
+/// delegated to `extract_analyze_params`.
+fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
+    // Extract parameters and build configuration groups
+    let (
+        path_cfg,
+        threshold_cfg,
+        feature_cfg,
+        display_cfg,
+        perf_cfg,
+        debug_cfg,
+        lang_cfg,
+        explain_metrics,
+        no_context_aware,
+    ) = extract_analyze_params(command)?;
+
+    // Apply side effects (I/O at edges)
+    apply_environment_setup(no_context_aware)?;
+
+    // Handle explain-metrics flag (early return for info display)
+    if explain_metrics {
+        print_metrics_explanation();
+        return Ok(Ok(()));
+    }
+
+    // Build final configuration from component configs
+    let config = build_analyze_config(
+        path_cfg,
+        threshold_cfg,
+        feature_cfg,
+        display_cfg,
+        perf_cfg,
+        debug_cfg,
+        lang_cfg,
+    );
+
+    // Delegate to analysis handler (pure core)
+    Ok(debtmap::commands::analyze::handle_analyze(config))
 }
 
 // Side effect function for environment setup (I/O at edges)
@@ -1210,6 +1288,177 @@ mod analyze_config {
     }
 }
 
+/// Builds PathConfig from command-line parameters (pure, spec 182)
+#[allow(clippy::too_many_arguments)]
+fn build_path_config(
+    path: std::path::PathBuf,
+    output: Option<std::path::PathBuf>,
+    coverage_file: Option<std::path::PathBuf>,
+    max_files: Option<usize>,
+    min_priority: Option<String>,
+    min_score: Option<f64>,
+    filter_categories: Option<Vec<String>>,
+    min_problematic: Option<usize>,
+) -> analyze_config::PathConfig {
+    analyze_config::PathConfig {
+        path,
+        output,
+        coverage_file,
+        max_files,
+        min_priority,
+        min_score,
+        filter_categories,
+        min_problematic,
+    }
+}
+
+/// Builds ThresholdConfig from command-line parameters (pure, spec 182)
+fn build_threshold_config(
+    complexity: u32,
+    duplication: usize,
+    preset: Option<debtmap::cli::ThresholdPreset>,
+    public_api_threshold: f32,
+) -> analyze_config::ThresholdConfig {
+    analyze_config::ThresholdConfig {
+        complexity,
+        duplication,
+        preset,
+        public_api_threshold,
+    }
+}
+
+/// Builds AnalysisFeatureConfig from command-line parameters (pure, spec 182)
+#[allow(clippy::too_many_arguments)]
+fn build_feature_config(
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
+    semantic_off: bool,
+    no_pattern_detection: bool,
+    patterns: Option<Vec<String>>,
+    pattern_threshold: f32,
+    no_god_object: bool,
+    no_public_api_detection: bool,
+    ast_functional_analysis: bool,
+    functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
+    min_split_methods: usize,
+    min_split_lines: usize,
+    validate_loc: bool,
+    validate_call_graph: bool,
+) -> analyze_config::AnalysisFeatureConfig {
+    analyze_config::AnalysisFeatureConfig {
+        enable_context,
+        context_providers,
+        disable_context,
+        semantic_off,
+        no_pattern_detection,
+        patterns,
+        pattern_threshold,
+        no_god_object,
+        no_public_api_detection,
+        ast_functional_analysis,
+        functional_analysis_profile,
+        min_split_methods,
+        min_split_lines,
+        validate_loc,
+        validate_call_graph,
+    }
+}
+
+/// Builds DisplayConfig from command-line parameters (pure, spec 182)
+#[allow(clippy::too_many_arguments)]
+fn build_display_config(
+    format: debtmap::cli::OutputFormat,
+    verbosity: u8,
+    summary: bool,
+    top: Option<usize>,
+    tail: Option<usize>,
+    group_by_category: bool,
+    show_attribution: bool,
+    detail_level: Option<String>,
+    no_tui: bool,
+    show_filter_stats: bool,
+    formatting_config: FormattingConfig,
+    no_context_aware: bool,
+) -> analyze_config::DisplayConfig {
+    analyze_config::DisplayConfig {
+        format,
+        verbosity,
+        summary,
+        top,
+        tail,
+        group_by_category,
+        show_attribution,
+        detail_level,
+        no_tui,
+        show_filter_stats,
+        formatting_config,
+        no_context_aware,
+    }
+}
+
+/// Builds PerformanceConfig from command-line parameters (pure, spec 182)
+fn build_performance_config(
+    parallel: bool,
+    jobs: usize,
+    multi_pass: bool,
+    aggregate_only: bool,
+    no_aggregation: bool,
+) -> analyze_config::PerformanceConfig {
+    analyze_config::PerformanceConfig {
+        parallel,
+        jobs,
+        multi_pass,
+        aggregate_only,
+        no_aggregation,
+    }
+}
+
+/// Builds DebugConfig from command-line parameters (pure, spec 182)
+#[allow(clippy::too_many_arguments)]
+fn build_debug_config(
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+    debug_call_graph: bool,
+    trace_functions: Option<Vec<String>>,
+    call_graph_stats_only: bool,
+    debug_format: debtmap::cli::DebugFormatArg,
+    show_pattern_warnings: bool,
+    show_dependencies: bool,
+    no_dependencies: bool,
+) -> analyze_config::DebugConfig {
+    analyze_config::DebugConfig {
+        verbose_macro_warnings,
+        show_macro_stats,
+        debug_call_graph,
+        trace_functions,
+        call_graph_stats_only,
+        debug_format,
+        show_pattern_warnings,
+        show_dependencies,
+        no_dependencies,
+    }
+}
+
+/// Builds LanguageConfig from command-line parameters (pure, spec 182)
+fn build_language_config(
+    languages: Option<Vec<String>>,
+    aggregation_method: Option<String>,
+    max_callers: usize,
+    max_callees: usize,
+    show_external: bool,
+    show_std_lib: bool,
+) -> analyze_config::LanguageConfig {
+    analyze_config::LanguageConfig {
+        languages,
+        aggregation_method,
+        max_callers,
+        max_callees,
+        show_external,
+        show_std_lib,
+    }
+}
+
 /// Build analyze configuration from grouped configuration structs (spec 204)
 fn build_analyze_config(
     p: analyze_config::PathConfig,
@@ -1528,32 +1777,32 @@ mod tests {
 
     #[test]
     fn test_compute_multi_pass_disabled() {
-        assert_eq!(compute_multi_pass(true), false);
+        assert!(!compute_multi_pass(true));
     }
 
     #[test]
     fn test_compute_multi_pass_enabled() {
         std::env::remove_var("DEBTMAP_SINGLE_PASS");
-        assert_eq!(compute_multi_pass(false), true);
+        assert!(compute_multi_pass(false));
     }
 
     #[test]
     fn test_is_single_pass_env_disabled() {
         std::env::remove_var("DEBTMAP_SINGLE_PASS");
-        assert_eq!(is_single_pass_env_enabled(), false);
+        assert!(!is_single_pass_env_enabled());
     }
 
     #[test]
     fn test_is_single_pass_env_true() {
         std::env::set_var("DEBTMAP_SINGLE_PASS", "true");
-        assert_eq!(is_single_pass_env_enabled(), true);
+        assert!(is_single_pass_env_enabled());
         std::env::remove_var("DEBTMAP_SINGLE_PASS");
     }
 
     #[test]
     fn test_is_single_pass_env_numeric() {
         std::env::set_var("DEBTMAP_SINGLE_PASS", "1");
-        assert_eq!(is_single_pass_env_enabled(), true);
+        assert!(is_single_pass_env_enabled());
         std::env::remove_var("DEBTMAP_SINGLE_PASS");
     }
 
@@ -1586,9 +1835,9 @@ mod tests {
             .semantic_off(false)
             .ast_functional_analysis(true)
             .build();
-        assert_eq!(config.enable_context, true);
-        assert_eq!(config.semantic_off, false);
-        assert_eq!(config.ast_functional_analysis, true);
+        assert!(config.enable_context);
+        assert!(!config.semantic_off);
+        assert!(config.ast_functional_analysis);
     }
 
     // Test conversion functions (spec 204)
