@@ -31,7 +31,6 @@ pub struct App {
     pub functions_count: usize,
     pub debt_count: usize,
     pub coverage_percent: f64,
-    pub thread_count: usize,
 }
 ```
 
@@ -70,7 +69,7 @@ impl ProgressManager {
     pub fn tui_update_metric(&self, stage_index: usize, metric: String);
     pub fn tui_update_subtask(&self, stage_index, subtask_index, status, progress);
     pub fn tui_set_progress(&self, progress: f64);
-    pub fn tui_update_stats(&self, functions, debt, coverage, threads);
+    pub fn tui_update_stats(&self, functions, debt, coverage);
     pub fn tui_render(&self);
     pub fn tui_cleanup(&self);
 }

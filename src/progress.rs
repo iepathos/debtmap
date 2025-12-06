@@ -261,11 +261,11 @@ impl ProgressManager {
     }
 
     /// Update statistics in TUI
-    pub fn tui_update_stats(&self, functions: usize, debt: usize, coverage: f64, threads: usize) {
+    pub fn tui_update_stats(&self, functions: usize, debt: usize, coverage: f64) {
         if let Ok(guard) = self.tui_manager.lock() {
             if let Some(ref tui) = *guard {
                 if let Ok(mut app) = tui.app().lock() {
-                    app.update_stats(functions, debt, coverage, threads);
+                    app.update_stats(functions, debt, coverage);
                 }
             }
         }

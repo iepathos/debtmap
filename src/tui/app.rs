@@ -83,8 +83,6 @@ pub struct App {
     pub debt_count: usize,
     /// Test coverage percentage
     pub coverage_percent: f64,
-    /// Number of threads used
-    pub thread_count: usize,
 
     // Animation state
     /// Current animation frame (0-59 for 60 FPS)
@@ -105,7 +103,6 @@ impl App {
             functions_count: 0,
             debt_count: 0,
             coverage_percent: 0.0,
-            thread_count: num_cpus::get(),
             animation_frame: 0,
             last_update: Instant::now(),
         }
@@ -293,11 +290,10 @@ impl App {
     }
 
     /// Update statistics
-    pub fn update_stats(&mut self, functions: usize, debt: usize, coverage: f64, threads: usize) {
+    pub fn update_stats(&mut self, functions: usize, debt: usize, coverage: f64) {
         self.functions_count = functions;
         self.debt_count = debt;
         self.coverage_percent = coverage;
-        self.thread_count = threads;
     }
 }
 

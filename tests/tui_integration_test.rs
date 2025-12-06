@@ -122,11 +122,10 @@ fn test_tui_statistics_updates() {
     assert_eq!(app.coverage_percent, 0.0);
 
     // Update statistics
-    app.update_stats(1234, 56, 78.5, 8);
+    app.update_stats(1234, 56, 78.5);
     assert_eq!(app.functions_count, 1234);
     assert_eq!(app.debt_count, 56);
     assert_eq!(app.coverage_percent, 78.5);
-    assert_eq!(app.thread_count, 8);
 }
 
 #[test]

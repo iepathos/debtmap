@@ -249,11 +249,10 @@ fn render_subtask_line(
 /// Render footer statistics bar
 fn render_footer(frame: &mut Frame, app: &App, theme: &Theme, area: ratatui::layout::Rect) {
     let stats = format!(
-        "functions {}  │  debt {}  │  coverage {:.1}%  │  threads {}",
+        "functions {}  │  debt {}  │  coverage {:.1}%",
         format_number(app.functions_count),
         app.debt_count,
-        app.coverage_percent,
-        app.thread_count
+        app.coverage_percent
     );
 
     frame.render_widget(Paragraph::new(stats).style(theme.metric_style()), area);
