@@ -52,8 +52,7 @@ impl UnifiedFileAnalyzer {
                 let enhanced_analysis = detector.analyze_enhanced(path, &ast);
 
                 // Normalize score to 0-1 range (from 0-100)
-                let mut analysis = enhanced_analysis.file_metrics;
-                analysis.god_object_score = analysis.god_object_score.min(100.0) / 100.0;
+                let analysis = enhanced_analysis.file_metrics;
 
                 return (Some(analysis), Some(enhanced_analysis.classification));
             }
