@@ -2,10 +2,11 @@ use crate::{
     analyzers::FileAnalyzer,
     core::FunctionMetrics,
     data_flow::DataFlowGraph,
+    organization::god_object::{DetectionType, GodObjectAnalysis, GodObjectConfidence},
     priority::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
-        file_metrics::FileDebtItem,
+        file_metrics::{FileDebtItem, FileDebtMetrics},
         UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     },
     progress::ProgressManager,
@@ -17,6 +18,34 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
+
+/// Convert GodObjectIndicators to GodObjectAnalysis for god object debt item creation (spec 207)
+fn convert_indicators_to_analysis(file_metrics: &FileDebtMetrics) -> GodObjectAnalysis {
+    let indicators = &file_metrics.god_object_indicators;
+
+    GodObjectAnalysis {
+        is_god_object: indicators.is_god_object,
+        method_count: indicators.methods_count,
+        field_count: indicators.fields_count,
+        responsibility_count: indicators.responsibilities,
+        lines_of_code: file_metrics.total_lines,
+        complexity_sum: file_metrics.total_complexity,
+        god_object_score: indicators.god_object_score,
+        recommended_splits: Vec::new(), // Type mismatch - will be populated from file indicators
+        confidence: GodObjectConfidence::Definite,
+        responsibilities: indicators.responsibility_names.clone(),
+        purity_distribution: None,
+        module_structure: None, // Type mismatch - using file-level data instead
+        detection_type: indicators.detection_type.clone().unwrap_or(DetectionType::GodFile),
+        visibility_breakdown: None,
+        domain_count: indicators.domain_count,
+        domain_diversity: indicators.domain_diversity,
+        struct_ratio: indicators.struct_ratio,
+        analysis_method: Default::default(), // Type mismatch - using default
+        cross_domain_severity: None, // Type mismatch - using None
+        domain_diversity_metrics: None, // Type mismatch - using None
+    }
+}
 
 // Pure functional transformations module
 mod transformations {
@@ -1060,8 +1089,22 @@ impl ParallelUnifiedAnalysisBuilder {
             unified.add_item(item);
         }
 
-        // Add file items
+        // Add file items and create god object UnifiedDebtItems (spec 207)
         for file_item in file_items {
+            // Check if this file has god object indicators
+            if file_item.metrics.god_object_indicators.is_god_object {
+                // Convert GodObjectIndicators to GodObjectAnalysis for god item creation
+                let god_analysis = convert_indicators_to_analysis(&file_item.metrics);
+
+                // Create god object UnifiedDebtItem using same function as sequential path
+                let god_item = crate::builders::unified_analysis::create_god_object_debt_item(
+                    &file_item.metrics.path,
+                    &file_item.metrics,
+                    &god_analysis,
+                );
+                unified.add_item(god_item);
+            }
+
             unified.add_file_item(file_item);
         }
 

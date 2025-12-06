@@ -1587,7 +1587,7 @@ fn create_god_object_analysis(
 /// too many responsibilities, methods, or fields. They bypass function-level
 /// complexity filtering since they represent architectural issues rather than
 /// individual function complexity.
-fn create_god_object_debt_item(
+pub fn create_god_object_debt_item(
     file_path: &Path,
     file_metrics: &FileDebtMetrics,
     god_analysis: &crate::organization::GodObjectAnalysis,
