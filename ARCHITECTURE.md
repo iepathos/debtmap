@@ -2050,7 +2050,7 @@ This two-stage approach ensures:
 
 ### Multi-Debt Type Accumulation (Spec 228)
 
-DebtMap supports accumulating multiple independent debt types for a single function, providing comprehensive technical debt assessment. This feature is controlled via the `DEBTMAP_ACCUMULATE_DEBT` environment variable for gradual rollout.
+DebtMap accumulates multiple independent debt types for a single function, providing comprehensive technical debt assessment.
 
 #### Design Philosophy
 
@@ -2091,15 +2091,9 @@ Three debt types are evaluated independently:
    - Not excluded by framework patterns
    - Independent of complexity or coverage
 
-#### Configuration
+#### Behavior
 
-Enable via environment variable:
-```bash
-export DEBTMAP_ACCUMULATE_DEBT=true  # or "1"
-debtmap analyze .
-```
-
-Default behavior (disabled) uses legacy single-debt classification for backward compatibility.
+Multi-debt accumulation is always enabled. Functions with multiple independent issues will appear once for each debt type detected.
 
 #### Implementation
 

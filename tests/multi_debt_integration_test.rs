@@ -46,9 +46,6 @@ fn create_test_function(
 
 #[test]
 fn test_multi_debt_end_to_end() {
-    // Enable multi-debt accumulation
-    std::env::set_var("DEBTMAP_ACCUMULATE_DEBT", "true");
-
     // Create a function that has multiple debt types:
     // 1. Low coverage (testing gap)
     // 2. High complexity (complexity hotspot)
@@ -77,7 +74,7 @@ fn test_multi_debt_end_to_end() {
         coverage.as_ref(),
     );
 
-    // Should accumulate all three debt types
+    // Should accumulate multiple debt types
     assert!(
         debt_types.len() >= 2,
         "Expected multiple debt types, got {} types: {:?}",
@@ -118,133 +115,11 @@ fn test_multi_debt_end_to_end() {
             debt_types
         );
     }
-
-    // Clean up
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
 }
 
-#[test]
-fn test_legacy_single_debt_classification() {
-    // Ensure env var is NOT set for legacy behavior
-    // Note: We remove it but can't assert it stays removed due to test parallelism
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
-
-    let func = create_test_function("process_data", "src/lib.rs", 12, 18, 80);
-    let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(PathBuf::from("src/lib.rs"), "process_data".to_string(), 10);
-    let framework_exclusions = HashSet::new();
-
-    let coverage = Some(TransitiveCoverage {
-        direct: 0.15,
-        transitive: 0.3,
-        propagated_from: vec![],
-        uncovered_lines: vec![15, 16, 17],
-    });
-
-    let debt_types = classify_debt_type_with_exclusions(
-        &func,
-        &call_graph,
-        &func_id,
-        &framework_exclusions,
-        None,
-        coverage.as_ref(),
-    );
-
-    // Legacy behavior: only one debt type (early return on first match)
-    // Note: Due to test parallelism, the env var might leak from other tests
-    // So we can't strictly enforce len==1, but we can check it's reasonable
-    assert!(
-        !debt_types.is_empty(),
-        "Should return at least one debt type"
-    );
-
-    // If we got exactly 1, that's the expected legacy behavior
-    // If we got more, it means another test's env var leaked (acceptable in parallel tests)
-    if debt_types.len() == 1 {
-        // This is the expected legacy behavior
-        assert!(matches!(debt_types[0], DebtType::TestingGap { .. }));
-    }
-}
-
-#[test]
-fn test_multi_debt_with_env_var_true() {
-    std::env::set_var("DEBTMAP_ACCUMULATE_DEBT", "true");
-
-    let func = create_test_function("complex_untested", "src/lib.rs", 15, 20, 100);
-    let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(
-        PathBuf::from("src/lib.rs"),
-        "complex_untested".to_string(),
-        10,
-    );
-    let framework_exclusions = HashSet::new();
-
-    let coverage = Some(TransitiveCoverage {
-        direct: 0.1,
-        transitive: 0.2,
-        propagated_from: vec![],
-        uncovered_lines: vec![10, 11, 12, 13, 14],
-    });
-
-    let debt_types = classify_debt_type_with_exclusions(
-        &func,
-        &call_graph,
-        &func_id,
-        &framework_exclusions,
-        None,
-        coverage.as_ref(),
-    );
-
-    assert!(
-        debt_types.len() >= 2,
-        "Multi-debt mode should accumulate multiple debt types"
-    );
-
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
-}
-
-#[test]
-fn test_multi_debt_with_env_var_1() {
-    // Test with "1" as the env var value (alternative to "true")
-    std::env::set_var("DEBTMAP_ACCUMULATE_DEBT", "1");
-
-    let func = create_test_function("another_complex", "src/lib.rs", 14, 19, 90);
-    let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(
-        PathBuf::from("src/lib.rs"),
-        "another_complex".to_string(),
-        10,
-    );
-    let framework_exclusions = HashSet::new();
-
-    let coverage = Some(TransitiveCoverage {
-        direct: 0.12,
-        transitive: 0.25,
-        propagated_from: vec![],
-        uncovered_lines: vec![20, 21],
-    });
-
-    let debt_types = classify_debt_type_with_exclusions(
-        &func,
-        &call_graph,
-        &func_id,
-        &framework_exclusions,
-        None,
-        coverage.as_ref(),
-    );
-
-    assert!(
-        debt_types.len() >= 2,
-        "Multi-debt mode should work with DEBTMAP_ACCUMULATE_DEBT=1"
-    );
-
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
-}
 
 #[test]
 fn test_single_debt_only() {
-    std::env::set_var("DEBTMAP_ACCUMULATE_DEBT", "true");
-
     // Function with only one debt type: complexity hotspot
     let func = create_test_function("just_complex", "src/lib.rs", 18, 25, 120);
 
@@ -289,14 +164,10 @@ fn test_single_debt_only() {
         matches!(debt_types[0], DebtType::ComplexityHotspot { .. }),
         "Expected ComplexityHotspot debt type"
     );
-
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
 }
 
 #[test]
 fn test_no_debt_accumulation() {
-    std::env::set_var("DEBTMAP_ACCUMULATE_DEBT", "true");
-
     // Simple, well-tested function with callers - should have minimal/no debt
     let func = create_test_function("simple_tested", "src/lib.rs", 3, 4, 15);
 
@@ -335,6 +206,4 @@ fn test_no_debt_accumulation() {
         debt_types.is_empty() || matches!(debt_types[0], DebtType::Risk { .. }),
         "Simple, well-tested function should have no significant debt"
     );
-
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
 }

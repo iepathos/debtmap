@@ -10,12 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Multi-Debt Type Accumulation** (Spec 228)
-  - Functions can now accumulate multiple independent debt classifications
+  - Functions now accumulate multiple independent debt classifications by default
   - Provides comprehensive technical debt assessment per function
   - Example: A function can be flagged as both a complexity hotspot AND have testing gaps
-  - Controlled via `DEBTMAP_ACCUMULATE_DEBT` environment variable (opt-in for backward compatibility)
   - Supports three independent debt types: Testing Gaps, Complexity Hotspots, Dead Code
-  - Set `DEBTMAP_ACCUMULATE_DEBT=true` or `DEBTMAP_ACCUMULATE_DEBT=1` to enable
+  - Each debt type appears as a separate entry in the output for the same function
   - Integration tests added in `tests/multi_debt_integration_test.rs`
 
 ## [0.8.0] - 2025-12-05

@@ -1,5 +1,5 @@
 // Performance benchmark for multi-debt type accumulation (spec 228)
-// Verifies that multi-debt feature has <5% performance overhead vs single-debt
+// Benchmarks debt classification performance with multi-debt accumulation
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use debtmap::core::FunctionMetrics;
@@ -45,10 +45,7 @@ fn create_test_function(
     }
 }
 
-fn benchmark_single_debt_classification(c: &mut Criterion) {
-    // Ensure single-debt mode (legacy)
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
-
+fn benchmark_debt_classification(c: &mut Criterion) {
     let func = create_test_function("benchmark_func", "src/lib.rs", 12, 18, 80);
     let call_graph = CallGraph::new();
     let func_id = FunctionId::new(
@@ -64,7 +61,7 @@ fn benchmark_single_debt_classification(c: &mut Criterion) {
         uncovered_lines: vec![15, 16, 17],
     });
 
-    c.bench_function("single_debt_classification", |b| {
+    c.bench_function("debt_classification", |b| {
         b.iter(|| {
             classify_debt_type_with_exclusions(
                 black_box(&func),
@@ -78,45 +75,7 @@ fn benchmark_single_debt_classification(c: &mut Criterion) {
     });
 }
 
-fn benchmark_multi_debt_classification(c: &mut Criterion) {
-    // Enable multi-debt mode
-    std::env::set_var("DEBTMAP_ACCUMULATE_DEBT", "true");
-
-    let func = create_test_function("benchmark_func", "src/lib.rs", 12, 18, 80);
-    let call_graph = CallGraph::new();
-    let func_id = FunctionId::new(
-        PathBuf::from("src/lib.rs"),
-        "benchmark_func".to_string(),
-        10,
-    );
-    let framework_exclusions = HashSet::new();
-    let coverage = Some(TransitiveCoverage {
-        direct: 0.15,
-        transitive: 0.3,
-        propagated_from: vec![],
-        uncovered_lines: vec![15, 16, 17],
-    });
-
-    c.bench_function("multi_debt_classification", |b| {
-        b.iter(|| {
-            classify_debt_type_with_exclusions(
-                black_box(&func),
-                black_box(&call_graph),
-                black_box(&func_id),
-                black_box(&framework_exclusions),
-                black_box(None),
-                black_box(coverage.as_ref()),
-            )
-        })
-    });
-
-    // Clean up
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
-}
-
-fn benchmark_batch_single_debt(c: &mut Criterion) {
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
-
+fn benchmark_batch_debt_classification(c: &mut Criterion) {
     // Create 1000 test functions
     let functions: Vec<_> = (0..1000)
         .map(|i| {
@@ -136,7 +95,7 @@ fn benchmark_batch_single_debt(c: &mut Criterion) {
         uncovered_lines: vec![15, 16, 17],
     });
 
-    c.bench_function("batch_1000_single_debt", |b| {
+    c.bench_function("batch_1000_debt_classification", |b| {
         b.iter(|| {
             for (func, func_id) in &functions {
                 black_box(classify_debt_type_with_exclusions(
@@ -150,53 +109,11 @@ fn benchmark_batch_single_debt(c: &mut Criterion) {
             }
         })
     });
-}
-
-fn benchmark_batch_multi_debt(c: &mut Criterion) {
-    std::env::set_var("DEBTMAP_ACCUMULATE_DEBT", "true");
-
-    // Create 1000 test functions
-    let functions: Vec<_> = (0..1000)
-        .map(|i| {
-            (
-                create_test_function(&format!("func_{}", i), "src/lib.rs", 12, 18, 80),
-                FunctionId::new(PathBuf::from("src/lib.rs"), format!("func_{}", i), 10 + i),
-            )
-        })
-        .collect();
-
-    let call_graph = CallGraph::new();
-    let framework_exclusions = HashSet::new();
-    let coverage = Some(TransitiveCoverage {
-        direct: 0.15,
-        transitive: 0.3,
-        propagated_from: vec![],
-        uncovered_lines: vec![15, 16, 17],
-    });
-
-    c.bench_function("batch_1000_multi_debt", |b| {
-        b.iter(|| {
-            for (func, func_id) in &functions {
-                black_box(classify_debt_type_with_exclusions(
-                    black_box(func),
-                    black_box(&call_graph),
-                    black_box(func_id),
-                    black_box(&framework_exclusions),
-                    black_box(None),
-                    black_box(coverage.as_ref()),
-                ));
-            }
-        })
-    });
-
-    std::env::remove_var("DEBTMAP_ACCUMULATE_DEBT");
 }
 
 criterion_group!(
     benches,
-    benchmark_single_debt_classification,
-    benchmark_multi_debt_classification,
-    benchmark_batch_single_debt,
-    benchmark_batch_multi_debt
+    benchmark_debt_classification,
+    benchmark_batch_debt_classification
 );
 criterion_main!(benches);
