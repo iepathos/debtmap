@@ -25,6 +25,18 @@
 //! let back_to_analysis: AnalysisError = anyhow_err.into();
 //! ```
 
+// Submodules for Spec 202 - Error Collection and Reporting
+pub mod collection;
+pub mod partition;
+pub mod reporting;
+pub mod summary;
+
+// Re-export key types for convenience
+pub use collection::{AnalysisFailure, AnalysisResults, OperationType};
+pub use partition::{ParPartitionResult, PartitionResult};
+pub use reporting::{report_brief_summary, report_completion_summary};
+pub use summary::ErrorSummary as AnalysisErrorSummary;
+
 use std::fmt;
 use std::io;
 use std::path::PathBuf;

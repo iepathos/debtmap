@@ -4,14 +4,20 @@ use crate::core::{
 };
 use crate::debt;
 use crate::debt::circular::analyze_module_dependencies;
+use crate::errors::{AnalysisFailure, AnalysisResults, ParPartitionResult};
 use crate::{analyzers, core::Language, io};
+use anyhow;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
+/// Collects file metrics with error collection (Spec 202).
+///
+/// Returns both successful metrics and failures, following the
+/// Stillwater "fail completely" pattern for independent operations.
+pub fn collect_file_metrics_with_errors(files: &[PathBuf]) -> AnalysisResults<FileMetrics> {
     // Only apply file limit if explicitly set by user
     let (total_files, files_to_process) = match std::env::var("DEBTMAP_MAX_FILES")
         .ok()
@@ -45,10 +51,11 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
     let processed_count = Arc::new(AtomicUsize::new(0));
     let processed_count_clone = Arc::clone(&processed_count);
 
-    let results: Vec<FileMetrics> = files_to_process
+    // Analyze files with error collection
+    let (successes, failures): (Vec<_>, Vec<_>) = files_to_process
         .par_iter()
-        .filter_map(|path| {
-            let result = analyze_single_file(path.as_path());
+        .map(|path| {
+            let result = analyze_single_file_to_result(path.as_path());
 
             // Update progress after each file
             let current = processed_count_clone.fetch_add(1, Ordering::Relaxed) + 1;
@@ -61,9 +68,16 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
 
             result
         })
-        .collect();
+        .partition_result();
 
-    results
+    AnalysisResults::new(successes, failures)
+}
+
+/// Original function preserved for backward compatibility.
+///
+/// Returns only successes (for existing code).
+pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
+    collect_file_metrics_with_errors(files).successes
 }
 
 pub fn extract_all_functions(file_metrics: &[FileMetrics]) -> Vec<FunctionMetrics> {
@@ -150,6 +164,18 @@ pub fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyRepor
 
 // Default timeout per file (can be overridden by env var)
 const DEFAULT_FILE_TIMEOUT_SECS: u64 = 60;
+
+/// Analyzes a single file and returns Result for error collection.
+///
+/// Used by `collect_file_metrics_with_errors` to capture detailed error information.
+pub fn analyze_single_file_to_result(file_path: &Path) -> Result<FileMetrics, AnalysisFailure> {
+    analyze_single_file_with_timeout(file_path, None).ok_or_else(|| {
+        AnalysisFailure::analysis(
+            file_path.to_path_buf(),
+            anyhow::anyhow!("Failed to analyze file"),
+        )
+    })
+}
 
 pub fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {
     analyze_single_file_with_timeout(file_path, None)
