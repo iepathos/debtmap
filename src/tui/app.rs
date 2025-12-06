@@ -116,7 +116,31 @@ impl App {
         vec![
             PipelineStage::new("files"),
             PipelineStage::new("parse"),
-            PipelineStage::new("call graph"),
+            PipelineStage::with_subtasks(
+                "call graph",
+                vec![
+                    SubTask {
+                        name: "discover files".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "parse ASTs".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "extract calls".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "link modules".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                ],
+            ),
             PipelineStage::with_subtasks(
                 "coverage",
                 vec![

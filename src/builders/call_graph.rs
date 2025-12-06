@@ -1,7 +1,11 @@
 use crate::{
     analysis::call_graph::RustCallGraphBuilder,
-    analyzers::rust_call_graph::extract_call_graph_multi_file, config, core::FunctionMetrics,
-    core::Language, io, priority,
+    analyzers::rust_call_graph::extract_call_graph_multi_file,
+    builders::parallel_call_graph::{CallGraphPhase, CallGraphProgress},
+    config,
+    core::FunctionMetrics,
+    core::Language,
+    io, priority,
 };
 use anyhow::{Context, Result};
 use std::collections::HashSet;
@@ -44,32 +48,75 @@ fn is_test_function(function_name: &str, file_path: &Path, is_test_attr: bool) -
         || file_path.to_string_lossy().contains("test")
 }
 
-pub fn process_rust_files_for_call_graph(
+pub fn process_rust_files_for_call_graph<F>(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
     _verbose_macro_warnings: bool,
     _show_macro_stats: bool,
+    mut progress_callback: F,
 ) -> Result<(
     HashSet<priority::call_graph::FunctionId>,
     HashSet<priority::call_graph::FunctionId>,
-)> {
+)>
+where
+    F: FnMut(CallGraphProgress),
+{
+    // Phase 1: Discover files
+    progress_callback(CallGraphProgress {
+        phase: CallGraphPhase::DiscoveringFiles,
+        current: 0,
+        total: 0,
+    });
+
     let config = config::get_config();
     let rust_files =
         io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
             .context("Failed to find Rust files for call graph")?;
 
+    let total_files = rust_files.len();
+
+    // Add minimum visibility pause
+    std::thread::sleep(std::time::Duration::from_millis(150));
+
+    // Phase 2: Parse ASTs
+    progress_callback(CallGraphProgress {
+        phase: CallGraphPhase::ParsingASTs,
+        current: 0,
+        total: total_files,
+    });
+
     let mut enhanced_builder = RustCallGraphBuilder::from_base_graph(call_graph.clone());
     let mut workspace_files = Vec::new();
     let mut expanded_files = Vec::new();
 
-    for file_path in rust_files {
-        if let Ok(content) = io::read_file(&file_path) {
+    for (idx, file_path) in rust_files.iter().enumerate() {
+        if let Ok(content) = io::read_file(file_path) {
             if let Ok(parsed) = syn::parse_file(&content) {
                 expanded_files.push((parsed.clone(), file_path.clone()));
                 workspace_files.push((file_path.clone(), parsed));
+
+                // Throttled progress updates (every 10 files or at completion)
+                let count = idx + 1;
+                if count % 10 == 0 || count == total_files {
+                    progress_callback(CallGraphProgress {
+                        phase: CallGraphPhase::ParsingASTs,
+                        current: count,
+                        total: total_files,
+                    });
+                }
             }
         }
     }
+
+    // Add minimum visibility pause
+    std::thread::sleep(std::time::Duration::from_millis(150));
+
+    // Phase 3: Extract calls
+    progress_callback(CallGraphProgress {
+        phase: CallGraphPhase::ExtractingCalls,
+        current: 0,
+        total: total_files,
+    });
 
     if !expanded_files.is_empty() {
         let multi_file_call_graph = extract_call_graph_multi_file(&expanded_files);
@@ -85,6 +132,16 @@ pub fn process_rust_files_for_call_graph(
     }
 
     enhanced_builder.analyze_cross_module(&workspace_files)?;
+
+    // Add minimum visibility pause
+    std::thread::sleep(std::time::Duration::from_millis(150));
+
+    // Phase 4: Link modules
+    progress_callback(CallGraphProgress {
+        phase: CallGraphPhase::LinkingModules,
+        current: 0,
+        total: 0,
+    });
 
     // Finalize trait analysis - detect patterns ONCE after all files processed
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();

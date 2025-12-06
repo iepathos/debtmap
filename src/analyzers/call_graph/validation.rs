@@ -950,8 +950,14 @@ mod tests {
         let mut call_graph = call_graph::build_initial_call_graph(&all_functions);
 
         // Build full call graph with Rust-specific features
-        call_graph::process_rust_files_for_call_graph(&project_root, &mut call_graph, false, false)
-            .expect("Failed to process Rust files");
+        call_graph::process_rust_files_for_call_graph(
+            &project_root,
+            &mut call_graph,
+            false,
+            false,
+            |_| {}, // No-op progress callback for test
+        )
+        .expect("Failed to process Rust files");
 
         // Validate the call graph
         let validation_report = CallGraphValidator::validate(&call_graph);

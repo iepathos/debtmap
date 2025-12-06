@@ -503,9 +503,7 @@ fn test_data_flow_page_rendering_with_mutations() {
 #[test]
 fn test_data_flow_page_rendering_with_io_operations() {
     use debtmap::data_flow::{DataFlowGraph, IoOperation};
-    use debtmap::priority::{
-        call_graph::FunctionId, DebtType, Location, UnifiedDebtItem, UnifiedScore,
-    };
+    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
     use std::path::PathBuf;
 
     let mut data_flow = DataFlowGraph::new();
@@ -642,7 +640,7 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
 #[test]
 fn test_data_flow_markdown_formatting() {
     use debtmap::data_flow::{DataFlowGraph, IoOperation, MutationInfo};
-    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
+    use debtmap::priority::{call_graph::FunctionId, Location};
     use std::path::PathBuf;
 
     let mut data_flow = DataFlowGraph::new();
