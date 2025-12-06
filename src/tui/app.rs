@@ -144,7 +144,26 @@ impl App {
                     },
                 ],
             ),
-            PipelineStage::new("context"),
+            PipelineStage::with_subtasks(
+                "context",
+                vec![
+                    SubTask {
+                        name: "critical path".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "dependencies".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "git history".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                ],
+            ),
             PipelineStage::new("debt scoring"),
             PipelineStage::new("prioritization"),
         ]

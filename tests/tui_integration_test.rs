@@ -267,3 +267,100 @@ fn test_purity_analysis_subtasks() {
         assert!(subtask.progress.is_none());
     }
 }
+
+#[test]
+fn test_context_analysis_subtasks() {
+    let app = App::new();
+
+    // Verify context stage (index 6) has the correct subtasks
+    let context_stage = &app.stages[6];
+    assert_eq!(context_stage.name, "context");
+    assert_eq!(context_stage.sub_tasks.len(), 3);
+
+    // Verify subtask names
+    assert_eq!(context_stage.sub_tasks[0].name, "critical path");
+    assert_eq!(context_stage.sub_tasks[1].name, "dependencies");
+    assert_eq!(context_stage.sub_tasks[2].name, "git history");
+
+    // All subtasks should be pending initially
+    for subtask in &context_stage.sub_tasks {
+        assert_eq!(subtask.status, StageStatus::Pending);
+        assert!(subtask.progress.is_none());
+    }
+}
+
+#[test]
+fn test_context_subsections_when_disabled() {
+    let mut app = App::new();
+
+    // Context subsections exist in the App structure
+    assert_eq!(app.stages[6].sub_tasks.len(), 3);
+
+    // Simulate context stage being skipped (enable_context=false)
+    // When context is disabled, the stage starts and completes immediately
+    // with "skipped" metric, and subsections are not updated
+    app.start_stage(6);
+    assert_eq!(app.stages[6].status, StageStatus::Active);
+
+    // Complete the context stage as "skipped" without updating subsections
+    app.complete_stage(6, "skipped");
+    assert_eq!(app.stages[6].status, StageStatus::Completed);
+    assert_eq!(app.stages[6].metric, Some("skipped".to_string()));
+
+    // All subsections should remain in Pending state when context is disabled
+    for subtask in &app.stages[6].sub_tasks {
+        assert_eq!(subtask.status, StageStatus::Pending);
+        assert!(subtask.progress.is_none());
+    }
+}
+
+#[test]
+fn test_context_subsection_lifecycle() {
+    let mut app = App::new();
+
+    // Start the context stage
+    app.start_stage(6);
+    assert_eq!(app.stages[6].status, StageStatus::Active);
+
+    // All subsections should start as Pending
+    for subtask in &app.stages[6].sub_tasks {
+        assert_eq!(subtask.status, StageStatus::Pending);
+    }
+
+    // Subsection 0: Critical path analysis - Pending → Active → Completed
+    app.update_subtask(6, 0, StageStatus::Active, None);
+    assert_eq!(app.stages[6].sub_tasks[0].status, StageStatus::Active);
+    assert_eq!(app.stages[6].sub_tasks[0].name, "critical path");
+    app.tick();
+
+    app.update_subtask(6, 0, StageStatus::Completed, None);
+    assert_eq!(app.stages[6].sub_tasks[0].status, StageStatus::Completed);
+
+    // Subsection 1: Dependencies - Pending → Active → Completed
+    app.update_subtask(6, 1, StageStatus::Active, None);
+    assert_eq!(app.stages[6].sub_tasks[1].status, StageStatus::Active);
+    assert_eq!(app.stages[6].sub_tasks[1].name, "dependencies");
+    app.tick();
+
+    app.update_subtask(6, 1, StageStatus::Completed, None);
+    assert_eq!(app.stages[6].sub_tasks[1].status, StageStatus::Completed);
+
+    // Subsection 2: Git history - Pending → Active → Completed
+    app.update_subtask(6, 2, StageStatus::Active, None);
+    assert_eq!(app.stages[6].sub_tasks[2].status, StageStatus::Active);
+    assert_eq!(app.stages[6].sub_tasks[2].name, "git history");
+    app.tick();
+
+    app.update_subtask(6, 2, StageStatus::Completed, None);
+    assert_eq!(app.stages[6].sub_tasks[2].status, StageStatus::Completed);
+
+    // Complete the overall context stage
+    app.complete_stage(6, "loaded");
+    assert_eq!(app.stages[6].status, StageStatus::Completed);
+    assert_eq!(app.stages[6].metric, Some("loaded".to_string()));
+
+    // All subsections should be completed
+    for subtask in &app.stages[6].sub_tasks {
+        assert_eq!(subtask.status, StageStatus::Completed);
+    }
+}
