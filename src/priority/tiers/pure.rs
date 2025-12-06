@@ -34,25 +34,28 @@ fn is_god_or_error_issue(debt_type: &crate::priority::DebtType) -> bool {
 
 /// Checks if metrics indicate T1 complexity level.
 fn has_t1_complexity(item: &UnifiedDebtItem) -> bool {
-    // Check final score first (includes exponential scaling, risk boosts)
-    if has_extreme_score(item.unified_score.final_score) {
-        return true;
-    }
+    has_extreme_score(item.unified_score.final_score)
+        || has_t1_cyclomatic_metric(item)
+        || has_t1_cognitive_metric(item)
+        || has_t1_other_metrics(item)
+}
 
-    // For complexity hotspots, check individual metrics
-    if let Some(effective_cyclomatic) = extract_effective_cyclomatic(&item.debt_type) {
-        if has_extreme_cyclomatic(effective_cyclomatic) {
-            return true;
-        }
-    }
+/// Checks if item has T1-level cyclomatic complexity.
+fn has_t1_cyclomatic_metric(item: &UnifiedDebtItem) -> bool {
+    extract_effective_cyclomatic(&item.debt_type)
+        .map(has_extreme_cyclomatic)
+        .unwrap_or(false)
+}
 
-    if let Some(cognitive) = extract_cognitive(&item.debt_type) {
-        if has_extreme_cognitive(cognitive) {
-            return true;
-        }
-    }
+/// Checks if item has T1-level cognitive complexity.
+fn has_t1_cognitive_metric(item: &UnifiedDebtItem) -> bool {
+    extract_cognitive(&item.debt_type)
+        .map(has_extreme_cognitive)
+        .unwrap_or(false)
+}
 
-    // Check other metrics
+/// Checks if item has other T1-level metrics (nesting, complexity factor).
+fn has_t1_other_metrics(item: &UnifiedDebtItem) -> bool {
     has_deep_nesting(item.nesting_depth)
         || has_high_complexity_factor(item.unified_score.complexity_factor)
 }
@@ -77,22 +80,22 @@ fn is_t2_testing_gap(item: &UnifiedDebtItem, config: &TierConfig) -> bool {
 
 /// Checks if item is T2-level complexity hotspot.
 fn is_t2_complexity_hotspot(item: &UnifiedDebtItem) -> bool {
-    if !is_complexity_hotspot(&item.debt_type) {
-        return false;
-    }
+    is_complexity_hotspot(&item.debt_type)
+        && (has_t2_meaningful_complexity(item) || has_t2_meaningful_adjusted(item))
+}
 
-    // Check multiple signals for meaningful complexity
-    let has_meaningful_complexity =
-        has_moderate_complexity_factor(item.unified_score.complexity_factor)
-            || has_moderate_cognitive(item.cognitive_complexity)
-            || has_moderate_nesting(item.nesting_depth);
+/// Checks if item has meaningful complexity signals for T2.
+fn has_t2_meaningful_complexity(item: &UnifiedDebtItem) -> bool {
+    has_moderate_complexity_factor(item.unified_score.complexity_factor)
+        || has_moderate_cognitive(item.cognitive_complexity)
+        || has_moderate_nesting(item.nesting_depth)
+}
 
-    // Check adjusted cyclomatic if available
-    let has_meaningful_adjusted = extract_effective_cyclomatic(&item.debt_type)
+/// Checks if item has meaningful adjusted cyclomatic for T2.
+fn has_t2_meaningful_adjusted(item: &UnifiedDebtItem) -> bool {
+    extract_effective_cyclomatic(&item.debt_type)
         .map(has_moderate_adjusted_cyclomatic)
-        .unwrap_or(false);
-
-    has_meaningful_complexity || has_meaningful_adjusted
+        .unwrap_or(false)
 }
 
 /// Checks if item is T3 testing gap.
@@ -107,6 +110,7 @@ mod tests {
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
+    use proptest::prelude::*;
 
     fn create_test_item(
         debt_type: DebtType,
@@ -403,5 +407,189 @@ mod tests {
         );
         let tier = classify_tier(&item, &TierConfig::default());
         assert_eq!(tier, RecommendationTier::T4Maintenance);
+    }
+
+    // Property-based tests for classification invariants
+
+    proptest! {
+        #[test]
+        fn prop_god_objects_always_t1(
+            methods in 1u32..200,
+            fields in 1u32..100,
+            responsibilities in 1u32..20,
+            god_score in 0.0f64..100.0,
+            cyclomatic in 1u32..100,
+            cognitive in 1u32..100,
+            nesting in 1u32..10,
+            deps in 0usize..50,
+        ) {
+            let item = create_test_item(
+                DebtType::GodObject {
+                    methods,
+                    fields,
+                    responsibilities,
+                    god_object_score: god_score,
+                },
+                cyclomatic,
+                cognitive,
+                nesting,
+                deps,
+            );
+            let tier = classify_tier(&item, &TierConfig::default());
+            prop_assert_eq!(tier, RecommendationTier::T1CriticalArchitecture);
+        }
+
+        #[test]
+        fn prop_error_handling_always_t1(
+            cyclomatic in 1u32..100,
+            cognitive in 1u32..100,
+            nesting in 1u32..10,
+            deps in 0usize..50,
+        ) {
+            let item = create_test_item(
+                DebtType::ErrorSwallowing {
+                    pattern: "unwrap".into(),
+                    context: None,
+                },
+                cyclomatic,
+                cognitive,
+                nesting,
+                deps,
+            );
+            let tier = classify_tier(&item, &TierConfig::default());
+            prop_assert_eq!(tier, RecommendationTier::T1CriticalArchitecture);
+        }
+
+        #[test]
+        fn prop_classification_is_deterministic(
+            cyclomatic in 1u32..100,
+            cognitive in 1u32..100,
+            nesting in 1u32..10,
+            deps in 0usize..50,
+        ) {
+            let item = create_test_item(
+                DebtType::TestingGap {
+                    coverage: 0.0,
+                    cyclomatic,
+                    cognitive,
+                },
+                cyclomatic,
+                cognitive,
+                nesting,
+                deps,
+            );
+            let config = TierConfig::default();
+            let tier1 = classify_tier(&item, &config);
+            let tier2 = classify_tier(&item, &config);
+            prop_assert_eq!(tier1, tier2);
+        }
+
+        #[test]
+        fn prop_extreme_score_triggers_t1(
+            cyclomatic in 1u32..100,
+            cognitive in 1u32..100,
+            nesting in 1u32..4, // Keep nesting below T1 threshold (5)
+            deps in 0usize..50,
+        ) {
+            let mut item = create_test_item(
+                DebtType::ComplexityHotspot {
+                    adjusted_cyclomatic: None,
+                    cyclomatic,
+                    cognitive,
+                },
+                cyclomatic,
+                cognitive,
+                nesting,
+                deps,
+            );
+            // Set extreme score (> 10.0)
+            item.unified_score.final_score = 11.0;
+            // Keep complexity_factor below threshold
+            item.unified_score.complexity_factor = 4.0;
+
+            let tier = classify_tier(&item, &TierConfig::default());
+            prop_assert_eq!(tier, RecommendationTier::T1CriticalArchitecture);
+        }
+
+        #[test]
+        fn prop_deep_nesting_triggers_t1(
+            cyclomatic in 1u32..50, // Keep below extreme cyclomatic (51)
+            cognitive in 1u32..19, // Keep below extreme cognitive (20)
+            deps in 0usize..50,
+        ) {
+            let mut item = create_test_item(
+                DebtType::ComplexityHotspot {
+                    adjusted_cyclomatic: None,
+                    cyclomatic,
+                    cognitive,
+                },
+                cyclomatic,
+                cognitive,
+                5, // Deep nesting (>= 5)
+                deps,
+            );
+            // Keep score below extreme threshold
+            item.unified_score.final_score = 8.0;
+            // Keep complexity_factor below threshold
+            item.unified_score.complexity_factor = 4.0;
+
+            let tier = classify_tier(&item, &TierConfig::default());
+            prop_assert_eq!(tier, RecommendationTier::T1CriticalArchitecture);
+        }
+
+        #[test]
+        fn prop_tier_ordering_respected(
+            cyclomatic in 1u32..100,
+            cognitive in 1u32..100,
+            nesting in 1u32..10,
+            deps in 0usize..50,
+        ) {
+            let item = create_test_item(
+                DebtType::TestingGap {
+                    coverage: 0.0,
+                    cyclomatic,
+                    cognitive,
+                },
+                cyclomatic,
+                cognitive,
+                nesting,
+                deps,
+            );
+            let tier = classify_tier(&item, &TierConfig::default());
+            // Tier should always be one of the valid tiers
+            prop_assert!(matches!(
+                tier,
+                RecommendationTier::T1CriticalArchitecture
+                    | RecommendationTier::T2ComplexUntested
+                    | RecommendationTier::T3TestingGaps
+                    | RecommendationTier::T4Maintenance
+            ));
+        }
+
+        #[test]
+        fn prop_low_complexity_never_t1(
+            deps in 0usize..9, // Keep below T2 dependency threshold (10)
+        ) {
+            // Create item with low complexity across all metrics
+            let mut item = create_test_item(
+                DebtType::TestingGap {
+                    coverage: 0.0,
+                    cyclomatic: 5,
+                    cognitive: 5,
+                },
+                5,  // Low cyclomatic
+                5,  // Low cognitive
+                2,  // Low nesting (< 5)
+                deps,
+            );
+            // Low score
+            item.unified_score.final_score = 2.0;
+            // Low complexity factor
+            item.unified_score.complexity_factor = 1.0;
+
+            let tier = classify_tier(&item, &TierConfig::default());
+            // Should never be T1 with all low metrics
+            prop_assert_ne!(tier, RecommendationTier::T1CriticalArchitecture);
+        }
     }
 }
