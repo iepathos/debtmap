@@ -1,6 +1,9 @@
+use crate::analysis::data_flow::DataFlowAnalysis;
 use crate::priority::{call_graph::CallGraph, call_graph::FunctionId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+
+pub mod population;
 
 mod function_id_serde {
     use super::*;
@@ -123,6 +126,13 @@ pub struct DataFlowGraph {
     /// Pure function analysis results
     #[serde(with = "function_id_serde")]
     purity_analysis: HashMap<FunctionId, PurityInfo>,
+    /// Full CFG-based data flow analysis from purity detector
+    /// Note: Skipped during serialization due to complexity
+    #[serde(skip)]
+    cfg_analysis: HashMap<FunctionId, DataFlowAnalysis>,
+    /// Mutation analysis (live vs dead mutations)
+    #[serde(with = "function_id_serde")]
+    mutation_analysis: HashMap<FunctionId, MutationInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +165,19 @@ pub struct PurityInfo {
     pub impurity_reasons: Vec<String>,
 }
 
+/// Mutation analysis information for a function
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MutationInfo {
+    /// Live mutations (after filtering out dead stores)
+    pub live_mutations: Vec<String>,
+    /// Total number of mutations detected
+    pub total_mutations: usize,
+    /// Dead stores (mutations that don't affect output)
+    pub dead_stores: HashSet<String>,
+    /// Escaping mutations (mutations that affect return value)
+    pub escaping_mutations: HashSet<String>,
+}
+
 impl DataFlowGraph {
     pub fn new() -> Self {
         Self {
@@ -163,6 +186,8 @@ impl DataFlowGraph {
             data_transformations: HashMap::new(),
             io_operations: HashMap::new(),
             purity_analysis: HashMap::new(),
+            cfg_analysis: HashMap::new(),
+            mutation_analysis: HashMap::new(),
         }
     }
 
@@ -174,6 +199,8 @@ impl DataFlowGraph {
             data_transformations: HashMap::new(),
             io_operations: HashMap::new(),
             purity_analysis: HashMap::new(),
+            cfg_analysis: HashMap::new(),
+            mutation_analysis: HashMap::new(),
         }
     }
 
@@ -232,6 +259,26 @@ impl DataFlowGraph {
     /// Set purity information for a function
     pub fn set_purity_info(&mut self, func_id: FunctionId, purity: PurityInfo) {
         self.purity_analysis.insert(func_id, purity);
+    }
+
+    /// Get CFG-based data flow analysis for a function
+    pub fn get_cfg_analysis(&self, func_id: &FunctionId) -> Option<&DataFlowAnalysis> {
+        self.cfg_analysis.get(func_id)
+    }
+
+    /// Set CFG-based data flow analysis for a function
+    pub fn set_cfg_analysis(&mut self, func_id: FunctionId, analysis: DataFlowAnalysis) {
+        self.cfg_analysis.insert(func_id, analysis);
+    }
+
+    /// Get mutation analysis for a function
+    pub fn get_mutation_info(&self, func_id: &FunctionId) -> Option<&MutationInfo> {
+        self.mutation_analysis.get(func_id)
+    }
+
+    /// Set mutation analysis for a function
+    pub fn set_mutation_info(&mut self, func_id: FunctionId, info: MutationInfo) {
+        self.mutation_analysis.insert(func_id, info);
     }
 
     /// Check if a function has side effects based on data flow analysis
