@@ -8,7 +8,7 @@ use super::{
     CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
     DisplayGroup, ImpactLevel, Tier, TieredDisplay, UnifiedAnalysis, UnifiedDebtItem,
 };
-use crate::priority::filtering::{filter_with_metrics, ClassifiedItem, FilterConfig, FilterResult};
+use crate::priority::filtering::{ClassifiedItem, FilterConfig, FilterResult};
 use crate::priority::tiers::{classify_tier, TierConfig};
 use im::Vector;
 use std::collections::{BTreeMap, HashMap};
@@ -113,13 +113,13 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
         limit: usize,
         tier_config: &TierConfig,
     ) -> FilterResult {
-        use std::cmp::Ordering;
+        use crate::priority::pipeline::filter_sort_limit;
 
         // Get configurable score threshold (spec 193)
         let min_score = crate::config::get_minimum_score_threshold();
 
-        // Classify all function items
-        let mut classified: Vec<ClassifiedItem> = self
+        // Stage 1: Classify all function items (pure)
+        let function_items: Vec<ClassifiedItem> = self
             .items
             .iter()
             .map(|item| {
@@ -134,35 +134,33 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
             })
             .collect();
 
-        // Add file items (files are always T1 if they're god objects)
-        classified.extend(self.file_items.iter().map(|item| {
-            let tier = crate::priority::tiers::RecommendationTier::T1CriticalArchitecture;
-            let score = item.score;
-            let debt_item = DebtItem::File(Box::new(item.clone()));
-            ClassifiedItem {
-                item: debt_item,
-                tier,
-                score,
-            }
-        }));
+        // Stage 2: Classify file items (pure)
+        let file_items: Vec<ClassifiedItem> = self
+            .file_items
+            .iter()
+            .map(|item| {
+                let tier = crate::priority::tiers::RecommendationTier::T1CriticalArchitecture;
+                let score = item.score;
+                let debt_item = DebtItem::File(Box::new(item.clone()));
+                ClassifiedItem {
+                    item: debt_item,
+                    tier,
+                    score,
+                }
+            })
+            .collect();
 
-        // Filter with metrics (pure)
+        // Stage 3: Combine (pure - iterator chain, no mutation)
+        let classified: Vec<ClassifiedItem> =
+            function_items.into_iter().chain(file_items).collect();
+
+        // Stage 4-6: Filter, sort, limit (pure pipeline)
         let config = FilterConfig {
             min_score,
             show_t4: tier_config.show_t4_in_main_report,
         };
 
-        let mut result = filter_with_metrics(classified, &config);
-
-        // Sort by score (highest first)
-        result
-            .included
-            .sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Equal));
-
-        // Limit results
-        result.included.truncate(limit);
-
-        result
+        filter_sort_limit(classified, &config, limit)
     }
 
     fn get_bottom_priorities(&self, n: usize) -> Vector<UnifiedDebtItem> {

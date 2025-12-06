@@ -12,6 +12,7 @@ pub mod formatter;
 pub mod formatter_markdown;
 pub mod formatter_verbosity;
 pub mod parallel_call_graph;
+pub mod pipeline;
 pub mod refactoring_impact;
 pub mod score_formatter;
 pub mod scoring;
@@ -35,6 +36,7 @@ pub use formatter_markdown::{
     format_priorities_categorical_markdown, format_priorities_markdown,
     format_priorities_tiered_markdown,
 };
+pub use pipeline::{analyze_and_filter, filter_sort_limit, sort_by_score, take_top};
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use tiers::{classify_tier, RecommendationTier, TierConfig};
 pub use unified_analysis_queries::UnifiedAnalysisQueries;
