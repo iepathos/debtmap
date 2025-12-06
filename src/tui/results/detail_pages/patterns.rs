@@ -23,6 +23,77 @@ pub fn render(
     let mut lines = Vec::new();
     let mut has_any_data = false;
 
+    // Entropy Analysis section
+    if let Some(ref entropy) = item.entropy_details {
+        has_any_data = true;
+        add_section_header(&mut lines, "ENTROPY ANALYSIS", theme);
+
+        add_label_value(
+            &mut lines,
+            "Token Entropy",
+            format!("{:.3}", entropy.entropy_score),
+            theme,
+        );
+
+        let entropy_desc = if entropy.entropy_score < 0.3 {
+            "Low (Repetitive)"
+        } else if entropy.entropy_score < 0.5 {
+            "Medium (Typical)"
+        } else {
+            "High (Chaotic)"
+        };
+        lines.push(Line::from(vec![
+            Span::raw("    "),
+            Span::styled(entropy_desc, Style::default().fg(theme.muted)),
+        ]));
+
+        add_label_value(
+            &mut lines,
+            "Pattern Repetition",
+            format!("{:.3}", entropy.pattern_repetition),
+            theme,
+        );
+
+        if entropy.dampening_factor < 1.0 {
+            add_label_value(
+                &mut lines,
+                "Dampening Applied",
+                format!("{:.3}x reduction", entropy.dampening_factor),
+                theme,
+            );
+
+            lines.push(Line::from(vec![
+                Span::raw("  Adjusted Complexity: "),
+                Span::styled(
+                    format!(
+                        "{} → {} (cyclomatic)",
+                        entropy.original_complexity, entropy.adjusted_complexity
+                    ),
+                    Style::default().fg(theme.primary),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                Span::raw("                       "),
+                Span::styled(
+                    format!(
+                        "{} → {} (cognitive)",
+                        item.cognitive_complexity, entropy.adjusted_cognitive
+                    ),
+                    Style::default().fg(theme.primary),
+                ),
+            ]));
+        } else {
+            add_label_value(
+                &mut lines,
+                "Dampening Applied",
+                "No".to_string(),
+                theme,
+            );
+        }
+
+        add_blank_line(&mut lines);
+    }
+
     // Purity Analysis section
     if item.is_pure.is_some() || item.purity_level.is_some() {
         has_any_data = true;
