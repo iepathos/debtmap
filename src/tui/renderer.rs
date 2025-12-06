@@ -198,7 +198,8 @@ fn render_subtask_line(
     match subtask.status {
         StageStatus::Completed => {
             // Dotted leader to "done"
-            let dots_needed = width.saturating_sub((name_with_indent.len() + 5) as u16) as usize;
+            // Account for: space (1) + dots + space (1) + "done" (4) = 6 total
+            let dots_needed = width.saturating_sub((name_with_indent.len() + 6) as u16) as usize;
             Line::from(vec![
                 Span::raw(name_with_indent),
                 Span::raw(" "),
@@ -233,7 +234,8 @@ fn render_subtask_line(
             }
         }
         StageStatus::Pending => {
-            let dots_needed = width.saturating_sub(name_with_indent.len() as u16) as usize;
+            // Reduce dots by 4 to align with completed/main section metrics
+            let dots_needed = width.saturating_sub((name_with_indent.len() + 4) as u16) as usize;
             Line::from(vec![
                 Span::raw(name_with_indent),
                 Span::styled("·".repeat(dots_needed), theme.dotted_leader_style()),

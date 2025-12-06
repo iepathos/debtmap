@@ -271,11 +271,6 @@ fn render_grouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListI
             is_selected,
             theme,
         ));
-
-        // Add spacing between groups (blank line)
-        if list_items.len() < area.height as usize {
-            list_items.push(ListItem::new(Line::from("")));
-        }
     }
 
     list_items
@@ -300,39 +295,12 @@ fn format_grouped_item(
 
     // Badge for multiple issues
     let badge = if group.items.len() > 1 {
-        format!("[{} issues]", group.items.len())
+        format!(" [{}]", group.items.len())
     } else {
         String::new()
     };
 
-    // First line: indicator, rank, severity, score, location, badge
-    let mut line1 = vec![
-        Span::styled(indicator, Style::default().fg(theme.accent())),
-        Span::styled(
-            format!("#{:<4}", index + 1),
-            Style::default().fg(theme.muted),
-        ),
-        Span::styled(
-            format!("{:<10}", group.max_severity),
-            Style::default().fg(severity_color),
-        ),
-        Span::styled(
-            format!("{:<7.1}", group.combined_score),
-            Style::default().fg(theme.primary),
-        ),
-        Span::raw("  "),
-        Span::styled(
-            format!("{}::{}", file_name, group.location.function),
-            Style::default().fg(theme.secondary()),
-        ),
-    ];
-
-    if !badge.is_empty() {
-        line1.push(Span::raw("  "));
-        line1.push(Span::styled(badge, Style::default().fg(theme.muted)));
-    }
-
-    // Second line: aggregated metrics
+    // Aggregated metrics
     let metrics = grouping::aggregate_metrics(group);
     let coverage_str = metrics
         .coverage
@@ -351,13 +319,33 @@ fn format_grouped_item(
         metric_parts.push(format!("Len:{}", metrics.function_length));
     }
 
-    let line2 = vec![
-        Span::raw("  "), // Indent
+    // Single line: indicator, rank, severity, score, location, badge, metrics
+    let line = Line::from(vec![
+        Span::styled(indicator, Style::default().fg(theme.accent())),
+        Span::styled(
+            format!("#{:<4}", index + 1),
+            Style::default().fg(theme.muted),
+        ),
+        Span::styled(
+            format!("{:<10}", group.max_severity),
+            Style::default().fg(severity_color),
+        ),
+        Span::styled(
+            format!("{:<7.1}", group.combined_score),
+            Style::default().fg(theme.primary),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            format!("{}::{}", file_name, group.location.function),
+            Style::default().fg(theme.secondary()),
+        ),
+        Span::styled(badge, Style::default().fg(theme.muted)),
+        Span::raw("  "),
         Span::styled(
             format!("({})", metric_parts.join(" ")),
             Style::default().fg(theme.muted),
         ),
-    ];
+    ]);
 
     let style = if is_selected {
         Style::default().bg(Color::DarkGray)
@@ -365,7 +353,7 @@ fn format_grouped_item(
         Style::default()
     };
 
-    ListItem::new(vec![Line::from(line1), Line::from(line2)]).style(style)
+    ListItem::new(line).style(style)
 }
 
 /// Format complexity metric for list view display.
