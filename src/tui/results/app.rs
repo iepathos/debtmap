@@ -429,15 +429,17 @@ mod tests {
         assert_eq!(DetailPage::Overview.next(), DetailPage::Dependencies);
         assert_eq!(DetailPage::Dependencies.next(), DetailPage::GitContext);
         assert_eq!(DetailPage::GitContext.next(), DetailPage::Patterns);
-        assert_eq!(DetailPage::Patterns.next(), DetailPage::Overview);
+        assert_eq!(DetailPage::Patterns.next(), DetailPage::DataFlow);
+        assert_eq!(DetailPage::DataFlow.next(), DetailPage::Overview);
     }
 
     #[test]
     fn test_detail_page_prev_wraps_backward() {
-        assert_eq!(DetailPage::Overview.prev(), DetailPage::Patterns);
+        assert_eq!(DetailPage::Overview.prev(), DetailPage::DataFlow);
         assert_eq!(DetailPage::Dependencies.prev(), DetailPage::Overview);
         assert_eq!(DetailPage::GitContext.prev(), DetailPage::Dependencies);
         assert_eq!(DetailPage::Patterns.prev(), DetailPage::GitContext);
+        assert_eq!(DetailPage::DataFlow.prev(), DetailPage::Patterns);
     }
 
     #[test]
@@ -446,7 +448,8 @@ mod tests {
         assert_eq!(DetailPage::from_index(1), Some(DetailPage::Dependencies));
         assert_eq!(DetailPage::from_index(2), Some(DetailPage::GitContext));
         assert_eq!(DetailPage::from_index(3), Some(DetailPage::Patterns));
-        assert_eq!(DetailPage::from_index(4), None);
+        assert_eq!(DetailPage::from_index(4), Some(DetailPage::DataFlow));
+        assert_eq!(DetailPage::from_index(5), None);
     }
 
     #[test]
@@ -455,6 +458,7 @@ mod tests {
         assert_eq!(DetailPage::Dependencies.index(), 1);
         assert_eq!(DetailPage::GitContext.index(), 2);
         assert_eq!(DetailPage::Patterns.index(), 3);
+        assert_eq!(DetailPage::DataFlow.index(), 4);
     }
 
     #[test]
@@ -463,5 +467,6 @@ mod tests {
         assert_eq!(DetailPage::Dependencies.name(), "Dependencies");
         assert_eq!(DetailPage::GitContext.name(), "Git Context");
         assert_eq!(DetailPage::Patterns.name(), "Patterns");
+        assert_eq!(DetailPage::DataFlow.name(), "Data Flow");
     }
 }

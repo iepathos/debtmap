@@ -73,7 +73,8 @@
     "variable_deps": {},
     "data_transformations": {},
     "io_operations": {},
-    "purity_analysis": {}
+    "purity_analysis": {},
+    "mutation_analysis": {}
   },
   "overall_coverage": null
 }
