@@ -531,5 +531,10 @@ fn handle_call_graph_diagnostics(
         );
     }
 
+    // Print coverage matching statistics if diagnostic mode enabled (Spec 203 FR3)
+    if std::env::var("DEBTMAP_COVERAGE_DEBUG").is_ok() {
+        crate::risk::lcov::print_coverage_statistics();
+    }
+
     Ok(())
 }

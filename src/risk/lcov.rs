@@ -7,7 +7,41 @@ use rayon::prelude::*;
 use rustc_demangle;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+// Global statistics for diagnostic mode (Spec 203 FR3)
+static COVERAGE_MATCH_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+static COVERAGE_MATCH_SUCCESS: AtomicUsize = AtomicUsize::new(0);
+static COVERAGE_MATCH_ZERO: AtomicUsize = AtomicUsize::new(0);
+
+/// Print aggregate coverage matching statistics (Spec 203 FR3)
+///
+/// Called at end of analysis when DEBTMAP_COVERAGE_DEBUG=1 to show
+/// summary of match success rates.
+pub fn print_coverage_statistics() {
+    let attempts = COVERAGE_MATCH_ATTEMPTS.load(Ordering::Relaxed);
+    if attempts == 0 {
+        return; // No matches attempted
+    }
+
+    let success = COVERAGE_MATCH_SUCCESS.load(Ordering::Relaxed);
+    let zero = COVERAGE_MATCH_ZERO.load(Ordering::Relaxed);
+    let success_rate = (success as f64 / attempts as f64) * 100.0;
+    let zero_rate = (zero as f64 / attempts as f64) * 100.0;
+
+    eprintln!();
+    eprintln!("[COVERAGE] ═══════════════════════════════════════════════════");
+    eprintln!("[COVERAGE] Match Statistics Summary");
+    eprintln!("[COVERAGE] ═══════════════════════════════════════════════════");
+    eprintln!("[COVERAGE]   Total functions: {}", attempts);
+    eprintln!(
+        "[COVERAGE]   Matched: {} ({:.1}%)",
+        success, success_rate
+    );
+    eprintln!("[COVERAGE]   Unmatched (0%): {} ({:.1}%)", zero, zero_rate);
+    eprintln!("[COVERAGE] ═══════════════════════════════════════════════════");
+}
 
 /// Progress state for coverage file parsing
 #[derive(Debug, Clone, Copy)]
@@ -708,6 +742,11 @@ impl LcovData {
     ) -> Option<f64> {
         let debug_mode = std::env::var("DEBTMAP_COVERAGE_DEBUG").is_ok();
 
+        // Track statistics for diagnostic mode (Spec 203 FR3)
+        if debug_mode {
+            COVERAGE_MATCH_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
+        }
+
         // Phase 1: Path matching using Spec 201
         let available_paths: Vec<PathBuf> = self.functions.keys().cloned().collect();
         let path_match = find_matching_path(file, &available_paths);
@@ -727,6 +766,7 @@ impl LcovData {
                     function_name,
                     available_paths.len()
                 );
+                COVERAGE_MATCH_ZERO.fetch_add(1, Ordering::Relaxed);
                 return Some(0.0); // Return 0% not None when LCOV provided
             }
         }
@@ -759,12 +799,22 @@ impl LcovData {
                     "[COVERAGE]   Func:✗ (not found in {} functions)",
                     functions.len()
                 );
+                COVERAGE_MATCH_ZERO.fetch_add(1, Ordering::Relaxed);
                 return Some(0.0); // Return 0% not None when LCOV provided
             }
         }
 
         let (matched_func, _confidence) = func_match?;
-        Some(matched_func.data.coverage_percentage / 100.0)
+        let coverage = matched_func.data.coverage_percentage / 100.0;
+
+        // Track successful match in debug mode (Spec 203 FR3)
+        if debug_mode && coverage > 0.0 {
+            COVERAGE_MATCH_SUCCESS.fetch_add(1, Ordering::Relaxed);
+        } else if debug_mode {
+            COVERAGE_MATCH_ZERO.fetch_add(1, Ordering::Relaxed);
+        }
+
+        Some(coverage)
     }
 
     pub fn get_overall_coverage(&self) -> f64 {
