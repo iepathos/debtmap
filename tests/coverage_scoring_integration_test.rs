@@ -216,7 +216,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             language_specific: None, // spec 190
             detected_pattern: None,
             contextual_risk: None, // spec 203
-        file_line_count: None,
+            file_line_count: None,
         };
         analysis_no_coverage.add_item(item);
     }
