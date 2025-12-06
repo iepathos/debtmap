@@ -198,6 +198,123 @@ Sub-tasks can show:
 - Status (Pending, Active, Completed)
 - Optional progress (current/total)
 
+### Stage with Sub-Tasks: Coverage
+
+The coverage stage (index 4) demonstrates the progress callback pattern with hierarchical sub-tasks:
+
+```rust
+PipelineStage::with_subtasks(
+    "coverage",
+    vec![
+        SubTask { name: "load data", .. },
+        SubTask { name: "parse coverage", .. },
+        SubTask { name: "map to functions", .. },
+    ],
+)
+```
+
+**Before Display (when stage starts):**
+```
+coverage                     [..................] 0%
+  • load data               [..................] pending
+  • parse coverage          [..................] pending
+  • map to functions        [..................] pending
+```
+
+**During Execution (active sub-task with progress):**
+```
+coverage                     [█████.............] 33%
+  ✓ load data               [██████████████████] complete
+  ➤ parse coverage          [████████..........] 45% (450/1000 lines)
+  • map to functions        [..................] pending
+```
+
+**After Completion (all sub-tasks done):**
+```
+✓ coverage                  [██████████████████] 100% - 1000 lines, 85% covered
+  ✓ load data               [██████████████████] complete
+  ✓ parse coverage          [██████████████████] complete
+  ✓ map to functions        [██████████████████] complete
+```
+
+**Implementation Pattern:**
+
+This demonstrates the canonical pattern for progress callbacks with sub-tasks:
+
+```rust
+// In unified_analysis.rs or coverage.rs:
+
+// 1. Start the stage
+if let Some(manager) = ProgressManager::global() {
+    manager.tui_start_stage(4);
+}
+
+// 2. Execute first sub-task
+if let Some(manager) = ProgressManager::global() {
+    manager.tui_update_subtask(4, 0, StageStatus::Active, None);
+}
+let data = load_coverage_data()?;
+if let Some(manager) = ProgressManager::global() {
+    manager.tui_update_subtask(4, 0, StageStatus::Completed, None);
+}
+
+// 3. Execute second sub-task with progress tracking
+if let Some(manager) = ProgressManager::global() {
+    manager.tui_update_subtask(4, 1, StageStatus::Active, None);
+}
+
+let total_lines = data.line_count();
+for (idx, line) in data.lines().enumerate() {
+    parse_coverage_line(line)?;
+
+    // Update progress every N iterations to avoid excessive rendering
+    if idx % 100 == 0 {
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(
+                4,
+                1,
+                StageStatus::Active,
+                Some((idx, total_lines))
+            );
+        }
+    }
+}
+
+if let Some(manager) = ProgressManager::global() {
+    manager.tui_update_subtask(4, 1, StageStatus::Completed, None);
+}
+
+// 4. Execute final sub-task
+if let Some(manager) = ProgressManager::global() {
+    manager.tui_update_subtask(4, 2, StageStatus::Active, None);
+}
+let coverage_map = map_coverage_to_functions(&data)?;
+if let Some(manager) = ProgressManager::global() {
+    manager.tui_update_subtask(4, 2, StageStatus::Completed, None);
+}
+
+// 5. Complete the stage with summary metric
+if let Some(manager) = ProgressManager::global() {
+    let summary = format!(
+        "{} lines, {}% covered",
+        total_lines,
+        coverage_map.coverage_percent()
+    );
+    manager.tui_complete_stage(4, summary);
+    manager.tui_set_progress(0.55); // ~5/9 stages complete
+}
+```
+
+**Key Principles:**
+
+1. **Sub-task granularity**: Each sub-task represents a distinct phase with clear start/end
+2. **Progress tracking**: Use `Some((current, total))` for long-running sub-tasks
+3. **Update frequency**: Balance responsiveness with rendering overhead (update every N iterations)
+4. **Completion metrics**: Provide meaningful summary when stage completes
+5. **Overall progress**: Update global progress bar to reflect pipeline advancement
+
+This pattern ensures users get rich, real-time feedback about long-running operations while maintaining clean separation between business logic and UI concerns.
+
 ## Adding a New Pipeline Stage
 
 To add a new stage to the TUI:

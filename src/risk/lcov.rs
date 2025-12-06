@@ -7,6 +7,20 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+/// Progress state for coverage file parsing
+#[derive(Debug, Clone, Copy)]
+pub enum CoverageProgress {
+    /// Opening and initializing LCOV file reader
+    Initializing,
+    /// Parsing coverage records with file count progress
+    /// (current_file, total_files_seen_so_far)
+    Parsing { current: usize, total: usize },
+    /// Computing final coverage statistics
+    ComputingStats,
+    /// Parsing complete
+    Complete,
+}
+
 /// Normalized function name with multiple matching variants
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedFunctionName {
@@ -222,6 +236,156 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
     parse_lcov_file_with_progress(path, &ProgressBar::hidden())
 }
 
+/// Parse LCOV file with progress callback
+pub fn parse_lcov_file_with_callback<F>(path: &Path, mut progress_callback: F) -> Result<LcovData>
+where
+    F: FnMut(CoverageProgress),
+{
+    use lcov::{Reader, Record};
+
+    // Report initialization
+    progress_callback(CoverageProgress::Initializing);
+
+    let reader = Reader::open_file(path)
+        .with_context(|| format!("Failed to open LCOV file: {}", path.display()))?;
+
+    let mut data = LcovData::default();
+    let mut current_file: Option<PathBuf> = None;
+    let mut file_functions: HashMap<String, FunctionCoverage> = HashMap::new();
+    let mut file_lines: HashMap<usize, u64> = HashMap::new();
+    let mut _lines_found = 0;
+    let mut _lines_hit = 0;
+    let mut file_count = 0usize;
+
+    // Report parsing start
+    progress_callback(CoverageProgress::Parsing {
+        current: 0,
+        total: 0,
+    });
+
+    for record in reader {
+        let record = record.with_context(|| "Failed to parse LCOV record")?;
+
+        match record {
+            Record::SourceFile { path } => {
+                // Save previous file's data if any
+                if let Some(file) = current_file.take() {
+                    if !file_functions.is_empty() {
+                        let mut funcs: Vec<FunctionCoverage> =
+                            file_functions.drain().map(|(_, v)| v).collect();
+                        funcs.sort_by_key(|f| f.start_line);
+                        data.functions.insert(file, funcs);
+                    }
+                }
+                current_file = Some(path);
+                file_functions.clear();
+                file_lines.clear();
+            }
+
+            Record::FunctionName { start_line, name } => {
+                // Demangle the function name if it's mangled
+                let demangled = demangle_function_name(&name);
+                let normalized = normalize_demangled_name(&demangled);
+
+                // Use normalized full_path as key to consolidate duplicates
+                // If the entry already exists, keep the existing one (same line, same function)
+                file_functions
+                    .entry(normalized.full_path.clone())
+                    .or_insert_with(|| FunctionCoverage {
+                        name: normalized.full_path.clone(),
+                        start_line: start_line as usize,
+                        execution_count: 0,
+                        coverage_percentage: 0.0,
+                        uncovered_lines: Vec::new(),
+                        normalized,
+                    });
+            }
+
+            Record::FunctionData { name, count } => {
+                // Demangle the function name to match the key used in file_functions
+                let demangled = demangle_function_name(&name);
+                let normalized = normalize_demangled_name(&demangled);
+
+                if let Some(func) = file_functions.get_mut(&normalized.full_path) {
+                    // Keep the maximum execution count when consolidating
+                    func.execution_count = func.execution_count.max(count);
+                    // If no line data is available, use execution count to determine coverage
+                    // Functions with count > 0 are considered 100% covered, 0 means 0% covered
+                    if func.coverage_percentage == 0.0 && count > 0 {
+                        func.coverage_percentage = 100.0;
+                    }
+                }
+            }
+
+            Record::LineData { line, count, .. } => {
+                file_lines.insert(line as usize, count);
+                if count > 0 {
+                    _lines_hit += 1;
+                }
+            }
+
+            Record::LinesFound { found } => {
+                _lines_found = found as usize;
+                data.total_lines += found as usize;
+            }
+
+            Record::LinesHit { hit } => {
+                _lines_hit = hit as usize;
+                data.lines_hit += hit as usize;
+            }
+
+            Record::EndOfRecord => {
+                // Use parallel processing for function coverage calculation
+                process_function_coverage_parallel(&mut file_functions, &file_lines);
+
+                // Save the file's data
+                if let Some(file) = current_file.take() {
+                    if !file_functions.is_empty() {
+                        let mut funcs: Vec<FunctionCoverage> =
+                            file_functions.drain().map(|(_, v)| v).collect();
+                        funcs.sort_by_key(|f| f.start_line);
+                        data.functions.insert(file, funcs);
+                    }
+                }
+
+                file_functions.clear();
+                file_lines.clear();
+                file_count += 1;
+
+                // Throttle: update every 10 files
+                if file_count % 10 == 0 {
+                    progress_callback(CoverageProgress::Parsing {
+                        current: file_count,
+                        total: file_count,
+                    });
+                }
+            }
+
+            _ => {} // Ignore other record types
+        }
+    }
+
+    // Handle case where file doesn't end with EndOfRecord
+    if let Some(file) = current_file {
+        if !file_functions.is_empty() {
+            let mut funcs: Vec<FunctionCoverage> = file_functions.drain().map(|(_, v)| v).collect();
+            funcs.sort_by_key(|f| f.start_line);
+            data.functions.insert(file, funcs);
+        }
+    }
+
+    // Report statistics computation
+    progress_callback(CoverageProgress::ComputingStats);
+
+    // Build the coverage index once after all data is loaded
+    data.build_index();
+
+    progress_callback(CoverageProgress::Complete);
+
+    Ok(data)
+}
+
+/// Legacy API: Parse LCOV file with ProgressBar
 pub fn parse_lcov_file_with_progress(path: &Path, progress: &ProgressBar) -> Result<LcovData> {
     use lcov::{Reader, Record};
 

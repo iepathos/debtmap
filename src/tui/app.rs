@@ -117,7 +117,26 @@ impl App {
             PipelineStage::new("files"),
             PipelineStage::new("parse"),
             PipelineStage::new("call graph"),
-            PipelineStage::new("coverage"),
+            PipelineStage::with_subtasks(
+                "coverage",
+                vec![
+                    SubTask {
+                        name: "open file".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "parse coverage".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "compute stats".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                ],
+            ),
             PipelineStage::with_subtasks(
                 "purity analysis",
                 vec![
