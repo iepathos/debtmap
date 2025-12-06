@@ -55,8 +55,18 @@ mod transformations {
             .par_iter()
             .filter_map(|m| {
                 // Read file and parse to get AST
-                let content = fs::read_to_string(&m.file).ok()?;
-                let file_ast = syn::parse_file(&content).ok()?;
+                let content = fs::read_to_string(&m.file)
+                    .map_err(|e| {
+                        eprintln!("Warning: Failed to read file {}: {}", m.file.display(), e);
+                        e
+                    })
+                    .ok()?;
+                let file_ast = syn::parse_file(&content)
+                    .map_err(|e| {
+                        eprintln!("Warning: Failed to parse {}: {}", m.file.display(), e);
+                        e
+                    })
+                    .ok()?;
 
                 // Find the function in the AST by name and line number
                 for item in &file_ast.items {
@@ -375,6 +385,13 @@ impl ParallelUnifiedAnalysisBuilder {
             rayon::ThreadPoolBuilder::new()
                 .num_threads(jobs)
                 .build_global()
+                .map_err(|e| {
+                    eprintln!(
+                        "Warning: Failed to configure thread pool with {} threads: {}",
+                        jobs, e
+                    );
+                    e
+                })
                 .ok();
         }
 
@@ -967,10 +984,28 @@ impl ParallelUnifiedAnalysisBuilder {
         coverage_data: Option<&LcovData>,
     ) -> Option<crate::priority::file_metrics::GodObjectIndicators> {
         // I/O: Read file content
-        let content = std::fs::read_to_string(file_path).ok()?;
+        let content = std::fs::read_to_string(file_path)
+            .map_err(|e| {
+                eprintln!(
+                    "Warning: Failed to read file {}: {}",
+                    file_path.display(),
+                    e
+                );
+                e
+            })
+            .ok()?;
 
         // Pure: Analyze content
-        file_analysis::analyze_god_object_indicators(&content, file_path, coverage_data).ok()
+        file_analysis::analyze_god_object_indicators(&content, file_path, coverage_data)
+            .map_err(|e| {
+                eprintln!(
+                    "Warning: Failed to analyze god object indicators for {}: {}",
+                    file_path.display(),
+                    e
+                );
+                e
+            })
+            .ok()
     }
 
     /// Build the final unified analysis from parallel results

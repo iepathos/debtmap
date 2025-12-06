@@ -199,7 +199,11 @@ pub fn diagnose_coverage_file(lcov_path: &Path, format: &str) -> Result<()> {
 }
 
 /// Generate actionable suggestions based on coverage patterns (Spec 203 FR4)
-fn generate_suggestions(uncovered: usize, total_functions: usize, total_files: usize) -> Vec<String> {
+fn generate_suggestions(
+    uncovered: usize,
+    total_functions: usize,
+    total_files: usize,
+) -> Vec<String> {
     let mut suggestions = Vec::new();
 
     if total_functions == 0 {
@@ -235,7 +239,9 @@ fn generate_suggestions(uncovered: usize, total_functions: usize, total_files: u
     }
 
     if suggestions.is_empty() {
-        suggestions.push("Coverage data looks good! Most functions have coverage information.".to_string());
+        suggestions.push(
+            "Coverage data looks good! Most functions have coverage information.".to_string(),
+        );
     }
 
     suggestions

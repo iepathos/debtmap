@@ -172,9 +172,19 @@ impl CodebaseSnapshot {
     pub fn from_directory(root: &Path) -> Result<Self, String> {
         let mut files = Vec::new();
 
+        let mut skipped_count = 0;
         for entry in walkdir::WalkDir::new(root)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(|e| match e {
+                Ok(entry) => Some(entry),
+                Err(err) => {
+                    if skipped_count < 10 {
+                        eprintln!("Warning: Skipping directory entry: {}", err);
+                    }
+                    skipped_count += 1;
+                    None
+                }
+            })
             .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("rs"))
         {
             let content = std::fs::read_to_string(entry.path())
@@ -188,6 +198,13 @@ impl CodebaseSnapshot {
                 ast,
                 content,
             });
+        }
+
+        if skipped_count > 10 {
+            eprintln!(
+                "Warning: Skipped {} additional directory entries",
+                skipped_count - 10
+            );
         }
 
         Ok(Self {

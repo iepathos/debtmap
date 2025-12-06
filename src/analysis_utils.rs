@@ -213,7 +213,16 @@ pub fn analyze_single_file_with_timeout(
 }
 
 fn analyze_single_file_direct(file_path: &Path) -> Option<FileMetrics> {
-    let content = io::read_file(file_path).ok()?;
+    let content = io::read_file(file_path)
+        .map_err(|e| {
+            eprintln!(
+                "Warning: Failed to read file {}: {}",
+                file_path.display(),
+                e
+            );
+            e
+        })
+        .ok()?;
     let ext = file_path.extension()?.to_str()?;
     let language = Language::from_extension(ext);
 
@@ -225,6 +234,10 @@ fn analyze_single_file_direct(file_path: &Path) -> Option<FileMetrics> {
             let analyzer = analyzers::get_analyzer_with_context(language, context_aware);
             analyzers::analyze_file(content, file_path.to_path_buf(), analyzer.as_ref())
         })?
+        .map_err(|e| {
+            eprintln!("Warning: Failed to analyze {}: {}", file_path.display(), e);
+            e
+        })
         .ok()
 }
 

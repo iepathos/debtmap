@@ -35,10 +35,7 @@ pub fn print_coverage_statistics() {
     eprintln!("[COVERAGE] Match Statistics Summary");
     eprintln!("[COVERAGE] ═══════════════════════════════════════════════════");
     eprintln!("[COVERAGE]   Total functions: {}", attempts);
-    eprintln!(
-        "[COVERAGE]   Matched: {} ({:.1}%)",
-        success, success_rate
-    );
+    eprintln!("[COVERAGE]   Matched: {} ({:.1}%)", success, success_rate);
     eprintln!("[COVERAGE]   Unmatched (0%): {} ({:.1}%)", zero, zero_rate);
     eprintln!("[COVERAGE] ═══════════════════════════════════════════════════");
 }

@@ -323,10 +323,20 @@ fn discover_files(path: &Path, _languages: &[Language]) -> Result<Vec<PathBuf>, 
     // For now, only support Rust files
     let extensions = ["rs"];
 
+    let mut skipped_count = 0;
     for entry in WalkDir::new(path)
         .follow_links(true)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(|e| match e {
+            Ok(entry) => Some(entry),
+            Err(err) => {
+                if skipped_count < 10 {
+                    eprintln!("Warning: Skipping directory entry: {}", err);
+                }
+                skipped_count += 1;
+                None
+            }
+        })
     {
         if entry.file_type().is_file() {
             let file_path = entry.path();
@@ -336,6 +346,13 @@ fn discover_files(path: &Path, _languages: &[Language]) -> Result<Vec<PathBuf>, 
                 }
             }
         }
+    }
+
+    if skipped_count > 10 {
+        eprintln!(
+            "Warning: Skipped {} additional directory entries",
+            skipped_count - 10
+        );
     }
 
     Ok(files)

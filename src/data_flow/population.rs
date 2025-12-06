@@ -162,12 +162,22 @@ fn extract_variable_deps(metric: &FunctionMetrics) -> HashSet<String> {
     // Read file and parse to get AST
     let content = match fs::read_to_string(&metric.file) {
         Ok(c) => c,
-        Err(_) => return HashSet::new(),
+        Err(e) => {
+            eprintln!(
+                "Warning: Failed to read file {}: {}",
+                metric.file.display(),
+                e
+            );
+            return HashSet::new();
+        }
     };
 
     let file_ast = match syn::parse_file(&content) {
         Ok(ast) => ast,
-        Err(_) => return HashSet::new(),
+        Err(e) => {
+            eprintln!("Warning: Failed to parse {}: {}", metric.file.display(), e);
+            return HashSet::new();
+        }
     };
 
     // Find the function by name and line number
@@ -208,12 +218,22 @@ pub fn populate_data_transformations(
         // Read file and parse to get AST
         let content = match fs::read_to_string(&metric.file) {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(e) => {
+                eprintln!(
+                    "Warning: Failed to read file {}: {}",
+                    metric.file.display(),
+                    e
+                );
+                continue;
+            }
         };
 
         let file_ast = match syn::parse_file(&content) {
             Ok(ast) => ast,
-            Err(_) => continue,
+            Err(e) => {
+                eprintln!("Warning: Failed to parse {}: {}", metric.file.display(), e);
+                continue;
+            }
         };
 
         // Find the function by name and line number
