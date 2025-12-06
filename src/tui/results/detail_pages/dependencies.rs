@@ -21,7 +21,7 @@ pub fn render(
     let mut lines = Vec::new();
 
     // Upstream Callers section
-    add_section_header(&mut lines, "UPSTREAM CALLERS", theme);
+    add_section_header(&mut lines, "upstream callers", theme);
     if !item.upstream_callers.is_empty() {
         add_list_section(&mut lines, "", &item.upstream_callers, 10, theme);
     } else {
@@ -30,7 +30,7 @@ pub fn render(
     }
 
     // Downstream Callees section
-    add_section_header(&mut lines, "DOWNSTREAM CALLEES", theme);
+    add_section_header(&mut lines, "downstream callees", theme);
     if !item.downstream_callees.is_empty() {
         add_list_section(&mut lines, "", &item.downstream_callees, 10, theme);
     } else {
@@ -39,7 +39,7 @@ pub fn render(
     }
 
     // Dependency Metrics section
-    add_section_header(&mut lines, "DEPENDENCY METRICS", theme);
+    add_section_header(&mut lines, "dependency metrics", theme);
     add_label_value(
         &mut lines,
         "Upstream Dependencies",

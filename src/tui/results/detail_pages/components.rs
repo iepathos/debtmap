@@ -2,17 +2,15 @@
 
 use crate::tui::theme::Theme;
 use ratatui::{
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
 };
 
-/// Add ALL CAPS section header with accent color
+/// Add lowercase section header with muted color
 pub fn add_section_header(lines: &mut Vec<Line<'static>>, title: &str, theme: &Theme) {
     lines.push(Line::from(vec![Span::styled(
-        title.to_uppercase(),
-        Style::default()
-            .fg(theme.accent())
-            .add_modifier(Modifier::BOLD),
+        title.to_string(),
+        Style::default().fg(theme.muted),
     )]));
 }
 
