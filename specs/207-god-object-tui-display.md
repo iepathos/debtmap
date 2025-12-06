@@ -150,7 +150,11 @@ Enable god objects to appear in the TUI by:
 4. **TUI Display Integration**
    - God objects must appear in TUI list view alongside other items
    - Display in correct tier (Tier 1 - Critical)
-   - Show proper icon/indicator for god objects
+   - Show proper suffix for god objects: "(God Object)" or "(God Module)"
+   - Format metrics consistently with existing pattern:
+     - God Objects: `(LOC:1616 Resp:8 Fns:91)` - shows lines, responsibilities, total functions
+     - God Modules: `(LOC:850 Fns:116)` - shows lines and function count (no responsibilities)
+     - Regular items: `(Cov:15% Cog:45)` - shows coverage and cognitive complexity
    - Detail view should show god object-specific metrics (methods, fields, responsibilities)
 
 5. **Consistency with --no-tui Output**
@@ -172,6 +176,8 @@ Enable god objects to appear in the TUI by:
 - [ ] God object items bypass cyclomatic/cognitive complexity filtering
 - [ ] God objects are stored in `file_items` collection, not `items`
 - [ ] TUI displays god objects with correct tier (Tier 1 - Critical)
+- [ ] List view shows god objects with proper suffix: `main.rs (God Object)` or `formatter.rs (God Module)`
+- [ ] List view metrics formatted consistently: `(LOC:1616 Resp:8 Fns:91)` for God Objects, `(LOC:850 Fns:116)` for God Modules
 - [ ] Detail view shows god object-specific metrics (methods, fields, responsibilities)
 - [ ] Detection type (GodClass vs GodFile) is preserved and displayed
 - [ ] Recommended splits appear in detail view
@@ -551,6 +557,19 @@ pub enum EffortLevel {
        assert!(god_class_item.location.name.contains("God Class"));
        assert!(god_file_item.location.name.contains("God Module"));
    }
+
+   #[test]
+   fn test_god_object_list_view_formatting() {
+       let god_object = create_god_object_item_with_metrics(1616, 8, 91); // LOC, Resp, Fns
+       let god_module = create_god_module_item_with_metrics(850, 116); // LOC, Fns
+
+       let god_object_display = format_god_object_metrics(&god_object);
+       let god_module_display = format_god_object_metrics(&god_module);
+
+       // Verify consistent formatting with regular items pattern
+       assert_eq!(god_object_display, "(LOC:1616 Resp:8 Fns:91)");
+       assert_eq!(god_module_display, "(LOC:850 Fns:116)");
+   }
    ```
 
 2. **Scoring Tests**
@@ -651,7 +670,8 @@ pub enum EffortLevel {
 
 2. **Verify src/main.rs appears as god object in TUI**:
    - Should show in Tier 1 (Critical)
-   - Should display "God Object" or "God Module" indicator
+   - List view should display: `main.rs (God Object)  (LOC:1616 Resp:8 Fns:91)`
+   - Metrics should follow consistent format: `(LOC:X Resp:Y Fns:Z)`
    - Detail view should show methods, fields, responsibilities
 
 3. **Compare TUI and --no-tui output**:
@@ -776,8 +796,9 @@ Eventually, the legacy god object path (`CodeOrganization` in --no-tui) can be d
 
 1. **Functional Completeness**: God objects appear in TUI 100% of the time they appear in --no-tui
 2. **Consistency**: Same god objects identified in both TUI and CLI output
-3. **Performance**: <2% increase in analysis time
-4. **User Satisfaction**: No user complaints about missing god objects in TUI
+3. **Display Formatting**: List view metrics follow consistent pattern - `(LOC:X Resp:Y Fns:Z)` matches format of `(Cov:X% Cog:Y)`
+4. **Performance**: <2% increase in analysis time
+5. **User Satisfaction**: No user complaints about missing god objects in TUI
 
 ## Future Enhancements
 
