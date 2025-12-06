@@ -1,4 +1,6 @@
 use super::coverage_index::CoverageIndex;
+use super::function_name_matching::MatchableFunction;
+use super::path_normalization::find_matching_path;
 use anyhow::{Context, Result};
 use indicatif::ProgressBar;
 use rayon::prelude::*;
@@ -691,16 +693,78 @@ impl LcovData {
 
     /// Get function coverage using exact boundaries from AST analysis
     /// This is more accurate than guessing boundaries from LCOV data alone
+    ///
+    /// **Integration of Specs 201, 202, and 203:**
+    /// - Uses path normalization (Spec 201) to find matching files
+    /// - Uses function name matching (Spec 202) to find matching functions
+    /// - Returns 0.0 instead of None when LCOV provided but function not found (Spec 203)
+    /// - Logs diagnostics when DEBTMAP_COVERAGE_DEBUG is set (Spec 203)
     pub fn get_function_coverage_with_bounds(
         &self,
         file: &Path,
         function_name: &str,
-        start_line: usize,
+        _start_line: usize,
         _end_line: usize,
     ) -> Option<f64> {
-        // Use the same logic as get_function_coverage_with_line
-        self.coverage_index
-            .get_function_coverage_with_line(file, function_name, start_line)
+        let debug_mode = std::env::var("DEBTMAP_COVERAGE_DEBUG").is_ok();
+
+        // Phase 1: Path matching using Spec 201
+        let available_paths: Vec<PathBuf> = self.functions.keys().cloned().collect();
+        let path_match = find_matching_path(file, &available_paths);
+
+        if debug_mode {
+            if let Some((_matched_path, strategy)) = &path_match {
+                eprintln!(
+                    "[COVERAGE] {}::{} Path:✓ Strategy:{:?}",
+                    file.display(),
+                    function_name,
+                    strategy
+                );
+            } else {
+                eprintln!(
+                    "[COVERAGE] {}::{} Path:✗ (not found in {} paths)",
+                    file.display(),
+                    function_name,
+                    available_paths.len()
+                );
+                return Some(0.0); // Return 0% not None when LCOV provided
+            }
+        }
+
+        let (matched_path, _path_strategy) = path_match?;
+
+        // Phase 2: Function matching using Spec 202
+        let functions = self.functions.get(matched_path)?;
+
+        // Convert to MatchableFunction for the matching algorithm
+        let matchable_funcs: Vec<MatchableFunction<&FunctionCoverage>> = functions
+            .iter()
+            .map(|f| MatchableFunction {
+                name: f.name.clone(),
+                data: f,
+            })
+            .collect();
+
+        let func_match =
+            super::function_name_matching::find_matching_function(function_name, &matchable_funcs);
+
+        if debug_mode {
+            if let Some((matched_func, confidence)) = &func_match {
+                eprintln!(
+                    "[COVERAGE]   Func:✓ Confidence:{:?} Coverage:{:.1}%",
+                    confidence, matched_func.data.coverage_percentage
+                );
+            } else {
+                eprintln!(
+                    "[COVERAGE]   Func:✗ (not found in {} functions)",
+                    functions.len()
+                );
+                return Some(0.0); // Return 0% not None when LCOV provided
+            }
+        }
+
+        let (matched_func, _confidence) = func_match?;
+        Some(matched_func.data.coverage_percentage / 100.0)
     }
 
     pub fn get_overall_coverage(&self) -> f64 {

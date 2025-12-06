@@ -161,6 +161,64 @@ pub fn function_names_match(query: &str, lcov: &str) -> (bool, MatchConfidence) 
     (false, MatchConfidence::None)
 }
 
+/// Function data structure for matching (generic over coverage types)
+#[derive(Debug, Clone)]
+pub struct MatchableFunction<T> {
+    pub name: String,
+    pub data: T,
+}
+
+/// Pure function: Find best matching function from a list
+///
+/// Searches through available functions and returns the one with the highest
+/// confidence match. Returns None if no match is found.
+///
+/// # Examples
+/// ```
+/// use debtmap::risk::function_name_matching::{find_matching_function, MatchableFunction, MatchConfidence};
+///
+/// let functions = vec![
+///     MatchableFunction { name: "Type::method".to_string(), data: 0.85 },
+///     MatchableFunction { name: "other_func".to_string(), data: 0.90 },
+/// ];
+///
+/// let result = find_matching_function("method", &functions);
+/// assert!(result.is_some());
+/// let (matched, confidence) = result.unwrap();
+/// assert_eq!(matched.data, 0.85);
+/// assert_eq!(confidence, MatchConfidence::Medium);
+/// ```
+pub fn find_matching_function<'a, T>(
+    query_name: &str,
+    available_functions: &'a [MatchableFunction<T>],
+) -> Option<(&'a MatchableFunction<T>, MatchConfidence)> {
+    let mut best_match: Option<(&MatchableFunction<T>, MatchConfidence)> = None;
+
+    for func in available_functions {
+        let (matches, confidence) = function_names_match(query_name, &func.name);
+
+        if !matches {
+            continue;
+        }
+
+        // Update best match if this is better confidence
+        if let Some((_, best_confidence)) = best_match {
+            if confidence > best_confidence {
+                best_match = Some((func, confidence));
+            }
+        } else {
+            best_match = Some((func, confidence));
+        }
+
+        // Early exit if we found an exact match
+        if confidence == MatchConfidence::High {
+            break;
+        }
+    }
+
+    best_match
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
