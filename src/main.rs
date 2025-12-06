@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{Cli, Commands};
 use debtmap::core::injection::{AppContainer, AppContainerBuilder};
+use debtmap::error::{CliError, ConfigError};
 use debtmap::formatting::{ColorMode, FormattingConfig};
 use std::path::Path;
 use std::sync::Arc;
@@ -442,7 +443,11 @@ fn main() -> Result<()> {
     let _container = Arc::new(create_app_container()?);
 
     match cli.command {
-        command @ Commands::Analyze { .. } => handle_analyze_command(command)?,
+        command @ Commands::Analyze { .. } => {
+            handle_analyze_command(command)
+                .map_err(|e| anyhow::anyhow!("Analyze command failed: {}", e))?;
+            Ok(())
+        }
         Commands::Init { force } => {
             debtmap::commands::init::init_config(force)?;
             Ok(())
@@ -804,16 +809,16 @@ fn extract_analyze_params(
 ///
 /// # Returns
 ///
-/// Returns `Result<Result<()>>` where:
-/// - Outer Result: Parameter extraction and config building errors
-/// - Inner Result: Analysis execution errors
+/// Returns `Result<(), CliError>` for all CLI-related errors (configuration, validation,
+/// or analysis execution errors).
 ///
 /// # Specification
 ///
-/// Implements spec 182: Refactor handle_analyze_command into composable functions.
-/// This handler is now 30-40 lines (coordination only), with parameter extraction
-/// delegated to `extract_analyze_params`.
-fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
+/// Implements specs 182 and 206: Refactor handle_analyze_command into composable functions
+/// with clear error types. This handler is now 30-40 lines (coordination only), with
+/// parameter extraction delegated to `extract_analyze_params` and uses typed errors
+/// instead of nested Results.
+fn handle_analyze_command(command: Commands) -> Result<(), CliError> {
     // Extract parameters and build configuration groups
     let (
         path_cfg,
@@ -825,15 +830,16 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         lang_cfg,
         explain_metrics,
         no_context_aware,
-    ) = extract_analyze_params(command)?;
+    ) = extract_analyze_params(command).map_err(|e| CliError::InvalidCommand(e.to_string()))?;
 
     // Apply side effects (I/O at edges)
-    apply_environment_setup(no_context_aware)?;
+    apply_environment_setup(no_context_aware)
+        .map_err(|e| CliError::Config(ConfigError::ValidationFailed(e.to_string())))?;
 
     // Handle explain-metrics flag (early return for info display)
     if explain_metrics {
         print_metrics_explanation();
-        return Ok(Ok(()));
+        return Ok(());
     }
 
     // Build final configuration from component configs
@@ -847,8 +853,9 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         lang_cfg,
     );
 
-    // Delegate to analysis handler (pure core)
-    Ok(debtmap::commands::analyze::handle_analyze(config))
+    // Delegate to analysis handler - map analysis errors to CLI errors
+    debtmap::commands::analyze::handle_analyze(config)
+        .map_err(|e| CliError::Config(ConfigError::ValidationFailed(e.to_string())))
 }
 
 // Side effect function for environment setup (I/O at edges)

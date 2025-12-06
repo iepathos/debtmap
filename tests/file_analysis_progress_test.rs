@@ -32,7 +32,7 @@ fn test_progress_throttling_every_10_files() {
     // - Update at file 20
     // So we expect 2-4 updates (accounting for timing variations)
     assert!(
-        final_count >= 2 && final_count <= 10,
+        (2..=10).contains(&final_count),
         "Expected 2-10 updates with throttling, got {}",
         final_count
     );
@@ -169,7 +169,7 @@ fn test_throttling_prevents_excessive_updates() {
     // With 100 files and throttling every 10, we expect exactly 10 updates
     // (at files 10, 20, 30, ..., 100)
     assert!(
-        final_count >= 10 && final_count <= 20,
+        (10..=20).contains(&final_count),
         "Expected 10-20 updates for 100 files, got {}",
         final_count
     );
