@@ -833,7 +833,7 @@ impl ParallelUnifiedAnalysisBuilder {
         metrics: &[FunctionMetrics],
         coverage_data: Option<&LcovData>,
         no_god_object: bool,
-    ) -> Vec<FileDebtItem> {
+    ) -> Vec<(FileDebtItem, Vec<FunctionMetrics>)> {
         let start = Instant::now();
 
         // Group functions by file
@@ -865,7 +865,8 @@ impl ParallelUnifiedAnalysisBuilder {
         let progress = indicatif::ProgressBar::hidden();
 
         // Analyze files in parallel with TUI progress updates
-        let file_items: Vec<FileDebtItem> = files_map
+        // Store both file items and raw functions for god object aggregation
+        let file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)> = files_map
             .par_iter()
             .progress_with(progress.clone())
             .filter_map(|(file_path, functions)| {
@@ -890,7 +891,12 @@ impl ParallelUnifiedAnalysisBuilder {
                     }
                 }
 
-                result
+                // Return both the file item and the raw functions
+                result.map(|item| {
+                    let raw_functions: Vec<FunctionMetrics> =
+                        functions.iter().map(|&f| f.clone()).collect();
+                    (item, raw_functions)
+                })
             })
             .collect();
 
@@ -898,7 +904,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         progress.finish_and_clear();
 
-        file_items
+        file_data
     }
 
     fn analyze_file_parallel(
@@ -1031,7 +1037,7 @@ impl ParallelUnifiedAnalysisBuilder {
         data_flow_graph: DataFlowGraph,
         purity_analysis: HashMap<String, bool>,
         items: Vec<UnifiedDebtItem>,
-        file_items: Vec<FileDebtItem>,
+        file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)>,
         coverage_data: Option<&LcovData>,
     ) -> (UnifiedAnalysis, AnalysisPhaseTimings) {
         let start = Instant::now();
@@ -1061,17 +1067,36 @@ impl ParallelUnifiedAnalysisBuilder {
         }
 
         // Add file items and create god object UnifiedDebtItems (spec 207)
-        for file_item in file_items {
+        for (file_item, raw_functions) in file_data {
             // Check if this file has god object analysis
             if let Some(ref god_analysis) = file_item.metrics.god_object_analysis {
                 if god_analysis.is_god_object {
-                    // NEW (spec 244): Extract and aggregate member function metrics
+                    // NEW (spec 244): Aggregate from raw metrics first (includes ALL functions, even tests)
                     use crate::priority::god_object_aggregation::{
-                        aggregate_god_object_metrics, extract_member_functions,
+                        aggregate_from_raw_metrics, aggregate_god_object_metrics,
+                        extract_member_functions,
                     };
+
+                    let mut aggregated_metrics = aggregate_from_raw_metrics(&raw_functions);
+
+                    // Then enrich with coverage/dependencies from unified items (if available)
                     let member_functions =
                         extract_member_functions(unified.items.iter(), &file_item.metrics.path);
-                    let aggregated_metrics = aggregate_god_object_metrics(&member_functions);
+                    if !member_functions.is_empty() {
+                        let item_metrics = aggregate_god_object_metrics(&member_functions);
+                        // Merge: keep complexity from raw metrics, add coverage/deps from items
+                        aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
+                        aggregated_metrics.unique_upstream_callers =
+                            item_metrics.unique_upstream_callers;
+                        aggregated_metrics.unique_downstream_callees =
+                            item_metrics.unique_downstream_callees;
+                        aggregated_metrics.upstream_dependencies =
+                            item_metrics.upstream_dependencies;
+                        aggregated_metrics.downstream_dependencies =
+                            item_metrics.downstream_dependencies;
+                        aggregated_metrics.aggregated_contextual_risk =
+                            item_metrics.aggregated_contextual_risk;
+                    }
 
                     // Create god object UnifiedDebtItem using same function as sequential path
                     let god_item = crate::builders::unified_analysis::create_god_object_debt_item(

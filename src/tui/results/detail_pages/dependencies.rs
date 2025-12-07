@@ -1,6 +1,6 @@
 //! Dependencies page (Page 2) - Call graph and blast radius.
 
-use super::components::{add_blank_line, add_label_value, add_list_section, add_section_header};
+use super::components::{add_label_value, add_section_header};
 use crate::priority::UnifiedDebtItem;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
@@ -10,7 +10,7 @@ use ratatui::{
     Frame,
 };
 
-/// Render dependencies page showing callers, callees, and metrics
+/// Render dependencies page showing dependency metrics and blast radius
 pub fn render(
     frame: &mut Frame,
     _app: &ResultsApp,
@@ -19,24 +19,6 @@ pub fn render(
     theme: &Theme,
 ) {
     let mut lines = Vec::new();
-
-    // Upstream Callers section
-    add_section_header(&mut lines, "upstream callers", theme);
-    if !item.upstream_callers.is_empty() {
-        add_list_section(&mut lines, "", &item.upstream_callers, 10, theme);
-    } else {
-        add_label_value(&mut lines, "count", "0".to_string(), theme, area.width);
-        add_blank_line(&mut lines);
-    }
-
-    // Downstream Callees section
-    add_section_header(&mut lines, "downstream callees", theme);
-    if !item.downstream_callees.is_empty() {
-        add_list_section(&mut lines, "", &item.downstream_callees, 10, theme);
-    } else {
-        add_label_value(&mut lines, "count", "0".to_string(), theme, area.width);
-        add_blank_line(&mut lines);
-    }
 
     // Dependency Metrics section
     add_section_header(&mut lines, "dependency metrics", theme);

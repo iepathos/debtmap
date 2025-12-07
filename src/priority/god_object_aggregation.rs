@@ -20,6 +20,7 @@
 //! assert!(metrics.weighted_coverage.is_some());
 //! ```
 
+use crate::core::FunctionMetrics;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
 use std::collections::HashSet;
@@ -195,6 +196,30 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
         upstream_dependencies: up_count,
         downstream_dependencies: down_count,
         aggregated_contextual_risk: contextual_risk,
+    }
+}
+
+/// Aggregate metrics directly from raw FunctionMetrics (for ALL functions including tests).
+///
+/// This function aggregates complexity from raw function metrics before any filtering,
+/// ensuring god objects show the TRUE complexity of all their functions.
+pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAggregatedMetrics {
+    let total_cyclomatic = functions.iter().map(|f| f.cyclomatic).sum();
+    let total_cognitive = functions.iter().map(|f| f.cognitive).sum();
+    let max_nesting = functions.iter().map(|f| f.nesting).max().unwrap_or(0);
+
+    // No coverage or dependency data available from raw metrics
+    // These will need to come from unified items if available
+    GodObjectAggregatedMetrics {
+        total_cyclomatic,
+        total_cognitive,
+        max_nesting_depth: max_nesting,
+        weighted_coverage: None,
+        unique_upstream_callers: Vec::new(),
+        unique_downstream_callees: Vec::new(),
+        upstream_dependencies: 0,
+        downstream_dependencies: 0,
+        aggregated_contextual_risk: None,
     }
 }
 
