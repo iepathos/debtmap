@@ -542,6 +542,7 @@ mod tests {
             overall_coverage: None,
             has_coverage_data: false,
             timings: None,
+            stats: crate::priority::FilterStatistics::new(),
         }
     }
 

@@ -3,7 +3,7 @@
 //! This module provides methods for managing debt items, accessing data flow
 //! information, and performing auxiliary operations on UnifiedAnalysis instances.
 
-use super::{DebtType, FileDebtItem, UnifiedAnalysis, UnifiedDebtItem};
+use super::{FileDebtItem, UnifiedAnalysis, UnifiedDebtItem};
 use crate::data_flow::{DataFlowGraph, IoOperation, PurityInfo};
 use crate::priority::call_graph::FunctionId;
 use std::cmp::Ordering;
@@ -94,58 +94,44 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     }
 
     fn add_item(&mut self, item: UnifiedDebtItem) {
-        // Get configurable thresholds
+        use crate::priority::filter_predicates::*;
+
+        self.stats.total_items_processed += 1;
+
+        // Get thresholds from configuration (I/O boundary)
         let min_score = crate::config::get_minimum_debt_score();
         let min_cyclomatic = crate::config::get_minimum_cyclomatic_complexity();
         let min_cognitive = crate::config::get_minimum_cognitive_complexity();
         let min_risk = crate::config::get_minimum_risk_score();
 
-        // Filter out items below minimum thresholds
-        if item.unified_score.final_score.value() < min_score {
+        // Apply filters using pure predicates
+        if !meets_score_threshold(&item, min_score) {
+            self.stats.filtered_by_score += 1;
             return;
         }
 
-        // Check risk score threshold for Risk debt types
-        if let DebtType::Risk { risk_score, .. } = &item.debt_type {
-            if *risk_score < min_risk {
-                return;
-            }
+        if !meets_risk_threshold(&item, min_risk) {
+            self.stats.filtered_by_risk += 1;
+            return;
         }
 
-        // Filter out trivial functions based on configured complexity thresholds.
-        // Test-related items and god objects are exempt as they have different complexity characteristics.
-        // God objects are file-level items with cyclomatic/cognitive = 0 (spec 207)
-        if !matches!(
-            item.debt_type,
-            DebtType::TestComplexityHotspot { .. }
-                | DebtType::TestTodo { .. }
-                | DebtType::TestDuplication { .. }
-                | DebtType::GodObject { .. }
-                | DebtType::GodModule { .. }
-        ) {
-            // Enforce cyclomatic complexity threshold
-            if item.cyclomatic_complexity < min_cyclomatic {
-                return;
-            }
-
-            // Enforce cognitive complexity threshold
-            if item.cognitive_complexity < min_cognitive {
-                return;
-            }
+        if !meets_complexity_thresholds(&item, min_cyclomatic, min_cognitive) {
+            self.stats.filtered_by_complexity += 1;
+            return;
         }
 
-        // Check for duplicates before adding
-        // Two items are considered duplicates if they have the same location and debt type
-        let is_duplicate = self.items.iter().any(|existing| {
-            existing.location.file == item.location.file
-                && existing.location.line == item.location.line
-                && std::mem::discriminant(&existing.debt_type)
-                    == std::mem::discriminant(&item.debt_type)
-        });
-
-        if !is_duplicate {
-            self.items.push_back(item);
+        if self
+            .items
+            .iter()
+            .any(|existing| is_duplicate_of(&item, existing))
+        {
+            self.stats.filtered_as_duplicate += 1;
+            return;
         }
+
+        // Item passed all filters
+        self.items.push_back(item);
+        self.stats.items_added += 1;
     }
 
     fn sort_by_priority(&mut self) {

@@ -6,6 +6,7 @@ pub mod debt_aggregator;
 pub mod detected_pattern;
 pub mod external_api_detector;
 pub mod file_metrics;
+pub mod filter_predicates;
 pub mod filtering;
 pub mod formatted_output;
 pub mod formatter;
@@ -30,6 +31,7 @@ pub use call_graph::{CallGraph, FunctionCall};
 pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage};
 pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
 pub use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+pub use filter_predicates::FilterStatistics;
 pub use filtering::{
     filter_with_metrics, ClassifiedItem, FilterConfig, FilterMetrics, FilterResult,
 };
@@ -68,6 +70,9 @@ pub struct UnifiedAnalysis {
     /// Timing information for analysis phases (spec 130)
     #[serde(skip)]
     pub timings: Option<crate::builders::parallel_unified_analysis::AnalysisPhaseTimings>,
+    /// Filter statistics for debugging (spec 242)
+    #[serde(skip)]
+    pub stats: FilterStatistics,
 }
 
 // Single function analysis for evidence-based risk calculation
@@ -860,6 +865,7 @@ impl UnifiedAnalysis {
             overall_coverage: None,
             has_coverage_data: false,
             timings: None,
+            stats: FilterStatistics::new(),
         }
     }
 
@@ -903,7 +909,12 @@ impl UnifiedAnalysis {
         let god_object_files: std::collections::HashSet<_> = self
             .items
             .iter()
-            .filter(|item| matches!(item.debt_type, DebtType::GodObject { .. } | DebtType::GodModule { .. }))
+            .filter(|item| {
+                matches!(
+                    item.debt_type,
+                    DebtType::GodObject { .. } | DebtType::GodModule { .. }
+                )
+            })
             .map(|item| &item.location.file)
             .collect();
 
@@ -955,15 +966,27 @@ impl UnifiedAnalysis {
             eprintln!("File-level items count: {}", self.file_items.len());
             eprintln!("God object files: {}", god_object_files.len());
             eprintln!("Total debt score: {:.0}", total_debt_score);
-            eprintln!("Average per function item: {:.1}",
-                if self.items.is_empty() { 0.0 } else { total_debt_score / self.items.len() as f64 });
+            eprintln!(
+                "Average per function item: {:.1}",
+                if self.items.is_empty() {
+                    0.0
+                } else {
+                    total_debt_score / self.items.len() as f64
+                }
+            );
 
             // Show top 10 scores
             let mut sorted_items: Vec<_> = self.items.iter().collect();
-            sorted_items.sort_by(|a, b| b.unified_score.final_score.partial_cmp(&a.unified_score.final_score).unwrap());
+            sorted_items.sort_by(|a, b| {
+                b.unified_score
+                    .final_score
+                    .partial_cmp(&a.unified_score.final_score)
+                    .unwrap()
+            });
             eprintln!("\nTop 10 scores:");
             for (i, item) in sorted_items.iter().take(10).enumerate() {
-                eprintln!("  {}: {:.1} - {:?} at {}::{}",
+                eprintln!(
+                    "  {}: {:.1} - {:?} at {}::{}",
                     i + 1,
                     item.unified_score.final_score,
                     item.debt_type,
@@ -1025,6 +1048,7 @@ impl UnifiedAnalysis {
             overall_coverage: self.overall_coverage,
             has_coverage_data: self.has_coverage_data,
             timings: self.timings.clone(),
+            stats: self.stats.clone(),
         }
     }
 
@@ -1099,6 +1123,28 @@ impl UnifiedAnalysis {
             overall_coverage: self.overall_coverage,
             has_coverage_data: self.has_coverage_data,
             timings: self.timings.clone(),
+            stats: self.stats.clone(),
+        }
+    }
+
+    /// Get filtering statistics for debugging (spec 242).
+    pub fn filter_statistics(&self) -> &FilterStatistics {
+        &self.stats
+    }
+
+    /// Log filter summary if DEBTMAP_SHOW_FILTER_STATS is set (spec 242).
+    pub fn log_filter_summary(&self) {
+        if std::env::var("DEBTMAP_SHOW_FILTER_STATS").is_ok() {
+            let stats = self.filter_statistics();
+            eprintln!("\n=== Filter Statistics ===");
+            eprintln!("Total processed: {}", stats.total_items_processed);
+            eprintln!("Items added: {}", stats.items_added);
+            eprintln!("Acceptance rate: {:.1}%", stats.acceptance_rate());
+            eprintln!("\nRejection reasons:");
+            eprintln!("  Score threshold: {}", stats.filtered_by_score);
+            eprintln!("  Risk threshold: {}", stats.filtered_by_risk);
+            eprintln!("  Complexity threshold: {}", stats.filtered_by_complexity);
+            eprintln!("  Duplicates: {}", stats.filtered_as_duplicate);
         }
     }
 }
