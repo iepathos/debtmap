@@ -61,13 +61,10 @@ pub fn render(
 
         if !mutation_info.live_mutations.is_empty() {
             add_blank_line(&mut lines);
-            lines.push(Line::from(vec![Span::styled(
-                "  live mutations",
-                Style::default().fg(theme.secondary()),
-            )]));
+            add_section_header(&mut lines, "live mutations", theme);
             for mutation in &mutation_info.live_mutations {
                 lines.push(Line::from(vec![
-                    Span::raw("    • "),
+                    Span::raw("                        "), // Align to value column (24 chars)
                     Span::styled(mutation.clone(), Style::default().fg(Color::Yellow)),
                 ]));
             }
@@ -75,13 +72,10 @@ pub fn render(
 
         if !mutation_info.dead_stores.is_empty() {
             add_blank_line(&mut lines);
-            lines.push(Line::from(vec![Span::styled(
-                "  dead stores",
-                Style::default().fg(theme.secondary()),
-            )]));
+            add_section_header(&mut lines, "dead stores", theme);
             for dead in &mutation_info.dead_stores {
                 lines.push(Line::from(vec![
-                    Span::raw("    • "),
+                    Span::raw("                        "), // Align to value column (24 chars)
                     Span::styled(
                         format!("{} (never read)", dead),
                         Style::default().fg(theme.muted),
@@ -132,13 +126,10 @@ pub fn render(
 
         if escaping_count > 0 {
             add_blank_line(&mut lines);
-            lines.push(Line::from(vec![Span::styled(
-                "  variables affecting return value",
-                Style::default().fg(theme.secondary()),
-            )]));
+            add_section_header(&mut lines, "variables affecting return value", theme);
             for var in &cfg_analysis.escape_info.return_dependencies {
                 lines.push(Line::from(vec![
-                    Span::raw("    • "),
+                    Span::raw("                        "), // Align to value column (24 chars)
                     Span::styled(format!("{:?}", var), Style::default().fg(theme.primary)),
                 ]));
             }
