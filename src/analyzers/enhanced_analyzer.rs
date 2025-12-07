@@ -1,6 +1,7 @@
 use crate::analysis::{FileContext, FileContextDetector};
 use crate::core::{FunctionMetrics, Language};
 use crate::organization::{GodObjectAnalysis, GodObjectDetector};
+use crate::priority::score_types::Score0To100;
 use anyhow::Result;
 use std::path::Path;
 
@@ -54,7 +55,7 @@ fn create_god_object_analysis(
         responsibility_count: 5,
         lines_of_code: lines,
         complexity_sum: total_complexity,
-        god_object_score: calculate_god_object_score(function_count, lines),
+        god_object_score: Score0To100::new(calculate_god_object_score(function_count, lines)),
         recommended_splits: Vec::new(),
         confidence: crate::organization::GodObjectConfidence::Probable,
         responsibilities: Vec::new(),

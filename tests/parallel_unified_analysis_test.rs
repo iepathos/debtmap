@@ -477,7 +477,7 @@ fn test_god_objects_created_in_parallel_analysis() {
     write(&god_file_path, content).unwrap();
 
     // Create metrics for this god object file
-    let mut metrics: Vec<FunctionMetrics> = (0..60)
+    let metrics: Vec<FunctionMetrics> = (0..60)
         .map(|i| FunctionMetrics {
             file: god_file_path.clone(),
             name: format!("method_{}", i),
@@ -577,7 +577,7 @@ fn test_god_objects_created_in_parallel_analysis() {
             item.metrics
                 .god_object_analysis
                 .as_ref()
-                .map_or(false, |a| a.is_god_object)
+                .is_some_and(|a| a.is_god_object)
         })
         .collect();
 

@@ -360,7 +360,7 @@ fn score_structural_issues(debt_type: &DebtType, _weights: &ScoreWeights) -> f64
         } => {
             let responsibility_score = ((*responsibilities as f64 - 1.0) * 10.0).min(30.0);
             let method_score = ((*methods as f64 / 20.0) * 15.0).min(20.0);
-            let god_score = (god_object_score * 10.0).min(10.0);
+            let god_score = (god_object_score.value() * 10.0).min(10.0);
 
             (responsibility_score + method_score + god_score).min(60.0)
         }

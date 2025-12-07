@@ -194,7 +194,7 @@ pub(super) fn calculate_complexity_reduction(debt_type: &DebtType, is_complex: b
         // Organization debt types - significant complexity reduction potential
         DebtType::GodObject {
             god_object_score, ..
-        } => *god_object_score * 0.4,
+        } => god_object_score.value() * 0.4,
         DebtType::NestedLoops { depth, .. } => (*depth as f64).powf(2.0) * 0.3, // Quadratic impact
         DebtType::FeatureEnvy { .. } => 2.0, // Modest improvement
         _ => 0.0,
@@ -209,7 +209,7 @@ pub(super) fn calculate_expected_impact(
     score: &UnifiedScore,
 ) -> ImpactMetrics {
     let risk_factor = calculate_risk_factor(debt_type);
-    let risk_reduction = score.final_score * risk_factor;
+    let risk_reduction = score.final_score.value() * risk_factor;
 
     let (coverage_improvement, lines_reduction, complexity_reduction) = match debt_type {
         DebtType::TestingGap {

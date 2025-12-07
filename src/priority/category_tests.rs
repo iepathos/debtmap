@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod tests {
+    use crate::priority::score_types::Score0To100;
     use crate::priority::{
         ActionableRecommendation, CallGraph, DebtCategory, DebtType, FileDebtItem, FileDebtMetrics,
-        FileImpact, FunctionRole, FunctionVisibility, GodObjectIndicators, ImpactMetrics, Location,
+        FileImpact, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
         UnifiedAnalysis, UnifiedAnalysisQueries, UnifiedAnalysisUtils, UnifiedDebtItem,
         UnifiedScore,
     };
@@ -21,7 +22,7 @@ mod tests {
                 coverage_factor: 8.0, // Set high enough to avoid filtering
                 dependency_factor: 5.0,
                 role_multiplier: 1.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -96,7 +97,7 @@ mod tests {
                         field_count: 20,
                         responsibility_count: 8,
                         is_god_object: true,
-                        god_object_score: 350.0,
+                        god_object_score: Score0To100::new(350.0),
                         lines_of_code: 500,
                         complexity_sum: 400,
                         responsibilities: vec![],
@@ -139,7 +140,7 @@ mod tests {
                 methods: 10,
                 fields: 5,
                 responsibilities: 10,
-                god_object_score: 90.0,
+                god_object_score: Score0To100::new(90.0),
             }),
             DebtCategory::Architecture
         );
@@ -279,7 +280,7 @@ mod tests {
                 methods: 10,
                 fields: 5,
                 responsibilities: 10,
-                god_object_score: 95.0,
+                god_object_score: Score0To100::new(95.0),
             },
             95.0,
         ));
@@ -409,7 +410,7 @@ mod tests {
                 methods: 10,
                 fields: 5,
                 responsibilities: 10,
-                god_object_score: 95.0,
+                god_object_score: Score0To100::new(95.0),
             },
             95.0,
         ));
@@ -448,7 +449,7 @@ mod tests {
                 methods: 15,
                 fields: 7,
                 responsibilities: 15,
-                god_object_score: 95.0,
+                god_object_score: Score0To100::new(95.0),
             },
             95.0,
         ));
@@ -506,7 +507,7 @@ mod tests {
                 methods: 10,
                 fields: 5,
                 responsibilities: 10,
-                god_object_score: 100.0,
+                god_object_score: Score0To100::new(100.0),
             },
             100.0,
         ));
@@ -534,7 +535,7 @@ mod tests {
                 methods: 10,
                 fields: 5,
                 responsibilities: 10,
-                god_object_score: 90.0,
+                god_object_score: Score0To100::new(90.0),
             },
             90.0,
         ));

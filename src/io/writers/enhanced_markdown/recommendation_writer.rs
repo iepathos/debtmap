@@ -91,7 +91,7 @@ mod tests {
     use crate::core::{ComplexityReport, ComplexitySummary, DependencyReport, TechnicalDebtReport};
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedAnalysis,
-        UnifiedDebtItem, UnifiedScore,
+        UnifiedDebtItem, UnifiedScore, score_types::Score0To100,
     };
     use chrono::Utc;
     use std::collections::HashMap;
@@ -129,7 +129,7 @@ mod tests {
                 lines_reduction: 20,
             },
             unified_score: UnifiedScore {
-                final_score: 8.5,
+                final_score: Score0To100::new(8.5),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

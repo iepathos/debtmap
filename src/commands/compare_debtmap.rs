@@ -253,7 +253,7 @@ fn create_summary(analysis: &DebtmapJsonInput) -> AnalysisSummary {
 
     let high_priority_items = function_items
         .iter()
-        .filter(|item| is_critical(item.unified_score.final_score))
+        .filter(|item| is_critical(item.unified_score.final_score.value()))
         .count();
 
     let average_score = if function_items.is_empty() {
@@ -261,7 +261,7 @@ fn create_summary(analysis: &DebtmapJsonInput) -> AnalysisSummary {
     } else {
         function_items
             .iter()
-            .map(|i| i.unified_score.final_score)
+            .map(|i| i.unified_score.final_score.value())
             .sum::<f64>()
             / function_items.len() as f64
     };
@@ -307,7 +307,7 @@ fn identify_resolved_items(before: &DebtmapJsonInput, after: &DebtmapJsonInput) 
 
     let high_priority_count = resolved
         .iter()
-        .filter(|item| is_critical(item.unified_score.final_score))
+        .filter(|item| is_critical(item.unified_score.final_score.value()))
         .count();
 
     ResolvedItems {
@@ -345,8 +345,8 @@ fn identify_improved_items(before: &DebtmapJsonInput, after: &DebtmapJsonInput) 
                 after_item.location.function.clone(),
             );
             if let Some(before_item) = before_map.get(&key) {
-                let score_improvement =
-                    before_item.unified_score.final_score - after_item.unified_score.final_score;
+                let score_improvement = before_item.unified_score.final_score.value()
+                    - after_item.unified_score.final_score.value();
                 if score_improvement > 0.5 {
                     improved_count += 1;
 
@@ -416,13 +416,13 @@ fn identify_new_items(before: &DebtmapJsonInput, after: &DebtmapJsonInput) -> Ne
         .filter_map(|item| match item {
             DebtItem::Function(f) => {
                 if !before_keys.contains(&(f.location.file.clone(), f.location.function.clone()))
-                    && is_critical(f.unified_score.final_score)
+                    && is_critical(f.unified_score.final_score.value())
                 {
                     Some(ItemInfo {
                         file: f.location.file.clone(),
                         function: f.location.function.clone(),
                         line: f.location.line,
-                        score: f.unified_score.final_score,
+                        score: f.unified_score.final_score.value(),
                     })
                 } else {
                     None
@@ -488,22 +488,22 @@ fn filter_unchanged_critical_items(
         .iter()
         .filter_map(|item| {
             if let DebtItem::Function(before_item) = item {
-                if is_critical(before_item.unified_score.final_score) {
+                if is_critical(before_item.unified_score.final_score.value()) {
                     let key = (
                         before_item.location.file.clone(),
                         before_item.location.function.clone(),
                     );
                     if let Some(after_item) = after_map.get(&key) {
                         if is_score_unchanged(
-                            before_item.unified_score.final_score,
-                            after_item.unified_score.final_score,
-                        ) && is_critical(after_item.unified_score.final_score)
+                            before_item.unified_score.final_score.value(),
+                            after_item.unified_score.final_score.value(),
+                        ) && is_critical(after_item.unified_score.final_score.value())
                         {
                             return Some(ItemInfo {
                                 file: before_item.location.file.clone(),
                                 function: before_item.location.function.clone(),
                                 line: before_item.location.line,
-                                score: before_item.unified_score.final_score,
+                                score: before_item.unified_score.final_score.value(),
                             });
                         }
                     }
@@ -641,6 +641,7 @@ fn print_summary(result: &ValidationResult) {
 mod tests {
     use super::*;
     use crate::priority::coverage_propagation::TransitiveCoverage;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::semantic_classifier::FunctionRole;
     use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
     use crate::priority::{
@@ -714,7 +715,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -795,7 +796,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -875,7 +876,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -1374,7 +1375,7 @@ mod tests {
 
     #[test]
     fn test_file_level_items_are_filtered() {
-        use crate::priority::file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use crate::priority::file_metrics::{FileDebtMetrics, FileImpact};
 
         let before = create_output_with_items(vec![
             DebtItem::File(Box::new(FileDebtItem {
@@ -1855,7 +1856,7 @@ mod tests {
     #[test]
     fn test_build_function_map_filters_file_items() {
         use crate::priority::{
-            file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators},
+            file_metrics::{FileDebtMetrics, FileImpact},
             FileDebtItem,
         };
 
@@ -2013,7 +2014,7 @@ mod tests {
     fn test_identify_unchanged_critical_file_items_ignored() {
         // File items should be ignored (only functions are processed)
         use crate::priority::{
-            file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators},
+            file_metrics::{FileDebtMetrics, FileImpact},
             FileDebtItem,
         };
 

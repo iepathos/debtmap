@@ -149,6 +149,7 @@ impl TierConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedDebtItem,
         UnifiedScore,
@@ -167,7 +168,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: 0.0,
+                final_score: Score0To100::new(0.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -231,7 +232,7 @@ mod tests {
                 methods: 100,
                 fields: 50,
                 responsibilities: 5,
-                god_object_score: 95.0,
+                god_object_score: Score0To100::new(95.0),
             },
             10,
             5,

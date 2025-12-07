@@ -47,7 +47,10 @@ fn test_metrics_tracking_integration() {
 
     // Verify that analysis ran and produced a reasonable score
     assert_eq!(analysis.method_count, 40);
-    assert!(analysis.god_object_score > 0.0, "Score should be non-zero");
+    assert!(
+        analysis.god_object_score.value() > 0.0,
+        "Score should be non-zero"
+    );
 
     // Simulate refactoring - file improved
     let improved_code = r#"

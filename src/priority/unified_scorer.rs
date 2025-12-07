@@ -5,6 +5,7 @@ use crate::priority::{
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::TransitiveCoverage,
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
+    score_types::Score0To100,
     scoring::calculation::{
         calculate_base_score_no_coverage, calculate_base_score_with_coverage_multiplier,
         calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
@@ -54,11 +55,11 @@ impl PuritySpectrum {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
-    pub complexity_factor: f64, // 0-10, configurable weight (default 35%)
-    pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
-    pub dependency_factor: f64, // 0-10, configurable weight (default 20%)
-    pub role_multiplier: f64,   // 0.1-1.5x based on function role
-    pub final_score: f64,       // Computed composite score (with scaling applied)
+    pub complexity_factor: f64,   // 0-10, configurable weight (default 35%)
+    pub coverage_factor: f64,     // 0-10, configurable weight (default 40%)
+    pub dependency_factor: f64,   // 0-10, configurable weight (default 20%)
+    pub role_multiplier: f64,     // 0.1-1.5x based on function role
+    pub final_score: Score0To100, // Computed composite score (with scaling applied)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_score: Option<f64>, // Score before exponential scaling (spec 171)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -198,7 +199,7 @@ pub fn calculate_unified_score_with_patterns(
     let god_object_multiplier = if let Some(go) = god_object {
         if go.is_god_object {
             // Massive boost for functions in god objects
-            3.0 + (go.god_object_score / 50.0)
+            3.0 + (go.god_object_score.value() / 50.0)
         } else {
             1.0
         }
@@ -211,7 +212,7 @@ pub fn calculate_unified_score_with_patterns(
         coverage_factor: base_score.coverage_factor,
         dependency_factor: base_score.dependency_factor,
         role_multiplier: base_score.role_multiplier,
-        final_score: base_score.final_score * god_object_multiplier,
+        final_score: Score0To100::new(base_score.final_score.value() * god_object_multiplier),
         base_score: base_score.base_score,
         exponential_factor: base_score.exponential_factor,
         risk_boost: base_score.risk_boost,
@@ -252,7 +253,7 @@ pub fn calculate_unified_priority_with_debt(
             coverage_factor: 0.0,
             dependency_factor: 0.0,
             role_multiplier: 1.0,
-            final_score: 0.0,
+            final_score: Score0To100::new(0.0),
             base_score: Some(0.0),
             exponential_factor: Some(1.0),
             risk_boost: Some(1.0),
@@ -344,7 +345,7 @@ pub fn calculate_unified_priority_with_debt(
         coverage_factor: (1.0 - coverage_pct) * 10.0, // Convert gap to 0-10 for display
         dependency_factor,
         role_multiplier,
-        final_score: final_normalized_score,
+        final_score: Score0To100::new(final_normalized_score),
         base_score: None,         // Set later in debt item construction (spec 171)
         exponential_factor: None, // Set later in debt item construction (spec 171)
         risk_boost: None,         // Set later in debt item construction (spec 171)
@@ -602,6 +603,8 @@ fn normalize_complexity(
     is_orchestrator: bool,
 ) -> f64 {
     use crate::complexity::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
+    #[allow(unused_imports)]
+    use crate::priority::score_types::Score0To100;
 
     // Get configuration
     let config = crate::config::get_config();
@@ -896,7 +899,7 @@ pub fn calculate_unified_priority_with_data_flow(
     };
 
     // Apply adjustment to final score
-    let adjusted_score = base_score.final_score * combined_adjustment;
+    let adjusted_score = Score0To100::new(base_score.final_score.value() * combined_adjustment);
 
     // Update score with data flow factors
     base_score.final_score = adjusted_score;

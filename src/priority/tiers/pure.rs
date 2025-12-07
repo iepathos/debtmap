@@ -34,7 +34,7 @@ fn is_god_or_error_issue(debt_type: &crate::priority::DebtType) -> bool {
 
 /// Checks if metrics indicate T1 complexity level.
 fn has_t1_complexity(item: &UnifiedDebtItem) -> bool {
-    has_extreme_score(item.unified_score.final_score)
+    has_extreme_score(item.unified_score.final_score.value())
         || has_t1_cyclomatic_metric(item)
         || has_t1_cognitive_metric(item)
         || has_t1_other_metrics(item)
@@ -107,6 +107,7 @@ fn is_t3_testing_gap(item: &UnifiedDebtItem, config: &TierConfig) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
@@ -131,7 +132,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: 0.0,
+                final_score: Score0To100::new(0.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -195,7 +196,7 @@ mod tests {
                 methods: 100,
                 fields: 50,
                 responsibilities: 5,
-                god_object_score: 95.0,
+                god_object_score: Score0To100::new(95.0),
             },
             10,
             10,
@@ -235,7 +236,7 @@ mod tests {
             3,
             5,
         );
-        item.unified_score.final_score = 11.0; // Extreme score
+        item.unified_score.final_score = Score0To100::new(11.0); // Extreme score
         let tier = classify_tier(&item, &TierConfig::default());
         assert_eq!(tier, RecommendationTier::T1CriticalArchitecture);
     }
@@ -432,7 +433,7 @@ mod tests {
                     methods,
                     fields,
                     responsibilities,
-                    god_object_score: god_score,
+                    god_object_score: Score0To100::new(god_score),
                 },
                 cyclomatic,
                 cognitive,
@@ -507,7 +508,7 @@ mod tests {
                 deps,
             );
             // Set extreme score (> 10.0)
-            item.unified_score.final_score = 11.0;
+            item.unified_score.final_score = Score0To100::new(11.0);
             // Keep complexity_factor below threshold
             item.unified_score.complexity_factor = 4.0;
 
@@ -533,7 +534,7 @@ mod tests {
                 deps,
             );
             // Keep score below extreme threshold
-            item.unified_score.final_score = 8.0;
+            item.unified_score.final_score = Score0To100::new(8.0);
             // Keep complexity_factor below threshold
             item.unified_score.complexity_factor = 4.0;
 
@@ -587,7 +588,7 @@ mod tests {
                 deps,
             );
             // Low score
-            item.unified_score.final_score = 2.0;
+            item.unified_score.final_score = Score0To100::new(2.0);
             // Low complexity factor
             item.unified_score.complexity_factor = 1.0;
 

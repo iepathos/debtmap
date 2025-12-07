@@ -42,8 +42,8 @@ fn test_unified_scoring() {
 
     assert!(score.complexity_factor > 0.0);
     assert!(score.coverage_factor > 0.0);
-    assert!(score.final_score > 0.0);
-    assert!(score.final_score <= 10.0);
+    assert!(score.final_score.value() > 0.0);
+    assert!(score.final_score.value() <= 10.0);
 }
 
 fn create_simple_io_wrapper() -> FunctionMetrics {
@@ -74,7 +74,7 @@ fn create_full_coverage_data(func: &FunctionMetrics) -> LcovData {
 }
 
 fn assert_zero_debt_score(score: &UnifiedScore) {
-    assert_eq!(score.final_score, 0.0);
+    assert_eq!(score.final_score.value(), 0.0);
     assert_eq!(score.complexity_factor, 0.0);
     assert_eq!(score.coverage_factor, 0.0);
 }
@@ -109,7 +109,7 @@ fn test_simple_io_wrapper_without_coverage_has_score() {
 
     // Untested simple I/O wrapper should have a non-zero score (testing gap)
     assert!(
-        score.final_score > 0.0,
+        score.final_score.value() > 0.0,
         "Untested I/O wrapper should have non-zero score"
     );
 }
@@ -118,9 +118,9 @@ fn assert_zero_coverage_boost(score: &UnifiedScore) {
     // Spec 122: With multiplier approach, 0% coverage (multiplier=1.0) keeps full base score
     // No longer applying 10x boost, but function still gets full complexity+dependency score
     assert!(
-        score.final_score > 0.0,
+        score.final_score.value() > 0.0,
         "Zero coverage functions should have non-zero score, got {}",
-        score.final_score
+        score.final_score.value()
     );
 }
 
@@ -207,9 +207,9 @@ fn test_test_code_not_boosted() {
 
     // Test code with no coverage should still have low score
     assert!(
-        score.final_score < 10.0,
+        score.final_score.value() < 10.0,
         "Test code should not get zero coverage boost, got {}",
-        score.final_score
+        score.final_score.value()
     );
 }
 
@@ -228,7 +228,7 @@ fn test_complex_function_has_score() {
     let score = calculate_unified_priority(&func, &call_graph, None, None);
 
     // Complex function should have non-zero score (is technical debt)
-    assert!(score.final_score > 0.0);
+    assert!(score.final_score.value() > 0.0);
     assert!(score.complexity_factor > 0.0);
 }
 
@@ -272,9 +272,9 @@ fn test_well_tested_simple_function_scores_below_20() {
     let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
 
     assert!(
-        score.final_score < 20.0,
+        score.final_score.value() < 20.0,
         "Well-tested simple function (100% coverage, cyclomatic=5) should score < 20.0, got {}",
-        score.final_score
+        score.final_score.value()
     );
 }
 
@@ -354,7 +354,7 @@ fn test_orchestrator_coverage_adjustment() {
     // Orchestrator with 0% coverage should have reduced penalty compared to normal functions
     // The score should be lower than a pure logic function with same complexity
     assert!(
-        score.final_score > 0.0,
+        score.final_score.value() > 0.0,
         "Orchestrator should still have a score, but reduced due to coverage adjustment"
     );
 }
@@ -382,7 +382,7 @@ fn test_entry_point_with_coverage_not_overly_penalized() {
 
     // Should not rank in critical tier (< 20.0)
     assert!(
-        score.final_score < 20.0,
+        score.final_score.value() < 20.0,
         "Entry point with 50% coverage and moderate complexity should not be critical (score: {})",
         score.final_score
     );
@@ -407,7 +407,7 @@ fn test_complex_entry_point_still_flagged() {
     // complexity_factor = 3.6 / 2.0 = 1.8
     // With EntryPoint role multiplier (1.5x) and 0% coverage, expect score around 8-10
     assert!(
-        score.final_score > 8.0,
+        score.final_score.value() > 8.0,
         "Complex entry point should still be flagged (score: {})",
         score.final_score
     );
@@ -435,7 +435,7 @@ fn test_io_wrapper_role_multiplier_not_clamped() {
     // With 0.5 multiplier: 22.0 * 0.5 = 11.0
     // With role-specific coverage weight (0.5x), the score should be even lower (~8-11)
     assert!(
-        score.final_score < 20.0,
+        score.final_score.value() < 20.0,
         "IOWrapper should score relatively low. Score: {}",
         score.final_score
     );
@@ -475,7 +475,7 @@ fn test_entry_point_role_multiplier_not_clamped() {
     // complexity_factor = 2.16 / 2.0 = 1.08
     // With 1.5x multiplier and 0% coverage, expect score around 4-6
     assert!(
-        score.final_score > 4.0,
+        score.final_score.value() > 4.0,
         "EntryPoint with 1.5x multiplier should have elevated score. Score: {}",
         score.final_score
     );
@@ -501,7 +501,7 @@ fn test_io_wrapper_coverage_weight_reduced() {
     // the score should be significantly lower than a PureLogic function
     // with same complexity
     assert!(
-        score.final_score < 15.0,
+        score.final_score.value() < 15.0,
         "IOWrapper with reduced coverage weight should score low. Score: {}",
         score.final_score
     );
@@ -526,7 +526,7 @@ fn test_pure_logic_coverage_weight_unchanged() {
     // complexity_factor = 1.7 / 2.0 = 0.85
     // With 1.3x multiplier and 0% coverage, expect score around 4-5
     assert!(
-        score.final_score > 4.0,
+        score.final_score.value() > 4.0,
         "PureLogic with 0% coverage should score reasonably. Score: {}",
         score.final_score
     );

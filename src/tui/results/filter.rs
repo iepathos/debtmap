@@ -45,7 +45,7 @@ pub enum SeverityFilter {
 impl SeverityFilter {
     /// Check if item matches severity filter
     pub fn matches(&self, item: &UnifiedDebtItem) -> bool {
-        let item_severity = calculate_severity(item.unified_score.final_score);
+        let item_severity = calculate_severity(item.unified_score.final_score.value());
         match self {
             SeverityFilter::Critical => item_severity == "critical",
             SeverityFilter::High => item_severity == "high",

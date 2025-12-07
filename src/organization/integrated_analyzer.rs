@@ -16,6 +16,7 @@ use crate::organization::{
     type_based_clustering::{MethodSignature, TypeAffinityAnalyzer},
     GodObjectAnalysis, ModuleSplit, SplitAnalysisMethod,
 };
+use crate::priority::score_types::Score0To100;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
@@ -129,12 +130,13 @@ impl IntegratedArchitectureAnalyzer {
         };
 
         // Phase 2: Advanced analysis (conditional on score threshold)
-        let advanced_results =
-            if god_object.god_object_score >= self.config.advanced_analysis_threshold {
-                self.run_advanced_analysis(god_object, ast, call_graph, start_time)?
-            } else {
-                AdvancedAnalysisResults::empty()
-            };
+        let advanced_results = if god_object.god_object_score
+            >= Score0To100::new(self.config.advanced_analysis_threshold)
+        {
+            self.run_advanced_analysis(god_object, ast, call_graph, start_time)?
+        } else {
+            AdvancedAnalysisResults::empty()
+        };
 
         // Phase 3: Conflict resolution
         let unified_splits = self.resolve_conflicts(

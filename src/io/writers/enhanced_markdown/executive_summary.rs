@@ -736,6 +736,7 @@ pub fn estimate_effort_hours(item: &UnifiedDebtItem) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::{
         ActionableRecommendation, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
@@ -764,7 +765,7 @@ mod tests {
                 lines_reduction: 10,
             },
             unified_score: UnifiedScore {
-                final_score: 5.0,
+                final_score: Score0To100::new(5.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

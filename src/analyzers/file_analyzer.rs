@@ -2,6 +2,7 @@ use crate::analyzers::FileAnalyzer;
 use crate::core::FunctionMetrics;
 use crate::organization::GodObjectDetector;
 use crate::priority::file_metrics::FileDebtMetrics;
+use crate::priority::score_types::Score0To100;
 use crate::risk::lcov::LcovData;
 use anyhow::Result;
 use std::path::Path;
@@ -82,7 +83,7 @@ impl UnifiedFileAnalyzer {
                     responsibility_count: 5,
                     lines_of_code: lines,
                     complexity_sum: 0,
-                    god_object_score: god_object_score.min(1.0),
+                    god_object_score: Score0To100::new(god_object_score.min(1.0)),
                     recommended_splits: Vec::new(),
                     confidence: crate::organization::GodObjectConfidence::Possible,
                     responsibilities: Vec::new(),
@@ -227,7 +228,7 @@ impl UnifiedFileAnalyzer {
                 responsibility_count: 5,
                 lines_of_code: total_lines,
                 complexity_sum: 0,
-                god_object_score,
+                god_object_score: Score0To100::new(god_object_score),
                 recommended_splits: Vec::new(),
                 confidence: crate::organization::GodObjectConfidence::Possible,
                 responsibilities: Vec::new(),
@@ -518,7 +519,7 @@ mod tests {
         assert!(function_god.is_some());
         let function_god = function_god.unwrap();
         assert!(function_god.is_god_object);
-        assert_eq!(function_god.god_object_score, 1.2); // 60/50 = 1.2
+        assert_eq!(function_god.god_object_score, Score0To100::new(1.2)); // 60/50 = 1.2
         assert_eq!(function_god.method_count, 60);
 
         // Test god object by line count
@@ -533,7 +534,7 @@ mod tests {
         assert!(extreme_god.is_some());
         let extreme_god = extreme_god.unwrap();
         assert!(extreme_god.is_god_object);
-        assert_eq!(extreme_god.god_object_score, 2.0); // Capped at 2.0
+        assert_eq!(extreme_god.god_object_score, Score0To100::new(2.0)); // Capped at 2.0
     }
 
     #[test]

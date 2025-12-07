@@ -255,9 +255,9 @@ fn test_well_tested_simple_function_has_low_score() {
     if let Some(item) = simple_func {
         // Score should be below 20.0 (as per spec 109)
         assert!(
-            item.unified_score.final_score < 20.0,
+            item.unified_score.final_score.value() < 20.0,
             "Well-tested simple function should score < 20.0, got {}",
-            item.unified_score.final_score
+            item.unified_score.final_score.value()
         );
     }
 }

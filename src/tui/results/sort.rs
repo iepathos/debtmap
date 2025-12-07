@@ -74,12 +74,12 @@ pub fn sort_indices(indices: &mut [usize], analysis: &UnifiedAnalysis, criteria:
                 let score_a = analysis
                     .items
                     .get(a)
-                    .map(|item| item.unified_score.final_score)
+                    .map(|item| item.unified_score.final_score.value())
                     .unwrap_or(0.0);
                 let score_b = analysis
                     .items
                     .get(b)
-                    .map(|item| item.unified_score.final_score)
+                    .map(|item| item.unified_score.final_score.value())
                     .unwrap_or(0.0);
 
                 match score_b.partial_cmp(&score_a).unwrap_or(Ordering::Equal) {

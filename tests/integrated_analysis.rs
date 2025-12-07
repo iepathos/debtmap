@@ -151,7 +151,7 @@ fn test_analyze_simple_code() {
         responsibility_count: 1,
         lines_of_code: 50,
         complexity_sum: 2,
-        god_object_score: 10.0,
+        god_object_score: debtmap::priority::score_types::Score0To100::new(10.0),
         recommended_splits: vec![],
         confidence: debtmap::organization::GodObjectConfidence::NotGodObject,
         responsibilities: vec!["Example".to_string()],
@@ -211,7 +211,7 @@ fn test_timeout_budget() {
         responsibility_count: 3,
         lines_of_code: 200,
         complexity_sum: 10,
-        god_object_score: 60.0, // Above threshold
+        god_object_score: debtmap::priority::score_types::Score0To100::new(60.0), // Above threshold
         recommended_splits: vec![],
         confidence: debtmap::organization::GodObjectConfidence::Probable,
         responsibilities: vec!["Complex".to_string()],

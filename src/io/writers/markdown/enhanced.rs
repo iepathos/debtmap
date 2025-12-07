@@ -176,7 +176,7 @@ fn format_priority_table_header(item_count: usize) -> String {
 /// # Returns
 /// A string containing the markdown table row with newline
 fn format_priority_table_row(rank: usize, item: &UnifiedDebtItem) -> String {
-    let score = format!("{:.1}", item.unified_score.final_score);
+    let score = format!("{:.1}", item.unified_score.final_score.value());
     let location = format!("{}:{}", item.location.file.display(), item.location.line);
     let debt_type = format_debt_type(&item.debt_type);
     let issue = format_debt_issue(&item.debt_type);
@@ -323,6 +323,7 @@ fn format_score_factors(score: &crate::priority::unified_scorer::UnifiedScore) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
     use crate::priority::{ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics};
 
@@ -334,7 +335,7 @@ mod tests {
                 function: function_name.to_string(),
             },
             unified_score: UnifiedScore {
-                final_score,
+                final_score: Score0To100::new(final_score),
                 complexity_factor: 0.8,
                 coverage_factor: 0.6,
                 dependency_factor: 0.5,
@@ -480,7 +481,7 @@ mod tests {
     #[test]
     fn test_format_score_factors() {
         let score = UnifiedScore {
-            final_score: 7.89,
+            final_score: Score0To100::new(7.89),
             complexity_factor: 0.85,
             coverage_factor: 0.65,
             dependency_factor: 0.45,
@@ -581,7 +582,7 @@ mod tests {
     #[test]
     fn test_format_score_factors_precision() {
         let score = UnifiedScore {
-            final_score: 7.899999,
+            final_score: Score0To100::new(7.899999),
             complexity_factor: 0.855555,
             coverage_factor: 0.654321,
             dependency_factor: 0.456789,

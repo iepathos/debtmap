@@ -11,6 +11,7 @@ use super::classification_types::*;
 use super::core_types::GodObjectAnalysis;
 use crate::common::UnifiedLocationExtractor;
 use crate::organization::{MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector};
+use crate::priority::score_types::Score0To100;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -371,7 +372,7 @@ impl GodObjectDetector {
             responsibility_count,
             lines_of_code,
             complexity_sum,
-            god_object_score,
+            god_object_score: Score0To100::new(god_object_score),
             recommended_splits,
             confidence,
             responsibilities,

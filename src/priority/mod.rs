@@ -15,6 +15,7 @@ pub mod parallel_call_graph;
 pub mod pipeline;
 pub mod refactoring_impact;
 pub mod score_formatter;
+pub mod score_types;
 pub mod scoring;
 pub mod semantic_classifier;
 pub mod tiers;
@@ -37,6 +38,7 @@ pub use formatter_markdown::{
     format_priorities_tiered_markdown,
 };
 pub use pipeline::{analyze_and_filter, filter_sort_limit, sort_by_score, take_top};
+pub use score_types::{Score0To1, Score0To100};
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use tiers::{classify_tier, RecommendationTier, TierConfig};
 pub use unified_analysis_queries::UnifiedAnalysisQueries;
@@ -265,7 +267,7 @@ pub enum DebtType {
         methods: u32,
         fields: u32,
         responsibilities: u32,
-        god_object_score: f64,
+        god_object_score: Score0To100,
     },
     GodModule {
         functions: u32,
@@ -471,7 +473,7 @@ impl std::hash::Hash for DebtType {
                 methods.hash(state);
                 fields.hash(state);
                 responsibilities.hash(state);
-                god_object_score.to_bits().hash(state);
+                god_object_score.value().to_bits().hash(state);
             }
             DebtType::GodModule {
                 functions,
@@ -769,7 +771,7 @@ impl DebtItem {
     pub fn score(&self) -> f64 {
         match self {
             DebtItem::File(item) => item.score,
-            DebtItem::Function(item) => item.unified_score.final_score,
+            DebtItem::Function(item) => item.unified_score.final_score.value(),
         }
     }
 
@@ -874,7 +876,7 @@ impl UnifiedAnalysis {
 
         for item in &self.items {
             // Sum up all final scores as the total debt score
-            total_debt_score += item.unified_score.final_score;
+            total_debt_score += item.unified_score.final_score.value();
 
             // Use cached file line count from item if available (spec 204)
             if let Some(line_count) = item.file_line_count {
@@ -968,7 +970,7 @@ impl UnifiedAnalysis {
         // Recalculate totals for filtered set
         let total_debt_score: f64 = filtered_items
             .iter()
-            .map(|item| item.unified_score.final_score)
+            .map(|item| item.unified_score.final_score.value())
             .sum();
 
         Self {
@@ -1001,7 +1003,7 @@ impl UnifiedAnalysis {
             .iter()
             .filter(|item| {
                 // Filter by score
-                if item.unified_score.final_score < min_score {
+                if item.unified_score.final_score.value() < min_score {
                     return false;
                 }
 
@@ -1031,7 +1033,7 @@ impl UnifiedAnalysis {
         // Recalculate total debt score for filtered items
         let function_debt_score: f64 = filtered_items
             .iter()
-            .map(|item| item.unified_score.final_score)
+            .map(|item| item.unified_score.final_score.value())
             .sum();
 
         let file_debt_score: f64 = filtered_file_items.iter().map(|item| item.score).sum();
@@ -1067,7 +1069,7 @@ mod tests {
 
     #[test]
     fn test_debtitem_file_roundtrip() {
-        use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact};
         use std::path::PathBuf;
 
         // Create a File debt item
@@ -1261,7 +1263,7 @@ mod tests {
                 coverage_factor: 10.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

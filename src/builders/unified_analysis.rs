@@ -10,6 +10,7 @@ use crate::{
         debt_aggregator::DebtAggregator,
         debt_aggregator::FunctionId as AggregatorFunctionId,
         file_metrics::{FileDebtItem, FileDebtMetrics},
+        score_types::Score0To100,
         scoring::debt_item,
         unified_scorer::Location,
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, UnifiedAnalysis,
@@ -1112,7 +1113,7 @@ fn convert_error_swallowing_to_unified(
                 coverage_factor: 5.0,
                 dependency_factor: 4.0,
                 role_multiplier: 1.2,
-                final_score: 5.5,
+                final_score: Score0To100::new(5.5),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -1464,9 +1465,10 @@ fn detect_god_object_analysis(
         // If we have an existing analysis, update it
         if let Some(ref mut analysis) = god_analysis {
             analysis.is_god_object = true;
-            if analysis.god_object_score == 0.0 {
-                analysis.god_object_score =
-                    ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0;
+            if analysis.god_object_score == Score0To100::new(0.0) {
+                analysis.god_object_score = Score0To100::new(
+                    ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0,
+                );
             }
         } else {
             // Create new minimal analysis for size-based detection
@@ -1477,7 +1479,9 @@ fn detect_god_object_analysis(
                 responsibility_count: 0,
                 lines_of_code: actual_line_count,
                 complexity_sum: file_metrics.total_complexity,
-                god_object_score: ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0,
+                god_object_score: Score0To100::new(
+                    ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0,
+                ),
                 recommended_splits: Vec::new(),
                 confidence: crate::organization::GodObjectConfidence::Probable,
                 responsibilities: Vec::new(),
@@ -1531,11 +1535,11 @@ pub fn create_god_object_debt_item(
     god_analysis: &crate::organization::GodObjectAnalysis,
 ) -> UnifiedDebtItem {
     // Calculate unified score based on god object score (0-100 scale)
-    let base_score = god_analysis.god_object_score;
+    let base_score = god_analysis.god_object_score.value();
     let tier = if base_score >= 50.0 { 1 } else { 2 };
 
     let unified_score = UnifiedScore {
-        final_score: base_score,
+        final_score: Score0To100::new(base_score),
         complexity_factor: file_metrics.total_complexity as f64 / 10.0,
         coverage_factor: 0.0, // File-level item, no coverage score
         dependency_factor: calculate_god_object_risk(god_analysis) / 10.0,
