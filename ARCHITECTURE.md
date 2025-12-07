@@ -3024,6 +3024,87 @@ Analyzing: src/processor.rs
   Classification: GOD MODULE
 ```
 
+### Git Context Analysis for God Objects (Spec 248)
+
+God objects can be enriched with file-level git context to provide historical risk assessment. This feature analyzes the git history of files containing god objects to surface patterns like high churn, bug-proneness, and multi-author complexity.
+
+#### File-Level Git Context Approach
+
+**Key Design Decision**: Git context is analyzed at the **file level** for god objects, not at the member (method/field) level.
+
+**Rationale**:
+1. **God objects ARE files**: When a struct dominates a file with >20 methods and >5 fields, the file and the god object are effectively the same unit of analysis
+2. **Aggregation is unnecessary**: For god objects, file-level metrics directly represent the god object's risk profile
+3. **Simplicity**: Direct file analysis avoids complex member-level git blame and aggregation logic
+4. **Accuracy**: File-level metrics (commits, authors, age) meaningfully describe god object evolution
+
+**Data Flow**:
+```
+1. God Object Detection
+   └─> Identify file containing god object (e.g., src/controller.rs)
+
+2. File-Level Git Context Analysis
+   └─> analyze_file_git_context(file_path, risk_analyzer, project_root)
+       └─> Returns ContextualRisk with git_history metrics
+
+3. Attach to God Object
+   └─> UnifiedDebtItem.contextual_risk = Some(contextual_risk)
+
+4. Display in TUI
+   └─> Show git metrics in god object detail view
+```
+
+**Implementation Location**: `src/builders/unified_analysis.rs:1707`
+
+**Key Function**:
+```rust
+pub fn analyze_file_git_context(
+    file_path: &Path,
+    risk_analyzer: &risk::RiskAnalyzer,
+    project_root: &Path,
+) -> Option<risk::context::ContextualRisk>
+```
+
+This pure function:
+- Takes a file path and risk analyzer with git context provider
+- Returns `None` if git context is disabled or unavailable
+- Returns `Some(ContextualRisk)` with git history metrics when available
+- Is called during god object aggregation to enrich items with contextual risk
+
+#### Git Metrics for God Objects
+
+When git context is enabled (`--enable-context`), god objects display the following file-level metrics:
+
+| Metric | Description | Risk Indication |
+|--------|-------------|-----------------|
+| **change_frequency** | Commits per day over file lifetime | High frequency = active pain point |
+| **bug_density** | Ratio of bug-fix commits to total commits | High density = error-prone code |
+| **author_count** | Number of distinct authors | High count = complex ownership |
+| **age_days** | Days since file creation | Young + complex = rapid growth issues |
+
+**Example Output** (with git context):
+```
+#3 SCORE: 7.5 [HIGH]
+├─ GOD OBJECT: src/controller.rs
+├─ TYPE: UserController (52 methods, 8 fields)
+├─ Git Context:
+│  ├─ Change Frequency: 2.5 commits/day (HIGH CHURN)
+│  ├─ Bug Density: 0.35 (35% of commits fix bugs)
+│  ├─ Authors: 8 contributors
+│  └─ Age: 180 days (active development)
+├─ ACTION: Extract responsibilities into focused classes
+└─ WHY: Single class with too many methods, high churn indicates pain
+```
+
+#### Integration with Risk Scoring
+
+File-level git context contributes to the overall risk score through the `contextual_risk` field:
+- **Risk boost**: High change frequency or bug density can increase priority
+- **Context type**: `git_history` context type indicates historical risk
+- **Confidence**: Git metrics have high confidence when sufficient history exists (>10 commits)
+
+This contextual information helps prioritize god objects that are not just large, but also actively causing problems as evidenced by their git history.
+
 ### Semantic Module Naming (Spec 191)
 
 When splitting god objects, debtmap automatically generates descriptive, meaningful module names based on the methods in each split. This feature ensures that refactored code has clear, domain-appropriate naming without manual intervention.

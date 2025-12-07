@@ -1120,8 +1120,29 @@ impl ParallelUnifiedAnalysisBuilder {
                             item_metrics.upstream_dependencies;
                         aggregated_metrics.downstream_dependencies =
                             item_metrics.downstream_dependencies;
+
+                        // Spec 248: Prefer direct file-level git analysis over member aggregation
+                        aggregated_metrics.aggregated_contextual_risk = self
+                            .risk_analyzer
+                            .as_ref()
+                            .and_then(|analyzer| {
+                                crate::builders::unified_analysis::analyze_file_git_context(
+                                    &file_item.metrics.path,
+                                    analyzer,
+                                    &self.project_path,
+                                )
+                            })
+                            .or(item_metrics.aggregated_contextual_risk); // Fallback to member aggregation
+                    } else {
+                        // Spec 248: When no member functions, try direct file analysis
                         aggregated_metrics.aggregated_contextual_risk =
-                            item_metrics.aggregated_contextual_risk;
+                            self.risk_analyzer.as_ref().and_then(|analyzer| {
+                                crate::builders::unified_analysis::analyze_file_git_context(
+                                    &file_item.metrics.path,
+                                    analyzer,
+                                    &self.project_path,
+                                )
+                            });
                     }
                     // If member_functions is empty, dependencies remain at 0 (no debt items = no deps to show)
 
