@@ -1529,15 +1529,23 @@ pub fn create_god_object_debt_item(
     file_path: &Path,
     file_metrics: &FileDebtMetrics,
     god_analysis: &crate::organization::GodObjectAnalysis,
+    aggregated_metrics: crate::priority::GodObjectAggregatedMetrics,
 ) -> UnifiedDebtItem {
     // Calculate unified score based on god object score (0-100 scale)
     let base_score = god_analysis.god_object_score;
     let tier = if base_score >= 50.0 { 1 } else { 2 };
 
+    // Use aggregated coverage in score calculation
+    let coverage_factor = aggregated_metrics
+        .weighted_coverage
+        .as_ref()
+        .map(|cov| (1.0 - cov.direct) * 10.0)
+        .unwrap_or(0.0);
+
     let unified_score = UnifiedScore {
         final_score: base_score,
         complexity_factor: file_metrics.total_complexity as f64 / 10.0,
-        coverage_factor: 0.0, // File-level item, no coverage score
+        coverage_factor,
         dependency_factor: calculate_god_object_risk(god_analysis) / 10.0,
         role_multiplier: 1.0,
         base_score: Some(base_score),
@@ -1602,15 +1610,15 @@ pub fn create_god_object_debt_item(
         function_role: FunctionRole::Unknown, // Not applicable for file-level items
         recommendation,
         expected_impact,
-        transitive_coverage: None,
-        upstream_dependencies: 0,
-        downstream_dependencies: 0,
-        upstream_callers: Vec::new(),
-        downstream_callees: Vec::new(),
-        nesting_depth: 0,
+        transitive_coverage: aggregated_metrics.weighted_coverage,
+        upstream_dependencies: aggregated_metrics.upstream_dependencies,
+        downstream_dependencies: aggregated_metrics.downstream_dependencies,
+        upstream_callers: aggregated_metrics.unique_upstream_callers,
+        downstream_callees: aggregated_metrics.unique_downstream_callees,
+        nesting_depth: aggregated_metrics.max_nesting_depth,
         function_length: god_analysis.lines_of_code,
-        cyclomatic_complexity: 0, // File-level metric, not function-level
-        cognitive_complexity: 0,  // File-level metric, not function-level
+        cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
+        cognitive_complexity: aggregated_metrics.total_cognitive,
         entropy_details: None,
         entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
@@ -1629,7 +1637,7 @@ pub fn create_god_object_debt_item(
         context_type: None,
         language_specific: None,
         detected_pattern: None,
-        contextual_risk: None,
+        contextual_risk: aggregated_metrics.aggregated_contextual_risk,
         file_line_count: Some(god_analysis.lines_of_code),
     }
 }
@@ -1682,16 +1690,26 @@ fn apply_file_analysis_results(
     unified: &mut UnifiedAnalysis,
     processed_files: Vec<ProcessedFileData>,
 ) {
+    use crate::priority::god_object_aggregation::{
+        aggregate_god_object_metrics, extract_member_functions,
+    };
+
     for file_data in processed_files {
         // Update god object indicators for functions in this file
         if let Some(god_analysis) = &file_data.god_analysis {
             update_function_god_indicators(unified, &file_data.file_path, god_analysis);
+
+            // NEW (spec 244): Extract and aggregate member function metrics
+            let member_functions =
+                extract_member_functions(unified.items.iter(), &file_data.file_path);
+            let aggregated_metrics = aggregate_god_object_metrics(&member_functions);
 
             // NEW (spec 207): Create god object debt item for TUI display
             let god_item = create_god_object_debt_item(
                 &file_data.file_path,
                 &file_data.file_metrics,
                 god_analysis,
+                aggregated_metrics,
             );
             unified.add_item(god_item); // Exempt from complexity filtering (spec 207)
         }

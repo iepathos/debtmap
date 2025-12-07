@@ -1063,11 +1063,20 @@ impl ParallelUnifiedAnalysisBuilder {
             // Check if this file has god object analysis
             if let Some(ref god_analysis) = file_item.metrics.god_object_analysis {
                 if god_analysis.is_god_object {
+                    // NEW (spec 244): Extract and aggregate member function metrics
+                    use crate::priority::god_object_aggregation::{
+                        aggregate_god_object_metrics, extract_member_functions,
+                    };
+                    let member_functions =
+                        extract_member_functions(unified.items.iter(), &file_item.metrics.path);
+                    let aggregated_metrics = aggregate_god_object_metrics(&member_functions);
+
                     // Create god object UnifiedDebtItem using same function as sequential path
                     let god_item = crate::builders::unified_analysis::create_god_object_debt_item(
                         &file_item.metrics.path,
                         &file_item.metrics,
                         god_analysis,
+                        aggregated_metrics,
                     );
                     unified.add_item(god_item);
                 }

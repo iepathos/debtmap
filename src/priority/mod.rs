@@ -946,6 +946,32 @@ impl UnifiedAnalysis {
             0.0
         };
 
+        // Debug: Log score breakdown
+        if std::env::var("DEBTMAP_DEBUG_SCORING").is_ok() {
+            eprintln!("\n=== Score Calculation Debug ===");
+            eprintln!("Function-level items count: {}", self.items.len());
+            eprintln!("File-level items count: {}", self.file_items.len());
+            eprintln!("God object files: {}", god_object_files.len());
+            eprintln!("Total debt score: {:.0}", total_debt_score);
+            eprintln!("Average per function item: {:.1}",
+                if self.items.is_empty() { 0.0 } else { total_debt_score / self.items.len() as f64 });
+
+            // Show top 10 scores
+            let mut sorted_items: Vec<_> = self.items.iter().collect();
+            sorted_items.sort_by(|a, b| b.unified_score.final_score.partial_cmp(&a.unified_score.final_score).unwrap());
+            eprintln!("\nTop 10 scores:");
+            for (i, item) in sorted_items.iter().take(10).enumerate() {
+                eprintln!("  {}: {:.1} - {:?} at {}::{}",
+                    i + 1,
+                    item.unified_score.final_score,
+                    item.debt_type,
+                    item.location.file.display(),
+                    item.location.function
+                );
+            }
+            eprintln!("===============================\n");
+        }
+
         self.total_debt_score = total_debt_score;
         self.total_lines_of_code = total_lines_of_code;
         self.debt_density = debt_density;
