@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Values are automatically clamped to the [0.0, 100.0] range.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct Score0To100(f64);
 
 impl Score0To100 {
@@ -86,6 +87,7 @@ impl Score0To100 {
 ///
 /// Values are automatically clamped to the [0.0, 1.0] range.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct Score0To1(f64);
 
 impl Score0To1 {

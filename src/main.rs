@@ -1580,6 +1580,7 @@ fn json_to_analysis(
         overall_coverage: json.overall_coverage,
         has_coverage_data: json.overall_coverage.is_some(),
         timings: None,
+        stats: debtmap::priority::FilterStatistics::new(),
     }
 }
 
