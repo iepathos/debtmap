@@ -76,9 +76,7 @@ fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
 
 /// Create variable names for translation
 fn create_var_names(num_vars: usize) -> Vec<String> {
-    (0..num_vars)
-        .map(|i| format!("var_{}", i))
-        .collect()
+    (0..num_vars).map(|i| format!("var_{}", i)).collect()
 }
 
 /// Benchmark: Memory overhead of translation layer
@@ -99,30 +97,52 @@ fn bench_memory_overhead(c: &mut Criterion) {
         let with_context_size = mem::size_of_val(&ctx);
 
         // Calculate overhead percentage
-        let overhead_pct = ((with_context_size as f64 - baseline_size as f64) / baseline_size as f64) * 100.0;
+        let overhead_pct =
+            ((with_context_size as f64 - baseline_size as f64) / baseline_size as f64) * 100.0;
 
         // Log the results for manual verification
-        eprintln!("Variables: {}, Baseline: {} bytes, With context: {} bytes, Overhead: {:.2}%",
-                  num_vars, baseline_size, with_context_size, overhead_pct);
+        eprintln!(
+            "Variables: {}, Baseline: {} bytes, With context: {} bytes, Overhead: {:.2}%",
+            num_vars, baseline_size, with_context_size, overhead_pct
+        );
 
         // Benchmark translation operations
         group.bench_function(&format!("translate_{}_vars", num_vars), |b| {
             let ctx = CfgAnalysisWithContext::new(var_names.clone(), analysis.clone());
             b.iter(|| {
                 // Simulate translating dead stores
-                let dead_stores: Vec<_> = ctx.analysis.liveness.dead_stores.iter().copied().collect();
+                let dead_stores: Vec<_> =
+                    ctx.analysis.liveness.dead_stores.iter().copied().collect();
                 black_box(ctx.var_names_for(dead_stores.into_iter()));
 
                 // Simulate translating escaping vars
-                let escaping: Vec<_> = ctx.analysis.escape_info.escaping_vars.iter().copied().collect();
+                let escaping: Vec<_> = ctx
+                    .analysis
+                    .escape_info
+                    .escaping_vars
+                    .iter()
+                    .copied()
+                    .collect();
                 black_box(ctx.var_names_for(escaping.into_iter()));
 
                 // Simulate translating return dependencies
-                let return_deps: Vec<_> = ctx.analysis.escape_info.return_dependencies.iter().copied().collect();
+                let return_deps: Vec<_> = ctx
+                    .analysis
+                    .escape_info
+                    .return_dependencies
+                    .iter()
+                    .copied()
+                    .collect();
                 black_box(ctx.var_names_for(return_deps.into_iter()));
 
                 // Simulate translating tainted vars
-                let tainted: Vec<_> = ctx.analysis.taint_info.tainted_vars.iter().copied().collect();
+                let tainted: Vec<_> = ctx
+                    .analysis
+                    .taint_info
+                    .tainted_vars
+                    .iter()
+                    .copied()
+                    .collect();
                 black_box(ctx.var_names_for(tainted.into_iter()));
             });
         });
