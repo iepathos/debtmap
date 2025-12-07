@@ -130,7 +130,7 @@ impl App {
         }
     }
 
-    /// Create the default 8-stage pipeline structure
+    /// Create the default 6-stage pipeline structure
     fn create_default_stages() -> Vec<PipelineStage> {
         vec![
             PipelineStage::with_subtasks(
@@ -248,12 +248,12 @@ impl App {
                     },
                 ],
             ),
-            // Stage 7: Debt scoring (index 6 due to 0-based indexing)
+            // Stage 6: Debt scoring and prioritization (index 5 due to 0-based indexing)
             // Breaks down the debt scoring process into 4 subsections:
             // 1. Initialize scoring structures
             // 2. Aggregate debt from all sources
             // 3. Score individual functions based on debt
-            // 4. Filter and rank results by severity
+            // 4. Filter and rank results by severity (includes prioritization)
             PipelineStage::with_subtasks(
                 "debt scoring",
                 vec![
@@ -279,7 +279,6 @@ impl App {
                     },
                 ],
             ),
-            PipelineStage::new("prioritization"),
         ]
     }
 
@@ -371,7 +370,7 @@ mod tests {
     #[test]
     fn test_app_creation() {
         let app = App::new();
-        assert_eq!(app.stages.len(), 7); // 7 stages (files and parse combined)
+        assert_eq!(app.stages.len(), 6); // 6 stages
         assert_eq!(app.overall_progress, 0.0);
         assert_eq!(app.current_stage, 0);
     }

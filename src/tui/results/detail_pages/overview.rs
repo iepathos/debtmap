@@ -169,14 +169,14 @@ pub fn render(
         area.width,
     );
 
-    // For non-god objects, show function length
+    // For non-god objects, show function LOC
     if !matches!(
         item.debt_type,
         DebtType::GodObject { .. } | DebtType::GodModule { .. }
     ) {
         add_label_value(
             &mut lines,
-            "length",
+            "loc",
             item.function_length.to_string(),
             theme,
             area.width,

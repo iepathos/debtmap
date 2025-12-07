@@ -345,12 +345,12 @@ fn perform_unified_analysis_computation(
     if let Some(manager) = crate::progress::ProgressManager::global() {
         let metric = if enable_context { "loaded" } else { "skipped" };
         manager.tui_complete_stage(4, metric);
-        manager.tui_set_progress(0.71); // ~5/7 stages complete
+        manager.tui_set_progress(0.83); // 5/6 stages complete
     }
 
-    // Stage 6: Debt scoring (index 5 in TUI)
+    // Stage 6: Debt scoring and prioritization (index 5 in TUI)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(5); // debt scoring stage
+        manager.tui_start_stage(5); // debt scoring and prioritization stage
     }
 
     // Show spinner for the main debt analysis computation
@@ -381,13 +381,6 @@ fn perform_unified_analysis_computation(
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_complete_stage(5, format!("{} items scored", result.items.len()));
-        manager.tui_set_progress(0.86); // ~6/7 stages complete
-    }
-
-    // Stage 7: Prioritization (index 6 in TUI - final stage)
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_start_stage(6); // prioritization stage
-        manager.tui_complete_stage(6, "complete");
         manager.tui_set_progress(1.0); // 100% complete
     }
 

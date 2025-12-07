@@ -171,9 +171,19 @@ impl ResultsApp {
 
     /// Get the currently selected item
     pub fn selected_item(&self) -> Option<&UnifiedDebtItem> {
-        self.filtered_indices
-            .get(self.selected_index)
-            .and_then(|&idx| self.analysis.items.get(idx))
+        if self.show_grouped {
+            // When grouped, selected_index refers to group index, not item index
+            let groups = super::grouping::group_by_location(self.filtered_items(), self.sort_by);
+            groups.get(self.selected_index).and_then(|group| {
+                // Return the first item from the group (groups always have at least 1 item)
+                group.items.first().copied()
+            })
+        } else {
+            // When not grouped, selected_index refers to filtered_indices
+            self.filtered_indices
+                .get(self.selected_index)
+                .and_then(|&idx| self.analysis.items.get(idx))
+        }
     }
 
     /// Get all filtered items
@@ -184,8 +194,14 @@ impl ResultsApp {
     }
 
     /// Get total item count (filtered)
+    /// Returns group count when grouped, item count otherwise
     pub fn item_count(&self) -> usize {
-        self.filtered_indices.len()
+        if self.show_grouped {
+            let groups = super::grouping::group_by_location(self.filtered_items(), self.sort_by);
+            groups.len()
+        } else {
+            self.filtered_indices.len()
+        }
     }
 
     /// Get selected index

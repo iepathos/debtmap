@@ -161,25 +161,22 @@ The rendering is fast because:
 
 ## Pipeline Stages
 
-### Current 9-Stage Pipeline
+### Current 6-Stage Pipeline
 
 The TUI displays these stages in order:
 
 | Index | Name             | Description                              |
 |-------|------------------|------------------------------------------|
-| 0     | files            | File discovery                           |
-| 1     | parse            | AST parsing                              |
-| 2     | call graph       | Function call graph construction         |
-| 3     | trait resolution | Rust trait method resolution             |
-| 4     | coverage         | Test coverage data loading               |
-| 5     | purity analysis  | Function purity and side effect analysis |
-| 6     | context          | Project context loading                  |
-| 7     | debt scoring     | Technical debt calculation               |
-| 8     | prioritization   | Final prioritization and ranking         |
+| 0     | files parse      | File discovery and parsing               |
+| 1     | call graph       | Function call graph construction         |
+| 2     | coverage         | Test coverage data loading               |
+| 3     | purity analysis  | Function purity and side effect analysis |
+| 4     | context          | Project context loading                  |
+| 5     | debt scoring     | Technical debt calculation and prioritization |
 
 ### Stage with Sub-Tasks: Purity Analysis
 
-The purity analysis stage (index 5) has hierarchical sub-tasks:
+The purity analysis stage (index 3) has hierarchical sub-tasks:
 
 ```rust
 PipelineStage::with_subtasks(
