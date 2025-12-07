@@ -186,62 +186,59 @@ fn render_pipeline_compact(
     frame.render_widget(Paragraph::new(lines), area);
 }
 
-/// Render a sub-task line with progress
+/// Render a sub-task line with right-aligned metrics.
+///
+/// Uses whitespace-based layout following the "futuristic zen minimalism" design principle:
+/// - Sub-task name on the left with 4-space indentation
+/// - Metric (progress count or "done") right-aligned with pure whitespace gap
+/// - No decorative elements (dots, progress bars, animations)
+///
+/// Three display modes based on status:
+/// - Completed: name + whitespace + "done" (in completed style)
+/// - Active with progress: name + whitespace + "125/450" (in metric style)
+/// - Pending or no progress: name only
 fn render_subtask_line(
     subtask: &SubTask,
-    frame: usize,
+    _frame: usize, // No longer used - sub-task animations removed for clarity
     theme: &Theme,
     width: u16,
 ) -> Line<'static> {
-    let indent = "    ";
-    let name_with_indent = format!("{}{}", indent, subtask.name);
+    const INDENT: &str = "    ";
+    let name_with_indent = format!("{}{}", INDENT, subtask.name);
 
     match subtask.status {
         StageStatus::Completed => {
-            // Dotted leader to "done"
-            // Account for: space (1) + dots + space (1) + "done" (4) + alignment (4) = 10 total
-            // The extra 4 ensures "done" ends at width - 2, matching main section metrics
-            let dots_needed = width.saturating_sub((name_with_indent.len() + 10) as u16) as usize;
+            // Right-align "done" with whitespace
+            let metric = "done";
+            let spacing_needed =
+                width.saturating_sub((name_with_indent.len() + metric.len()) as u16) as usize;
+
             Line::from(vec![
                 Span::raw(name_with_indent),
-                Span::raw(" "),
-                Span::styled("·".repeat(dots_needed), theme.dotted_leader_style()),
-                Span::styled(" done", theme.completed_style()),
+                Span::raw(" ".repeat(spacing_needed)),
+                Span::styled(metric, theme.completed_style()),
             ])
         }
         StageStatus::Active => {
             if let Some((current, total)) = subtask.progress {
-                let progress = current as f64 / total as f64;
-                let bar_width: usize = 30;
-                let filled = (progress * bar_width as f64) as usize;
-                let empty = bar_width.saturating_sub(filled);
-
-                // Animate arrows
-                let arrow = match (frame / 3) % 3 {
-                    0 => "▸",
-                    1 => "▹",
-                    _ => "▸",
-                };
+                // Right-align numeric count with whitespace
+                let metric = format!("{}/{}", current, total);
+                let spacing_needed =
+                    width.saturating_sub((name_with_indent.len() + metric.len()) as u16) as usize;
 
                 Line::from(vec![
                     Span::raw(name_with_indent),
-                    Span::raw(" "),
-                    Span::styled(arrow.repeat(filled), theme.arrow_style()),
-                    Span::styled("·".repeat(empty), theme.dotted_leader_style()),
-                    Span::raw(" "),
-                    Span::styled(format!("{}/{}", current, total), theme.metric_style()),
+                    Span::raw(" ".repeat(spacing_needed)),
+                    Span::styled(metric, theme.metric_style()),
                 ])
             } else {
+                // No progress data - show name only
                 Line::from(Span::raw(name_with_indent))
             }
         }
         StageStatus::Pending => {
-            // Reduce dots by 4 to align with completed/main section metrics
-            let dots_needed = width.saturating_sub((name_with_indent.len() + 4) as u16) as usize;
-            Line::from(vec![
-                Span::raw(name_with_indent),
-                Span::styled("·".repeat(dots_needed), theme.dotted_leader_style()),
-            ])
+            // Show name only - no trailing indicators
+            Line::from(Span::raw(name_with_indent))
         }
     }
 }
