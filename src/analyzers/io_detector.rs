@@ -44,7 +44,10 @@
 //! - Type inference is limited to same-function scope
 
 use crate::data_flow::IoOperation;
-use syn::{spanned::Spanned, visit::Visit, Expr, ExprCall, ExprMethodCall, ItemFn, Macro};
+use syn::{
+    punctuated::Punctuated, spanned::Spanned, token::Comma, visit::Visit, Expr, ExprCall,
+    ExprMethodCall, ItemFn, Macro, Member,
+};
 
 /// Pattern for matching I/O operations
 #[derive(Debug)]
@@ -363,6 +366,35 @@ impl IoDetectorVisitor {
         }
     }
 
+    /// Extract variables from expression arguments
+    fn extract_variables_from_args(&self, args: &Punctuated<Expr, Comma>) -> Vec<String> {
+        let mut vars = Vec::new();
+        for arg in args {
+            collect_variables_from_expr(arg, &mut vars, 0);
+        }
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+
+    /// Extract variables from macro tokens (heuristic-based)
+    fn extract_variables_from_macro(&self, mac: &Macro) -> Vec<String> {
+        let mut vars = Vec::new();
+        let token_str = mac.tokens.to_string();
+
+        // Split on common delimiters and extract identifiers
+        for token in token_str.split(&[',', ' ', '{', '}', '(', ')', '[', ']', ':', ';'][..]) {
+            let trimmed = token.trim();
+            if is_valid_identifier(trimmed) && !is_literal_or_keyword(trimmed) {
+                vars.push(trimmed.to_string());
+            }
+        }
+
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+
     /// Handle macro invocations
     fn handle_macro(&mut self, mac: &Macro) {
         let path = &mac.path;
@@ -372,9 +404,10 @@ impl IoDetectorVisitor {
         for &macro_name in CONSOLE_IO_MACROS {
             if path_str.ends_with(macro_name) {
                 let line = self.extract_line(path.segments.span());
+                let variables = self.extract_variables_from_macro(mac);
                 self.operations.push(IoOperation {
                     operation_type: "console".to_string(),
-                    variables: vec![],
+                    variables,
                     line,
                 });
                 return;
@@ -386,9 +419,10 @@ impl IoDetectorVisitor {
             && path_str.contains("std::io")
         {
             let line = self.extract_line(path.segments.span());
+            let variables = self.extract_variables_from_macro(mac);
             self.operations.push(IoOperation {
                 operation_type: "console".to_string(),
-                variables: vec![],
+                variables,
                 line,
             });
         }
@@ -405,9 +439,19 @@ impl<'ast> Visit<'ast> for IoDetectorVisitor {
         // Check against patterns
         if let Some(op_type) = self.check_method_patterns(&method_name, receiver_type.as_deref()) {
             let line = self.extract_line(method_call.method.span());
+
+            // Extract variables from receiver and arguments
+            let mut variables = Vec::new();
+            collect_variables_from_expr(&method_call.receiver, &mut variables, 0);
+            for arg in &method_call.args {
+                collect_variables_from_expr(arg, &mut variables, 0);
+            }
+            variables.sort();
+            variables.dedup();
+
             self.operations.push(IoOperation {
                 operation_type: op_type.to_string(),
-                variables: vec![],
+                variables,
                 line,
             });
         }
@@ -425,9 +469,10 @@ impl<'ast> Visit<'ast> for IoDetectorVisitor {
             if self.is_io_module_path(&path_str) {
                 if let Some(op_type) = self.operation_type_from_path(&path_str) {
                     let line = self.extract_line(path.span());
+                    let variables = self.extract_variables_from_args(&call.args);
                     self.operations.push(IoOperation {
                         operation_type: op_type.to_string(),
-                        variables: vec![],
+                        variables,
                         line,
                     });
                 }
@@ -442,9 +487,10 @@ impl<'ast> Visit<'ast> for IoDetectorVisitor {
                     if let Some(op_type) = self.check_method_patterns(method_name, Some(type_name))
                     {
                         let line = self.extract_line(path.span());
+                        let variables = self.extract_variables_from_args(&call.args);
                         self.operations.push(IoOperation {
                             operation_type: op_type.to_string(),
-                            variables: vec![],
+                            variables,
                             line,
                         });
                     }
@@ -471,6 +517,127 @@ impl<'ast> Visit<'ast> for IoDetectorVisitor {
         // Continue visiting nested expressions
         syn::visit::visit_expr(self, expr);
     }
+}
+
+/// Recursively collect variable names from an expression
+fn collect_variables_from_expr(expr: &Expr, vars: &mut Vec<String>, depth: usize) {
+    const MAX_DEPTH: usize = 2;
+    if depth > MAX_DEPTH {
+        return;
+    }
+
+    match expr {
+        Expr::Path(path) => {
+            // Extract variable name from path
+            if let Some(ident) = path.path.get_ident() {
+                vars.push(ident.to_string());
+            } else {
+                // Multi-segment path: self.field or module::item
+                let path_str = quote::quote!(#path).to_string();
+                // Only include if it looks like a variable (lowercase start)
+                if let Some(first_char) = path_str.chars().next() {
+                    if first_char.is_lowercase() || path_str.starts_with("self") {
+                        vars.push(path_str);
+                    }
+                }
+            }
+        }
+        Expr::Field(field) => {
+            // field.member access - collect full path
+            collect_variables_from_expr(&field.base, vars, depth + 1);
+            if let Member::Named(name) = &field.member {
+                vars.push(name.to_string());
+            }
+        }
+        Expr::Reference(reference) => {
+            // &expr or &mut expr - unwrap reference
+            collect_variables_from_expr(&reference.expr, vars, depth);
+        }
+        Expr::Unary(unary) => {
+            // *expr, !expr, -expr - unwrap unary
+            collect_variables_from_expr(&unary.expr, vars, depth);
+        }
+        Expr::Call(call) => {
+            // Function call: extract args
+            for arg in &call.args {
+                collect_variables_from_expr(arg, vars, depth + 1);
+            }
+        }
+        Expr::MethodCall(method_call) => {
+            // Receiver and args
+            collect_variables_from_expr(&method_call.receiver, vars, depth + 1);
+            for arg in &method_call.args {
+                collect_variables_from_expr(arg, vars, depth + 1);
+            }
+        }
+        Expr::Index(index) => {
+            // array[index]
+            collect_variables_from_expr(&index.expr, vars, depth + 1);
+            collect_variables_from_expr(&index.index, vars, depth + 1);
+        }
+        // Stop at literals, blocks, closures
+        _ => {}
+    }
+}
+
+/// Check if a string is a valid Rust identifier
+fn is_valid_identifier(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+
+    let mut chars = s.chars();
+    let first = chars.next().unwrap();
+
+    // Must start with letter or underscore
+    if !first.is_alphabetic() && first != '_' {
+        return false;
+    }
+
+    // Rest must be alphanumeric or underscore
+    chars.all(|c| c.is_alphanumeric() || c == '_')
+}
+
+/// Check if a string is a literal or keyword that should not be treated as a variable
+fn is_literal_or_keyword(s: &str) -> bool {
+    // Check if it's a number
+    if s.chars().all(|c| c.is_numeric() || c == '.') {
+        return true;
+    }
+
+    // Check if it's a string literal
+    if s.starts_with('"') || s.starts_with('\'') {
+        return true;
+    }
+
+    // Check common keywords and types
+    matches!(
+        s,
+        "true"
+            | "false"
+            | "None"
+            | "Some"
+            | "Ok"
+            | "Err"
+            | "self"
+            | "Self"
+            | "super"
+            | "crate"
+            | "String"
+            | "Vec"
+            | "Option"
+            | "Result"
+            | "let"
+            | "mut"
+            | "fn"
+            | "if"
+            | "else"
+            | "match"
+            | "for"
+            | "while"
+            | "loop"
+            | "return"
+    )
 }
 
 /// Detect I/O operations in a function's AST
@@ -661,5 +828,236 @@ mod tests {
         let ops = detect_io_operations(&function);
         assert!(ops.len() >= 2); // File::open + BufReader::new
         assert!(ops.iter().all(|op| op.operation_type == "file_io"));
+    }
+
+    // Variable extraction tests
+    #[test]
+    fn test_extract_simple_variable() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                std::fs::write(path, content)?;
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        assert!(ops[0].variables.contains(&"path".to_string()));
+        assert!(ops[0].variables.contains(&"content".to_string()));
+    }
+
+    #[test]
+    fn test_extract_field_access() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                file.write(self.buffer)?;
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        assert!(
+            ops[0].variables.contains(&"buffer".to_string())
+                || ops[0].variables.contains(&"self".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_multiple_args() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                conn.execute(query, params)?;
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        let vars = &ops[0].variables;
+        assert!(vars.contains(&"conn".to_string()));
+        assert!(vars.contains(&"params".to_string()) || vars.contains(&"query".to_string()));
+    }
+
+    #[test]
+    fn test_extract_from_println() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                println!("Value: {}", x);
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        assert!(ops[0].variables.contains(&"x".to_string()));
+    }
+
+    #[test]
+    fn test_extract_multiple_variables_from_macro() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                println!("User {} has status {}", name, status);
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        let vars = &ops[0].variables;
+        assert!(vars.contains(&"name".to_string()));
+        assert!(vars.contains(&"status".to_string()));
+    }
+
+    #[test]
+    fn test_deduplication() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                println!("{} {}", x, x);
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        let x_count = ops[0].variables.iter().filter(|v| *v == "x").count();
+        assert_eq!(x_count, 1); // Deduplicated
+    }
+
+    #[test]
+    fn test_method_chain() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                file.write_all(data.clone())?;
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        assert!(
+            ops[0].variables.contains(&"data".to_string())
+                || ops[0].variables.contains(&"file".to_string())
+        );
+    }
+
+    #[test]
+    fn test_reference_extraction() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                file.write(&buffer)?;
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        assert!(ops[0].variables.contains(&"buffer".to_string()));
+    }
+
+    #[test]
+    fn test_complex_expression() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                println!("{}", calculate(x, y));
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        // Should extract x and y from calculate(x, y)
+        let vars = &ops[0].variables;
+        assert!(vars.contains(&"x".to_string()) || vars.contains(&"y".to_string()));
+    }
+
+    #[test]
+    fn test_no_false_positives_from_literals() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                println!("literal string");
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        // Should not include "literal" or "string" as variables
+        assert!(!ops[0].variables.contains(&"literal".to_string()));
+        assert!(!ops[0].variables.contains(&"string".to_string()));
+    }
+
+    #[test]
+    fn test_integration_file_write_with_variables() {
+        let function: ItemFn = parse_quote! {
+            fn write_data(path: &str, content: String) {
+                std::fs::write(path, content).unwrap();
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation_type, "file_io");
+        assert!(ops[0].variables.contains(&"path".to_string()));
+        assert!(ops[0].variables.contains(&"content".to_string()));
+    }
+
+    #[test]
+    fn test_integration_println_with_variables() {
+        let function: ItemFn = parse_quote! {
+            fn log_status(name: &str, status: i32) {
+                println!("User {} has status {}", name, status);
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        assert!(ops[0].variables.contains(&"name".to_string()));
+        assert!(ops[0].variables.contains(&"status".to_string()));
+    }
+
+    #[test]
+    fn test_integration_network_with_variables() {
+        let function: ItemFn = parse_quote! {
+            fn send_request(url: &str, body: String) {
+                client.post(url).send(body).unwrap();
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert!(!ops.is_empty());
+        // Should have variables from the network operations
+        let all_vars: Vec<String> = ops
+            .iter()
+            .flat_map(|op| op.variables.iter())
+            .cloned()
+            .collect();
+        assert!(
+            all_vars.contains(&"url".to_string())
+                || all_vars.contains(&"body".to_string())
+                || all_vars.contains(&"client".to_string())
+        );
+    }
+
+    #[test]
+    fn test_variables_sorted_and_unique() {
+        let function: ItemFn = parse_quote! {
+            fn test() {
+                println!("{} {} {}", z, a, z);
+            }
+        };
+        let ops = detect_io_operations(&function);
+        assert_eq!(ops.len(), 1);
+        let vars = &ops[0].variables;
+        // Check sorted
+        let mut sorted_vars = vars.clone();
+        sorted_vars.sort();
+        assert_eq!(vars, &sorted_vars);
+        // Check unique
+        assert_eq!(
+            vars.len(),
+            vars.iter().collect::<std::collections::HashSet<_>>().len()
+        );
+    }
+
+    // Helper function tests
+    #[test]
+    fn test_is_valid_identifier() {
+        assert!(is_valid_identifier("x"));
+        assert!(is_valid_identifier("variable_name"));
+        assert!(is_valid_identifier("_private"));
+        assert!(is_valid_identifier("value123"));
+        assert!(!is_valid_identifier("123invalid"));
+        assert!(!is_valid_identifier(""));
+        assert!(!is_valid_identifier("with-dash"));
+    }
+
+    #[test]
+    fn test_is_literal_or_keyword() {
+        assert!(is_literal_or_keyword("true"));
+        assert!(is_literal_or_keyword("false"));
+        assert!(is_literal_or_keyword("None"));
+        assert!(is_literal_or_keyword("123"));
+        assert!(is_literal_or_keyword("\"string\""));
+        assert!(is_literal_or_keyword("'c'"));
+        assert!(!is_literal_or_keyword("variable"));
+        assert!(!is_literal_or_keyword("my_var"));
     }
 }
