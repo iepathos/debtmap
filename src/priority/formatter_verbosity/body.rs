@@ -337,7 +337,7 @@ pub fn format_priority_item_with_config(
     has_coverage_data: bool,
 ) {
     let formatter = ColoredFormatter::new(config);
-    let sev = Severity::from_score(item.unified_score.final_score.value());
+    let sev = Severity::from_score_100(item.unified_score.final_score.value());
     let severity = sev.as_str();
     let severity_color = sev.color();
     let tree_pipe = " ";

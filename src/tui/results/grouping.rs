@@ -3,6 +3,7 @@
 //! Groups multiple debt items at the same location (file, function, line)
 //! into a single entry for display, while preserving all individual items.
 
+use crate::priority::classification::Severity;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -19,8 +20,8 @@ pub struct LocationGroup<'a> {
     pub items: Vec<&'a UnifiedDebtItem>,
     /// Combined score (sum of all item scores)
     pub combined_score: f64,
-    /// Highest severity among items
-    pub max_severity: &'static str,
+    /// Highest severity among items (lowercase string for TUI display)
+    pub max_severity: String,
 }
 
 /// Aggregated metrics across all items in a group
@@ -58,9 +59,13 @@ pub fn group_by_location<'a>(
 
             let max_severity = items
                 .iter()
-                .map(|i| calculate_severity(i.unified_score.final_score.value()))
+                .map(|i| {
+                    Severity::from_score_100(i.unified_score.final_score.value())
+                        .as_str()
+                        .to_lowercase()
+                })
                 .max_by(|a, b| severity_rank(a).cmp(&severity_rank(b)))
-                .unwrap_or("LOW");
+                .unwrap_or_else(|| "low".to_string());
 
             LocationGroup {
                 location: &items[0].location,
@@ -157,19 +162,6 @@ pub fn aggregate_metrics<'a>(group: &LocationGroup<'a>) -> AggregatedMetrics<'a>
         nesting_depth: max_nest,
         function_length: max_len,
         coverage,
-    }
-}
-
-/// Calculate severity level from score
-fn calculate_severity(score: f64) -> &'static str {
-    if score >= 100.0 {
-        "critical"
-    } else if score >= 50.0 {
-        "high"
-    } else if score >= 10.0 {
-        "medium"
-    } else {
-        "low"
     }
 }
 

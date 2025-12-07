@@ -106,7 +106,7 @@ pub fn format_file_priority_item_with_verbosity(
     use std::fmt::Write;
 
     // Determine severity based on score
-    let severity = crate::priority::classification::Severity::from_score(item.score);
+    let severity = crate::priority::classification::Severity::from_score_100(item.score);
     let (severity_label, severity_color) = (severity.as_str(), severity.color());
 
     // Header section

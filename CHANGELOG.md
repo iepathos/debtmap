@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Severity Classification Consistency** (Spec 251)
+  - Fixed critical bug where severity labels were inconsistent between output formats
+  - Unified severity classification to use 70/50/30 thresholds for 0-100 scale
+  - TUI, markdown, JSON, and terminal output now show identical severity labels
+  - Removed duplicated severity calculation logic from TUI modules
+  - Improved clarity: scores 70+ are CRITICAL, 50+ are HIGH, 30+ are MEDIUM, <30 are LOW
+
 ### Added
 
 - **Multi-Debt Type Accumulation** (Spec 228)

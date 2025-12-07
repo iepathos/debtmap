@@ -26,9 +26,13 @@ pub enum Severity {
 }
 
 impl Severity {
-    /// Pure function: score → severity
+    /// Pure function: score (0-10 scale) → severity
     ///
-    /// Classifies a debt score into a severity level based on these thresholds:
+    /// Classifies a debt score on a 0-10 scale into a severity level.
+    /// **Note**: For scores from the unified scoring system (0-100 scale),
+    /// use `from_score_100()` instead.
+    ///
+    /// Thresholds:
     /// - score >= 8.0: Critical
     /// - score >= 6.0: High
     /// - score >= 4.0: Medium
@@ -51,6 +55,41 @@ impl Severity {
         } else if score >= 6.0 {
             Self::High
         } else if score >= 4.0 {
+            Self::Medium
+        } else {
+            Self::Low
+        }
+    }
+
+    /// Pure function: score (0-100 scale) → severity
+    ///
+    /// Classifies a debt score from the unified scoring system (0-100 scale)
+    /// into a severity level based on these thresholds:
+    /// - score >= 70.0: Critical (top 30% - immediate action required)
+    /// - score >= 50.0: High (next 20% - high priority, address soon)
+    /// - score >= 30.0: Medium (next 20% - moderate priority, plan refactoring)
+    /// - score <  30.0: Low (bottom 30% - nice-to-have improvements)
+    ///
+    /// These thresholds provide balanced distribution across the 0-100 scale
+    /// and align with industry-standard code quality tool classifications.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use debtmap::priority::classification::Severity;
+    ///
+    /// assert_eq!(Severity::from_score_100(85.0), Severity::Critical);
+    /// assert_eq!(Severity::from_score_100(60.0), Severity::High);
+    /// assert_eq!(Severity::from_score_100(40.0), Severity::Medium);
+    /// assert_eq!(Severity::from_score_100(15.0), Severity::Low);
+    /// ```
+    #[inline]
+    pub fn from_score_100(score: f64) -> Self {
+        if score >= 70.0 {
+            Self::Critical
+        } else if score >= 50.0 {
+            Self::High
+        } else if score >= 30.0 {
             Self::Medium
         } else {
             Self::Low
@@ -157,5 +196,50 @@ mod tests {
                 lower
             );
         }
+    }
+
+    #[test]
+    fn severity_thresholds_0_100_scale() {
+        // Critical boundary
+        assert_eq!(Severity::from_score_100(100.0), Severity::Critical);
+        assert_eq!(Severity::from_score_100(70.0), Severity::Critical);
+        assert_eq!(Severity::from_score_100(69.9), Severity::High);
+
+        // High boundary
+        assert_eq!(Severity::from_score_100(50.0), Severity::High);
+        assert_eq!(Severity::from_score_100(49.9), Severity::Medium);
+
+        // Medium boundary
+        assert_eq!(Severity::from_score_100(30.0), Severity::Medium);
+        assert_eq!(Severity::from_score_100(29.9), Severity::Low);
+
+        // Low boundary
+        assert_eq!(Severity::from_score_100(0.0), Severity::Low);
+    }
+
+    #[test]
+    fn severity_100_scale_is_monotonic() {
+        // Higher scores produce same or higher severity
+        let test_cases = [(0.0, 29.9), (30.0, 49.9), (50.0, 69.9), (70.0, 100.0)];
+
+        for (lower, higher) in test_cases {
+            let sev_lower = Severity::from_score_100(lower);
+            let sev_higher = Severity::from_score_100(higher);
+            assert!(
+                sev_higher >= sev_lower,
+                "Higher score ({}) should have same or higher severity than lower ({})",
+                higher,
+                lower
+            );
+        }
+    }
+
+    #[test]
+    fn severity_100_scale_practical_examples() {
+        // Real-world example scores from spec
+        assert_eq!(Severity::from_score_100(53.2), Severity::High);
+        assert_eq!(Severity::from_score_100(30.1), Severity::Medium);
+        assert_eq!(Severity::from_score_100(13.2), Severity::Low);
+        assert_eq!(Severity::from_score_100(7.35), Severity::Low);
     }
 }
