@@ -209,7 +209,6 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
     }
 }
 
-
 /// Aggregate metrics directly from raw FunctionMetrics (for ALL functions including tests).
 ///
 /// This function aggregates complexity from raw function metrics before any filtering,

@@ -14,6 +14,7 @@ pub mod enhanced_analyzer;
 pub mod file_analyzer;
 pub mod function_registry;
 pub mod implementations;
+pub mod io_detector;
 pub mod macro_definition_collector;
 pub mod purity_detector;
 pub mod rust;

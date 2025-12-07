@@ -70,10 +70,12 @@ pub fn render(
                     ratatui::style::Style::default().fg(theme.muted),
                 ),
             ]));
-            lines.push(ratatui::text::Line::from(vec![ratatui::text::Span::styled(
-                "Zero deps means all functions are simple (no debt).",
-                ratatui::style::Style::default().fg(theme.muted),
-            )]));
+            lines.push(ratatui::text::Line::from(vec![
+                ratatui::text::Span::styled(
+                    "Zero deps means all functions are simple (no debt).",
+                    ratatui::style::Style::default().fg(theme.muted),
+                ),
+            ]));
         }
     }
 
