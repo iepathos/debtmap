@@ -1,6 +1,7 @@
 //! Overview page (Page 1) - Core metrics and recommendation.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
+use crate::priority::classification::Severity;
 use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
@@ -59,8 +60,10 @@ pub fn render(
             .iter()
             .map(|i| i.unified_score.final_score.value())
             .sum();
-        let severity = calculate_severity(combined_score);
-        let severity_color = severity_color(severity);
+        let severity = Severity::from_score_100(combined_score)
+            .as_str()
+            .to_lowercase();
+        let severity_color = severity_color(&severity);
 
         lines.push(Line::from(vec![
             Span::raw("  combined              "),
@@ -74,8 +77,10 @@ pub fn render(
         ]));
     } else {
         // Single debt type - show single score
-        let severity = calculate_severity(item.unified_score.final_score.value());
-        let severity_color = severity_color(severity);
+        let severity = Severity::from_score_100(item.unified_score.final_score.value())
+            .as_str()
+            .to_lowercase();
+        let severity_color = severity_color(&severity);
 
         lines.push(Line::from(vec![
             Span::raw("  total                 "),
@@ -303,19 +308,6 @@ fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
         DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl".to_string(),
         // Default for legacy variants
         _ => "Other".to_string(),
-    }
-}
-
-/// Calculate severity level from score
-fn calculate_severity(score: f64) -> &'static str {
-    if score >= 100.0 {
-        "critical"
-    } else if score >= 50.0 {
-        "high"
-    } else if score >= 10.0 {
-        "medium"
-    } else {
-        "low"
     }
 }
 

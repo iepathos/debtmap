@@ -64,9 +64,9 @@ pub(crate) fn format_file_impact(impact: &crate::priority::FileImpact) -> String
     }
 }
 
-/// Get severity label using shared classification (Spec 202)
+/// Get severity label using shared classification (Spec 251)
 pub(crate) fn get_severity_label(score: f64) -> &'static str {
-    Severity::from_score(score).as_str()
+    Severity::from_score_100(score).as_str()
 }
 
 pub(crate) fn format_debt_type(debt_type: &DebtType) -> &'static str {

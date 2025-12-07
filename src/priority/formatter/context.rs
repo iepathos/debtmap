@@ -50,7 +50,7 @@ pub(crate) struct SeverityInfo {
 
 impl SeverityInfo {
     fn from_score(score: f64) -> Self {
-        let severity = Severity::from_score(score);
+        let severity = Severity::from_score_100(score);
         Self {
             label: severity.as_str().to_string(),
             color: severity.color(),

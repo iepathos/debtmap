@@ -2,6 +2,7 @@
 
 use super::app::ResultsApp;
 use super::grouping;
+use crate::priority::classification::Severity;
 use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::theme::Theme;
 use ratatui::{
@@ -284,7 +285,7 @@ fn format_grouped_item(
     is_selected: bool,
     theme: &Theme,
 ) -> ListItem<'static> {
-    let severity_color = severity_color(group.max_severity);
+    let severity_color = severity_color(&group.max_severity);
     let indicator = if is_selected { "▸ " } else { "  " };
 
     let file_name = group
@@ -408,8 +409,10 @@ fn format_list_item(
     is_selected: bool,
     theme: &Theme,
 ) -> ListItem<'static> {
-    let severity = calculate_severity(item.unified_score.final_score.value());
-    let severity_color = severity_color(severity);
+    let severity = Severity::from_score_100(item.unified_score.final_score.value())
+        .as_str()
+        .to_lowercase();
+    let severity_color = severity_color(&severity);
 
     let indicator = if is_selected { "▸ " } else { "  " };
 
@@ -526,19 +529,6 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         .style(Style::default());
 
     frame.render_widget(footer, area);
-}
-
-/// Calculate severity level from score
-fn calculate_severity(score: f64) -> &'static str {
-    if score >= 100.0 {
-        "critical"
-    } else if score >= 50.0 {
-        "high"
-    } else if score >= 10.0 {
-        "medium"
-    } else {
-        "low"
-    }
 }
 
 /// Get color for severity level

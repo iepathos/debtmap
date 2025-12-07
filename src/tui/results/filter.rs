@@ -1,5 +1,6 @@
 //! Filter functionality for results.
 
+use crate::priority::classification::Severity;
 use crate::priority::UnifiedDebtItem;
 
 /// Filter for debt items
@@ -45,7 +46,9 @@ pub enum SeverityFilter {
 impl SeverityFilter {
     /// Check if item matches severity filter
     pub fn matches(&self, item: &UnifiedDebtItem) -> bool {
-        let item_severity = calculate_severity(item.unified_score.final_score.value());
+        let item_severity = Severity::from_score_100(item.unified_score.final_score.value())
+            .as_str()
+            .to_lowercase();
         match self {
             SeverityFilter::Critical => item_severity == "critical",
             SeverityFilter::High => item_severity == "high",
@@ -123,19 +126,6 @@ impl CoverageFilter {
     }
 }
 
-/// Calculate severity level from score
-fn calculate_severity(score: f64) -> &'static str {
-    if score >= 100.0 {
-        "critical"
-    } else if score >= 50.0 {
-        "high"
-    } else if score >= 10.0 {
-        "medium"
-    } else {
-        "low"
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,11 +147,24 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_severity() {
-        assert_eq!(calculate_severity(150.0), "critical");
-        assert_eq!(calculate_severity(75.0), "high");
-        assert_eq!(calculate_severity(25.0), "medium");
-        assert_eq!(calculate_severity(5.0), "low");
+    fn test_severity_classification() {
+        // Test uses unified Severity::from_score_100() method
+        assert_eq!(
+            Severity::from_score_100(85.0).as_str().to_lowercase(),
+            "critical"
+        );
+        assert_eq!(
+            Severity::from_score_100(60.0).as_str().to_lowercase(),
+            "high"
+        );
+        assert_eq!(
+            Severity::from_score_100(40.0).as_str().to_lowercase(),
+            "medium"
+        );
+        assert_eq!(
+            Severity::from_score_100(15.0).as_str().to_lowercase(),
+            "low"
+        );
     }
 
     #[test]
