@@ -192,9 +192,9 @@ mod tests {
         FunctionMetrics, Priority, TechnicalDebtReport,
     };
     use crate::priority::{
-        ActionableRecommendation, DebtType as PriorityDebtType, FunctionRole, FunctionVisibility,
-        ImpactMetrics, Location as PriorityLocation, TransitiveCoverage, UnifiedDebtItem,
-        UnifiedScore, score_types::Score0To100,
+        score_types::Score0To100, ActionableRecommendation, DebtType as PriorityDebtType,
+        FunctionRole, FunctionVisibility, ImpactMetrics, Location as PriorityLocation,
+        TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
     };
     use std::collections::HashMap;
     use std::path::PathBuf;

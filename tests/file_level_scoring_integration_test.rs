@@ -1,6 +1,4 @@
-use debtmap::priority::file_metrics::{
-    FileDebtItem, FileDebtMetrics, FileImpact,
-};
+use debtmap::priority::file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact};
 use std::path::PathBuf;
 
 #[test]

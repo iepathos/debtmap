@@ -72,8 +72,8 @@ mod tests {
     use super::*;
     use crate::output::unified::{UnifiedDebtItemOutput, UnifiedOutput};
     use crate::priority::{
-        call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
-        Location, UnifiedDebtItem, UnifiedScore, score_types::Score0To100,
+        call_graph::CallGraph, score_types::Score0To100, ActionableRecommendation, DebtType,
+        FunctionRole, ImpactMetrics, Location, UnifiedDebtItem, UnifiedScore,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;

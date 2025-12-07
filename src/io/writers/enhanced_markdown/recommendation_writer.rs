@@ -90,8 +90,8 @@ mod tests {
     use super::*;
     use crate::core::{ComplexityReport, ComplexitySummary, DependencyReport, TechnicalDebtReport};
     use crate::priority::{
-        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedAnalysis,
-        UnifiedDebtItem, UnifiedScore, score_types::Score0To100,
+        score_types::Score0To100, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
+        Location, UnifiedAnalysis, UnifiedDebtItem, UnifiedScore,
     };
     use chrono::Utc;
     use std::collections::HashMap;

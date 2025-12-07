@@ -9,8 +9,7 @@
 use crate::core::LanguageSpecificData;
 use crate::io::writers::pattern_display::PATTERN_CONFIDENCE_THRESHOLD;
 use crate::priority::{
-    DebtItem, DebtType, FileDebtItem, FunctionRole, UnifiedAnalysisQueries,
-    UnifiedDebtItem,
+    DebtItem, DebtType, FileDebtItem, FunctionRole, UnifiedAnalysisQueries, UnifiedDebtItem,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
