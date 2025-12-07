@@ -11,8 +11,8 @@ use debtmap::{
 fn test_tui_app_initialization() {
     let app = App::new();
 
-    // Verify all 7 stages are created (files and parse combined into "files parse")
-    assert_eq!(app.stages.len(), 7);
+    // Verify all 6 stages are created
+    assert_eq!(app.stages.len(), 6);
 
     // Verify stage names
     assert_eq!(app.stages[0].name, "files parse");
@@ -21,7 +21,6 @@ fn test_tui_app_initialization() {
     assert_eq!(app.stages[3].name, "purity analysis");
     assert_eq!(app.stages[4].name, "context");
     assert_eq!(app.stages[5].name, "debt scoring");
-    assert_eq!(app.stages[6].name, "prioritization");
 
     // All stages should be pending initially
     for stage in &app.stages {
@@ -191,21 +190,15 @@ fn test_full_pipeline_simulation() {
     app.complete_stage(4, "loaded");
     app.set_overall_progress(0.77);
 
-    // Stage 6: Debt scoring
+    // Stage 6: Debt scoring (includes prioritization)
     app.start_stage(5);
     app.tick();
-    app.complete_stage(5, "123 items scored");
-    app.set_overall_progress(0.88);
-
-    // Stage 7: Prioritization
-    app.start_stage(6);
-    app.tick();
-    app.complete_stage(6, "complete");
+    app.complete_stage(5, "123 items scored and prioritized");
     app.set_overall_progress(1.0);
 
     // Verify final state
     assert_eq!(app.overall_progress, 1.0);
-    assert_eq!(app.current_stage, 6);
+    assert_eq!(app.current_stage, 5);
 
     // All stages should be completed
     for stage in &app.stages {

@@ -112,7 +112,7 @@ pub struct App {
 }
 
 impl App {
-    /// Create a new application with the standard 7-stage pipeline
+    /// Create a new application with the standard 6-stage pipeline
     pub fn new() -> Self {
         Self {
             stages: Self::create_default_stages(),
