@@ -698,20 +698,20 @@ fn test_god_object_displays_git_context() {
 
     // Initialize git repository
     Command::new("git")
-        .args(&["init"])
+        .args(["init"])
         .current_dir(&project_root)
         .output()
         .expect("Failed to init git repo");
 
     // Configure git user
     Command::new("git")
-        .args(&["config", "user.name", "Test User"])
+        .args(["config", "user.name", "Test User"])
         .current_dir(&project_root)
         .output()
         .expect("Failed to configure git user");
 
     Command::new("git")
-        .args(&["config", "user.email", "test@example.com"])
+        .args(["config", "user.email", "test@example.com"])
         .current_dir(&project_root)
         .output()
         .expect("Failed to configure git email");
@@ -729,13 +729,13 @@ fn test_god_object_displays_git_context() {
     .expect("Failed to write initial file");
 
     Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(&project_root)
         .output()
         .expect("Failed to git add");
 
     Command::new("git")
-        .args(&["commit", "-m", "Initial commit"])
+        .args(["commit", "-m", "Initial commit"])
         .current_dir(&project_root)
         .output()
         .expect("Failed to git commit");
@@ -753,13 +753,13 @@ fn test_god_object_displays_git_context() {
     .expect("Failed to write second version");
 
     Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(&project_root)
         .output()
         .expect("Failed to git add");
 
     Command::new("git")
-        .args(&["commit", "-m", "Add more methods"])
+        .args(["commit", "-m", "Add more methods"])
         .current_dir(&project_root)
         .output()
         .expect("Failed to git commit");
@@ -768,8 +768,7 @@ fn test_god_object_displays_git_context() {
     let git_provider =
         GitHistoryProvider::new(project_root.clone()).expect("Failed to create git provider");
 
-    let context_aggregator = ContextAggregator::new()
-        .with_provider(Box::new(git_provider));
+    let context_aggregator = ContextAggregator::new().with_provider(Box::new(git_provider));
 
     let risk_analyzer = risk::RiskAnalyzer::default().with_context_aggregator(context_aggregator);
 

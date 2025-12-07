@@ -1986,20 +1986,20 @@ mod tests {
 
         // Initialize a git repo in the temp directory
         std::process::Command::new("git")
-            .args(&["init"])
+            .args(["init"])
             .current_dir(&project_root)
             .output()
             .expect("Failed to init git repo");
 
         // Configure git user for the test repo
         std::process::Command::new("git")
-            .args(&["config", "user.name", "Test User"])
+            .args(["config", "user.name", "Test User"])
             .current_dir(&project_root)
             .output()
             .expect("Failed to configure git user");
 
         std::process::Command::new("git")
-            .args(&["config", "user.email", "test@example.com"])
+            .args(["config", "user.email", "test@example.com"])
             .current_dir(&project_root)
             .output()
             .expect("Failed to configure git email");
@@ -2011,13 +2011,13 @@ mod tests {
 
         // Add and commit the file
         std::process::Command::new("git")
-            .args(&["add", "."])
+            .args(["add", "."])
             .current_dir(&project_root)
             .output()
             .expect("Failed to git add");
 
         std::process::Command::new("git")
-            .args(&["commit", "-m", "Initial commit"])
+            .args(["commit", "-m", "Initial commit"])
             .current_dir(&project_root)
             .output()
             .expect("Failed to git commit");
@@ -2026,10 +2026,10 @@ mod tests {
         let git_provider =
             GitHistoryProvider::new(project_root.clone()).expect("Failed to create git provider");
 
-        let context_aggregator = ContextAggregator::new()
-            .with_provider(Box::new(git_provider));
+        let context_aggregator = ContextAggregator::new().with_provider(Box::new(git_provider));
 
-        let risk_analyzer = risk::RiskAnalyzer::default().with_context_aggregator(context_aggregator);
+        let risk_analyzer =
+            risk::RiskAnalyzer::default().with_context_aggregator(context_aggregator);
 
         let result = analyze_file_git_context(&test_file, &risk_analyzer, &project_root);
 
@@ -2060,7 +2060,10 @@ mod tests {
                         age_days,
                         ..
                     } => {
-                        assert!(*change_frequency >= 0.0, "Should have valid change frequency");
+                        assert!(
+                            *change_frequency >= 0.0,
+                            "Should have valid change frequency"
+                        );
                         assert!(*author_count >= 1, "Should have at least one author");
                         // age_days is u32, always >= 0, just verify it exists
                         let _ = age_days;

@@ -1,12 +1,13 @@
 // Performance benchmark for multi-debt type accumulation (spec 228)
 // Benchmarks debt classification performance with multi-debt accumulation
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
 use debtmap::priority::scoring::classification::classify_debt_type_with_exclusions;
 use debtmap::priority::TransitiveCoverage;
 use std::collections::HashSet;
+use std::hint::black_box;
 use std::path::PathBuf;
 
 /// Create a test function with specified metrics

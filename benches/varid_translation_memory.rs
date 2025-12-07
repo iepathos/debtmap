@@ -107,7 +107,7 @@ fn bench_memory_overhead(c: &mut Criterion) {
         );
 
         // Benchmark translation operations
-        group.bench_function(&format!("translate_{}_vars", num_vars), |b| {
+        group.bench_function(format!("translate_{}_vars", num_vars), |b| {
             let ctx = CfgAnalysisWithContext::new(var_names.clone(), analysis.clone());
             b.iter(|| {
                 // Simulate translating dead stores
@@ -175,7 +175,7 @@ fn bench_data_flow_graph_memory(c: &mut Criterion) {
             graph.set_cfg_analysis_with_context(func_id, ctx);
         }
 
-        group.bench_function(&format!("translate_all_{}_functions", num_functions), |b| {
+        group.bench_function(format!("translate_all_{}_functions", num_functions), |b| {
             b.iter(|| {
                 for i in 0..num_functions {
                     let func_id = FunctionId::new(
