@@ -123,11 +123,18 @@ fn render_pipeline(frame: &mut Frame, app: &App, theme: &Theme, area: ratatui::l
             ),
         ];
 
-        // Add metric if present
+        // Add metric if present, aligned to match progress bar right edge
         if let Some(metric) = &stage.metric {
+            // Progress bar ends at width - 5 (accounting for leading space and " XX%" suffix)
+            // Stage line: {icon}  {name}{whitespace}{metric}
+            // Total width should be: 1 + 2 + name_chars + whitespace + metric_chars = width - 5
+            let icon_width = 1; // Display width of Unicode icons (✓, ▸, ·)
+            let spacing_width = 2; // Two spaces after icon
+            let alignment_offset = 5; // Align to progress bar right edge (width - 5)
+
             let remaining = area
                 .width
-                .saturating_sub((icon.len() + 2 + stage.name.len() + metric.len() + 2) as u16);
+                .saturating_sub((icon_width + spacing_width + stage.name.chars().count() + metric.chars().count() + alignment_offset) as u16);
             spans.push(Span::raw(" ".repeat(remaining as usize)));
             spans.push(Span::styled(metric, theme.metric_style()));
         }
@@ -208,10 +215,12 @@ fn render_subtask_line(
 
     match subtask.status {
         StageStatus::Completed => {
-            // Right-align "done" with whitespace
+            // Right-align "done" with whitespace, matching progress bar right edge
             let metric = "done";
-            let spacing_needed =
-                width.saturating_sub((name_with_indent.len() + metric.len()) as u16) as usize;
+            let alignment_offset = 5; // Align to progress bar right edge (width - 5)
+            let spacing_needed = width
+                .saturating_sub((name_with_indent.chars().count() + metric.len() + alignment_offset) as u16)
+                as usize;
 
             Line::from(vec![
                 Span::raw(name_with_indent),
@@ -221,10 +230,12 @@ fn render_subtask_line(
         }
         StageStatus::Active => {
             if let Some((current, total)) = subtask.progress {
-                // Right-align numeric count with whitespace
+                // Right-align numeric count with whitespace, matching progress bar right edge
                 let metric = format!("{}/{}", current, total);
-                let spacing_needed =
-                    width.saturating_sub((name_with_indent.len() + metric.len()) as u16) as usize;
+                let alignment_offset = 5; // Align to progress bar right edge (width - 5)
+                let spacing_needed = width
+                    .saturating_sub((name_with_indent.chars().count() + metric.chars().count() + alignment_offset) as u16)
+                    as usize;
 
                 Line::from(vec![
                     Span::raw(name_with_indent),
