@@ -218,10 +218,10 @@ pub fn render(
     if location_items.len() > 1 {
         // Multiple debt types - show all (simplified, no detailed metrics)
         add_section_header(&mut lines, "debt types", theme);
-        for (idx, debt_item) in location_items.iter().enumerate() {
+        for debt_item in location_items.iter() {
             let debt_name = format_debt_type_name(&debt_item.debt_type);
             lines.push(Line::from(vec![
-                Span::raw(format!("  {}. ", idx + 1)),
+                Span::raw("  "),
                 Span::styled(debt_name, Style::default().fg(theme.secondary())),
             ]));
         }
@@ -232,7 +232,7 @@ pub fn render(
             Span::raw("  "),
             Span::styled(
                 format_debt_type_name(&item.debt_type),
-                Style::default().fg(theme.primary),
+                Style::default().fg(theme.secondary()),
             ),
         ]));
     }
