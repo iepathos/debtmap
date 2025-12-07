@@ -132,9 +132,13 @@ fn render_pipeline(frame: &mut Frame, app: &App, theme: &Theme, area: ratatui::l
             let spacing_width = 2; // Two spaces after icon
             let alignment_offset = 5; // Align to progress bar right edge (width - 5)
 
-            let remaining = area
-                .width
-                .saturating_sub((icon_width + spacing_width + stage.name.chars().count() + metric.chars().count() + alignment_offset) as u16);
+            let remaining = area.width.saturating_sub(
+                (icon_width
+                    + spacing_width
+                    + stage.name.chars().count()
+                    + metric.chars().count()
+                    + alignment_offset) as u16,
+            );
             spans.push(Span::raw(" ".repeat(remaining as usize)));
             spans.push(Span::styled(metric, theme.metric_style()));
         }
@@ -218,9 +222,9 @@ fn render_subtask_line(
             // Right-align "done" with whitespace, matching progress bar right edge
             let metric = "done";
             let alignment_offset = 5; // Align to progress bar right edge (width - 5)
-            let spacing_needed = width
-                .saturating_sub((name_with_indent.chars().count() + metric.len() + alignment_offset) as u16)
-                as usize;
+            let spacing_needed = width.saturating_sub(
+                (name_with_indent.chars().count() + metric.len() + alignment_offset) as u16,
+            ) as usize;
 
             Line::from(vec![
                 Span::raw(name_with_indent),
@@ -233,9 +237,10 @@ fn render_subtask_line(
                 // Right-align numeric count with whitespace, matching progress bar right edge
                 let metric = format!("{}/{}", current, total);
                 let alignment_offset = 5; // Align to progress bar right edge (width - 5)
-                let spacing_needed = width
-                    .saturating_sub((name_with_indent.chars().count() + metric.chars().count() + alignment_offset) as u16)
-                    as usize;
+                let spacing_needed = width.saturating_sub(
+                    (name_with_indent.chars().count() + metric.chars().count() + alignment_offset)
+                        as u16,
+                ) as usize;
 
                 Line::from(vec![
                     Span::raw(name_with_indent),

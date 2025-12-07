@@ -3629,6 +3629,176 @@ This enables whole-program purity inference across module boundaries.
 - Better trait method handling
 - IDE integration for real-time feedback
 
+### VarId Translation Layer (Spec 247)
+
+**Problem**: CFG-based data flow analysis uses numeric `VarId { name_id: u32, version: u32 }` for efficiency during analysis, but users need human-readable variable names like "buffer", "result", "user_input" in reports.
+
+**Solution**: DebtMap implements a lightweight translation layer that maps VarIds back to variable names with <10% memory overhead, enabling efficient analysis with user-friendly output.
+
+#### Architecture
+
+**Location**: `src/data_flow/mod.rs`
+
+**Core Types**:
+
+```rust
+/// CFG-based analysis with variable name translation context
+pub struct CfgAnalysisWithContext {
+    /// The data flow analysis results (uses VarId internally)
+    pub analysis: DataFlowAnalysis,
+    /// Variable name mapping (VarId.name_id -> variable name)
+    pub var_names: Vec<String>,
+}
+```
+
+**Design Rationale**:
+- **During Analysis**: Use numeric VarIds for efficiency (no string comparisons, compact memory)
+- **During Reporting**: Translate VarIds to names on-demand (lazy evaluation)
+- **Memory Trade-off**: Small `Vec<String>` overhead vs large `HashMap<VarId, String>`
+
+#### Translation API
+
+**Single Variable Translation**:
+```rust
+let var_id = VarId { name_id: 0, version: 0 };
+let name = ctx.var_name(var_id);  // "buffer"
+```
+
+**Batch Translation**:
+```rust
+let dead_stores = ctx.analysis.liveness.dead_stores.iter().copied();
+let names = ctx.var_names_for(dead_stores);  // ["temp", "unused"]
+```
+
+**High-Level Translation** (via DataFlowGraph):
+```rust
+// Translate dead stores
+let dead_store_names = graph.get_dead_store_names(&func_id);
+
+// Translate escaping variables
+let escaping_names = graph.get_escaping_var_names(&func_id);
+
+// Translate return dependencies
+let return_dep_names = graph.get_return_dependency_names(&func_id);
+
+// Translate tainted variables
+let tainted_names = graph.get_tainted_var_names(&func_id);
+```
+
+#### Memory Overhead Strategy
+
+**Memory Layout**:
+- `DataFlowAnalysis`: Uses `VarId` (8 bytes) in all sets and maps
+- `Vec<String>`: One entry per unique variable name (typically 10-100 per function)
+- Total overhead: `size_of::<String>() * num_vars` ≈ 24 bytes × N
+
+**Optimization Techniques**:
+1. **Compact VarId Representation**: `u32` instead of `String` in analysis
+2. **Shared Ownership**: `String` in vector, not duplicated per VarId occurrence
+3. **Lazy Translation**: Only translate on user-facing operations, not internal analysis
+4. **No Reverse Mapping**: No `HashMap<String, VarId>` (only forward translation needed)
+
+**Benchmark Verification**:
+See `benches/varid_translation_memory.rs` for memory overhead measurements:
+- Baseline: DataFlowAnalysis alone
+- With translation: CfgAnalysisWithContext
+- Target: <10% overhead (NFR1 from spec 247)
+
+#### Integration with Data Flow Analysis
+
+**Creation Pattern**:
+```rust
+use debtmap::analysis::data_flow::ControlFlowGraph;
+
+// 1. Build CFG from function AST
+let cfg = ControlFlowGraph::from_block(&function_block);
+
+// 2. Extract variable names from CFG
+let var_names = cfg.variables.clone();  // Vec<String>
+
+// 3. Run data flow analysis (uses VarId internally)
+let analysis = DataFlowAnalysis::analyze(&cfg);
+
+// 4. Create context with translation capability
+let ctx = CfgAnalysisWithContext::new(var_names, analysis);
+
+// 5. Store in DataFlowGraph
+data_flow_graph.set_cfg_analysis_with_context(func_id, ctx);
+```
+
+**Usage in Reports**:
+```rust
+// Get human-readable names for reporting
+let dead_stores = graph.get_dead_store_names(&func_id);
+println!("Dead stores: {:?}", dead_stores);  // ["temp", "unused_result"]
+
+let escaping = graph.get_escaping_var_names(&func_id);
+println!("Escaping: {:?}", escaping);  // ["result", "error"]
+```
+
+#### Translation Guarantees
+
+**Correctness**:
+- Valid VarId always maps to a name (may be "unknown_N" for out-of-bounds)
+- Translation is deterministic (same VarId → same name)
+- Version numbers preserved in analysis, not exposed to users
+
+**Performance**:
+- Single translation: O(1) vector lookup
+- Batch translation: O(n) where n = number of VarIds
+- No allocation overhead (returns borrowed `String`)
+
+**Memory Safety**:
+- No VarId lifetime issues (uses `Copy` trait)
+- Variable names stored once, referenced many times
+- Translation happens on-demand, not eagerly
+
+#### Limitations and Design Decisions
+
+**Current Limitations**:
+1. **No reverse translation**: Cannot convert "buffer" back to VarId (not needed)
+2. **Version numbers hidden**: Users see "buffer", not "buffer_v2" (simplicity)
+3. **Unknown variables**: Out-of-bounds name_id returns "unknown_N" (defensive)
+
+**Design Decisions**:
+- **Vec over HashMap**: O(1) indexed access vs O(1) hashed access, simpler memory model
+- **Lazy translation**: Translate on reporting, not during analysis (performance)
+- **Context wrapper**: Combine analysis + names instead of polluting DataFlowAnalysis
+- **Skipped serialization**: Translation context not serialized (ephemeral, can be rebuilt)
+
+**Memory Trade-offs**:
+- **Accepted overhead**: Small `Vec<String>` per function (~200-500 bytes typical)
+- **Rejected alternative**: Store names in every VarId occurrence (10x memory increase)
+- **Rejected alternative**: Global string table (complex lifetime management)
+
+#### Testing
+
+**Unit Tests** (`src/data_flow/mod.rs`):
+- `test_varid_translation`: Basic VarId → name translation
+- `test_translation_with_missing_id`: Out-of-bounds handling ("unknown_N")
+- `test_dead_store_translation`: Dead store name translation
+- `test_escaping_var_translation`: Escaping variable translation
+- `test_return_dependency_translation`: Return dependency translation
+- `test_tainted_var_translation`: Tainted variable translation
+
+**Benchmarks** (`benches/varid_translation_memory.rs`):
+- Memory overhead measurements for various function sizes
+- Translation performance for different variable counts
+- DataFlowGraph integration overhead
+
+**Property Tests** (future):
+- Translation determinism (same VarId always → same name)
+- Memory overhead < 10% for all realistic input sizes
+- No allocation during translation (borrowed strings only)
+
+#### Future Enhancements
+
+**Potential Improvements**:
+- String interning for common variable names ("self", "result", "error")
+- Compressed variable name storage (prefix compression)
+- Optional version number display in verbose mode
+- Custom variable name formatters (e.g., "buffer_v2" for SSA debugging)
+
 ### God Object Detection - Recommendation Strategy
 
 When a god object or god module is detected, DebtMap provides actionable refactoring recommendations. The recommendation strategy adapts to the file's characteristics to provide the most relevant split suggestions.

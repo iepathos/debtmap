@@ -130,6 +130,10 @@ pub struct DataFlowGraph {
     /// Note: Skipped during serialization due to complexity
     #[serde(skip)]
     cfg_analysis: HashMap<FunctionId, DataFlowAnalysis>,
+    /// CFG-based data flow analysis with variable name context
+    /// Note: Skipped during serialization due to complexity
+    #[serde(skip)]
+    cfg_analysis_with_context: HashMap<FunctionId, CfgAnalysisWithContext>,
     /// Mutation analysis (live vs dead mutations)
     #[serde(with = "function_id_serde")]
     mutation_analysis: HashMap<FunctionId, MutationInfo>,
@@ -178,6 +182,63 @@ pub struct MutationInfo {
     pub escaping_mutations: HashSet<String>,
 }
 
+/// CFG-based data flow analysis with variable name context for translation.
+///
+/// This wrapper combines `DataFlowAnalysis` (which uses numeric `VarId`s)
+/// with the variable name mapping from the CFG, enabling translation of
+/// VarIds back to human-readable variable names.
+///
+/// # Why This Exists
+///
+/// The CFG uses `VarId { name_id: u32, version: u32 }` for efficiency during
+/// analysis. To display results to users, we need to translate these IDs back
+/// to variable names like "buffer", "x", "result", etc.
+///
+/// # Example
+///
+/// ```ignore
+/// let cfg = ControlFlowGraph::from_block(&block);
+/// let analysis = DataFlowAnalysis::analyze(&cfg);
+/// let ctx = CfgAnalysisWithContext::from_cfg(&cfg, analysis);
+///
+/// // Translate a VarId to a name
+/// let var_id = VarId { name_id: 0, version: 0 };
+/// let name = ctx.var_name(var_id); // "x", "buffer", etc.
+/// ```
+#[derive(Debug, Clone)]
+pub struct CfgAnalysisWithContext {
+    /// The full data flow analysis results
+    pub analysis: DataFlowAnalysis,
+    /// Variable name mapping from CFG (VarId.name_id -> variable name)
+    pub var_names: Vec<String>,
+}
+
+impl CfgAnalysisWithContext {
+    /// Create from a ControlFlowGraph and its analysis
+    pub fn new(var_names: Vec<String>, analysis: DataFlowAnalysis) -> Self {
+        Self {
+            analysis,
+            var_names,
+        }
+    }
+
+    /// Translate a VarId to a variable name
+    pub fn var_name(&self, var_id: crate::analysis::data_flow::VarId) -> String {
+        self.var_names
+            .get(var_id.name_id as usize)
+            .cloned()
+            .unwrap_or_else(|| format!("unknown_{}", var_id.name_id))
+    }
+
+    /// Translate multiple VarIds to names
+    pub fn var_names_for(
+        &self,
+        var_ids: impl Iterator<Item = crate::analysis::data_flow::VarId>,
+    ) -> Vec<String> {
+        var_ids.map(|id| self.var_name(id)).collect()
+    }
+}
+
 impl DataFlowGraph {
     pub fn new() -> Self {
         Self {
@@ -187,6 +248,7 @@ impl DataFlowGraph {
             io_operations: HashMap::new(),
             purity_analysis: HashMap::new(),
             cfg_analysis: HashMap::new(),
+            cfg_analysis_with_context: HashMap::new(),
             mutation_analysis: HashMap::new(),
         }
     }
@@ -200,6 +262,7 @@ impl DataFlowGraph {
             io_operations: HashMap::new(),
             purity_analysis: HashMap::new(),
             cfg_analysis: HashMap::new(),
+            cfg_analysis_with_context: HashMap::new(),
             mutation_analysis: HashMap::new(),
         }
     }
@@ -279,6 +342,59 @@ impl DataFlowGraph {
     /// Set mutation analysis for a function
     pub fn set_mutation_info(&mut self, func_id: FunctionId, info: MutationInfo) {
         self.mutation_analysis.insert(func_id, info);
+    }
+
+    /// Get CFG analysis with translation context
+    pub fn get_cfg_analysis_with_context(
+        &self,
+        func_id: &FunctionId,
+    ) -> Option<&CfgAnalysisWithContext> {
+        self.cfg_analysis_with_context.get(func_id)
+    }
+
+    /// Set CFG analysis with context
+    pub fn set_cfg_analysis_with_context(
+        &mut self,
+        func_id: FunctionId,
+        context: CfgAnalysisWithContext,
+    ) {
+        self.cfg_analysis_with_context.insert(func_id, context);
+    }
+
+    /// Get dead store variable names
+    pub fn get_dead_store_names(&self, func_id: &FunctionId) -> Vec<String> {
+        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
+            ctx.var_names_for(ctx.analysis.liveness.dead_stores.iter().copied())
+        } else {
+            vec![]
+        }
+    }
+
+    /// Get escaping variable names
+    pub fn get_escaping_var_names(&self, func_id: &FunctionId) -> Vec<String> {
+        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
+            ctx.var_names_for(ctx.analysis.escape_info.escaping_vars.iter().copied())
+        } else {
+            vec![]
+        }
+    }
+
+    /// Get return dependency variable names
+    pub fn get_return_dependency_names(&self, func_id: &FunctionId) -> Vec<String> {
+        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
+            ctx.var_names_for(ctx.analysis.escape_info.return_dependencies.iter().copied())
+        } else {
+            vec![]
+        }
+    }
+
+    /// Get tainted variable names
+    pub fn get_tainted_var_names(&self, func_id: &FunctionId) -> Vec<String> {
+        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
+            ctx.var_names_for(ctx.analysis.taint_info.tainted_vars.iter().copied())
+        } else {
+            vec![]
+        }
     }
 
     /// Check if a function has side effects based on data flow analysis
@@ -524,5 +640,305 @@ mod tests {
 
         assert_eq!(graph.call_graph().node_count(), 0);
         assert!(graph.variable_deps.is_empty());
+    }
+
+    #[test]
+    fn test_varid_translation() {
+        use crate::analysis::data_flow::{
+            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+            VarId,
+        };
+        use std::collections::HashMap;
+
+        let var_names = vec!["x".to_string(), "y".to_string(), "buffer".to_string()];
+
+        // Create minimal analysis
+        let analysis = DataFlowAnalysis {
+            liveness: LivenessInfo {
+                live_in: HashMap::new(),
+                live_out: HashMap::new(),
+                dead_stores: HashSet::new(),
+            },
+            reaching_defs: ReachingDefinitions {
+                reach_in: HashMap::new(),
+                reach_out: HashMap::new(),
+                def_use_chains: HashMap::new(),
+            },
+            escape_info: EscapeAnalysis {
+                escaping_vars: HashSet::new(),
+                captured_vars: HashSet::new(),
+                return_dependencies: HashSet::new(),
+            },
+            taint_info: TaintAnalysis {
+                tainted_vars: HashSet::new(),
+                taint_sources: HashMap::new(),
+                return_tainted: false,
+            },
+        };
+
+        let ctx = CfgAnalysisWithContext::new(var_names, analysis);
+
+        let var_id = VarId {
+            name_id: 0,
+            version: 0,
+        };
+        assert_eq!(ctx.var_name(var_id), "x");
+
+        let var_id = VarId {
+            name_id: 2,
+            version: 1,
+        };
+        assert_eq!(ctx.var_name(var_id), "buffer");
+    }
+
+    #[test]
+    fn test_translation_with_missing_id() {
+        use crate::analysis::data_flow::{
+            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+            VarId,
+        };
+        use std::collections::HashMap;
+
+        let var_names = vec!["x".to_string()];
+
+        let analysis = DataFlowAnalysis {
+            liveness: LivenessInfo {
+                live_in: HashMap::new(),
+                live_out: HashMap::new(),
+                dead_stores: HashSet::new(),
+            },
+            reaching_defs: ReachingDefinitions {
+                reach_in: HashMap::new(),
+                reach_out: HashMap::new(),
+                def_use_chains: HashMap::new(),
+            },
+            escape_info: EscapeAnalysis {
+                escaping_vars: HashSet::new(),
+                captured_vars: HashSet::new(),
+                return_dependencies: HashSet::new(),
+            },
+            taint_info: TaintAnalysis {
+                tainted_vars: HashSet::new(),
+                taint_sources: HashMap::new(),
+                return_tainted: false,
+            },
+        };
+
+        let ctx = CfgAnalysisWithContext::new(var_names, analysis);
+
+        let invalid_id = VarId {
+            name_id: 999,
+            version: 0,
+        };
+        assert_eq!(ctx.var_name(invalid_id), "unknown_999");
+    }
+
+    #[test]
+    fn test_dead_store_translation() {
+        use crate::analysis::data_flow::{
+            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+            VarId,
+        };
+        use std::collections::HashMap;
+
+        let mut data_flow = DataFlowGraph::new();
+        let func_id = create_test_function_id("test");
+
+        // Create analysis with dead store
+        let mut dead_stores = HashSet::new();
+        dead_stores.insert(VarId {
+            name_id: 0,
+            version: 0,
+        });
+
+        let analysis = DataFlowAnalysis {
+            liveness: LivenessInfo {
+                live_in: HashMap::new(),
+                live_out: HashMap::new(),
+                dead_stores,
+            },
+            reaching_defs: ReachingDefinitions {
+                reach_in: HashMap::new(),
+                reach_out: HashMap::new(),
+                def_use_chains: HashMap::new(),
+            },
+            escape_info: EscapeAnalysis {
+                escaping_vars: HashSet::new(),
+                captured_vars: HashSet::new(),
+                return_dependencies: HashSet::new(),
+            },
+            taint_info: TaintAnalysis {
+                tainted_vars: HashSet::new(),
+                taint_sources: HashMap::new(),
+                return_tainted: false,
+            },
+        };
+
+        let ctx = CfgAnalysisWithContext::new(vec!["temp".to_string()], analysis);
+
+        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
+
+        let names = data_flow.get_dead_store_names(&func_id);
+        assert_eq!(names, vec!["temp"]);
+    }
+
+    #[test]
+    fn test_escaping_var_translation() {
+        use crate::analysis::data_flow::{
+            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+            VarId,
+        };
+        use std::collections::HashMap;
+
+        let mut data_flow = DataFlowGraph::new();
+        let func_id = create_test_function_id("test");
+
+        let mut escaping_vars = HashSet::new();
+        escaping_vars.insert(VarId {
+            name_id: 0,
+            version: 0,
+        });
+
+        let analysis = DataFlowAnalysis {
+            liveness: LivenessInfo {
+                live_in: HashMap::new(),
+                live_out: HashMap::new(),
+                dead_stores: HashSet::new(),
+            },
+            reaching_defs: ReachingDefinitions {
+                reach_in: HashMap::new(),
+                reach_out: HashMap::new(),
+                def_use_chains: HashMap::new(),
+            },
+            escape_info: EscapeAnalysis {
+                escaping_vars,
+                captured_vars: HashSet::new(),
+                return_dependencies: HashSet::new(),
+            },
+            taint_info: TaintAnalysis {
+                tainted_vars: HashSet::new(),
+                taint_sources: HashMap::new(),
+                return_tainted: false,
+            },
+        };
+
+        let ctx = CfgAnalysisWithContext::new(vec!["result".to_string()], analysis);
+
+        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
+
+        let names = data_flow.get_escaping_var_names(&func_id);
+        assert_eq!(names, vec!["result"]);
+    }
+
+    #[test]
+    fn test_return_dependency_translation() {
+        use crate::analysis::data_flow::{
+            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+            VarId,
+        };
+        use std::collections::HashMap;
+
+        let mut data_flow = DataFlowGraph::new();
+        let func_id = create_test_function_id("test");
+
+        let mut return_deps = HashSet::new();
+        return_deps.insert(VarId {
+            name_id: 0,
+            version: 0,
+        });
+        return_deps.insert(VarId {
+            name_id: 1,
+            version: 0,
+        });
+
+        let analysis = DataFlowAnalysis {
+            liveness: LivenessInfo {
+                live_in: HashMap::new(),
+                live_out: HashMap::new(),
+                dead_stores: HashSet::new(),
+            },
+            reaching_defs: ReachingDefinitions {
+                reach_in: HashMap::new(),
+                reach_out: HashMap::new(),
+                def_use_chains: HashMap::new(),
+            },
+            escape_info: EscapeAnalysis {
+                escaping_vars: HashSet::new(),
+                captured_vars: HashSet::new(),
+                return_dependencies: return_deps,
+            },
+            taint_info: TaintAnalysis {
+                tainted_vars: HashSet::new(),
+                taint_sources: HashMap::new(),
+                return_tainted: false,
+            },
+        };
+
+        let ctx =
+            CfgAnalysisWithContext::new(vec!["result".to_string(), "buffer".to_string()], analysis);
+
+        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
+
+        let names = data_flow.get_return_dependency_names(&func_id);
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"result".to_string()));
+        assert!(names.contains(&"buffer".to_string()));
+    }
+
+    #[test]
+    fn test_tainted_var_translation() {
+        use crate::analysis::data_flow::{
+            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+            VarId,
+        };
+        use std::collections::HashMap;
+
+        let mut data_flow = DataFlowGraph::new();
+        let func_id = create_test_function_id("test");
+
+        let mut tainted_vars = HashSet::new();
+        tainted_vars.insert(VarId {
+            name_id: 0,
+            version: 0,
+        });
+        tainted_vars.insert(VarId {
+            name_id: 1,
+            version: 1,
+        });
+
+        let analysis = DataFlowAnalysis {
+            liveness: LivenessInfo {
+                live_in: HashMap::new(),
+                live_out: HashMap::new(),
+                dead_stores: HashSet::new(),
+            },
+            reaching_defs: ReachingDefinitions {
+                reach_in: HashMap::new(),
+                reach_out: HashMap::new(),
+                def_use_chains: HashMap::new(),
+            },
+            escape_info: EscapeAnalysis {
+                escaping_vars: HashSet::new(),
+                captured_vars: HashSet::new(),
+                return_dependencies: HashSet::new(),
+            },
+            taint_info: TaintAnalysis {
+                tainted_vars,
+                taint_sources: HashMap::new(),
+                return_tainted: false,
+            },
+        };
+
+        let ctx = CfgAnalysisWithContext::new(
+            vec!["user_input".to_string(), "sanitized".to_string()],
+            analysis,
+        );
+
+        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
+
+        let names = data_flow.get_tainted_var_names(&func_id);
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"user_input".to_string()));
+        assert!(names.contains(&"sanitized".to_string()));
     }
 }
