@@ -895,7 +895,14 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
 
     // Step 7: File-level analysis
-    analyze_files_for_debt(&mut unified, metrics, coverage_data, no_god_object);
+    analyze_files_for_debt(
+        &mut unified,
+        metrics,
+        coverage_data,
+        no_god_object,
+        risk_analyzer.as_ref(),
+        project_path,
+    );
 
     // Step 8: File aggregation has been removed - skip to step 9
 
@@ -1287,6 +1294,8 @@ fn analyze_files_for_debt(
     metrics: &[FunctionMetrics],
     coverage_data: Option<&risk::lcov::LcovData>,
     no_god_object: bool,
+    risk_analyzer: Option<&risk::RiskAnalyzer>,
+    project_path: &Path,
 ) {
     use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
 
@@ -1310,9 +1319,14 @@ fn analyze_files_for_debt(
     let mut last_update = std::time::Instant::now();
 
     for (idx, (file_path, functions)) in file_groups.into_iter().enumerate() {
-        if let Ok(data) =
-            process_single_file(file_path, functions, &file_analyzer, no_god_object, unified)
-        {
+        if let Ok(data) = process_single_file(
+            file_path,
+            functions,
+            &file_analyzer,
+            no_god_object,
+            unified,
+            project_path,
+        ) {
             if data.file_metrics.calculate_score() > 50.0 {
                 processed_files.push(data);
             }
@@ -1333,7 +1347,7 @@ fn analyze_files_for_debt(
     }
 
     // Apply results to unified analysis (I/O at edges)
-    apply_file_analysis_results(unified, processed_files);
+    apply_file_analysis_results(unified, processed_files, risk_analyzer, project_path);
 }
 
 // Pure function to group functions by file
@@ -1357,6 +1371,7 @@ struct ProcessedFileData {
     god_analysis: Option<crate::organization::GodObjectAnalysis>,
     file_context: crate::analysis::FileContext,
     raw_functions: Vec<FunctionMetrics>, // Keep raw metrics for god object aggregation
+    project_root: PathBuf,               // Project root for git context analysis
 }
 
 // Pure function to process a single file
@@ -1366,6 +1381,7 @@ fn process_single_file(
     file_analyzer: &crate::analyzers::file_analyzer::UnifiedFileAnalyzer,
     no_god_object: bool,
     unified: &UnifiedAnalysis,
+    project_root: &Path,
 ) -> Result<ProcessedFileData, Box<dyn std::error::Error>> {
     // Get base file metrics
     let file_metrics = file_analyzer.aggregate_functions(&functions);
@@ -1401,6 +1417,7 @@ fn process_single_file(
         god_analysis,
         file_context,
         raw_functions: functions, // Include raw metrics for aggregation
+        project_root: project_root.to_path_buf(),
     })
 }
 
@@ -1684,10 +1701,46 @@ fn create_god_object_recommendation(
     }
 }
 
+/// Analyze file-level git context for god objects.
+/// Returns contextual risk based on file's git history.
+/// This is a pure function that delegates to the risk analyzer's context aggregator.
+pub fn analyze_file_git_context(
+    file_path: &Path,
+    risk_analyzer: &risk::RiskAnalyzer,
+    project_root: &Path,
+) -> Option<risk::context::ContextualRisk> {
+    // Check if context aggregator is available
+    if !risk_analyzer.has_context() {
+        return None;
+    }
+
+    // Since we can't access the context_aggregator directly, we'll use a workaround:
+    // Call analyze_function_with_context with dummy complexity metrics
+    let dummy_complexity = crate::core::ComplexityMetrics {
+        functions: Vec::new(),
+        cyclomatic_complexity: 0,
+        cognitive_complexity: 0,
+    };
+
+    let (_, contextual_risk) = risk_analyzer.analyze_function_with_context(
+        file_path.to_path_buf(),
+        String::new(), // Empty function name for file-level
+        (0, 0),        // Empty line range for file-level
+        &dummy_complexity,
+        None,  // No coverage for file-level
+        false, // Not a test
+        project_root.to_path_buf(),
+    );
+
+    contextual_risk
+}
+
 // I/O function to apply results to unified analysis
 fn apply_file_analysis_results(
     unified: &mut UnifiedAnalysis,
     processed_files: Vec<ProcessedFileData>,
+    risk_analyzer: Option<&risk::RiskAnalyzer>,
+    _project_root: &Path,
 ) {
     use crate::priority::god_object_aggregation::{
         aggregate_from_raw_metrics, aggregate_god_object_metrics, extract_member_functions,
@@ -1715,8 +1768,27 @@ fn apply_file_analysis_results(
                     item_metrics.unique_downstream_callees;
                 aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
                 aggregated_metrics.downstream_dependencies = item_metrics.downstream_dependencies;
+
+                // Spec 248: Prefer direct file-level git analysis over member aggregation
+                aggregated_metrics.aggregated_contextual_risk = risk_analyzer
+                    .and_then(|analyzer| {
+                        analyze_file_git_context(
+                            &file_data.file_path,
+                            analyzer,
+                            &file_data.project_root,
+                        )
+                    })
+                    .or(item_metrics.aggregated_contextual_risk); // Fallback to member aggregation
+            } else {
+                // Spec 248: When no member functions, try direct file analysis
                 aggregated_metrics.aggregated_contextual_risk =
-                    item_metrics.aggregated_contextual_risk;
+                    risk_analyzer.and_then(|analyzer| {
+                        analyze_file_git_context(
+                            &file_data.file_path,
+                            analyzer,
+                            &file_data.project_root,
+                        )
+                    });
             }
             // If member_functions is empty, dependencies remain at 0 (no debt items = no deps to show)
 
