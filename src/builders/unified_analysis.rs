@@ -1955,3 +1955,144 @@ fn run_purity_propagation(
 
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::risk::context::git_history::GitHistoryProvider;
+    use crate::risk::context::{ContextAggregator, ContextDetails};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_analyze_file_git_context_returns_none_when_no_context_provider() {
+        // Create a risk analyzer without context provider
+        let risk_analyzer = risk::RiskAnalyzer::default();
+        let file_path = PathBuf::from("src/test.rs");
+        let project_root = PathBuf::from("/tmp/test_project");
+
+        let result = analyze_file_git_context(&file_path, &risk_analyzer, &project_root);
+
+        assert!(
+            result.is_none(),
+            "Should return None when context provider is missing"
+        );
+    }
+
+    #[test]
+    fn test_analyze_file_git_context_with_valid_provider() {
+        // Create a context provider with test data
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let project_root = temp_dir.path().to_path_buf();
+
+        // Initialize a git repo in the temp directory
+        std::process::Command::new("git")
+            .args(&["init"])
+            .current_dir(&project_root)
+            .output()
+            .expect("Failed to init git repo");
+
+        // Configure git user for the test repo
+        std::process::Command::new("git")
+            .args(&["config", "user.name", "Test User"])
+            .current_dir(&project_root)
+            .output()
+            .expect("Failed to configure git user");
+
+        std::process::Command::new("git")
+            .args(&["config", "user.email", "test@example.com"])
+            .current_dir(&project_root)
+            .output()
+            .expect("Failed to configure git email");
+
+        // Create a test file
+        let test_file = project_root.join("src/test.rs");
+        std::fs::create_dir_all(test_file.parent().unwrap()).expect("Failed to create src dir");
+        std::fs::write(&test_file, "fn test() {}").expect("Failed to write test file");
+
+        // Add and commit the file
+        std::process::Command::new("git")
+            .args(&["add", "."])
+            .current_dir(&project_root)
+            .output()
+            .expect("Failed to git add");
+
+        std::process::Command::new("git")
+            .args(&["commit", "-m", "Initial commit"])
+            .current_dir(&project_root)
+            .output()
+            .expect("Failed to git commit");
+
+        // Create git history provider and context aggregator
+        let git_provider =
+            GitHistoryProvider::new(project_root.clone()).expect("Failed to create git provider");
+
+        let context_aggregator = ContextAggregator::new()
+            .with_provider(Box::new(git_provider));
+
+        let risk_analyzer = risk::RiskAnalyzer::default().with_context_aggregator(context_aggregator);
+
+        let result = analyze_file_git_context(&test_file, &risk_analyzer, &project_root);
+
+        // Should return Some contextual risk when provider is available
+        assert!(
+            result.is_some(),
+            "Should return Some when context provider is available"
+        );
+
+        if let Some(contextual_risk) = result {
+            // Verify the contextual risk has git_history context
+            let git_context = contextual_risk
+                .contexts
+                .iter()
+                .find(|ctx| ctx.provider == "git_history");
+
+            assert!(
+                git_context.is_some(),
+                "Should have git_history context in contexts"
+            );
+
+            // Verify it has Historical details
+            if let Some(ctx) = git_context {
+                match &ctx.details {
+                    ContextDetails::Historical {
+                        change_frequency,
+                        author_count,
+                        age_days,
+                        ..
+                    } => {
+                        assert!(*change_frequency >= 0.0, "Should have valid change frequency");
+                        assert!(*author_count >= 1, "Should have at least one author");
+                        // age_days is u32, always >= 0, just verify it exists
+                        let _ = age_days;
+                    }
+                    _ => panic!("Expected Historical context details"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_analyze_file_git_context_handles_various_paths() {
+        // Create a risk analyzer without context provider for simple path testing
+        let risk_analyzer = risk::RiskAnalyzer::default();
+        let project_root = PathBuf::from("/tmp/test_project");
+
+        // Test various path formats
+        let paths = vec![
+            PathBuf::from("src/main.rs"),
+            PathBuf::from("src/nested/module/file.rs"),
+            PathBuf::from("/absolute/path/to/file.rs"),
+            PathBuf::from("./relative/path.rs"),
+        ];
+
+        for path in paths {
+            let result = analyze_file_git_context(&path, &risk_analyzer, &project_root);
+            // All should return None since no context provider
+            assert!(
+                result.is_none(),
+                "Should handle path {} correctly",
+                path.display()
+            );
+        }
+    }
+}

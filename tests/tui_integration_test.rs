@@ -682,3 +682,203 @@ fn test_data_flow_markdown_formatting() {
     assert_eq!(io_ops.len(), 1);
     assert_eq!(io_ops[0].operation_type, "Database Query");
 }
+
+#[test]
+fn test_god_object_displays_git_context() {
+    use debtmap::priority::{score_types::Score0To100, DebtType, Location};
+    use debtmap::risk;
+    use debtmap::risk::context::git_history::GitHistoryProvider;
+    use debtmap::risk::context::{ContextAggregator, ContextDetails};
+    use std::fs;
+    use std::process::Command;
+
+    // Create a temporary project with git history
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let project_root = temp_dir.path().to_path_buf();
+
+    // Initialize git repository
+    Command::new("git")
+        .args(&["init"])
+        .current_dir(&project_root)
+        .output()
+        .expect("Failed to init git repo");
+
+    // Configure git user
+    Command::new("git")
+        .args(&["config", "user.name", "Test User"])
+        .current_dir(&project_root)
+        .output()
+        .expect("Failed to configure git user");
+
+    Command::new("git")
+        .args(&["config", "user.email", "test@example.com"])
+        .current_dir(&project_root)
+        .output()
+        .expect("Failed to configure git email");
+
+    // Create a god object file with multiple commits to build history
+    let src_dir = project_root.join("src");
+    fs::create_dir_all(&src_dir).expect("Failed to create src dir");
+    let god_object_file = src_dir.join("god_object.rs");
+
+    // Initial commit
+    fs::write(
+        &god_object_file,
+        "pub struct GodObject { field1: i32 }\nimpl GodObject { fn method1(&self) {} }",
+    )
+    .expect("Failed to write initial file");
+
+    Command::new("git")
+        .args(&["add", "."])
+        .current_dir(&project_root)
+        .output()
+        .expect("Failed to git add");
+
+    Command::new("git")
+        .args(&["commit", "-m", "Initial commit"])
+        .current_dir(&project_root)
+        .output()
+        .expect("Failed to git commit");
+
+    // Second commit - add more complexity
+    fs::write(
+        &god_object_file,
+        "pub struct GodObject { field1: i32, field2: String }\n\
+         impl GodObject {\n\
+         fn method1(&self) {}\n\
+         fn method2(&self) {}\n\
+         fn method3(&self) {}\n\
+         }",
+    )
+    .expect("Failed to write second version");
+
+    Command::new("git")
+        .args(&["add", "."])
+        .current_dir(&project_root)
+        .output()
+        .expect("Failed to git add");
+
+    Command::new("git")
+        .args(&["commit", "-m", "Add more methods"])
+        .current_dir(&project_root)
+        .output()
+        .expect("Failed to git commit");
+
+    // Create a risk analyzer with git context
+    let git_provider =
+        GitHistoryProvider::new(project_root.clone()).expect("Failed to create git provider");
+
+    let context_aggregator = ContextAggregator::new()
+        .with_provider(Box::new(git_provider));
+
+    let risk_analyzer = risk::RiskAnalyzer::default().with_context_aggregator(context_aggregator);
+
+    // Analyze the god object file's git context
+    let contextual_risk = debtmap::builders::unified_analysis::analyze_file_git_context(
+        &god_object_file,
+        &risk_analyzer,
+        &project_root,
+    );
+
+    // Verify git context is present
+    assert!(
+        contextual_risk.is_some(),
+        "God object should have git context when analyzed with git context enabled"
+    );
+
+    let context = contextual_risk.unwrap();
+
+    // Verify git_history context is populated in the contexts vec
+    let git_context = context
+        .contexts
+        .iter()
+        .find(|ctx| ctx.provider == "git_history");
+
+    assert!(
+        git_context.is_some(),
+        "Contextual risk should include git_history context"
+    );
+
+    let git_ctx = git_context.unwrap();
+
+    // Verify git metrics are present in Historical details
+    match &git_ctx.details {
+        ContextDetails::Historical {
+            change_frequency,
+            author_count,
+            age_days,
+            ..
+        } => {
+            // Note: change_frequency might be 0 if commits are very recent (age is 0 days)
+            // The key is that we got Historical context data
+            assert!(
+                *change_frequency >= 0.0,
+                "Should have valid (non-negative) change frequency"
+            );
+            assert!(*author_count >= 1, "Should have at least one author");
+            // age_days is u32, always >= 0, just verify it exists
+            let _ = age_days;
+        }
+        _ => panic!("Expected Historical context details"),
+    }
+
+    // Create a test god object debt item with this contextual risk
+    let location = Location {
+        file: god_object_file.clone(),
+        line: 1,
+        function: "GodObject".to_string(),
+    };
+
+    let god_object_item = create_test_unified_debt_item(
+        location,
+        DebtType::GodObject {
+            methods: 3,
+            fields: 2,
+            responsibilities: 2,
+            god_object_score: Score0To100::new(60.0),
+        },
+    );
+
+    // In a real TUI rendering scenario, this contextual_risk would be attached
+    // to the god_object_item and displayed in the detail view
+    // For this test, we verify the data exists and has expected structure
+    assert_eq!(format!("{}", god_object_item.debt_type), "God Object");
+
+    // Verify the contextual risk can be attached to items
+    // (In actual code, this happens during analysis pipeline)
+    let mut enriched_item = god_object_item;
+    enriched_item.contextual_risk = Some(context);
+
+    assert!(
+        enriched_item.contextual_risk.is_some(),
+        "God object item should have contextual risk attached"
+    );
+
+    let final_context = enriched_item.contextual_risk.unwrap();
+
+    // Verify git_history context is preserved
+    let final_git_context = final_context
+        .contexts
+        .iter()
+        .find(|ctx| ctx.provider == "git_history");
+
+    assert!(
+        final_git_context.is_some(),
+        "Final item should preserve git history context"
+    );
+
+    // Verify metrics are preserved
+    if let Some(git_ctx) = final_git_context {
+        match &git_ctx.details {
+            ContextDetails::Historical {
+                change_frequency, ..
+            } => {
+                assert!(
+                    *change_frequency >= 0.0,
+                    "Git metrics should be preserved in final item (valid non-negative value)"
+                );
+            }
+            _ => panic!("Expected Historical context details"),
+        }
+    }
+}
