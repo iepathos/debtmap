@@ -16,11 +16,17 @@ fn test_file_debt_metrics_minimal() {
         "coverage_percent": 0.5,
         "uncovered_lines": 50,
         "god_object_indicators": {
-            "methods_count": 5,
-            "fields_count": 0,
-            "responsibilities": 1,
+            "method_count": 5,
+            "field_count": 0,
+            "responsibility_count": 1,
+            "lines_of_code": 100,
+            "complexity_sum": 50,
             "is_god_object": false,
-            "god_object_score": 0.0
+            "god_object_score": 0.0,
+            "responsibilities": ["General"],
+            "recommended_splits": [],
+            "confidence": "NotGodObject",
+            "detection_type": "GodFile"
         },
         "function_scores": []
     }"#;
@@ -55,11 +61,17 @@ fn test_file_debt_item_full() {
             "coverage_percent": 0.5,
             "uncovered_lines": 50,
             "god_object_indicators": {
-                "methods_count": 5,
-                "fields_count": 0,
-                "responsibilities": 1,
+                "method_count": 5,
+                "field_count": 0,
+                "responsibility_count": 1,
+                "lines_of_code": 100,
+                "complexity_sum": 50,
                 "is_god_object": false,
-                "god_object_score": 0.0
+                "god_object_score": 0.0,
+                "responsibilities": ["General"],
+                "recommended_splits": [],
+                "confidence": "NotGodObject",
+                "detection_type": "GodFile"
             },
             "function_scores": []
         },
@@ -100,11 +112,17 @@ fn test_file_debt_item_minimal_with_defaults() {
             "coverage_percent": 0.5,
             "uncovered_lines": 50,
             "god_object_indicators": {
-                "methods_count": 5,
-                "fields_count": 0,
-                "responsibilities": 1,
+                "method_count": 5,
+                "field_count": 0,
+                "responsibility_count": 1,
+                "lines_of_code": 100,
+                "complexity_sum": 50,
                 "is_god_object": false,
-                "god_object_score": 0.0
+                "god_object_score": 0.0,
+                "responsibilities": ["General"],
+                "recommended_splits": [],
+                "confidence": "NotGodObject",
+                "detection_type": "GodFile"
             },
             "function_scores": []
         }
@@ -137,11 +155,17 @@ fn test_debt_item_file_variant_externally_tagged() {
                 "coverage_percent": 0.5,
                 "uncovered_lines": 50,
                 "god_object_indicators": {
-                    "methods_count": 5,
-                    "fields_count": 0,
-                    "responsibilities": 1,
+                    "method_count": 5,
+                    "field_count": 0,
+                    "responsibility_count": 1,
+                    "lines_of_code": 100,
+                    "complexity_sum": 50,
                     "is_god_object": false,
-                    "god_object_score": 0.0
+                    "god_object_score": 0.0,
+                    "responsibilities": ["General"],
+                    "recommended_splits": [],
+                    "confidence": "NotGodObject",
+                    "detection_type": "GodFile"
                 },
                 "function_scores": []
             },
@@ -190,13 +214,17 @@ fn test_debt_item_file_variant_with_real_json_from_analyze() {
                 "coverage_percent": 0.0,
                 "uncovered_lines": 2529,
                 "god_object_indicators": {
-                    "methods_count": 105,
-                    "fields_count": 6,
-                    "responsibilities": 7,
+                    "method_count": 105,
+                    "field_count": 6,
+                    "responsibility_count": 7,
+                    "lines_of_code": 2529,
+                    "complexity_sum": 347,
                     "is_god_object": true,
-                    "god_object_score": 1.0,
-                    "responsibility_names": ["Core Operations"],
-                    "recommended_splits": []
+                    "god_object_score": 100.0,
+                    "responsibilities": ["Core Operations", "Cache Management", "Data Access", "Serialization", "Configuration", "Logging", "Error Handling"],
+                    "recommended_splits": [],
+                    "confidence": "Definite",
+                    "detection_type": "GodClass"
                 },
                 "function_scores": []
             },
@@ -238,11 +266,17 @@ fn test_unified_json_output_with_file_items() {
                         "coverage_percent": 0.5,
                         "uncovered_lines": 50,
                         "god_object_indicators": {
-                            "methods_count": 5,
-                            "fields_count": 0,
-                            "responsibilities": 1,
+                            "method_count": 5,
+                            "field_count": 0,
+                            "responsibility_count": 1,
+                            "lines_of_code": 100,
+                            "complexity_sum": 50,
                             "is_god_object": false,
-                            "god_object_score": 0.0
+                            "god_object_score": 0.0,
+                            "responsibilities": ["General"],
+                            "recommended_splits": [],
+                            "confidence": "NotGodObject",
+                            "detection_type": "GodFile"
                         },
                         "function_scores": []
                     },

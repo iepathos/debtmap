@@ -1,5 +1,5 @@
 use debtmap::data_flow::DataFlowGraph;
-use debtmap::priority::{CallGraph, ImpactMetrics, UnifiedAnalysis};
+use debtmap::priority::{CallGraph, FilterStatistics, ImpactMetrics, UnifiedAnalysis};
 use im::Vector;
 
 #[test]
@@ -22,6 +22,7 @@ fn test_unified_analysis_json_serialization() {
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
+        stats: FilterStatistics::new(),
     };
 
     // Attempt to serialize to JSON
