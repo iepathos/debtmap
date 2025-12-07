@@ -192,9 +192,9 @@ mod tests {
         FunctionMetrics, Priority, TechnicalDebtReport,
     };
     use crate::priority::{
-        ActionableRecommendation, DebtType as PriorityDebtType, FunctionRole, FunctionVisibility,
-        ImpactMetrics, Location as PriorityLocation, TransitiveCoverage, UnifiedDebtItem,
-        UnifiedScore,
+        score_types::Score0To100, ActionableRecommendation, DebtType as PriorityDebtType,
+        FunctionRole, FunctionVisibility, ImpactMetrics, Location as PriorityLocation,
+        TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
     };
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -383,7 +383,7 @@ mod tests {
                 methods: 50,
                 fields: 25,
                 responsibilities: 50,
-                god_object_score: 100.0
+                god_object_score: Score0To100::new(100.0)
             }),
             16
         );
@@ -463,7 +463,7 @@ mod tests {
                 coverage_factor: 3.0,
                 dependency_factor: 2.0,
                 role_multiplier: 1.0,
-                final_score: 10.0,
+                final_score: Score0To100::new(10.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -715,7 +715,7 @@ mod tests {
                 coverage_factor: 1.0,
                 dependency_factor: 1.0,
                 role_multiplier: 1.0,
-                final_score: 1.0,
+                final_score: Score0To100::new(1.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

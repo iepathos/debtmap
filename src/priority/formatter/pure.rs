@@ -68,7 +68,7 @@ use crate::priority::UnifiedDebtItem;
 /// );
 ///
 /// assert_eq!(formatted.rank, 1);
-/// assert_eq!(formatted.severity, Severity::from_score(item.unified_score.final_score));
+/// assert_eq!(formatted.severity, Severity::from_score(item.unified_score.final_score.value()));
 /// ```
 pub fn format_priority_item(
     rank: usize,
@@ -80,7 +80,7 @@ pub fn format_priority_item(
     let context = create_format_context(rank, item, has_coverage_data);
     let sections_data = generate_formatted_sections(&context);
 
-    let severity = Severity::from_score(item.unified_score.final_score);
+    let severity = Severity::from_score(item.unified_score.final_score.value());
     let mut sections = Vec::new();
 
     // Header section
@@ -285,7 +285,7 @@ mod tests {
                 coverage_factor: 5.0,
                 dependency_factor: 5.0,
                 role_multiplier: 1.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -447,6 +447,7 @@ mod tests {
     }
 
     // Property-based tests with proptest
+    use crate::priority::score_types::Score0To100;
     use proptest::prelude::*;
 
     proptest! {

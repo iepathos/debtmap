@@ -9,8 +9,7 @@
 use crate::core::LanguageSpecificData;
 use crate::io::writers::pattern_display::PATTERN_CONFIDENCE_THRESHOLD;
 use crate::priority::{
-    DebtItem, DebtType, FileDebtItem, FunctionRole, GodObjectIndicators, UnifiedAnalysisQueries,
-    UnifiedDebtItem,
+    DebtItem, DebtType, FileDebtItem, FunctionRole, UnifiedAnalysisQueries, UnifiedDebtItem,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -116,7 +115,7 @@ pub struct FileDebtItemOutput {
     pub location: UnifiedLocation,
     pub metrics: FileMetricsOutput,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub god_object_indicators: Option<GodObjectIndicators>,
+    pub god_object_indicators: Option<crate::priority::GodObjectIndicators>,
     pub recommendation: RecommendationOutput,
     pub impact: FileImpactOutput,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -321,7 +320,7 @@ impl FileDebtItemOutput {
 
 impl FunctionDebtItemOutput {
     fn from_function_item(item: &UnifiedDebtItem, include_scoring_details: bool) -> Self {
-        let score = item.unified_score.final_score;
+        let score = item.unified_score.final_score.value();
         let complexity_pattern = extract_complexity_pattern(
             &item.recommendation.rationale,
             &item.recommendation.primary_action,
@@ -383,7 +382,7 @@ impl FunctionDebtItemOutput {
                         + item.unified_score.dependency_factor,
                     entropy_dampening: item.entropy_details.as_ref().map(|e| e.dampening_factor),
                     role_multiplier: item.unified_score.role_multiplier,
-                    final_score: item.unified_score.final_score,
+                    final_score: item.unified_score.final_score.value(),
                     purity_factor: item.unified_score.purity_factor,
                     refactorability_factor: item.unified_score.refactorability_factor,
                     pattern_factor: item.unified_score.pattern_factor,
@@ -506,6 +505,8 @@ pub fn convert_to_unified_format(
     analysis: &crate::priority::UnifiedAnalysis,
     include_scoring_details: bool,
 ) -> UnifiedOutput {
+    #[allow(unused_imports)]
+    use crate::priority::score_types::Score0To100;
     use std::collections::HashMap;
 
     // Get all debt items sorted by score

@@ -177,7 +177,8 @@ fn bench_progress_callback_overhead(c: &mut Criterion) {
                             }
                         },
                     );
-                    black_box((result, *progress.lock().unwrap()))
+                    let progress_value = *progress.lock().unwrap();
+                    black_box((result, progress_value))
                 });
             },
         );

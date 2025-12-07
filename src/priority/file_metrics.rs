@@ -1,3 +1,4 @@
+use crate::priority::score_types::Score0To100;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -43,7 +44,7 @@ pub struct GodObjectIndicators {
     pub fields_count: usize,
     pub responsibilities: usize,
     pub is_god_object: bool,
-    pub god_object_score: f64,
+    pub god_object_score: Score0To100,
     /// Detailed list of identified responsibilities (e.g., "data_access", "validation")
     #[serde(default)]
     pub responsibility_names: Vec<String>,
@@ -224,7 +225,7 @@ pub struct FileScoreFactors {
     /// God object penalty multiplier: 2.0 + god_object_score if flagged
     pub god_object_multiplier: f64,
     /// God object detection score
-    pub god_object_score: f64,
+    pub god_object_score: Score0To100,
     /// Whether file is flagged as a god object
     pub is_god_object: bool,
 
@@ -258,7 +259,7 @@ impl FileDebtMetrics {
         // God object multiplier
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                2.0 + analysis.god_object_score
+                2.0 + analysis.god_object_score.value()
             } else {
                 1.0
             }
@@ -327,7 +328,7 @@ impl FileDebtMetrics {
         // God object multiplier
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                2.0 + analysis.god_object_score
+                2.0 + analysis.god_object_score.value()
             } else {
                 1.0
             }
@@ -343,7 +344,7 @@ impl FileDebtMetrics {
         {
             (analysis.god_object_score, analysis.is_god_object)
         } else {
-            (0.0, false)
+            (Score0To100::new(0.0), false)
         };
 
         FileScoreFactors {
@@ -487,7 +488,7 @@ impl Default for GodObjectIndicators {
             fields_count: 0,
             responsibilities: 0,
             is_god_object: false,
-            god_object_score: 0.0,
+            god_object_score: Score0To100::new(0.0),
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
             module_structure: None,
@@ -509,7 +510,7 @@ impl From<crate::organization::GodObjectAnalysis> for GodObjectIndicators {
             fields_count: analysis.field_count,
             responsibilities: analysis.responsibility_count,
             is_god_object: analysis.is_god_object,
-            god_object_score: analysis.god_object_score / 100.0, // Convert back from percentage
+            god_object_score: Score0To100::new(analysis.god_object_score.value() / 100.0), // Convert back from percentage
             responsibility_names: analysis.responsibilities,
             recommended_splits: Vec::new(), // GodObjectAnalysis uses different split structure
             module_structure: analysis.module_structure,
@@ -658,7 +659,7 @@ mod tests {
                 responsibility_count: 10,
                 lines_of_code: 1000,
                 complexity_sum: 900,
-                god_object_score: 0.8,
+                god_object_score: Score0To100::new(0.8),
                 recommended_splits: Vec::new(),
                 confidence: GodObjectConfidence::Definite,
                 responsibilities: Vec::new(),
@@ -767,7 +768,7 @@ mod tests {
                 responsibility_count: 5,
                 lines_of_code: 500,
                 complexity_sum: 200,
-                god_object_score: 0.8,
+                god_object_score: Score0To100::new(0.8),
                 confidence: GodObjectConfidence::Definite,
                 detection_type: DetectionType::GodClass,
                 responsibilities: Vec::new(),
@@ -876,7 +877,7 @@ mod tests {
             responsibility_count: 5,
             lines_of_code: 400,
             complexity_sum: 200,
-            god_object_score: 0.5,
+            god_object_score: Score0To100::new(0.5),
             confidence: GodObjectConfidence::Definite,
             detection_type: DetectionType::GodClass,
             responsibilities: Vec::new(),
@@ -963,7 +964,7 @@ mod tests {
                 responsibility_count: 1,
                 lines_of_code: 7775,
                 complexity_sum: 888,
-                god_object_score: 0.878,
+                god_object_score: Score0To100::new(0.878),
                 confidence: GodObjectConfidence::Definite,
                 detection_type: DetectionType::GodClass,
                 responsibilities: Vec::new(),
@@ -1018,7 +1019,7 @@ mod tests {
                 responsibility_count: 5,
                 lines_of_code: 2000,
                 complexity_sum: 500,
-                god_object_score: 0.8,
+                god_object_score: Score0To100::new(0.8),
                 confidence: GodObjectConfidence::Definite,
                 detection_type: DetectionType::GodClass,
                 responsibilities: Vec::new(),
@@ -1070,7 +1071,7 @@ mod tests {
                 responsibility_count: 10,
                 lines_of_code: 5000,
                 complexity_sum: 1000,
-                god_object_score: 0.95,
+                god_object_score: Score0To100::new(0.95),
                 confidence: GodObjectConfidence::Definite,
                 detection_type: DetectionType::GodClass,
                 responsibilities: Vec::new(),
@@ -1117,7 +1118,7 @@ mod tests {
                 responsibility_count: 10,
                 lines_of_code: 354,
                 complexity_sum: 56,
-                god_object_score: 7.0,
+                god_object_score: Score0To100::new(7.0),
                 confidence: GodObjectConfidence::Definite,
                 detection_type: DetectionType::GodClass,
                 responsibilities: Vec::new(),
@@ -1166,7 +1167,7 @@ mod tests {
                 responsibility_count: 5,
                 lines_of_code: 400,
                 complexity_sum: 200,
-                god_object_score: 3.0,
+                god_object_score: Score0To100::new(3.0),
                 confidence: GodObjectConfidence::Definite,
                 detection_type: DetectionType::GodClass,
                 responsibilities: Vec::new(),
@@ -1257,7 +1258,7 @@ mod tests {
                 responsibility_count: 2,
                 lines_of_code: 200,
                 complexity_sum: 50,
-                god_object_score: 0.0,
+                god_object_score: Score0To100::new(0.0),
                 confidence: GodObjectConfidence::Definite,
                 detection_type: DetectionType::GodClass,
                 responsibilities: Vec::new(),
@@ -1288,7 +1289,7 @@ mod tests {
             responsibility_count: 2,
             lines_of_code: 200,
             complexity_sum: 50,
-            god_object_score: 8.5,
+            god_object_score: Score0To100::new(8.5),
             confidence: GodObjectConfidence::Definite,
             detection_type: DetectionType::GodClass,
             responsibilities: Vec::new(),

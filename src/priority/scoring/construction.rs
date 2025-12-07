@@ -6,6 +6,7 @@
 use crate::config::{get_context_multipliers, get_data_flow_scoring_config};
 use crate::context::{detect_file_type, FileType};
 use crate::core::FunctionMetrics;
+use crate::priority::score_types::Score0To100;
 use crate::priority::unified_scorer::{
     calculate_unified_priority, calculate_unified_priority_with_data_flow,
     calculate_unified_priority_with_debt,
@@ -66,7 +67,7 @@ fn calculate_context_multiplier(file_path: &Path) -> (f64, FileType) {
 /// Apply context multiplier to a UnifiedScore (spec 191)
 fn apply_context_multiplier_to_score(mut score: UnifiedScore, multiplier: f64) -> UnifiedScore {
     // Apply multiplier to final_score and all contributing factors
-    score.final_score *= multiplier;
+    score.final_score = Score0To100::new(score.final_score.value() * multiplier);
     score.complexity_factor *= multiplier;
     score.coverage_factor *= multiplier;
     score.dependency_factor *= multiplier;
@@ -149,7 +150,7 @@ pub fn create_unified_debt_item_enhanced(
             func,
             context_analysis.context,
             context_analysis.confidence,
-            unified_score.final_score,
+            unified_score.final_score.value(),
         ))
     } else {
         None
@@ -379,7 +380,7 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     use crate::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
 
     let config = ScalingConfig::default();
-    let base_score = item.unified_score.final_score;
+    let base_score = item.unified_score.final_score.value();
 
     // Calculate final score with scaling
     let (final_score, exponent, boost) =
@@ -389,7 +390,7 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     item.unified_score.base_score = Some(base_score);
     item.unified_score.exponential_factor = Some(exponent);
     item.unified_score.risk_boost = Some(boost);
-    item.unified_score.final_score = final_score;
+    item.unified_score.final_score = Score0To100::new(final_score);
 
     item
 }
@@ -416,7 +417,7 @@ fn build_unified_debt_item(
             func,
             context_analysis.context,
             context_analysis.confidence,
-            context.unified_score.final_score,
+            context.unified_score.final_score.value(),
         ))
     } else {
         None
@@ -640,7 +641,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
             func,
             context_analysis.context,
             context_analysis.confidence,
-            unified_score.final_score,
+            unified_score.final_score.value(),
         ))
     } else {
         None
@@ -795,7 +796,7 @@ pub fn create_unified_debt_item_with_data_flow(
             func,
             context_analysis.context,
             context_analysis.confidence,
-            unified_score.final_score,
+            unified_score.final_score.value(),
         ))
     } else {
         None
@@ -855,6 +856,7 @@ pub fn create_unified_debt_item_with_data_flow(
 mod tests {
     use super::*;
     use crate::context::FileType;
+    use crate::priority::score_types::Score0To100;
     use std::path::PathBuf;
 
     #[test]
@@ -909,7 +911,7 @@ mod tests {
             coverage_factor: 10.0,
             dependency_factor: 6.0,
             role_multiplier: 1.0,
-            final_score: 24.0,
+            final_score: Score0To100::new(24.0),
             base_score: Some(20.0),
             exponential_factor: None,
             risk_boost: None,
@@ -923,7 +925,7 @@ mod tests {
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
 
         // All scores should be multiplied by 0.1 (use approximate comparison for floats)
-        assert!((adjusted.final_score - 2.4).abs() < 0.0001);
+        assert!((adjusted.final_score.value() - 2.4).abs() < 0.0001);
         assert!((adjusted.complexity_factor - 0.8).abs() < 0.0001);
         assert!((adjusted.coverage_factor - 1.0).abs() < 0.0001);
         assert!((adjusted.dependency_factor - 0.6).abs() < 0.0001);
@@ -940,7 +942,7 @@ mod tests {
             coverage_factor: 5.0,
             dependency_factor: 5.0,
             role_multiplier: 1.0,
-            final_score: 15.0,
+            final_score: Score0To100::new(15.0),
             base_score: None,
             exponential_factor: None,
             risk_boost: None,

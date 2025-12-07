@@ -57,7 +57,7 @@ pub fn render(
         // Multiple debt types - show combined score
         let combined_score: f64 = location_items
             .iter()
-            .map(|i| i.unified_score.final_score)
+            .map(|i| i.unified_score.final_score.value())
             .sum();
         let severity = calculate_severity(combined_score);
         let severity_color = severity_color(severity);
@@ -74,13 +74,13 @@ pub fn render(
         ]));
     } else {
         // Single debt type - show single score
-        let severity = calculate_severity(item.unified_score.final_score);
+        let severity = calculate_severity(item.unified_score.final_score.value());
         let severity_color = severity_color(severity);
 
         lines.push(Line::from(vec![
             Span::raw("  total                 "),
             Span::styled(
-                format!("{:.1}", item.unified_score.final_score),
+                format!("{:.1}", item.unified_score.final_score.value()),
                 Style::default().fg(theme.primary),
             ),
             Span::raw("  ["),
@@ -208,6 +208,8 @@ fn get_items_at_location<'a>(
 
 /// Format debt type as human-readable name
 fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
+    #[allow(unused_imports)]
+    use crate::priority::score_types::Score0To100;
     use crate::priority::DebtType;
     match debt_type {
         DebtType::ComplexityHotspot { .. } => "High Complexity".to_string(),

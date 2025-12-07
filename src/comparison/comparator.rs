@@ -280,7 +280,7 @@ impl Comparator {
     }
 
     fn get_score(&self, item: &UnifiedDebtItem) -> f64 {
-        item.unified_score.final_score
+        item.unified_score.final_score.value()
     }
 
     fn format_location(&self, item: &UnifiedDebtItem) -> String {
@@ -442,6 +442,7 @@ impl Comparator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::{
         unified_scorer::{Location, UnifiedScore},
         DebtType, FunctionRole, ImpactMetrics,
@@ -466,7 +467,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

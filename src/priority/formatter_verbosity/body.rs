@@ -337,7 +337,7 @@ pub fn format_priority_item_with_config(
     has_coverage_data: bool,
 ) {
     let formatter = ColoredFormatter::new(config);
-    let sev = Severity::from_score(item.unified_score.final_score);
+    let sev = Severity::from_score(item.unified_score.final_score.value());
     let severity = sev.as_str();
     let severity_color = sev.color();
     let tree_pipe = " ";
@@ -346,7 +346,7 @@ pub fn format_priority_item_with_config(
     let coverage_indicator = get_coverage_indicator(item, has_coverage_data);
     let score_header = format_score_header(
         rank,
-        item.unified_score.final_score,
+        item.unified_score.final_score.value(),
         coverage_indicator,
         severity,
         severity_color,
@@ -487,7 +487,7 @@ mod tests {
                 coverage_factor: 5.0,
                 dependency_factor: 2.0,
                 role_multiplier: 1.0,
-                final_score: 10.0,
+                final_score: crate::priority::score_types::Score0To100::new(10.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

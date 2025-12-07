@@ -389,7 +389,7 @@ fn create_test_unified_debt_item(
             coverage_factor: 5.0,
             dependency_factor: 3.0,
             role_multiplier: 1.0,
-            final_score: 5.0,
+            final_score: debtmap::priority::score_types::Score0To100::new(5.0),
             base_score: None,
             exponential_factor: None,
             risk_boost: None,

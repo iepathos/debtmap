@@ -33,7 +33,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         unified_score: UnifiedScore {
-            final_score: 85.0,
+            final_score: debtmap::priority::score_types::Score0To100::new(85.0),
             base_score: Some(75.0),
             complexity_factor: 1.0,
             dependency_factor: 1.0,
@@ -117,7 +117,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         unified_score: UnifiedScore {
-            final_score: 75.0,
+            final_score: debtmap::priority::score_types::Score0To100::new(75.0),
             base_score: Some(65.0),
             complexity_factor: 1.0,
             dependency_factor: 1.0,

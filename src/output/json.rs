@@ -72,8 +72,8 @@ mod tests {
     use super::*;
     use crate::output::unified::{UnifiedDebtItemOutput, UnifiedOutput};
     use crate::priority::{
-        call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
-        Location, UnifiedDebtItem, UnifiedScore,
+        call_graph::CallGraph, score_types::Score0To100, ActionableRecommendation, DebtType,
+        FunctionRole, ImpactMetrics, Location, UnifiedDebtItem, UnifiedScore,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;
@@ -95,7 +95,7 @@ mod tests {
                 coverage_factor: 80.0,
                 dependency_factor: 50.0,
                 role_multiplier: 2.0,
-                final_score: score,
+                final_score: Score0To100::new(score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -342,7 +342,8 @@ mod tests {
 
     #[test]
     fn test_output_json_includes_file_level_items() {
-        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use crate::priority::score_types::Score0To100;
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact};
 
         let temp_dir = TempDir::new().unwrap();
         let output_path = temp_dir.path().join("output.json");
@@ -374,7 +375,7 @@ mod tests {
                     field_count: 20,
                     responsibility_count: 15,
                     is_god_object: true,
-                    god_object_score: 8500.0,
+                    god_object_score: Score0To100::new(8500.0),
                     lines_of_code: 5533,
                     complexity_sum: 4500,
                     responsibilities: vec!["Too many responsibilities".to_string()],

@@ -330,6 +330,7 @@ fn calculate_similarity(a: &str, b: &str) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::{
         unified_scorer::{Location, UnifiedScore},
         DebtType, FunctionRole, ImpactMetrics,
@@ -354,7 +355,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: 50.0,
+                final_score: Score0To100::new(50.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

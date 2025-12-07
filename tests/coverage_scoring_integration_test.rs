@@ -49,7 +49,7 @@ fn create_debt_item(
             coverage_factor: coverage_multiplier * 10.0, // For display compatibility
             dependency_factor,
             role_multiplier: 1.0,
-            final_score,
+            final_score: debtmap::priority::score_types::Score0To100::new(final_score),
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -163,7 +163,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
                 coverage_factor: 0.0, // No coverage data
                 dependency_factor,
                 role_multiplier: 1.0,
-                final_score: base_score,
+                final_score: debtmap::priority::score_types::Score0To100::new(base_score),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
@@ -245,13 +245,13 @@ fn test_coverage_scoring_invariant_total_analysis() {
     let total_without_coverage: f64 = analysis_no_coverage
         .items
         .iter()
-        .map(|item| item.unified_score.final_score)
+        .map(|item| item.unified_score.final_score.value())
         .sum();
 
     let total_with_coverage: f64 = analysis_with_coverage
         .items
         .iter()
-        .map(|item| item.unified_score.final_score)
+        .map(|item| item.unified_score.final_score.value())
         .sum();
 
     // INVARIANT: Total debt score WITH coverage should be ≤ total WITHOUT coverage

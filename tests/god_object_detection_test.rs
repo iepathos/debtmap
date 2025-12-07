@@ -56,7 +56,7 @@ fn test_detects_file_with_many_standalone_functions() {
         "File with 30 simple functions should NOT be flagged as god object with complexity weighting"
     );
     assert!(
-        analysis.god_object_score < 100.0,
+        analysis.god_object_score.value() < 100.0,
         "God object score should be less than 100 for simple functions, got {}",
         analysis.god_object_score
     );
@@ -93,7 +93,7 @@ fn test_detects_rust_call_graph_scenario() {
 
     // The key assertion: the analysis should run and produce a reasonable score
     assert!(
-        analysis.god_object_score >= 30.0,
+        analysis.god_object_score.value() >= 30.0,
         "Should have at least moderate score for 270 functions, got {}",
         analysis.god_object_score
     );
@@ -196,7 +196,7 @@ fn test_mixed_struct_and_functions() {
         "File with 25 simple functions should NOT be flagged as god object with complexity weighting"
     );
     assert!(
-        analysis.god_object_score < 100.0,
+        analysis.god_object_score.value() < 100.0,
         "God object score should be less than 100 for simple functions, got {}",
         analysis.god_object_score
     );

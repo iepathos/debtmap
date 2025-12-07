@@ -2,6 +2,8 @@
 ///
 /// Each predicate tests ONE specific condition with no side effects.
 /// All functions are deterministic, pure, and independently testable.
+#[allow(unused_imports)]
+use crate::priority::score_types::Score0To100;
 use crate::priority::{DebtType, FunctionRole};
 
 // ============================================================================
@@ -156,7 +158,7 @@ mod tests {
             methods: 100,
             fields: 50,
             responsibilities: 5,
-            god_object_score: 95.0,
+            god_object_score: Score0To100::new(95.0),
         }));
         assert!(is_god_object(&DebtType::GodModule {
             functions: 100,
@@ -238,7 +240,7 @@ mod tests {
             methods: 100,
             fields: 50,
             responsibilities: 5,
-            god_object_score: 95.0,
+            god_object_score: Score0To100::new(95.0),
         }));
     }
 

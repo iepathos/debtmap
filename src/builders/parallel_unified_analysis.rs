@@ -6,6 +6,7 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
         file_metrics::FileDebtItem,
+        score_types::Score0To100,
         UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     },
     progress::ProgressManager,
@@ -938,8 +939,9 @@ impl ParallelUnifiedAnalysisBuilder {
                                 responsibility_count: 5,
                                 lines_of_code: actual_line_count,
                                 complexity_sum: file_metrics.total_complexity,
-                                god_object_score: (file_metrics.function_count as f64 / 50.0)
-                                    .min(2.0),
+                                god_object_score: Score0To100::new(
+                                    (file_metrics.function_count as f64 / 50.0).min(2.0),
+                                ),
                                 recommended_splits: Vec::new(),
                                 confidence: crate::organization::GodObjectConfidence::Probable,
                                 responsibilities: Vec::new(),

@@ -215,7 +215,7 @@ fn test_structural_issues_god_objects() {
             methods: 45,
             fields: 25,
             responsibilities: 8,
-            god_object_score: 3.5,
+            god_object_score: debtmap::priority::score_types::Score0To100::new(3.5),
         },
         &ScoreWeights::default(),
     );

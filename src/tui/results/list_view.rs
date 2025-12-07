@@ -408,7 +408,7 @@ fn format_list_item(
     is_selected: bool,
     theme: &Theme,
 ) -> ListItem<'static> {
-    let severity = calculate_severity(item.unified_score.final_score);
+    let severity = calculate_severity(item.unified_score.final_score.value());
     let severity_color = severity_color(severity);
 
     let indicator = if is_selected { "▸ " } else { "  " };
@@ -476,7 +476,7 @@ fn format_list_item(
             Style::default().fg(severity_color),
         ),
         Span::styled(
-            format!("{:<7.1}", item.unified_score.final_score),
+            format!("{:<7.1}", item.unified_score.final_score.value()),
             Style::default().fg(theme.primary),
         ),
         Span::raw("  "),
@@ -555,6 +555,7 @@ fn severity_color(severity: &str) -> Color {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::score_types::Score0To100;
     use crate::priority::{
         ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedScore,
     };
@@ -580,7 +581,7 @@ mod tests {
                 coverage_factor: 5.0,
                 dependency_factor: 5.0,
                 role_multiplier: 1.0,
-                final_score: 50.0,
+                final_score: Score0To100::new(50.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
