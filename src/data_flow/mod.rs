@@ -884,4 +884,61 @@ mod tests {
         assert!(names.contains(&"result".to_string()));
         assert!(names.contains(&"buffer".to_string()));
     }
+
+    #[test]
+    fn test_tainted_var_translation() {
+        use crate::analysis::data_flow::{
+            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+            VarId,
+        };
+        use std::collections::HashMap;
+
+        let mut data_flow = DataFlowGraph::new();
+        let func_id = create_test_function_id("test");
+
+        let mut tainted_vars = HashSet::new();
+        tainted_vars.insert(VarId {
+            name_id: 0,
+            version: 0,
+        });
+        tainted_vars.insert(VarId {
+            name_id: 1,
+            version: 1,
+        });
+
+        let analysis = DataFlowAnalysis {
+            liveness: LivenessInfo {
+                live_in: HashMap::new(),
+                live_out: HashMap::new(),
+                dead_stores: HashSet::new(),
+            },
+            reaching_defs: ReachingDefinitions {
+                reach_in: HashMap::new(),
+                reach_out: HashMap::new(),
+                def_use_chains: HashMap::new(),
+            },
+            escape_info: EscapeAnalysis {
+                escaping_vars: HashSet::new(),
+                captured_vars: HashSet::new(),
+                return_dependencies: HashSet::new(),
+            },
+            taint_info: TaintAnalysis {
+                tainted_vars,
+                taint_sources: HashMap::new(),
+                return_tainted: false,
+            },
+        };
+
+        let ctx = CfgAnalysisWithContext::new(
+            vec!["user_input".to_string(), "sanitized".to_string()],
+            analysis,
+        );
+
+        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
+
+        let names = data_flow.get_tainted_var_names(&func_id);
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"user_input".to_string()));
+        assert!(names.contains(&"sanitized".to_string()));
+    }
 }
