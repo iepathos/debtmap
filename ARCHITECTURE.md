@@ -1826,6 +1826,71 @@ The system automatically adjusts based on:
 - Codebase size
 - File complexity distribution
 
+### Single-Stage Filtering (Spec 243)
+
+DebtMap uses a **single-stage filtering** approach where all filtering happens during item construction. There are no post-filtering stages - items that pass thresholds are added to `UnifiedAnalysis`, and those that don't are never created.
+
+#### Configuration Precedence
+
+Filtering configuration follows a strict precedence chain:
+
+1. **CLI arguments** (highest priority)
+   - `--min-score <value>`: Minimum unified score threshold
+   - Direct command-line flags always win
+
+2. **Environment variables**
+   - `DEBTMAP_MIN_SCORE_THRESHOLD`: Minimum score (0-100 scale)
+   - `DEBTMAP_MIN_CYCLOMATIC`: Minimum cyclomatic complexity
+   - `DEBTMAP_MIN_COGNITIVE`: Minimum cognitive complexity
+   - `DEBTMAP_MIN_RISK`: Minimum risk score (0-1 scale)
+
+3. **Config file** (`.debtmap.toml`)
+   - `thresholds.min_score_threshold`: Default minimum score
+   - Other threshold configurations
+
+4. **Hardcoded defaults** (lowest priority)
+   - `min_score: 3.0` (default threshold)
+   - Conservative defaults to reduce noise
+
+#### Implementation
+
+The `ItemFilterConfig` struct (`src/priority/filter_config.rs`) centralizes all filtering configuration:
+
+```rust
+pub struct ItemFilterConfig {
+    pub min_score: f64,           // Minimum unified score (0-100)
+    pub min_cyclomatic: u32,      // Minimum cyclomatic complexity
+    pub min_cognitive: u32,       // Minimum cognitive complexity
+    pub min_risk: f64,            // Minimum risk score (0-1)
+    pub show_t4_items: bool,      // Show low-priority items
+}
+```
+
+Filtering happens during item creation in `UnifiedAnalysis::add_item()` and `UnifiedAnalysis::add_file_item()`. Items below thresholds are never added to the analysis.
+
+#### Consistency Across Output Modes
+
+Both TUI and non-TUI output modes use the **same** `UnifiedAnalysis` result. There is no additional filtering in either code path:
+
+- **TUI mode**: Interactive results explorer (`ResultsExplorer`) displays `analysis.items`
+- **Non-TUI mode**: Traditional output (`output_unified_priorities_with_config`) displays `analysis.items`
+
+This architecture guarantees that users see identical item lists regardless of output mode.
+
+#### Empty Results Handling
+
+When filtering removes all items, the system provides helpful feedback:
+
+```
+No technical debt items found matching current thresholds.
+Try adjusting filters:
+  - Use --min-score <value> to lower the score threshold
+  - Current min_score threshold: 3.0 (default)
+  - Use DEBTMAP_MIN_SCORE_THRESHOLD=0 to see all items
+```
+
+This guides users to adjust thresholds when their codebase doesn't have high-scoring debt items.
+
 ## Extension Points
 
 ### Extending Rust Analysis

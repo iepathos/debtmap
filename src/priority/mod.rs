@@ -6,6 +6,7 @@ pub mod debt_aggregator;
 pub mod detected_pattern;
 pub mod external_api_detector;
 pub mod file_metrics;
+pub mod filter_config;
 pub mod filter_predicates;
 pub mod filtering;
 pub mod formatted_output;
@@ -1052,81 +1053,6 @@ impl UnifiedAnalysis {
         }
     }
 
-    /// Filter analysis results by minimum score threshold (spec 193)
-    ///
-    /// Removes items below the specified score threshold and recalculates
-    /// total debt score and debt density based on remaining items.
-    /// Also filters out T4 items if show_t4_in_main_report is false (default).
-    pub fn filter_by_score_threshold(&self, min_score: f64) -> Self {
-        use crate::priority::tiers::{classify_tier, RecommendationTier, TierConfig};
-
-        let tier_config = TierConfig::default();
-
-        let filtered_items: Vector<UnifiedDebtItem> = self
-            .items
-            .iter()
-            .filter(|item| {
-                // Filter by score
-                if item.unified_score.final_score.value() < min_score {
-                    return false;
-                }
-
-                // Filter T4 items unless explicitly requested (consistent with display behavior)
-                if !tier_config.show_t4_in_main_report {
-                    // Use pre-assigned tier if available (e.g., for god objects), otherwise classify
-                    let tier = item
-                        .tier
-                        .unwrap_or_else(|| classify_tier(item, &tier_config));
-                    if tier == RecommendationTier::T4Maintenance {
-                        return false;
-                    }
-                }
-
-                true
-            })
-            .cloned()
-            .collect();
-
-        let filtered_file_items: Vector<FileDebtItem> = self
-            .file_items
-            .iter()
-            .filter(|item| item.score >= min_score)
-            .cloned()
-            .collect();
-
-        // Recalculate total debt score for filtered items
-        let function_debt_score: f64 = filtered_items
-            .iter()
-            .map(|item| item.unified_score.final_score.value())
-            .sum();
-
-        let file_debt_score: f64 = filtered_file_items.iter().map(|item| item.score).sum();
-
-        let total_debt_score = function_debt_score + file_debt_score;
-
-        // Recalculate debt density based on filtered items
-        let debt_density = if self.total_lines_of_code > 0 {
-            (total_debt_score / self.total_lines_of_code as f64) * 1000.0
-        } else {
-            0.0
-        };
-
-        Self {
-            items: filtered_items,
-            file_items: filtered_file_items,
-            total_debt_score,
-            total_impact: self.total_impact.clone(),
-            debt_density,
-            total_lines_of_code: self.total_lines_of_code,
-            call_graph: self.call_graph.clone(),
-            data_flow_graph: self.data_flow_graph.clone(),
-            overall_coverage: self.overall_coverage,
-            has_coverage_data: self.has_coverage_data,
-            timings: self.timings.clone(),
-            stats: self.stats.clone(),
-        }
-    }
-
     /// Get filtering statistics for debugging (spec 242).
     pub fn filter_statistics(&self) -> &FilterStatistics {
         &self.stats
@@ -1335,13 +1261,24 @@ mod tests {
         cognitive: u32,
         score: f64,
     ) -> UnifiedDebtItem {
+        create_test_item_with_line(debt_type, cyclomatic, cognitive, score, 1)
+    }
+
+    // Helper function to create test items with specific line number
+    fn create_test_item_with_line(
+        debt_type: DebtType,
+        cyclomatic: u32,
+        cognitive: u32,
+        score: f64,
+        line: usize,
+    ) -> UnifiedDebtItem {
         use semantic_classifier::FunctionRole;
 
         UnifiedDebtItem {
             location: unified_scorer::Location {
                 file: "test.rs".into(),
                 function: "test_fn".into(),
-                line: 1,
+                line,
             },
             debt_type,
             unified_score: unified_scorer::UnifiedScore {
@@ -1625,75 +1562,84 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_by_score_threshold() {
+    fn test_single_stage_filtering_by_score() {
         use crate::priority::call_graph::CallGraph;
+
+        // Set minimum score threshold for single-stage filtering (spec 243)
+        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "3.0");
+        // Set complexity thresholds to 0 to isolate score filtering
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
 
         let call_graph = CallGraph::new();
         let mut analysis = UnifiedAnalysis::new(call_graph);
 
-        // Create items with different scores
-        // Use higher complexity to avoid T4 classification (T4 threshold is complexity < 10)
-        let high_score_item = create_test_item(
+        // Create items with different scores and different line numbers
+        // Use higher complexity to avoid T4 classification
+        let high_score_item = create_test_item_with_line(
             DebtType::TestingGap {
                 coverage: 0.0,
-                cyclomatic: 15, // High complexity - won't be T4
+                cyclomatic: 15,
                 cognitive: 20,
             },
             15,
             20,
             10.0, // High score - should be kept
+            10,   // line number
         );
 
-        let low_score_item = create_test_item(
+        let low_score_item = create_test_item_with_line(
             DebtType::TestingGap {
                 coverage: 0.5,
-                cyclomatic: 12, // Moderate complexity - won't be T4
+                cyclomatic: 12,
                 cognitive: 15,
             },
             12,
             15,
-            2.0, // Low score - should be filtered by score
+            2.0, // Low score - should be filtered during add_item
+            20,  // line number
         );
 
-        let mid_score_item = create_test_item(
+        let mid_score_item = create_test_item_with_line(
             DebtType::TestingGap {
                 coverage: 0.3,
-                cyclomatic: 11, // Moderate complexity - won't be T4
+                cyclomatic: 11,
                 cognitive: 12,
             },
             11,
             12,
-            5.0, // Mid score
+            5.0, // Mid score - should be kept
+            30,  // line number
         );
 
-        analysis.items.push_back(high_score_item);
-        analysis.items.push_back(low_score_item);
-        analysis.items.push_back(mid_score_item);
+        // Add items - filtering happens during add_item (spec 243)
+        analysis.add_item(high_score_item);
+        analysis.add_item(low_score_item); // Filtered out
+        analysis.add_item(mid_score_item);
 
-        // Calculate totals before filtering
+        // Single-stage filtering: only items >= 3.0 should be present
+        assert_eq!(analysis.items.len(), 2); // high_score and mid_score
+        assert_eq!(analysis.stats.filtered_by_score, 1); // low_score filtered
+
+        // Calculate totals
         analysis.calculate_total_impact();
-        let original_score = analysis.total_debt_score;
-        assert_eq!(original_score, 17.0); // 10.0 + 2.0 + 5.0
+        assert_eq!(analysis.total_debt_score, 15.0); // 10.0 + 5.0
 
-        // Filter by threshold of 3.0
-        let filtered = analysis.filter_by_score_threshold(3.0);
-
-        // Should keep items with score >= 3.0 (high_score and mid_score)
-        // T4 items are also filtered out by default, but our items have high complexity so they won't be T4
-        assert_eq!(filtered.items.len(), 2);
-        assert_eq!(filtered.total_debt_score, 15.0); // 10.0 + 5.0
-
-        // Filter by higher threshold of 6.0
-        let filtered_high = analysis.filter_by_score_threshold(6.0);
-
-        // Should only keep high_score item
-        assert_eq!(filtered_high.items.len(), 1);
-        assert_eq!(filtered_high.total_debt_score, 10.0);
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
     }
 
     #[test]
-    fn test_filter_by_score_threshold_recalculates_density() {
+    fn test_single_stage_filtering_calculates_correct_density() {
         use crate::priority::call_graph::CallGraph;
+
+        // Set threshold for single-stage filtering (spec 243)
+        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "5.0");
+        // Set complexity thresholds to 0 to isolate score filtering
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
 
         let call_graph = CallGraph::new();
         let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -1702,27 +1648,28 @@ mod tests {
         let item1 = create_test_item(
             DebtType::TestingGap {
                 coverage: 0.0,
-                cyclomatic: 15, // High complexity - won't be T4
+                cyclomatic: 15,
                 cognitive: 20,
             },
             15,
             20,
-            10.0,
+            10.0, // Above threshold - kept
         );
 
         let item2 = create_test_item(
             DebtType::TestingGap {
                 coverage: 0.5,
-                cyclomatic: 12, // Moderate complexity - won't be T4
+                cyclomatic: 12,
                 cognitive: 15,
             },
             12,
             15,
-            2.0,
+            2.0, // Below threshold - filtered during add_item
         );
 
-        analysis.items.push_back(item1);
-        analysis.items.push_back(item2);
+        // Add items - filtering happens during add_item (spec 243)
+        analysis.add_item(item1);
+        analysis.add_item(item2); // Filtered out
 
         // Calculate totals and manually set LOC for density calculation
         analysis.calculate_total_impact();
@@ -1731,19 +1678,16 @@ mod tests {
         // Manually calculate density since calculate_total_impact sets LOC to 0 in test env
         analysis.debt_density = (analysis.total_debt_score / 1000.0) * 1000.0;
 
-        // Original debt score should be 12.0 (10.0 + 2.0)
-        assert_eq!(analysis.total_debt_score, 12.0);
-        // Original density: (12.0 / 1000) * 1000 = 12.0 per 1K LOC
-        assert_eq!(analysis.debt_density, 12.0);
+        // Only item1 should be present (score 10.0)
+        assert_eq!(analysis.items.len(), 1);
+        assert_eq!(analysis.total_debt_score, 10.0);
+        // Density: (10.0 / 1000) * 1000 = 10.0 per 1K LOC
+        assert_eq!(analysis.debt_density, 10.0);
 
-        // Filter to keep only items with score >= 5.0
-        let filtered = analysis.filter_by_score_threshold(5.0);
-
-        // Should only keep item1 with score 10.0
-        assert_eq!(filtered.items.len(), 1);
-        assert_eq!(filtered.total_debt_score, 10.0);
-        // New density: (10.0 / 1000) * 1000 = 10.0 per 1K LOC
-        assert_eq!(filtered.debt_density, 10.0);
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
     }
 }
 

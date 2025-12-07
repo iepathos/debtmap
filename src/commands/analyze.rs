@@ -165,7 +165,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     }
 
     // Apply category filtering if specified
-    let mut filtered_analysis = if let Some(ref filter_cats) = config.filter_categories {
+    let filtered_analysis = if let Some(ref filter_cats) = config.filter_categories {
         let categories: Vec<crate::priority::DebtCategory> = filter_cats
             .iter()
             .filter_map(|s| crate::priority::DebtCategory::from_string(s))
@@ -180,10 +180,20 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         unified_analysis
     };
 
-    // Apply score threshold filtering (spec 193)
-    let min_score = crate::config::get_minimum_score_threshold();
-    if min_score > 0.0 {
-        filtered_analysis = filtered_analysis.filter_by_score_threshold(min_score);
+    // Items in unified_analysis are final (spec 243: single-stage filtering)
+    // No post-filtering needed - all filtering happens during add_item
+
+    // Check for empty results and provide helpful message (spec 243 AC9)
+    if filtered_analysis.items.is_empty() && filtered_analysis.file_items.is_empty() {
+        eprintln!("No technical debt items found matching current thresholds.");
+        eprintln!("Try adjusting filters:");
+        eprintln!("  - Use --min-score <value> to lower the score threshold");
+        eprintln!(
+            "  - Current min_score threshold: {}",
+            std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD")
+                .unwrap_or_else(|_| "3.0 (default)".to_string())
+        );
+        eprintln!("  - Use DEBTMAP_MIN_SCORE_THRESHOLD=0 to see all items");
     }
 
     // Cleanup TUI BEFORE writing output (alternate screen would discard output)
