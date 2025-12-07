@@ -1671,7 +1671,15 @@ fn calculate_god_object_risk(god_analysis: &crate::organization::GodObjectAnalys
 fn create_god_object_recommendation(
     god_analysis: &crate::organization::GodObjectAnalysis,
 ) -> ActionableRecommendation {
-    let split_count = god_analysis.recommended_splits.len().max(1);
+    // Calculate recommended split count based on responsibility count
+    // If recommended_splits is populated, use that; otherwise calculate from responsibilities
+    let split_count = if !god_analysis.recommended_splits.is_empty() {
+        god_analysis.recommended_splits.len()
+    } else {
+        // Heuristic: Split into 2-5 modules based on responsibility count
+        // For N responsibilities, recommend splitting into min(N, 5) modules, with minimum of 2
+        god_analysis.responsibility_count.clamp(2, 5)
+    };
 
     let primary_action = match god_analysis.detection_type {
         crate::organization::DetectionType::GodClass => {
