@@ -1697,7 +1697,8 @@ fn apply_file_analysis_results(
     processed_files: Vec<ProcessedFileData>,
 ) {
     use crate::priority::god_object_aggregation::{
-        aggregate_from_raw_metrics, aggregate_god_object_metrics, extract_member_functions,
+        aggregate_dependencies_from_raw_metrics, aggregate_from_raw_metrics,
+        aggregate_god_object_metrics, extract_member_functions,
     };
 
     for file_data in processed_files {
@@ -1708,20 +1709,32 @@ fn apply_file_analysis_results(
             // NEW (spec 244): Aggregate from raw metrics first (includes ALL functions, even tests)
             let mut aggregated_metrics = aggregate_from_raw_metrics(&file_data.raw_functions);
 
-            // Then enrich with coverage/dependencies from unified items (if available)
+            // Try to aggregate dependencies from raw metrics via call graph
+            let (cg_callers, cg_callees, cg_up_count, cg_down_count) =
+                aggregate_dependencies_from_raw_metrics(&file_data.raw_functions, &unified.call_graph);
+
+            // Enrich with coverage/dependencies/risk from unified items (if available)
             let member_functions =
                 extract_member_functions(unified.items.iter(), &file_data.file_path);
             if !member_functions.is_empty() {
                 let item_metrics = aggregate_god_object_metrics(&member_functions);
-                // Merge: keep complexity from raw metrics, add coverage/deps from items
+                // Merge: keep complexity from raw metrics, prefer unified items for deps (more complete)
                 aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
-                aggregated_metrics.unique_upstream_callers = item_metrics.unique_upstream_callers;
+                aggregated_metrics.unique_upstream_callers =
+                    item_metrics.unique_upstream_callers;
                 aggregated_metrics.unique_downstream_callees =
                     item_metrics.unique_downstream_callees;
                 aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
-                aggregated_metrics.downstream_dependencies = item_metrics.downstream_dependencies;
+                aggregated_metrics.downstream_dependencies =
+                    item_metrics.downstream_dependencies;
                 aggregated_metrics.aggregated_contextual_risk =
                     item_metrics.aggregated_contextual_risk;
+            } else {
+                // Fall back to call graph if no unified items (functions filtered out)
+                aggregated_metrics.unique_upstream_callers = cg_callers;
+                aggregated_metrics.unique_downstream_callees = cg_callees;
+                aggregated_metrics.upstream_dependencies = cg_up_count;
+                aggregated_metrics.downstream_dependencies = cg_down_count;
             }
 
             // NEW (spec 207): Create god object debt item for TUI display

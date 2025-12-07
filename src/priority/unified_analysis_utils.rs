@@ -99,25 +99,34 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
 
         self.stats.total_items_processed += 1;
 
-        // Get unified filter configuration (spec 243: single-stage filtering)
-        let config = ItemFilterConfig::from_environment();
+        // God objects bypass filters as they represent critical architectural issues (spec 207)
+        let is_god_object = item
+            .god_object_indicators
+            .as_ref()
+            .is_some_and(|indicators| indicators.is_god_object);
 
-        // Apply filters using pure predicates
-        if !meets_score_threshold(&item, config.min_score) {
-            self.stats.filtered_by_score += 1;
-            return;
+        if !is_god_object {
+            // Get unified filter configuration (spec 243: single-stage filtering)
+            let config = ItemFilterConfig::from_environment();
+
+            // Apply filters using pure predicates
+            if !meets_score_threshold(&item, config.min_score) {
+                self.stats.filtered_by_score += 1;
+                return;
+            }
+
+            if !meets_risk_threshold(&item, config.min_risk) {
+                self.stats.filtered_by_risk += 1;
+                return;
+            }
+
+            if !meets_complexity_thresholds(&item, config.min_cyclomatic, config.min_cognitive) {
+                self.stats.filtered_by_complexity += 1;
+                return;
+            }
         }
 
-        if !meets_risk_threshold(&item, config.min_risk) {
-            self.stats.filtered_by_risk += 1;
-            return;
-        }
-
-        if !meets_complexity_thresholds(&item, config.min_cyclomatic, config.min_cognitive) {
-            self.stats.filtered_by_complexity += 1;
-            return;
-        }
-
+        // Check for duplicates (applies to all items including god objects)
         if self
             .items
             .iter()

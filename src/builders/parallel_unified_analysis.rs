@@ -934,38 +934,52 @@ impl ParallelUnifiedAnalysisBuilder {
             file_metrics.god_object_analysis = if no_god_object {
                 None
             } else {
-                file_analysis::analyze_god_object(&content, file_path, coverage_data)
-                    .unwrap_or_else(|_| {
-                        // Fallback to heuristic detection if analysis fails
-                        if actual_line_count > 2000 || file_metrics.function_count > 50 {
-                            Some(crate::organization::GodObjectAnalysis {
-                                is_god_object: true,
-                                method_count: file_metrics.function_count,
-                                field_count: 0,
-                                responsibility_count: 5,
-                                lines_of_code: actual_line_count,
-                                complexity_sum: file_metrics.total_complexity,
-                                god_object_score: Score0To100::new(
-                                    (file_metrics.function_count as f64 / 50.0).min(2.0),
-                                ),
-                                recommended_splits: Vec::new(),
-                                confidence: crate::organization::GodObjectConfidence::Probable,
-                                responsibilities: Vec::new(),
-                                purity_distribution: None,
-                                module_structure: None,
-                                detection_type: crate::organization::DetectionType::GodFile,
-                                visibility_breakdown: None,
-                                domain_count: 0,
-                                domain_diversity: 0.0,
-                                struct_ratio: 0.0,
-                                analysis_method: Default::default(),
-                                cross_domain_severity: None,
-                                domain_diversity_metrics: None,
-                            })
-                        } else {
-                            None
-                        }
+                let analysis_result = file_analysis::analyze_god_object(&content, file_path, coverage_data);
+
+                let analyzed = analysis_result.unwrap_or_else(|_| None);
+
+                // Use heuristic fallback if:
+                // 1. Analysis failed (analyzed is None), OR
+                // 2. Analysis succeeded but said not god object, BUT heuristic thresholds are met
+                // This ensures simple god objects (many low-complexity methods) are caught
+                if analyzed.as_ref().is_some_and(|a| a.is_god_object) {
+                    // Analysis found a god object, use it
+                    analyzed
+                } else if actual_line_count > 2000 || file_metrics.function_count > 50 {
+                    // Heuristic threshold met - create god object even if analysis said no
+
+                    // Calculate god object score (0-100 scale)
+                    // Base score on number of methods and LOC
+                    let method_score = ((file_metrics.function_count as f64 / 50.0) * 50.0).min(50.0);
+                    let loc_score = ((actual_line_count as f64 / 2000.0) * 50.0).min(50.0);
+                    let god_score = method_score + loc_score;
+
+                    Some(crate::organization::GodObjectAnalysis {
+                        is_god_object: true,
+                        method_count: file_metrics.function_count,
+                        field_count: 0,
+                        responsibility_count: 5,
+                        lines_of_code: actual_line_count,
+                        complexity_sum: file_metrics.total_complexity,
+                        god_object_score: Score0To100::new(god_score),
+                        recommended_splits: Vec::new(),
+                        confidence: crate::organization::GodObjectConfidence::Probable,
+                        responsibilities: Vec::new(),
+                        purity_distribution: None,
+                        module_structure: None,
+                        detection_type: crate::organization::DetectionType::GodFile,
+                        visibility_breakdown: None,
+                        domain_count: 0,
+                        domain_diversity: 0.0,
+                        struct_ratio: 0.0,
+                        analysis_method: Default::default(),
+                        cross_domain_severity: None,
+                        domain_diversity_metrics: None,
                     })
+                } else {
+                    // No god object detected and heuristic not met
+                    analyzed
+                }
             };
         } else {
             // Fallback to estimated metrics if file can't be read
@@ -992,7 +1006,15 @@ impl ParallelUnifiedAnalysisBuilder {
         // Create FileDebtItem with context-aware scoring
         let item = crate::priority::FileDebtItem::from_metrics(file_metrics, Some(&file_context));
 
-        if file_analysis::should_include_file(item.score) {
+        // Include file if it meets score threshold OR is a god object (spec 207)
+        // God objects should always be included as they represent architectural issues
+        let has_god_object = item
+            .metrics
+            .god_object_analysis
+            .as_ref()
+            .is_some_and(|analysis| analysis.is_god_object);
+
+        if file_analysis::should_include_file(item.score) || has_god_object {
             Some(item)
         } else {
             None
@@ -1073,27 +1095,27 @@ impl ParallelUnifiedAnalysisBuilder {
                 if god_analysis.is_god_object {
                     // NEW (spec 244): Aggregate from raw metrics first (includes ALL functions, even tests)
                     use crate::priority::god_object_aggregation::{
-                        aggregate_from_raw_metrics, aggregate_god_object_metrics,
-                        extract_member_functions,
+                        aggregate_dependencies_from_raw_metrics, aggregate_from_raw_metrics,
+                        aggregate_god_object_metrics, extract_member_functions,
                     };
 
                     let mut aggregated_metrics = aggregate_from_raw_metrics(&raw_functions);
 
-                    // Then enrich with coverage/dependencies from unified items (if available)
+                    // Aggregate dependencies from raw metrics via call graph
+                    let (callers, callees, up_count, down_count) =
+                        aggregate_dependencies_from_raw_metrics(&raw_functions, &self.call_graph);
+                    aggregated_metrics.unique_upstream_callers = callers;
+                    aggregated_metrics.unique_downstream_callees = callees;
+                    aggregated_metrics.upstream_dependencies = up_count;
+                    aggregated_metrics.downstream_dependencies = down_count;
+
+                    // Then enrich with coverage/contextual risk from unified items (if available)
                     let member_functions =
                         extract_member_functions(unified.items.iter(), &file_item.metrics.path);
                     if !member_functions.is_empty() {
                         let item_metrics = aggregate_god_object_metrics(&member_functions);
-                        // Merge: keep complexity from raw metrics, add coverage/deps from items
+                        // Merge: keep complexity and dependencies from raw metrics, add coverage/risk from items
                         aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
-                        aggregated_metrics.unique_upstream_callers =
-                            item_metrics.unique_upstream_callers;
-                        aggregated_metrics.unique_downstream_callees =
-                            item_metrics.unique_downstream_callees;
-                        aggregated_metrics.upstream_dependencies =
-                            item_metrics.upstream_dependencies;
-                        aggregated_metrics.downstream_dependencies =
-                            item_metrics.downstream_dependencies;
                         aggregated_metrics.aggregated_contextual_risk =
                             item_metrics.aggregated_contextual_risk;
                     }
