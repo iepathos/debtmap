@@ -56,6 +56,27 @@ pub fn render(
         area.width,
     );
 
+    // Add note for god objects about dependency aggregation
+    if let Some(indicators) = &item.god_object_indicators {
+        if indicators.is_god_object && blast_radius == 0 {
+            lines.push(ratatui::text::Line::from(""));
+            lines.push(ratatui::text::Line::from(vec![
+                ratatui::text::Span::styled(
+                    "Note: ",
+                    ratatui::style::Style::default().fg(theme.primary),
+                ),
+                ratatui::text::Span::styled(
+                    "Dependencies aggregate from debt items only.",
+                    ratatui::style::Style::default().fg(theme.muted),
+                ),
+            ]));
+            lines.push(ratatui::text::Line::from(vec![ratatui::text::Span::styled(
+                "Zero deps means all functions are simple (no debt).",
+                ratatui::style::Style::default().fg(theme.muted),
+            )]));
+        }
+    }
+
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
         .wrap(Wrap { trim: false });

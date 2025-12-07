@@ -5,10 +5,20 @@
 //!
 //! # Aggregation Strategies
 //!
-//! - **Complexity**: SUM (total burden)
+//! - **Complexity**: SUM of all functions (total burden)
 //! - **Coverage**: Weighted average by function length
-//! - **Dependencies**: Unique set (deduplicate)
-//! - **Contextual Risk**: Aggregate base and contextual risk
+//! - **Dependencies**: Deduplicated from UnifiedDebtItems only (debt-focused)
+//! - **Contextual Risk**: Average across member functions
+//!
+//! ## Dependency Aggregation Note
+//!
+//! Dependencies aggregate only from functions that became UnifiedDebtItems
+//! (passed complexity/coverage thresholds). This provides a debt-focused view
+//! of dependencies rather than complete architectural dependencies. Simple
+//! functions (getters, setters) are filtered out and don't contribute.
+//!
+//! This means god objects may show zero dependencies if all their functions
+//! are too simple to become debt items, which is working as intended.
 //!
 //! # Examples
 //!
@@ -21,7 +31,6 @@
 //! ```
 
 use crate::core::FunctionMetrics;
-use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
 use std::collections::HashSet;
@@ -200,37 +209,6 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
     }
 }
 
-/// Aggregate dependencies from raw FunctionMetrics using call graph.
-///
-/// Queries the call graph for each function to get upstream/downstream dependencies.
-pub fn aggregate_dependencies_from_raw_metrics(
-    functions: &[FunctionMetrics],
-    call_graph: &CallGraph,
-) -> (Vec<String>, Vec<String>, usize, usize) {
-    let mut unique_callers: HashSet<String> = HashSet::new();
-    let mut unique_callees: HashSet<String> = HashSet::new();
-
-    for func in functions {
-        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
-
-        // Query call graph for dependencies
-        let upstream_callers = call_graph.get_callers(&func_id);
-        let downstream_callees = call_graph.get_callees(&func_id);
-
-        unique_callers.extend(upstream_callers.iter().map(|id| id.name.clone()));
-        unique_callees.extend(downstream_callees.iter().map(|id| id.name.clone()));
-    }
-
-    let upstream_count = unique_callers.len();
-    let downstream_count = unique_callees.len();
-
-    (
-        unique_callers.into_iter().collect(),
-        unique_callees.into_iter().collect(),
-        upstream_count,
-        downstream_count,
-    )
-}
 
 /// Aggregate metrics directly from raw FunctionMetrics (for ALL functions including tests).
 ///

@@ -1093,32 +1093,34 @@ impl ParallelUnifiedAnalysisBuilder {
             // Check if this file has god object analysis
             if let Some(ref god_analysis) = file_item.metrics.god_object_analysis {
                 if god_analysis.is_god_object {
-                    // NEW (spec 244): Aggregate from raw metrics first (includes ALL functions, even tests)
+                    // Aggregate from raw metrics first for complexity (includes ALL functions, even tests)
                     use crate::priority::god_object_aggregation::{
-                        aggregate_dependencies_from_raw_metrics, aggregate_from_raw_metrics,
-                        aggregate_god_object_metrics, extract_member_functions,
+                        aggregate_from_raw_metrics, aggregate_god_object_metrics,
+                        extract_member_functions,
                     };
 
                     let mut aggregated_metrics = aggregate_from_raw_metrics(&raw_functions);
 
-                    // Aggregate dependencies from raw metrics via call graph
-                    let (callers, callees, up_count, down_count) =
-                        aggregate_dependencies_from_raw_metrics(&raw_functions, &self.call_graph);
-                    aggregated_metrics.unique_upstream_callers = callers;
-                    aggregated_metrics.unique_downstream_callees = callees;
-                    aggregated_metrics.upstream_dependencies = up_count;
-                    aggregated_metrics.downstream_dependencies = down_count;
-
-                    // Then enrich with coverage/contextual risk from unified items (if available)
+                    // Enrich with coverage/dependencies/risk from unified items
+                    // NOTE: Dependencies aggregate only from "problematic" functions that became debt items.
+                    // This provides a debt-focused view rather than complete architectural dependencies.
                     let member_functions =
                         extract_member_functions(unified.items.iter(), &file_item.metrics.path);
                     if !member_functions.is_empty() {
                         let item_metrics = aggregate_god_object_metrics(&member_functions);
-                        // Merge: keep complexity and dependencies from raw metrics, add coverage/risk from items
+                        // Merge all contextual data from debt items
                         aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
+                        aggregated_metrics.unique_upstream_callers =
+                            item_metrics.unique_upstream_callers;
+                        aggregated_metrics.unique_downstream_callees =
+                            item_metrics.unique_downstream_callees;
+                        aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
+                        aggregated_metrics.downstream_dependencies =
+                            item_metrics.downstream_dependencies;
                         aggregated_metrics.aggregated_contextual_risk =
                             item_metrics.aggregated_contextual_risk;
                     }
+                    // If member_functions is empty, dependencies remain at 0 (no debt items = no deps to show)
 
                     // Create god object UnifiedDebtItem using same function as sequential path
                     let god_item = crate::builders::unified_analysis::create_god_object_debt_item(
