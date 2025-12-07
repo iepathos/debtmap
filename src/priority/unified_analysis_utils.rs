@@ -94,28 +94,26 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     }
 
     fn add_item(&mut self, item: UnifiedDebtItem) {
+        use crate::priority::filter_config::ItemFilterConfig;
         use crate::priority::filter_predicates::*;
 
         self.stats.total_items_processed += 1;
 
-        // Get thresholds from configuration (I/O boundary)
-        let min_score = crate::config::get_minimum_debt_score();
-        let min_cyclomatic = crate::config::get_minimum_cyclomatic_complexity();
-        let min_cognitive = crate::config::get_minimum_cognitive_complexity();
-        let min_risk = crate::config::get_minimum_risk_score();
+        // Get unified filter configuration (spec 243: single-stage filtering)
+        let config = ItemFilterConfig::from_environment();
 
         // Apply filters using pure predicates
-        if !meets_score_threshold(&item, min_score) {
+        if !meets_score_threshold(&item, config.min_score) {
             self.stats.filtered_by_score += 1;
             return;
         }
 
-        if !meets_risk_threshold(&item, min_risk) {
+        if !meets_risk_threshold(&item, config.min_risk) {
             self.stats.filtered_by_risk += 1;
             return;
         }
 
-        if !meets_complexity_thresholds(&item, min_cyclomatic, min_cognitive) {
+        if !meets_complexity_thresholds(&item, config.min_cyclomatic, config.min_cognitive) {
             self.stats.filtered_by_complexity += 1;
             return;
         }
