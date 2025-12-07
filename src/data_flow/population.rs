@@ -439,27 +439,39 @@ mod tests {
         assert!(escaping.is_empty());
     }
 
-    fn create_test_metric(name: &str, line: usize, is_pure: bool) -> FunctionMetrics {
-        let mut metric = FunctionMetrics::new(name.to_string(), PathBuf::from("test.rs"), line);
-        metric.length = 10;
-        metric.is_pure = Some(is_pure);
-        metric
-    }
-
     #[test]
     fn test_populate_io_operations() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create temporary file with actual Rust code containing I/O operations
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let test_code = r#"
+use std::fs::File;
+use std::io::Read;
+
+fn read_file() -> std::io::Result<String> {
+    let mut file = File::open("data.txt")?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+
+fn pure_func(x: i32) -> i32 {
+    x * 2
+}
+"#;
+        temp_file.write_all(test_code.as_bytes()).unwrap();
+        let temp_path = temp_file.path().to_path_buf();
+
         let mut data_flow = DataFlowGraph::new();
         let metrics = vec![
-            create_test_metric("read_file", 10, false),
-            create_test_metric("pure_func", 20, true),
+            FunctionMetrics::new("read_file".to_string(), temp_path.clone(), 4),
+            FunctionMetrics::new("pure_func".to_string(), temp_path.clone(), 11),
         ];
 
         let count = populate_io_operations(&mut data_flow, &metrics);
 
-        assert!(count > 0);
-        let mut func_id = create_test_function_id("read_file");
-        func_id.line = 10;
-        // Should have detected I/O in read_file
-        // Note: This test may need adjustment based on actual detection logic
+        assert!(count > 0, "Should detect I/O operations in read_file function");
     }
 }
