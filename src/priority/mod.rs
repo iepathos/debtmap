@@ -11,6 +11,7 @@ pub mod formatted_output;
 pub mod formatter;
 pub mod formatter_markdown;
 pub mod formatter_verbosity;
+pub mod god_object_aggregation;
 pub mod parallel_call_graph;
 pub mod pipeline;
 pub mod refactoring_impact;
@@ -36,6 +37,7 @@ pub use formatter_markdown::{
     format_priorities_categorical_markdown, format_priorities_markdown,
     format_priorities_tiered_markdown,
 };
+pub use god_object_aggregation::{aggregate_god_object_metrics, GodObjectAggregatedMetrics};
 pub use pipeline::{analyze_and_filter, filter_sort_limit, sort_by_score, take_top};
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use tiers::{classify_tier, RecommendationTier, TierConfig};
@@ -895,9 +897,21 @@ impl UnifiedAnalysis {
             risk_reduction += item.expected_impact.risk_reduction;
         }
 
-        // Add file-level impacts
+        // Track files that have god object items to avoid double-counting
+        let god_object_files: std::collections::HashSet<_> = self
+            .items
+            .iter()
+            .filter(|item| matches!(item.debt_type, DebtType::GodObject { .. } | DebtType::GodModule { .. }))
+            .map(|item| &item.location.file)
+            .collect();
+
+        // Add file-level impacts (excluding files already counted as god objects)
         for file_item in &self.file_items {
-            total_debt_score += file_item.score;
+            // Skip adding score if this file already has a god object item
+            // to avoid double-counting the same issue
+            if !god_object_files.contains(&file_item.metrics.path) {
+                total_debt_score += file_item.score;
+            }
 
             // Track file and its actual total lines
             unique_files.insert(
