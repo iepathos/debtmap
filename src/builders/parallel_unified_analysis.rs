@@ -934,9 +934,10 @@ impl ParallelUnifiedAnalysisBuilder {
             file_metrics.god_object_analysis = if no_god_object {
                 None
             } else {
-                let analysis_result = file_analysis::analyze_god_object(&content, file_path, coverage_data);
+                let analysis_result =
+                    file_analysis::analyze_god_object(&content, file_path, coverage_data);
 
-                let analyzed = analysis_result.unwrap_or_else(|_| None);
+                let analyzed = analysis_result.unwrap_or(None);
 
                 // Use heuristic fallback if:
                 // 1. Analysis failed (analyzed is None), OR
@@ -950,7 +951,8 @@ impl ParallelUnifiedAnalysisBuilder {
 
                     // Calculate god object score (0-100 scale)
                     // Base score on number of methods and LOC
-                    let method_score = ((file_metrics.function_count as f64 / 50.0) * 50.0).min(50.0);
+                    let method_score =
+                        ((file_metrics.function_count as f64 / 50.0) * 50.0).min(50.0);
                     let loc_score = ((actual_line_count as f64 / 2000.0) * 50.0).min(50.0);
                     let god_score = method_score + loc_score;
 
@@ -1114,7 +1116,8 @@ impl ParallelUnifiedAnalysisBuilder {
                             item_metrics.unique_upstream_callers;
                         aggregated_metrics.unique_downstream_callees =
                             item_metrics.unique_downstream_callees;
-                        aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
+                        aggregated_metrics.upstream_dependencies =
+                            item_metrics.upstream_dependencies;
                         aggregated_metrics.downstream_dependencies =
                             item_metrics.downstream_dependencies;
                         aggregated_metrics.aggregated_contextual_risk =
