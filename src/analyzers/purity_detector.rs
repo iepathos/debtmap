@@ -161,6 +161,9 @@ impl PurityDetector {
         let cfg = ControlFlowGraph::from_block(&item_fn.block);
         let data_flow = DataFlowAnalysis::analyze(&cfg);
 
+        // Capture var_names from CFG for VarId translation
+        let var_names = cfg.var_names.clone();
+
         // Filter dead mutations from local_mutations
         let live_mutations = self.filter_dead_mutations(&cfg, &data_flow);
 
@@ -202,6 +205,7 @@ impl PurityDetector {
             data_flow_info: Some(data_flow),
             live_mutations,
             total_mutations: self.local_mutations.len(),
+            var_names,
         }
     }
 
@@ -224,7 +228,9 @@ impl PurityDetector {
         self.visit_block(block);
 
         // Perform data flow analysis
-        let data_flow = DataFlowAnalysis::from_block(block);
+        let cfg = ControlFlowGraph::from_block(block);
+        let data_flow = DataFlowAnalysis::analyze(&cfg);
+        let var_names = cfg.var_names.clone();
 
         let purity_level = if !self.has_side_effects
             && !self.has_io_operations
@@ -252,6 +258,7 @@ impl PurityDetector {
             data_flow_info: Some(data_flow),
             live_mutations: self.local_mutations.clone(),
             total_mutations: self.local_mutations.len(),
+            var_names,
         }
     }
 
@@ -1025,6 +1032,8 @@ pub struct PurityAnalysis {
     pub live_mutations: Vec<LocalMutation>,
     /// Total mutations detected (before filtering dead stores)
     pub total_mutations: usize,
+    /// Variable name mapping for translating VarIds (from CFG)
+    pub var_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

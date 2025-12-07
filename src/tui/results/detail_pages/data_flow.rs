@@ -112,10 +112,10 @@ pub fn render(
     }
 
     // Escape Analysis Section
-    if let Some(cfg_analysis) = data_flow.get_cfg_analysis(&func_id) {
+    if let Some(cfg_ctx) = data_flow.get_cfg_analysis_with_context(&func_id) {
         add_section_header(&mut lines, "escape analysis", theme);
 
-        let escaping_count = cfg_analysis.escape_info.escaping_vars.len();
+        let escaping_count = cfg_ctx.analysis.escape_info.escaping_vars.len();
         add_label_value(
             &mut lines,
             "escaping",
@@ -124,13 +124,32 @@ pub fn render(
             area.width,
         );
 
-        if escaping_count > 0 {
+        // Display return dependencies with translated variable names
+        let return_dep_names = data_flow.get_return_dependency_names(&func_id);
+        if !return_dep_names.is_empty() {
             add_blank_line(&mut lines);
             add_section_header(&mut lines, "variables affecting return value", theme);
-            for var in &cfg_analysis.escape_info.return_dependencies {
+            for var_name in &return_dep_names {
                 lines.push(Line::from(vec![
                     Span::raw("                        "), // Align to value column (24 chars)
-                    Span::styled(format!("{:?}", var), Style::default().fg(theme.primary)),
+                    Span::styled(var_name.clone(), Style::default().fg(theme.primary)),
+                ]));
+            }
+        }
+
+        // Display tainted variables (optional, for debugging)
+        let tainted_names = data_flow.get_tainted_var_names(&func_id);
+        if !tainted_names.is_empty() && tainted_names.len() < 10 {
+            // Only show if reasonable number
+            add_blank_line(&mut lines);
+            add_section_header(&mut lines, "tainted variables", theme);
+            for var_name in &tainted_names {
+                lines.push(Line::from(vec![
+                    Span::raw("                        "),
+                    Span::styled(
+                        format!("{} (affected by mutations)", var_name),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]));
             }
         }

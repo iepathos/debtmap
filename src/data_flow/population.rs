@@ -16,7 +16,7 @@ use std::collections::HashSet;
 /// Populate DataFlowGraph from purity analysis results
 ///
 /// Extracts and stores:
-/// - Full CFG-based data flow analysis
+/// - Full CFG-based data flow analysis with variable name context
 /// - Mutation information (live vs dead stores)
 /// - Escape analysis results
 pub fn populate_from_purity_analysis(
@@ -24,9 +24,15 @@ pub fn populate_from_purity_analysis(
     func_id: &FunctionId,
     purity: &PurityAnalysis,
 ) {
-    // Store full CFG analysis if available
+    // Store full CFG analysis with context if available
     if let Some(cfg_analysis) = &purity.data_flow_info {
+        // Store raw analysis (for backward compatibility)
         data_flow.set_cfg_analysis(func_id.clone(), cfg_analysis.clone());
+
+        // Store analysis with var_names context for translation
+        use crate::data_flow::CfgAnalysisWithContext;
+        let context = CfgAnalysisWithContext::new(purity.var_names.clone(), cfg_analysis.clone());
+        data_flow.set_cfg_analysis_with_context(func_id.clone(), context);
     }
 
     // Extract mutation information
@@ -39,8 +45,8 @@ pub fn populate_from_purity_analysis(
     let mutation_info = MutationInfo {
         live_mutations: live_mutations.clone(),
         total_mutations: purity.total_mutations,
-        dead_stores: extract_dead_stores(purity),
-        escaping_mutations: extract_escaping_mutations(purity),
+        dead_stores: extract_dead_stores(purity, data_flow, func_id),
+        escaping_mutations: extract_escaping_mutations(purity, data_flow, func_id),
     };
 
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
@@ -48,33 +54,32 @@ pub fn populate_from_purity_analysis(
 
 /// Extract dead stores from purity analysis
 ///
-/// Note: Dead stores are tracked in DataFlowAnalysis.liveness.dead_stores as VarIds.
-/// Converting VarIds to variable names requires the CFG's var_names vector, which is
-/// not stored in PurityAnalysis to save memory.
-///
-/// The dead store information (as VarIds) IS preserved in the DataFlowGraph's cfg_analysis field.
-/// To get variable names, access cfg_analysis and use the VarId indices with the CFG's var_names.
-///
-/// This is an acceptable trade-off: we preserve the analysis results while avoiding
-/// storing duplicate variable name mappings in multiple places.
-fn extract_dead_stores(_purity: &PurityAnalysis) -> HashSet<String> {
-    // Return empty set - dead stores are available as VarIds via cfg_analysis
-    HashSet::new()
+/// Now uses the stored CfgAnalysisWithContext to translate VarIds to variable names.
+fn extract_dead_stores(
+    _purity: &PurityAnalysis,
+    data_flow: &DataFlowGraph,
+    func_id: &FunctionId,
+) -> HashSet<String> {
+    // Use the translation layer to get dead store names
+    data_flow
+        .get_dead_store_names(func_id)
+        .into_iter()
+        .collect()
 }
 
 /// Extract escaping mutations from purity analysis
 ///
-/// Note: Escaping variables are tracked in DataFlowAnalysis.escape_info.escaping_vars as VarIds.
-/// Converting VarIds to variable names requires the CFG's var_names vector, which is
-/// not stored in PurityAnalysis to save memory.
-///
-/// The escape analysis information (as VarIds) IS preserved in the DataFlowGraph's cfg_analysis field.
-/// To get variable names, access cfg_analysis and use the VarId indices with the CFG's var_names.
-///
-/// Live mutations (which use string names) are already extracted and stored in MutationInfo.
-fn extract_escaping_mutations(_purity: &PurityAnalysis) -> HashSet<String> {
-    // Return empty set - escaping vars are available as VarIds via cfg_analysis
-    HashSet::new()
+/// Now uses the stored CfgAnalysisWithContext to translate VarIds to variable names.
+fn extract_escaping_mutations(
+    _purity: &PurityAnalysis,
+    data_flow: &DataFlowGraph,
+    func_id: &FunctionId,
+) -> HashSet<String> {
+    // Use the translation layer to get escaping variable names
+    data_flow
+        .get_escaping_var_names(func_id)
+        .into_iter()
+        .collect()
 }
 
 /// Populate I/O operations from function metrics using AST-based detection
@@ -397,6 +402,7 @@ mod tests {
                 target: "x".to_string(),
             }],
             total_mutations: 2,
+            var_names: vec!["x".to_string(), "y".to_string()],
         }
     }
 
@@ -421,21 +427,31 @@ mod tests {
 
     #[test]
     fn test_extract_dead_stores() {
+        let mut data_flow = DataFlowGraph::new();
+        let func_id = create_test_function_id("test_func");
         let purity = create_test_purity_analysis();
-        let dead_stores = extract_dead_stores(&purity);
 
-        // Note: Currently returns empty set as VarId->String conversion needs CFG context
-        // The actual dead store information is available via cfg_analysis field
+        // Populate data flow first so we have the context
+        populate_from_purity_analysis(&mut data_flow, &func_id, &purity);
+
+        let dead_stores = extract_dead_stores(&purity, &data_flow, &func_id);
+
+        // Should return empty since test analysis has no dead stores
         assert!(dead_stores.is_empty());
     }
 
     #[test]
     fn test_extract_escaping_mutations() {
+        let mut data_flow = DataFlowGraph::new();
+        let func_id = create_test_function_id("test_func");
         let purity = create_test_purity_analysis();
-        let escaping = extract_escaping_mutations(&purity);
 
-        // Note: Currently returns empty set as VarId->String conversion needs CFG context
-        // The actual escaping information is available via cfg_analysis field
+        // Populate data flow first so we have the context
+        populate_from_purity_analysis(&mut data_flow, &func_id, &purity);
+
+        let escaping = extract_escaping_mutations(&purity, &data_flow, &func_id);
+
+        // Should return empty since test analysis has no escaping vars
         assert!(escaping.is_empty());
     }
 
