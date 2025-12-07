@@ -63,7 +63,7 @@ pub fn render(
         let severity_color = severity_color(severity);
 
         lines.push(Line::from(vec![
-            Span::raw("  combined  "),
+            Span::raw("  combined              "),
             Span::styled(
                 format!("{:.1}", combined_score),
                 Style::default().fg(theme.primary),
@@ -78,7 +78,7 @@ pub fn render(
         let severity_color = severity_color(severity);
 
         lines.push(Line::from(vec![
-            Span::raw("  total  "),
+            Span::raw("  total                 "),
             Span::styled(
                 format!("{:.1}", item.unified_score.final_score),
                 Style::default().fg(theme.primary),
@@ -153,7 +153,7 @@ pub fn render(
             // Note: Only cognitive is dampened, not cyclomatic (structural metric)
             if entropy.dampening_factor < 1.0 {
                 lines.push(Line::from(vec![
-                    Span::raw("  cognitive reduction  "),
+                    Span::raw("  cognitive reduction    "),
                     Span::styled(
                         format!(
                             "{} → {}",
