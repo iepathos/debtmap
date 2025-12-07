@@ -472,6 +472,9 @@ fn pure_func(x: i32) -> i32 {
 
         let count = populate_io_operations(&mut data_flow, &metrics);
 
-        assert!(count > 0, "Should detect I/O operations in read_file function");
+        assert!(
+            count > 0,
+            "Should detect I/O operations in read_file function"
+        );
     }
 }
