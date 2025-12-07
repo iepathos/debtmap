@@ -56,9 +56,9 @@ pub fn render(
         area.width,
     );
 
-    // Add note for god objects about dependency aggregation
+    // Add note for god objects about what matters
     if let Some(indicators) = &item.god_object_indicators {
-        if indicators.is_god_object && blast_radius == 0 {
+        if indicators.is_god_object {
             lines.push(ratatui::text::Line::from(""));
             lines.push(ratatui::text::Line::from(vec![
                 ratatui::text::Span::styled(
@@ -66,16 +66,24 @@ pub fn render(
                     ratatui::style::Style::default().fg(theme.primary),
                 ),
                 ratatui::text::Span::styled(
-                    "Dependencies aggregate from debt items only.",
+                    "God objects are structural issues (too many",
                     ratatui::style::Style::default().fg(theme.muted),
                 ),
             ]));
             lines.push(ratatui::text::Line::from(vec![
                 ratatui::text::Span::styled(
-                    "Zero deps means all functions are simple (no debt).",
+                    "responsibilities). Focus on functions/methods count.",
                     ratatui::style::Style::default().fg(theme.muted),
                 ),
             ]));
+            if blast_radius == 0 {
+                lines.push(ratatui::text::Line::from(vec![
+                    ratatui::text::Span::styled(
+                        "Zero deps = all functions are simple (good!).",
+                        ratatui::style::Style::default().fg(theme.muted),
+                    ),
+                ]));
+            }
         }
     }
 

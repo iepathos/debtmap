@@ -1,7 +1,7 @@
 //! Overview page (Page 1) - Core metrics and recommendation.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
-use crate::priority::UnifiedDebtItem;
+use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
@@ -90,8 +90,63 @@ pub fn render(
     }
     add_blank_line(&mut lines);
 
-    // Metrics section
-    add_section_header(&mut lines, "metrics", theme);
+    // For god objects/modules, show structural metrics first
+    match &item.debt_type {
+        DebtType::GodObject {
+            methods,
+            fields,
+            responsibilities,
+            ..
+        } => {
+            add_section_header(&mut lines, "god object structure", theme);
+            add_label_value(
+                &mut lines,
+                "methods",
+                methods.to_string(),
+                theme,
+                area.width,
+            );
+            add_label_value(&mut lines, "fields", fields.to_string(), theme, area.width);
+            add_label_value(
+                &mut lines,
+                "responsibilities",
+                responsibilities.to_string(),
+                theme,
+                area.width,
+            );
+            let loc = item.file_line_count.unwrap_or(item.function_length);
+            add_label_value(&mut lines, "loc", loc.to_string(), theme, area.width);
+            add_blank_line(&mut lines);
+        }
+        DebtType::GodModule {
+            functions,
+            lines: _module_lines,
+            responsibilities,
+        } => {
+            add_section_header(&mut lines, "god module structure", theme);
+            add_label_value(
+                &mut lines,
+                "functions",
+                functions.to_string(),
+                theme,
+                area.width,
+            );
+            add_label_value(
+                &mut lines,
+                "responsibilities",
+                responsibilities.to_string(),
+                theme,
+                area.width,
+            );
+            let loc = item.file_line_count.unwrap_or(item.function_length);
+            add_label_value(&mut lines, "loc", loc.to_string(), theme, area.width);
+            add_blank_line(&mut lines);
+        }
+        _ => {}
+    }
+
+    // Complexity metrics section
+    add_section_header(&mut lines, "complexity", theme);
     add_label_value(
         &mut lines,
         "cyclomatic",
@@ -113,13 +168,20 @@ pub fn render(
         theme,
         area.width,
     );
-    add_label_value(
-        &mut lines,
-        "length",
-        item.function_length.to_string(),
-        theme,
-        area.width,
-    );
+
+    // For non-god objects, show function length
+    if !matches!(
+        item.debt_type,
+        DebtType::GodObject { .. } | DebtType::GodModule { .. }
+    ) {
+        add_label_value(
+            &mut lines,
+            "length",
+            item.function_length.to_string(),
+            theme,
+            area.width,
+        );
+    }
     add_blank_line(&mut lines);
 
     // Coverage section
