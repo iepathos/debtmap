@@ -69,7 +69,7 @@ pub fn render(
             );
 
             lines.push(Line::from(vec![
-                Span::raw("  cognitive complexity    "),
+                Span::raw("  cognitive complexity "),
                 Span::styled(
                     format!(
                         "{} → {} (dampened)",

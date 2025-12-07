@@ -153,7 +153,7 @@ pub fn render(
             // Note: Only cognitive is dampened, not cyclomatic (structural metric)
             if entropy.dampening_factor < 1.0 {
                 lines.push(Line::from(vec![
-                    Span::raw("  cognitive reduction    "),
+                    Span::raw("  cognitive reduction   "),
                     Span::styled(
                         format!(
                             "{} → {}",
