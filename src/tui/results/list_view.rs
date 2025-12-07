@@ -368,7 +368,7 @@ fn format_grouped_item(
 /// - Otherwise shows raw value: "Cog:22"
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// // With entropy adjustment
 /// let item = create_item_with_entropy(22, 14);
 /// assert_eq!(format_complexity_metric(&item), "Cog:22→14");

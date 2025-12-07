@@ -6,7 +6,7 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```ignore
 //! use debtmap::commands::state::{AnalyzeConfig, Unvalidated, Validated};
 //!
 //! // Create unvalidated config

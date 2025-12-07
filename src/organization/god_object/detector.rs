@@ -310,8 +310,12 @@ impl GodObjectDetector {
             .map(|fc| fc.cyclomatic_complexity)
             .sum();
 
-        // Estimate lines of code
-        let lines_of_code = method_count * 15; // Simple estimate
+        // Calculate actual lines of code from source content
+        let lines_of_code = self
+            .source_content
+            .as_ref()
+            .map(|content| content.lines().count())
+            .unwrap_or(method_count * 15); // Fallback to estimate if no source
 
         // Step 5: Calculate weighted metrics
         let (weighted_method_count, avg_complexity, _, purity_distribution) =

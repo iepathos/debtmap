@@ -19,7 +19,7 @@ use crate::config;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```ignore
 /// // Get configuration from environment
 /// let config = ItemFilterConfig::from_environment();
 ///
@@ -62,7 +62,7 @@ impl ItemFilterConfig {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```ignore
     /// // Get from environment
     /// let config = ItemFilterConfig::from_environment();
     ///

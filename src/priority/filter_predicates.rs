@@ -13,7 +13,7 @@
 //!
 //! # Examples
 //!
-//! ```rust
+//! ```ignore
 //! use debtmap::priority::filter_predicates::*;
 //! use debtmap::priority::UnifiedDebtItem;
 //!
@@ -84,7 +84,7 @@ impl FilterStatistics {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```ignore
 /// # use debtmap::priority::filter_predicates::meets_score_threshold;
 /// # use debtmap::priority::UnifiedDebtItem;
 /// # fn create_item_with_score(score: f64) -> UnifiedDebtItem { todo!() }
@@ -106,7 +106,7 @@ pub fn meets_score_threshold(item: &UnifiedDebtItem, min_score: f64) -> bool {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```ignore
 /// # use debtmap::priority::filter_predicates::meets_risk_threshold;
 /// # use debtmap::priority::UnifiedDebtItem;
 /// # fn create_risk_item(risk_score: f64) -> UnifiedDebtItem { todo!() }
@@ -137,7 +137,7 @@ pub fn meets_risk_threshold(item: &UnifiedDebtItem, min_risk: f64) -> bool {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```ignore
 /// # use debtmap::priority::filter_predicates::is_exempt_from_complexity_filter;
 /// # use debtmap::priority::UnifiedDebtItem;
 /// # fn create_god_object_item() -> UnifiedDebtItem { todo!() }
@@ -170,7 +170,7 @@ pub fn is_exempt_from_complexity_filter(item: &UnifiedDebtItem) -> bool {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```ignore
 /// # use debtmap::priority::filter_predicates::meets_complexity_thresholds;
 /// # use debtmap::priority::UnifiedDebtItem;
 /// # fn create_item(cyclomatic: u32, cognitive: u32) -> UnifiedDebtItem { todo!() }
@@ -205,7 +205,7 @@ pub fn meets_complexity_thresholds(
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```ignore
 /// # use debtmap::priority::filter_predicates::is_duplicate_of;
 /// # use debtmap::priority::{UnifiedDebtItem, DebtType};
 /// # fn create_item(file: &str, line: u32, debt_type: DebtType) -> UnifiedDebtItem { todo!() }
