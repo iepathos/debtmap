@@ -188,9 +188,11 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         eprintln!("No technical debt items found matching current thresholds.");
         eprintln!("Try adjusting filters:");
         eprintln!("  - Use --min-score <value> to lower the score threshold");
-        eprintln!("  - Current min_score threshold: {}",
-                  std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD")
-                      .unwrap_or_else(|_| "3.0 (default)".to_string()));
+        eprintln!(
+            "  - Current min_score threshold: {}",
+            std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD")
+                .unwrap_or_else(|_| "3.0 (default)".to_string())
+        );
         eprintln!("  - Use DEBTMAP_MIN_SCORE_THRESHOLD=0 to see all items");
     }
 
