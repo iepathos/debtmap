@@ -903,7 +903,12 @@ impl UnifiedAnalysis {
         let god_object_files: std::collections::HashSet<_> = self
             .items
             .iter()
-            .filter(|item| matches!(item.debt_type, DebtType::GodObject { .. } | DebtType::GodModule { .. }))
+            .filter(|item| {
+                matches!(
+                    item.debt_type,
+                    DebtType::GodObject { .. } | DebtType::GodModule { .. }
+                )
+            })
             .map(|item| &item.location.file)
             .collect();
 
@@ -955,15 +960,27 @@ impl UnifiedAnalysis {
             eprintln!("File-level items count: {}", self.file_items.len());
             eprintln!("God object files: {}", god_object_files.len());
             eprintln!("Total debt score: {:.0}", total_debt_score);
-            eprintln!("Average per function item: {:.1}",
-                if self.items.is_empty() { 0.0 } else { total_debt_score / self.items.len() as f64 });
+            eprintln!(
+                "Average per function item: {:.1}",
+                if self.items.is_empty() {
+                    0.0
+                } else {
+                    total_debt_score / self.items.len() as f64
+                }
+            );
 
             // Show top 10 scores
             let mut sorted_items: Vec<_> = self.items.iter().collect();
-            sorted_items.sort_by(|a, b| b.unified_score.final_score.partial_cmp(&a.unified_score.final_score).unwrap());
+            sorted_items.sort_by(|a, b| {
+                b.unified_score
+                    .final_score
+                    .partial_cmp(&a.unified_score.final_score)
+                    .unwrap()
+            });
             eprintln!("\nTop 10 scores:");
             for (i, item) in sorted_items.iter().take(10).enumerate() {
-                eprintln!("  {}: {:.1} - {:?} at {}::{}",
+                eprintln!(
+                    "  {}: {:.1} - {:?} at {}::{}",
                     i + 1,
                     item.unified_score.final_score,
                     item.debt_type,

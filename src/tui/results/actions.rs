@@ -35,9 +35,13 @@ pub fn copy_path_to_clipboard(path: &Path) -> Result<()> {
 /// Open file in editor (suspends TUI during editing)
 pub fn open_in_editor(path: &Path, line: Option<usize>) -> Result<()> {
     use crossterm::{
+        cursor::MoveTo,
         event::{DisableMouseCapture, EnableMouseCapture},
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        terminal::{
+            disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
+            LeaveAlternateScreen,
+        },
     };
     use std::io;
 
@@ -81,6 +85,10 @@ pub fn open_in_editor(path: &Path, line: Option<usize>) -> Result<()> {
     disable_raw_mode().context("Failed to disable raw mode")?;
     execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)
         .context("Failed to leave alternate screen")?;
+
+    // Clear the main screen to prevent flash of old terminal content
+    execute!(io::stdout(), Clear(ClearType::All), MoveTo(0, 0))
+        .context("Failed to clear screen")?;
 
     // Launch editor and wait for it to complete
     let status = cmd
