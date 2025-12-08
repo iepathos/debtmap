@@ -68,9 +68,9 @@ pub struct PatternAnalysis {
 /// # Examples
 ///
 /// ```
-/// use debtmap::organization::god_object::patterns::detect_pattern;
+/// use debtmap::organization::struct_patterns::{detect_pattern, StructPattern};
 /// use debtmap::organization::god_object::ast_visitor::TypeAnalysis;
-/// use crate::common::SourceLocation;
+/// use debtmap::common::{SourceLocation, LocationConfidence};
 ///
 /// let type_analysis = TypeAnalysis {
 ///     name: "AppConfig".to_string(),
@@ -80,7 +80,13 @@ pub struct PatternAnalysis {
 ///     fields: vec![],
 ///     responsibilities: vec![],
 ///     trait_implementations: 0,
-///     location: SourceLocation { line: 1, column: 1 },
+///     location: SourceLocation {
+///         line: 1,
+///         column: Some(1),
+///         end_line: None,
+///         end_column: None,
+///         confidence: LocationConfidence::Exact,
+///     },
 /// };
 ///
 /// let analysis = detect_pattern(&type_analysis, 1);

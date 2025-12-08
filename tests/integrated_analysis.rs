@@ -155,6 +155,7 @@ fn test_analyze_simple_code() {
         recommended_splits: vec![],
         confidence: debtmap::organization::GodObjectConfidence::NotGodObject,
         responsibilities: vec!["Example".to_string()],
+        responsibility_method_counts: std::collections::HashMap::new(),
         purity_distribution: None,
         module_structure: None,
         detection_type: debtmap::organization::DetectionType::GodClass,
@@ -165,6 +166,8 @@ fn test_analyze_simple_code() {
         analysis_method: debtmap::organization::SplitAnalysisMethod::None,
         cross_domain_severity: None,
         domain_diversity_metrics: None,
+        struct_name: None,
+        struct_line: None,
     };
 
     let call_graph = std::collections::HashMap::new();
@@ -215,6 +218,7 @@ fn test_timeout_budget() {
         recommended_splits: vec![],
         confidence: debtmap::organization::GodObjectConfidence::Probable,
         responsibilities: vec!["Complex".to_string()],
+        responsibility_method_counts: std::collections::HashMap::new(),
         purity_distribution: None,
         module_structure: None,
         detection_type: debtmap::organization::DetectionType::GodClass,
@@ -225,6 +229,8 @@ fn test_timeout_budget() {
         analysis_method: debtmap::organization::SplitAnalysisMethod::None,
         cross_domain_severity: None,
         domain_diversity_metrics: None,
+        struct_name: None,
+        struct_line: None,
     };
 
     let call_graph = std::collections::HashMap::new();
