@@ -1684,18 +1684,7 @@ fn create_god_object_recommendation(
         god_analysis.responsibility_count.clamp(2, 5)
     };
 
-    let primary_action = match god_analysis.detection_type {
-        crate::organization::DetectionType::GodClass => {
-            format!(
-                "Split god object into {} modules by responsibility",
-                split_count
-            )
-        }
-        crate::organization::DetectionType::GodFile
-        | crate::organization::DetectionType::GodModule => {
-            format!("Split god module into {} modules by responsibility", split_count)
-        }
-    };
+    let primary_action = format!("Split into {} modules by responsibility", split_count);
 
     let rationale = format!(
         "{} responsibilities detected with {} methods/functions - splitting will improve maintainability",
