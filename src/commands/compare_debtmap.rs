@@ -319,37 +319,41 @@ fn determine_status(
 // Validation Core
 // =============================================================================
 
+/// Holds all identified changes between before and after states
+struct IdentifiedChanges {
+    resolved: ResolvedItems,
+    improved: ImprovedItems,
+    new_items: NewItems,
+    unchanged_critical: UnchangedCritical,
+}
+
+/// Pure: Identify all changes between before and after debtmaps
+fn identify_all_changes(before: &DebtmapJsonInput, after: &DebtmapJsonInput) -> IdentifiedChanges {
+    IdentifiedChanges {
+        resolved: identify_resolved_items(before, after),
+        improved: identify_improved_items(before, after),
+        new_items: identify_new_items(before, after),
+        unchanged_critical: identify_unchanged_critical(before, after),
+    }
+}
+
 fn perform_validation(
     before: &DebtmapJsonInput,
     after: &DebtmapJsonInput,
 ) -> Result<ValidationResult> {
-    // Create summaries (pure)
     let before_summary = create_summary(before);
     let after_summary = create_summary(after);
+    let changes = identify_all_changes(before, after);
 
-    // Identify all changes (pure)
-    let resolved = identify_resolved_items(before, after);
-    let improved = identify_improved_items(before, after);
-    let new_items = identify_new_items(before, after);
-    let unchanged_critical = identify_unchanged_critical(before, after);
+    let improvements = build_all_improvement_messages(&changes.resolved, &changes.improved);
+    let remaining_issues = build_all_issue_messages(&changes.unchanged_critical, &changes.new_items);
+    let gaps = build_all_gaps(&changes.unchanged_critical, &changes.new_items);
 
-    // Build messages (pure)
-    let improvements = build_all_improvement_messages(&resolved, &improved);
-    let remaining_issues = build_all_issue_messages(&unchanged_critical, &new_items);
-    let gaps = build_all_gaps(&unchanged_critical, &new_items);
-
-    // Calculate score (pure)
     let completion = calculate_improvement_score(
-        &resolved,
-        &improved,
-        &new_items,
-        &unchanged_critical,
-        &before_summary,
-        &after_summary,
+        &changes.resolved, &changes.improved, &changes.new_items,
+        &changes.unchanged_critical, &before_summary, &after_summary,
     );
-
-    // Determine status (pure)
-    let status = determine_status(completion, &new_items, &before_summary, &after_summary);
+    let status = determine_status(completion, &changes.new_items, &before_summary, &after_summary);
 
     Ok(ValidationResult {
         completion_percentage: completion,
@@ -726,38 +730,46 @@ fn apply_minimum_threshold(score: f64, has_improvements: bool, score_improvement
     }
 }
 
+/// Scoring component weights for weighted average calculation
+struct ScoringComponents {
+    high_priority: f64,
+    improvement: f64,
+    complexity: f64,
+    regression: f64,
+}
+
+/// Pure: Calculate weighted score from scoring components
+fn calculate_weighted_score(components: &ScoringComponents) -> f64 {
+    components.high_priority * 0.4
+        + components.improvement.max(0.0) * 0.3
+        + components.complexity * 0.2
+        + components.regression * 0.1
+}
+
 // =============================================================================
 // Main Scoring Orchestration
 // =============================================================================
 
 fn calculate_improvement_score(
-    resolved: &ResolvedItems,
-    improved: &ImprovedItems,
-    new_items: &NewItems,
+    resolved: &ResolvedItems, improved: &ImprovedItems, new_items: &NewItems,
     unchanged_critical: &UnchangedCritical,
-    before_summary: &AnalysisSummary,
-    after_summary: &AnalysisSummary,
+    before_summary: &AnalysisSummary, after_summary: &AnalysisSummary,
 ) -> f64 {
-    // Early return for empty case
     if before_summary.total_items == 0 && after_summary.total_items == 0 {
         return 100.0;
     }
 
-    // Compose scoring components (all pure)
-    let high_priority = score_high_priority_progress(before_summary, after_summary, resolved);
-    let improvement = score_overall_improvement(before_summary, after_summary);
-    let complexity = score_complexity_reduction(improved);
-    let regression = score_regression_penalty(new_items);
+    let components = ScoringComponents {
+        high_priority: score_high_priority_progress(before_summary, after_summary, resolved),
+        improvement: score_overall_improvement(before_summary, after_summary),
+        complexity: score_complexity_reduction(improved),
+        regression: score_regression_penalty(new_items),
+    };
 
-    // Calculate weighted score
-    let weighted_score =
-        high_priority * 0.4 + improvement.max(0.0) * 0.3 + complexity * 0.2 + regression * 0.1;
-
-    // Apply adjustments (pure)
-    let has_improvements = complexity > 0.0 || improvement > 0.0;
+    let weighted_score = calculate_weighted_score(&components);
+    let has_improvements = components.complexity > 0.0 || components.improvement > 0.0;
     let penalized = apply_unchanged_penalty(weighted_score, unchanged_critical, has_improvements);
-
-    apply_minimum_threshold(penalized, has_improvements, improvement)
+    apply_minimum_threshold(penalized, has_improvements, components.improvement)
 }
 
 fn write_validation_result(path: &Path, result: &ValidationResult) -> Result<()> {
