@@ -83,9 +83,10 @@ fn create_architecture_item(function_name: &str) -> UnifiedDebtItem {
     let mut item = create_testing_item(function_name);
     item.debt_type = DebtType::GodObject {
         methods: 15,
-        fields: 8,
+        fields: Some(8),
         responsibilities: 8,
         god_object_score: debtmap::priority::score_types::Score0To100::new(50.0),
+        lines: 150,
     };
     item
 }
