@@ -7,7 +7,7 @@ use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
     layout::Rect,
-    style::{Color, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
@@ -63,35 +63,25 @@ pub fn render(
         let severity = Severity::from_score_100(combined_score)
             .as_str()
             .to_lowercase();
-        let severity_color = severity_color(&severity);
-
-        lines.push(Line::from(vec![
-            Span::raw("  combined              "),
-            Span::styled(
-                format!("{:.1}", combined_score),
-                Style::default().fg(theme.primary),
-            ),
-            Span::raw("  ["),
-            Span::styled(severity, Style::default().fg(severity_color)),
-            Span::raw("]"),
-        ]));
+        add_label_value(
+            &mut lines,
+            "combined",
+            format!("{:.1}  [{}]", combined_score, severity),
+            theme,
+            area.width,
+        );
     } else {
         // Single debt type - show single score
         let severity = Severity::from_score_100(item.unified_score.final_score.value())
             .as_str()
             .to_lowercase();
-        let severity_color = severity_color(&severity);
-
-        lines.push(Line::from(vec![
-            Span::raw("  total                 "),
-            Span::styled(
-                format!("{:.1}", item.unified_score.final_score.value()),
-                Style::default().fg(theme.primary),
-            ),
-            Span::raw("  ["),
-            Span::styled(severity, Style::default().fg(severity_color)),
-            Span::raw("]"),
-        ]));
+        add_label_value(
+            &mut lines,
+            "total",
+            format!("{:.1}  [{}]", item.unified_score.final_score.value(), severity),
+            theme,
+            area.width,
+        );
     }
     add_blank_line(&mut lines);
 
@@ -217,20 +207,13 @@ pub fn render(
 
     // Coverage section
     add_section_header(&mut lines, "coverage", theme);
-    if let Some(coverage) = item.transitive_coverage.as_ref().map(|c| c.direct) {
-        lines.push(Line::from(vec![
-            Span::raw("  coverage              "),
-            Span::styled(
-                format!("{:.1}%", coverage * 100.0),
-                Style::default().fg(coverage_color(coverage)),
-            ),
-        ]));
+    let coverage_value = if let Some(coverage) = item.transitive_coverage.as_ref().map(|c| c.direct)
+    {
+        format!("{:.1}%", coverage * 100.0)
     } else {
-        lines.push(Line::from(vec![
-            Span::raw("  coverage              "),
-            Span::styled("No data", Style::default().fg(theme.muted)),
-        ]));
-    }
+        "No data".to_string()
+    };
+    add_label_value(&mut lines, "coverage", coverage_value, theme, area.width);
     add_blank_line(&mut lines);
 
     // Recommendation section
@@ -333,27 +316,5 @@ fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
         DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl".to_string(),
         // Default for legacy variants
         _ => "Other".to_string(),
-    }
-}
-
-/// Get color for severity level
-fn severity_color(severity: &str) -> Color {
-    match severity {
-        "critical" => Color::Red,
-        "high" => Color::LightRed,
-        "medium" => Color::Yellow,
-        "low" => Color::Green,
-        _ => Color::White,
-    }
-}
-
-/// Get color for coverage fraction (0.0-1.0)
-fn coverage_color(coverage: f64) -> Color {
-    if coverage >= 0.7 {
-        Color::Green
-    } else if coverage >= 0.3 {
-        Color::Yellow
-    } else {
-        Color::Red
     }
 }

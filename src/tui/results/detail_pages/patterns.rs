@@ -64,16 +64,16 @@ pub fn render(
                 area.width,
             );
 
-            lines.push(Line::from(vec![
-                Span::raw("  cognitive complexity  "),
-                Span::styled(
-                    format!(
-                        "{} → {} (dampened)",
-                        entropy.original_complexity, entropy.adjusted_cognitive
-                    ),
-                    Style::default().fg(theme.primary),
+            add_label_value(
+                &mut lines,
+                "cognitive complexity",
+                format!(
+                    "{} → {} (dampened)",
+                    entropy.original_complexity, entropy.adjusted_cognitive
                 ),
-            ]));
+                theme,
+                area.width,
+            );
         } else {
             add_label_value(&mut lines, "dampening", "No".to_string(), theme, area.width);
         }
