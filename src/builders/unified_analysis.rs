@@ -1672,8 +1672,9 @@ fn create_god_object_recommendation(
     god_analysis: &crate::organization::GodObjectAnalysis,
 ) -> ActionableRecommendation {
     // Calculate recommended split count based on responsibility count
-    // If recommended_splits is populated, use that; otherwise calculate from responsibilities
-    let split_count = if !god_analysis.recommended_splits.is_empty() {
+    // Only use recommended_splits if it has 2+ meaningful splits
+    // A single recommended split is nonsensical (can't split into 1 piece)
+    let split_count = if god_analysis.recommended_splits.len() >= 2 {
         god_analysis.recommended_splits.len()
     } else {
         // Heuristic: Split into 2-5 modules based on responsibility count
