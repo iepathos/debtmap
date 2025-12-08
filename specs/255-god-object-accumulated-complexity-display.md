@@ -1,6 +1,6 @@
 ---
 number: 255
-title: God Object Accumulated Complexity Display
+title: God Object Accumulated Complexity Metric Labels
 category: foundation
 priority: low
 status: draft
@@ -8,7 +8,7 @@ dependencies: [253]
 created: 2025-12-07
 ---
 
-# Specification 255: God Object Accumulated Complexity Display
+# Specification 255: God Object Accumulated Complexity Metric Labels
 
 **Category**: foundation
 **Priority**: low
@@ -91,28 +91,38 @@ When it should communicate:
 
 ## Objective
 
-Update the TUI overview page to use **"accumulated complexity"** as the section header for god objects, making it immediately clear that the metrics represent **aggregated values across all functions** rather than a single function's complexity.
+Update the TUI overview page to use **descriptive metric labels** for god object complexity, making it immediately clear that the metrics represent **aggregated values across all functions** rather than a single function's complexity.
 
-For regular functions, keep the existing "complexity" header to maintain clarity that metrics apply to a single function.
+For god objects:
+- Use **"accumulated cyclomatic"** and **"accumulated cognitive"** (summed across all functions)
+- Use **"max nesting"** (maximum nesting depth found in any function)
+
+For regular functions, keep existing labels ("cyclomatic", "cognitive", "nesting") as they represent single-function metrics.
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Conditional Section Header**
-   - God objects: Display section header as **"accumulated complexity"**
-   - Regular functions: Display section header as **"complexity"** (existing)
-   - Use `matches!(item.debt_type, DebtType::GodObject { .. })` to determine type
+1. **Consistent Section Header**
+   - All items: Display section header as **"complexity"**
+   - No conditional logic for section header (simpler)
 
-2. **Metric Labels Remain Unchanged**
-   - "cyclomatic", "cognitive", "nesting" labels stay the same
-   - Values stay the same (already correct)
-   - Only the section header changes
+2. **Conditional Metric Labels**
+   - God objects:
+     - **"accumulated cyclomatic"** (sum across all functions)
+     - **"accumulated cognitive"** (sum across all functions)
+     - **"max nesting"** (maximum across all functions)
+   - Regular functions:
+     - **"cyclomatic"** (this function's value)
+     - **"cognitive"** (this function's value)
+     - **"nesting"** (this function's value)
+   - Use `matches!(item.debt_type, DebtType::GodObject { .. })` to determine labels
 
-3. **Semantic Clarity**
-   - "accumulated complexity" conveys: "sum/aggregate of complexity metrics"
-   - "complexity" conveys: "this single function's complexity metrics"
-   - Users should immediately understand the scope of the metrics
+3. **Semantic Precision**
+   - "accumulated" clearly indicates summation
+   - "max" clearly indicates maximum value
+   - Labels directly describe the aggregation strategy
+   - Users immediately understand what each metric represents
 
 ### Non-Functional Requirements
 
@@ -134,11 +144,12 @@ For regular functions, keep the existing "complexity" header to maintain clarity
 ## Acceptance Criteria
 
 - [ ] **Conditional Logic**: TUI checks `DebtType::GodObject` vs other types
-- [ ] **God Object Header**: Shows "accumulated complexity" for god objects
-- [ ] **Regular Function Header**: Shows "complexity" for non-god objects
-- [ ] **Metric Labels**: "cyclomatic", "cognitive", "nesting" unchanged
+- [ ] **Section Header**: All items show "complexity" (unchanged)
+- [ ] **God Object Labels**: Shows "accumulated cyclomatic", "accumulated cognitive", "max nesting"
+- [ ] **Regular Function Labels**: Shows "cyclomatic", "cognitive", "nesting" (unchanged)
 - [ ] **Values**: Complexity values unchanged (still aggregated for god objects)
-- [ ] **Visual Consistency**: Follows existing theme and section header styling
+- [ ] **Semantic Accuracy**: "accumulated" for sums, "max" for maximum
+- [ ] **Visual Consistency**: Follows existing theme and label styling
 - [ ] **Manual Testing**: Verified with actual god object and regular function items
 - [ ] **Screenshot Comparison**: Before/after screenshots show clear improvement
 - [ ] **No Regressions**: Other pages (dependencies, action) unaffected
@@ -161,17 +172,18 @@ add_label_value(&mut lines, "nesting", item.nesting_depth.to_string(), ...);
 #### After (This Spec)
 ```rust
 // Complexity metrics section
-// For god objects, use "accumulated complexity" to indicate aggregated metrics
-let complexity_header = if matches!(item.debt_type, DebtType::GodObject { .. }) {
-    "accumulated complexity"
-} else {
-    "complexity"
-};
-add_section_header(&mut lines, complexity_header, theme);
+add_section_header(&mut lines, "complexity", theme);
 
-add_label_value(&mut lines, "cyclomatic", item.cyclomatic_complexity.to_string(), ...);
-add_label_value(&mut lines, "cognitive", item.cognitive_complexity.to_string(), ...);
-add_label_value(&mut lines, "nesting", item.nesting_depth.to_string(), ...);
+// For god objects, use descriptive labels indicating aggregation strategy
+let is_god_object = matches!(item.debt_type, DebtType::GodObject { .. });
+
+let cyclomatic_label = if is_god_object { "accumulated cyclomatic" } else { "cyclomatic" };
+let cognitive_label = if is_god_object { "accumulated cognitive" } else { "cognitive" };
+let nesting_label = if is_god_object { "max nesting" } else { "nesting" };
+
+add_label_value(&mut lines, cyclomatic_label, item.cyclomatic_complexity.to_string(), ...);
+add_label_value(&mut lines, cognitive_label, item.cognitive_complexity.to_string(), ...);
+add_label_value(&mut lines, nesting_label, item.nesting_depth.to_string(), ...);
 ```
 
 ### Semantic Clarification
@@ -215,14 +227,13 @@ TUI displays value (NEW: with clarifying header)
 
 ### Alternative Designs Considered
 
-#### Option 1: Change Metric Labels ❌
+#### Option 1: Change Section Header ❌
 ```rust
-add_label_value(&mut lines, "total cyclomatic", ...);
-add_label_value(&mut lines, "total cognitive", ...);
-add_label_value(&mut lines, "max nesting", ...);
+let header = if is_god_object { "accumulated complexity" } else { "complexity" };
+add_section_header(&mut lines, header, theme);
 ```
 
-**Rejected**: Breaks consistency with regular functions, harder to scan
+**Rejected**: Less precise - doesn't distinguish sum vs max
 
 #### Option 2: Add Explanation Text ❌
 ```rust
@@ -231,23 +242,27 @@ lines.push(Line::from("  (aggregated across all functions)"));
 
 **Rejected**: Too verbose, clutters display
 
-#### Option 3: Different Section Name ❌
+#### Option 3: Use "total" instead of "accumulated" ❌
 ```rust
-add_section_header(&mut lines, "total complexity", theme);
+add_label_value(&mut lines, "total cyclomatic", ...);
+add_label_value(&mut lines, "total cognitive", ...);
+add_label_value(&mut lines, "total nesting", ...);
 ```
 
-**Rejected**: "accumulated" is more accurate (nesting is max, not total)
+**Rejected**: "total nesting" is misleading (it's max, not sum)
 
 #### Option 4: This Spec's Approach ✅
 ```rust
-let header = if matches!(item.debt_type, DebtType::GodObject { .. }) {
-    "accumulated complexity"
-} else {
-    "complexity"
-};
+let cyclomatic_label = if is_god_object { "accumulated cyclomatic" } else { "cyclomatic" };
+let cognitive_label = if is_god_object { "accumulated cognitive" } else { "cognitive" };
+let nesting_label = if is_god_object { "max nesting" } else { "nesting" };
 ```
 
-**Accepted**: Minimal change, maximum clarity, consistent with existing patterns
+**Accepted**:
+- Semantically precise ("accumulated" for sums, "max" for maximum)
+- Consistent section header across all items
+- Self-documenting labels
+- Easy to scan and understand
 
 ## Dependencies
 
@@ -292,44 +307,44 @@ None
 
 **Before Screenshot**:
 ```
-┌─ overview ──────────────────┐
-│ location                     │
-│   file        foo.rs         │
-│   function    UserManager    │
-│   line        10             │
-│                              │
-│ god object structure         │
-│   methods                30  │
-│   fields                 8   │
-│   responsibilities       5   │
-│   lines                  450 │
-│                              │
-│ complexity                   │  ← Ambiguous!
-│   cyclomatic            150  │
-│   cognitive             200  │
-│   nesting               6    │
-└──────────────────────────────┘
+┌─ overview ──────────────────────────┐
+│ location                             │
+│   file        foo.rs                 │
+│   function    UserManager            │
+│   line        10                     │
+│                                      │
+│ god object structure                 │
+│   methods                30          │
+│   fields                 8           │
+│   responsibilities       5           │
+│   lines                  450         │
+│                                      │
+│ complexity                           │
+│   cyclomatic            150          │  ← Ambiguous!
+│   cognitive             200          │  ← Is this sum or single value?
+│   nesting               6            │  ← Is this max or sum?
+└──────────────────────────────────────┘
 ```
 
 **After Screenshot**:
 ```
-┌─ overview ──────────────────┐
-│ location                     │
-│   file        foo.rs         │
-│   function    UserManager    │
-│   line        10             │
-│                              │
-│ god object structure         │
-│   methods                30  │
-│   fields                 8   │
-│   responsibilities       5   │
-│   lines                  450 │
-│                              │
-│ accumulated complexity       │  ← Clear!
-│   cyclomatic            150  │
-│   cognitive             200  │
-│   nesting               6    │
-└──────────────────────────────┘
+┌─ overview ──────────────────────────┐
+│ location                             │
+│   file        foo.rs                 │
+│   function    UserManager            │
+│   line        10                     │
+│                                      │
+│ god object structure                 │
+│   methods                30          │
+│   fields                 8           │
+│   responsibilities       5           │
+│   lines                  450         │
+│                                      │
+│ complexity                           │
+│   accumulated cyclomatic    150      │  ← Clear: sum!
+│   accumulated cognitive     200      │  ← Clear: sum!
+│   max nesting              6         │  ← Clear: maximum!
+└──────────────────────────────────────┘
 ```
 
 ### Integration Tests
@@ -357,7 +372,7 @@ fn test_complexity_header_for_god_objects() {
 1. **User Study** (informal)
    - Show before/after screenshots to 3-5 developers
    - Ask: "What do the complexity numbers represent?"
-   - Expected: Higher comprehension with "accumulated complexity"
+   - Expected: Higher comprehension with descriptive labels ("accumulated", "max")
 
 2. **Documentation Check**
    - Verify existing docs don't assume "complexity" label
@@ -371,14 +386,14 @@ fn test_complexity_header_for_god_objects() {
 
 Add comment before conditional logic:
 ```rust
-// For god objects, use "accumulated complexity" to clarify that metrics
-// are aggregated across all functions (cyclomatic/cognitive are summed,
-// nesting is max). Regular functions show "complexity" for single-function metrics.
-let complexity_header = if matches!(item.debt_type, DebtType::GodObject { .. }) {
-    "accumulated complexity"
-} else {
-    "complexity"
-};
+// For god objects, use descriptive labels to clarify aggregation strategy:
+// - "accumulated cyclomatic/cognitive" = sum across all functions
+// - "max nesting" = maximum nesting depth found in any function
+// Regular functions use simple labels as they represent single-function metrics.
+let is_god_object = matches!(item.debt_type, DebtType::GodObject { .. });
+let cyclomatic_label = if is_god_object { "accumulated cyclomatic" } else { "cyclomatic" };
+let cognitive_label = if is_god_object { "accumulated cognitive" } else { "cognitive" };
+let nesting_label = if is_god_object { "max nesting" } else { "nesting" };
 ```
 
 ### User Documentation
@@ -396,12 +411,12 @@ The "complexity" section shows metrics for the individual function:
 - **nesting**: Maximum nesting depth in this function
 
 #### God Objects
-The "accumulated complexity" section shows aggregated metrics across all functions:
-- **cyclomatic**: Sum of cyclomatic complexity across all methods
-- **cognitive**: Sum of cognitive complexity across all methods
-- **nesting**: Maximum nesting depth found in any method
+The "complexity" section shows aggregated metrics across all functions with descriptive labels:
+- **accumulated cyclomatic**: Sum of cyclomatic complexity across all methods
+- **accumulated cognitive**: Sum of cognitive complexity across all methods
+- **max nesting**: Maximum nesting depth found in any method
 
-The "accumulated" label indicates these are combined metrics, not a single function's complexity.
+The labels clearly indicate the aggregation strategy used for each metric.
 ```
 
 ### Architecture Updates
@@ -412,10 +427,11 @@ No architecture documentation changes needed (display-only change).
 
 ### Best Practices
 
-1. **Consistency with Spec 253**
-   - Spec 253 uses detection type to customize "god object structure" header
-   - This spec follows same pattern: use debt type to customize complexity header
-   - Maintains consistent approach across overview page
+1. **Semantic Precision**
+   - "accumulated" specifically means sum/aggregation
+   - "max" specifically means maximum value
+   - Different metrics use different aggregation strategies
+   - Labels must reflect the actual calculation
 
 2. **Keep It Simple**
    - Single `if` expression, no complex branching
@@ -429,9 +445,9 @@ No architecture documentation changes needed (display-only change).
 
 ### Common Pitfalls
 
-1. **Don't change metric labels**
-   - ❌ "total cyclomatic" vs "cyclomatic"
-   - ✅ Keep labels consistent, change section header only
+1. **Don't use "total" for all metrics**
+   - ❌ "total nesting" (misleading - it's max, not sum)
+   - ✅ "max nesting" (accurate)
 
 2. **Don't add explanatory text**
    - ❌ "accumulated complexity (sum across all methods)"
@@ -501,34 +517,44 @@ Rollback is trivial (2-line change reversal).
 
 ## Rationale
 
-### Why "Accumulated" vs Alternatives?
+### Why Metric Labels vs Section Header?
 
-1. **"accumulated complexity"** ✅
-   - Accurate: Complexity is accumulated/aggregated across functions
-   - Works for both sum (cyclomatic/cognitive) and max (nesting)
+Changing the **metric labels** is better than changing the **section header** because:
+
+1. **Precision**: Can use "accumulated" for sums and "max" for maximum
+2. **Accuracy**: Labels directly describe the aggregation strategy
+3. **Semantic Clarity**: Each metric self-documents its meaning
+4. **Simplicity**: Section header stays consistent across all items
+
+### Why "Accumulated" vs "Total"?
+
+1. **"accumulated cyclomatic/cognitive"** ✅
+   - Accurate: Values are accumulated/summed across functions
    - Natural language, easy to understand
-   - Matches existing terminology in codebase
+   - Matches terminology in analysis phase
 
-2. **"total complexity"** ❌
-   - Inaccurate: Nesting is max, not total
-   - Implies simple addition (misleading for max)
+2. **"total cyclomatic/cognitive"** ⚠️
+   - Less precise about accumulation process
+   - Could work, but "accumulated" is more descriptive
 
-3. **"aggregated complexity"** ⚠️
-   - More technical/precise but less familiar to users
-   - "accumulated" is more conversational
+3. **"sum cyclomatic/cognitive"** ❌
+   - Too technical/mathematical
+   - Less natural in UI context
 
-4. **"combined complexity"** ⚠️
-   - Less specific about how values are combined
-   - "accumulated" better conveys summation/aggregation
+### Why "Max" for Nesting?
 
-### Why Section Header vs Metric Labels?
+1. **"max nesting"** ✅
+   - Accurate: Value is maximum across all functions
+   - Clear and unambiguous
+   - Immediately understandable
 
-Changing the **section header** is better than changing **metric labels** because:
+2. **"accumulated nesting"** ❌
+   - Misleading: Implies sum, but it's actually max
+   - Semantically incorrect
 
-1. **Consistency**: Metric labels match across god objects and regular functions
-2. **Scannability**: Users can quickly compare "cyclomatic" values across items
-3. **Minimal Change**: One label change vs three (cyclomatic, cognitive, nesting)
-4. **Semantic Grouping**: Header provides context for all metrics in section
+3. **"nesting depth"** ❌
+   - Doesn't clarify aggregation strategy
+   - Ambiguous like current implementation
 
 ## Appendix: God Object Complexity Calculation
 
