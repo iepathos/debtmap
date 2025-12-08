@@ -89,26 +89,58 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     frame.render_widget(header, area);
 }
 
-/// Render footer with action hints
-fn render_footer(frame: &mut Frame, _app: &ResultsApp, area: Rect, theme: &Theme) {
-    let footer_text = Line::from(vec![
-        Span::styled("Tab/←→", Style::default().fg(theme.accent())),
-        Span::raw(": Pages  "),
-        Span::styled("1-5", Style::default().fg(theme.accent())),
-        Span::raw(": Jump  "),
-        Span::styled("n/p", Style::default().fg(theme.accent())),
-        Span::raw(": Items  "),
-        Span::styled("c", Style::default().fg(theme.accent())),
-        Span::raw(": Copy  "),
-        Span::styled("e", Style::default().fg(theme.accent())),
-        Span::raw(": Edit  "),
-        Span::styled("?", Style::default().fg(theme.accent())),
-        Span::raw(": Help  "),
-        Span::styled("Esc", Style::default().fg(theme.accent())),
-        Span::raw(": Back"),
-    ]);
+/// Render footer with action hints and status message
+fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
+    // If there's a status message, show it on first line, shortcuts on second line
+    let lines = if let Some(status) = app.status_message() {
+        let status_color = if status.starts_with('✓') {
+            theme.success()
+        } else {
+            theme.warning()
+        };
 
-    let footer = Paragraph::new(footer_text).block(Block::default().borders(Borders::TOP));
+        vec![
+            Line::from(vec![Span::styled(
+                status,
+                Style::default().fg(status_color),
+            )]),
+            Line::from(vec![
+                Span::styled("Tab/←→", Style::default().fg(theme.accent())),
+                Span::raw(": Pages  "),
+                Span::styled("1-5", Style::default().fg(theme.accent())),
+                Span::raw(": Jump  "),
+                Span::styled("n/p", Style::default().fg(theme.accent())),
+                Span::raw(": Items  "),
+                Span::styled("c", Style::default().fg(theme.accent())),
+                Span::raw(": Copy Page  "),
+                Span::styled("e", Style::default().fg(theme.accent())),
+                Span::raw(": Edit  "),
+                Span::styled("?", Style::default().fg(theme.accent())),
+                Span::raw(": Help  "),
+                Span::styled("Esc", Style::default().fg(theme.accent())),
+                Span::raw(": Back"),
+            ]),
+        ]
+    } else {
+        vec![Line::from(vec![
+            Span::styled("Tab/←→", Style::default().fg(theme.accent())),
+            Span::raw(": Pages  "),
+            Span::styled("1-5", Style::default().fg(theme.accent())),
+            Span::raw(": Jump  "),
+            Span::styled("n/p", Style::default().fg(theme.accent())),
+            Span::raw(": Items  "),
+            Span::styled("c", Style::default().fg(theme.accent())),
+            Span::raw(": Copy Page  "),
+            Span::styled("e", Style::default().fg(theme.accent())),
+            Span::raw(": Edit  "),
+            Span::styled("?", Style::default().fg(theme.accent())),
+            Span::raw(": Help  "),
+            Span::styled("Esc", Style::default().fg(theme.accent())),
+            Span::raw(": Back"),
+        ])]
+    };
+
+    let footer = Paragraph::new(lines).block(Block::default().borders(Borders::TOP));
 
     frame.render_widget(footer, area);
 }

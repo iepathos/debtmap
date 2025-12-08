@@ -126,6 +126,8 @@ pub struct ResultsApp {
     detail_page: DetailPage,
     /// Whether to group items by location
     show_grouped: bool,
+    /// Status message to display temporarily (cleared on next key press)
+    status_message: Option<String>,
 }
 
 impl ResultsApp {
@@ -147,6 +149,7 @@ impl ResultsApp {
             needs_redraw: false,
             detail_page: DetailPage::Overview,
             show_grouped: true, // Default: grouping enabled
+            status_message: None,
         }
     }
 
@@ -464,6 +467,21 @@ impl ResultsApp {
         } else {
             format!("{} items", self.filtered_indices.len())
         }
+    }
+
+    /// Set status message to display temporarily
+    pub fn set_status_message(&mut self, message: String) {
+        self.status_message = Some(message);
+    }
+
+    /// Get current status message
+    pub fn status_message(&self) -> Option<&str> {
+        self.status_message.as_deref()
+    }
+
+    /// Clear status message
+    pub fn clear_status_message(&mut self) {
+        self.status_message = None;
     }
 }
 

@@ -38,6 +38,16 @@ impl Theme {
         self.success
     }
 
+    /// Success color (green for positive status messages)
+    pub fn success(&self) -> Color {
+        self.success
+    }
+
+    /// Warning color (yellow for warnings and errors)
+    pub fn warning(&self) -> Color {
+        Color::Yellow
+    }
+
     /// Style for completed stage markers (✓)
     pub fn completed_style(&self) -> Style {
         Style::default().fg(self.success)

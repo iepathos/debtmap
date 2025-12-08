@@ -8,6 +8,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle keyboard input and return true if should quit
 pub fn handle_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
+    // Clear status message on any key press (except on first press that sets it)
+    app.clear_status_message();
+
     match app.view_mode() {
         ViewMode::List => handle_list_key(app, key),
         ViewMode::Detail => handle_detail_key(app, key),
@@ -86,7 +89,8 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         // Actions (clipboard, editor)
         KeyCode::Char('c') => {
             if let Some(item) = app.selected_item() {
-                super::actions::copy_path_to_clipboard(&item.location.file)?;
+                let message = super::actions::copy_path_to_clipboard(&item.location.file)?;
+                app.set_status_message(message);
             }
         }
         KeyCode::Char('e') => {
@@ -151,7 +155,8 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         // Actions
         KeyCode::Char('c') => {
             if let Some(item) = app.selected_item() {
-                super::actions::copy_path_to_clipboard(&item.location.file)?;
+                let message = super::actions::copy_page_to_clipboard(item, app.detail_page())?;
+                app.set_status_message(message);
             }
         }
         KeyCode::Char('e') | KeyCode::Char('o') => {
