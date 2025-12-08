@@ -78,7 +78,11 @@ pub fn render(
         add_label_value(
             &mut lines,
             "total",
-            format!("{:.1}  [{}]", item.unified_score.final_score.value(), severity),
+            format!(
+                "{:.1}  [{}]",
+                item.unified_score.final_score.value(),
+                severity
+            ),
             theme,
             area.width,
         );
