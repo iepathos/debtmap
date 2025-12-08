@@ -231,7 +231,7 @@ pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Ve
 /// assert_eq!(analyze_function_responsibility("validate_email"), Some("Validation".to_string()));
 /// assert_eq!(analyze_function_responsibility("parse_json"), Some("Parsing".to_string()));
 /// assert_eq!(analyze_function_responsibility("get_user"), Some("Data Access".to_string()));
-/// assert_eq!(analyze_function_responsibility("process_item"), None); // Low confidence
+/// assert_eq!(analyze_function_responsibility("do_stuff"), None); // Low confidence
 /// ```
 ///
 /// # Stillwater Principle: Pure Core
