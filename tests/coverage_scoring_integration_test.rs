@@ -108,6 +108,7 @@ fn create_debt_item(
         detected_pattern: None,
         contextual_risk: None, // spec 203
         file_line_count: None,
+            responsibility_category: None,
     }
 }
 
@@ -217,6 +218,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             detected_pattern: None,
             contextual_risk: None, // spec 203
             file_line_count: None,
+            responsibility_category: None,
         };
         analysis_no_coverage.add_item(item);
     }

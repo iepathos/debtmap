@@ -90,6 +90,7 @@ fn create_test_item(
         detected_pattern: None, // spec 204
         contextual_risk: None,
         file_line_count: None,
+            responsibility_category: None,
     }
 }
 

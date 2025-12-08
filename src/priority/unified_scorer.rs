@@ -132,6 +132,12 @@ pub struct UnifiedDebtItem {
     /// Populated during item creation to avoid re-reading files during calculate_total_impact.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_line_count: Option<usize>,
+    /// Primary responsibility category for this function/module (spec 254).
+    /// Derived from behavioral analysis of function name during analysis phase.
+    /// Examples: "Data Access", "Validation", "Parsing", "Rendering"
+    /// None if behavioral category cannot be inferred with high confidence (>= 0.7).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub responsibility_category: Option<String>,
 }
 
 impl UnifiedDebtItem {

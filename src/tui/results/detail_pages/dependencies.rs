@@ -56,6 +56,18 @@ pub fn render(
         area.width,
     );
 
+    // Primary responsibility (for all items - spec 254)
+    if let Some(category) = &item.responsibility_category {
+        lines.push(ratatui::text::Line::from(""));
+        add_label_value(
+            &mut lines,
+            "primary responsibility",
+            category.clone(),
+            theme,
+            area.width,
+        );
+    }
+
     // Responsibilities section (for god objects)
     if let Some(indicators) = &item.god_object_indicators {
         if indicators.is_god_object && !indicators.responsibilities.is_empty() {

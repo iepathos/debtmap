@@ -166,6 +166,10 @@ pub fn create_unified_debt_item_enhanced(
     // Cache file line count during item creation (spec 204)
     let file_line_count = calculate_file_line_count(&func.file);
 
+    // Analyze responsibility category during construction (spec 254)
+    let responsibility_category =
+        crate::organization::god_object::analyze_function_responsibility(&func.name);
+
     let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -205,7 +209,8 @@ pub fn create_unified_debt_item_enhanced(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
-        file_line_count, // Cached line count (spec 204)
+        file_line_count,            // Cached line count (spec 204)
+        responsibility_category,    // Behavioral responsibility (spec 254)
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
@@ -433,6 +438,10 @@ fn build_unified_debt_item(
     // Cache file line count during item creation (spec 204)
     let file_line_count = calculate_file_line_count(&func.file);
 
+    // Analyze responsibility category during construction (spec 254)
+    let responsibility_category =
+        crate::organization::god_object::analyze_function_responsibility(&func.name);
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -472,7 +481,8 @@ fn build_unified_debt_item(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
-        file_line_count, // Cached line count (spec 204)
+        file_line_count,         // Cached line count (spec 204)
+        responsibility_category, // Behavioral responsibility (spec 254)
     }
 }
 
@@ -711,6 +721,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 detected_pattern: detected_pattern.clone(),
                 contextual_risk: None,
                 file_line_count,
+                responsibility_category: crate::organization::god_object::analyze_function_responsibility(&func.name),
             })
         })
         .collect()
@@ -809,6 +820,10 @@ pub fn create_unified_debt_item_with_data_flow(
     // Cache file line count during item creation (spec 204)
     let file_line_count = calculate_file_line_count(&func.file);
 
+    // Analyze responsibility category during construction (spec 254)
+    let responsibility_category =
+        crate::organization::god_object::analyze_function_responsibility(&func.name);
+
     Some(UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -848,7 +863,8 @@ pub fn create_unified_debt_item_with_data_flow(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
-        file_line_count, // Cached line count (spec 204)
+        file_line_count,            // Cached line count (spec 204)
+        responsibility_category,    // Behavioral responsibility (spec 254)
     })
 }
 

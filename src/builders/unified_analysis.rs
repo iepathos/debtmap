@@ -1188,6 +1188,7 @@ fn convert_error_swallowing_to_unified(
                 detected_pattern: None, // No pattern detection for error swallowing items (spec 204)
                 contextual_risk: None,
                 file_line_count: None, // No file line count caching for error swallowing items (spec 204)
+                responsibility_category: None, // No responsibility category for error swallowing items (spec 254)
             }
         })
         .collect()
@@ -1657,6 +1658,7 @@ pub fn create_god_object_debt_item(
         detected_pattern: None,
         contextual_risk: aggregated_metrics.aggregated_contextual_risk,
         file_line_count: Some(god_analysis.lines_of_code),
+        responsibility_category: god_analysis.responsibilities.first().cloned(), // Primary responsibility from detailed list (spec 254)
     }
 }
 

@@ -42,9 +42,9 @@ pub use ast_visitor::{
     TypeVisitor,
 };
 pub use classifier::{
-    calculate_struct_ratio, classify_struct_domain, count_distinct_domains, determine_confidence,
-    extract_domain_from_name, group_methods_by_responsibility,
-    infer_responsibility_with_confidence,
+    analyze_function_responsibility, calculate_struct_ratio, classify_struct_domain,
+    count_distinct_domains, determine_confidence, extract_domain_from_name,
+    group_methods_by_responsibility, infer_responsibility_with_confidence,
 };
 pub use detector::GodObjectDetector;
 pub use recommender::{

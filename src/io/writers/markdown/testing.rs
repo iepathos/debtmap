@@ -146,6 +146,7 @@ mod tests {
             detected_pattern: None,
             contextual_risk: None, // spec 203
             file_line_count: None,
+            responsibility_category: None,
         }
     }
 
@@ -220,6 +221,7 @@ mod tests {
             detected_pattern: None,
             contextual_risk: None, // spec 203
             file_line_count: None,
+            responsibility_category: None,
         }
     }
 
