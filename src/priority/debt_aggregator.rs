@@ -114,7 +114,6 @@ pub fn categorize_debt_type(debt_type: &DebtType) -> DebtCategory {
         DebtType::BlockingIO { .. } => DebtCategory::Resource,
         DebtType::SuboptimalDataStructure { .. } => DebtCategory::Resource,
         DebtType::GodObject { .. } => DebtCategory::Organization,
-        DebtType::GodModule { .. } => DebtCategory::Organization,
         DebtType::FeatureEnvy { .. } => DebtCategory::Organization,
         DebtType::PrimitiveObsession { .. } => DebtCategory::Organization,
         DebtType::MagicValues { .. } => DebtCategory::Organization,

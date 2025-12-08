@@ -95,59 +95,66 @@ pub fn render(
     }
     add_blank_line(&mut lines);
 
-    // For god objects/modules, show structural metrics first
-    match &item.debt_type {
-        DebtType::GodObject {
-            methods,
-            fields,
-            responsibilities,
-            ..
-        } => {
-            add_section_header(&mut lines, "god object structure", theme);
+    // For god objects, show structural metrics first (spec 253)
+    // Use detection_type to customize labels and display
+    if let DebtType::GodObject {
+        methods,
+        fields,
+        responsibilities,
+        lines: debt_lines,
+        ..
+    } = &item.debt_type
+    {
+        // Determine detection type from indicators
+        let detection_type = item
+            .god_object_indicators
+            .as_ref()
+            .map(|i| &i.detection_type);
+
+        // Customize header and labels based on detection type
+        let header = match detection_type {
+            Some(crate::organization::DetectionType::GodClass) => "god object structure",
+            Some(crate::organization::DetectionType::GodFile) => "god file structure",
+            Some(crate::organization::DetectionType::GodModule) => "god module structure",
+            None => "god object structure",
+        };
+        add_section_header(&mut lines, header, theme);
+
+        // Use appropriate label for methods/functions
+        let method_label = match detection_type {
+            Some(crate::organization::DetectionType::GodClass) => "methods",
+            _ => "functions",
+        };
+        add_label_value(
+            &mut lines,
+            method_label,
+            methods.to_string(),
+            theme,
+            area.width,
+        );
+
+        // Show fields only if present (Some for GodClass, None for GodFile/GodModule)
+        if let Some(field_count) = fields {
             add_label_value(
                 &mut lines,
-                "methods",
-                methods.to_string(),
+                "fields",
+                field_count.to_string(),
                 theme,
                 area.width,
             );
-            add_label_value(&mut lines, "fields", fields.to_string(), theme, area.width);
-            add_label_value(
-                &mut lines,
-                "responsibilities",
-                responsibilities.to_string(),
-                theme,
-                area.width,
-            );
-            let loc = item.file_line_count.unwrap_or(item.function_length);
-            add_label_value(&mut lines, "loc", loc.to_string(), theme, area.width);
-            add_blank_line(&mut lines);
         }
-        DebtType::GodModule {
-            functions,
-            lines: _module_lines,
-            responsibilities,
-        } => {
-            add_section_header(&mut lines, "god module structure", theme);
-            add_label_value(
-                &mut lines,
-                "functions",
-                functions.to_string(),
-                theme,
-                area.width,
-            );
-            add_label_value(
-                &mut lines,
-                "responsibilities",
-                responsibilities.to_string(),
-                theme,
-                area.width,
-            );
-            let loc = item.file_line_count.unwrap_or(item.function_length);
-            add_label_value(&mut lines, "loc", loc.to_string(), theme, area.width);
-            add_blank_line(&mut lines);
-        }
-        _ => {}
+
+        add_label_value(
+            &mut lines,
+            "responsibilities",
+            responsibilities.to_string(),
+            theme,
+            area.width,
+        );
+
+        // Use debt_lines for LOC (spec 253 adds this field)
+        add_label_value(&mut lines, "loc", debt_lines.to_string(), theme, area.width);
+        add_blank_line(&mut lines);
     }
 
     // Complexity metrics section
@@ -175,10 +182,7 @@ pub fn render(
     );
 
     // For non-god objects, show function LOC
-    if !matches!(
-        item.debt_type,
-        DebtType::GodObject { .. } | DebtType::GodModule { .. }
-    ) {
+    if !matches!(item.debt_type, DebtType::GodObject { .. }) {
         add_label_value(
             &mut lines,
             "loc",
@@ -294,7 +298,6 @@ fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
         DebtType::BlockingIO { .. } => "Blocking I/O".to_string(),
         DebtType::SuboptimalDataStructure { .. } => "Suboptimal Data Structure".to_string(),
         DebtType::GodObject { .. } => "God Object".to_string(),
-        DebtType::GodModule { .. } => "God Module".to_string(),
         DebtType::FeatureEnvy { .. } => "Feature Envy".to_string(),
         DebtType::PrimitiveObsession { .. } => "Primitive Obsession".to_string(),
         DebtType::MagicValues { .. } => "Magic Values".to_string(),

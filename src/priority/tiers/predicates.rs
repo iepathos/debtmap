@@ -13,10 +13,7 @@ use crate::priority::{DebtType, FunctionRole};
 /// Checks if debt type is a god object or god module.
 #[inline]
 pub fn is_god_object(debt_type: &DebtType) -> bool {
-    matches!(
-        debt_type,
-        DebtType::GodObject { .. } | DebtType::GodModule { .. }
-    )
+    matches!(debt_type, DebtType::GodObject { .. })
 }
 
 /// Checks if debt type is an error handling issue.
@@ -156,14 +153,18 @@ mod tests {
     fn test_is_god_object() {
         assert!(is_god_object(&DebtType::GodObject {
             methods: 100,
-            fields: 50,
+            fields: Some(50),
             responsibilities: 5,
             god_object_score: Score0To100::new(95.0),
+            lines: 500,
         }));
-        assert!(is_god_object(&DebtType::GodModule {
-            functions: 100,
-            lines: 1000,
+        // GodModule was unified into GodObject (spec 253)
+        assert!(is_god_object(&DebtType::GodObject {
+            methods: 100,
+            fields: None,  // No fields for module-level god objects
             responsibilities: 5,
+            god_object_score: Score0To100::new(95.0),
+            lines: 1000,
         }));
         assert!(!is_god_object(&DebtType::TestingGap {
             coverage: 0.0,
@@ -238,9 +239,10 @@ mod tests {
         }));
         assert!(!is_testing_gap(&DebtType::GodObject {
             methods: 100,
-            fields: 50,
+            fields: Some(50),
             responsibilities: 5,
             god_object_score: Score0To100::new(95.0),
+            lines: 500,
         }));
     }
 

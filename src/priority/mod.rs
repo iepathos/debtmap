@@ -271,16 +271,17 @@ pub enum DebtType {
         recommended_type: String,
     },
     // Organization debt types
+    /// Unified god object variant representing all detection types (GodClass, GodFile, GodModule)
+    /// The `god_object_indicators.detection_type` field distinguishes between these types
     GodObject {
+        /// Number of methods (for GodClass) or functions (for GodFile/GodModule)
         methods: u32,
-        fields: u32,
+        /// Number of fields - Some for GodClass, None for GodFile/GodModule
+        fields: Option<u32>,
         responsibilities: u32,
         god_object_score: Score0To100,
-    },
-    GodModule {
-        functions: u32,
+        /// Total lines of code
         lines: u32,
-        responsibilities: u32,
     },
     FeatureEnvy {
         external_class: String,
@@ -477,20 +478,13 @@ impl std::hash::Hash for DebtType {
                 fields,
                 responsibilities,
                 god_object_score,
+                lines,
             } => {
                 methods.hash(state);
                 fields.hash(state);
                 responsibilities.hash(state);
                 god_object_score.value().to_bits().hash(state);
-            }
-            DebtType::GodModule {
-                functions,
-                lines,
-                responsibilities,
-            } => {
-                functions.hash(state);
                 lines.hash(state);
-                responsibilities.hash(state);
             }
             DebtType::FeatureEnvy {
                 external_class,
@@ -594,7 +588,6 @@ impl std::fmt::Display for DebtType {
             DebtType::BlockingIO { .. } => write!(f, "Blocking I/O"),
             DebtType::SuboptimalDataStructure { .. } => write!(f, "Suboptimal Data Structure"),
             DebtType::GodObject { .. } => write!(f, "God Object"),
-            DebtType::GodModule { .. } => write!(f, "God Module"),
             DebtType::FeatureEnvy { .. } => write!(f, "Feature Envy"),
             DebtType::PrimitiveObsession { .. } => write!(f, "Primitive Obsession"),
             DebtType::MagicValues { .. } => write!(f, "Magic Values"),
@@ -634,7 +627,6 @@ impl DebtCategory {
         match debt_type {
             // Architecture Issues
             DebtType::GodObject { .. } => DebtCategory::Architecture,
-            DebtType::GodModule { .. } => DebtCategory::Architecture,
             DebtType::FeatureEnvy { .. } => DebtCategory::Architecture,
             DebtType::PrimitiveObsession { .. } => DebtCategory::Architecture,
             DebtType::ScatteredType { .. } => DebtCategory::Architecture,
@@ -910,12 +902,7 @@ impl UnifiedAnalysis {
         let god_object_files: std::collections::HashSet<_> = self
             .items
             .iter()
-            .filter(|item| {
-                matches!(
-                    item.debt_type,
-                    DebtType::GodObject { .. } | DebtType::GodModule { .. }
-                )
-            })
+            .filter(|item| matches!(item.debt_type, DebtType::GodObject { .. }))
             .map(|item| &item.location.file)
             .collect();
 

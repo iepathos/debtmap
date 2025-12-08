@@ -101,7 +101,6 @@ fn calculate_base_effort(debt_type: &crate::priority::DebtType) -> u32 {
         crate::priority::DebtType::BlockingIO { .. } => 5,
         crate::priority::DebtType::SuboptimalDataStructure { .. } => 6,
         crate::priority::DebtType::GodObject { .. } => 16,
-        crate::priority::DebtType::GodModule { .. } => 16,
         crate::priority::DebtType::FeatureEnvy { .. } => 8,
         crate::priority::DebtType::PrimitiveObsession { .. } => 4,
         crate::priority::DebtType::MagicValues { .. } => 2,
@@ -381,9 +380,10 @@ mod tests {
         assert_eq!(
             calculate_base_effort(&PriorityDebtType::GodObject {
                 methods: 50,
-                fields: 25,
+                fields: Some(25),
                 responsibilities: 50,
-                god_object_score: Score0To100::new(100.0)
+                god_object_score: Score0To100::new(100.0),
+                lines: 500,
             }),
             16
         );

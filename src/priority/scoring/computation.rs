@@ -126,7 +126,6 @@ pub(super) fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::SuboptimalDataStructure { .. } => 0.2,
         // Organization debt types (maintenance risk)
         DebtType::GodObject { .. } => 0.4,
-        DebtType::GodModule { .. } => 0.4,
         DebtType::FeatureEnvy { .. } => 0.25,
         DebtType::PrimitiveObsession { .. } => 0.2,
         DebtType::MagicValues { .. } => 0.15,

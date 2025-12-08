@@ -95,9 +95,10 @@ fn bench_classify_god_object(c: &mut Criterion) {
     let item = create_test_item(
         DebtType::GodObject {
             methods: 100,
-            fields: 50,
+            fields: Some(50),
             responsibilities: 5,
             god_object_score: debtmap::priority::score_types::Score0To100::new(95.0),
+            lines: 500,
         },
         10,
         10,
@@ -268,9 +269,10 @@ fn bench_classify_batch(c: &mut Criterion) {
                 let debt_type = match i % 4 {
                     0 => DebtType::GodObject {
                         methods: 50 + (i % 50),
-                        fields: 20 + (i % 30),
+                        fields: Some(20 + (i % 30)),
                         responsibilities: 5,
                         god_object_score: debtmap::priority::score_types::Score0To100::new(85.0),
+                        lines: 300 + (i % 200),
                     },
                     1 => DebtType::ComplexityHotspot {
                         adjusted_cyclomatic: Some(20 + (i % 30)),

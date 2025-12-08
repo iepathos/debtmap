@@ -580,22 +580,6 @@ fn generate_standard_recommendation(
             god_object_score,
             ..
         } => generate_god_object_recommendation(*responsibilities, god_object_score.value()),
-        DebtType::GodModule {
-            functions,
-            responsibilities,
-            ..
-        } => (
-            "Split module into focused submodules".to_string(),
-            format!(
-                "Module with {} functions across {} responsibilities",
-                functions, responsibilities
-            ),
-            vec![
-                "Identify distinct responsibilities".to_string(),
-                "Create separate modules for each responsibility".to_string(),
-                "Move functions to appropriate modules".to_string(),
-            ],
-        ),
         DebtType::FeatureEnvy {
             external_class,
             usage_ratio,

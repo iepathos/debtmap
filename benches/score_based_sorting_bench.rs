@@ -99,9 +99,10 @@ fn bench_score_calculation(c: &mut Criterion) {
         30.0,
         DebtType::GodObject {
             methods: 50,
-            fields: 20,
+            fields: Some(20),
             responsibilities: 10,
             god_object_score: debtmap::priority::score_types::Score0To100::new(85.0),
+            lines: 400,
         },
         10,
         10,
@@ -132,9 +133,10 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
                 let debt_type = match i % 3 {
                     0 => DebtType::GodObject {
                         methods: 50,
-                        fields: 20,
+                        fields: Some(20),
                         responsibilities: 10,
                         god_object_score: debtmap::priority::score_types::Score0To100::new(85.0),
+                        lines: 400,
                     },
                     1 => DebtType::ComplexityHotspot {
                         cyclomatic: 35,
@@ -249,9 +251,10 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
             let debt_type = match i % 5 {
                 0 => DebtType::GodObject {
                     methods: 50,
-                    fields: 20,
+                    fields: Some(20),
                     responsibilities: 10,
                     god_object_score: debtmap::priority::score_types::Score0To100::new(85.0),
+                    lines: 400,
                 },
                 1 => DebtType::GodModule {
                     functions: 100,
