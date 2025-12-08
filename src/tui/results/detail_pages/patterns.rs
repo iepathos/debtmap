@@ -31,14 +31,6 @@ pub fn render(
         has_any_data = true;
         add_section_header(&mut lines, "entropy analysis", theme);
 
-        add_label_value(
-            &mut lines,
-            "entropy",
-            format!("{:.3}", entropy.entropy_score),
-            theme,
-            area.width,
-        );
-
         let entropy_desc = if entropy.entropy_score < 0.3 {
             "Low (Repetitive)"
         } else if entropy.entropy_score < 0.5 {
@@ -46,10 +38,14 @@ pub fn render(
         } else {
             "High (Chaotic)"
         };
-        lines.push(Line::from(vec![
-            Span::raw("    "),
-            Span::styled(entropy_desc, Style::default().fg(theme.muted)),
-        ]));
+
+        add_label_value(
+            &mut lines,
+            "entropy",
+            format!("{:.3} ({})", entropy.entropy_score, entropy_desc),
+            theme,
+            area.width,
+        );
 
         add_label_value(
             &mut lines,
@@ -216,14 +212,13 @@ pub fn render(
         );
 
         if !purity_info.impurity_reasons.is_empty() {
-            add_blank_line(&mut lines);
-            add_section_header(&mut lines, "impurity reasons", theme);
-            for reason in &purity_info.impurity_reasons {
-                lines.push(Line::from(vec![
-                    Span::raw("                        "), // Align to value column (24 chars)
-                    Span::styled(reason.clone(), Style::default().fg(theme.muted)),
-                ]));
-            }
+            add_label_value(
+                &mut lines,
+                "reasons",
+                purity_info.impurity_reasons.join(", "),
+                theme,
+                area.width,
+            );
         }
 
         add_blank_line(&mut lines);
