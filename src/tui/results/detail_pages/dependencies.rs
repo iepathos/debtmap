@@ -56,6 +56,49 @@ pub fn render(
         area.width,
     );
 
+    // Responsibilities section (for god objects)
+    if let Some(indicators) = &item.god_object_indicators {
+        if indicators.is_god_object && !indicators.responsibilities.is_empty() {
+            lines.push(ratatui::text::Line::from(""));
+
+            // Section header
+            add_section_header(&mut lines, "responsibilities", theme);
+
+            // List responsibilities (limit to 6)
+            for resp in indicators.responsibilities.iter().take(6) {
+                // Find method count from recommended_splits if available
+                let method_count = indicators
+                    .recommended_splits
+                    .iter()
+                    .find(|split| split.responsibility == *resp)
+                    .map(|split| split.method_count)
+                    .unwrap_or(0);
+
+                // Lowercase responsibility name for consistency
+                let resp_text = resp.to_lowercase();
+                let count_text = if method_count > 0 {
+                    format!("{} methods", method_count)
+                } else {
+                    String::new()
+                };
+
+                // Use the same column system as dependency metrics
+                add_label_value(&mut lines, &resp_text, count_text, theme, area.width);
+            }
+
+            // Overflow indicator
+            if indicators.responsibilities.len() > 6 {
+                lines.push(ratatui::text::Line::from(vec![
+                    ratatui::text::Span::raw("  "),
+                    ratatui::text::Span::styled(
+                        format!("... and {} more", indicators.responsibilities.len() - 6),
+                        ratatui::style::Style::default().fg(theme.muted),
+                    ),
+                ]));
+            }
+        }
+    }
+
     // Add note for god objects about what matters
     if let Some(indicators) = &item.god_object_indicators {
         if indicators.is_god_object {
