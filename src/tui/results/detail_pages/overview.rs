@@ -158,7 +158,15 @@ pub fn render(
     }
 
     // Complexity metrics section
-    add_section_header(&mut lines, "complexity", theme);
+    // For god objects, use "accumulated complexity" to clarify that metrics
+    // are aggregated across all functions (cyclomatic/cognitive are summed,
+    // nesting is max). Regular functions show "complexity" for single-function metrics.
+    let complexity_header = if matches!(item.debt_type, DebtType::GodObject { .. }) {
+        "accumulated complexity"
+    } else {
+        "complexity"
+    };
+    add_section_header(&mut lines, complexity_header, theme);
     add_label_value(
         &mut lines,
         "cyclomatic",
