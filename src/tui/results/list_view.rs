@@ -306,7 +306,7 @@ fn format_grouped_item(
     let metrics = grouping::aggregate_metrics(group);
     let coverage_str = metrics
         .coverage
-        .map(|c| format!("{:.0}%", c.direct))
+        .map(|c| format!("{:.0}%", c.direct * 100.0))
         .unwrap_or_else(|| "N/A".to_string());
 
     let mut metric_parts = vec![format!("Cov:{}", coverage_str)];
@@ -455,7 +455,7 @@ fn format_list_item(
             let coverage_str = item
                 .transitive_coverage
                 .as_ref()
-                .map(|c| format!("{:.0}%", c.direct))
+                .map(|c| format!("{:.0}%", c.direct * 100.0))
                 .unwrap_or_else(|| "N/A".to_string());
 
             // Format complexity with entropy adjustment if available

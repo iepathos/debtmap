@@ -217,7 +217,7 @@ pub fn render(
         lines.push(Line::from(vec![
             Span::raw("  coverage              "),
             Span::styled(
-                format!("{:.1}%", coverage),
+                format!("{:.1}%", coverage * 100.0),
                 Style::default().fg(coverage_color(coverage)),
             ),
         ]));
@@ -343,11 +343,11 @@ fn severity_color(severity: &str) -> Color {
     }
 }
 
-/// Get color for coverage percentage
+/// Get color for coverage fraction (0.0-1.0)
 fn coverage_color(coverage: f64) -> Color {
-    if coverage >= 70.0 {
+    if coverage >= 0.7 {
         Color::Green
-    } else if coverage >= 30.0 {
+    } else if coverage >= 0.3 {
         Color::Yellow
     } else {
         Color::Red
