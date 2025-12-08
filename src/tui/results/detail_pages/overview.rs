@@ -175,7 +175,11 @@ pub fn render(
     } else {
         "cognitive"
     };
-    let nesting_label = if is_god_object { "max nesting" } else { "nesting" };
+    let nesting_label = if is_god_object {
+        "max nesting"
+    } else {
+        "nesting"
+    };
 
     add_label_value(
         &mut lines,

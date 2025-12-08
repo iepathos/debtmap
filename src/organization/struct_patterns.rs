@@ -118,7 +118,10 @@ pub fn detect_pattern(type_analysis: &TypeAnalysis, responsibilities: usize) -> 
 /// - Low field count (< 10)
 /// - Low method count (< 10)
 /// - Single responsibility
-fn detect_config_pattern(type_analysis: &TypeAnalysis, responsibilities: usize) -> Option<PatternAnalysis> {
+fn detect_config_pattern(
+    type_analysis: &TypeAnalysis,
+    responsibilities: usize,
+) -> Option<PatternAnalysis> {
     let mut evidence = Vec::new();
     let mut confidence = 0.0;
 
@@ -185,7 +188,10 @@ fn detect_config_pattern(type_analysis: &TypeAnalysis, responsibilities: usize) 
 /// - Low method-to-field ratio (< 0.2)
 /// - Single responsibility
 /// - Name patterns: *Data, *Dto, *Item, *Record, *Result, *Metrics
-fn detect_dto_pattern(type_analysis: &TypeAnalysis, responsibilities: usize) -> Option<PatternAnalysis> {
+fn detect_dto_pattern(
+    type_analysis: &TypeAnalysis,
+    responsibilities: usize,
+) -> Option<PatternAnalysis> {
     let mut evidence = Vec::new();
     let mut confidence = 0.0;
 
@@ -222,12 +228,11 @@ fn detect_dto_pattern(type_analysis: &TypeAnalysis, responsibilities: usize) -> 
 
     // Check name patterns
     let name_lower = type_analysis.name.to_lowercase();
-    let dto_suffixes = ["data", "dto", "item", "record", "result", "metrics", "analysis"];
+    let dto_suffixes = [
+        "data", "dto", "item", "record", "result", "metrics", "analysis",
+    ];
     if dto_suffixes.iter().any(|s| name_lower.ends_with(s)) {
-        evidence.push(format!(
-            "Name pattern suggests DTO: {}",
-            type_analysis.name
-        ));
+        evidence.push(format!("Name pattern suggests DTO: {}", type_analysis.name));
         confidence += 0.1;
     }
 
@@ -348,12 +353,8 @@ mod tests {
 
     #[test]
     fn test_dto_pattern_detected() {
-        let type_analysis = make_type_analysis(
-            "UnifiedDebtItem",
-            vec!["with_pattern_analysis"],
-            1,
-            35,
-        );
+        let type_analysis =
+            make_type_analysis("UnifiedDebtItem", vec!["with_pattern_analysis"], 1, 35);
 
         let analysis = detect_pattern(&type_analysis, 1);
         assert_eq!(analysis.pattern, StructPattern::DataTransferObject);

@@ -1350,7 +1350,13 @@ fn analyze_files_for_debt(
     }
 
     // Apply results to unified analysis (I/O at edges)
-    apply_file_analysis_results(unified, processed_files, risk_analyzer, project_path, coverage_data);
+    apply_file_analysis_results(
+        unified,
+        processed_files,
+        risk_analyzer,
+        project_path,
+        coverage_data,
+    );
 }
 
 // Pure function to group functions by file
@@ -1504,7 +1510,7 @@ fn detect_god_object_analysis(
                 purity_distribution: None,
                 module_structure: None,
                 detection_type: crate::organization::DetectionType::GodFile,
-                struct_name: None,  // Size-based detection is always GodFile
+                struct_name: None, // Size-based detection is always GodFile
                 struct_line: None,
                 visibility_breakdown: None,
                 domain_count: 0,
@@ -1609,11 +1615,10 @@ pub fn create_god_object_debt_item(
 
     // Apply contextual risk to score if available (spec 255)
     if let Some(ref ctx_risk) = aggregated_metrics.aggregated_contextual_risk {
-        unified_score =
-            crate::priority::scoring::construction::apply_contextual_risk_to_score(
-                unified_score,
-                ctx_risk,
-            );
+        unified_score = crate::priority::scoring::construction::apply_contextual_risk_to_score(
+            unified_score,
+            ctx_risk,
+        );
     }
 
     // Unified debt type for all god object detections (spec 253)
@@ -1634,15 +1639,12 @@ pub fn create_god_object_debt_item(
     let (display_name, line_number) = match god_analysis.detection_type {
         crate::organization::DetectionType::GodClass => {
             // For GodClass, use struct name and struct line if available
-            let name = god_analysis
-                .struct_name
-                .as_deref()
-                .unwrap_or_else(|| {
-                    file_path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown")
-                });
+            let name = god_analysis.struct_name.as_deref().unwrap_or_else(|| {
+                file_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+            });
             let line = god_analysis.struct_line.unwrap_or(1);
             (name.to_string(), line)
         }

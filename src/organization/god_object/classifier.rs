@@ -477,7 +477,7 @@ mod tests {
 
     #[test]
     fn test_group_methods_by_responsibility_unclassified() {
-        let methods = vec!["helper_method".to_string()];
+        let methods = vec!["foo".to_string()]; // Single-word method with no pattern
         let groups = group_methods_by_responsibility(&methods);
         // Low confidence methods go to "unclassified"
         assert!(groups.contains_key("unclassified"));

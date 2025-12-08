@@ -202,8 +202,10 @@ impl GodObjectDetector {
         };
 
         // Step 6: Generate responsibility-aware recommendation (pure)
-        let recommendation =
-            recommendation_generator::generate_recommendation(&classification, pattern_analysis.as_ref());
+        let recommendation = recommendation_generator::generate_recommendation(
+            &classification,
+            pattern_analysis.as_ref(),
+        );
 
         EnhancedGodObjectAnalysis {
             file_metrics,
@@ -380,12 +382,17 @@ impl GodObjectDetector {
         let (struct_name, struct_line) = match detection_type {
             DetectionType::GodClass => {
                 // Get the first (dominant) struct's name and location
-                visitor.types.values().next().map(|type_analysis| {
-                    (
-                        Some(type_analysis.name.clone()),
-                        Some(type_analysis.location.line),
-                    )
-                }).unwrap_or((None, None))
+                visitor
+                    .types
+                    .values()
+                    .next()
+                    .map(|type_analysis| {
+                        (
+                            Some(type_analysis.name.clone()),
+                            Some(type_analysis.location.line),
+                        )
+                    })
+                    .unwrap_or((None, None))
             }
             DetectionType::GodFile | DetectionType::GodModule => {
                 // For file/module level, no specific struct

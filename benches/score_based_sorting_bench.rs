@@ -173,11 +173,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
             overall_coverage: None,
             has_coverage_data: false,
             timings: None,
-<<<<<<< HEAD
-            stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
-=======
             stats: FilterStatistics::default(),
->>>>>>> prodigy-workflow-1765158901319
         };
 
         group.bench_with_input(

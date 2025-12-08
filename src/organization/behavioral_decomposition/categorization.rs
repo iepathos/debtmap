@@ -220,19 +220,8 @@ impl BehavioralCategorizer {
 
     pub(crate) fn is_filtering(name: &str) -> bool {
         const FILTERING_KEYWORDS: &[&str] = &[
-            "filter",
-            "select",
-            "find",
-            "search",
-            "query",
-            "lookup",
-            "match",
-            "where",
-            "first",
-            "last",
-            "single",
-            "take",
-            "skip",
+            "filter", "select", "find", "search", "query", "lookup", "match", "where", "first",
+            "last", "single", "take", "skip",
         ];
         FILTERING_KEYWORDS
             .iter()
@@ -290,58 +279,26 @@ impl BehavioralCategorizer {
     }
 
     pub(crate) fn is_utilities(name: &str) -> bool {
-        // Builder/factory patterns
+        // Builder/factory patterns (but not to_* which is often transformation)
         if name.starts_with("with_")
             || name.starts_with("from_")
             || name.starts_with("into_")
             || name.starts_with("as_")
-            || name.starts_with("to_")
             || name.starts_with("for_")
         {
             return true;
         }
 
-        // Common utility methods
-        const UTILITY_KEYWORDS: &[&str] = &[
-            "default",
-            "any",
-            "clone",
-            "copy",
-            "eq",
-            "cmp",
-            "hash",
-            "debug",
-            "fmt",
-            "partial",
-            "ord",
-            "helper",
-            "util",
-            "contains",
-            "has_",
-            "is_empty",
-            "len",
-            "count",
-            "size",
-            "clear",
-            "reset",
-            "add",
-            "remove",
-            "insert",
-            "delete",
-            "push",
-            "pop",
-            "append",
-            "extend",
-            "iter",
-            "collect",
-            "keys",
-            "values",
-            "entries",
+        // Common utility methods - be conservative to avoid conflicts with other categories
+        // Only match exact names or specific patterns
+        const UTILITY_EXACT: &[&str] = &[
+            "default", "any", "clone", "eq", "cmp", "hash", "len", "is_empty", "clear", "reset",
         ];
 
-        UTILITY_KEYWORDS.iter().any(|&kw| {
-            name == kw || name.starts_with(kw) || name.contains(&format!("_{}", kw))
-        })
+        const UTILITY_PREFIXES: &[&str] = &["helper_", "util_"];
+
+        UTILITY_EXACT.contains(&name)
+            || UTILITY_PREFIXES.iter().any(|&kw| name.starts_with(kw))
     }
 }
 
