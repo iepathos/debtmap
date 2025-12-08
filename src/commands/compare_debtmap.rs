@@ -73,32 +73,28 @@ pub struct CompareConfig {
     pub output_path: PathBuf,
 }
 
-pub fn compare_debtmaps(config: CompareConfig) -> Result<()> {
-    let is_automation = std::env::var("PRODIGY_AUTOMATION")
+// =============================================================================
+// I/O Shell Functions (Side Effects at Boundaries)
+// =============================================================================
+
+/// I/O: Read automation mode from environment variables
+fn read_automation_mode() -> bool {
+    std::env::var("PRODIGY_AUTOMATION")
         .unwrap_or_default()
         .eq_ignore_ascii_case("true")
         || std::env::var("PRODIGY_VALIDATION")
             .unwrap_or_default()
-            .eq_ignore_ascii_case("true");
-
-    if !is_automation {
-        println!("Loading debtmap data from before and after states...");
-    }
-
-    let before = load_debtmap(&config.before_path)?;
-    let after = load_debtmap(&config.after_path)?;
-
-    let validation_result = perform_validation(&before, &after)?;
-
-    write_validation_result(&config.output_path, &validation_result)?;
-
-    if !is_automation {
-        print_summary(&validation_result);
-    }
-
-    Ok(())
+            .eq_ignore_ascii_case("true")
 }
 
+/// I/O: Load both debtmap files
+fn load_both_debtmaps(config: &CompareConfig) -> Result<(DebtmapJsonInput, DebtmapJsonInput)> {
+    let before = load_debtmap(&config.before_path)?;
+    let after = load_debtmap(&config.after_path)?;
+    Ok((before, after))
+}
+
+/// I/O: Load single debtmap file
 fn load_debtmap(path: &Path) -> Result<DebtmapJsonInput> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read debtmap file: {}", path.display()))?;
@@ -107,45 +103,85 @@ fn load_debtmap(path: &Path) -> Result<DebtmapJsonInput> {
         .with_context(|| format!("Failed to parse debtmap JSON from: {}", path.display()))
 }
 
-fn perform_validation(
-    before: &DebtmapJsonInput,
-    after: &DebtmapJsonInput,
-) -> Result<ValidationResult> {
-    let before_summary = create_summary(before);
-    let after_summary = create_summary(after);
+/// I/O Shell: Main entry point - orchestrates I/O and delegates to pure validation
+pub fn compare_debtmaps(config: CompareConfig) -> Result<()> {
+    let is_automation = read_automation_mode();
 
-    let mut improvements = Vec::new();
-    let mut remaining_issues = Vec::new();
-    let mut gaps = HashMap::new();
+    if !is_automation {
+        println!("Loading debtmap data from before and after states...");
+    }
 
-    let resolved_items = identify_resolved_items(before, after);
-    let improved_items = identify_improved_items(before, after);
-    let new_items = identify_new_items(before, after);
-    let unchanged_critical = identify_unchanged_critical(before, after);
+    let (before, after) = load_both_debtmaps(&config)?;
+    let result = perform_validation(&before, &after)?; // Pure!
 
-    if resolved_items.high_priority_count > 0 {
-        improvements.push(format!(
+    write_validation_result(&config.output_path, &result)?;
+
+    if !is_automation {
+        print_summary(&result);
+    }
+
+    Ok(())
+}
+
+// =============================================================================
+// Pure Message Builder Functions
+// =============================================================================
+
+/// Pure: Build resolved items improvement message
+fn build_resolved_message(resolved: &ResolvedItems) -> Option<String> {
+    if resolved.high_priority_count > 0 {
+        Some(format!(
             "Resolved {} high-priority debt items",
-            resolved_items.high_priority_count
-        ));
+            resolved.high_priority_count
+        ))
+    } else {
+        None
     }
+}
 
-    if improved_items.complexity_reduction > 0.0 {
-        improvements.push(format!(
+/// Pure: Build complexity reduction improvement message
+fn build_complexity_message(improved: &ImprovedItems) -> Option<String> {
+    if improved.complexity_reduction > 0.0 {
+        Some(format!(
             "Reduced average cyclomatic complexity by {:.0}%",
-            improved_items.complexity_reduction * 100.0
-        ));
+            improved.complexity_reduction * 100.0
+        ))
+    } else {
+        None
     }
+}
 
-    if improved_items.coverage_improvement > 0.0 {
-        improvements.push(format!(
+/// Pure: Build coverage improvement message
+fn build_coverage_message(improved: &ImprovedItems) -> Option<String> {
+    if improved.coverage_improvement > 0.0 {
+        Some(format!(
             "Added test coverage for {} critical functions",
-            improved_items.coverage_improvement_count
-        ));
+            improved.coverage_improvement_count
+        ))
+    } else {
+        None
     }
+}
 
+/// Pure: Build all improvement messages
+fn build_all_improvement_messages(
+    resolved: &ResolvedItems,
+    improved: &ImprovedItems,
+) -> Vec<String> {
+    [
+        build_resolved_message(resolved),
+        build_complexity_message(improved),
+        build_coverage_message(improved),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+/// Pure: Build unchanged critical items issue message
+fn build_unchanged_critical_message(unchanged_critical: &UnchangedCritical) -> Option<String> {
     if unchanged_critical.count > 0 {
-        remaining_issues.push(format!(
+        Some(format!(
             "{} critical debt item{} still present",
             unchanged_critical.count,
             if unchanged_critical.count == 1 {
@@ -153,72 +189,121 @@ fn perform_validation(
             } else {
                 "s"
             }
-        ));
-
-        for (idx, item) in unchanged_critical.items.iter().take(2).enumerate() {
-            gaps.insert(
-                format!("critical_debt_remaining_{}", idx),
-                GapDetail {
-                    description: format!(
-                        "High-priority debt item still present in {}",
-                        item.function
-                    ),
-                    location: format!("{}:{}:{}", item.file.display(), item.function, item.line),
-                    severity: "high".to_string(),
-                    suggested_fix: "Apply functional programming patterns to reduce complexity"
-                        .to_string(),
-                    original_score: Some(item.score),
-                    current_score: Some(item.score),
-                    original_complexity: None,
-                    current_complexity: None,
-                    target_complexity: None,
-                },
-            );
-        }
+        ))
+    } else {
+        None
     }
+}
 
+/// Pure: Build regression issue message
+fn build_regression_message(new_items: &NewItems) -> Option<String> {
     if new_items.critical_count > 0 {
-        remaining_issues.push(format!(
+        Some(format!(
             "{} new critical debt items introduced",
             new_items.critical_count
-        ));
+        ))
+    } else {
+        None
+    }
+}
 
-        gaps.insert(
-            "regression_detected".to_string(),
-            GapDetail {
-                description: "New complexity introduced during refactoring".to_string(),
-                location: new_items
-                    .items
-                    .first()
-                    .map(|i| format!("{}:{}:{}", i.file.display(), i.function, i.line))
-                    .unwrap_or_default(),
-                severity: "high".to_string(),
-                suggested_fix: "Simplify the newly added conditional logic".to_string(),
-                original_score: None,
-                current_score: new_items.items.first().map(|i| i.score),
-                original_complexity: None,
-                current_complexity: None,
-                target_complexity: None,
-            },
-        );
+/// Pure: Build all issue messages
+fn build_all_issue_messages(
+    unchanged_critical: &UnchangedCritical,
+    new_items: &NewItems,
+) -> Vec<String> {
+    [
+        build_unchanged_critical_message(unchanged_critical),
+        build_regression_message(new_items),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+// =============================================================================
+// Pure Gap Builder Functions
+// =============================================================================
+
+/// Pure: Build a single critical debt gap detail
+fn build_critical_debt_gap(item: &ItemInfo, idx: usize) -> (String, GapDetail) {
+    let key = format!("critical_debt_remaining_{}", idx);
+    let detail = GapDetail {
+        description: format!("High-priority debt item still present in {}", item.function),
+        location: format!("{}:{}:{}", item.file.display(), item.function, item.line),
+        severity: "high".to_string(),
+        suggested_fix: "Apply functional programming patterns to reduce complexity".to_string(),
+        original_score: Some(item.score),
+        current_score: Some(item.score),
+        original_complexity: None,
+        current_complexity: None,
+        target_complexity: None,
+    };
+    (key, detail)
+}
+
+/// Pure: Build regression gap detail
+fn build_regression_gap(new_items: &NewItems) -> Option<(String, GapDetail)> {
+    if new_items.critical_count == 0 {
+        return None;
     }
 
-    let improvement_score = calculate_improvement_score(
-        &resolved_items,
-        &improved_items,
-        &new_items,
-        &unchanged_critical,
-        &before_summary,
-        &after_summary,
-    );
+    let detail = GapDetail {
+        description: "New complexity introduced during refactoring".to_string(),
+        location: new_items
+            .items
+            .first()
+            .map(|i| format!("{}:{}:{}", i.file.display(), i.function, i.line))
+            .unwrap_or_default(),
+        severity: "high".to_string(),
+        suggested_fix: "Simplify the newly added conditional logic".to_string(),
+        original_score: None,
+        current_score: new_items.items.first().map(|i| i.score),
+        original_complexity: None,
+        current_complexity: None,
+        target_complexity: None,
+    };
+    Some(("regression_detected".to_string(), detail))
+}
 
-    // Determine status based on functional composition of conditions
+/// Pure: Build all gaps from analysis results
+fn build_all_gaps(
+    unchanged_critical: &UnchangedCritical,
+    new_items: &NewItems,
+) -> HashMap<String, GapDetail> {
+    let mut gaps = HashMap::new();
+
+    // Add critical debt gaps (max 2)
+    for (idx, item) in unchanged_critical.items.iter().take(2).enumerate() {
+        let (key, detail) = build_critical_debt_gap(item, idx);
+        gaps.insert(key, detail);
+    }
+
+    // Add regression gap if applicable
+    if let Some((key, detail)) = build_regression_gap(new_items) {
+        gaps.insert(key, detail);
+    }
+
+    gaps
+}
+
+// =============================================================================
+// Pure Status Determination
+// =============================================================================
+
+/// Pure: Determine validation status based on score and metrics
+fn determine_status(
+    improvement_score: f64,
+    new_items: &NewItems,
+    before_summary: &AnalysisSummary,
+    after_summary: &AnalysisSummary,
+) -> String {
     let has_regressions = new_items.critical_count > 0;
     let all_high_priority_addressed =
         before_summary.high_priority_items > 0 && after_summary.high_priority_items == 0;
     let meets_score_threshold = improvement_score >= 75.0;
 
-    let status = if has_regressions {
+    if has_regressions {
         "failed"
     } else if all_high_priority_addressed || meets_score_threshold {
         "complete"
@@ -227,10 +312,47 @@ fn perform_validation(
     } else {
         "failed"
     }
-    .to_string();
+    .to_string()
+}
+
+// =============================================================================
+// Validation Core
+// =============================================================================
+
+fn perform_validation(
+    before: &DebtmapJsonInput,
+    after: &DebtmapJsonInput,
+) -> Result<ValidationResult> {
+    // Create summaries (pure)
+    let before_summary = create_summary(before);
+    let after_summary = create_summary(after);
+
+    // Identify all changes (pure)
+    let resolved = identify_resolved_items(before, after);
+    let improved = identify_improved_items(before, after);
+    let new_items = identify_new_items(before, after);
+    let unchanged_critical = identify_unchanged_critical(before, after);
+
+    // Build messages (pure)
+    let improvements = build_all_improvement_messages(&resolved, &improved);
+    let remaining_issues = build_all_issue_messages(&unchanged_critical, &new_items);
+    let gaps = build_all_gaps(&unchanged_critical, &new_items);
+
+    // Calculate score (pure)
+    let completion = calculate_improvement_score(
+        &resolved,
+        &improved,
+        &new_items,
+        &unchanged_critical,
+        &before_summary,
+        &after_summary,
+    );
+
+    // Determine status (pure)
+    let status = determine_status(completion, &new_items, &before_summary, &after_summary);
 
     Ok(ValidationResult {
-        completion_percentage: improvement_score,
+        completion_percentage: completion,
         status,
         improvements,
         remaining_issues,
@@ -527,6 +649,87 @@ fn identify_unchanged_critical(
     }
 }
 
+// =============================================================================
+// Pure Scoring Component Functions
+// =============================================================================
+
+/// Pure: Calculate high priority resolution progress percentage
+fn score_high_priority_progress(
+    before_summary: &AnalysisSummary,
+    after_summary: &AnalysisSummary,
+    resolved: &ResolvedItems,
+) -> f64 {
+    if before_summary.high_priority_items == 0 {
+        return 100.0;
+    }
+
+    let resolved_count = resolved.high_priority_count as f64;
+    let addressed_count = before_summary
+        .high_priority_items
+        .saturating_sub(after_summary.high_priority_items) as f64;
+
+    (addressed_count.max(resolved_count) / before_summary.high_priority_items as f64) * 100.0
+}
+
+/// Pure: Calculate overall score improvement percentage
+fn score_overall_improvement(
+    before_summary: &AnalysisSummary,
+    after_summary: &AnalysisSummary,
+) -> f64 {
+    if before_summary.average_score <= 0.0 {
+        return 0.0;
+    }
+    ((before_summary.average_score - after_summary.average_score) / before_summary.average_score)
+        * 100.0
+}
+
+/// Pure: Calculate complexity reduction score (0-100)
+fn score_complexity_reduction(improved: &ImprovedItems) -> f64 {
+    improved.complexity_reduction * 100.0
+}
+
+/// Pure: Calculate regression penalty score (100 if no regressions, 0 otherwise)
+fn score_regression_penalty(new_items: &NewItems) -> f64 {
+    if new_items.critical_count == 0 {
+        100.0
+    } else {
+        0.0
+    }
+}
+
+/// Pure: Apply penalty for unchanged critical items
+fn apply_unchanged_penalty(
+    score: f64,
+    unchanged_critical: &UnchangedCritical,
+    has_improvements: bool,
+) -> f64 {
+    if unchanged_critical.count == 0 {
+        return score;
+    }
+
+    let (penalty_rate, max_penalty) = if has_improvements {
+        (0.05, 0.25) // Lighter penalty when there are improvements
+    } else {
+        (0.1, 0.5)
+    };
+
+    let penalty_factor = 1.0 - (unchanged_critical.count as f64 * penalty_rate).min(max_penalty);
+    score * penalty_factor
+}
+
+/// Pure: Apply minimum threshold for significant improvements
+fn apply_minimum_threshold(score: f64, has_improvements: bool, score_improvement: f64) -> f64 {
+    if has_improvements && score < 40.0 && score_improvement > 5.0 {
+        40.0
+    } else {
+        score.clamp(0.0, 100.0)
+    }
+}
+
+// =============================================================================
+// Main Scoring Orchestration
+// =============================================================================
+
 fn calculate_improvement_score(
     resolved: &ResolvedItems,
     improved: &ImprovedItems,
@@ -535,64 +738,26 @@ fn calculate_improvement_score(
     before_summary: &AnalysisSummary,
     after_summary: &AnalysisSummary,
 ) -> f64 {
-    // If both before and after have no items, it's 100% complete (nothing to do)
+    // Early return for empty case
     if before_summary.total_items == 0 && after_summary.total_items == 0 {
         return 100.0;
     }
 
-    // Calculate high-priority resolution score
-    let high_priority_progress = if before_summary.high_priority_items > 0 {
-        let resolved_count = resolved.high_priority_count as f64;
-        // Use saturating subtraction to handle cases where after > before (regressions)
-        let addressed_count = before_summary
-            .high_priority_items
-            .saturating_sub(after_summary.high_priority_items) as f64;
-        // Use the better of resolved or addressed (items may improve below threshold without being removed)
-        (addressed_count.max(resolved_count) / before_summary.high_priority_items as f64) * 100.0
-    } else {
-        100.0
-    };
+    // Compose scoring components (all pure)
+    let high_priority = score_high_priority_progress(before_summary, after_summary, resolved);
+    let improvement = score_overall_improvement(before_summary, after_summary);
+    let complexity = score_complexity_reduction(improved);
+    let regression = score_regression_penalty(new_items);
 
-    let overall_score_improvement = if before_summary.average_score > 0.0 {
-        ((before_summary.average_score - after_summary.average_score)
-            / before_summary.average_score)
-            * 100.0
-    } else {
-        0.0
-    };
+    // Calculate weighted score
+    let weighted_score =
+        high_priority * 0.4 + improvement.max(0.0) * 0.3 + complexity * 0.2 + regression * 0.1;
 
-    let complexity_reduction_score = improved.complexity_reduction * 100.0;
+    // Apply adjustments (pure)
+    let has_improvements = complexity > 0.0 || improvement > 0.0;
+    let penalized = apply_unchanged_penalty(weighted_score, unchanged_critical, has_improvements);
 
-    let no_new_critical_score = if new_items.critical_count == 0 {
-        100.0
-    } else {
-        0.0
-    };
-
-    let weighted_score = high_priority_progress * 0.4
-        + overall_score_improvement.max(0.0) * 0.3
-        + complexity_reduction_score * 0.2
-        + no_new_critical_score * 0.1;
-
-    // Apply penalty for unchanged critical items, but ensure progress is still reflected
-    // If there are improvements (complexity reduction or coverage), reduce the penalty impact
-    let has_improvements = complexity_reduction_score > 0.0 || overall_score_improvement > 0.0;
-    let penalty_factor = if unchanged_critical.count > 0 && !has_improvements {
-        1.0 - (unchanged_critical.count as f64 * 0.1).min(0.5)
-    } else if unchanged_critical.count > 0 {
-        // Lighter penalty when there are improvements
-        1.0 - (unchanged_critical.count as f64 * 0.05).min(0.25)
-    } else {
-        1.0
-    };
-
-    // Ensure minimum score of 40% when there are significant improvements
-    let final_score = weighted_score * penalty_factor;
-    if has_improvements && final_score < 40.0 && overall_score_improvement > 5.0 {
-        40.0
-    } else {
-        final_score.clamp(0.0, 100.0)
-    }
+    apply_minimum_threshold(penalized, has_improvements, improvement)
 }
 
 fn write_validation_result(path: &Path, result: &ValidationResult) -> Result<()> {
@@ -2059,6 +2224,436 @@ mod tests {
 
         assert_eq!(result.count, 0);
         assert_eq!(result.items.len(), 0);
+    }
+
+    // =======================================================================
+    // Tests for extracted pure scoring functions
+    // =======================================================================
+
+    #[test]
+    fn test_score_high_priority_progress_all_resolved() {
+        let before = AnalysisSummary {
+            total_items: 5,
+            high_priority_items: 5,
+            average_score: 10.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 0,
+            high_priority_items: 0,
+            average_score: 0.0,
+        };
+        let resolved = ResolvedItems {
+            high_priority_count: 5,
+            total_count: 5,
+        };
+
+        let score = score_high_priority_progress(&before, &after, &resolved);
+        assert_eq!(score, 100.0);
+    }
+
+    #[test]
+    fn test_score_high_priority_progress_partial() {
+        let before = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 10,
+            average_score: 10.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 5,
+            high_priority_items: 5,
+            average_score: 8.0,
+        };
+        let resolved = ResolvedItems {
+            high_priority_count: 3,
+            total_count: 5,
+        };
+
+        let score = score_high_priority_progress(&before, &after, &resolved);
+        assert_eq!(score, 50.0); // 5 addressed out of 10
+    }
+
+    #[test]
+    fn test_score_high_priority_progress_no_high_priority() {
+        let before = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 0,
+            average_score: 5.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 0,
+            average_score: 5.0,
+        };
+        let resolved = ResolvedItems {
+            high_priority_count: 0,
+            total_count: 0,
+        };
+
+        let score = score_high_priority_progress(&before, &after, &resolved);
+        assert_eq!(score, 100.0);
+    }
+
+    #[test]
+    fn test_score_overall_improvement_significant() {
+        let before = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 5,
+            average_score: 10.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 3,
+            average_score: 8.0,
+        };
+
+        let score = score_overall_improvement(&before, &after);
+        assert_eq!(score, 20.0); // (10-8)/10 * 100
+    }
+
+    #[test]
+    fn test_score_overall_improvement_zero_before() {
+        let before = AnalysisSummary {
+            total_items: 0,
+            high_priority_items: 0,
+            average_score: 0.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 5,
+            high_priority_items: 2,
+            average_score: 5.0,
+        };
+
+        let score = score_overall_improvement(&before, &after);
+        assert_eq!(score, 0.0);
+    }
+
+    #[test]
+    fn test_score_complexity_reduction() {
+        let improved = ImprovedItems {
+            complexity_reduction: 0.5,
+            coverage_improvement: 0.0,
+            coverage_improvement_count: 0,
+        };
+
+        let score = score_complexity_reduction(&improved);
+        assert_eq!(score, 50.0);
+    }
+
+    #[test]
+    fn test_score_regression_penalty_no_regressions() {
+        let new_items = NewItems {
+            critical_count: 0,
+            items: vec![],
+        };
+        assert_eq!(score_regression_penalty(&new_items), 100.0);
+    }
+
+    #[test]
+    fn test_score_regression_penalty_with_regressions() {
+        let new_items = NewItems {
+            critical_count: 3,
+            items: vec![],
+        };
+        assert_eq!(score_regression_penalty(&new_items), 0.0);
+    }
+
+    #[test]
+    fn test_apply_unchanged_penalty_no_unchanged() {
+        let unchanged = UnchangedCritical {
+            count: 0,
+            items: vec![],
+        };
+        let score = apply_unchanged_penalty(80.0, &unchanged, true);
+        assert_eq!(score, 80.0);
+    }
+
+    #[test]
+    fn test_apply_unchanged_penalty_with_improvements() {
+        let unchanged = UnchangedCritical {
+            count: 2,
+            items: vec![],
+        };
+        let score = apply_unchanged_penalty(80.0, &unchanged, true);
+        // With improvements: penalty_rate=0.05, so 1.0 - (2*0.05) = 0.9
+        assert_eq!(score, 72.0); // 80.0 * 0.9
+    }
+
+    #[test]
+    fn test_apply_unchanged_penalty_without_improvements() {
+        let unchanged = UnchangedCritical {
+            count: 2,
+            items: vec![],
+        };
+        let score = apply_unchanged_penalty(80.0, &unchanged, false);
+        // Without improvements: penalty_rate=0.1, so 1.0 - (2*0.1) = 0.8
+        assert_eq!(score, 64.0); // 80.0 * 0.8
+    }
+
+    #[test]
+    fn test_apply_minimum_threshold_boosts_low_score() {
+        let score = apply_minimum_threshold(30.0, true, 10.0);
+        assert_eq!(score, 40.0);
+    }
+
+    #[test]
+    fn test_apply_minimum_threshold_no_boost_when_no_improvements() {
+        let score = apply_minimum_threshold(30.0, false, 10.0);
+        assert_eq!(score, 30.0);
+    }
+
+    #[test]
+    fn test_apply_minimum_threshold_clamps_to_100() {
+        let score = apply_minimum_threshold(150.0, true, 10.0);
+        assert_eq!(score, 100.0);
+    }
+
+    #[test]
+    fn test_determine_status_complete_all_high_priority_addressed() {
+        let new_items = NewItems {
+            critical_count: 0,
+            items: vec![],
+        };
+        let before = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 5,
+            average_score: 10.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 5,
+            high_priority_items: 0,
+            average_score: 5.0,
+        };
+
+        let status = determine_status(60.0, &new_items, &before, &after);
+        assert_eq!(status, "complete");
+    }
+
+    #[test]
+    fn test_determine_status_failed_with_regressions() {
+        let new_items = NewItems {
+            critical_count: 2,
+            items: vec![],
+        };
+        let before = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 5,
+            average_score: 10.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 3,
+            average_score: 8.0,
+        };
+
+        let status = determine_status(80.0, &new_items, &before, &after);
+        assert_eq!(status, "failed");
+    }
+
+    #[test]
+    fn test_determine_status_incomplete() {
+        let new_items = NewItems {
+            critical_count: 0,
+            items: vec![],
+        };
+        let before = AnalysisSummary {
+            total_items: 10,
+            high_priority_items: 5,
+            average_score: 10.0,
+        };
+        let after = AnalysisSummary {
+            total_items: 8,
+            high_priority_items: 3,
+            average_score: 8.0,
+        };
+
+        let status = determine_status(55.0, &new_items, &before, &after);
+        assert_eq!(status, "incomplete");
+    }
+
+    // =======================================================================
+    // Tests for pure message builders
+    // =======================================================================
+
+    #[test]
+    fn test_build_resolved_message_with_count() {
+        let resolved = ResolvedItems {
+            high_priority_count: 3,
+            total_count: 5,
+        };
+        let msg = build_resolved_message(&resolved);
+        assert_eq!(msg, Some("Resolved 3 high-priority debt items".to_string()));
+    }
+
+    #[test]
+    fn test_build_resolved_message_zero() {
+        let resolved = ResolvedItems {
+            high_priority_count: 0,
+            total_count: 0,
+        };
+        let msg = build_resolved_message(&resolved);
+        assert_eq!(msg, None);
+    }
+
+    #[test]
+    fn test_build_complexity_message_with_reduction() {
+        let improved = ImprovedItems {
+            complexity_reduction: 0.25,
+            coverage_improvement: 0.0,
+            coverage_improvement_count: 0,
+        };
+        let msg = build_complexity_message(&improved);
+        assert_eq!(
+            msg,
+            Some("Reduced average cyclomatic complexity by 25%".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_coverage_message_with_improvement() {
+        let improved = ImprovedItems {
+            complexity_reduction: 0.0,
+            coverage_improvement: 2.0,
+            coverage_improvement_count: 2,
+        };
+        let msg = build_coverage_message(&improved);
+        assert_eq!(
+            msg,
+            Some("Added test coverage for 2 critical functions".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_all_improvement_messages() {
+        let resolved = ResolvedItems {
+            high_priority_count: 2,
+            total_count: 3,
+        };
+        let improved = ImprovedItems {
+            complexity_reduction: 0.3,
+            coverage_improvement: 1.0,
+            coverage_improvement_count: 1,
+        };
+
+        let messages = build_all_improvement_messages(&resolved, &improved);
+        assert_eq!(messages.len(), 3);
+    }
+
+    #[test]
+    fn test_build_unchanged_critical_message_singular() {
+        let unchanged = UnchangedCritical {
+            count: 1,
+            items: vec![],
+        };
+        let msg = build_unchanged_critical_message(&unchanged);
+        assert_eq!(msg, Some("1 critical debt item still present".to_string()));
+    }
+
+    #[test]
+    fn test_build_unchanged_critical_message_plural() {
+        let unchanged = UnchangedCritical {
+            count: 3,
+            items: vec![],
+        };
+        let msg = build_unchanged_critical_message(&unchanged);
+        assert_eq!(msg, Some("3 critical debt items still present".to_string()));
+    }
+
+    #[test]
+    fn test_build_regression_message_with_regressions() {
+        let new_items = NewItems {
+            critical_count: 2,
+            items: vec![],
+        };
+        let msg = build_regression_message(&new_items);
+        assert_eq!(
+            msg,
+            Some("2 new critical debt items introduced".to_string())
+        );
+    }
+
+    // =======================================================================
+    // Tests for pure gap builders
+    // =======================================================================
+
+    #[test]
+    fn test_build_critical_debt_gap() {
+        let item = ItemInfo {
+            file: PathBuf::from("src/test.rs"),
+            function: "complex_fn".to_string(),
+            line: 42,
+            score: 9.5,
+        };
+
+        let (key, detail) = build_critical_debt_gap(&item, 0);
+        assert_eq!(key, "critical_debt_remaining_0");
+        assert_eq!(detail.severity, "high");
+        assert!(detail.location.contains("src/test.rs"));
+        assert!(detail.location.contains("complex_fn"));
+        assert_eq!(detail.original_score, Some(9.5));
+    }
+
+    #[test]
+    fn test_build_regression_gap_none_when_no_regressions() {
+        let new_items = NewItems {
+            critical_count: 0,
+            items: vec![],
+        };
+        let gap = build_regression_gap(&new_items);
+        assert!(gap.is_none());
+    }
+
+    #[test]
+    fn test_build_regression_gap_with_regressions() {
+        let new_items = NewItems {
+            critical_count: 1,
+            items: vec![ItemInfo {
+                file: PathBuf::from("src/new.rs"),
+                function: "bad_fn".to_string(),
+                line: 10,
+                score: 12.0,
+            }],
+        };
+        let gap = build_regression_gap(&new_items);
+        assert!(gap.is_some());
+        let (key, detail) = gap.unwrap();
+        assert_eq!(key, "regression_detected");
+        assert_eq!(detail.current_score, Some(12.0));
+    }
+
+    #[test]
+    fn test_build_all_gaps_combined() {
+        let unchanged = UnchangedCritical {
+            count: 2,
+            items: vec![
+                ItemInfo {
+                    file: PathBuf::from("src/a.rs"),
+                    function: "fn1".to_string(),
+                    line: 10,
+                    score: 9.0,
+                },
+                ItemInfo {
+                    file: PathBuf::from("src/b.rs"),
+                    function: "fn2".to_string(),
+                    line: 20,
+                    score: 10.0,
+                },
+            ],
+        };
+        let new_items = NewItems {
+            critical_count: 1,
+            items: vec![ItemInfo {
+                file: PathBuf::from("src/c.rs"),
+                function: "fn3".to_string(),
+                line: 30,
+                score: 11.0,
+            }],
+        };
+
+        let gaps = build_all_gaps(&unchanged, &new_items);
+        assert_eq!(gaps.len(), 3); // 2 critical + 1 regression
+        assert!(gaps.contains_key("critical_debt_remaining_0"));
+        assert!(gaps.contains_key("critical_debt_remaining_1"));
+        assert!(gaps.contains_key("regression_detected"));
     }
 
     // Property-based tests

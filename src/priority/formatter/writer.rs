@@ -581,7 +581,11 @@ mod tests {
     fn test_write_dependencies_section_with_callers_and_callees() {
         let mut output = Vec::new();
         let callers = vec!["main".to_string(), "init".to_string()];
-        let callees = vec!["helper1".to_string(), "helper2".to_string(), "helper3".to_string()];
+        let callees = vec![
+            "helper1".to_string(),
+            "helper2".to_string(),
+            "helper3".to_string(),
+        ];
         super::write_dependencies_section(&mut output, 5, 3, &callers, &callees).unwrap();
 
         let output_str = String::from_utf8(output).unwrap();
