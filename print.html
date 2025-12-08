@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0e79105b.js";
+            window.path_to_searchindex_js = "searchindex-9e1f585f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c7b19542.js"></script>
@@ -17779,13 +17779,24 @@ items.map(process_item)
 <li>No struct/class is found, OR</li>
 <li>The file has many standalone functions outside of any impl blocks</li>
 </ol>
-<p><strong>Implementation Detail:</strong> Debtmap uses the <code>DetectionType</code> enum with three variants:</p>
+<p><strong>Implementation Detail:</strong> All three detection types (GodClass, GodFile, GodModule) share a single unified <code>DebtType::GodObject</code> variant. The specific detection type is distinguished using the <code>detection_type</code> field within the variant:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>DebtType::GodObject {
+    methods: u32,
+    fields: Option&lt;u32&gt;,
+    responsibilities: u32,
+    god_object_score: Score0To100,
+    lines: u32,
+}
+<span class="boring">}</span></code></pre>
+<p>The <code>detection_type</code> field (tracked separately in the analysis) indicates whether this god object was detected as:</p>
 <ul>
-<li><code>GodClass</code> - Single struct with excessive methods/fields</li>
-<li><code>GodFile</code> - File with excessive functions or lines of code</li>
-<li><code>GodModule</code> - Alias for <code>GodFile</code> (both represent the same detection type)</li>
+<li><code>GodClass</code> - Single struct with excessive methods/fields (has <code>fields: Some(count)</code>)</li>
+<li><code>GodFile</code> - File with excessive functions or lines of code (has <code>fields: None</code>)</li>
+<li><code>GodModule</code> - Same as <code>GodFile</code>, used conceptually for files with many standalone functions (has <code>fields: None</code>)</li>
 </ul>
-<p>The <code>GodModule</code> variant is provided for clarity when discussing files with many standalone functions, but internally it’s the same as <code>GodFile</code>. Both terms exist to help distinguish between “file is large” (GodFile) and “file has many functions” (GodModule) conceptually in documentation and error messages, even though they’re implemented identically in the detection logic.</p>
+<p>This unified structure ensures consistent handling across all god object types while the <code>fields</code> value (Some vs None) provides the key distinction between class-based and file-based detection.</p>
 <p><strong>Example:</strong> A file like <code>rust_call_graph.rs</code> with 270 standalone functions would be flagged as a god module (using the <code>GodFile</code>/<code>GodModule</code> detection type).</p>
 <h3 id="why-separate-analysis"><a class="header" href="#why-separate-analysis">Why Separate Analysis?</a></h3>
 <p>Previously, Debtmap combined standalone functions with struct methods, causing <strong>false positives</strong> for functional/procedural modules. The current implementation analyzes them separately to:</p>
