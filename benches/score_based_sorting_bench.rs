@@ -171,6 +171,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
             overall_coverage: None,
             has_coverage_data: false,
             timings: None,
+            stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
         };
 
         group.bench_with_input(
@@ -234,6 +235,7 @@ fn bench_worst_case_sorting(c: &mut Criterion) {
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
+        stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
     };
 
     c.bench_function("worst_case_similar_scores_1000", |b| {
@@ -256,10 +258,12 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
                     god_object_score: debtmap::priority::score_types::Score0To100::new(85.0),
                     lines: 400,
                 },
-                1 => DebtType::GodModule {
-                    functions: 100,
-                    lines: 1000,
+                1 => DebtType::GodObject {
+                    methods: 100,
+                    fields: None,
                     responsibilities: 15,
+                    god_object_score: debtmap::priority::score_types::Score0To100::new(75.0),
+                    lines: 1000,
                 },
                 2 => DebtType::ComplexityHotspot {
                     cyclomatic: 35,
@@ -298,6 +302,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
+        stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
     };
 
     c.bench_function("mixed_debt_types_1000", |b| {
@@ -352,6 +357,7 @@ fn bench_with_risk_boosts(c: &mut Criterion) {
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
+        stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
     };
 
     c.bench_function("with_risk_boosts_1000", |b| {
