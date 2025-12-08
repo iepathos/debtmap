@@ -34,6 +34,8 @@ pub enum BehaviorCategory {
     Processing,
     /// Communication: send, receive, transmit, broadcast, notify
     Communication,
+    /// Utilities: helpers, builders, factories, converters (with_*, from_*, into_*, as_*, default, any)
+    Utilities,
     /// Domain-specific behavior with custom name
     Domain(String),
 }
@@ -56,6 +58,7 @@ impl BehaviorCategory {
             BehaviorCategory::Construction => "Construction".to_string(),
             BehaviorCategory::Processing => "Processing".to_string(),
             BehaviorCategory::Communication => "Communication".to_string(),
+            BehaviorCategory::Utilities => "Utilities".to_string(),
             BehaviorCategory::Domain(name) => name.clone(),
         }
     }
@@ -77,6 +80,7 @@ impl BehaviorCategory {
             BehaviorCategory::Construction => "construction".to_string(),
             BehaviorCategory::Processing => "processing".to_string(),
             BehaviorCategory::Communication => "communication".to_string(),
+            BehaviorCategory::Utilities => "utilities".to_string(),
             BehaviorCategory::Domain(name) => name.to_lowercase().replace(' ', "_"),
         }
     }

@@ -128,22 +128,42 @@ impl GodObjectDetector {
     /// Main analysis pipeline - composes pure functions.
     ///
     /// Enhanced analysis that includes pattern detection and per-struct breakdown.
+    /// Follows Stillwater pattern: orchestrates pure functions with clear data flow.
     pub fn analyze_enhanced(&self, path: &Path, ast: &syn::File) -> EnhancedGodObjectAnalysis {
         use super::ast_visitor::TypeVisitor;
         use super::classification_types::{EnhancedGodObjectAnalysis, GodObjectType};
         use super::metrics;
+        use super::recommendation_generator;
+        use crate::organization::struct_patterns;
         use syn::visit::Visit;
 
-        // Step 1: Get comprehensive analysis
+        // Step 1: Get comprehensive analysis (pure)
         let file_metrics = self.analyze_comprehensive(path, ast);
 
-        // Step 2: Build per-struct metrics
+        // Step 2: Build per-struct metrics (pure)
         let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
         visitor.visit_file(ast);
         let per_struct_metrics = metrics::build_per_struct_metrics(&visitor);
 
-        // Step 3: Classify the god object type
-        let classification = if file_metrics.is_god_object {
+        // Step 3: Detect patterns (pure) - reduces false positives
+        let pattern_analysis = if let Some(first_struct) = visitor.types.values().next() {
+            Some(struct_patterns::detect_pattern(
+                first_struct,
+                file_metrics.responsibility_count,
+            ))
+        } else {
+            None
+        };
+
+        // Step 4: Determine if this is truly a god object (pure with pattern awareness)
+        let is_genuine_god_object = file_metrics.is_god_object
+            && !pattern_analysis
+                .as_ref()
+                .map(|p| p.skip_god_object_check)
+                .unwrap_or(false);
+
+        // Step 5: Classify the god object type (pure)
+        let classification = if is_genuine_god_object {
             // Simple classification based on detection type
             match file_metrics.detection_type {
                 super::core_types::DetectionType::GodClass => {
@@ -181,36 +201,9 @@ impl GodObjectDetector {
             GodObjectType::NotGodObject
         };
 
-        // Step 4: Generate recommendation
-        let recommendation = match &classification {
-            GodObjectType::GodClass {
-                method_count,
-                field_count,
-                ..
-            } => {
-                format!(
-                    "God Class detected: {} methods, {} fields. Consider extracting responsibilities into separate modules.",
-                    method_count, field_count
-                )
-            }
-            GodObjectType::GodModule { total_methods, .. } => {
-                format!(
-                    "God Module detected: {} methods. Consider splitting into focused sub-modules by domain.",
-                    total_methods
-                )
-            }
-            GodObjectType::NotGodObject => {
-                if let Some(largest) = per_struct_metrics.first() {
-                    format!(
-                        "No god object detected. Largest struct: {} with {} methods.",
-                        largest.name, largest.method_count
-                    )
-                } else {
-                    "No god object detected.".to_string()
-                }
-            }
-            _ => "Analysis complete.".to_string(),
-        };
+        // Step 6: Generate responsibility-aware recommendation (pure)
+        let recommendation =
+            recommendation_generator::generate_recommendation(&classification, pattern_analysis.as_ref());
 
         EnhancedGodObjectAnalysis {
             file_metrics,
@@ -399,13 +392,6 @@ impl GodObjectDetector {
                 (None, None)
             }
         };
-
-        // Step 11: Calculate responsibility method counts
-        let responsibility_method_counts: std::collections::HashMap<String, usize> =
-            responsibility_groups
-                .iter()
-                .map(|(key, methods)| (key.clone(), methods.len()))
-                .collect();
 
         GodObjectAnalysis {
             is_god_object,

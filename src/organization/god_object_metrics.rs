@@ -251,6 +251,7 @@ mod tests {
                 GodObjectConfidence::NotGodObject
             },
             responsibilities: Vec::new(),
+            responsibility_method_counts: Default::default(),
             purity_distribution: None,
             module_structure: None,
             detection_type: crate::organization::DetectionType::GodClass,

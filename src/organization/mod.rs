@@ -16,6 +16,7 @@ pub use behavioral_decomposition::{
 pub mod boilerplate_detector;
 pub mod builder_pattern;
 pub mod call_graph_cohesion;
+pub mod struct_patterns;
 pub mod class_ownership;
 pub mod clustering;
 pub mod cohesion_calculator;

@@ -111,6 +111,7 @@ pub fn suggest_trait_extraction(cluster: &MethodCluster, _struct_name: &str) -> 
         BehaviorCategory::Construction => "Constructor".to_string(),
         BehaviorCategory::Processing => "Processor".to_string(),
         BehaviorCategory::Communication => "Communicator".to_string(),
+        BehaviorCategory::Utilities => "Utilities".to_string(),
         BehaviorCategory::Domain(name) => format!("{}Ops", capitalize_first(name)),
     };
 

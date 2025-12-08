@@ -28,10 +28,16 @@ impl BehavioralCategorizer {
     /// - State management: update_*, mutate_*, *_state, etc.
     /// - Processing: process, handle, execute, run
     /// - Communication: send, receive, transmit, broadcast, notify
+    /// - Utilities: helper functions, builders, converters (with_*, from_*, into_*, as_*, default, any)
     pub fn categorize_method(method_name: &str) -> BehaviorCategory {
         let lower_name = method_name.to_lowercase();
 
         // Order matters: check more specific categories first
+
+        // Utilities/Helpers (check early for builder patterns)
+        if Self::is_utilities(&lower_name) {
+            return BehaviorCategory::Utilities;
+        }
 
         // Construction (before lifecycle to catch "create_*")
         if Self::is_construction(&lower_name) {
@@ -214,7 +220,19 @@ impl BehavioralCategorizer {
 
     pub(crate) fn is_filtering(name: &str) -> bool {
         const FILTERING_KEYWORDS: &[&str] = &[
-            "filter", "select", "find", "search", "query", "lookup", "match",
+            "filter",
+            "select",
+            "find",
+            "search",
+            "query",
+            "lookup",
+            "match",
+            "where",
+            "first",
+            "last",
+            "single",
+            "take",
+            "skip",
         ];
         FILTERING_KEYWORDS
             .iter()
@@ -222,7 +240,21 @@ impl BehavioralCategorizer {
     }
 
     pub(crate) fn is_transformation(name: &str) -> bool {
-        const TRANSFORMATION_KEYWORDS: &[&str] = &["transform", "convert", "map", "apply", "adapt"];
+        const TRANSFORMATION_KEYWORDS: &[&str] = &[
+            "transform",
+            "convert",
+            "map",
+            "apply",
+            "adapt",
+            "reduce",
+            "fold",
+            "flatten",
+            "merge",
+            "join",
+            "split",
+            "group",
+            "partition",
+        ];
         TRANSFORMATION_KEYWORDS
             .iter()
             .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
@@ -256,6 +288,61 @@ impl BehavioralCategorizer {
             .iter()
             .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
     }
+
+    pub(crate) fn is_utilities(name: &str) -> bool {
+        // Builder/factory patterns
+        if name.starts_with("with_")
+            || name.starts_with("from_")
+            || name.starts_with("into_")
+            || name.starts_with("as_")
+            || name.starts_with("to_")
+            || name.starts_with("for_")
+        {
+            return true;
+        }
+
+        // Common utility methods
+        const UTILITY_KEYWORDS: &[&str] = &[
+            "default",
+            "any",
+            "clone",
+            "copy",
+            "eq",
+            "cmp",
+            "hash",
+            "debug",
+            "fmt",
+            "partial",
+            "ord",
+            "helper",
+            "util",
+            "contains",
+            "has_",
+            "is_empty",
+            "len",
+            "count",
+            "size",
+            "clear",
+            "reset",
+            "add",
+            "remove",
+            "insert",
+            "delete",
+            "push",
+            "pop",
+            "append",
+            "extend",
+            "iter",
+            "collect",
+            "keys",
+            "values",
+            "entries",
+        ];
+
+        UTILITY_KEYWORDS.iter().any(|&kw| {
+            name == kw || name.starts_with(kw) || name.contains(&format!("_{}", kw))
+        })
+    }
 }
 
 /// Cluster methods by behavioral category
@@ -285,6 +372,7 @@ pub fn cluster_methods_by_behavior(methods: &[String]) -> HashMap<BehaviorCatego
                 | BehaviorCategory::Construction
                 | BehaviorCategory::Processing
                 | BehaviorCategory::Communication
+                | BehaviorCategory::Utilities
         ) || methods.len() >= 3 // Keep domain clusters only if they have 3+ methods
     });
 

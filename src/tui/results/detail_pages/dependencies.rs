@@ -64,18 +64,7 @@ pub fn render(
             // Section header
             add_section_header(&mut lines, "responsibilities", theme);
 
-            // Primary responsibility (for all items - spec 254)
-            if let Some(category) = &item.responsibility_category {
-                add_label_value(
-                    &mut lines,
-                    "primary responsibility",
-                    category.clone(),
-                    theme,
-                    area.width,
-                );
-            }
-
-            // List all responsibilities (no truncation)
+            // List all responsibilities (sorted by count, no truncation)
             for resp in indicators.responsibilities.iter() {
                 // Get method count from responsibility_method_counts
                 let method_count = indicators
@@ -96,17 +85,6 @@ pub fn render(
                 add_label_value(&mut lines, &resp_text, count_text, theme, area.width);
             }
         }
-    } else if let Some(category) = &item.responsibility_category {
-        // Show primary responsibility for non-god-object items
-        lines.push(ratatui::text::Line::from(""));
-        add_section_header(&mut lines, "responsibilities", theme);
-        add_label_value(
-            &mut lines,
-            "primary responsibility",
-            category.clone(),
-            theme,
-            area.width,
-        );
     }
 
     // Add note for god objects about what matters

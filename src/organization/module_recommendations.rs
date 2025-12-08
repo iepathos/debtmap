@@ -467,6 +467,12 @@ fn generate_responsibility(category: &BehaviorCategory, method_count: usize) -> 
                 method_count
             )
         }
+        BehaviorCategory::Utilities => {
+            format!(
+                "Provides utility functions and helpers ({} methods)",
+                method_count
+            )
+        }
         BehaviorCategory::Domain(name) => {
             format!(
                 "Handles {} domain operations ({} methods)",

@@ -137,6 +137,7 @@ pub fn infer_responsibility_with_confidence(
     // Assign confidence based on category type
     let confidence = match category {
         crate::organization::BehaviorCategory::Domain(_) => 0.45, // Below threshold
+        crate::organization::BehaviorCategory::Utilities => 0.75, // Good confidence for utilities
         _ => 0.85, // High confidence for recognized patterns
     };
 

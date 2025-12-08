@@ -10,7 +10,10 @@
 //! - `predicates` - Detection predicates
 //! - `scoring` - Scoring algorithms
 //! - `classifier` - Classification logic
-//! - `recommender` - Recommendation generation
+//! - `recommendation_generator` - Responsibility-aware recommendations
+//! - `recommender` - Module split recommendations
+//!
+//! Pattern detection is handled by `crate::organization::struct_patterns`
 //!
 //! **Orchestration**:
 //! - `detector` - Composes pure functions into pipeline
@@ -29,6 +32,7 @@ pub mod ast_visitor;
 pub mod classifier;
 pub mod detector;
 pub mod predicates;
+pub mod recommendation_generator; // Pure Core: Responsibility-aware recommendations
 pub mod recommender;
 pub mod scoring;
 pub mod thresholds;
@@ -47,6 +51,7 @@ pub use classifier::{
     group_methods_by_responsibility, infer_responsibility_with_confidence,
 };
 pub use detector::GodObjectDetector;
+pub use recommendation_generator::generate_recommendation;
 pub use recommender::{
     determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,
     recommend_module_splits_enhanced, recommend_module_splits_enhanced_with_evidence,

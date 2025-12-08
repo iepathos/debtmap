@@ -101,6 +101,7 @@ mod tests {
                         lines_of_code: 500,
                         complexity_sum: 400,
                         responsibilities: vec![],
+                        responsibility_method_counts: Default::default(),
                         recommended_splits: vec![],
                         confidence: crate::organization::GodObjectConfidence::Definite,
                         purity_distribution: None,
