@@ -68,21 +68,21 @@ Shows detailed complexity and quality metrics:
 - Lines of Code (LOC)
 - Nesting Depth
 
-**Understanding Complexity vs Accumulated Complexity:**
+**Understanding Complexity Metric Labels:**
 
-The metrics display varies depending on whether you're viewing a regular function or a god object:
+The "Complexity" section uses different metric labels depending on whether you're viewing a regular function or a god object:
 
-- **Regular Functions:** The "Complexity" section shows metrics for the individual function:
-  - **Cyclomatic Complexity:** The function's own cyclomatic complexity
-  - **Cognitive Complexity:** The function's own cognitive complexity
-  - **Nesting Depth:** Maximum nesting depth within the function
+- **Regular Functions:** Shows individual function metrics with simple labels:
+  - **cyclomatic:** The function's own cyclomatic complexity
+  - **cognitive:** The function's own cognitive complexity
+  - **nesting:** Maximum nesting depth within the function
 
-- **God Objects:** The "Accumulated Complexity" section shows aggregated metrics across all methods in the class:
-  - **Cyclomatic Complexity:** Sum of cyclomatic complexity across all methods
-  - **Cognitive Complexity:** Sum of cognitive complexity across all methods
-  - **Nesting Depth:** Maximum nesting depth found in any method
+- **God Objects:** Shows aggregated metrics with descriptive labels indicating the aggregation strategy:
+  - **accumulated cyclomatic:** Sum of cyclomatic complexity across all methods
+  - **accumulated cognitive:** Sum of cognitive complexity across all methods
+  - **max nesting:** Maximum nesting depth found in any method
 
-The "accumulated" label indicates that these are combined metrics representing the total complexity burden of the entire class, not just a single method. This helps identify classes that have grown too large and may need to be split into smaller, more focused components.
+The descriptive labels ("accumulated" for sums, "max" for maximum) clearly indicate how the metrics are calculated across all functions in the class. This helps identify classes that have grown too large and may need to be split into smaller, more focused components.
 
 **Quality Indicators:**
 - Maintainability Index

@@ -158,32 +158,42 @@ pub fn render(
     }
 
     // Complexity metrics section
-    // For god objects, use "accumulated complexity" to clarify that metrics
-    // are aggregated across all functions (cyclomatic/cognitive are summed,
-    // nesting is max). Regular functions show "complexity" for single-function metrics.
-    let complexity_header = if matches!(item.debt_type, DebtType::GodObject { .. }) {
-        "accumulated complexity"
+    // For god objects, use descriptive labels to clarify aggregation strategy:
+    // - "accumulated cyclomatic/cognitive" = sum across all functions
+    // - "max nesting" = maximum nesting depth found in any function
+    // Regular functions use simple labels as they represent single-function metrics.
+    add_section_header(&mut lines, "complexity", theme);
+
+    let is_god_object = matches!(item.debt_type, DebtType::GodObject { .. });
+    let cyclomatic_label = if is_god_object {
+        "accumulated cyclomatic"
     } else {
-        "complexity"
+        "cyclomatic"
     };
-    add_section_header(&mut lines, complexity_header, theme);
+    let cognitive_label = if is_god_object {
+        "accumulated cognitive"
+    } else {
+        "cognitive"
+    };
+    let nesting_label = if is_god_object { "max nesting" } else { "nesting" };
+
     add_label_value(
         &mut lines,
-        "cyclomatic",
+        cyclomatic_label,
         item.cyclomatic_complexity.to_string(),
         theme,
         area.width,
     );
     add_label_value(
         &mut lines,
-        "cognitive",
+        cognitive_label,
         item.cognitive_complexity.to_string(),
         theme,
         area.width,
     );
     add_label_value(
         &mut lines,
-        "nesting",
+        nesting_label,
         item.nesting_depth.to_string(),
         theme,
         area.width,
