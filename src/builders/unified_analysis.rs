@@ -1350,7 +1350,7 @@ fn analyze_files_for_debt(
     }
 
     // Apply results to unified analysis (I/O at edges)
-    apply_file_analysis_results(unified, processed_files, risk_analyzer, project_path);
+    apply_file_analysis_results(unified, processed_files, risk_analyzer, project_path, coverage_data);
 }
 
 // Pure function to group functions by file
@@ -1503,6 +1503,8 @@ fn detect_god_object_analysis(
                 purity_distribution: None,
                 module_structure: None,
                 detection_type: crate::organization::DetectionType::GodFile,
+                struct_name: None,  // Size-based detection is always GodFile
+                struct_line: None,
                 visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
@@ -1548,13 +1550,30 @@ pub fn create_god_object_debt_item(
     file_path: &Path,
     file_metrics: &FileDebtMetrics,
     god_analysis: &crate::organization::GodObjectAnalysis,
-    aggregated_metrics: crate::priority::GodObjectAggregatedMetrics,
+    mut aggregated_metrics: crate::priority::GodObjectAggregatedMetrics,
+    coverage_data: Option<&risk::lcov::LcovData>,
 ) -> UnifiedDebtItem {
+    // Fallback: If no function-level coverage, use file-level coverage from LCOV
+    // This handles god files where all functions are too simple to be debt items
+    // but the file still has test coverage
+    if aggregated_metrics.weighted_coverage.is_none() {
+        if let Some(coverage) = coverage_data {
+            if let Some(file_coverage) = coverage.get_file_coverage(file_path) {
+                aggregated_metrics.weighted_coverage = Some(priority::TransitiveCoverage {
+                    direct: file_coverage,
+                    transitive: 0.0,
+                    propagated_from: vec![],
+                    uncovered_lines: vec![],
+                });
+            }
+        }
+    }
+
     // Calculate unified score based on god object score (0-100 scale)
     let base_score = god_analysis.god_object_score.value();
     let tier = if base_score >= 50.0 { 1 } else { 2 };
 
-    // Use aggregated coverage in score calculation
+    // Use aggregated coverage in score calculation (now with file-level fallback)
     let coverage_factor = aggregated_metrics
         .weighted_coverage
         .as_ref()
@@ -1591,11 +1610,32 @@ pub fn create_god_object_debt_item(
         lines: god_analysis.lines_of_code as u32,
     };
 
-    // Extract file name for display
-    let file_name = file_path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown");
+    // Determine display name and line number based on detection type
+    let (display_name, line_number) = match god_analysis.detection_type {
+        crate::organization::DetectionType::GodClass => {
+            // For GodClass, use struct name and struct line if available
+            let name = god_analysis
+                .struct_name
+                .as_deref()
+                .unwrap_or_else(|| {
+                    file_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                });
+            let line = god_analysis.struct_line.unwrap_or(1);
+            (name.to_string(), line)
+        }
+        crate::organization::DetectionType::GodFile
+        | crate::organization::DetectionType::GodModule => {
+            // For GodFile and GodModule, use file name and line 1
+            let name = file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown");
+            (name.to_string(), 1)
+        }
+    };
 
     // Create impact metrics
     let expected_impact = ImpactMetrics {
@@ -1619,8 +1659,8 @@ pub fn create_god_object_debt_item(
     UnifiedDebtItem {
         location: Location {
             file: file_path.to_path_buf(),
-            function: file_name.to_string(),
-            line: 1, // File-level item starts at line 1
+            function: display_name,
+            line: line_number,
         },
         debt_type,
         unified_score,
@@ -1714,25 +1754,18 @@ pub fn analyze_file_git_context(
         return None;
     }
 
-    // Since we can't access the context_aggregator directly, we'll use a workaround:
-    // Call analyze_function_with_context with dummy complexity metrics
-    let dummy_complexity = crate::core::ComplexityMetrics {
-        functions: Vec::new(),
-        cyclomatic_complexity: 0,
-        cognitive_complexity: 0,
-    };
+    // For god objects, use a moderate base risk since they're inherently risky
+    // due to their size and complexity. The git context multipliers will be
+    // applied on top of this base value.
+    // Base risk of 40 represents a "moderate-high" risk level that git history
+    // can then amplify or reduce based on change patterns.
+    let base_risk = 40.0;
 
-    let (_, contextual_risk) = risk_analyzer.analyze_function_with_context(
+    risk_analyzer.analyze_file_context(
         file_path.to_path_buf(),
-        String::new(), // Empty function name for file-level
-        (0, 0),        // Empty line range for file-level
-        &dummy_complexity,
-        None,  // No coverage for file-level
-        false, // Not a test
+        base_risk,
         project_root.to_path_buf(),
-    );
-
-    contextual_risk
+    )
 }
 
 // I/O function to apply results to unified analysis
@@ -1741,6 +1774,7 @@ fn apply_file_analysis_results(
     processed_files: Vec<ProcessedFileData>,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     _project_root: &Path,
+    coverage_data: Option<&risk::lcov::LcovData>,
 ) {
     use crate::priority::god_object_aggregation::{
         aggregate_from_raw_metrics, aggregate_god_object_metrics, extract_member_functions,
@@ -1798,6 +1832,7 @@ fn apply_file_analysis_results(
                 &file_data.file_metrics,
                 god_analysis,
                 aggregated_metrics,
+                coverage_data,
             );
             unified.add_item(god_item); // Exempt from complexity filtering (spec 207)
         }

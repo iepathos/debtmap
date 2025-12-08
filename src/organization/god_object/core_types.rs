@@ -77,6 +77,12 @@ pub struct GodObjectAnalysis {
     pub module_structure: Option<crate::analysis::ModuleStructure>,
     /// Type of god object detection (class vs file/module)
     pub detection_type: DetectionType,
+    /// Name of the primary struct (for GodClass detection type only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub struct_name: Option<String>,
+    /// Line number where the primary struct is defined (for GodClass detection type only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub struct_line: Option<usize>,
     /// Function visibility breakdown (added for spec 134)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visibility_breakdown: Option<FunctionVisibilityBreakdown>,

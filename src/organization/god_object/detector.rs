@@ -369,6 +369,23 @@ impl GodObjectDetector {
             &method_names,
         ));
 
+        // Step 10: Extract struct name and line for GodClass
+        let (struct_name, struct_line) = match detection_type {
+            DetectionType::GodClass => {
+                // Get the first (dominant) struct's name and location
+                visitor.types.values().next().map(|type_analysis| {
+                    (
+                        Some(type_analysis.name.clone()),
+                        Some(type_analysis.location.line),
+                    )
+                }).unwrap_or((None, None))
+            }
+            DetectionType::GodFile | DetectionType::GodModule => {
+                // For file/module level, no specific struct
+                (None, None)
+            }
+        };
+
         GodObjectAnalysis {
             is_god_object,
             method_count,
@@ -383,6 +400,8 @@ impl GodObjectDetector {
             purity_distribution,
             module_structure: None,
             detection_type,
+            struct_name,
+            struct_line,
             visibility_breakdown,
             domain_count: 0,
             domain_diversity: 0.0,

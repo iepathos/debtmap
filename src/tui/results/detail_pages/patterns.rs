@@ -32,17 +32,17 @@ pub fn render(
         add_section_header(&mut lines, "entropy analysis", theme);
 
         let entropy_desc = if entropy.entropy_score < 0.3 {
-            "Low (Repetitive)"
+            "low (repetitive)"
         } else if entropy.entropy_score < 0.5 {
-            "Medium (Typical)"
+            "medium (typical)"
         } else {
-            "High (Chaotic)"
+            "high (chaotic)"
         };
 
         add_label_value(
             &mut lines,
             "entropy",
-            format!("{:.3} ({})", entropy.entropy_score, entropy_desc),
+            format!("{:.3} {}", entropy.entropy_score, entropy_desc),
             theme,
             area.width,
         );

@@ -275,6 +275,38 @@ impl RiskAnalyzer {
         self.strategy
             .calculate_risk_reduction(current_risk, complexity, target_coverage)
     }
+
+    /// Analyze file-level contextual risk for god objects.
+    ///
+    /// This method specifically handles file-level analysis where there is no
+    /// specific function being analyzed. It's designed for god objects where
+    /// the entire file represents the technical debt unit.
+    ///
+    /// # Arguments
+    /// * `file_path` - Path to the file being analyzed
+    /// * `base_risk` - Base risk score for the god object (from god object scoring)
+    /// * `root_path` - Project root path
+    ///
+    /// # Returns
+    /// `Some(ContextualRisk)` if context analysis is enabled, `None` otherwise
+    pub fn analyze_file_context(
+        &self,
+        file_path: PathBuf,
+        base_risk: f64,
+        root_path: PathBuf,
+    ) -> Option<ContextualRisk> {
+        let aggregator = self.context_aggregator.as_ref()?;
+
+        let target = AnalysisTarget {
+            root_path,
+            file_path,
+            function_name: String::new(), // Empty for file-level analysis
+            line_range: (0, 0),           // Not applicable for file-level
+        };
+
+        let context_map = aggregator.analyze(&target);
+        Some(ContextualRisk::new(base_risk, &context_map))
+    }
 }
 
 #[cfg(test)]

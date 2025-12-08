@@ -254,6 +254,8 @@ mod tests {
             purity_distribution: None,
             module_structure: None,
             detection_type: crate::organization::DetectionType::GodClass,
+            struct_name: None,
+            struct_line: None,
             visibility_breakdown: None, // Spec 134: Added for test compatibility
             domain_count: 0,
             domain_diversity: 0.0,

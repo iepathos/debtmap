@@ -970,6 +970,8 @@ impl ParallelUnifiedAnalysisBuilder {
                         purity_distribution: None,
                         module_structure: None,
                         detection_type: crate::organization::DetectionType::GodFile,
+                        struct_name: None,
+                        struct_line: None,
                         visibility_breakdown: None,
                         domain_count: 0,
                         domain_diversity: 0.0,
@@ -1152,6 +1154,7 @@ impl ParallelUnifiedAnalysisBuilder {
                         &file_item.metrics,
                         god_analysis,
                         aggregated_metrics,
+                        coverage_data,
                     );
                     unified.add_item(god_item);
                 }
