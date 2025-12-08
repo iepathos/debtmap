@@ -87,6 +87,7 @@ fn create_test_item(
         detected_pattern: None,
         contextual_risk: None,
         file_line_count: None,
+        responsibility_category: None,
     }
 }
 

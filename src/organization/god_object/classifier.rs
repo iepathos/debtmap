@@ -209,6 +209,50 @@ pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Ve
     groups
 }
 
+/// Pure function: analyzes function name and returns primary responsibility category.
+///
+/// Reuses existing behavioral categorization infrastructure to provide uniform
+/// responsibility analysis across all debt items (not just god objects).
+///
+/// # Arguments
+///
+/// * `function_name` - Name of the function to analyze
+///
+/// # Returns
+///
+/// * `Some(category)` - If behavioral category can be inferred with high confidence (>= 0.7)
+/// * `None` - If function name doesn't clearly indicate a behavioral pattern
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::analyze_function_responsibility;
+///
+/// assert_eq!(analyze_function_responsibility("validate_email"), Some("Validation".to_string()));
+/// assert_eq!(analyze_function_responsibility("parse_json"), Some("Parsing".to_string()));
+/// assert_eq!(analyze_function_responsibility("get_user"), Some("Data Access".to_string()));
+/// assert_eq!(analyze_function_responsibility("do_stuff"), None); // Low confidence
+/// ```
+///
+/// # Stillwater Principle: Pure Core
+///
+/// This function is pure - same input always gives same output, no side effects.
+/// Responsibility inference happens once during analysis, not during rendering.
+pub fn analyze_function_responsibility(function_name: &str) -> Option<String> {
+    // Reuse existing inference with confidence threshold
+    let result = infer_responsibility_with_confidence(function_name, None);
+
+    // Only return category if confidence meets threshold (>= 0.7)
+    // Threshold of 0.7 matches existing god object analysis patterns
+    // The infer_responsibility_with_confidence function uses MINIMUM_CONFIDENCE (0.50)
+    // but we want higher confidence for universal responsibility analysis
+    if result.confidence >= 0.7 {
+        result.category
+    } else {
+        None
+    }
+}
+
 /// Classify struct into a domain based on naming patterns.
 ///
 /// Pure function that extracts semantic domain from struct names:
@@ -617,5 +661,257 @@ mod tests {
             let ratio = calculate_struct_ratio(struct_count, 0);
             prop_assert_eq!(ratio, 0.0);
         }
+    }
+
+    // Spec 254: Universal Responsibility Analysis Tests
+    #[test]
+    fn test_analyze_function_responsibility_validation() {
+        assert_eq!(
+            analyze_function_responsibility("validate_email"),
+            Some("Validation".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("check_bounds"),
+            Some("Validation".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("verify_signature"),
+            Some("Validation".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("is_valid"),
+            Some("Validation".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_parsing() {
+        assert_eq!(
+            analyze_function_responsibility("parse_json"),
+            Some("Parsing".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("read_config"),
+            Some("Parsing".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("extract_data"),
+            Some("Parsing".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("decode_message"),
+            Some("Parsing".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_data_access() {
+        assert_eq!(
+            analyze_function_responsibility("get_user"),
+            Some("Data Access".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("set_property"),
+            Some("Data Access".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("fetch_record"),
+            Some("Data Access".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("retrieve_data"),
+            Some("Data Access".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_rendering() {
+        assert_eq!(
+            analyze_function_responsibility("render_view"),
+            Some("Rendering".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("draw_chart"),
+            Some("Rendering".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("paint_canvas"),
+            Some("Rendering".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("format_output"),
+            Some("Rendering".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_construction() {
+        assert_eq!(
+            analyze_function_responsibility("create_instance"),
+            Some("Construction".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("build_object"),
+            Some("Construction".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("make_widget"),
+            Some("Construction".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_filtering() {
+        assert_eq!(
+            analyze_function_responsibility("filter_results"),
+            Some("Filtering".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("select_items"),
+            Some("Filtering".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("find_matches"),
+            Some("Filtering".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("search_database"),
+            Some("Filtering".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_transformation() {
+        assert_eq!(
+            analyze_function_responsibility("transform_data"),
+            Some("Transformation".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("convert_to_json"),
+            Some("Transformation".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("map_values"),
+            Some("Transformation".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_communication() {
+        assert_eq!(
+            analyze_function_responsibility("send_message"),
+            Some("Communication".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("receive_data"),
+            Some("Communication".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("transmit_packet"),
+            Some("Communication".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("notify_observers"),
+            Some("Communication".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_persistence() {
+        assert_eq!(
+            analyze_function_responsibility("save_state"),
+            Some("Persistence".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("load_config"),
+            Some("Persistence".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_event_handling() {
+        assert_eq!(
+            analyze_function_responsibility("handle_keypress"),
+            Some("Event Handling".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("on_mouse_down"),
+            Some("Event Handling".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("dispatch_event"),
+            Some("Event Handling".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_processing() {
+        assert_eq!(
+            analyze_function_responsibility("process_request"),
+            Some("Processing".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("execute_task"),
+            Some("Processing".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("run_pipeline"),
+            Some("Processing".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_low_confidence() {
+        // Generic names should return None due to low confidence
+        // Note: "process" and "handle" are recognized patterns (Processing/Event Handling)
+        // so we test truly generic names
+        assert_eq!(analyze_function_responsibility("do_something"), None);
+        assert_eq!(analyze_function_responsibility("helper"), None);
+        assert_eq!(analyze_function_responsibility("utils"), None);
+        assert_eq!(analyze_function_responsibility("foo"), None);
+        assert_eq!(analyze_function_responsibility("bar"), None);
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_purity() {
+        // Pure function: same input = same output
+        let result1 = analyze_function_responsibility("validate_input");
+        let result2 = analyze_function_responsibility("validate_input");
+        assert_eq!(result1, result2);
+        assert_eq!(result1, Some("Validation".to_string()));
+
+        // Test multiple times to ensure determinism
+        for _ in 0..10 {
+            assert_eq!(
+                analyze_function_responsibility("parse_json"),
+                Some("Parsing".to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_empty_string() {
+        // Edge case: empty string
+        assert_eq!(analyze_function_responsibility(""), None);
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_lifecycle() {
+        assert_eq!(
+            analyze_function_responsibility("initialize_system"),
+            Some("Lifecycle".to_string())
+        );
+        assert_eq!(
+            analyze_function_responsibility("cleanup"),
+            Some("Lifecycle".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_function_responsibility_state_management() {
+        assert_eq!(
+            analyze_function_responsibility("update_state"),
+            Some("State Management".to_string())
+        );
     }
 }

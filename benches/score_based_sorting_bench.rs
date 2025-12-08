@@ -6,6 +6,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::data_flow::DataFlowGraph;
 use debtmap::priority::call_graph::CallGraph;
+use debtmap::priority::filter_predicates::FilterStatistics;
 use debtmap::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
 use debtmap::priority::semantic_classifier::FunctionRole;
 use debtmap::priority::unified_analysis_queries::UnifiedAnalysisQueries;
@@ -90,6 +91,7 @@ fn create_test_item(
         detected_pattern: None, // spec 204
         contextual_risk: None,
         file_line_count: None,
+        responsibility_category: None,
     }
 }
 
@@ -171,7 +173,11 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
             overall_coverage: None,
             has_coverage_data: false,
             timings: None,
+<<<<<<< HEAD
             stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
+=======
+            stats: FilterStatistics::default(),
+>>>>>>> prodigy-workflow-1765158901319
         };
 
         group.bench_with_input(
@@ -235,7 +241,7 @@ fn bench_worst_case_sorting(c: &mut Criterion) {
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
-        stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
+        stats: FilterStatistics::default(),
     };
 
     c.bench_function("worst_case_similar_scores_1000", |b| {
@@ -302,7 +308,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
-        stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
+        stats: FilterStatistics::default(),
     };
 
     c.bench_function("mixed_debt_types_1000", |b| {
@@ -357,7 +363,7 @@ fn bench_with_risk_boosts(c: &mut Criterion) {
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
-        stats: debtmap::priority::filter_predicates::FilterStatistics::default(),
+        stats: FilterStatistics::default(),
     };
 
     c.bench_function("with_risk_boosts_1000", |b| {

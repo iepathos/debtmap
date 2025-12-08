@@ -446,6 +446,7 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         detected_pattern: None,  // No pattern detection available in this context (spec 204)
         contextual_risk: None,
         file_line_count: None, // No file line count caching for temporary items (spec 204)
+        responsibility_category: None, // No responsibility category for temporary items (spec 254)
     }
 }
 

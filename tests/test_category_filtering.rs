@@ -76,6 +76,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
         detected_pattern: None,  // spec 204
         contextual_risk: None,   // spec 203
         file_line_count: None,
+        responsibility_category: None,
     }
 }
 

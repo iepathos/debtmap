@@ -436,6 +436,7 @@ fn create_test_unified_debt_item(
         detected_pattern: None,
         contextual_risk: None,
         file_line_count: None,
+        responsibility_category: None,
     }
 }
 
