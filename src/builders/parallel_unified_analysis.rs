@@ -967,6 +967,7 @@ impl ParallelUnifiedAnalysisBuilder {
                         recommended_splits: Vec::new(),
                         confidence: crate::organization::GodObjectConfidence::Probable,
                         responsibilities: Vec::new(),
+                        responsibility_method_counts: std::collections::HashMap::new(),
                         purity_distribution: None,
                         module_structure: None,
                         detection_type: crate::organization::DetectionType::GodFile,

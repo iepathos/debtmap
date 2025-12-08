@@ -56,18 +56,6 @@ pub fn render(
         area.width,
     );
 
-    // Primary responsibility (for all items - spec 254)
-    if let Some(category) = &item.responsibility_category {
-        lines.push(ratatui::text::Line::from(""));
-        add_label_value(
-            &mut lines,
-            "primary responsibility",
-            category.clone(),
-            theme,
-            area.width,
-        );
-    }
-
     // Responsibilities section (for god objects)
     if let Some(indicators) = &item.god_object_indicators {
         if indicators.is_god_object && !indicators.responsibilities.is_empty() {
@@ -76,14 +64,24 @@ pub fn render(
             // Section header
             add_section_header(&mut lines, "responsibilities", theme);
 
-            // List responsibilities (limit to 6)
-            for resp in indicators.responsibilities.iter().take(6) {
-                // Find method count from recommended_splits if available
+            // Primary responsibility (for all items - spec 254)
+            if let Some(category) = &item.responsibility_category {
+                add_label_value(
+                    &mut lines,
+                    "primary responsibility",
+                    category.clone(),
+                    theme,
+                    area.width,
+                );
+            }
+
+            // List all responsibilities (no truncation)
+            for resp in indicators.responsibilities.iter() {
+                // Get method count from responsibility_method_counts
                 let method_count = indicators
-                    .recommended_splits
-                    .iter()
-                    .find(|split| split.responsibility == *resp)
-                    .map(|split| split.method_count)
+                    .responsibility_method_counts
+                    .get(resp)
+                    .copied()
                     .unwrap_or(0);
 
                 // Lowercase responsibility name for consistency
@@ -97,18 +95,18 @@ pub fn render(
                 // Use the same column system as dependency metrics
                 add_label_value(&mut lines, &resp_text, count_text, theme, area.width);
             }
-
-            // Overflow indicator
-            if indicators.responsibilities.len() > 6 {
-                lines.push(ratatui::text::Line::from(vec![
-                    ratatui::text::Span::raw("  "),
-                    ratatui::text::Span::styled(
-                        format!("... and {} more", indicators.responsibilities.len() - 6),
-                        ratatui::style::Style::default().fg(theme.muted),
-                    ),
-                ]));
-            }
         }
+    } else if let Some(category) = &item.responsibility_category {
+        // Show primary responsibility for non-god-object items
+        lines.push(ratatui::text::Line::from(""));
+        add_section_header(&mut lines, "responsibilities", theme);
+        add_label_value(
+            &mut lines,
+            "primary responsibility",
+            category.clone(),
+            theme,
+            area.width,
+        );
     }
 
     // Add note for god objects about what matters

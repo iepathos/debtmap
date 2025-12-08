@@ -300,7 +300,21 @@ impl GodObjectDetector {
         // Group methods by responsibility
         let responsibility_groups = group_methods_by_responsibility(&method_names);
         let responsibility_count = responsibility_groups.len();
-        let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
+
+        // Sort responsibilities by method count (descending) so primary responsibility is most common
+        let mut responsibilities_with_counts: Vec<(String, usize)> = responsibility_groups
+            .iter()
+            .map(|(name, methods)| (name.clone(), methods.len()))
+            .collect();
+        responsibilities_with_counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        let responsibilities: Vec<String> = responsibilities_with_counts
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        // Build method count map for all responsibilities (not just those in recommended_splits)
+        let responsibility_method_counts: std::collections::HashMap<String, usize> =
+            responsibilities_with_counts.into_iter().collect();
 
         // Calculate complexity
         let complexity_sum: u32 = visitor
@@ -386,6 +400,13 @@ impl GodObjectDetector {
             }
         };
 
+        // Step 11: Calculate responsibility method counts
+        let responsibility_method_counts: std::collections::HashMap<String, usize> =
+            responsibility_groups
+                .iter()
+                .map(|(key, methods)| (key.clone(), methods.len()))
+                .collect();
+
         GodObjectAnalysis {
             is_god_object,
             method_count,
@@ -397,6 +418,7 @@ impl GodObjectDetector {
             recommended_splits,
             confidence,
             responsibilities,
+            responsibility_method_counts,
             purity_distribution,
             module_structure: None,
             detection_type,

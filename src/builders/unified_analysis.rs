@@ -1500,6 +1500,7 @@ fn detect_god_object_analysis(
                 recommended_splits: Vec::new(),
                 confidence: crate::organization::GodObjectConfidence::Probable,
                 responsibilities: Vec::new(),
+                responsibility_method_counts: std::collections::HashMap::new(),
                 purity_distribution: None,
                 module_structure: None,
                 detection_type: crate::organization::DetectionType::GodFile,
@@ -1580,8 +1581,18 @@ pub fn create_god_object_debt_item(
         .map(|cov| (1.0 - cov.direct) * 10.0)
         .unwrap_or(0.0);
 
-    let unified_score = UnifiedScore {
-        final_score: Score0To100::new(base_score),
+    // Apply coverage as dampening multiplier (same as regular functions - spec 122)
+    // 100% coverage → multiplier = 0.0 → near-zero score
+    // 0% coverage → multiplier = 1.0 → full base score
+    let coverage_multiplier = aggregated_metrics
+        .weighted_coverage
+        .as_ref()
+        .map(|cov| 1.0 - cov.direct)
+        .unwrap_or(1.0);
+    let coverage_adjusted_score = base_score * coverage_multiplier;
+
+    let mut unified_score = UnifiedScore {
+        final_score: Score0To100::new(coverage_adjusted_score),
         complexity_factor: file_metrics.total_complexity as f64 / 10.0,
         coverage_factor,
         dependency_factor: calculate_god_object_risk(god_analysis) / 10.0,
@@ -1595,6 +1606,15 @@ pub fn create_god_object_debt_item(
         refactorability_factor: None,
         pattern_factor: None,
     };
+
+    // Apply contextual risk to score if available (spec 255)
+    if let Some(ref ctx_risk) = aggregated_metrics.aggregated_contextual_risk {
+        unified_score =
+            crate::priority::scoring::construction::apply_contextual_risk_to_score(
+                unified_score,
+                ctx_risk,
+            );
+    }
 
     // Unified debt type for all god object detections (spec 253)
     // Use detection_type in god_object_indicators to distinguish between GodClass, GodFile, GodModule

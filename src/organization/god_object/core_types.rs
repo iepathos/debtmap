@@ -71,6 +71,8 @@ pub struct GodObjectAnalysis {
     pub recommended_splits: Vec<crate::organization::god_object::ModuleSplit>,
     pub confidence: GodObjectConfidence,
     pub responsibilities: Vec<String>,
+    #[serde(default)]
+    pub responsibility_method_counts: std::collections::HashMap<String, usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purity_distribution: Option<crate::organization::god_object::PurityDistribution>,
     #[serde(skip_serializing_if = "Option::is_none")]

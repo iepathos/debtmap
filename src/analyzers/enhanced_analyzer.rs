@@ -59,6 +59,7 @@ fn create_god_object_analysis(
         recommended_splits: Vec::new(),
         confidence: crate::organization::GodObjectConfidence::Probable,
         responsibilities: Vec::new(),
+        responsibility_method_counts: Default::default(),
         purity_distribution: None,
         module_structure: None,
         detection_type: crate::organization::DetectionType::GodFile,

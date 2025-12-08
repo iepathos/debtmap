@@ -85,6 +85,35 @@ fn apply_context_multiplier_to_score(mut score: UnifiedScore, multiplier: f64) -
     score
 }
 
+/// Apply contextual risk multiplier to a UnifiedScore (spec 255)
+///
+/// Adjusts the final score based on git context analysis (churn, recency, etc.).
+/// The multiplier is calculated as contextual_risk / base_risk.
+/// For example, if contextual_risk is 2x the base_risk, the score is doubled.
+pub fn apply_contextual_risk_to_score(
+    mut score: UnifiedScore,
+    contextual_risk: &crate::risk::context::ContextualRisk,
+) -> UnifiedScore {
+    // Calculate multiplier from contextual risk
+    // If base_risk is 0, no adjustment (avoid division by zero)
+    if contextual_risk.base_risk <= 0.0 {
+        return score;
+    }
+
+    let risk_multiplier = contextual_risk.contextual_risk / contextual_risk.base_risk;
+
+    // Apply multiplier to final_score (clamped to 0-100 by Score0To100)
+    let adjusted_final = score.final_score.value() * risk_multiplier;
+    score.final_score = Score0To100::new(adjusted_final);
+
+    // Also record the pre-contextual score for transparency
+    if score.base_score.is_none() {
+        score.base_score = Some(score.final_score.value() / risk_multiplier);
+    }
+
+    score
+}
+
 /// Create a unified debt item with enhanced call graph analysis (spec 201)
 /// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 pub fn create_unified_debt_item_enhanced(
@@ -554,6 +583,12 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
                     func.is_test,
                     project_path.to_path_buf(),
                 );
+
+                // Apply contextual risk to score (spec 255)
+                if let Some(ref ctx_risk) = contextual_risk {
+                    item.unified_score =
+                        apply_contextual_risk_to_score(item.unified_score, ctx_risk);
+                }
 
                 item.contextual_risk = contextual_risk;
             }
