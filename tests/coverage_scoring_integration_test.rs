@@ -108,7 +108,7 @@ fn create_debt_item(
         detected_pattern: None,
         contextual_risk: None, // spec 203
         file_line_count: None,
-            responsibility_category: None,
+        responsibility_category: None,
     }
 }
 

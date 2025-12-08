@@ -6,11 +6,11 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::data_flow::DataFlowGraph;
 use debtmap::priority::call_graph::CallGraph;
+use debtmap::priority::filter_predicates::FilterStatistics;
 use debtmap::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
 use debtmap::priority::semantic_classifier::FunctionRole;
 use debtmap::priority::unified_analysis_queries::UnifiedAnalysisQueries;
 use debtmap::priority::unified_scorer::{Location, UnifiedScore};
-use debtmap::priority::filter_predicates::FilterStatistics;
 use debtmap::priority::{
     ActionableRecommendation, DebtType, ImpactMetrics, UnifiedAnalysis, UnifiedDebtItem,
 };
@@ -91,7 +91,7 @@ fn create_test_item(
         detected_pattern: None, // spec 204
         contextual_risk: None,
         file_line_count: None,
-            responsibility_category: None,
+        responsibility_category: None,
     }
 }
 

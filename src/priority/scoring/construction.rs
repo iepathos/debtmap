@@ -209,8 +209,8 @@ pub fn create_unified_debt_item_enhanced(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
-        file_line_count,            // Cached line count (spec 204)
-        responsibility_category,    // Behavioral responsibility (spec 254)
+        file_line_count,         // Cached line count (spec 204)
+        responsibility_category, // Behavioral responsibility (spec 254)
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
@@ -721,7 +721,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 detected_pattern: detected_pattern.clone(),
                 contextual_risk: None,
                 file_line_count,
-                responsibility_category: crate::organization::god_object::analyze_function_responsibility(&func.name),
+                responsibility_category:
+                    crate::organization::god_object::analyze_function_responsibility(&func.name),
             })
         })
         .collect()
@@ -863,8 +864,8 @@ pub fn create_unified_debt_item_with_data_flow(
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
         contextual_risk: None,
-        file_line_count,            // Cached line count (spec 204)
-        responsibility_category,    // Behavioral responsibility (spec 254)
+        file_line_count,         // Cached line count (spec 204)
+        responsibility_category, // Behavioral responsibility (spec 254)
     })
 }
 
