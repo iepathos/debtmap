@@ -174,6 +174,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }];
 
         AnalysisResults {
@@ -357,6 +359,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -388,6 +392,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -419,6 +425,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -450,6 +458,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -485,6 +495,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             });
         }
 
@@ -532,6 +544,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -558,6 +572,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
         ];
 

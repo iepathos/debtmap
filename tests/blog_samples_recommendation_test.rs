@@ -37,6 +37,8 @@ fn create_reconcile_state_metrics() -> FunctionMetrics {
         composition_metrics: None,
         language_specific: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 
@@ -68,6 +70,8 @@ fn create_validate_config_metrics() -> FunctionMetrics {
         composition_metrics: None,
         language_specific: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 
@@ -200,6 +204,8 @@ fn test_blog_samples_complexity_tier_boundaries() {
         composition_metrics: None,
         language_specific: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
 
     let rec_low = generate_concise_recommendation(
@@ -246,6 +252,8 @@ fn test_blog_samples_complexity_tier_boundaries() {
         composition_metrics: None,
         language_specific: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
 
     let rec_moderate = generate_concise_recommendation(

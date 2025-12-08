@@ -31,6 +31,8 @@ fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
             purity_reason: None,
             call_dependencies: None,
         })
@@ -501,6 +503,8 @@ fn test_god_objects_created_in_parallel_analysis() {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
             purity_reason: None,
             call_dependencies: None,
         })
@@ -621,6 +625,8 @@ fn test_god_objects_not_created_when_disabled() {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
             purity_reason: None,
             call_dependencies: None,
         })
@@ -700,6 +706,8 @@ fn test_god_objects_visible_in_tui() {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
             purity_reason: None,
             call_dependencies: None,
         })

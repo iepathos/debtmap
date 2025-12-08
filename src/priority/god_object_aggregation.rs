@@ -48,6 +48,10 @@ pub struct GodObjectAggregatedMetrics {
     pub upstream_dependencies: usize,
     pub downstream_dependencies: usize,
     pub aggregated_contextual_risk: Option<ContextualRisk>,
+    /// Total count of error swallowing patterns across all functions
+    pub total_error_swallowing_count: u32,
+    /// Unique error swallowing pattern types found
+    pub error_swallowing_patterns: Vec<String>,
 }
 
 /// Extract member functions for a file.
@@ -189,6 +193,23 @@ pub fn aggregate_contextual_risk(members: &[&UnifiedDebtItem]) -> Option<Context
     })
 }
 
+/// Aggregate error swallowing metrics from FunctionMetrics.
+pub fn aggregate_error_swallowing(functions: &[FunctionMetrics]) -> (u32, Vec<String>) {
+    let total_count = functions
+        .iter()
+        .filter_map(|f| f.error_swallowing_count)
+        .sum();
+
+    let mut unique_patterns: HashSet<String> = HashSet::new();
+    for func in functions {
+        if let Some(ref patterns) = func.error_swallowing_patterns {
+            unique_patterns.extend(patterns.iter().cloned());
+        }
+    }
+
+    (total_count, unique_patterns.into_iter().collect())
+}
+
 /// Aggregate all metrics (composition of above functions).
 pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAggregatedMetrics {
     let (total_cyc, total_cog, max_nest) = aggregate_complexity_metrics(members);
@@ -196,6 +217,8 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
     let (callers, callees, up_count, down_count) = aggregate_dependency_metrics(members);
     let contextual_risk = aggregate_contextual_risk(members);
 
+    // Note: Error swallowing is aggregated from raw FunctionMetrics, not UnifiedDebtItem
+    // This function sets defaults; use aggregate_from_raw_metrics for full error swallowing data
     GodObjectAggregatedMetrics {
         total_cyclomatic: total_cyc,
         total_cognitive: total_cog,
@@ -206,6 +229,8 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
         upstream_dependencies: up_count,
         downstream_dependencies: down_count,
         aggregated_contextual_risk: contextual_risk,
+        total_error_swallowing_count: 0,
+        error_swallowing_patterns: Vec::new(),
     }
 }
 
@@ -217,6 +242,9 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
     let total_cyclomatic = functions.iter().map(|f| f.cyclomatic).sum();
     let total_cognitive = functions.iter().map(|f| f.cognitive).sum();
     let max_nesting = functions.iter().map(|f| f.nesting).max().unwrap_or(0);
+
+    // Aggregate error swallowing from raw metrics
+    let (total_error_swallowing, error_patterns) = aggregate_error_swallowing(functions);
 
     // No coverage or dependency data available from raw metrics
     // These will need to come from unified items if available
@@ -230,6 +258,8 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         aggregated_contextual_risk: None,
+        total_error_swallowing_count: total_error_swallowing,
+        error_swallowing_patterns: error_patterns,
     }
 }
 
@@ -319,6 +349,8 @@ mod tests {
             contextual_risk: None,
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 
@@ -426,5 +458,149 @@ mod tests {
         assert_eq!(metrics.total_cognitive, 25);
         assert_eq!(metrics.max_nesting_depth, 5);
         assert!(metrics.weighted_coverage.is_none()); // No coverage data
+    }
+
+    #[test]
+    fn test_aggregate_error_swallowing() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "func1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 5,
+                cognitive: 5,
+                nesting: 1,
+                length: 20,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: Some(2),
+                error_swallowing_patterns: Some(vec![
+                    "if let Ok(...) without else branch".to_string()
+                ]),
+            },
+            FunctionMetrics {
+                name: "func2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 25,
+                cyclomatic: 3,
+                cognitive: 3,
+                nesting: 1,
+                length: 15,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: Some(3),
+                error_swallowing_patterns: Some(vec![
+                    "if let Ok(...) without else branch".to_string(),
+                    "let _ = discarding Result".to_string(),
+                ]),
+            },
+            FunctionMetrics {
+                name: "func3".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 50,
+                cyclomatic: 2,
+                cognitive: 2,
+                nesting: 1,
+                length: 10,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None, // No error swallowing
+                error_swallowing_patterns: None,
+            },
+        ];
+
+        let (total, patterns) = aggregate_error_swallowing(&functions);
+
+        assert_eq!(total, 5); // 2 + 3 = 5
+        assert_eq!(patterns.len(), 2); // 2 unique patterns
+        assert!(patterns.contains(&"if let Ok(...) without else branch".to_string()));
+        assert!(patterns.contains(&"let _ = discarding Result".to_string()));
+    }
+
+    #[test]
+    fn test_aggregate_from_raw_metrics_includes_error_swallowing() {
+        let functions = vec![FunctionMetrics {
+            name: "func1".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 10,
+            cognitive: 15,
+            nesting: 3,
+            length: 50,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: Some(4),
+            error_swallowing_patterns: Some(vec!["match with ignored Err variant".to_string()]),
+        }];
+
+        let metrics = aggregate_from_raw_metrics(&functions);
+
+        assert_eq!(metrics.total_cyclomatic, 10);
+        assert_eq!(metrics.total_cognitive, 15);
+        assert_eq!(metrics.total_error_swallowing_count, 4);
+        assert_eq!(metrics.error_swallowing_patterns.len(), 1);
+        assert!(metrics
+            .error_swallowing_patterns
+            .contains(&"match with ignored Err variant".to_string()));
     }
 }

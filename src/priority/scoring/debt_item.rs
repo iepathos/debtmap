@@ -447,6 +447,8 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         contextual_risk: None,
         file_line_count: None, // No file line count caching for temporary items (spec 204)
         responsibility_category: None, // No responsibility category for temporary items (spec 254)
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 
@@ -494,6 +496,8 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         composition_metrics: None,
         language_specific: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 
@@ -753,6 +757,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let debt = classify_test_debt(&test_func);
@@ -858,6 +864,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -903,6 +911,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -952,6 +962,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -999,6 +1011,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -1047,6 +1061,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -1095,6 +1111,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let transitive_cov = TransitiveCoverage {
@@ -1147,6 +1165,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         // Test at cyclomatic=10 (not complex)
@@ -1209,6 +1229,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let func_id = create_function_id(&func);
@@ -1464,6 +1486,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let debt_type = DebtType::ComplexityHotspot {
@@ -1539,6 +1563,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let info = FunctionInfo::from_metrics(&func);

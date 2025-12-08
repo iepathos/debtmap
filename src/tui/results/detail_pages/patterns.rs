@@ -224,6 +224,30 @@ pub fn render(
         add_blank_line(&mut lines);
     }
 
+    // Error Swallowing section
+    if item.error_swallowing_count.is_some() || item.error_swallowing_patterns.is_some() {
+        has_any_data = true;
+        add_section_header(&mut lines, "error handling", theme);
+
+        if let Some(count) = item.error_swallowing_count {
+            add_label_value(
+                &mut lines,
+                "errors swallowed",
+                count.to_string(),
+                theme,
+                area.width,
+            );
+        }
+
+        if let Some(ref patterns) = item.error_swallowing_patterns {
+            for pattern in patterns {
+                add_label_value(&mut lines, "pattern", pattern.clone(), theme, area.width);
+            }
+        }
+
+        add_blank_line(&mut lines);
+    }
+
     // If no data available
     if !has_any_data {
         lines.push(Line::from(vec![Span::styled(

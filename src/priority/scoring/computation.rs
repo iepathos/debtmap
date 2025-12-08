@@ -269,6 +269,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         let risk = calculate_risk_score(&func);
         assert!(risk < 3.0, "Low complexity should have low risk score");
@@ -301,6 +303,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         let risk = calculate_risk_score(&func);
         assert!(risk >= 8.0, "High complexity should have high risk score");

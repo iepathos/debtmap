@@ -888,13 +888,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Active, None);
     }
 
-    // Step 6: Error swallowing analysis
-    if let Some(debt_items) = debt_items {
-        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
-        for item in error_swallowing_items {
-            unified.add_item(item);
-        }
-    }
+    // Step 6: Error swallowing analysis (now handled as function metrics, not standalone items)
 
     // Step 7: File-level analysis
     analyze_files_for_debt(
@@ -1006,12 +1000,8 @@ fn create_unified_analysis_parallel(
         manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Active, None);
     }
 
-    // Add error swallowing items
-    let mut all_items = items;
-    if let Some(debt_items) = debt_items {
-        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
-        all_items.extend(error_swallowing_items);
-    }
+    // Error swallowing is now handled as function metrics, not standalone items
+    let all_items = items;
 
     // Phase 3: Parallel file analysis
     let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
@@ -1095,103 +1085,6 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         risk_analyzer,
         project_path,
     )
-}
-
-fn convert_error_swallowing_to_unified(
-    debt_items: &[DebtItem],
-    _call_graph: &priority::CallGraph,
-) -> Vec<UnifiedDebtItem> {
-    debt_items
-        .iter()
-        .filter(|item| {
-            matches!(
-                item.debt_type,
-                crate::core::DebtType::ErrorSwallowing { .. }
-            )
-        })
-        .map(|item| {
-            let unified_score = UnifiedScore {
-                complexity_factor: 3.0,
-                coverage_factor: 5.0,
-                dependency_factor: 4.0,
-                role_multiplier: 1.2,
-                final_score: Score0To100::new(5.5),
-                base_score: None,
-                exponential_factor: None,
-                risk_boost: None,
-                pre_adjustment_score: None,
-                adjustment_applied: None,
-                purity_factor: None,
-                refactorability_factor: None,
-                pattern_factor: None,
-            };
-
-            let pattern = item.message.split(':').next().unwrap_or("Error swallowing");
-            let context = item.context.clone();
-
-            UnifiedDebtItem {
-                location: Location {
-                    file: item.file.clone(),
-                    function: format!("line_{}", item.line),
-                    line: item.line,
-                },
-                debt_type: DebtType::ErrorSwallowing {
-                    pattern: pattern.to_string(),
-                    context,
-                },
-                unified_score,
-                function_role: FunctionRole::Unknown,
-                recommendation: ActionableRecommendation {
-                    primary_action: format!("Fix error swallowing at line {}", item.line),
-                    rationale: item.message.clone(),
-                    implementation_steps: vec![
-                        "Replace error swallowing with proper error handling".to_string(),
-                        "Log errors at minimum, even if they can't be handled".to_string(),
-                        "Consider propagating errors to caller with ?".to_string(),
-                    ],
-                    related_items: vec![],
-                    steps: None,
-                    estimated_effort_hours: None,
-                },
-                expected_impact: ImpactMetrics {
-                    coverage_improvement: 0.0,
-                    lines_reduction: 0,
-                    complexity_reduction: 0.0,
-                    risk_reduction: 3.5,
-                },
-                transitive_coverage: None,
-                file_context: None,
-                upstream_dependencies: 0,
-                downstream_dependencies: 0,
-                upstream_callers: vec![],
-                downstream_callees: vec![],
-                nesting_depth: 0,
-                function_length: 0,
-                cyclomatic_complexity: 0,
-                cognitive_complexity: 0,
-                entropy_details: None,
-                entropy_adjusted_cyclomatic: None,
-                entropy_adjusted_cognitive: None,
-                entropy_dampening_factor: None,
-                is_pure: None,
-                purity_confidence: None,
-                purity_level: None,
-                god_object_indicators: None,
-                tier: None,
-                function_context: None,
-                context_confidence: None,
-                contextual_recommendation: None,
-                pattern_analysis: None,
-                context_multiplier: None,
-                context_type: None,
-                language_specific: None, // No language-specific data for error swallowing items (spec 190)
-                detected_pattern: None, // No pattern detection for error swallowing items (spec 204)
-                contextual_risk: None,
-                file_line_count: None, // No file line count caching for error swallowing items (spec 204)
-                responsibility_category: None, // No responsibility category for error swallowing items (spec 254)
-            }
-        })
-        .collect()
 }
 
 /// Perform multi-pass analysis on the results
@@ -1719,6 +1612,16 @@ pub fn create_god_object_debt_item(
         contextual_risk: aggregated_metrics.aggregated_contextual_risk,
         file_line_count: Some(god_analysis.lines_of_code),
         responsibility_category: god_analysis.responsibilities.first().cloned(), // Primary responsibility from detailed list (spec 254)
+        error_swallowing_count: if aggregated_metrics.total_error_swallowing_count > 0 {
+            Some(aggregated_metrics.total_error_swallowing_count)
+        } else {
+            None
+        },
+        error_swallowing_patterns: if aggregated_metrics.error_swallowing_patterns.is_empty() {
+            None
+        } else {
+            Some(aggregated_metrics.error_swallowing_patterns.clone())
+        },
     }
 }
 

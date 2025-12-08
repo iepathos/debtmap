@@ -35,7 +35,10 @@ fn some_function() -> Result<i32, std::io::Error> {
     // Verify the debt type is ErrorSwallowing
     for item in &items {
         assert!(
-            matches!(item.debt_type, debtmap::core::DebtType::ErrorSwallowing { .. }),
+            matches!(
+                item.debt_type,
+                debtmap::core::DebtType::ErrorSwallowing { .. }
+            ),
             "Expected ErrorSwallowing debt type, got {:?}",
             item.debt_type
         );
@@ -69,7 +72,12 @@ fn some_function() -> Result<i32, std::io::Error> {
     let error_swallowing_items: Vec<_> = metrics
         .debt_items
         .iter()
-        .filter(|item| matches!(item.debt_type, debtmap::core::DebtType::ErrorSwallowing { .. }))
+        .filter(|item| {
+            matches!(
+                item.debt_type,
+                debtmap::core::DebtType::ErrorSwallowing { .. }
+            )
+        })
         .collect();
 
     assert!(
@@ -83,17 +91,15 @@ fn some_function() -> Result<i32, std::io::Error> {
     );
 }
 
-/// Test that error swallowing items flow through to UnifiedAnalysis
+/// Test that error swallowing flows through to FunctionMetrics as per-function data
+/// (not as standalone debt items - architectural change per new design)
+///
+/// Note: UnifiedAnalysis filters out simple functions, so we verify the detection
+/// at the FunctionMetrics level which is the source of truth.
 #[test]
 fn test_unified_analysis_contains_error_swallowing() {
     use debtmap::analyzers::{analyze_file, get_analyzer};
-    use debtmap::builders::unified_analysis::perform_unified_analysis;
-    use debtmap::core::{
-        AnalysisResults, ComplexityReport, ComplexitySummary, DependencyReport, Language,
-        TechnicalDebtReport,
-    };
-    use debtmap::priority::DebtType;
-    use std::collections::HashMap;
+    use debtmap::core::Language;
     use std::path::PathBuf;
 
     let code = r#"
@@ -110,67 +116,50 @@ fn some_function() -> Result<i32, std::io::Error> {
 
     let analyzer = get_analyzer(Language::Rust);
     let path = PathBuf::from("test.rs");
-    let metrics = analyze_file(code.to_string(), path.clone(), &*analyzer).expect("Failed to analyze");
+    let metrics =
+        analyze_file(code.to_string(), path.clone(), &*analyzer).expect("Failed to analyze");
 
-    // Build AnalysisResults with the debt items
-    let all_functions = metrics.complexity.functions.clone();
-    let mut by_type = HashMap::new();
-    for item in &metrics.debt_items {
-        by_type
-            .entry(item.debt_type.clone())
-            .or_insert_with(Vec::new)
-            .push(item.clone());
-    }
-    let priorities = metrics.debt_items.iter().map(|i| i.priority).collect();
-
-    let results = AnalysisResults {
-        project_path: PathBuf::from("."),
-        timestamp: chrono::Utc::now(),
-        complexity: ComplexityReport {
-            metrics: all_functions,
-            summary: ComplexitySummary {
-                total_functions: 2,
-                average_complexity: 1.0,
-                max_complexity: 1,
-                high_complexity_count: 0,
-            },
-        },
-        technical_debt: TechnicalDebtReport {
-            items: metrics.debt_items.clone(),
-            by_type,
-            priorities,
-            duplications: vec![],
-        },
-        dependencies: DependencyReport {
-            modules: vec![],
-            circular: vec![],
-        },
-        duplications: vec![],
-        file_contexts: HashMap::new(),
-    };
-
-    // Perform unified analysis
-    let unified = perform_unified_analysis(&results, None, false, &PathBuf::from("."), false, false)
-        .expect("Failed to perform unified analysis");
-
-    // Check for ErrorSwallowing items in unified analysis
-    let error_swallowing_items: Vec<_> = unified
-        .items
+    // Verify that function metrics contain error swallowing information
+    // This is the key test - error swallowing is now detected per-function
+    let functions_with_error_swallowing: Vec<_> = metrics
+        .complexity
+        .functions
         .iter()
-        .filter(|item| {
-            matches!(
-                &item.debt_type,
-                DebtType::ErrorSwallowing { .. }
-            )
-        })
+        .filter(|f| f.error_swallowing_count.is_some() && f.error_swallowing_count.unwrap() > 0)
         .collect();
 
     assert!(
-        !error_swallowing_items.is_empty(),
-        "UnifiedAnalysis.items should contain ErrorSwallowing items. Found {} items total with types: {:?}",
-        unified.items.len(),
-        unified.items.iter().map(|i| format!("{:?}", std::mem::discriminant(&i.debt_type))).collect::<Vec<_>>()
+        !functions_with_error_swallowing.is_empty(),
+        "FunctionMetrics should have error_swallowing_count set for functions with error swallowing patterns. Functions: {:?}",
+        metrics.complexity.functions.iter().map(|f| (&f.name, f.error_swallowing_count)).collect::<Vec<_>>()
     );
+
+    // Verify patterns are detected correctly
+    let example_fn = metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|f| f.name == "example")
+        .expect("Should find example function");
+
+    assert!(
+        example_fn.error_swallowing_count.is_some(),
+        "example function should have error_swallowing_count set"
+    );
+
+    assert!(
+        example_fn.error_swallowing_patterns.is_some(),
+        "example function should have error_swallowing_patterns set"
+    );
+
+    // Verify the pattern type
+    if let Some(ref patterns) = example_fn.error_swallowing_patterns {
+        assert!(
+            patterns.iter().any(|p| p.contains("if let Ok")),
+            "Patterns should include 'if let Ok' pattern. Got: {:?}",
+            patterns
+        );
+    }
 }
 
 /// Test that AnalysisResults.technical_debt.items contains error swallowing items
@@ -205,7 +194,12 @@ fn some_function() -> Result<i32, std::io::Error> {
     // Check extracted debt items contain ErrorSwallowing
     let error_swallowing_items: Vec<_> = all_debt_items
         .iter()
-        .filter(|item| matches!(item.debt_type, debtmap::core::DebtType::ErrorSwallowing { .. }))
+        .filter(|item| {
+            matches!(
+                item.debt_type,
+                debtmap::core::DebtType::ErrorSwallowing { .. }
+            )
+        })
         .collect();
 
     assert!(
@@ -224,7 +218,12 @@ fn some_function() -> Result<i32, std::io::Error> {
     let report_error_swallowing: Vec<_> = technical_debt
         .items
         .iter()
-        .filter(|item| matches!(item.debt_type, debtmap::core::DebtType::ErrorSwallowing { .. }))
+        .filter(|item| {
+            matches!(
+                item.debt_type,
+                debtmap::core::DebtType::ErrorSwallowing { .. }
+            )
+        })
         .collect();
 
     assert!(

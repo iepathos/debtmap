@@ -144,6 +144,8 @@ fn create_function_item(
         contextual_risk: None,
         file_line_count: None,
         responsibility_category: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }))
 }
 
@@ -225,6 +227,8 @@ fn create_test_function_item(
         contextual_risk: None,
         file_line_count: None,
         responsibility_category: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }))
 }
 
@@ -300,6 +304,8 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
         contextual_risk: None,
         file_line_count: None,
         responsibility_category: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 
