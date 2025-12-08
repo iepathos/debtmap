@@ -302,7 +302,7 @@ fn test_contextual_risk_new() {
 }
 
 #[test]
-fn test_contextual_risk_no_cap() {
+fn test_contextual_risk_with_cap() {
     let mut context_map = ContextMap::new();
 
     context_map.add(
@@ -322,8 +322,9 @@ fn test_contextual_risk_no_cap() {
     let risk = ContextualRisk::new(8.0, &context_map);
 
     assert_eq!(risk.base_risk, 8.0);
-    // With spec 96, no cap: 8.0 * (1.0 + 4.0) = 40.0
-    assert_eq!(risk.contextual_risk, 40.0);
+    // Raw contribution = 2.0 * 2.0 = 4.0, but capped at 2.0
+    // contextual_risk = 8.0 * (1.0 + 2.0) = 24.0
+    assert_eq!(risk.contextual_risk, 24.0);
 }
 
 #[test]
