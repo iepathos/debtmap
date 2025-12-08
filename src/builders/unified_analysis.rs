@@ -258,7 +258,9 @@ fn perform_unified_analysis_computation(
 
     // Emit warning if no coverage data provided (spec 108)
     // Suppress for validate command (spec 131)
-    if coverage_data.is_none() && !quiet_mode && !suppress_coverage_tip {
+    // Suppress when TUI is active to avoid disrupting progress display (the TUI shows "skipped" already)
+    let tui_active = crate::progress::ProgressManager::global().is_some();
+    if coverage_data.is_none() && !quiet_mode && !suppress_coverage_tip && !tui_active {
         use colored::*;
         eprintln!();
         eprintln!(
@@ -1691,7 +1693,7 @@ fn create_god_object_recommendation(
         }
         crate::organization::DetectionType::GodFile
         | crate::organization::DetectionType::GodModule => {
-            format!("Split god module into {} focused modules", split_count)
+            format!("Split god module into {} modules by responsibility", split_count)
         }
     };
 
