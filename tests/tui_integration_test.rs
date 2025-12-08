@@ -832,9 +832,10 @@ fn test_god_object_displays_git_context() {
         location,
         DebtType::GodObject {
             methods: 3,
-            fields: 2,
+            fields: Some(2),
             responsibilities: 2,
             god_object_score: Score0To100::new(60.0),
+            lines: 150,
         },
     );
 

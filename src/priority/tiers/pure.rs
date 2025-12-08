@@ -194,9 +194,10 @@ mod tests {
         let item = create_test_item(
             DebtType::GodObject {
                 methods: 100,
-                fields: 50,
+                fields: Some(50),
                 responsibilities: 5,
                 god_object_score: Score0To100::new(95.0),
+                lines: 500,
             },
             10,
             10,
@@ -431,9 +432,10 @@ mod tests {
             let item = create_test_item(
                 DebtType::GodObject {
                     methods,
-                    fields,
+                    fields: Some(fields),
                     responsibilities,
                     god_object_score: Score0To100::new(god_score),
+                    lines: methods * 10,
                 },
                 cyclomatic,
                 cognitive,

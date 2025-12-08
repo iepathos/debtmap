@@ -54,7 +54,6 @@ fn apply_exponential_scaling(base_score: f64, debt_type: &DebtType, config: &Sca
     let exponent = match debt_type {
         // Architectural issues get strong exponential scaling
         DebtType::GodObject { .. } => config.god_object_exponent,
-        DebtType::GodModule { .. } => config.god_module_exponent,
 
         // High complexity gets moderate exponential scaling (use adjusted complexity - spec 182)
         DebtType::ComplexityHotspot {
@@ -134,7 +133,6 @@ pub fn calculate_final_score(
     // Determine exponent (for transparency)
     let exponent = match debt_type {
         DebtType::GodObject { .. } => config.god_object_exponent,
-        DebtType::GodModule { .. } => config.god_module_exponent,
         DebtType::ComplexityHotspot {
             cyclomatic,
             adjusted_cyclomatic,
@@ -274,9 +272,10 @@ mod tests {
             base,
             &DebtType::GodObject {
                 methods: 50,
-                fields: 20,
+                fields: Some(20),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 400,
             },
             &config,
         );
@@ -298,9 +297,10 @@ mod tests {
             base,
             &DebtType::GodObject {
                 methods: 50,
-                fields: 20,
+                fields: Some(20),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 400,
             },
             &config,
         );
@@ -354,9 +354,10 @@ mod tests {
             30.0,
             DebtType::GodObject {
                 methods: 50,
-                fields: 1000,
+                fields: Some(1000),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 600,
             },
             20, // High deps
             10,
@@ -385,9 +386,10 @@ mod tests {
             30.0,
             DebtType::GodObject {
                 methods: 50,
-                fields: 1000,
+                fields: Some(1000),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 600,
             },
             5,
             5,
@@ -431,9 +433,10 @@ mod tests {
             0.0,
             &DebtType::GodObject {
                 methods: 50,
-                fields: 1000,
+                fields: Some(1000),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 600,
             },
             &config,
         );
@@ -459,9 +462,10 @@ mod tests {
                 let debt_type = if i % 3 == 0 {
                     DebtType::GodObject {
                         methods: 50,
-                        fields: 20,
+                        fields: Some(20),
                         responsibilities: 10,
                         god_object_score: Score0To100::new(85.0),
+                        lines: 400,
                     }
                 } else if i % 3 == 1 {
                     DebtType::ComplexityHotspot {
@@ -538,9 +542,10 @@ mod tests {
             let config = ScalingConfig::default();
             let debt_type = DebtType::GodObject {
                 methods: 50,
-                fields: 20,
+                fields: Some(20),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 400,
             };
 
             let scaled_lower = apply_exponential_scaling(lower, &debt_type, &config);
@@ -600,9 +605,10 @@ mod tests {
                 base_score,
                 DebtType::GodObject {
                     methods: 50,
-                    fields: 20,
+                    fields: Some(20),
                     responsibilities: 10,
                     god_object_score: Score0To100::new(85.0),
+                    lines: 400,
                 },
                 10,
                 10,

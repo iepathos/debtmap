@@ -130,7 +130,7 @@ pub fn meets_risk_threshold(item: &UnifiedDebtItem, min_risk: f64) -> bool {
 ///
 /// Exempted types:
 /// - Test-related: `TestComplexityHotspot`, `TestTodo`, `TestDuplication`
-/// - Architectural: `GodObject`, `GodModule`
+/// - Architectural: `GodObject` (covers all god object detection types)
 ///
 /// These types have different complexity characteristics and are
 /// evaluated by other criteria.
@@ -159,7 +159,6 @@ pub fn is_exempt_from_complexity_filter(item: &UnifiedDebtItem) -> bool {
             | DebtType::TestTodo { .. }
             | DebtType::TestDuplication { .. }
             | DebtType::GodObject { .. }
-            | DebtType::GodModule { .. }
     )
 }
 
@@ -378,9 +377,10 @@ mod tests {
             0, // Below threshold
             DebtType::GodObject {
                 methods: 50,
-                fields: 20,
+                fields: Some(20),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 500,
             },
         );
 
@@ -471,9 +471,10 @@ mod tests {
             5,
             DebtType::GodObject {
                 methods: 50,
-                fields: 20,
+                fields: Some(20),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(85.0),
+                lines: 500,
             },
         );
 

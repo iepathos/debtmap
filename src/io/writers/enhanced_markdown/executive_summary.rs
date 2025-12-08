@@ -174,7 +174,6 @@ pub fn identify_quick_wins(items: &[UnifiedDebtItem]) -> QuickWins {
             DebtType::Duplication { .. } => "Duplication",
             DebtType::Risk { .. } => "Risk",
             DebtType::GodObject { .. } => "God Object",
-            DebtType::GodModule { .. } => "God Module",
             DebtType::TestComplexityHotspot { .. } => "Test Complexity",
             DebtType::TestTodo { .. } => "Test Todo",
             DebtType::TestDuplication { .. } => "Test Duplication",

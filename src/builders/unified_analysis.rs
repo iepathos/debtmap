@@ -1576,20 +1576,18 @@ pub fn create_god_object_debt_item(
         pattern_factor: None,
     };
 
-    // Determine debt type based on detection type
-    let debt_type = match god_analysis.detection_type {
-        crate::organization::DetectionType::GodClass => DebtType::GodObject {
-            methods: god_analysis.method_count as u32,
-            fields: god_analysis.field_count as u32,
-            responsibilities: god_analysis.responsibility_count as u32,
-            god_object_score: god_analysis.god_object_score,
+    // Unified debt type for all god object detections (spec 253)
+    // Use detection_type in god_object_indicators to distinguish between GodClass, GodFile, GodModule
+    let debt_type = DebtType::GodObject {
+        methods: god_analysis.method_count as u32,
+        fields: match god_analysis.detection_type {
+            crate::organization::DetectionType::GodClass => Some(god_analysis.field_count as u32),
+            crate::organization::DetectionType::GodFile
+            | crate::organization::DetectionType::GodModule => None,
         },
-        crate::organization::DetectionType::GodFile
-        | crate::organization::DetectionType::GodModule => DebtType::GodModule {
-            functions: god_analysis.method_count as u32,
-            lines: god_analysis.lines_of_code as u32,
-            responsibilities: god_analysis.responsibility_count as u32,
-        },
+        responsibilities: god_analysis.responsibility_count as u32,
+        god_object_score: god_analysis.god_object_score,
+        lines: god_analysis.lines_of_code as u32,
     };
 
     // Extract file name for display

@@ -88,7 +88,6 @@ pub(crate) fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::SuboptimalDataStructure { .. } => "Suboptimal Data Structure",
         // Organization debt types
         DebtType::GodObject { .. } => "God Object",
-        DebtType::GodModule { .. } => "God Module",
         DebtType::FeatureEnvy { .. } => "Feature Envy",
         DebtType::PrimitiveObsession { .. } => "Primitive Obsession",
         DebtType::MagicValues { .. } => "Magic Values",

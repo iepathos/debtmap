@@ -94,12 +94,24 @@ A **god module** is a file with excessive standalone functions (no dominant stru
 1. No struct/class is found, OR
 2. The file has many standalone functions outside of any impl blocks
 
-**Implementation Detail:** Debtmap uses the `DetectionType` enum with three variants:
-- `GodClass` - Single struct with excessive methods/fields
-- `GodFile` - File with excessive functions or lines of code
-- `GodModule` - Alias for `GodFile` (both represent the same detection type)
+**Implementation Detail:** All three detection types (GodClass, GodFile, GodModule) share a single unified `DebtType::GodObject` variant. The specific detection type is distinguished using the `detection_type` field within the variant:
 
-The `GodModule` variant is provided for clarity when discussing files with many standalone functions, but internally it's the same as `GodFile`. Both terms exist to help distinguish between "file is large" (GodFile) and "file has many functions" (GodModule) conceptually in documentation and error messages, even though they're implemented identically in the detection logic.
+```rust
+DebtType::GodObject {
+    methods: u32,
+    fields: Option<u32>,
+    responsibilities: u32,
+    god_object_score: Score0To100,
+    lines: u32,
+}
+```
+
+The `detection_type` field (tracked separately in the analysis) indicates whether this god object was detected as:
+- `GodClass` - Single struct with excessive methods/fields (has `fields: Some(count)`)
+- `GodFile` - File with excessive functions or lines of code (has `fields: None`)
+- `GodModule` - Same as `GodFile`, used conceptually for files with many standalone functions (has `fields: None`)
+
+This unified structure ensures consistent handling across all god object types while the `fields` value (Some vs None) provides the key distinction between class-based and file-based detection.
 
 **Example:** A file like `rust_call_graph.rs` with 270 standalone functions would be flagged as a god module (using the `GodFile`/`GodModule` detection type).
 

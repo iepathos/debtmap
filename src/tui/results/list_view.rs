@@ -423,24 +423,31 @@ fn format_list_item(
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
 
-    // Check if this is a god object - format differently (spec 207)
+    // Check if this is a god object - format differently (spec 207, spec 253)
     let (location_str, metrics_str) = match &item.debt_type {
         DebtType::GodObject {
             methods,
             responsibilities,
+            lines,
             ..
         } => {
-            let loc = item.file_line_count.unwrap_or(item.function_length);
+            // Determine detection type from indicators
+            let detection_type = item
+                .god_object_indicators
+                .as_ref()
+                .map(|i| &i.detection_type);
+
+            // Customize display label based on detection type
+            let type_label = match detection_type {
+                Some(crate::organization::DetectionType::GodClass) => "God Object",
+                Some(crate::organization::DetectionType::GodFile) => "God File",
+                Some(crate::organization::DetectionType::GodModule) => "God Module",
+                None => "God Object",
+            };
+
             (
-                format!("{} (God Object)", file_name),
-                format!("(LOC:{} Resp:{} Fns:{})", loc, responsibilities, methods),
-            )
-        }
-        DebtType::GodModule { functions, .. } => {
-            let loc = item.file_line_count.unwrap_or(item.function_length);
-            (
-                format!("{} (God Module)", file_name),
-                format!("(LOC:{} Fns:{})", loc, functions),
+                format!("{} ({})", file_name, type_label),
+                format!("(LOC:{} Resp:{} Fns:{})", lines, responsibilities, methods),
             )
         }
         _ => {

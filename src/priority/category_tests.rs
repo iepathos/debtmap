@@ -137,9 +137,10 @@ mod tests {
         assert_eq!(
             DebtCategory::from_debt_type(&DebtType::GodObject {
                 methods: 10,
-                fields: 5,
+                fields: Some(5),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(90.0),
+                lines: 200,
             }),
             DebtCategory::Architecture
         );
@@ -277,9 +278,10 @@ mod tests {
             "god_func",
             DebtType::GodObject {
                 methods: 10,
-                fields: 5,
+                fields: Some(5),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(95.0),
+                lines: 250,
             },
             95.0,
         ));
@@ -407,9 +409,10 @@ mod tests {
             "god_func",
             DebtType::GodObject {
                 methods: 10,
-                fields: 5,
+                fields: Some(5),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(95.0),
+                lines: 250,
             },
             95.0,
         ));
@@ -446,9 +449,10 @@ mod tests {
             "critical_god",
             DebtType::GodObject {
                 methods: 15,
-                fields: 7,
+                fields: Some(7),
                 responsibilities: 15,
                 god_object_score: Score0To100::new(95.0),
+                lines: 350,
             },
             95.0,
         ));
@@ -504,9 +508,10 @@ mod tests {
             "arch1",
             DebtType::GodObject {
                 methods: 10,
-                fields: 5,
+                fields: Some(5),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(100.0),
+                lines: 300,
             },
             100.0,
         ));
@@ -532,9 +537,10 @@ mod tests {
             "god",
             DebtType::GodObject {
                 methods: 10,
-                fields: 5,
+                fields: Some(5),
                 responsibilities: 10,
                 god_object_score: Score0To100::new(90.0),
+                lines: 250,
             },
             90.0,
         ));
