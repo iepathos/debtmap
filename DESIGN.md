@@ -294,23 +294,34 @@ This creates natural eye flow: context → content → actions.
 ### Section Headers
 
 ```rust
-// ALL CAPS with muted color
-Span::styled("SECTION NAME", Style::default().fg(theme.muted))
+// lowercase with muted color
+Span::styled("section name", Style::default().fg(theme.muted))
 ```
 
-**Rationale**: Uppercase provides visual anchor without bold weight. Muted color prevents overwhelming.
+**Rationale**: Lowercase provides subtle visual anchor through color alone. More zen than uppercase - hierarchy without aggression. Muted color creates distinction without overwhelming. Examples: "complexity", "god object structure", "dependency metrics".
 
 ### Label-Value Pairs
 
 ```rust
-// Label in normal text, value in primary color
+// Fixed-column layout with generous spacing (see components.rs)
+const INDENT: usize = 2;
+const LABEL_WIDTH: usize = 20;   // Fixed column for alignment
+const GAP: usize = 4;             // Breathing room between label and value
+const VALUE_COLUMN: usize = 24;   // Column where values start (LABEL_WIDTH + GAP)
+
+// Creates aligned columns:
+//   label                 value
+//   another label         another value
+//   long label here       value
+
 Line::from(vec![
-    Span::raw("  Label: "),  // 2-space indent
+    Span::raw(format!("{:width$}", label_with_indent, width = LABEL_WIDTH)),
+    Span::raw(" ".repeat(GAP)),
     Span::styled(value, Style::default().fg(theme.primary))
 ])
 ```
 
-**Rationale**: Clear hierarchy, values pop as important data.
+**Rationale**: Fixed 20-character label column creates clean vertical alignment, making values easier to scan down the right side. 4-character gap provides generous breathing room between label and value. Labels are normal text (white), values in primary color (cyan) to draw attention to the data. Multi-line values automatically wrap with continuation lines indented to align with first line's value column at position 24.
 
 ### Progress Bars
 
