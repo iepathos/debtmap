@@ -196,7 +196,9 @@ pub fn is_significantly_improved(before_score: f64, after_score: f64) -> bool {
 }
 
 /// Extract maximum coverage value from transitive coverage
-pub fn extract_max_coverage(coverage: &Option<crate::priority::coverage_propagation::TransitiveCoverage>) -> f64 {
+pub fn extract_max_coverage(
+    coverage: &Option<crate::priority::coverage_propagation::TransitiveCoverage>,
+) -> f64 {
     coverage
         .as_ref()
         .map(|tc| tc.direct.max(tc.transitive))

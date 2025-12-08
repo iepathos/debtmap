@@ -3,7 +3,9 @@
 //! All functions in this module are pure - they take inputs and return
 //! formatted strings without any side effects.
 
-use super::types::{GapDetail, ImprovedItems, ItemInfo, NewItems, ResolvedItems, UnchangedCritical};
+use super::types::{
+    GapDetail, ImprovedItems, ItemInfo, NewItems, ResolvedItems, UnchangedCritical,
+};
 use std::collections::HashMap;
 
 // =============================================================================
@@ -71,7 +73,11 @@ pub fn build_unchanged_critical_message(unchanged_critical: &UnchangedCritical) 
         Some(format!(
             "{} critical debt item{} still present",
             unchanged_critical.count,
-            if unchanged_critical.count == 1 { "" } else { "s" }
+            if unchanged_critical.count == 1 {
+                ""
+            } else {
+                "s"
+            }
         ))
     } else {
         None

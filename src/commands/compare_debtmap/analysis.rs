@@ -5,9 +5,8 @@
 
 use super::types::{
     extract_function_keys, extract_functions, extract_location_keys, extract_max_coverage,
-    is_critical, is_score_unchanged, is_significantly_improved, AnalysisSummary,
-    DebtmapJsonInput, IdentifiedChanges, ImprovedItems, ItemInfo, NewItems, ResolvedItems,
-    UnchangedCritical,
+    is_critical, is_score_unchanged, is_significantly_improved, AnalysisSummary, DebtmapJsonInput,
+    IdentifiedChanges, ImprovedItems, ItemInfo, NewItems, ResolvedItems, UnchangedCritical,
 };
 use crate::priority::unified_scorer::UnifiedDebtItem;
 use std::collections::{HashMap, HashSet};
@@ -130,9 +129,9 @@ fn collect_improvements(
     extract_functions(after_items)
         .filter_map(|after| {
             let key = (after.location.file.clone(), after.location.function.clone());
-            before_map.get(&key).and_then(|before| {
-                compute_improvement_if_significant(before, after)
-            })
+            before_map
+                .get(&key)
+                .and_then(|before| compute_improvement_if_significant(before, after))
         })
         .collect()
 }
@@ -182,7 +181,10 @@ fn aggregate_improvements(improvements: Vec<ImprovementMetrics>) -> ImprovedItem
     }
 
     let total_reduction: f64 = improvements.iter().map(|i| i.complexity_reduction).sum();
-    let coverage_count = improvements.iter().filter(|i| i.has_coverage_improvement).count();
+    let coverage_count = improvements
+        .iter()
+        .filter(|i| i.has_coverage_improvement)
+        .count();
 
     ImprovedItems {
         complexity_reduction: total_reduction / improvements.len() as f64,
@@ -262,7 +264,10 @@ fn check_if_unchanged(
     before: &UnifiedDebtItem,
     after_map: &HashMap<(PathBuf, String), &UnifiedDebtItem>,
 ) -> Option<ItemInfo> {
-    let key = (before.location.file.clone(), before.location.function.clone());
+    let key = (
+        before.location.file.clone(),
+        before.location.function.clone(),
+    );
     let before_score = before.unified_score.final_score.value();
 
     after_map.get(&key).and_then(|after| {

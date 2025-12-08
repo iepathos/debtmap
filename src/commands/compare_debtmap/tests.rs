@@ -6,6 +6,7 @@ use super::messages::{
     build_coverage_message, build_critical_debt_gap, build_regression_gap,
     build_regression_message, build_resolved_message, build_unchanged_critical_message,
 };
+use super::perform_validation;
 use super::scoring::{
     apply_minimum_threshold, apply_unchanged_penalty, determine_status, score_complexity_reduction,
     score_high_priority_progress, score_overall_improvement, score_regression_penalty,
@@ -14,7 +15,6 @@ use super::types::{
     is_critical, is_score_unchanged, AnalysisSummary, DebtmapJsonInput, ImprovedItems, ItemInfo,
     NewItems, ResolvedItems, UnchangedCritical, CRITICAL_SCORE_THRESHOLD,
 };
-use super::perform_validation;
 use crate::priority::coverage_propagation::TransitiveCoverage;
 use crate::priority::score_types::Score0To100;
 use crate::priority::semantic_classifier::FunctionRole;

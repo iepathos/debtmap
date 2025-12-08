@@ -27,9 +27,7 @@ mod scoring;
 pub mod types;
 
 // Re-export public types
-pub use types::{
-    AnalysisSummary, CompareConfig, DebtmapJsonInput, GapDetail, ValidationResult,
-};
+pub use types::{AnalysisSummary, CompareConfig, DebtmapJsonInput, GapDetail, ValidationResult};
 
 use analysis::{create_summary, identify_all_changes};
 use anyhow::Result;
@@ -73,7 +71,8 @@ fn perform_validation(before: &Input, after: &Input) -> Result<ValidationResult>
     let changes = identify_all_changes(before, after);
 
     let improvements = build_all_improvement_messages(&changes.resolved, &changes.improved);
-    let remaining_issues = build_all_issue_messages(&changes.unchanged_critical, &changes.new_items);
+    let remaining_issues =
+        build_all_issue_messages(&changes.unchanged_critical, &changes.new_items);
     let gaps = build_all_gaps(&changes.unchanged_critical, &changes.new_items);
 
     let completion = calculate_improvement_score(
@@ -84,7 +83,12 @@ fn perform_validation(before: &Input, after: &Input) -> Result<ValidationResult>
         &before_summary,
         &after_summary,
     );
-    let status = determine_status(completion, &changes.new_items, &before_summary, &after_summary);
+    let status = determine_status(
+        completion,
+        &changes.new_items,
+        &before_summary,
+        &after_summary,
+    );
 
     Ok(ValidationResult {
         completion_percentage: completion,
