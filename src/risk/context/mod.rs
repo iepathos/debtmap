@@ -213,7 +213,14 @@ pub struct ContextualRisk {
 
 impl ContextualRisk {
     pub fn new(base_risk: f64, context_map: &ContextMap) -> Self {
-        let context_contribution = context_map.total_contribution();
+        let raw_contribution = context_map.total_contribution();
+
+        // Cap contribution at 2.0 to prevent excessive score amplification
+        // Without cap: contribution=15+ → 16x multiplier → inflated scores
+        // With cap: contribution capped at 2.0 → max 3x multiplier → reasonable prioritization
+        // This ensures high-churn files get elevated priority without absurd inflation
+        let context_contribution = raw_contribution.min(2.0);
+
         let contextual_risk = base_risk * (1.0 + context_contribution);
 
         let contexts: Vec<Context> = context_map

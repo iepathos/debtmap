@@ -256,10 +256,12 @@ impl FileDebtMetrics {
             1.0
         };
 
-        // God object multiplier
+        // God object multiplier - scale score proportionally to avoid extreme inflation
+        // Score 0-100 maps to multiplier 1.0x-3.0x (not 2x-102x!)
+        // This aligns with contextual risk cap (max 3x) for consistent scoring
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                2.0 + analysis.god_object_score.value()
+                1.0 + (analysis.god_object_score.value() / 50.0)
             } else {
                 1.0
             }
@@ -325,10 +327,12 @@ impl FileDebtMetrics {
             1.0
         };
 
-        // God object multiplier
+        // God object multiplier - scale score proportionally to avoid extreme inflation
+        // Score 0-100 maps to multiplier 1.0x-3.0x (not 2x-102x!)
+        // This aligns with contextual risk cap (max 3x) for consistent scoring
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                2.0 + analysis.god_object_score.value()
+                1.0 + (analysis.god_object_score.value() / 50.0)
             } else {
                 1.0
             }
@@ -883,7 +887,7 @@ mod tests {
             responsibility_count: 5,
             lines_of_code: 400,
             complexity_sum: 200,
-            god_object_score: Score0To100::new(0.5),
+            god_object_score: Score0To100::new(100.0), // Severe god object for testing multiplication
             confidence: GodObjectConfidence::Definite,
             detection_type: DetectionType::GodClass,
             struct_name: None,
@@ -1164,7 +1168,7 @@ mod tests {
 
         assert!((factors.size_factor - 1.88).abs() < 0.01);
         assert_eq!(factors.coverage_factor, 3.0);
-        assert_eq!(factors.god_object_multiplier, 9.0);
+        assert!((factors.god_object_multiplier - 1.14).abs() < 0.01); // 1.0 + (7.0 / 50.0)
         assert_eq!(factors.density_factor, 1.0);
         assert_eq!(factors.function_count, 7);
         assert!(factors.is_god_object);
@@ -1335,7 +1339,7 @@ mod tests {
             domain_diversity_metrics: None,
         });
         let factors = metrics.get_score_factors();
-        assert_eq!(factors.god_object_multiplier, 10.5); // 2.0 + 8.5
+        assert!((factors.god_object_multiplier - 1.17).abs() < 0.01); // 1.0 + (8.5 / 50.0)
     }
 
     // Tests for spec 168: File context-aware scoring
