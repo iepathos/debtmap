@@ -161,7 +161,7 @@ mod tests {
         // GodModule was unified into GodObject (spec 253)
         assert!(is_god_object(&DebtType::GodObject {
             methods: 100,
-            fields: None,  // No fields for module-level god objects
+            fields: None, // No fields for module-level god objects
             responsibilities: 5,
             god_object_score: Score0To100::new(95.0),
             lines: 1000,
