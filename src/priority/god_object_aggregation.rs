@@ -30,6 +30,7 @@
 //! assert!(metrics.weighted_coverage.is_some());
 //! ```
 
+use crate::complexity::entropy_core::{EntropyConfig, EntropyScore, UniversalEntropyCalculator};
 use crate::core::FunctionMetrics;
 use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
@@ -296,68 +297,72 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
     }
 }
 
+// =============================================================================
+// Pure helper functions for entropy aggregation (Stillwater principles)
+// =============================================================================
+
+/// Extracts entropy data tuples from function metrics.
+///
+/// Pure function - filters functions that have entropy scores and returns
+/// tuples of (entropy_score, length, cognitive_complexity).
+fn extract_entropy_data(functions: &[FunctionMetrics]) -> Vec<(&EntropyScore, usize, u32)> {
+    functions
+        .iter()
+        .filter_map(|f| f.entropy_score.as_ref().map(|e| (e, f.length, f.cognitive)))
+        .collect()
+}
+
+/// Calculates weighted average of a metric from entropy data.
+///
+/// Pure function that computes a length-weighted average using the provided
+/// extractor function.
+fn weighted_average<F>(data: &[(&EntropyScore, usize, u32)], total_length: usize, f: F) -> f64
+where
+    F: Fn(&EntropyScore) -> f64,
+{
+    data.iter()
+        .map(|(e, len, _)| f(e) * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64
+}
+
+/// Sums a u32 field from entropy data tuples.
+///
+/// Pure function for aggregating cognitive complexity values.
+fn sum_cognitive(data: &[(&EntropyScore, usize, u32)]) -> u32 {
+    data.iter().map(|(_, _, cog)| cog).sum()
+}
+
+/// Calculates total length from entropy data tuples.
+fn total_length(data: &[(&EntropyScore, usize, u32)]) -> usize {
+    data.iter().map(|(_, len, _)| *len).sum()
+}
+
 /// Aggregate entropy from raw FunctionMetrics.
 ///
 /// Returns weighted average entropy based on function length from ALL functions,
 /// not just those that became debt items.
+///
+/// Composed from pure helper functions following Stillwater principles.
 pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<EntropyDetails> {
-    let entropy_data: Vec<_> = functions
-        .iter()
-        .filter_map(|f| {
-            f.entropy_score
-                .as_ref()
-                .map(|e| (e, f.length, f.cognitive))
-        })
-        .collect();
+    let data = extract_entropy_data(functions);
+    let len = total_length(&data);
 
-    if entropy_data.is_empty() {
+    if data.is_empty() || len == 0 {
         return None;
     }
 
-    let total_length: usize = entropy_data.iter().map(|(_, len, _)| len).sum();
-    if total_length == 0 {
-        return None;
-    }
+    let entropy = weighted_average(&data, len, |e| e.token_entropy);
+    let repetition = weighted_average(&data, len, |e| e.pattern_repetition);
+    let total_cognitive = sum_cognitive(&data);
 
-    // Weighted average of entropy scores
-    let weighted_entropy = entropy_data
-        .iter()
-        .map(|(e, len, _)| e.token_entropy * (*len as f64))
-        .sum::<f64>()
-        / total_length as f64;
-
-    // Weighted average of pattern repetition
-    let weighted_repetition = entropy_data
-        .iter()
-        .map(|(e, len, _)| e.pattern_repetition * (*len as f64))
-        .sum::<f64>()
-        / total_length as f64;
-
-    // Calculate dampening factor from entropy calculator
-    let calculator = crate::complexity::entropy_core::UniversalEntropyCalculator::new(
-        crate::complexity::entropy_core::EntropyConfig::default(),
-    );
-
-    // Create a synthetic entropy score for dampening calculation
-    let avg_score = crate::complexity::entropy_core::EntropyScore {
-        token_entropy: weighted_entropy,
-        pattern_repetition: weighted_repetition,
-        branch_similarity: 0.0,
-        effective_complexity: 0.0,
-        unique_variables: 0,
-        max_nesting: 0,
-        dampening_applied: 0.0,
-    };
-    let dampening_value = calculator.apply_dampening(&avg_score);
-    let dampening_factor = (dampening_value / 2.0).clamp(0.5, 1.0);
-
-    // Sum original complexity across all functions with entropy
-    let total_cognitive: u32 = entropy_data.iter().map(|(_, _, cog)| cog).sum();
+    let calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
+    let dampening_factor = calculator.calculate_dampening_factor(entropy, repetition);
     let adjusted_cognitive = (total_cognitive as f64 * dampening_factor) as u32;
 
     Some(EntropyDetails {
-        entropy_score: weighted_entropy,
-        pattern_repetition: weighted_repetition,
+        entropy_score: entropy,
+        pattern_repetition: repetition,
         original_complexity: total_cognitive,
         adjusted_complexity: adjusted_cognitive,
         dampening_factor,
@@ -970,5 +975,181 @@ mod tests {
         let entropy = metrics.aggregated_entropy.unwrap();
         assert!((entropy.entropy_score - 0.4).abs() < 0.001);
         assert_eq!(entropy.original_complexity, 20);
+    }
+
+    // =========================================================================
+    // Tests for pure helper functions (Stillwater refactoring)
+    // =========================================================================
+
+    #[test]
+    fn test_extract_entropy_data_filters_correctly() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let functions = vec![
+            FunctionMetrics {
+                name: "with_entropy".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 1,
+                length: 50,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: Some(RawEntropyScore {
+                    token_entropy: 0.4,
+                    pattern_repetition: 0.6,
+                    branch_similarity: 0.0,
+                    effective_complexity: 5.0,
+                    unique_variables: 0,
+                    max_nesting: 0,
+                    dampening_applied: 0.0,
+                }),
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+            FunctionMetrics {
+                name: "without_entropy".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 50,
+                cyclomatic: 3,
+                cognitive: 5,
+                nesting: 1,
+                length: 25,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None, // No entropy
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+        ];
+
+        let data = extract_entropy_data(&functions);
+        assert_eq!(data.len(), 1); // Only one function has entropy
+        assert_eq!(data[0].1, 50); // Length of function with entropy
+        assert_eq!(data[0].2, 10); // Cognitive of function with entropy
+    }
+
+    #[test]
+    fn test_weighted_average_calculation() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let e1 = RawEntropyScore {
+            token_entropy: 0.4,
+            pattern_repetition: 0.6,
+            branch_similarity: 0.0,
+            effective_complexity: 5.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+        let e2 = RawEntropyScore {
+            token_entropy: 0.6,
+            pattern_repetition: 0.2,
+            branch_similarity: 0.0,
+            effective_complexity: 3.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+
+        // length 100, cognitive 20 and length 50, cognitive 10
+        let data: Vec<(&RawEntropyScore, usize, u32)> = vec![(&e1, 100, 20), (&e2, 50, 10)];
+
+        // (100*0.4 + 50*0.6) / 150 = 70/150 ≈ 0.467
+        let avg = weighted_average(&data, 150, |e| e.token_entropy);
+        assert!((avg - 0.467).abs() < 0.01);
+
+        // (100*0.6 + 50*0.2) / 150 = 70/150 ≈ 0.467
+        let rep = weighted_average(&data, 150, |e| e.pattern_repetition);
+        assert!((rep - 0.467).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_sum_cognitive() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let e = RawEntropyScore {
+            token_entropy: 0.4,
+            pattern_repetition: 0.6,
+            branch_similarity: 0.0,
+            effective_complexity: 5.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+
+        let data: Vec<(&RawEntropyScore, usize, u32)> =
+            vec![(&e, 100, 20), (&e, 50, 15), (&e, 25, 5)];
+
+        let total = sum_cognitive(&data);
+        assert_eq!(total, 40); // 20 + 15 + 5
+    }
+
+    #[test]
+    fn test_total_length() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let e = RawEntropyScore {
+            token_entropy: 0.4,
+            pattern_repetition: 0.6,
+            branch_similarity: 0.0,
+            effective_complexity: 5.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+
+        let data: Vec<(&RawEntropyScore, usize, u32)> = vec![(&e, 100, 20), (&e, 50, 15)];
+
+        let total = total_length(&data);
+        assert_eq!(total, 150); // 100 + 50
+    }
+
+    #[test]
+    fn test_calculate_dampening_factor_direct() {
+        use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
+
+        let calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
+
+        // Test with various entropy/repetition combinations
+        let dampening = calculator.calculate_dampening_factor(0.4, 0.6);
+        assert!((0.5..=1.0).contains(&dampening));
+
+        // Low entropy, high repetition should result in lower effective complexity
+        let low_dampening = calculator.calculate_dampening_factor(0.2, 0.8);
+        assert!(low_dampening >= 0.5);
+
+        // High entropy, low repetition should result in higher effective complexity
+        let high_dampening = calculator.calculate_dampening_factor(0.8, 0.2);
+        assert!(high_dampening <= 1.0);
     }
 }
