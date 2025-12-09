@@ -27,24 +27,29 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
     // Render header with page indicator
     render_header(frame, app, chunks[0], &theme);
 
+    // Apply margins to content area per DESIGN.md:
+    // - 1-character margin on layout edges (horizontal)
+    // - 1 line margin above/below content (vertical)
+    let content_area = apply_content_margins(chunks[1]);
+
     // Route to appropriate page renderer
     if let Some(item) = app.selected_item() {
         match app.detail_page() {
             DetailPage::Overview => {
-                detail_pages::overview::render(frame, app, item, chunks[1], &theme)
+                detail_pages::overview::render(frame, app, item, content_area, &theme)
             }
             DetailPage::Dependencies => {
-                detail_pages::dependencies::render(frame, app, item, chunks[1], &theme)
+                detail_pages::dependencies::render(frame, app, item, content_area, &theme)
             }
             DetailPage::GitContext => {
-                detail_pages::git_context::render(frame, app, item, chunks[1], &theme)
+                detail_pages::git_context::render(frame, app, item, content_area, &theme)
             }
             DetailPage::Patterns => detail_pages::patterns::render(
                 frame,
                 app,
                 item,
                 &app.analysis().data_flow_graph,
-                chunks[1],
+                content_area,
                 &theme,
             ),
             DetailPage::DataFlow => detail_pages::data_flow::render(
@@ -52,17 +57,34 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
                 app,
                 item,
                 &app.analysis().data_flow_graph,
-                chunks[1],
+                content_area,
                 &theme,
             ),
         }
     } else {
         let empty = Paragraph::new("No item selected").style(Style::default().fg(theme.muted));
-        frame.render_widget(empty, chunks[1]);
+        frame.render_widget(empty, content_area);
     }
 
     // Render footer
     render_footer(frame, app, chunks[2], &theme);
+}
+
+/// Apply content margins per DESIGN.md spacing rules.
+///
+/// Creates breathing room around content with:
+/// - 1 character horizontal margin on each side
+/// - 1 line vertical margin top and bottom
+fn apply_content_margins(area: Rect) -> Rect {
+    const HORIZONTAL_MARGIN: u16 = 1;
+    const VERTICAL_MARGIN: u16 = 1;
+
+    Rect {
+        x: area.x.saturating_add(HORIZONTAL_MARGIN),
+        y: area.y.saturating_add(VERTICAL_MARGIN),
+        width: area.width.saturating_sub(HORIZONTAL_MARGIN * 2),
+        height: area.height.saturating_sub(VERTICAL_MARGIN * 2),
+    }
 }
 
 /// Render header with page indicator
