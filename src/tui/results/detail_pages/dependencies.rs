@@ -1,4 +1,11 @@
-//! Dependencies page (Page 2) - Call graph and blast radius.
+//! Dependencies page (Page 2) - Call graph, blast radius, and coupling visualization.
+//!
+//! This page displays:
+//! - Function-level dependency metrics (upstream/downstream counts)
+//! - File-level coupling metrics with visual indicators (spec 203)
+//! - Coupling classification badges with semantic coloring
+//! - Instability progress bars with color gradients
+//! - Lists of dependents and dependencies
 
 use super::components::{add_label_value, add_section_header};
 use crate::priority::UnifiedDebtItem;
@@ -6,6 +13,8 @@ use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
     layout::Rect,
+    style::Style,
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
@@ -64,7 +73,7 @@ pub fn render(
     // Regular functions: show single responsibility category
     let god_object_responsibilities_shown = if let Some(indicators) = &item.god_object_indicators {
         if indicators.is_god_object && !indicators.responsibilities.is_empty() {
-            lines.push(ratatui::text::Line::from(""));
+            lines.push(Line::from(""));
 
             // Section header
             add_section_header(&mut lines, "responsibilities", theme);
@@ -100,7 +109,7 @@ pub fn render(
     // Fall back to single responsibility category if god object responsibilities weren't shown
     if !god_object_responsibilities_shown {
         if let Some(ref category) = item.responsibility_category {
-            lines.push(ratatui::text::Line::from(""));
+            lines.push(Line::from(""));
             add_section_header(&mut lines, "responsibility", theme);
             add_label_value(
                 &mut lines,
@@ -115,30 +124,23 @@ pub fn render(
     // Add note for god objects about what matters
     if let Some(indicators) = &item.god_object_indicators {
         if indicators.is_god_object {
-            lines.push(ratatui::text::Line::from(""));
-            lines.push(ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(
-                    "Note: ",
-                    ratatui::style::Style::default().fg(theme.primary),
-                ),
-                ratatui::text::Span::styled(
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("Note: ", Style::default().fg(theme.primary)),
+                Span::styled(
                     "God objects are structural issues (too many",
-                    ratatui::style::Style::default().fg(theme.muted),
+                    Style::default().fg(theme.muted),
                 ),
             ]));
-            lines.push(ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(
-                    "responsibilities). Focus on functions/methods count.",
-                    ratatui::style::Style::default().fg(theme.muted),
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                "responsibilities). Focus on functions/methods count.",
+                Style::default().fg(theme.muted),
+            )]));
             if blast_radius == 0 {
-                lines.push(ratatui::text::Line::from(vec![
-                    ratatui::text::Span::styled(
-                        "Zero deps = all functions are simple (good!).",
-                        ratatui::style::Style::default().fg(theme.muted),
-                    ),
-                ]));
+                lines.push(Line::from(vec![Span::styled(
+                    "Zero deps = all functions are simple (good!).",
+                    Style::default().fg(theme.muted),
+                )]));
             }
         }
     }
@@ -150,15 +152,16 @@ pub fn render(
     frame.render_widget(paragraph, area);
 }
 
-/// Render file-level coupling metrics section (spec 201).
+/// Render file-level coupling metrics section with enhanced visualization (spec 201, 203).
 ///
 /// Looks up file-level metrics from the analysis and displays:
+/// - Coupling classification badge with color coding
 /// - Afferent coupling (Ca) - files that depend on this file
 /// - Efferent coupling (Ce) - files this file depends on
-/// - Instability (I = Ce / (Ca + Ce))
-/// - Coupling classification (StableCore, HighlyCoupled, etc.)
+/// - Instability progress bar with color gradient
+/// - Lists of top dependents and dependencies
 fn render_file_coupling_section(
-    lines: &mut Vec<ratatui::text::Line<'static>>,
+    lines: &mut Vec<Line<'static>>,
     app: &ResultsApp,
     item: &UnifiedDebtItem,
     theme: &Theme,
@@ -184,76 +187,188 @@ fn render_file_coupling_section(
         return;
     }
 
-    lines.push(ratatui::text::Line::from(""));
-    add_section_header(lines, "file coupling (spec 201)", theme);
+    lines.push(Line::from(""));
+    add_section_header(lines, "coupling profile", theme);
 
-    add_label_value(
-        lines,
-        "afferent (ca)",
-        format!("{} files depend on this", metrics.afferent_coupling),
-        theme,
-        width,
-    );
-
-    add_label_value(
-        lines,
-        "efferent (ce)",
-        format!("{} files depended on", metrics.efferent_coupling),
-        theme,
-        width,
-    );
-
-    add_label_value(
-        lines,
-        "instability",
-        format!("{:.2} (0=stable, 1=unstable)", metrics.instability),
-        theme,
-        width,
-    );
-
-    // Derive coupling classification
+    // Classification badge with color (spec 203)
     let classification = derive_coupling_classification(
         metrics.afferent_coupling,
         metrics.efferent_coupling,
         metrics.instability,
     );
-    add_label_value(lines, "classification", classification, theme, width);
+    render_classification_badge(lines, &classification, theme, width);
+
+    // Afferent coupling (Ca)
+    add_label_value(
+        lines,
+        "afferent (ca)",
+        metrics.afferent_coupling.to_string(),
+        theme,
+        width,
+    );
+
+    // Efferent coupling (Ce)
+    add_label_value(
+        lines,
+        "efferent (ce)",
+        metrics.efferent_coupling.to_string(),
+        theme,
+        width,
+    );
+
+    // Instability with progress bar (spec 203)
+    render_instability_bar(lines, metrics.instability, theme, width);
 
     // Add context note for extreme values
     if total_coupling > 15 {
-        lines.push(ratatui::text::Line::from(vec![
-            ratatui::text::Span::styled(
-                "Warning: ",
-                ratatui::style::Style::default().fg(ratatui::style::Color::Red),
-            ),
-            ratatui::text::Span::styled(
+        lines.push(Line::from(vec![
+            Span::styled("Warning: ", Style::default().fg(ratatui::style::Color::Red)),
+            Span::styled(
                 "High coupling may indicate architectural issues.",
-                ratatui::style::Style::default().fg(theme.muted),
+                Style::default().fg(theme.muted),
             ),
         ]));
     } else if metrics.instability < 0.1 && metrics.afferent_coupling > 0 {
-        lines.push(ratatui::text::Line::from(vec![
-            ratatui::text::Span::styled(
-                "Note: ",
-                ratatui::style::Style::default().fg(theme.primary),
-            ),
-            ratatui::text::Span::styled(
+        lines.push(Line::from(vec![
+            Span::styled("Note: ", Style::default().fg(theme.primary)),
+            Span::styled(
                 "Stable core - changes need careful review.",
-                ratatui::style::Style::default().fg(theme.muted),
+                Style::default().fg(theme.muted),
             ),
         ]));
     } else if metrics.instability > 0.9 {
-        lines.push(ratatui::text::Line::from(vec![
-            ratatui::text::Span::styled(
-                "Note: ",
-                ratatui::style::Style::default().fg(theme.success),
-            ),
-            ratatui::text::Span::styled(
+        lines.push(Line::from(vec![
+            Span::styled("Note: ", Style::default().fg(theme.success)),
+            Span::styled(
                 "Unstable leaf - safe to refactor.",
-                ratatui::style::Style::default().fg(theme.muted),
+                Style::default().fg(theme.muted),
             ),
         ]));
     }
+
+    // Dependents list (who uses this) - spec 203
+    render_dependency_list(
+        lines,
+        &metrics.dependents,
+        "dependents (who uses this)",
+        theme,
+        width,
+    );
+
+    // Dependencies list (what this uses) - spec 203
+    render_dependency_list(
+        lines,
+        &metrics.dependencies_list,
+        "dependencies (what this uses)",
+        theme,
+        width,
+    );
+}
+
+/// Render classification badge with semantic coloring (spec 203).
+///
+/// Displays classification as a colored badge like `[STABLE CORE]`
+fn render_classification_badge(
+    lines: &mut Vec<Line<'static>>,
+    classification: &str,
+    theme: &Theme,
+    width: u16,
+) {
+    let badge_text = format!("[{}]", classification.to_uppercase());
+    let badge_style = theme.coupling_badge_style(classification);
+
+    // Calculate padding for alignment (similar to add_label_value)
+    let label = "classification";
+    let label_width = 16.min(width.saturating_sub(4) as usize / 2);
+    let padding = label_width.saturating_sub(label.len());
+    let dots = ".".repeat(padding);
+
+    lines.push(Line::from(vec![
+        Span::styled(label.to_string(), Style::default().fg(theme.text)),
+        Span::styled(dots, theme.dotted_leader_style()),
+        Span::styled(badge_text, badge_style),
+    ]));
+}
+
+/// Render instability as a progress bar with color gradient (spec 203).
+///
+/// Format: `instability.....0.40 ████████░░░░░░░░░░░░`
+/// Color: Green (0.0) -> Yellow (0.5) -> Red (1.0)
+fn render_instability_bar(
+    lines: &mut Vec<Line<'static>>,
+    instability: f64,
+    theme: &Theme,
+    width: u16,
+) {
+    let label = "instability";
+    let label_width = 16.min(width.saturating_sub(4) as usize / 2);
+    let padding = label_width.saturating_sub(label.len());
+    let dots = ".".repeat(padding);
+
+    // Progress bar configuration
+    let bar_width = 20;
+    let filled = ((instability * bar_width as f64).round() as usize).min(bar_width);
+    let empty = bar_width - filled;
+
+    let bar_color = theme.instability_color(instability);
+    let filled_bar: String = "█".repeat(filled);
+    let empty_bar: String = "░".repeat(empty);
+
+    lines.push(Line::from(vec![
+        Span::styled(label.to_string(), Style::default().fg(theme.text)),
+        Span::styled(dots, theme.dotted_leader_style()),
+        Span::styled(
+            format!("{:.2} ", instability),
+            Style::default().fg(theme.text),
+        ),
+        Span::styled(filled_bar, Style::default().fg(bar_color)),
+        Span::styled(empty_bar, Style::default().fg(theme.muted)),
+    ]));
+}
+
+/// Render a dependency list section (spec 203).
+///
+/// Displays up to 5 items with a truncation indicator if more exist.
+fn render_dependency_list(
+    lines: &mut Vec<Line<'static>>,
+    items: &[String],
+    title: &str,
+    theme: &Theme,
+    _width: u16,
+) {
+    // Skip if empty
+    if items.is_empty() {
+        return;
+    }
+
+    lines.push(Line::from(""));
+    add_section_header(lines, title, theme);
+
+    let max_display = 5;
+    for item in items.iter().take(max_display) {
+        // Shorten path for display (show just filename or last component)
+        let display_name = shorten_path(item);
+        lines.push(Line::from(vec![Span::styled(
+            format!("  {} {}", "\u{2022}", display_name), // bullet point
+            Style::default().fg(theme.text),
+        )]));
+    }
+
+    // Show truncation indicator
+    if items.len() > max_display {
+        lines.push(Line::from(vec![Span::styled(
+            format!("    (+{} more)", items.len() - max_display),
+            Style::default().fg(theme.muted),
+        )]));
+    }
+}
+
+/// Shorten a file path for display.
+///
+/// If the path contains a directory separator, show only the last component.
+/// Otherwise, return the path as-is.
+fn shorten_path(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
 }
 
 /// Derive coupling classification from metrics (same logic as CouplingClassification).
