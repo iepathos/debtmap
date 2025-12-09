@@ -1096,7 +1096,10 @@ fn calculate_error_swallowing_severity(pattern: &str) -> f64 {
     // Match patterns from src/debt/error_swallowing.rs priorities
     if pattern.contains("let _ =") || pattern.contains("discarding Result") {
         40.0 // Highest severity - completely discarding Result
-    } else if pattern.contains("if let Ok") || pattern.contains(".ok()") || pattern.contains("match") {
+    } else if pattern.contains("if let Ok")
+        || pattern.contains(".ok()")
+        || pattern.contains("match")
+    {
         25.0 // Medium-high severity - swallowing specific error information
     } else if pattern.contains("unwrap_or") {
         15.0 // Lower severity - at least provides fallback value
