@@ -9,6 +9,8 @@ pub enum OutputFormat {
     Markdown,
     Terminal,
     Html,
+    /// Graphviz DOT format for dependency visualization (Spec 204)
+    Dot,
 }
 
 pub trait OutputWriter {
@@ -22,6 +24,9 @@ pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
         OutputFormat::Markdown => Box::new(MarkdownWriter::new(io::stdout())),
         OutputFormat::Terminal => Box::new(TerminalWriter::default()),
         OutputFormat::Html => Box::new(HtmlWriter::new(io::stdout())),
+        // DOT format is handled separately via the output module, not through OutputWriter trait
+        // Fall back to terminal for legacy code paths that use create_writer
+        OutputFormat::Dot => Box::new(TerminalWriter::default()),
     }
 }
 

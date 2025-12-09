@@ -537,6 +537,10 @@ fn main() -> Result<()> {
                     debtmap::cli::OutputFormat::Html => {
                         debtmap::commands::validate_improvement::OutputFormat::Terminal
                     }
+                    debtmap::cli::OutputFormat::Dot => {
+                        // DOT format not applicable for improvement validation, use terminal
+                        debtmap::commands::validate_improvement::OutputFormat::Terminal
+                    }
                 },
                 quiet: quiet || is_automation_mode(),
             };
@@ -1622,6 +1626,11 @@ fn handle_compare_command(
         debtmap::cli::OutputFormat::Json => serde_json::to_string_pretty(&comparison)?,
         debtmap::cli::OutputFormat::Markdown => format_comparison_markdown(&comparison),
         debtmap::cli::OutputFormat::Html => format_comparison_markdown(&comparison),
+        debtmap::cli::OutputFormat::Dot => {
+            // DOT format not applicable for comparison, use terminal
+            print_comparison_terminal(&comparison);
+            return Ok(());
+        }
         debtmap::cli::OutputFormat::Terminal => {
             print_comparison_terminal(&comparison);
             return Ok(());

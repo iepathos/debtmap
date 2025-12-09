@@ -254,7 +254,10 @@ pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<Entropy
         / total_length as f64;
 
     // Sum original complexity across all members
-    let total_original: u32 = entropy_data.iter().map(|(e, _)| e.original_complexity).sum();
+    let total_original: u32 = entropy_data
+        .iter()
+        .map(|(e, _)| e.original_complexity)
+        .sum();
     let total_adjusted: u32 = entropy_data.iter().map(|(e, _)| e.adjusted_cognitive).sum();
 
     Some(EntropyDetails {
