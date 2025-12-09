@@ -400,9 +400,9 @@ impl ParallelUnifiedAnalysisBuilder {
     ) {
         let start = Instant::now();
 
-        // Subtask 0: Initialize (data flow graph, purity, test detection) - PARALLEL
+        // Subtask 0: Aggregate debt (data flow graph, purity, test detection, debt aggregation) - PARALLEL
         if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Active, None);
+            manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Active, None);
         }
 
         // Execute parallel initialization tasks
@@ -413,16 +413,7 @@ impl ParallelUnifiedAnalysisBuilder {
         self.report_phase1_completion(phase1_time);
 
         if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Completed, None);
-            std::thread::sleep(std::time::Duration::from_millis(150));
-        }
-
-        // Subtask 1: Aggregate debt (included in phase 1)
-        if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Active, None);
-        }
-        if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Completed, None);
+            manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Completed, None);
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
 
@@ -708,12 +699,12 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
 
-        // Subtask 2: Score functions (main computational loop with progress) - PARALLEL
+        // Subtask 1: Score functions (main computational loop with progress) - PARALLEL
         let total_metrics = metrics.len();
         if let Some(manager) = ProgressManager::global() {
             manager.tui_update_subtask(
-                6,
-                2,
+                5,
+                1,
                 crate::tui::app::StageStatus::Active,
                 Some((0, total_metrics)),
             );
@@ -746,8 +737,8 @@ impl ParallelUnifiedAnalysisBuilder {
 
         if let Some(manager) = ProgressManager::global() {
             manager.tui_update_subtask(
-                6,
-                2,
+                5,
+                1,
                 crate::tui::app::StageStatus::Completed,
                 Some((total_metrics, total_metrics)),
             );
