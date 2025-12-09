@@ -46,6 +46,7 @@ fn extract_page_text(item: &UnifiedDebtItem, page: DetailPage) -> String {
         DetailPage::GitContext => extract_git_context_text(item),
         DetailPage::Patterns => extract_patterns_text(item),
         DetailPage::DataFlow => extract_data_flow_text(item),
+        DetailPage::Responsibilities => extract_responsibilities_text(item),
     }
 }
 
@@ -219,6 +220,43 @@ fn extract_data_flow_text(item: &UnifiedDebtItem) -> String {
     output.push_str(&format!("DATA FLOW - {}\n\n", item.location.function));
     output.push_str("(Full data flow details available in TUI)\n");
     output.push_str(&format!("File: {}\n", item.location.file.display()));
+    output
+}
+
+/// Extract responsibilities page content as plain text
+fn extract_responsibilities_text(item: &UnifiedDebtItem) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "RESPONSIBILITIES - {}\n\n",
+        item.location.function
+    ));
+
+    // God object responsibilities
+    if let Some(indicators) = &item.god_object_indicators {
+        if indicators.is_god_object && !indicators.responsibilities.is_empty() {
+            output.push_str("Responsibilities:\n");
+            for resp in &indicators.responsibilities {
+                let method_count = indicators
+                    .responsibility_method_counts
+                    .get(resp)
+                    .copied()
+                    .unwrap_or(0);
+                if method_count > 0 {
+                    output.push_str(&format!("  - {} ({} methods)\n", resp, method_count));
+                } else {
+                    output.push_str(&format!("  - {}\n", resp));
+                }
+            }
+            output.push('\n');
+        }
+    }
+
+    // Single responsibility category
+    if let Some(ref category) = item.responsibility_category {
+        output.push_str(&format!("Category: {}\n", category));
+    }
+
+    output.push_str(&format!("\nFile: {}\n", item.location.file.display()));
     output
 }
 

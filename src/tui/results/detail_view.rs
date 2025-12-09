@@ -60,6 +60,9 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
                 content_area,
                 &theme,
             ),
+            DetailPage::Responsibilities => {
+                detail_pages::responsibilities::render(frame, item, content_area, &theme)
+            }
         }
     } else {
         let empty = Paragraph::new("No item selected").style(Style::default().fg(theme.muted));
@@ -146,7 +149,7 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
             Line::from(vec![
                 Span::styled("Tab/←→", Style::default().fg(theme.accent())),
                 Span::raw(": Pages  "),
-                Span::styled("1-5", Style::default().fg(theme.accent())),
+                Span::styled("1-6", Style::default().fg(theme.accent())),
                 Span::raw(": Jump  "),
                 Span::styled("n/p", Style::default().fg(theme.accent())),
                 Span::raw(": Items  "),
@@ -164,7 +167,7 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         vec![Line::from(vec![
             Span::styled("Tab/←→", Style::default().fg(theme.accent())),
             Span::raw(": Pages  "),
-            Span::styled("1-5", Style::default().fg(theme.accent())),
+            Span::styled("1-6", Style::default().fg(theme.accent())),
             Span::raw(": Jump  "),
             Span::styled("n/p", Style::default().fg(theme.accent())),
             Span::raw(": Items  "),
