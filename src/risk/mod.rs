@@ -323,4 +323,192 @@ mod tests {
 
         assert!(cloned.has_context());
     }
+
+    /// Stress test: analyze many functions with context to detect stack overflow.
+    /// This simulates what happens when running `debtmap analyze --context`
+    /// on a large codebase like debtmap itself (~4000 functions).
+    #[test]
+    fn test_analyze_many_functions_with_context_no_stack_overflow() {
+        use crate::core::ComplexityMetrics;
+        use crate::priority::call_graph::CallGraph;
+        use crate::risk::context::critical_path::{
+            CriticalPathAnalyzer, CriticalPathProvider, EntryPoint, EntryType,
+        };
+        use crate::risk::context::dependency::{DependencyGraph, DependencyRiskProvider};
+
+        // Build a realistic call graph
+        let mut call_graph = CallGraph::new();
+        for i in 0..2000 {
+            let caller = format!("func_{}", i);
+            let callee = format!("func_{}", i + 1);
+            call_graph.add_edge_by_name(caller, callee, PathBuf::from("src/lib.rs"));
+        }
+
+        // Create critical path analyzer with entry point
+        let mut cp_analyzer = CriticalPathAnalyzer::new();
+        cp_analyzer.call_graph = call_graph;
+        cp_analyzer.entry_points.push_back(EntryPoint {
+            function_name: "func_0".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: EntryType::Main,
+            is_user_facing: true,
+        });
+
+        // Build aggregator with providers
+        let aggregator = ContextAggregator::new()
+            .with_provider(Box::new(CriticalPathProvider::new(cp_analyzer)))
+            .with_provider(Box::new(DependencyRiskProvider::new(DependencyGraph::new())));
+
+        // Create risk analyzer with context
+        let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
+
+        // Analyze many functions - this is what crashes in production
+        for i in 0..500 {
+            let complexity = ComplexityMetrics {
+                functions: vec![],
+                cyclomatic_complexity: 10,
+                cognitive_complexity: 15,
+            };
+
+            let (_risk, contextual) = analyzer.analyze_function_with_context(
+                PathBuf::from(format!("src/module_{}.rs", i % 50)),
+                format!("func_{}", i),
+                (1, 50),
+                &complexity,
+                Some(0.75),
+                false,
+                PathBuf::from("/project"),
+            );
+
+            // Verify we got context
+            if i < 100 {
+                // First 100 should be cache misses
+                assert!(
+                    contextual.is_some(),
+                    "Should get contextual risk for function {}",
+                    i
+                );
+            }
+        }
+    }
+
+    /// Test file-level context analysis (for god objects) at scale
+    #[test]
+    fn test_analyze_file_context_many_files_no_stack_overflow() {
+        use crate::risk::context::critical_path::{
+            CriticalPathAnalyzer, CriticalPathProvider, EntryPoint, EntryType,
+        };
+        use crate::risk::context::dependency::{DependencyGraph, DependencyRiskProvider};
+
+        // Create aggregator
+        let mut cp_analyzer = CriticalPathAnalyzer::new();
+        cp_analyzer.entry_points.push_back(EntryPoint {
+            function_name: "main".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: EntryType::Main,
+            is_user_facing: true,
+        });
+
+        let aggregator = ContextAggregator::new()
+            .with_provider(Box::new(CriticalPathProvider::new(cp_analyzer)))
+            .with_provider(Box::new(DependencyRiskProvider::new(DependencyGraph::new())));
+
+        let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
+
+        // Analyze many files - simulates god object analysis
+        for i in 0..200 {
+            let result = analyzer.analyze_file_context(
+                PathBuf::from(format!("src/large_file_{}.rs", i)),
+                40.0,
+                PathBuf::from("/project"),
+            );
+
+            assert!(result.is_some(), "Should get context for file {}", i);
+        }
+    }
+
+    /// Minimal mock provider for testing
+    struct MockProvider {
+        name: &'static str,
+    }
+
+    impl context::ContextProvider for MockProvider {
+        fn name(&self) -> &str {
+            self.name
+        }
+
+        fn gather(&self, _target: &context::AnalysisTarget) -> anyhow::Result<context::Context> {
+            Ok(context::Context {
+                provider: self.name.to_string(),
+                weight: 1.0,
+                contribution: 0.5,
+                details: context::ContextDetails::Historical {
+                    change_frequency: 0.1,
+                    bug_density: 0.05,
+                    age_days: 100,
+                    author_count: 3,
+                },
+            })
+        }
+
+        fn weight(&self) -> f64 {
+            1.0
+        }
+
+        fn explain(&self, _context: &context::Context) -> String {
+            "mock".to_string()
+        }
+    }
+
+    /// Test with 3 providers (matching production: critical_path, dependency, git_history)
+    #[test]
+    fn test_three_providers_many_iterations() {
+        // Build aggregator with 3 mock providers
+        let aggregator = ContextAggregator::new()
+            .with_provider(Box::new(MockProvider { name: "critical_path" }))
+            .with_provider(Box::new(MockProvider { name: "dependency_risk" }))
+            .with_provider(Box::new(MockProvider { name: "git_history" }));
+
+        let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
+
+        // Run many iterations - each should be independent
+        for i in 0..5000 {
+            let result = analyzer.analyze_file_context(
+                PathBuf::from(format!("src/file_{}.rs", i)),
+                40.0,
+                PathBuf::from("/project"),
+            );
+
+            assert!(result.is_some(), "Iteration {} should succeed", i);
+        }
+    }
+
+    /// Test parallel execution with rayon - this is closer to production behavior
+    #[test]
+    fn test_parallel_context_analysis_with_rayon() {
+        use rayon::prelude::*;
+
+        // Build aggregator with 3 mock providers
+        let aggregator = ContextAggregator::new()
+            .with_provider(Box::new(MockProvider { name: "critical_path" }))
+            .with_provider(Box::new(MockProvider { name: "dependency_risk" }))
+            .with_provider(Box::new(MockProvider { name: "git_history" }));
+
+        let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
+
+        // Run in parallel - this uses rayon's thread pool with smaller stacks
+        let results: Vec<_> = (0..5000)
+            .into_par_iter()
+            .map(|i| {
+                analyzer.analyze_file_context(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    40.0,
+                    PathBuf::from("/project"),
+                )
+            })
+            .collect();
+
+        assert_eq!(results.len(), 5000);
+        assert!(results.iter().all(|r| r.is_some()));
+    }
 }

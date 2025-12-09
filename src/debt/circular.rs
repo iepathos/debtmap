@@ -40,23 +40,23 @@ impl DependencyGraph {
         self.adjacency.entry(from).or_default().push(to);
     }
 
-    /// Detect circular dependencies using DFS
+    /// Detect circular dependencies using iterative DFS
+    ///
+    /// Uses an iterative approach to avoid stack overflow on large dependency graphs.
     pub fn detect_circular_dependencies(&self) -> Vec<CircularDependency> {
         let mut visited: HashMap<String, bool> =
             self.modules.iter().map(|m| (m.clone(), false)).collect();
         let mut rec_stack: HashMap<String, bool> =
             self.modules.iter().map(|m| (m.clone(), false)).collect();
-        let mut path = Vec::new();
 
         let mut circular_deps = Vec::new();
 
         for module in &self.modules {
-            if !visited[module] {
-                self.dfs_detect_cycles(
+            if !visited.get(module).copied().unwrap_or(false) {
+                self.dfs_detect_cycles_iterative(
                     module,
                     &mut visited,
                     &mut rec_stack,
-                    &mut path,
                     &mut circular_deps,
                 );
             }
@@ -65,33 +65,56 @@ impl DependencyGraph {
         circular_deps
     }
 
-    fn dfs_detect_cycles(
+    /// Iterative DFS cycle detection to avoid stack overflow on large graphs.
+    ///
+    /// Uses an explicit stack with frame state tracking to simulate recursive DFS.
+    /// Each frame tracks: module name, dependency index, and entry state.
+    fn dfs_detect_cycles_iterative(
         &self,
-        module: &str,
+        start_module: &str,
         visited: &mut HashMap<String, bool>,
         rec_stack: &mut HashMap<String, bool>,
-        path: &mut Vec<String>,
         cycles: &mut Vec<CircularDependency>,
     ) {
-        visited.insert(module.to_string(), true);
-        rec_stack.insert(module.to_string(), true);
-        path.push(module.to_string());
+        // Stack frame: (module_name, dep_index, is_entering)
+        // is_entering=true: first visit to this node
+        // is_entering=false: returning from processing children
+        let mut stack: Vec<(String, usize, bool)> =
+            vec![(start_module.to_string(), 0, true)];
+        let mut path: Vec<String> = Vec::new();
 
-        if let Some(deps) = self.adjacency.get(module) {
-            for dep in deps {
-                if !visited[dep] {
-                    self.dfs_detect_cycles(dep, visited, rec_stack, path, cycles);
-                } else if rec_stack[dep] {
-                    // Found a cycle
-                    let cycle_start = path.iter().position(|m| m == dep).unwrap();
-                    let cycle = path[cycle_start..].to_vec();
-                    cycles.push(CircularDependency { cycle });
+        while let Some((module, _dep_idx, is_entering)) = stack.pop() {
+            if is_entering {
+                // First visit to this module - mark as visited and in recursion stack
+                visited.insert(module.clone(), true);
+                rec_stack.insert(module.clone(), true);
+                path.push(module.clone());
+
+                // Push a "return" frame to clean up when we're done with this module
+                stack.push((module.clone(), 0, false));
+
+                // Process dependencies
+                if let Some(deps) = self.adjacency.get(&module) {
+                    // Push dependencies in reverse order so we process them in forward order
+                    for (i, dep) in deps.iter().enumerate().rev() {
+                        if !visited.get(dep).copied().unwrap_or(false) {
+                            // Unvisited node - push it for processing
+                            stack.push((dep.clone(), i, true));
+                        } else if rec_stack.get(dep).copied().unwrap_or(false) {
+                            // Found a cycle! dep is already in the current path
+                            if let Some(cycle_start) = path.iter().position(|m| m == dep) {
+                                let cycle = path[cycle_start..].to_vec();
+                                cycles.push(CircularDependency { cycle });
+                            }
+                        }
+                    }
                 }
+            } else {
+                // Returning from this module - clean up
+                path.pop();
+                rec_stack.insert(module, false);
             }
         }
-
-        path.pop();
-        rec_stack.insert(module.to_string(), false);
     }
 
     /// Calculate coupling metrics for all modules
@@ -240,5 +263,64 @@ mod tests {
         let a_metrics = metrics.iter().find(|m| m.module == "A").unwrap();
         assert_eq!(a_metrics.dependencies.len(), 2); // Depends on B and C
         assert_eq!(a_metrics.dependents.len(), 1); // D depends on A
+    }
+
+    /// Stress test: large dependency chain should not stack overflow
+    #[test]
+    fn test_large_dependency_chain_no_stack_overflow() {
+        let mut graph = DependencyGraph::new();
+
+        // Create a deep chain: mod_0 -> mod_1 -> mod_2 -> ... -> mod_3999
+        let num_modules = 4000;
+        for i in 0..num_modules - 1 {
+            graph.add_dependency(format!("mod_{}", i), format!("mod_{}", i + 1));
+        }
+
+        // Should complete without stack overflow
+        let circular = graph.detect_circular_dependencies();
+        assert!(circular.is_empty(), "Linear chain should have no cycles");
+    }
+
+    /// Stress test: large graph with cycle should detect it without stack overflow
+    #[test]
+    fn test_large_graph_with_cycle_no_stack_overflow() {
+        let mut graph = DependencyGraph::new();
+
+        // Create a deep chain with a cycle at the end
+        let num_modules = 4000;
+        for i in 0..num_modules - 1 {
+            graph.add_dependency(format!("mod_{}", i), format!("mod_{}", i + 1));
+        }
+        // Add cycle: last module points back to first
+        graph.add_dependency(format!("mod_{}", num_modules - 1), "mod_0".to_string());
+
+        // Should detect the cycle without stack overflow
+        let circular = graph.detect_circular_dependencies();
+        assert_eq!(circular.len(), 1, "Should detect exactly one cycle");
+        assert_eq!(
+            circular[0].cycle.len(),
+            num_modules,
+            "Cycle should include all modules"
+        );
+    }
+
+    /// Stress test: wide graph with many independent chains
+    #[test]
+    fn test_wide_graph_no_stack_overflow() {
+        let mut graph = DependencyGraph::new();
+
+        // Create 100 independent chains of length 100 each
+        for chain in 0..100 {
+            for i in 0..99 {
+                graph.add_dependency(
+                    format!("chain_{}_mod_{}", chain, i),
+                    format!("chain_{}_mod_{}", chain, i + 1),
+                );
+            }
+        }
+
+        // Should complete without stack overflow
+        let circular = graph.detect_circular_dependencies();
+        assert!(circular.is_empty(), "Independent chains should have no cycles");
     }
 }

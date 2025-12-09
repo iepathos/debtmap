@@ -38,8 +38,8 @@ pub struct CriticalPath {
 
 /// Analyzes critical paths in the codebase
 pub struct CriticalPathAnalyzer {
-    entry_points: Vector<EntryPoint>,
-    call_graph: CallGraph,
+    pub(crate) entry_points: Vector<EntryPoint>,
+    pub(crate) call_graph: CallGraph,
 }
 
 impl Default for CriticalPathAnalyzer {

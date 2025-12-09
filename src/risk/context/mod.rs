@@ -283,4 +283,92 @@ mod tests {
         }
         // No panics = success
     }
+
+    /// Stress test that simulates analyzing a large codebase like debtmap itself.
+    /// This should reproduce stack overflow if recursive DFS is used.
+    #[test]
+    fn test_large_call_graph_no_stack_overflow() {
+        use crate::priority::call_graph::CallGraph;
+        use crate::risk::context::critical_path::{CriticalPathAnalyzer, CriticalPathProvider};
+
+        // Build a call graph with 4000 functions (similar to debtmap)
+        let mut call_graph = CallGraph::new();
+        let num_functions = 4000;
+
+        // Create a deep call chain: main -> f1 -> f2 -> ... -> f3999
+        for i in 0..num_functions - 1 {
+            let caller = format!("func_{}", i);
+            let callee = format!("func_{}", i + 1);
+            call_graph.add_edge_by_name(caller, callee, PathBuf::from("src/lib.rs"));
+        }
+
+        // Add main as entry point
+        let mut analyzer = CriticalPathAnalyzer::new();
+        analyzer.call_graph = call_graph;
+        analyzer.entry_points.push_back(super::critical_path::EntryPoint {
+            function_name: "func_0".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: super::critical_path::EntryType::Main,
+            is_user_facing: true,
+        });
+
+        let provider = CriticalPathProvider::new(analyzer);
+
+        // This should NOT stack overflow - if it does, we found the bug
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "func_2000".to_string(), // Middle of the chain
+            file_path: PathBuf::from("src/lib.rs"),
+            line_range: (1, 10),
+        };
+
+        let result = provider.gather(&target);
+        assert!(result.is_ok(), "gather should succeed without stack overflow");
+    }
+
+    /// Test the full context aggregator with all providers on a large graph
+    #[test]
+    fn test_context_aggregator_large_codebase() {
+        use crate::risk::context::critical_path::{CriticalPathAnalyzer, CriticalPathProvider};
+        use crate::risk::context::dependency::{DependencyGraph, DependencyRiskProvider};
+
+        // Create critical path provider with large graph
+        let mut call_graph = crate::priority::call_graph::CallGraph::new();
+        for i in 0..1000 {
+            let caller = format!("func_{}", i);
+            let callee = format!("func_{}", i + 1);
+            call_graph.add_edge_by_name(caller, callee, PathBuf::from("src/lib.rs"));
+        }
+
+        let mut cp_analyzer = CriticalPathAnalyzer::new();
+        cp_analyzer.call_graph = call_graph;
+        cp_analyzer.entry_points.push_back(super::critical_path::EntryPoint {
+            function_name: "func_0".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: super::critical_path::EntryType::Main,
+            is_user_facing: true,
+        });
+
+        // Create dependency provider
+        let dep_graph = DependencyGraph::new();
+
+        // Build aggregator with both providers
+        let aggregator = ContextAggregator::new()
+            .with_provider(Box::new(CriticalPathProvider::new(cp_analyzer)))
+            .with_provider(Box::new(DependencyRiskProvider::new(dep_graph)));
+
+        // Analyze 100 different functions - should NOT overflow
+        for i in 0..100 {
+            let target = AnalysisTarget {
+                root_path: PathBuf::from("/project"),
+                function_name: format!("func_{}", i * 10),
+                file_path: PathBuf::from("src/lib.rs"),
+                line_range: (1, 10),
+            };
+
+            let context_map = aggregator.analyze(&target);
+            // Just verify we get a result without crashing
+            let _ = context_map.total_contribution();
+        }
+    }
 }
