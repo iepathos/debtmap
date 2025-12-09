@@ -357,7 +357,9 @@ mod tests {
         // Build aggregator with providers
         let aggregator = ContextAggregator::new()
             .with_provider(Box::new(CriticalPathProvider::new(cp_analyzer)))
-            .with_provider(Box::new(DependencyRiskProvider::new(DependencyGraph::new())));
+            .with_provider(Box::new(
+                DependencyRiskProvider::new(DependencyGraph::new()),
+            ));
 
         // Create risk analyzer with context
         let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
@@ -411,7 +413,9 @@ mod tests {
 
         let aggregator = ContextAggregator::new()
             .with_provider(Box::new(CriticalPathProvider::new(cp_analyzer)))
-            .with_provider(Box::new(DependencyRiskProvider::new(DependencyGraph::new())));
+            .with_provider(Box::new(
+                DependencyRiskProvider::new(DependencyGraph::new()),
+            ));
 
         let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
 
@@ -465,9 +469,15 @@ mod tests {
     fn test_three_providers_many_iterations() {
         // Build aggregator with 3 mock providers
         let aggregator = ContextAggregator::new()
-            .with_provider(Box::new(MockProvider { name: "critical_path" }))
-            .with_provider(Box::new(MockProvider { name: "dependency_risk" }))
-            .with_provider(Box::new(MockProvider { name: "git_history" }));
+            .with_provider(Box::new(MockProvider {
+                name: "critical_path",
+            }))
+            .with_provider(Box::new(MockProvider {
+                name: "dependency_risk",
+            }))
+            .with_provider(Box::new(MockProvider {
+                name: "git_history",
+            }));
 
         let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
 
@@ -490,9 +500,15 @@ mod tests {
 
         // Build aggregator with 3 mock providers
         let aggregator = ContextAggregator::new()
-            .with_provider(Box::new(MockProvider { name: "critical_path" }))
-            .with_provider(Box::new(MockProvider { name: "dependency_risk" }))
-            .with_provider(Box::new(MockProvider { name: "git_history" }));
+            .with_provider(Box::new(MockProvider {
+                name: "critical_path",
+            }))
+            .with_provider(Box::new(MockProvider {
+                name: "dependency_risk",
+            }))
+            .with_provider(Box::new(MockProvider {
+                name: "git_history",
+            }));
 
         let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
 

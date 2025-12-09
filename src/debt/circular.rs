@@ -79,8 +79,7 @@ impl DependencyGraph {
         // Stack frame: (module_name, dep_index, is_entering)
         // is_entering=true: first visit to this node
         // is_entering=false: returning from processing children
-        let mut stack: Vec<(String, usize, bool)> =
-            vec![(start_module.to_string(), 0, true)];
+        let mut stack: Vec<(String, usize, bool)> = vec![(start_module.to_string(), 0, true)];
         let mut path: Vec<String> = Vec::new();
 
         while let Some((module, _dep_idx, is_entering)) = stack.pop() {
@@ -321,6 +320,9 @@ mod tests {
 
         // Should complete without stack overflow
         let circular = graph.detect_circular_dependencies();
-        assert!(circular.is_empty(), "Independent chains should have no cycles");
+        assert!(
+            circular.is_empty(),
+            "Independent chains should have no cycles"
+        );
     }
 }

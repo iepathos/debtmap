@@ -213,8 +213,12 @@ pub fn calculate_cyclomatic(block: &Block) -> u32 {
                     }
                 }
                 // Leaf expressions - no children to process
-                Expr::Lit(_) | Expr::Path(_) | Expr::Continue(_) | Expr::Infer(_)
-                | Expr::Verbatim(_) | Expr::Const(_) => {}
+                Expr::Lit(_)
+                | Expr::Path(_)
+                | Expr::Continue(_)
+                | Expr::Infer(_)
+                | Expr::Verbatim(_)
+                | Expr::Const(_) => {}
                 // Catch-all for any other expressions
                 _ => {}
             }

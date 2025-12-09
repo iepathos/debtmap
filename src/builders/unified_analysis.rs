@@ -881,13 +881,12 @@ fn create_unified_analysis_with_exclusions_and_timing(
         manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Active, None);
     }
 
-    // Step 6: Error swallowing analysis
-    if let Some(debt_items) = debt_items {
-        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
-        for item in error_swallowing_items {
-            unified.add_item(item);
-        }
-    }
+    // Step 6: Error swallowing analysis - REMOVED
+    // Error swallowing is no longer reported as separate debt items.
+    // Instead, error swallowing info is attached to FunctionMetrics and
+    // shown in the TUI patterns page for functions that have other debt types.
+    // See: src/tui/results/detail_pages/patterns.rs (Error Handling section)
+    let _ = debt_items; // Silence unused warning
 
     // Step 7: File-level analysis
     analyze_files_for_debt(
@@ -999,12 +998,12 @@ fn create_unified_analysis_parallel(
         manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Active, None);
     }
 
-    // Add error swallowing items
-    let mut all_items = items;
-    if let Some(debt_items) = debt_items {
-        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
-        all_items.extend(error_swallowing_items);
-    }
+    // Error swallowing items - REMOVED
+    // Error swallowing is no longer reported as separate debt items.
+    // Instead, error swallowing info is attached to FunctionMetrics and
+    // shown in the TUI patterns page for functions that have other debt types.
+    let all_items = items;
+    let _ = debt_items; // Silence unused warning
 
     // Phase 3: Parallel file analysis
     let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
@@ -1088,151 +1087,6 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         risk_analyzer,
         project_path,
     )
-}
-
-/// Calculate severity score for error swallowing pattern
-/// Maps pattern types to severity scores (10-40 range)
-fn calculate_error_swallowing_severity(pattern: &str) -> f64 {
-    // Match patterns from src/debt/error_swallowing.rs priorities
-    if pattern.contains("let _ =") || pattern.contains("discarding Result") {
-        40.0 // Highest severity - completely discarding Result
-    } else if pattern.contains("if let Ok")
-        || pattern.contains(".ok()")
-        || pattern.contains("match")
-    {
-        25.0 // Medium-high severity - swallowing specific error information
-    } else if pattern.contains("unwrap_or") {
-        15.0 // Lower severity - at least provides fallback value
-    } else {
-        20.0 // Default severity for unknown patterns
-    }
-}
-
-/// Calculate weight from priority level
-/// Maps Priority enum to numeric weights matching debt/mod.rs
-fn calculate_priority_weight(priority: &crate::core::Priority) -> f64 {
-    match priority {
-        crate::core::Priority::Low => 1.0,
-        crate::core::Priority::Medium => 3.0,
-        crate::core::Priority::High => 5.0,
-        crate::core::Priority::Critical => 10.0,
-    }
-}
-
-fn convert_error_swallowing_to_unified(
-    debt_items: &[DebtItem],
-    _call_graph: &priority::CallGraph,
-) -> Vec<UnifiedDebtItem> {
-    debt_items
-        .iter()
-        .filter(|item| {
-            matches!(
-                item.debt_type,
-                crate::core::DebtType::ErrorSwallowing { .. }
-            )
-        })
-        .map(|item| {
-            // Extract pattern and context from the original debt item
-            let pattern = item.message.split(':').next().unwrap_or("Error swallowing");
-            let context = item.context.clone();
-
-            // Calculate score based on pattern severity and priority
-            // Error swallowing has high risk (0.35 in computation.rs) and type weight 4 (in debt/mod.rs)
-            let pattern_severity = calculate_error_swallowing_severity(pattern);
-            let priority_weight = calculate_priority_weight(&item.priority);
-
-            // Base score: pattern severity (10-40) * priority weight (1-10) = 10-400
-            // This puts error swallowing in a meaningful range:
-            // - Low priority unwrap_or: ~10-15
-            // - Medium priority if-let: ~60-90
-            // - High priority let _: ~200-400
-            let base_score = pattern_severity * priority_weight;
-
-            // Risk factor of 0.35 means error swallowing is high risk
-            let risk_boost = base_score * 0.35;
-            let final_score_value = (base_score + risk_boost).min(100.0);
-
-            let unified_score = UnifiedScore {
-                complexity_factor: pattern_severity / 10.0, // Normalized to 0-10 scale
-                coverage_factor: 0.0, // Error swallowing is code-level, not coverage-dependent
-                dependency_factor: 0.0, // Not dependency-related
-                role_multiplier: priority_weight / 10.0, // Normalized priority
-                final_score: Score0To100::new(final_score_value),
-                base_score: Some(base_score),
-                exponential_factor: None,
-                risk_boost: Some(risk_boost),
-                pre_adjustment_score: Some(base_score),
-                adjustment_applied: None, // ScoreAdjustment is for orchestration patterns, not needed here
-                purity_factor: None,
-                refactorability_factor: None,
-                pattern_factor: Some(pattern_severity),
-            };
-
-            UnifiedDebtItem {
-                location: Location {
-                    file: item.file.clone(),
-                    function: format!("line_{}", item.line),
-                    line: item.line,
-                },
-                debt_type: DebtType::ErrorSwallowing {
-                    pattern: pattern.to_string(),
-                    context,
-                },
-                unified_score,
-                function_role: FunctionRole::Unknown,
-                recommendation: ActionableRecommendation {
-                    primary_action: format!("Fix error swallowing at line {}", item.line),
-                    rationale: item.message.clone(),
-                    implementation_steps: vec![
-                        "Replace error swallowing with proper error handling".to_string(),
-                        "Log errors at minimum, even if they can't be handled".to_string(),
-                        "Consider propagating errors to caller with ?".to_string(),
-                    ],
-                    related_items: vec![],
-                    steps: None,
-                    estimated_effort_hours: None,
-                },
-                expected_impact: ImpactMetrics {
-                    coverage_improvement: 0.0,
-                    lines_reduction: 0,
-                    complexity_reduction: 0.0,
-                    risk_reduction: pattern_severity * 0.35, // Risk reduction proportional to severity
-                },
-                transitive_coverage: None,
-                file_context: None,
-                upstream_dependencies: 0,
-                downstream_dependencies: 0,
-                upstream_callers: vec![],
-                downstream_callees: vec![],
-                nesting_depth: 0,
-                function_length: 0,
-                cyclomatic_complexity: 0,
-                cognitive_complexity: 0,
-                entropy_details: None,
-                entropy_adjusted_cyclomatic: None,
-                entropy_adjusted_cognitive: None,
-                entropy_dampening_factor: None,
-                is_pure: None,
-                purity_confidence: None,
-                purity_level: None,
-                god_object_indicators: None,
-                tier: None,
-                function_context: None,
-                context_confidence: None,
-                contextual_recommendation: None,
-                pattern_analysis: None,
-                context_multiplier: None,
-                context_type: None,
-                language_specific: None, // No language-specific data for error swallowing items (spec 190)
-                detected_pattern: None, // No pattern detection for error swallowing items (spec 204)
-                contextual_risk: None,
-                file_line_count: None, // No file line count caching for error swallowing items (spec 204)
-                responsibility_category: None, // No responsibility category for error swallowing items (spec 254)
-                error_swallowing_count: Some(1), // This is an error swallowing item itself
-                error_swallowing_patterns: Some(vec![pattern.to_string()]), // Pattern type from debt item
-            }
-        })
-        .collect()
 }
 
 /// Perform multi-pass analysis on the results

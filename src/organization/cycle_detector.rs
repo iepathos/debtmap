@@ -48,7 +48,7 @@ fn dfs_find_cycles(
     graph: &HashMap<String, Vec<String>>,
     visited: &mut HashSet<String>,
     rec_stack: &mut HashSet<String>,
-    _current_path: &mut Vec<String>, // Kept for API compatibility but unused
+    _current_path: &mut [String], // Kept for API compatibility but unused
     cycles: &mut Vec<Vec<String>>,
 ) {
     // Stack frame: (node, is_entering)

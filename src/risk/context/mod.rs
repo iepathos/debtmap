@@ -305,12 +305,14 @@ mod tests {
         // Add main as entry point
         let mut analyzer = CriticalPathAnalyzer::new();
         analyzer.call_graph = call_graph;
-        analyzer.entry_points.push_back(super::critical_path::EntryPoint {
-            function_name: "func_0".to_string(),
-            file_path: PathBuf::from("src/main.rs"),
-            entry_type: super::critical_path::EntryType::Main,
-            is_user_facing: true,
-        });
+        analyzer
+            .entry_points
+            .push_back(super::critical_path::EntryPoint {
+                function_name: "func_0".to_string(),
+                file_path: PathBuf::from("src/main.rs"),
+                entry_type: super::critical_path::EntryType::Main,
+                is_user_facing: true,
+            });
 
         let provider = CriticalPathProvider::new(analyzer);
 
@@ -323,7 +325,10 @@ mod tests {
         };
 
         let result = provider.gather(&target);
-        assert!(result.is_ok(), "gather should succeed without stack overflow");
+        assert!(
+            result.is_ok(),
+            "gather should succeed without stack overflow"
+        );
     }
 
     /// Test the full context aggregator with all providers on a large graph
@@ -342,12 +347,14 @@ mod tests {
 
         let mut cp_analyzer = CriticalPathAnalyzer::new();
         cp_analyzer.call_graph = call_graph;
-        cp_analyzer.entry_points.push_back(super::critical_path::EntryPoint {
-            function_name: "func_0".to_string(),
-            file_path: PathBuf::from("src/main.rs"),
-            entry_type: super::critical_path::EntryType::Main,
-            is_user_facing: true,
-        });
+        cp_analyzer
+            .entry_points
+            .push_back(super::critical_path::EntryPoint {
+                function_name: "func_0".to_string(),
+                file_path: PathBuf::from("src/main.rs"),
+                entry_type: super::critical_path::EntryType::Main,
+                is_user_facing: true,
+            });
 
         // Create dependency provider
         let dep_graph = DependencyGraph::new();
