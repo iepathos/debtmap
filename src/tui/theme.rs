@@ -105,6 +105,48 @@ impl Theme {
     pub fn time_style(&self) -> Style {
         Style::default().fg(self.muted)
     }
+
+    /// Color for coupling classification badge (spec 203)
+    ///
+    /// Returns appropriate color based on classification type:
+    /// - Stable Core: Green (healthy core module)
+    /// - Utility Module: Cyan (normal utility)
+    /// - Leaf Module: Yellow (attention - peripheral)
+    /// - Isolated: Gray (neutral - low coupling)
+    /// - Highly Coupled: Red (warning - needs refactoring)
+    pub fn coupling_classification_color(&self, classification: &str) -> Color {
+        match classification.to_lowercase().as_str() {
+            "stable core" => Color::Green,
+            "utility module" => Color::Cyan,
+            "leaf module" => Color::Yellow,
+            "isolated" => Color::DarkGray,
+            "highly coupled" => Color::Red,
+            _ => Color::White,
+        }
+    }
+
+    /// Color for instability gradient (spec 203)
+    ///
+    /// Returns a color on the green-yellow-red gradient based on instability value:
+    /// - 0.0 (stable): Green
+    /// - 0.5 (balanced): Yellow
+    /// - 1.0 (unstable): Red
+    pub fn instability_color(&self, instability: f64) -> Color {
+        if instability < 0.3 {
+            Color::Green
+        } else if instability < 0.7 {
+            Color::Yellow
+        } else {
+            Color::Red
+        }
+    }
+
+    /// Style for coupling classification badge (spec 203)
+    pub fn coupling_badge_style(&self, classification: &str) -> Style {
+        Style::default()
+            .fg(self.coupling_classification_color(classification))
+            .add_modifier(Modifier::BOLD)
+    }
 }
 
 impl Default for Theme {
@@ -133,5 +175,65 @@ mod tests {
 
         // Verify colors are distinct
         assert_ne!(completed.fg, active.fg);
+    }
+
+    // Tests for spec 203: Coupling visualization colors
+
+    #[test]
+    fn test_coupling_classification_colors() {
+        let theme = Theme::default_theme();
+
+        assert_eq!(
+            theme.coupling_classification_color("stable core"),
+            Color::Green
+        );
+        assert_eq!(
+            theme.coupling_classification_color("Stable Core"),
+            Color::Green
+        );
+        assert_eq!(
+            theme.coupling_classification_color("utility module"),
+            Color::Cyan
+        );
+        assert_eq!(
+            theme.coupling_classification_color("leaf module"),
+            Color::Yellow
+        );
+        assert_eq!(
+            theme.coupling_classification_color("isolated"),
+            Color::DarkGray
+        );
+        assert_eq!(
+            theme.coupling_classification_color("highly coupled"),
+            Color::Red
+        );
+        assert_eq!(theme.coupling_classification_color("unknown"), Color::White);
+    }
+
+    #[test]
+    fn test_instability_color_gradient() {
+        let theme = Theme::default_theme();
+
+        // Stable (low instability) = green
+        assert_eq!(theme.instability_color(0.0), Color::Green);
+        assert_eq!(theme.instability_color(0.2), Color::Green);
+
+        // Balanced (mid instability) = yellow
+        assert_eq!(theme.instability_color(0.3), Color::Yellow);
+        assert_eq!(theme.instability_color(0.5), Color::Yellow);
+        assert_eq!(theme.instability_color(0.69), Color::Yellow);
+
+        // Unstable (high instability) = red
+        assert_eq!(theme.instability_color(0.7), Color::Red);
+        assert_eq!(theme.instability_color(1.0), Color::Red);
+    }
+
+    #[test]
+    fn test_coupling_badge_style_has_bold() {
+        let theme = Theme::default_theme();
+        let style = theme.coupling_badge_style("stable core");
+
+        assert!(style.add_modifier.contains(Modifier::BOLD));
+        assert_eq!(style.fg, Some(Color::Green));
     }
 }
