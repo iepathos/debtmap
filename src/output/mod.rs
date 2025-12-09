@@ -1,3 +1,4 @@
+pub mod dot;
 pub mod evidence_formatter;
 pub mod formatters;
 pub mod json;
@@ -23,6 +24,7 @@ pub struct OutputConfig {
     pub show_filter_stats: bool,
 }
 
+pub use dot::*;
 pub use evidence_formatter::*;
 pub use formatters::*;
 pub use json::*;
@@ -148,6 +150,10 @@ pub fn output_unified_priorities_with_summary(
                 Ok(())
             }
         },
+        Some(crate::cli::OutputFormat::Dot) => {
+            // DOT format for Graphviz visualization (Spec 204)
+            dot::output_dot_default(&analysis, output_file)
+        }
         _ => {
             if is_markdown_file(&output_file) {
                 markdown::output_markdown(
