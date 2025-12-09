@@ -336,8 +336,7 @@ impl DependencyMatrix {
             // Find next unvisited neighbor
             let neighbors = &adj[node];
             let mut found_unvisited = false;
-            for i in neighbor_idx..neighbors.len() {
-                let neighbor = neighbors[i];
+            for (i, &neighbor) in neighbors.iter().enumerate().skip(neighbor_idx) {
                 if !visited[neighbor] {
                     // Push current node back with next neighbor index and backtrack flag
                     stack.push((node, i + 1, false));
