@@ -31,6 +31,7 @@
 //! ```
 
 use crate::core::FunctionMetrics;
+use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
 use std::collections::HashSet;
@@ -52,6 +53,8 @@ pub struct GodObjectAggregatedMetrics {
     pub total_error_swallowing_count: u32,
     /// Unique error swallowing pattern types found
     pub error_swallowing_patterns: Vec<String>,
+    /// Aggregated entropy analysis from member functions
+    pub aggregated_entropy: Option<EntropyDetails>,
 }
 
 /// Extract member functions for a file.
@@ -210,12 +213,67 @@ pub fn aggregate_error_swallowing(functions: &[FunctionMetrics]) -> (u32, Vec<St
     (total_count, unique_patterns.into_iter().collect())
 }
 
+/// Aggregate entropy analysis from member UnifiedDebtItems.
+///
+/// Returns weighted average entropy metrics based on function length.
+/// Uses original (undampened) complexity values for the aggregate summary.
+pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<EntropyDetails> {
+    let entropy_data: Vec<_> = members
+        .iter()
+        .filter_map(|m| m.entropy_details.as_ref().map(|e| (e, m.function_length)))
+        .collect();
+
+    if entropy_data.is_empty() {
+        return None;
+    }
+
+    let total_length: usize = entropy_data.iter().map(|(_, len)| len).sum();
+    if total_length == 0 {
+        return None;
+    }
+
+    // Weighted average of entropy scores
+    let weighted_entropy = entropy_data
+        .iter()
+        .map(|(e, len)| e.entropy_score * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
+    // Weighted average of pattern repetition
+    let weighted_repetition = entropy_data
+        .iter()
+        .map(|(e, len)| e.pattern_repetition * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
+    // Weighted average of dampening factor
+    let weighted_dampening = entropy_data
+        .iter()
+        .map(|(e, len)| e.dampening_factor * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
+    // Sum original complexity across all members
+    let total_original: u32 = entropy_data.iter().map(|(e, _)| e.original_complexity).sum();
+    let total_adjusted: u32 = entropy_data.iter().map(|(e, _)| e.adjusted_cognitive).sum();
+
+    Some(EntropyDetails {
+        entropy_score: weighted_entropy,
+        pattern_repetition: weighted_repetition,
+        original_complexity: total_original,
+        adjusted_complexity: total_adjusted,
+        dampening_factor: weighted_dampening,
+        adjusted_cognitive: total_adjusted,
+    })
+}
+
 /// Aggregate all metrics (composition of above functions).
 pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAggregatedMetrics {
     let (total_cyc, total_cog, max_nest) = aggregate_complexity_metrics(members);
     let weighted_cov = aggregate_coverage_metrics(members);
     let (callers, callees, up_count, down_count) = aggregate_dependency_metrics(members);
     let contextual_risk = aggregate_contextual_risk(members);
+    let entropy = aggregate_entropy_metrics(members);
 
     // Note: Error swallowing is aggregated from raw FunctionMetrics, not UnifiedDebtItem
     // This function sets defaults; use aggregate_from_raw_metrics for full error swallowing data
@@ -231,6 +289,7 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
         aggregated_contextual_risk: contextual_risk,
         total_error_swallowing_count: 0,
         error_swallowing_patterns: Vec::new(),
+        aggregated_entropy: entropy,
     }
 }
 
@@ -246,7 +305,7 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
     // Aggregate error swallowing from raw metrics
     let (total_error_swallowing, error_patterns) = aggregate_error_swallowing(functions);
 
-    // No coverage or dependency data available from raw metrics
+    // No coverage, dependency, or entropy data available from raw metrics
     // These will need to come from unified items if available
     GodObjectAggregatedMetrics {
         total_cyclomatic,
@@ -260,6 +319,7 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
         aggregated_contextual_risk: None,
         total_error_swallowing_count: total_error_swallowing,
         error_swallowing_patterns: error_patterns,
+        aggregated_entropy: None,
     }
 }
 
@@ -560,6 +620,101 @@ mod tests {
         assert_eq!(patterns.len(), 2); // 2 unique patterns
         assert!(patterns.contains(&"if let Ok(...) without else branch".to_string()));
         assert!(patterns.contains(&"let _ = discarding Result".to_string()));
+    }
+
+    #[test]
+    fn test_aggregate_entropy_metrics_weighted_average() {
+        // Create items with different entropy details and lengths
+        let mut item1 = create_test_item("file.rs", 10, 20, 2, 100); // length 100
+        item1.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.4,
+            pattern_repetition: 0.6,
+            original_complexity: 20,
+            adjusted_complexity: 16,
+            dampening_factor: 0.8,
+            adjusted_cognitive: 16,
+        });
+
+        let mut item2 = create_test_item("file.rs", 15, 30, 3, 200); // length 200
+        item2.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.5,
+            pattern_repetition: 0.3,
+            original_complexity: 30,
+            adjusted_complexity: 27,
+            dampening_factor: 0.9,
+            adjusted_cognitive: 27,
+        });
+
+        let members = vec![&item1, &item2];
+        let result = aggregate_entropy_metrics(&members).expect("should have entropy");
+
+        // Weighted average: (100*0.4 + 200*0.5) / 300 = 140/300 ≈ 0.467
+        assert!((result.entropy_score - 0.467).abs() < 0.01);
+
+        // Weighted repetition: (100*0.6 + 200*0.3) / 300 = 120/300 = 0.4
+        assert!((result.pattern_repetition - 0.4).abs() < 0.01);
+
+        // Weighted dampening: (100*0.8 + 200*0.9) / 300 = 260/300 ≈ 0.867
+        assert!((result.dampening_factor - 0.867).abs() < 0.01);
+
+        // Sums: 20 + 30 = 50, 16 + 27 = 43
+        assert_eq!(result.original_complexity, 50);
+        assert_eq!(result.adjusted_cognitive, 43);
+    }
+
+    #[test]
+    fn test_aggregate_entropy_metrics_empty() {
+        let item1 = create_test_item("file.rs", 10, 20, 2, 100);
+        let item2 = create_test_item("file.rs", 15, 30, 3, 200);
+        // Neither has entropy_details
+
+        let members = vec![&item1, &item2];
+        let result = aggregate_entropy_metrics(&members);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_entropy_metrics_partial() {
+        // Only one item has entropy
+        let mut item1 = create_test_item("file.rs", 10, 20, 2, 100);
+        item1.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.4,
+            pattern_repetition: 0.6,
+            original_complexity: 20,
+            adjusted_complexity: 16,
+            dampening_factor: 0.8,
+            adjusted_cognitive: 16,
+        });
+
+        let item2 = create_test_item("file.rs", 15, 30, 3, 200); // No entropy
+
+        let members = vec![&item1, &item2];
+        let result = aggregate_entropy_metrics(&members).expect("should have entropy from item1");
+
+        // Only item1 contributes, so values are from item1 only
+        assert!((result.entropy_score - 0.4).abs() < 0.001);
+        assert_eq!(result.original_complexity, 20);
+    }
+
+    #[test]
+    fn test_aggregate_god_object_metrics_includes_entropy() {
+        let mut item1 = create_test_item("file.rs", 10, 20, 2, 100);
+        item1.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.4,
+            pattern_repetition: 0.6,
+            original_complexity: 20,
+            adjusted_complexity: 16,
+            dampening_factor: 0.8,
+            adjusted_cognitive: 16,
+        });
+
+        let members = vec![&item1];
+        let metrics = aggregate_god_object_metrics(&members);
+
+        assert!(metrics.aggregated_entropy.is_some());
+        let entropy = metrics.aggregated_entropy.unwrap();
+        assert!((entropy.entropy_score - 0.4).abs() < 0.001);
     }
 
     #[test]

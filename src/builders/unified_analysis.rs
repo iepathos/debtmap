@@ -1591,10 +1591,19 @@ pub fn create_god_object_debt_item(
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
         cognitive_complexity: aggregated_metrics.total_cognitive,
-        entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
-        entropy_adjusted_cognitive: None,
-        entropy_dampening_factor: None,
+        entropy_details: aggregated_metrics.aggregated_entropy.clone(),
+        entropy_adjusted_cyclomatic: aggregated_metrics
+            .aggregated_entropy
+            .as_ref()
+            .map(|e| e.adjusted_complexity),
+        entropy_adjusted_cognitive: aggregated_metrics
+            .aggregated_entropy
+            .as_ref()
+            .map(|e| e.adjusted_cognitive),
+        entropy_dampening_factor: aggregated_metrics
+            .aggregated_entropy
+            .as_ref()
+            .map(|e| e.dampening_factor),
         is_pure: None,
         purity_confidence: None,
         purity_level: None,
@@ -1713,7 +1722,7 @@ fn apply_file_analysis_results(
             // Aggregate from raw metrics first for complexity (includes ALL functions, even tests)
             let mut aggregated_metrics = aggregate_from_raw_metrics(&file_data.raw_functions);
 
-            // Enrich with coverage/dependencies/risk from unified items
+            // Enrich with coverage/dependencies/risk/entropy from unified items
             // NOTE: Dependencies aggregate only from "problematic" functions that became debt items.
             // This provides a debt-focused view rather than complete architectural dependencies.
             let member_functions =
@@ -1727,6 +1736,7 @@ fn apply_file_analysis_results(
                     item_metrics.unique_downstream_callees;
                 aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
                 aggregated_metrics.downstream_dependencies = item_metrics.downstream_dependencies;
+                aggregated_metrics.aggregated_entropy = item_metrics.aggregated_entropy;
 
                 // Spec 248: Prefer direct file-level git analysis over member aggregation
                 aggregated_metrics.aggregated_contextual_risk = risk_analyzer
