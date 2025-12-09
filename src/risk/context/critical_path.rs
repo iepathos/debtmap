@@ -156,21 +156,27 @@ impl CriticalPathAnalyzer {
         let mut visited = HashSet::new();
         let mut path = Vector::new();
 
-        self.dfs_trace(&entry.function_name, &mut visited, &mut path);
+        // Iterative DFS using explicit stack to avoid stack overflow on large graphs
+        let mut stack = vec![entry.function_name.clone()];
+
+        while let Some(function) = stack.pop() {
+            if visited.contains(&function) {
+                continue;
+            }
+
+            visited.insert(function.clone());
+            path.push_back(function.clone());
+
+            // Add callees to stack (reverse order to maintain DFS order)
+            let callees: Vec<_> = self.call_graph.get_callees_by_name(&function);
+            for callee in callees.into_iter().rev() {
+                if !visited.contains(&callee) {
+                    stack.push(callee);
+                }
+            }
+        }
+
         path
-    }
-
-    fn dfs_trace(&self, function: &str, visited: &mut HashSet<String>, path: &mut Vector<String>) {
-        if visited.contains(function) {
-            return;
-        }
-
-        visited.insert(function.to_string());
-        path.push_back(function.to_string());
-
-        for callee in self.call_graph.get_callees_by_name(function) {
-            self.dfs_trace(&callee, visited, path);
-        }
     }
 
     fn calculate_path_weight(&self, entry: &EntryPoint) -> f64 {
