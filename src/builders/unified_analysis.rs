@@ -1722,21 +1722,23 @@ fn apply_file_analysis_results(
             // Aggregate from raw metrics first for complexity (includes ALL functions, even tests)
             let mut aggregated_metrics = aggregate_from_raw_metrics(&file_data.raw_functions);
 
-            // Enrich with coverage/dependencies/risk/entropy from unified items
+            // Enrich with coverage/dependencies/risk from unified items
             // NOTE: Dependencies aggregate only from "problematic" functions that became debt items.
             // This provides a debt-focused view rather than complete architectural dependencies.
+            // NOTE: Entropy is already aggregated from raw metrics (ALL functions), so we don't
+            // overwrite it with member-only entropy.
             let member_functions =
                 extract_member_functions(unified.items.iter(), &file_data.file_path);
             if !member_functions.is_empty() {
                 let item_metrics = aggregate_god_object_metrics(&member_functions);
-                // Merge all contextual data from debt items
+                // Merge coverage and dependency data from debt items
                 aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
                 aggregated_metrics.unique_upstream_callers = item_metrics.unique_upstream_callers;
                 aggregated_metrics.unique_downstream_callees =
                     item_metrics.unique_downstream_callees;
                 aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
                 aggregated_metrics.downstream_dependencies = item_metrics.downstream_dependencies;
-                aggregated_metrics.aggregated_entropy = item_metrics.aggregated_entropy;
+                // Keep raw entropy (from all functions) - don't overwrite with member-only entropy
 
                 // Spec 248: Prefer direct file-level git analysis over member aggregation
                 aggregated_metrics.aggregated_contextual_risk = risk_analyzer
