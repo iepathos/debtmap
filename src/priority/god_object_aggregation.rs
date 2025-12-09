@@ -303,11 +303,7 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
 pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<EntropyDetails> {
     let entropy_data: Vec<_> = functions
         .iter()
-        .filter_map(|f| {
-            f.entropy_score
-                .as_ref()
-                .map(|e| (e, f.length, f.cognitive))
-        })
+        .filter_map(|f| f.entropy_score.as_ref().map(|e| (e, f.length, f.cognitive)))
         .collect();
 
     if entropy_data.is_empty() {

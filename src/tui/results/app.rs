@@ -40,6 +40,7 @@ pub enum DetailPage {
     GitContext,
     Patterns,
     DataFlow,
+    Responsibilities,
 }
 
 impl DetailPage {
@@ -50,18 +51,20 @@ impl DetailPage {
             DetailPage::Dependencies => DetailPage::GitContext,
             DetailPage::GitContext => DetailPage::Patterns,
             DetailPage::Patterns => DetailPage::DataFlow,
-            DetailPage::DataFlow => DetailPage::Overview,
+            DetailPage::DataFlow => DetailPage::Responsibilities,
+            DetailPage::Responsibilities => DetailPage::Overview,
         }
     }
 
     /// Get previous page with wrapping
     pub fn prev(self) -> Self {
         match self {
-            DetailPage::Overview => DetailPage::DataFlow,
+            DetailPage::Overview => DetailPage::Responsibilities,
             DetailPage::Dependencies => DetailPage::Overview,
             DetailPage::GitContext => DetailPage::Dependencies,
             DetailPage::Patterns => DetailPage::GitContext,
             DetailPage::DataFlow => DetailPage::Patterns,
+            DetailPage::Responsibilities => DetailPage::DataFlow,
         }
     }
 
@@ -73,6 +76,7 @@ impl DetailPage {
             2 => Some(DetailPage::GitContext),
             3 => Some(DetailPage::Patterns),
             4 => Some(DetailPage::DataFlow),
+            5 => Some(DetailPage::Responsibilities),
             _ => None,
         }
     }
@@ -85,6 +89,7 @@ impl DetailPage {
             DetailPage::GitContext => 2,
             DetailPage::Patterns => 3,
             DetailPage::DataFlow => 4,
+            DetailPage::Responsibilities => 5,
         }
     }
 
@@ -96,6 +101,7 @@ impl DetailPage {
             DetailPage::GitContext => "Git Context",
             DetailPage::Patterns => "Patterns",
             DetailPage::DataFlow => "Data Flow",
+            DetailPage::Responsibilities => "Responsibilities",
         }
     }
 }
@@ -424,6 +430,21 @@ impl ResultsApp {
             .unwrap_or(false)
     }
 
+    /// Check if responsibilities data is available for current item
+    fn has_responsibilities_data(&self) -> bool {
+        self.selected_item()
+            .map(|item| {
+                // Has god object responsibilities
+                item.god_object_indicators
+                    .as_ref()
+                    .map(|ind| ind.is_god_object && !ind.responsibilities.is_empty())
+                    .unwrap_or(false)
+                    // Or has single responsibility category
+                    || item.responsibility_category.is_some()
+            })
+            .unwrap_or(false)
+    }
+
     /// Get available pages for current item (skip pages with no data)
     pub fn available_pages(&self) -> Vec<DetailPage> {
         let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
@@ -438,6 +459,10 @@ impl ResultsApp {
 
         if self.has_data_flow_data() {
             pages.push(DetailPage::DataFlow);
+        }
+
+        if self.has_responsibilities_data() {
+            pages.push(DetailPage::Responsibilities);
         }
 
         pages
@@ -495,16 +520,18 @@ mod tests {
         assert_eq!(DetailPage::Dependencies.next(), DetailPage::GitContext);
         assert_eq!(DetailPage::GitContext.next(), DetailPage::Patterns);
         assert_eq!(DetailPage::Patterns.next(), DetailPage::DataFlow);
-        assert_eq!(DetailPage::DataFlow.next(), DetailPage::Overview);
+        assert_eq!(DetailPage::DataFlow.next(), DetailPage::Responsibilities);
+        assert_eq!(DetailPage::Responsibilities.next(), DetailPage::Overview);
     }
 
     #[test]
     fn test_detail_page_prev_wraps_backward() {
-        assert_eq!(DetailPage::Overview.prev(), DetailPage::DataFlow);
+        assert_eq!(DetailPage::Overview.prev(), DetailPage::Responsibilities);
         assert_eq!(DetailPage::Dependencies.prev(), DetailPage::Overview);
         assert_eq!(DetailPage::GitContext.prev(), DetailPage::Dependencies);
         assert_eq!(DetailPage::Patterns.prev(), DetailPage::GitContext);
         assert_eq!(DetailPage::DataFlow.prev(), DetailPage::Patterns);
+        assert_eq!(DetailPage::Responsibilities.prev(), DetailPage::DataFlow);
     }
 
     #[test]
@@ -514,7 +541,11 @@ mod tests {
         assert_eq!(DetailPage::from_index(2), Some(DetailPage::GitContext));
         assert_eq!(DetailPage::from_index(3), Some(DetailPage::Patterns));
         assert_eq!(DetailPage::from_index(4), Some(DetailPage::DataFlow));
-        assert_eq!(DetailPage::from_index(5), None);
+        assert_eq!(
+            DetailPage::from_index(5),
+            Some(DetailPage::Responsibilities)
+        );
+        assert_eq!(DetailPage::from_index(6), None);
     }
 
     #[test]
@@ -524,6 +555,7 @@ mod tests {
         assert_eq!(DetailPage::GitContext.index(), 2);
         assert_eq!(DetailPage::Patterns.index(), 3);
         assert_eq!(DetailPage::DataFlow.index(), 4);
+        assert_eq!(DetailPage::Responsibilities.index(), 5);
     }
 
     #[test]
@@ -533,5 +565,6 @@ mod tests {
         assert_eq!(DetailPage::GitContext.name(), "Git Context");
         assert_eq!(DetailPage::Patterns.name(), "Patterns");
         assert_eq!(DetailPage::DataFlow.name(), "Data Flow");
+        assert_eq!(DetailPage::Responsibilities.name(), "Responsibilities");
     }
 }
