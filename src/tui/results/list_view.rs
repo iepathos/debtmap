@@ -13,6 +13,19 @@ use ratatui::{
     Frame,
 };
 
+/// Horizontal margin constant per DESIGN.md spacing rules.
+const HORIZONTAL_MARGIN: u16 = 1;
+
+/// Apply horizontal margin for consistent padding.
+fn apply_horizontal_margin(area: Rect) -> Rect {
+    Rect {
+        x: area.x.saturating_add(HORIZONTAL_MARGIN),
+        y: area.y,
+        width: area.width.saturating_sub(HORIZONTAL_MARGIN * 2),
+        height: area.height,
+    }
+}
+
 /// Render main list view
 pub fn render(frame: &mut Frame, app: &ResultsApp) {
     let theme = Theme::default();
@@ -209,19 +222,25 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         ]),
     ];
 
+    // Apply horizontal margin per DESIGN.md
+    let header_area = apply_horizontal_margin(area);
+
     let header = Paragraph::new(header_text)
         .block(Block::default().borders(Borders::BOTTOM))
         .style(Style::default());
 
-    frame.render_widget(header, area);
+    frame.render_widget(header, header_area);
 }
 
 /// Render list of items
 fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
+    // Apply horizontal margin per DESIGN.md
+    let list_area = apply_horizontal_margin(area);
+
     let items: Vec<ListItem> = if app.is_grouped() {
-        render_grouped_list(app, area, theme)
+        render_grouped_list(app, list_area, theme)
     } else {
-        render_ungrouped_list(app, area, theme)
+        render_ungrouped_list(app, list_area, theme)
     };
 
     if items.is_empty() {
@@ -235,10 +254,10 @@ fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
             .style(Style::default().fg(theme.muted))
             .block(Block::default().borders(Borders::NONE));
 
-        frame.render_widget(empty, area);
+        frame.render_widget(empty, list_area);
     } else {
         let list = List::new(items).block(Block::default().borders(Borders::NONE));
-        frame.render_widget(list, area);
+        frame.render_widget(list, list_area);
     }
 }
 
@@ -531,11 +550,14 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::raw(":Quit"),
     ]);
 
+    // Apply horizontal margin per DESIGN.md
+    let footer_area = apply_horizontal_margin(area);
+
     let footer = Paragraph::new(footer_text)
         .block(Block::default().borders(Borders::TOP))
         .style(Style::default());
 
-    frame.render_widget(footer, area);
+    frame.render_widget(footer, footer_area);
 }
 
 /// Get color for severity level

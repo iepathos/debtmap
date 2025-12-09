@@ -70,13 +70,15 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
     render_footer(frame, app, chunks[2], &theme);
 }
 
+/// Horizontal margin constant per DESIGN.md spacing rules.
+const HORIZONTAL_MARGIN: u16 = 1;
+
 /// Apply content margins per DESIGN.md spacing rules.
 ///
 /// Creates breathing room around content with:
 /// - 1 character horizontal margin on each side
 /// - 1 line vertical margin top and bottom
 fn apply_content_margins(area: Rect) -> Rect {
-    const HORIZONTAL_MARGIN: u16 = 1;
     const VERTICAL_MARGIN: u16 = 1;
 
     Rect {
@@ -84,6 +86,18 @@ fn apply_content_margins(area: Rect) -> Rect {
         y: area.y.saturating_add(VERTICAL_MARGIN),
         width: area.width.saturating_sub(HORIZONTAL_MARGIN * 2),
         height: area.height.saturating_sub(VERTICAL_MARGIN * 2),
+    }
+}
+
+/// Apply horizontal margin only (for header/footer areas).
+///
+/// Creates consistent horizontal padding without vertical margin.
+fn apply_horizontal_margin(area: Rect) -> Rect {
+    Rect {
+        x: area.x.saturating_add(HORIZONTAL_MARGIN),
+        y: area.y,
+        width: area.width.saturating_sub(HORIZONTAL_MARGIN * 2),
+        height: area.height,
     }
 }
 
@@ -102,13 +116,16 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         page_name
     );
 
+    // Apply horizontal margin per DESIGN.md
+    let header_area = apply_horizontal_margin(area);
+
     let header = Paragraph::new(vec![Line::from(vec![Span::styled(
         position,
         Style::default().fg(theme.accent()),
     )])])
     .block(Block::default().borders(Borders::BOTTOM));
 
-    frame.render_widget(header, area);
+    frame.render_widget(header, header_area);
 }
 
 /// Render footer with action hints and status message
@@ -162,7 +179,10 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         ])]
     };
 
+    // Apply horizontal margin per DESIGN.md
+    let footer_area = apply_horizontal_margin(area);
+
     let footer = Paragraph::new(lines).block(Block::default().borders(Borders::TOP));
 
-    frame.render_widget(footer, area);
+    frame.render_widget(footer, footer_area);
 }
