@@ -428,7 +428,8 @@ impl FileDebtMetrics {
             return recommendation.clone();
         }
 
-        if self
+        // Build base recommendation
+        let base_recommendation = if self
             .god_object_analysis
             .as_ref()
             .is_some_and(|a| a.is_god_object)
@@ -479,6 +480,61 @@ impl FileDebtMetrics {
             )
         } else {
             "Refactor for better maintainability and testability".to_string()
+        };
+
+        // Add coupling and instability context (spec 201)
+        let coupling_context = self.generate_coupling_context();
+        let instability_context = self.generate_instability_context();
+
+        // Combine recommendations
+        if !coupling_context.is_empty() || !instability_context.is_empty() {
+            let mut parts = vec![base_recommendation];
+            if !coupling_context.is_empty() {
+                parts.push(coupling_context);
+            }
+            if !instability_context.is_empty() {
+                parts.push(instability_context);
+            }
+            parts.join(" ")
+        } else {
+            base_recommendation
+        }
+    }
+
+    /// Generate coupling warning context for highly coupled files (spec 201).
+    ///
+    /// Files with Ca + Ce > 15 are considered highly coupled and should
+    /// show a warning in recommendations.
+    fn generate_coupling_context(&self) -> String {
+        let total_coupling = self.afferent_coupling + self.efferent_coupling;
+
+        if total_coupling > 15 {
+            format!(
+                "[COUPLING WARNING: Ca={}, Ce={}, total={}. Consider reducing dependencies to improve modularity.]",
+                self.afferent_coupling, self.efferent_coupling, total_coupling
+            )
+        } else {
+            String::new()
+        }
+    }
+
+    /// Generate instability context for files with extreme instability values (spec 201).
+    ///
+    /// - I > 0.9: Highly unstable - changes here propagate easily, low risk to modify
+    /// - I < 0.1: Highly stable - many dependents, changes need careful review
+    fn generate_instability_context(&self) -> String {
+        // Only provide context when we have coupling data
+        let total_coupling = self.afferent_coupling + self.efferent_coupling;
+        if total_coupling == 0 {
+            return String::new();
+        }
+
+        if self.instability > 0.9 {
+            "[UNSTABLE: I>0.9 - changes here have few dependents, safe to refactor.]".to_string()
+        } else if self.instability < 0.1 {
+            "[STABLE: I<0.1 - many files depend on this, changes need careful review.]".to_string()
+        } else {
+            String::new()
         }
     }
 }
@@ -1467,5 +1523,159 @@ mod tests {
 
         // Should be reduced by 40% (multiplied by 0.6)
         assert!((item.score - base_score * 0.6).abs() < 0.5);
+    }
+
+    // Tests for spec 201: File-level coupling in recommendations
+
+    #[test]
+    fn test_coupling_warning_for_highly_coupled_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("highly_coupled.rs"),
+            total_lines: 200,
+            afferent_coupling: 10,
+            efferent_coupling: 8,
+            instability: 0.44,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            rec.contains("COUPLING WARNING"),
+            "Should contain coupling warning for Ca+Ce>15"
+        );
+        assert!(rec.contains("Ca=10"), "Should show afferent coupling");
+        assert!(rec.contains("Ce=8"), "Should show efferent coupling");
+        assert!(rec.contains("total=18"), "Should show total coupling");
+    }
+
+    #[test]
+    fn test_no_coupling_warning_for_normal_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("normal.rs"),
+            total_lines: 200,
+            afferent_coupling: 5,
+            efferent_coupling: 5,
+            instability: 0.5,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            !rec.contains("COUPLING WARNING"),
+            "Should not contain coupling warning for Ca+Ce<=15"
+        );
+    }
+
+    #[test]
+    fn test_instability_context_for_unstable_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("unstable.rs"),
+            total_lines: 200,
+            afferent_coupling: 1,
+            efferent_coupling: 10,
+            instability: 0.91,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            rec.contains("UNSTABLE"),
+            "Should contain instability context for I>0.9"
+        );
+        assert!(
+            rec.contains("safe to refactor"),
+            "Should indicate safe to refactor"
+        );
+    }
+
+    #[test]
+    fn test_instability_context_for_stable_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("stable.rs"),
+            total_lines: 200,
+            afferent_coupling: 10,
+            efferent_coupling: 1,
+            instability: 0.09,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            rec.contains("STABLE"),
+            "Should contain stability context for I<0.1"
+        );
+        assert!(
+            rec.contains("careful review"),
+            "Should indicate need for careful review"
+        );
+    }
+
+    #[test]
+    fn test_no_instability_context_for_normal_instability() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("normal.rs"),
+            total_lines: 200,
+            afferent_coupling: 5,
+            efferent_coupling: 5,
+            instability: 0.5,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            !rec.contains("UNSTABLE"),
+            "Should not contain unstable context"
+        );
+        assert!(
+            !rec.contains("STABLE:"),
+            "Should not contain stable context"
+        );
+    }
+
+    #[test]
+    fn test_no_instability_context_when_no_coupling() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("isolated.rs"),
+            total_lines: 200,
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        // Should not have any coupling or instability context
+        assert!(
+            !rec.contains("COUPLING"),
+            "Should not contain coupling context"
+        );
+        assert!(
+            !rec.contains("STABLE"),
+            "Should not contain stability context"
+        );
+        assert!(
+            !rec.contains("UNSTABLE"),
+            "Should not contain instability context"
+        );
+    }
+
+    #[test]
+    fn test_coupling_and_instability_can_combine() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("highly_coupled_unstable.rs"),
+            total_lines: 200,
+            afferent_coupling: 2,
+            efferent_coupling: 18,
+            instability: 0.9,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        // Both warnings should appear when both conditions are met
+        assert!(
+            rec.contains("COUPLING WARNING"),
+            "Should contain coupling warning"
+        );
+        // Note: instability 0.9 is not > 0.9, so no instability context here
     }
 }
