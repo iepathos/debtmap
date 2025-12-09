@@ -406,10 +406,11 @@ fn build_parallel_call_graph(
         thread_count,
         |progress| {
             if let Some(manager) = crate::progress::ProgressManager::global() {
+                // Call graph stage is at index 1 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
                 match progress.phase {
                     CallGraphPhase::DiscoveringFiles => {
                         manager.tui_update_subtask(
-                            2,
+                            1,
                             0,
                             crate::tui::app::StageStatus::Active,
                             None,
@@ -418,20 +419,20 @@ fn build_parallel_call_graph(
                     CallGraphPhase::ParsingASTs => {
                         if progress.current == 0 {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 0,
                                 crate::tui::app::StageStatus::Completed,
                                 None,
                             );
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 1,
                                 crate::tui::app::StageStatus::Active,
                                 Some((0, progress.total)),
                             );
                         } else {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 1,
                                 crate::tui::app::StageStatus::Active,
                                 Some((progress.current, progress.total)),
@@ -441,20 +442,20 @@ fn build_parallel_call_graph(
                     CallGraphPhase::ExtractingCalls => {
                         if progress.current == 0 {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 1,
                                 crate::tui::app::StageStatus::Completed,
                                 None,
                             );
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 2,
                                 crate::tui::app::StageStatus::Active,
                                 Some((0, progress.total)),
                             );
                         } else {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 2,
                                 crate::tui::app::StageStatus::Active,
                                 Some((progress.current, progress.total)),
@@ -463,13 +464,13 @@ fn build_parallel_call_graph(
                     }
                     CallGraphPhase::LinkingModules => {
                         manager.tui_update_subtask(
-                            2,
+                            1,
                             2,
                             crate::tui::app::StageStatus::Completed,
                             None,
                         );
                         manager.tui_update_subtask(
-                            2,
+                            1,
                             3,
                             crate::tui::app::StageStatus::Active,
                             None,
@@ -501,10 +502,11 @@ fn build_sequential_call_graph(
         show_macro_stats,
         |progress| {
             if let Some(manager) = crate::progress::ProgressManager::global() {
+                // Call graph stage is at index 1 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
                 match progress.phase {
                     CallGraphPhase::DiscoveringFiles => {
                         manager.tui_update_subtask(
-                            2,
+                            1,
                             0,
                             crate::tui::app::StageStatus::Active,
                             None,
@@ -513,20 +515,20 @@ fn build_sequential_call_graph(
                     CallGraphPhase::ParsingASTs => {
                         if progress.current == 0 {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 0,
                                 crate::tui::app::StageStatus::Completed,
                                 None,
                             );
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 1,
                                 crate::tui::app::StageStatus::Active,
                                 Some((0, progress.total)),
                             );
                         } else {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 1,
                                 crate::tui::app::StageStatus::Active,
                                 Some((progress.current, progress.total)),
@@ -536,20 +538,20 @@ fn build_sequential_call_graph(
                     CallGraphPhase::ExtractingCalls => {
                         if progress.current == 0 {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 1,
                                 crate::tui::app::StageStatus::Completed,
                                 None,
                             );
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 2,
                                 crate::tui::app::StageStatus::Active,
                                 Some((0, progress.total)),
                             );
                         } else {
                             manager.tui_update_subtask(
-                                2,
+                                1,
                                 2,
                                 crate::tui::app::StageStatus::Active,
                                 Some((progress.current, progress.total)),
@@ -558,13 +560,13 @@ fn build_sequential_call_graph(
                     }
                     CallGraphPhase::LinkingModules => {
                         manager.tui_update_subtask(
-                            2,
+                            1,
                             2,
                             crate::tui::app::StageStatus::Completed,
                             None,
                         );
                         manager.tui_update_subtask(
-                            2,
+                            1,
                             3,
                             crate::tui::app::StageStatus::Active,
                             None,
@@ -598,8 +600,9 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
     match coverage_file {
         Some(lcov_path) => {
             // Start subsection 0: open file
+            // Coverage stage is at index 2 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
             if let Some(manager) = crate::progress::ProgressManager::global() {
-                manager.tui_update_subtask(3, 0, crate::tui::app::StageStatus::Active, None);
+                manager.tui_update_subtask(2, 0, crate::tui::app::StageStatus::Active, None);
             }
 
             let data = risk::lcov::parse_lcov_file_with_callback(&lcov_path, |progress| {
@@ -608,7 +611,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
                         risk::lcov::CoverageProgress::Initializing => {
                             // Subtask 0 complete: open file
                             manager.tui_update_subtask(
-                                3,
+                                2,
                                 0,
                                 crate::tui::app::StageStatus::Completed,
                                 None,
@@ -616,7 +619,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
                             std::thread::sleep(Duration::from_millis(150));
                             // Subtask 1 start: parse coverage
                             manager.tui_update_subtask(
-                                3,
+                                2,
                                 1,
                                 crate::tui::app::StageStatus::Active,
                                 None,
@@ -624,7 +627,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
                         }
                         risk::lcov::CoverageProgress::Parsing { current, total } => {
                             manager.tui_update_subtask(
-                                3,
+                                2,
                                 1,
                                 crate::tui::app::StageStatus::Active,
                                 Some((current, total)),
@@ -633,7 +636,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
                         risk::lcov::CoverageProgress::ComputingStats => {
                             // Subtask 1 complete
                             manager.tui_update_subtask(
-                                3,
+                                2,
                                 1,
                                 crate::tui::app::StageStatus::Completed,
                                 None,
@@ -641,7 +644,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
                             std::thread::sleep(Duration::from_millis(150));
                             // Subtask 2 start: compute stats
                             manager.tui_update_subtask(
-                                3,
+                                2,
                                 2,
                                 crate::tui::app::StageStatus::Active,
                                 None,
@@ -649,7 +652,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
                         }
                         risk::lcov::CoverageProgress::Complete => {
                             manager.tui_update_subtask(
-                                3,
+                                2,
                                 2,
                                 crate::tui::app::StageStatus::Completed,
                                 None,
@@ -665,9 +668,9 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
         None => {
             // No coverage file provided - skip all subsections
             if let Some(manager) = crate::progress::ProgressManager::global() {
-                manager.tui_update_subtask(3, 0, crate::tui::app::StageStatus::Completed, None);
-                manager.tui_update_subtask(3, 1, crate::tui::app::StageStatus::Completed, None);
-                manager.tui_update_subtask(3, 2, crate::tui::app::StageStatus::Completed, None);
+                manager.tui_update_subtask(2, 0, crate::tui::app::StageStatus::Completed, None);
+                manager.tui_update_subtask(2, 1, crate::tui::app::StageStatus::Completed, None);
+                manager.tui_update_subtask(2, 2, crate::tui::app::StageStatus::Completed, None);
             }
             Ok(None)
         }
@@ -767,12 +770,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
 
     // Progress is tracked by unified AnalysisProgress system - no individual step output needed
 
-    // Subtask 0: Initialize (data flow graph, purity, test detection)
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Active, None);
-    }
-
-    // Step 1: Initialize unified analysis with data flow graph
+    // Step 1: Initialize unified analysis with data flow graph (no subtask - instant operation)
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
     // Step 2: Populate purity analysis
@@ -782,14 +780,9 @@ fn create_unified_analysis_with_exclusions_and_timing(
     let test_only_functions: HashSet<_> =
         call_graph.find_test_only_functions().into_iter().collect();
 
+    // Subtask 0: Aggregate debt
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Completed, None);
-        std::thread::sleep(std::time::Duration::from_millis(150));
-    }
-
-    // Subtask 1: Aggregate debt
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Active, None);
+        manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Active, None);
     }
 
     // Step 4: Setup debt aggregator
@@ -808,16 +801,16 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Completed, None);
+        manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Completed, None);
         std::thread::sleep(std::time::Duration::from_millis(150));
     }
 
-    // Subtask 2: Score functions (main computational loop with progress)
+    // Subtask 1: Score functions (main computational loop with progress)
     let total_metrics = metrics.len();
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_update_subtask(
-            6,
-            2,
+            5,
+            1,
             crate::tui::app::StageStatus::Active,
             Some((0, total_metrics)),
         );
@@ -831,8 +824,8 @@ fn create_unified_analysis_with_exclusions_and_timing(
             if idx % 100 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100) {
                 if let Some(manager) = crate::progress::ProgressManager::global() {
                     manager.tui_update_subtask(
-                        6,
-                        2,
+                        5,
+                        1,
                         crate::tui::app::StageStatus::Active,
                         Some((idx + 1, total_metrics)),
                     );
@@ -863,8 +856,8 @@ fn create_unified_analysis_with_exclusions_and_timing(
         if idx % 100 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100) {
             if let Some(manager) = crate::progress::ProgressManager::global() {
                 manager.tui_update_subtask(
-                    6,
-                    2,
+                    5,
+                    1,
                     crate::tui::app::StageStatus::Active,
                     Some((idx + 1, total_metrics)),
                 );
@@ -875,20 +868,26 @@ fn create_unified_analysis_with_exclusions_and_timing(
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_update_subtask(
-            6,
-            2,
+            5,
+            1,
             crate::tui::app::StageStatus::Completed,
             Some((total_metrics, total_metrics)),
         );
         std::thread::sleep(std::time::Duration::from_millis(150));
     }
 
-    // Subtask 3: Filter results (error analysis, file analysis, sorting, filtering)
+    // Subtask 2: Filter results (error analysis, file analysis, sorting, filtering)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Active, None);
+        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Active, None);
     }
 
-    // Step 6: Error swallowing analysis (now handled as function metrics, not standalone items)
+    // Step 6: Error swallowing analysis
+    if let Some(debt_items) = debt_items {
+        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
+        for item in error_swallowing_items {
+            unified.add_item(item);
+        }
+    }
 
     // Step 7: File-level analysis
     analyze_files_for_debt(
@@ -907,7 +906,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     unified.calculate_total_impact();
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Completed, None);
+        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Completed, None);
     }
 
     // Set coverage data availability flag (spec 108)
@@ -995,13 +994,17 @@ fn create_unified_analysis_parallel(
         function_pointer_used_functions,
     );
 
-    // Subtask 3: Filter results (error analysis, file analysis, sorting, filtering) - PARALLEL
+    // Subtask 2: Filter results (error analysis, file analysis, sorting, filtering) - PARALLEL
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Active, None);
+        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Active, None);
     }
 
-    // Error swallowing is now handled as function metrics, not standalone items
-    let all_items = items;
+    // Add error swallowing items
+    let mut all_items = items;
+    if let Some(debt_items) = debt_items {
+        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
+        all_items.extend(error_swallowing_items);
+    }
 
     // Phase 3: Parallel file analysis
     let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
@@ -1021,7 +1024,7 @@ fn create_unified_analysis_parallel(
     // Aggregation has been removed - no longer needed
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(6, 3, crate::tui::app::StageStatus::Completed, None);
+        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Completed, None);
     }
 
     unified
@@ -1085,6 +1088,148 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         risk_analyzer,
         project_path,
     )
+}
+
+/// Calculate severity score for error swallowing pattern
+/// Maps pattern types to severity scores (10-40 range)
+fn calculate_error_swallowing_severity(pattern: &str) -> f64 {
+    // Match patterns from src/debt/error_swallowing.rs priorities
+    if pattern.contains("let _ =") || pattern.contains("discarding Result") {
+        40.0 // Highest severity - completely discarding Result
+    } else if pattern.contains("if let Ok") || pattern.contains(".ok()") || pattern.contains("match") {
+        25.0 // Medium-high severity - swallowing specific error information
+    } else if pattern.contains("unwrap_or") {
+        15.0 // Lower severity - at least provides fallback value
+    } else {
+        20.0 // Default severity for unknown patterns
+    }
+}
+
+/// Calculate weight from priority level
+/// Maps Priority enum to numeric weights matching debt/mod.rs
+fn calculate_priority_weight(priority: &crate::core::Priority) -> f64 {
+    match priority {
+        crate::core::Priority::Low => 1.0,
+        crate::core::Priority::Medium => 3.0,
+        crate::core::Priority::High => 5.0,
+        crate::core::Priority::Critical => 10.0,
+    }
+}
+
+fn convert_error_swallowing_to_unified(
+    debt_items: &[DebtItem],
+    _call_graph: &priority::CallGraph,
+) -> Vec<UnifiedDebtItem> {
+    debt_items
+        .iter()
+        .filter(|item| {
+            matches!(
+                item.debt_type,
+                crate::core::DebtType::ErrorSwallowing { .. }
+            )
+        })
+        .map(|item| {
+            // Extract pattern and context from the original debt item
+            let pattern = item.message.split(':').next().unwrap_or("Error swallowing");
+            let context = item.context.clone();
+
+            // Calculate score based on pattern severity and priority
+            // Error swallowing has high risk (0.35 in computation.rs) and type weight 4 (in debt/mod.rs)
+            let pattern_severity = calculate_error_swallowing_severity(pattern);
+            let priority_weight = calculate_priority_weight(&item.priority);
+
+            // Base score: pattern severity (10-40) * priority weight (1-10) = 10-400
+            // This puts error swallowing in a meaningful range:
+            // - Low priority unwrap_or: ~10-15
+            // - Medium priority if-let: ~60-90
+            // - High priority let _: ~200-400
+            let base_score = pattern_severity * priority_weight;
+
+            // Risk factor of 0.35 means error swallowing is high risk
+            let risk_boost = base_score * 0.35;
+            let final_score_value = (base_score + risk_boost).min(100.0);
+
+            let unified_score = UnifiedScore {
+                complexity_factor: pattern_severity / 10.0, // Normalized to 0-10 scale
+                coverage_factor: 0.0, // Error swallowing is code-level, not coverage-dependent
+                dependency_factor: 0.0, // Not dependency-related
+                role_multiplier: priority_weight / 10.0, // Normalized priority
+                final_score: Score0To100::new(final_score_value),
+                base_score: Some(base_score),
+                exponential_factor: None,
+                risk_boost: Some(risk_boost),
+                pre_adjustment_score: Some(base_score),
+                adjustment_applied: None, // ScoreAdjustment is for orchestration patterns, not needed here
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: Some(pattern_severity),
+            };
+
+            UnifiedDebtItem {
+                location: Location {
+                    file: item.file.clone(),
+                    function: format!("line_{}", item.line),
+                    line: item.line,
+                },
+                debt_type: DebtType::ErrorSwallowing {
+                    pattern: pattern.to_string(),
+                    context,
+                },
+                unified_score,
+                function_role: FunctionRole::Unknown,
+                recommendation: ActionableRecommendation {
+                    primary_action: format!("Fix error swallowing at line {}", item.line),
+                    rationale: item.message.clone(),
+                    implementation_steps: vec![
+                        "Replace error swallowing with proper error handling".to_string(),
+                        "Log errors at minimum, even if they can't be handled".to_string(),
+                        "Consider propagating errors to caller with ?".to_string(),
+                    ],
+                    related_items: vec![],
+                    steps: None,
+                    estimated_effort_hours: None,
+                },
+                expected_impact: ImpactMetrics {
+                    coverage_improvement: 0.0,
+                    lines_reduction: 0,
+                    complexity_reduction: 0.0,
+                    risk_reduction: pattern_severity * 0.35, // Risk reduction proportional to severity
+                },
+                transitive_coverage: None,
+                file_context: None,
+                upstream_dependencies: 0,
+                downstream_dependencies: 0,
+                upstream_callers: vec![],
+                downstream_callees: vec![],
+                nesting_depth: 0,
+                function_length: 0,
+                cyclomatic_complexity: 0,
+                cognitive_complexity: 0,
+                entropy_details: None,
+                entropy_adjusted_cyclomatic: None,
+                entropy_adjusted_cognitive: None,
+                entropy_dampening_factor: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_level: None,
+                god_object_indicators: None,
+                tier: None,
+                function_context: None,
+                context_confidence: None,
+                contextual_recommendation: None,
+                pattern_analysis: None,
+                context_multiplier: None,
+                context_type: None,
+                language_specific: None, // No language-specific data for error swallowing items (spec 190)
+                detected_pattern: None, // No pattern detection for error swallowing items (spec 204)
+                contextual_risk: None,
+                file_line_count: None, // No file line count caching for error swallowing items (spec 204)
+                responsibility_category: None, // No responsibility category for error swallowing items (spec 254)
+                error_swallowing_count: Some(1), // This is an error swallowing item itself
+                error_swallowing_patterns: Some(vec![pattern.to_string()]), // Pattern type from debt item
+            }
+        })
+        .collect()
 }
 
 /// Perform multi-pass analysis on the results
@@ -1591,19 +1736,10 @@ pub fn create_god_object_debt_item(
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
         cognitive_complexity: aggregated_metrics.total_cognitive,
-        entropy_details: aggregated_metrics.aggregated_entropy.clone(),
-        entropy_adjusted_cyclomatic: aggregated_metrics
-            .aggregated_entropy
-            .as_ref()
-            .map(|e| e.adjusted_complexity),
-        entropy_adjusted_cognitive: aggregated_metrics
-            .aggregated_entropy
-            .as_ref()
-            .map(|e| e.adjusted_cognitive),
-        entropy_dampening_factor: aggregated_metrics
-            .aggregated_entropy
-            .as_ref()
-            .map(|e| e.dampening_factor),
+        entropy_details: None,
+        entropy_adjusted_cyclomatic: None,
+        entropy_adjusted_cognitive: None,
+        entropy_dampening_factor: None,
         is_pure: None,
         purity_confidence: None,
         purity_level: None,
@@ -1621,16 +1757,8 @@ pub fn create_god_object_debt_item(
         contextual_risk: aggregated_metrics.aggregated_contextual_risk,
         file_line_count: Some(god_analysis.lines_of_code),
         responsibility_category: god_analysis.responsibilities.first().cloned(), // Primary responsibility from detailed list (spec 254)
-        error_swallowing_count: if aggregated_metrics.total_error_swallowing_count > 0 {
-            Some(aggregated_metrics.total_error_swallowing_count)
-        } else {
-            None
-        },
-        error_swallowing_patterns: if aggregated_metrics.error_swallowing_patterns.is_empty() {
-            None
-        } else {
-            Some(aggregated_metrics.error_swallowing_patterns.clone())
-        },
+        error_swallowing_count: None, // Not applicable for god object items
+        error_swallowing_patterns: None,
     }
 }
 
@@ -1725,20 +1853,17 @@ fn apply_file_analysis_results(
             // Enrich with coverage/dependencies/risk from unified items
             // NOTE: Dependencies aggregate only from "problematic" functions that became debt items.
             // This provides a debt-focused view rather than complete architectural dependencies.
-            // NOTE: Entropy is already aggregated from raw metrics (ALL functions), so we don't
-            // overwrite it with member-only entropy.
             let member_functions =
                 extract_member_functions(unified.items.iter(), &file_data.file_path);
             if !member_functions.is_empty() {
                 let item_metrics = aggregate_god_object_metrics(&member_functions);
-                // Merge coverage and dependency data from debt items
+                // Merge all contextual data from debt items
                 aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
                 aggregated_metrics.unique_upstream_callers = item_metrics.unique_upstream_callers;
                 aggregated_metrics.unique_downstream_callees =
                     item_metrics.unique_downstream_callees;
                 aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
                 aggregated_metrics.downstream_dependencies = item_metrics.downstream_dependencies;
-                // Keep raw entropy (from all functions) - don't overwrite with member-only entropy
 
                 // Spec 248: Prefer direct file-level git analysis over member aggregation
                 aggregated_metrics.aggregated_contextual_risk = risk_analyzer
@@ -1774,36 +1899,10 @@ fn apply_file_analysis_results(
             unified.add_item(god_item); // Exempt from complexity filtering (spec 207)
         }
 
-        // Spec 201: Aggregate file-level dependency metrics from function-level data
-        let member_functions_for_deps =
-            extract_member_functions(unified.items.iter(), &file_data.file_path);
-        let file_data_with_deps =
-            enrich_file_metrics_with_dependencies(file_data, &member_functions_for_deps);
-
         // Create and add file debt item
-        let file_item = create_file_debt_item(file_data_with_deps);
+        let file_item = create_file_debt_item(file_data);
         unified.add_file_item(file_item);
     }
-}
-
-/// Enrich file metrics with dependency data aggregated from function-level items (spec 201)
-fn enrich_file_metrics_with_dependencies(
-    mut file_data: ProcessedFileData,
-    member_functions: &[&crate::priority::UnifiedDebtItem],
-) -> ProcessedFileData {
-    use crate::priority::god_object_aggregation::aggregate_dependency_metrics;
-
-    let (callers, callees, afferent, efferent) = aggregate_dependency_metrics(member_functions);
-
-    // Update file metrics with aggregated dependency data
-    file_data.file_metrics.afferent_coupling = afferent;
-    file_data.file_metrics.efferent_coupling = efferent;
-    file_data.file_metrics.instability =
-        crate::output::unified::calculate_instability(afferent, efferent);
-    file_data.file_metrics.dependents = callers.into_iter().take(10).collect();
-    file_data.file_metrics.dependencies_list = callees.into_iter().take(10).collect();
-
-    file_data
 }
 
 // Pure function to update function god indicators
@@ -1841,8 +1940,9 @@ fn run_purity_propagation(
     use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
 
     // Subtask 0: Build data flow graph
+    // Purity stage is at index 3 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Active, None);
+        manager.tui_update_subtask(3, 0, crate::tui::app::StageStatus::Active, None);
     }
 
     // Create RustCallGraph wrapper around the base call graph
@@ -1858,7 +1958,7 @@ fn run_purity_propagation(
     let adapter = PurityCallGraphAdapter::from_rust_graph(rust_graph);
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Completed, None);
+        manager.tui_update_subtask(3, 0, crate::tui::app::StageStatus::Completed, None);
         // Brief pause to ensure subtask update is visible
         std::thread::sleep(std::time::Duration::from_millis(150));
     }
@@ -1866,7 +1966,7 @@ fn run_purity_propagation(
     // Subtask 1: Initial purity detection
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_update_subtask(
-            5,
+            3,
             1,
             crate::tui::app::StageStatus::Active,
             Some((0, metrics.len())),
@@ -1879,7 +1979,7 @@ fn run_purity_propagation(
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_update_subtask(
-            5,
+            3,
             1,
             crate::tui::app::StageStatus::Completed,
             Some((metrics.len(), metrics.len())),
@@ -1890,20 +1990,20 @@ fn run_purity_propagation(
 
     // Subtask 2: Purity propagation
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Active, None);
+        manager.tui_update_subtask(3, 2, crate::tui::app::StageStatus::Active, None);
     }
 
     // Run propagation
     if let Err(e) = propagator.propagate(metrics) {
         log::warn!("Purity propagation failed: {}", e);
         if let Some(manager) = crate::progress::ProgressManager::global() {
-            manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Completed, None);
+            manager.tui_update_subtask(3, 2, crate::tui::app::StageStatus::Completed, None);
         }
         return metrics.to_vec();
     }
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_update_subtask(5, 2, crate::tui::app::StageStatus::Completed, None);
+        manager.tui_update_subtask(3, 2, crate::tui::app::StageStatus::Completed, None);
         // Brief pause to ensure subtask update is visible
         std::thread::sleep(std::time::Duration::from_millis(150));
     }
@@ -1911,7 +2011,7 @@ fn run_purity_propagation(
     // Subtask 3: Side effects analysis
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_update_subtask(
-            5,
+            3,
             3,
             crate::tui::app::StageStatus::Active,
             Some((0, metrics.len())),
@@ -1944,7 +2044,7 @@ fn run_purity_propagation(
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_update_subtask(
-            5,
+            3,
             3,
             crate::tui::app::StageStatus::Completed,
             Some((metrics.len(), metrics.len())),

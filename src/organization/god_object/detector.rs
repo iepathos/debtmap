@@ -256,23 +256,20 @@ impl GodObjectDetector {
 
         // Determine detection type based on code structure:
         // - GodModule: Many standalone functions dominating the file (>50 and >3x impl methods)
-        // - GodClass: Structs with meaningful impl methods (impl methods >= standalone or impl > 0 with few standalone)
-        // - GodFile: Primarily standalone functions, or structs without impl methods (data-only structs)
+        // - GodClass: Structs with impl methods (Spec 118 - only count impl methods for struct analysis)
+        // - GodFile: Pure functional modules or structs without impl methods (data-only structs)
         let detection_type =
             if has_structs && standalone_count > 50 && standalone_count > impl_method_count * 3 {
                 DetectionType::GodModule
-            } else if has_structs && impl_method_count > 0 && impl_method_count >= standalone_count
-            {
-                // True god class: has structs with impl methods that dominate the file
-                DetectionType::GodClass
-            } else if has_structs && impl_method_count > 0 && standalone_count < 10 {
-                // Small file with struct + impl methods - treat as god class
+            } else if has_structs && impl_method_count > 0 {
+                // File has structs with impl methods - treat as god class (Spec 118)
+                // This ensures only impl methods are counted for struct analysis,
+                // preventing false positives for functional/procedural modules
                 DetectionType::GodClass
             } else {
                 // Default to GodFile for:
                 // - No structs (pure functional module)
                 // - Structs with no impl methods (data-only structs)
-                // - Structs with few impl methods but many standalone functions
                 DetectionType::GodFile
             };
 

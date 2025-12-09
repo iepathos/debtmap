@@ -350,13 +350,12 @@ fn test_debt_scoring_subtasks() {
     // Verify debt scoring stage (index 5) has the correct subtasks
     let debt_stage = &app.stages[5];
     assert_eq!(debt_stage.name, "debt scoring");
-    assert_eq!(debt_stage.sub_tasks.len(), 4);
+    assert_eq!(debt_stage.sub_tasks.len(), 3);
 
-    // Verify subtask names
-    assert_eq!(debt_stage.sub_tasks[0].name, "initialize");
-    assert_eq!(debt_stage.sub_tasks[1].name, "aggregate debt");
-    assert_eq!(debt_stage.sub_tasks[2].name, "score functions");
-    assert_eq!(debt_stage.sub_tasks[3].name, "filter results");
+    // Verify subtask names (spec 206 simplified to 3 stages)
+    assert_eq!(debt_stage.sub_tasks[0].name, "aggregate debt");
+    assert_eq!(debt_stage.sub_tasks[1].name, "score functions");
+    assert_eq!(debt_stage.sub_tasks[2].name, "filter results");
 
     // All subtasks should be pending initially
     for subtask in &debt_stage.sub_tasks {

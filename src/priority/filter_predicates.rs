@@ -159,7 +159,7 @@ pub fn is_exempt_from_complexity_filter(item: &UnifiedDebtItem) -> bool {
             | DebtType::TestTodo { .. }
             | DebtType::TestDuplication { .. }
             | DebtType::GodObject { .. }
-            | DebtType::ErrorSwallowing { .. }
+            | DebtType::ErrorSwallowing { .. } // Code-level pattern detection, not function-level complexity
     )
 }
 
