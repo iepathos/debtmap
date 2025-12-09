@@ -1762,10 +1762,36 @@ fn apply_file_analysis_results(
             unified.add_item(god_item); // Exempt from complexity filtering (spec 207)
         }
 
+        // Spec 201: Aggregate file-level dependency metrics from function-level data
+        let member_functions_for_deps =
+            extract_member_functions(unified.items.iter(), &file_data.file_path);
+        let file_data_with_deps =
+            enrich_file_metrics_with_dependencies(file_data, &member_functions_for_deps);
+
         // Create and add file debt item
-        let file_item = create_file_debt_item(file_data);
+        let file_item = create_file_debt_item(file_data_with_deps);
         unified.add_file_item(file_item);
     }
+}
+
+/// Enrich file metrics with dependency data aggregated from function-level items (spec 201)
+fn enrich_file_metrics_with_dependencies(
+    mut file_data: ProcessedFileData,
+    member_functions: &[&crate::priority::UnifiedDebtItem],
+) -> ProcessedFileData {
+    use crate::priority::god_object_aggregation::aggregate_dependency_metrics;
+
+    let (callers, callees, afferent, efferent) = aggregate_dependency_metrics(member_functions);
+
+    // Update file metrics with aggregated dependency data
+    file_data.file_metrics.afferent_coupling = afferent;
+    file_data.file_metrics.efferent_coupling = efferent;
+    file_data.file_metrics.instability =
+        crate::output::unified::calculate_instability(afferent, efferent);
+    file_data.file_metrics.dependents = callers.into_iter().take(10).collect();
+    file_data.file_metrics.dependencies_list = callees.into_iter().take(10).collect();
+
+    file_data
 }
 
 // Pure function to update function god indicators

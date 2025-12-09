@@ -42,6 +42,7 @@ fn test_file_level_scoring_integration() {
         function_scores: vec![],
         god_object_type: None,
         file_type: None,
+        ..Default::default()
     };
 
     // Add various function scores
@@ -119,6 +120,7 @@ fn test_file_scoring_with_god_object_detection() {
         god_object_type: None,
         function_scores: vec![8.0; 80], // High scores for all functions
         file_type: None,
+        ..Default::default()
     };
 
     let score = metrics.calculate_score();
@@ -245,6 +247,7 @@ fn test_file_debt_item_creation() {
         function_scores: vec![6.0; 35],
         god_object_type: None,
         file_type: None,
+        ..Default::default()
     };
 
     let score = metrics.calculate_score();
@@ -444,6 +447,7 @@ fn test_file_scoring_with_real_world_scenarios() {
         function_scores: vec![9.0; 70],
         god_object_type: None,
         file_type: None,
+        ..Default::default()
     };
 
     let legacy_score = legacy_file.calculate_score();
@@ -467,6 +471,7 @@ fn test_file_scoring_with_real_world_scenarios() {
         function_scores: vec![2.0; 15],
         god_object_type: None,
         file_type: None,
+        ..Default::default()
     };
 
     let util_score = util_file.calculate_score();
@@ -490,6 +495,7 @@ fn test_file_scoring_with_real_world_scenarios() {
         function_scores: vec![5.5; 30],
         god_object_type: None,
         file_type: None,
+        ..Default::default()
     };
 
     let business_score = business_logic.calculate_score();

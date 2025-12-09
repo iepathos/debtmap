@@ -125,6 +125,7 @@ mod tests {
                 function_scores: vec![],
                 god_object_type: None,
                 file_type: None,
+                ..Default::default()
             },
             score,
             priority_rank: 1,
