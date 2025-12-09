@@ -311,27 +311,67 @@ impl DependencyMatrix {
         sccs
     }
 
+    /// Iterative DFS to compute finish order (avoids stack overflow on large graphs)
     fn dfs_finish(
-        node: usize,
+        start: usize,
         adj: &[Vec<usize>],
         visited: &mut [bool],
         finish_order: &mut Vec<usize>,
     ) {
-        visited[node] = true;
-        for &neighbor in &adj[node] {
-            if !visited[neighbor] {
-                Self::dfs_finish(neighbor, adj, visited, finish_order);
+        // Use explicit stack instead of recursion to avoid stack overflow
+        // Each stack frame: (node, neighbor_index, is_backtracking)
+        let mut stack: Vec<(usize, usize, bool)> = vec![(start, 0, false)];
+
+        while let Some((node, neighbor_idx, backtracking)) = stack.pop() {
+            if backtracking {
+                // All neighbors processed, add to finish order
+                finish_order.push(node);
+                continue;
+            }
+
+            if !visited[node] {
+                visited[node] = true;
+            }
+
+            // Find next unvisited neighbor
+            let neighbors = &adj[node];
+            let mut found_unvisited = false;
+            for i in neighbor_idx..neighbors.len() {
+                let neighbor = neighbors[i];
+                if !visited[neighbor] {
+                    // Push current node back with next neighbor index and backtrack flag
+                    stack.push((node, i + 1, false));
+                    // Push the unvisited neighbor to explore
+                    stack.push((neighbor, 0, false));
+                    found_unvisited = true;
+                    break;
+                }
+            }
+
+            if !found_unvisited {
+                // No more unvisited neighbors, mark for backtracking
+                stack.push((node, 0, true));
             }
         }
-        finish_order.push(node);
     }
 
-    fn dfs_collect(node: usize, adj: &[Vec<usize>], visited: &mut [bool], scc: &mut Vec<usize>) {
-        visited[node] = true;
-        scc.push(node);
-        for &neighbor in &adj[node] {
-            if !visited[neighbor] {
-                Self::dfs_collect(neighbor, adj, visited, scc);
+    /// Iterative DFS to collect strongly connected component (avoids stack overflow)
+    fn dfs_collect(start: usize, adj: &[Vec<usize>], visited: &mut [bool], scc: &mut Vec<usize>) {
+        // Use explicit stack instead of recursion
+        let mut stack = vec![start];
+
+        while let Some(node) = stack.pop() {
+            if visited[node] {
+                continue;
+            }
+            visited[node] = true;
+            scc.push(node);
+
+            // Add all unvisited neighbors to the stack
+            for &neighbor in &adj[node] {
+                if !visited[neighbor] {
+                    stack.push(neighbor);
+                }
             }
         }
     }
