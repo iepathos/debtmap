@@ -254,14 +254,28 @@ impl GodObjectDetector {
         let standalone_count = visitor.standalone_functions.len();
         let impl_method_count: usize = visitor.types.values().map(|t| t.method_count).sum();
 
-        let detection_type =
-            if has_structs && standalone_count > 50 && standalone_count > impl_method_count * 3 {
-                DetectionType::GodModule
-            } else if has_structs {
-                DetectionType::GodClass
-            } else {
-                DetectionType::GodFile
-            };
+        // Determine detection type based on code structure:
+        // - GodModule: Many standalone functions dominating the file (>50 and >3x impl methods)
+        // - GodClass: Structs with meaningful impl methods (impl methods >= standalone or impl > 0 with few standalone)
+        // - GodFile: Primarily standalone functions, or structs without impl methods (data-only structs)
+        let detection_type = if has_structs
+            && standalone_count > 50
+            && standalone_count > impl_method_count * 3
+        {
+            DetectionType::GodModule
+        } else if has_structs && impl_method_count > 0 && impl_method_count >= standalone_count {
+            // True god class: has structs with impl methods that dominate the file
+            DetectionType::GodClass
+        } else if has_structs && impl_method_count > 0 && standalone_count < 10 {
+            // Small file with struct + impl methods - treat as god class
+            DetectionType::GodClass
+        } else {
+            // Default to GodFile for:
+            // - No structs (pure functional module)
+            // - Structs with no impl methods (data-only structs)
+            // - Structs with few impl methods but many standalone functions
+            DetectionType::GodFile
+        };
 
         // Step 3: Count methods (exclude tests for GodClass, include for GodFile/GodModule)
         let (method_count, method_names) = match detection_type {

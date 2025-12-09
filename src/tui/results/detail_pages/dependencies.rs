@@ -56,8 +56,10 @@ pub fn render(
         area.width,
     );
 
-    // Responsibilities section (for god objects)
-    if let Some(indicators) = &item.god_object_indicators {
+    // Responsibility section - show for all items
+    // God objects: show all responsibilities with method counts
+    // Regular functions: show single responsibility category
+    let god_object_responsibilities_shown = if let Some(indicators) = &item.god_object_indicators {
         if indicators.is_god_object && !indicators.responsibilities.is_empty() {
             lines.push(ratatui::text::Line::from(""));
 
@@ -84,6 +86,26 @@ pub fn render(
                 // Use the same column system as dependency metrics
                 add_label_value(&mut lines, &resp_text, count_text, theme, area.width);
             }
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    // Fall back to single responsibility category if god object responsibilities weren't shown
+    if !god_object_responsibilities_shown {
+        if let Some(ref category) = item.responsibility_category {
+            lines.push(ratatui::text::Line::from(""));
+            add_section_header(&mut lines, "responsibility", theme);
+            add_label_value(
+                &mut lines,
+                "category",
+                category.to_lowercase(),
+                theme,
+                area.width,
+            );
         }
     }
 
