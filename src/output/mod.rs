@@ -1,4 +1,5 @@
 pub mod dot;
+pub mod dsm;
 pub mod evidence_formatter;
 pub mod formatters;
 pub mod json;
@@ -153,6 +154,10 @@ pub fn output_unified_priorities_with_summary(
         Some(crate::cli::OutputFormat::Dot) => {
             // DOT format for Graphviz visualization (Spec 204)
             dot::output_dot_default(&analysis, output_file)
+        }
+        Some(crate::cli::OutputFormat::Dsm) => {
+            // DSM format for dependency structure matrix visualization (Spec 205)
+            dsm::output_dsm_default(&analysis, output_file)
         }
         _ => {
             if is_markdown_file(&output_file) {

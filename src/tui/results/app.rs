@@ -11,7 +11,7 @@ pub fn get_coverage(item: &UnifiedDebtItem) -> Option<f64> {
 }
 
 use super::{
-    detail_view, filter::Filter, layout, list_view, navigation, search::SearchState,
+    detail_view, dsm_view, filter::Filter, layout, list_view, navigation, search::SearchState,
     sort::SortCriteria,
 };
 
@@ -30,6 +30,8 @@ pub enum ViewMode {
     FilterMenu,
     /// Help overlay
     Help,
+    /// Dependency Structure Matrix view (Spec 205)
+    Dsm,
 }
 
 /// Detail page selection for multi-page detail view
@@ -134,6 +136,10 @@ pub struct ResultsApp {
     show_grouped: bool,
     /// Status message to display temporarily (cleared on next key press)
     status_message: Option<String>,
+    /// DSM view horizontal scroll offset (Spec 205)
+    dsm_scroll_x: usize,
+    /// DSM view vertical scroll offset (Spec 205)
+    dsm_scroll_y: usize,
 }
 
 impl ResultsApp {
@@ -156,6 +162,8 @@ impl ResultsApp {
             detail_page: DetailPage::Overview,
             show_grouped: true, // Default: grouping enabled
             status_message: None,
+            dsm_scroll_x: 0,
+            dsm_scroll_y: 0,
         }
     }
 
@@ -175,6 +183,7 @@ impl ResultsApp {
             ViewMode::SortMenu => list_view::render_with_sort_menu(frame, self),
             ViewMode::FilterMenu => list_view::render_with_filter_menu(frame, self),
             ViewMode::Help => layout::render_help_overlay(frame, self),
+            ViewMode::Dsm => dsm_view::render(frame, self),
         }
     }
 
@@ -507,6 +516,26 @@ impl ResultsApp {
     /// Clear status message
     pub fn clear_status_message(&mut self) {
         self.status_message = None;
+    }
+
+    /// Get DSM horizontal scroll offset (Spec 205)
+    pub fn dsm_scroll_x(&self) -> usize {
+        self.dsm_scroll_x
+    }
+
+    /// Set DSM horizontal scroll offset (Spec 205)
+    pub fn set_dsm_scroll_x(&mut self, offset: usize) {
+        self.dsm_scroll_x = offset;
+    }
+
+    /// Get DSM vertical scroll offset (Spec 205)
+    pub fn dsm_scroll_y(&self) -> usize {
+        self.dsm_scroll_y
+    }
+
+    /// Set DSM vertical scroll offset (Spec 205)
+    pub fn set_dsm_scroll_y(&mut self, offset: usize) {
+        self.dsm_scroll_y = offset;
     }
 }
 

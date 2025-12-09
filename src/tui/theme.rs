@@ -106,6 +106,16 @@ impl Theme {
         Style::default().fg(self.muted)
     }
 
+    /// Get primary accent color (Spec 205)
+    pub fn primary_color(&self) -> Color {
+        self.primary
+    }
+
+    /// Get muted/dim color (Spec 205)
+    pub fn muted_color(&self) -> Color {
+        self.muted
+    }
+
     /// Color for coupling classification badge (spec 203)
     ///
     /// Returns appropriate color based on classification type:
