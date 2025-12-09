@@ -529,6 +529,14 @@ impl ResultsApp {
         self.available_pages().contains(&page)
     }
 
+    /// Ensure current page is valid for the selected item
+    /// If current page isn't available, reset to Overview
+    pub fn ensure_valid_page(&mut self) {
+        if !self.is_page_available(self.detail_page) {
+            self.detail_page = DetailPage::Overview;
+        }
+    }
+
     /// Toggle grouping on/off
     pub fn toggle_grouping(&mut self) {
         self.show_grouped = !self.show_grouped;

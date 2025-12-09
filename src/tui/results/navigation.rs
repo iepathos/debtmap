@@ -166,12 +166,14 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             }
         }
 
-        // Navigate to next/previous item (preserve page)
+        // Navigate to next/previous item (preserve page if available)
         KeyCode::Char('n') | KeyCode::Down | KeyCode::Char('j') => {
             move_selection(app, 1);
+            app.ensure_valid_page();
         }
         KeyCode::Char('p') | KeyCode::Up | KeyCode::Char('k') => {
             move_selection(app, -1);
+            app.ensure_valid_page();
         }
 
         // Actions
