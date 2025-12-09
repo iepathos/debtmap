@@ -482,6 +482,53 @@ impl ResultsApp {
         self.available_pages().len()
     }
 
+    /// Get the index of current page within available pages (for display)
+    /// Returns 0 if current page is not in available pages
+    pub fn current_page_index(&self) -> usize {
+        let available = self.available_pages();
+        available
+            .iter()
+            .position(|&p| p == self.detail_page)
+            .unwrap_or(0)
+    }
+
+    /// Navigate to next available page (wrapping)
+    pub fn next_available_page(&mut self) {
+        let available = self.available_pages();
+        if available.is_empty() {
+            return;
+        }
+        let current_idx = available
+            .iter()
+            .position(|&p| p == self.detail_page)
+            .unwrap_or(0);
+        let next_idx = (current_idx + 1) % available.len();
+        self.detail_page = available[next_idx];
+    }
+
+    /// Navigate to previous available page (wrapping)
+    pub fn prev_available_page(&mut self) {
+        let available = self.available_pages();
+        if available.is_empty() {
+            return;
+        }
+        let current_idx = available
+            .iter()
+            .position(|&p| p == self.detail_page)
+            .unwrap_or(0);
+        let prev_idx = if current_idx == 0 {
+            available.len() - 1
+        } else {
+            current_idx - 1
+        };
+        self.detail_page = available[prev_idx];
+    }
+
+    /// Check if a page is available for the current item
+    pub fn is_page_available(&self, page: DetailPage) -> bool {
+        self.available_pages().contains(&page)
+    }
+
     /// Toggle grouping on/off
     pub fn toggle_grouping(&mut self) {
         self.show_grouped = !self.show_grouped;

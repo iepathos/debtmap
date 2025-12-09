@@ -126,28 +126,44 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             app.set_view_mode(ViewMode::List);
         }
 
-        // Page navigation
+        // Page navigation (only cycles through available pages)
         KeyCode::Tab | KeyCode::Right => {
-            let next_page = app.detail_page().next();
-            app.set_detail_page(next_page);
+            app.next_available_page();
         }
         KeyCode::BackTab | KeyCode::Left => {
-            let prev_page = app.detail_page().prev();
-            app.set_detail_page(prev_page);
+            app.prev_available_page();
         }
 
-        // Jump to specific page
+        // Jump to specific page (only if available)
         KeyCode::Char('1') => {
-            app.set_detail_page(super::app::DetailPage::Overview);
+            if app.is_page_available(super::app::DetailPage::Overview) {
+                app.set_detail_page(super::app::DetailPage::Overview);
+            }
         }
         KeyCode::Char('2') => {
-            app.set_detail_page(super::app::DetailPage::Dependencies);
+            if app.is_page_available(super::app::DetailPage::Dependencies) {
+                app.set_detail_page(super::app::DetailPage::Dependencies);
+            }
         }
         KeyCode::Char('3') => {
-            app.set_detail_page(super::app::DetailPage::GitContext);
+            if app.is_page_available(super::app::DetailPage::GitContext) {
+                app.set_detail_page(super::app::DetailPage::GitContext);
+            }
         }
         KeyCode::Char('4') => {
-            app.set_detail_page(super::app::DetailPage::Patterns);
+            if app.is_page_available(super::app::DetailPage::Patterns) {
+                app.set_detail_page(super::app::DetailPage::Patterns);
+            }
+        }
+        KeyCode::Char('5') => {
+            if app.is_page_available(super::app::DetailPage::DataFlow) {
+                app.set_detail_page(super::app::DetailPage::DataFlow);
+            }
+        }
+        KeyCode::Char('6') => {
+            if app.is_page_available(super::app::DetailPage::Responsibilities) {
+                app.set_detail_page(super::app::DetailPage::Responsibilities);
+            }
         }
 
         // Navigate to next/previous item (preserve page)

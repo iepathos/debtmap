@@ -106,7 +106,7 @@ fn apply_horizontal_margin(area: Rect) -> Rect {
 
 /// Render header with page indicator
 fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
-    let current_page = app.detail_page().index() + 1; // 1-based for display
+    let current_page = app.current_page_index() + 1; // 1-based for display
     let total_pages = app.page_count();
     let page_name = app.detail_page().name();
 
