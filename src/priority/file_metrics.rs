@@ -36,6 +36,24 @@ pub struct FileDebtMetrics {
     /// File type classification for context-aware thresholds (spec 135)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_type: Option<crate::organization::FileType>,
+
+    // === File-level dependency metrics (spec 201) ===
+    /// Afferent coupling - number of files that depend on this file
+    #[serde(default)]
+    pub afferent_coupling: usize,
+    /// Efferent coupling - number of files this file depends on
+    #[serde(default)]
+    pub efferent_coupling: usize,
+    /// Instability metric (0.0 = stable, 1.0 = unstable)
+    /// Calculated as Ce / (Ca + Ce)
+    #[serde(default)]
+    pub instability: f64,
+    /// List of files that depend on this file (top N)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependents: Vec<String>,
+    /// List of files this file depends on (top N)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies_list: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -481,6 +499,11 @@ impl Default for FileDebtMetrics {
             function_scores: Vec::new(),
             god_object_type: None,
             file_type: None,
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            dependents: Vec::new(),
+            dependencies_list: Vec::new(),
         }
     }
 }
@@ -635,6 +658,7 @@ mod tests {
             function_scores: vec![1.0, 2.0, 3.0],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -684,6 +708,7 @@ mod tests {
             function_scores: vec![5.0; 60],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -706,6 +731,7 @@ mod tests {
             function_scores: vec![1.0; 10],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -735,6 +761,7 @@ mod tests {
             function_scores: vec![3.0; 15],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -757,6 +784,7 @@ mod tests {
             function_scores: vec![2.0; 75],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -1359,6 +1387,7 @@ mod tests {
             function_scores: vec![],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         }
     }
 
