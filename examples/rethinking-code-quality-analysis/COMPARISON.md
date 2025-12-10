@@ -50,10 +50,10 @@ TOP 2 RECOMMENDATIONS
 ├─ COMPLEXITY: cyclomatic=21 (dampened: 10, factor: 0.50),
    est_branches=21, cognitive=6, nesting=1, entropy=0.33
 ├─ WHY THIS MATTERS: Repetitive validation pattern detected
-   (entropy 0.33, 20 checks). Low entropy (0.33) indicates
-   boilerplate, not complexity. Adjusted complexity: 21 → 13
-   (reflects actual cognitive load). Refactoring improves
-   maintainability and reduces error-prone boilerplate.
+   (entropy 0.33, 20 checks). Low entropy indicates boilerplate,
+   not genuine complexity - cognitive load is dampened accordingly.
+   Refactoring improves maintainability and reduces error-prone
+   boilerplate.
 ├─ RECOMMENDED ACTION: Replace 20 repetitive validation checks
    with declarative pattern
 ```
