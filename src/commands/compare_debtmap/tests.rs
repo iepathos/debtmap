@@ -82,7 +82,6 @@ fn create_function_item(
         debt_type: DebtType::ComplexityHotspot {
             cyclomatic: complexity,
             cognitive: 0,
-            adjusted_cyclomatic: None,
         },
         unified_score: UnifiedScore {
             complexity_factor: 0.0,
@@ -124,7 +123,6 @@ fn create_function_item(
         cyclomatic_complexity: complexity,
         cognitive_complexity: 0,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         is_pure: None,
@@ -165,7 +163,6 @@ fn create_test_function_item(
         debt_type: DebtType::ComplexityHotspot {
             cyclomatic: complexity,
             cognitive: 5,
-            adjusted_cyclomatic: None,
         },
         unified_score: UnifiedScore {
             complexity_factor: 0.0,
@@ -208,7 +205,6 @@ fn create_test_function_item(
         cyclomatic_complexity: complexity,
         cognitive_complexity: 5,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         is_pure: None,
@@ -242,7 +238,6 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
         debt_type: DebtType::ComplexityHotspot {
             cyclomatic: 5,
             cognitive: 8,
-            adjusted_cyclomatic: None,
         },
         unified_score: UnifiedScore {
             complexity_factor: 0.0,
@@ -285,7 +280,6 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
         cyclomatic_complexity: 5,
         cognitive_complexity: 8,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         is_pure: Some(false),

@@ -93,7 +93,6 @@ fn create_debt_item(
         purity_confidence: Some(0.9),
         purity_level: None,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         god_object_indicators: None,
@@ -159,7 +158,6 @@ fn test_coverage_scoring_invariant_total_analysis() {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: complexity as u32,
                 cognitive: complexity as u32,
-                adjusted_cyclomatic: None,
             },
             unified_score: UnifiedScore {
                 complexity_factor,
@@ -205,7 +203,6 @@ fn test_coverage_scoring_invariant_total_analysis() {
             purity_confidence: Some(0.9),
             purity_level: None,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             god_object_indicators: None,

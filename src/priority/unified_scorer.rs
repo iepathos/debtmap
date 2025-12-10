@@ -99,20 +99,18 @@ pub struct UnifiedDebtItem {
     pub cognitive_complexity: u32,
     pub entropy_details: Option<EntropyDetails>, // Store entropy information
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub entropy_adjusted_cyclomatic: Option<u32>, // Entropy-adjusted cyclomatic complexity (spec 214)
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_adjusted_cognitive: Option<u32>, // Entropy-adjusted cognitive complexity (spec 214)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_dampening_factor: Option<f64>, // Dampening factor applied (spec 214)
-    pub is_pure: Option<bool>,          // Whether the function is pure
-    pub purity_confidence: Option<f32>, // Confidence in purity detection
+    pub is_pure: Option<bool>,                   // Whether the function is pure
+    pub purity_confidence: Option<f32>,          // Confidence in purity detection
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purity_level: Option<PurityLevel>, // Refined purity classification (spec 157)
     pub god_object_indicators: Option<GodObjectAnalysis>, // God object detection results
     #[serde(skip)]
     pub tier: Option<crate::priority::RecommendationTier>, // Recommendation tier for prioritization
     pub function_context: Option<crate::analysis::FunctionContext>, // Detected context (spec 122)
-    pub context_confidence: Option<f64>, // Confidence in context detection (spec 122)
+    pub context_confidence: Option<f64>,         // Confidence in context detection (spec 122)
     pub contextual_recommendation: Option<crate::priority::scoring::ContextualRecommendation>, // Context-aware recommendation (spec 122)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)
@@ -338,7 +336,8 @@ pub fn calculate_unified_priority_with_debt(
     // Apply structural quality adjustment based on nesting/cyclomatic ratio
     // High ratio = deeply nested relative to branches = bad structure = boost score
     // Low ratio = flat structure = good structure = reduce score
-    let structural_multiplier = calculate_structural_quality_multiplier(func.nesting, func.cyclomatic);
+    let structural_multiplier =
+        calculate_structural_quality_multiplier(func.nesting, func.cyclomatic);
     let structure_adjusted_score = role_adjusted_score * structural_multiplier;
 
     // Add debt-based adjustments

@@ -289,7 +289,6 @@ mod tests {
             nesting_depth: 0,
             function_length: 10,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: None,
@@ -323,7 +322,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 5,
                 cognitive: 5,
-                adjusted_cyclomatic: None,
             },
         );
         let low = create_test_item(
@@ -333,7 +331,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 5,
                 cognitive: 5,
-                adjusted_cyclomatic: None,
             },
         );
 
@@ -366,7 +363,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 5,
                 cognitive: 5,
-                adjusted_cyclomatic: None,
             },
         );
 
@@ -418,7 +414,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 10,
                 cognitive: 2,
-                adjusted_cyclomatic: None,
             },
         );
         let high_cog = create_test_item(
@@ -428,7 +423,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 2,
                 cognitive: 10,
-                adjusted_cyclomatic: None,
             },
         );
         let both_high = create_test_item(
@@ -438,7 +432,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 10,
                 cognitive: 10,
-                adjusted_cyclomatic: None,
             },
         );
 
@@ -456,7 +449,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 5,
                 cognitive: 5,
-                adjusted_cyclomatic: None,
             },
         );
         let item2 = create_test_item(
@@ -466,7 +458,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 10,
                 cognitive: 10,
-                adjusted_cyclomatic: None,
             },
         ); // Different values, same type
         let item3 = create_test_item(

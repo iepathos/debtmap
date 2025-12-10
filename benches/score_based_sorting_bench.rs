@@ -72,9 +72,8 @@ fn create_test_item(
         cyclomatic_complexity: cyclomatic,
         cognitive_complexity: cyclomatic,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None, // spec 214
-        entropy_adjusted_cognitive: None,  // spec 214
-        entropy_dampening_factor: None,    // spec 214
+        entropy_adjusted_cognitive: None, // spec 214
+        entropy_dampening_factor: None,   // spec 214
         is_pure: None,
         purity_confidence: None,
         purity_level: None,
@@ -145,7 +144,6 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
                     1 => DebtType::ComplexityHotspot {
                         cyclomatic: 35,
                         cognitive: 40,
-                        adjusted_cyclomatic: None,
                     },
                     _ => DebtType::TestingGap {
                         coverage: 0.0,
@@ -272,7 +270,6 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
                 2 => DebtType::ComplexityHotspot {
                     cyclomatic: 35,
                     cognitive: 40,
-                    adjusted_cyclomatic: None,
                 },
                 3 => DebtType::TestingGap {
                     coverage: 0.0,

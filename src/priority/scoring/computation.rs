@@ -361,7 +361,6 @@ mod tests {
             calculate_risk_factor(&DebtType::ComplexityHotspot {
                 cyclomatic: 20,
                 cognitive: 15,
-                adjusted_cyclomatic: None,
             }),
             0.35
         );

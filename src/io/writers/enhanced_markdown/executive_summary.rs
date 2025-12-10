@@ -790,7 +790,6 @@ mod tests {
             upstream_callers: vec![],
             downstream_callees: vec![],
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: None,
@@ -867,7 +866,6 @@ mod tests {
                 DebtType::ComplexityHotspot {
                     cyclomatic: 30,
                     cognitive: 25,
-                    adjusted_cyclomatic: None,
                 },
                 30,
             ),

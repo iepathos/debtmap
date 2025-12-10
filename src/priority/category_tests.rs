@@ -57,7 +57,6 @@ mod tests {
             cyclomatic_complexity: 10,
             cognitive_complexity: 15,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: Some(false),
@@ -223,7 +222,6 @@ mod tests {
             DebtCategory::from_debt_type(&DebtType::ComplexityHotspot {
                 cyclomatic: 25,
                 cognitive: 40,
-                adjusted_cyclomatic: None,
             }),
             DebtCategory::CodeQuality
         );
@@ -321,7 +319,6 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 25,
                 cognitive: 35,
-                adjusted_cyclomatic: None,
             },
             70.0,
         ));

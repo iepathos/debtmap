@@ -127,12 +127,7 @@ pub fn generate_concise_recommendation(
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-            adjusted_cyclomatic,
-        } => {
-            // Use adjusted complexity if available (spec 182)
-            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
-            generate_complexity_steps(effective_cyclomatic, *cognitive, metrics)?
-        }
+        } => generate_complexity_steps(*cyclomatic, *cognitive, metrics)?,
         DebtType::DeadCode {
             visibility,
             cyclomatic,
@@ -330,13 +325,10 @@ fn generate_complexity_steps(
         ComplexityPattern::RepetitiveValidation {
             validation_count,
             entropy,
-            cyclomatic: cyclo,
-            adjusted_cyclomatic,
+            cyclomatic: _,
         } => Some(generate_repetitive_validation_recommendation(
             validation_count,
             entropy,
-            cyclo,
-            adjusted_cyclomatic,
             metrics,
         )),
         ComplexityPattern::HighNesting {
@@ -931,8 +923,6 @@ fn generate_dispatcher_recommendation(
 fn generate_repetitive_validation_recommendation(
     validation_count: u32,
     entropy: f64,
-    cyclomatic: u32,
-    adjusted_cyclomatic: u32,
     metrics: &FunctionMetrics,
 ) -> ActionableRecommendation {
     let boilerplate_reduction = RefactoringImpact::validation_extraction(validation_count);
@@ -1311,7 +1301,6 @@ mod tests {
             &DebtType::ComplexityHotspot {
                 cyclomatic: 20,
                 cognitive: 25,
-                adjusted_cyclomatic: None,
             },
             &metrics,
             FunctionRole::PureLogic,
@@ -1806,7 +1795,6 @@ mod tests {
                 &DebtType::ComplexityHotspot {
                     cyclomatic,
                     cognitive,
-                    adjusted_cyclomatic: None,
                 },
                 &metrics,
                 FunctionRole::PureLogic,
@@ -1834,7 +1822,6 @@ mod tests {
             &DebtType::ComplexityHotspot {
                 cyclomatic: 12,
                 cognitive: 18,
-                adjusted_cyclomatic: None,
             },
             &metrics,
             FunctionRole::Orchestrator,

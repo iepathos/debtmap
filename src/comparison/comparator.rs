@@ -503,7 +503,6 @@ mod tests {
             cyclomatic_complexity: 10,
             cognitive_complexity: 20,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: None,

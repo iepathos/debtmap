@@ -260,7 +260,6 @@ fn test_score_normalization_range() {
             DebtType::ComplexityHotspot {
                 cyclomatic: 50,
                 cognitive: 100,
-                adjusted_cyclomatic: None,
             },
         ),
         (

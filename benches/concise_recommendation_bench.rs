@@ -92,7 +92,6 @@ fn bench_complexity_hotspot_recommendation(c: &mut Criterion) {
                 let debt = DebtType::ComplexityHotspot {
                     cyclomatic: *cyc,
                     cognitive: *cog,
-                    adjusted_cyclomatic: None,
                 };
                 b.iter(|| {
                     generate_concise_recommendation(
@@ -168,7 +167,6 @@ fn bench_batch_recommendation_generation(c: &mut Criterion) {
                             1 => DebtType::ComplexityHotspot {
                                 cyclomatic,
                                 cognitive,
-                                adjusted_cyclomatic: None,
                             },
                             _ => DebtType::DeadCode {
                                 visibility: FunctionVisibility::Private,

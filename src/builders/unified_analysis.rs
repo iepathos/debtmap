@@ -1598,7 +1598,6 @@ pub fn create_god_object_debt_item(
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
         cognitive_complexity: aggregated_metrics.total_cognitive,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         is_pure: None,

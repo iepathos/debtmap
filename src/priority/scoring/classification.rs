@@ -95,7 +95,6 @@ fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
     Some(DebtType::ComplexityHotspot {
         cyclomatic: func.cyclomatic,
         cognitive: func.cognitive,
-        adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
     })
 }
 
@@ -253,7 +252,6 @@ fn check_complexity_hotspot_predicate(func: &FunctionMetrics) -> Option<DebtType
         Some(DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
-            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
         })
     } else {
         None
@@ -421,7 +419,6 @@ pub fn is_complexity_hotspot(func: &FunctionMetrics, role: &FunctionRole) -> Opt
         return Some(DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
-            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
         });
     }
 
@@ -440,7 +437,6 @@ pub fn is_complexity_hotspot(func: &FunctionMetrics, role: &FunctionRole) -> Opt
         Some(DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
-            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
         })
     } else {
         None
@@ -1263,16 +1259,10 @@ mod tests {
         if let Some(DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-            adjusted_cyclomatic,
         }) = check_complexity_hotspot(&func)
         {
             assert_eq!(cyclomatic, 15, "Raw cyclomatic should be stored");
             assert_eq!(cognitive, 20, "Cognitive should be stored");
-            assert_eq!(
-                adjusted_cyclomatic,
-                Some(9),
-                "Adjusted cyclomatic should be rounded and stored"
-            );
         } else {
             panic!("Expected ComplexityHotspot");
         }
@@ -1292,17 +1282,8 @@ mod tests {
             "Should flag due to high cognitive complexity"
         );
 
-        if let Some(DebtType::ComplexityHotspot {
-            adjusted_cyclomatic,
-            ..
-        }) = result
-        {
-            assert_eq!(
-                adjusted_cyclomatic,
-                Some(4),
-                "Should store adjusted complexity"
-            );
-        }
+        // Just verify it's a ComplexityHotspot
+        assert!(matches!(result, Some(DebtType::ComplexityHotspot { .. })));
     }
 
     // Unit tests for spec 180: exclude Low tier maintenance recommendations

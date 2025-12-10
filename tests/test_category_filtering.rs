@@ -61,7 +61,6 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
         purity_confidence: None,
         purity_level: None,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         god_object_indicators: None,

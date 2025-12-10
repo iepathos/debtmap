@@ -50,10 +50,9 @@ pub enum ComplexityPattern {
     },
     /// Repetitive validation pattern: many early returns with same structure
     RepetitiveValidation {
-        validation_count: u32,    // Number of validation checks
-        entropy: f64,             // Token entropy (low = repetitive)
-        cyclomatic: u32,          // Raw cyclomatic (before dampening)
-        adjusted_cyclomatic: u32, // Dampened complexity (reflects cognitive load)
+        validation_count: u32, // Number of validation checks
+        entropy: f64,          // Token entropy (low = repetitive)
+        cyclomatic: u32,       // Raw cyclomatic complexity
     },
     /// Deep nesting drives complexity (cognitive >> cyclomatic)
     HighNesting {
@@ -221,7 +220,6 @@ impl ComplexityPattern {
         // This prevents validation boilerplate from being misclassified as high complexity
         if let Some(entropy) = metrics.entropy_score {
             if is_repetitive_validation(metrics.cyclomatic, entropy, &metrics.validation_signals) {
-                let adjusted = dampen_complexity_for_repetition(metrics.cyclomatic, entropy);
                 return ComplexityPattern::RepetitiveValidation {
                     validation_count: metrics
                         .validation_signals
@@ -230,7 +228,6 @@ impl ComplexityPattern {
                         .unwrap_or(metrics.cyclomatic),
                     entropy,
                     cyclomatic: metrics.cyclomatic,
-                    adjusted_cyclomatic: adjusted,
                 };
             }
         }
@@ -379,23 +376,6 @@ fn is_repetitive_validation(
         // Return false to avoid false positives
         false
     }
-}
-
-/// Dampen cyclomatic complexity for repetitive patterns
-fn dampen_complexity_for_repetition(cyclomatic: u32, entropy: f64) -> u32 {
-    // Lower entropy = more dampening (recognition of low cognitive load)
-    // entropy < 0.25: 60% dampening (very repetitive)
-    // entropy < 0.30: 50% dampening (highly repetitive)
-    // entropy < 0.35: 40% dampening (moderately repetitive)
-    let dampening_factor = if entropy < 0.25 {
-        0.4
-    } else if entropy < 0.30 {
-        0.5
-    } else {
-        0.6
-    };
-
-    (cyclomatic as f64 * dampening_factor).ceil() as u32
 }
 
 #[cfg(test)]
@@ -715,12 +695,10 @@ mod tests {
             validation_count,
             entropy,
             cyclomatic,
-            adjusted_cyclomatic,
         } = pattern
         {
             assert_eq!(validation_count, 20);
             assert_eq!(cyclomatic, 20);
-            assert_eq!(adjusted_cyclomatic, 10); // 20 * 0.5 dampening
             assert!((entropy - 0.28).abs() < 0.01);
         }
     }
@@ -769,13 +747,6 @@ mod tests {
             !matches!(pattern, ComplexityPattern::RepetitiveValidation { .. }),
             "High entropy should prevent validation pattern detection"
         );
-    }
-
-    #[test]
-    fn dampening_factor_scales_with_entropy() {
-        assert_eq!(dampen_complexity_for_repetition(20, 0.20), 8); // 0.4 factor
-        assert_eq!(dampen_complexity_for_repetition(20, 0.28), 10); // 0.5 factor
-        assert_eq!(dampen_complexity_for_repetition(20, 0.33), 12); // 0.6 factor
     }
 
     // Tests for dispatcher pattern (spec 189)

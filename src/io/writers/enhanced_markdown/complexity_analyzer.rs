@@ -264,7 +264,6 @@ mod tests {
         let debt_type = PriorityDebtType::ComplexityHotspot {
             cyclomatic: 15,
             cognitive: 20,
-            adjusted_cyclomatic: None,
         };
         assert_eq!(calculate_base_effort(&debt_type), 4);
     }
@@ -456,7 +455,6 @@ mod tests {
             debt_type: PriorityDebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
-                adjusted_cyclomatic: None,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 5.0,
@@ -504,7 +502,6 @@ mod tests {
             cyclomatic_complexity: 15,
             cognitive_complexity: 20,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: None,
@@ -765,7 +762,6 @@ mod tests {
             cyclomatic_complexity: 1,
             cognitive_complexity: 1,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: None,

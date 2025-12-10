@@ -168,7 +168,6 @@ mod tests {
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: cognitive,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: Some(false),
@@ -231,7 +230,6 @@ mod tests {
     fn test_classify_extreme_score_as_t1() {
         let mut item = create_test_item(
             DebtType::ComplexityHotspot {
-                adjusted_cyclomatic: None,
                 cyclomatic: 30,
                 cognitive: 25,
             },
@@ -249,7 +247,6 @@ mod tests {
     fn test_classify_extreme_cyclomatic_as_t1() {
         let item = create_test_item(
             DebtType::ComplexityHotspot {
-                adjusted_cyclomatic: Some(60),
                 cyclomatic: 70,
                 cognitive: 15,
             },
@@ -266,7 +263,6 @@ mod tests {
     fn test_classify_extreme_cognitive_as_t1() {
         let item = create_test_item(
             DebtType::ComplexityHotspot {
-                adjusted_cyclomatic: None,
                 cyclomatic: 15,
                 cognitive: 25,
             },
@@ -283,7 +279,6 @@ mod tests {
     fn test_classify_deep_nesting_as_t1() {
         let item = create_test_item(
             DebtType::ComplexityHotspot {
-                adjusted_cyclomatic: None,
                 cyclomatic: 15,
                 cognitive: 10,
             },
@@ -300,7 +295,6 @@ mod tests {
     fn test_classify_high_complexity_factor_as_t1() {
         let mut item = create_test_item(
             DebtType::ComplexityHotspot {
-                adjusted_cyclomatic: None,
                 cyclomatic: 15,
                 cognitive: 10,
             },
@@ -370,7 +364,6 @@ mod tests {
     fn test_classify_moderate_complexity_hotspot_as_t2() {
         let mut item = create_test_item(
             DebtType::ComplexityHotspot {
-                adjusted_cyclomatic: None,
                 cyclomatic: 15,
                 cognitive: 12,
             },
@@ -503,7 +496,6 @@ mod tests {
         ) {
             let mut item = create_test_item(
                 DebtType::ComplexityHotspot {
-                    adjusted_cyclomatic: None,
                     cyclomatic,
                     cognitive,
                 },
@@ -529,7 +521,6 @@ mod tests {
         ) {
             let mut item = create_test_item(
                 DebtType::ComplexityHotspot {
-                    adjusted_cyclomatic: None,
                     cyclomatic,
                     cognitive,
                 },

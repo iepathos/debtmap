@@ -249,7 +249,6 @@ mod tests {
     #[test]
     fn test_is_complexity_hotspot() {
         assert!(is_complexity_hotspot(&DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: Some(20),
             cyclomatic: 25,
             cognitive: 15,
         }));
@@ -328,7 +327,6 @@ mod tests {
     fn test_extract_effective_cyclomatic() {
         // Returns raw cyclomatic (adjusted_cyclomatic is ignored)
         let debt = DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: Some(20),
             cyclomatic: 25,
             cognitive: 15,
         };
@@ -336,7 +334,6 @@ mod tests {
 
         // Without adjusted cyclomatic
         let debt = DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: None,
             cyclomatic: 25,
             cognitive: 15,
         };
@@ -354,7 +351,6 @@ mod tests {
     #[test]
     fn test_extract_cognitive() {
         let debt = DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: Some(20),
             cyclomatic: 25,
             cognitive: 15,
         };

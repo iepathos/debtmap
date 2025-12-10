@@ -131,7 +131,6 @@ mod tests {
             purity_confidence: None,
             purity_level: None,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             god_object_indicators: None,
@@ -177,7 +176,6 @@ mod tests {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
-                adjusted_cyclomatic: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
@@ -208,7 +206,6 @@ mod tests {
             purity_confidence: None,
             purity_level: None,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             god_object_indicators: None,

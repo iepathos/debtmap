@@ -38,7 +38,6 @@ pub(super) fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtTyp
         Some(DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
-            adjusted_cyclomatic: None, // Deprecated: cyclomatic is not dampened
         })
     } else {
         None

@@ -69,7 +69,6 @@ fn create_test_item(
         cyclomatic_complexity: cyclomatic,
         cognitive_complexity: cognitive,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         is_pure: Some(false),
@@ -140,7 +139,6 @@ fn bench_classify_complexity_hotspot(c: &mut Criterion) {
     let config = TierConfig::default();
     let item = create_test_item(
         DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: Some(30),
             cyclomatic: 35,
             cognitive: 25,
         },
@@ -186,7 +184,6 @@ fn bench_classify_extreme_scores(c: &mut Criterion) {
     // Extreme final score
     let item_extreme_score = create_test_item(
         DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: None,
             cyclomatic: 30,
             cognitive: 25,
         },
@@ -205,7 +202,6 @@ fn bench_classify_extreme_scores(c: &mut Criterion) {
     // Extreme cyclomatic
     let item_extreme_cyclomatic = create_test_item(
         DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: Some(60),
             cyclomatic: 70,
             cognitive: 15,
         },
@@ -224,7 +220,6 @@ fn bench_classify_extreme_scores(c: &mut Criterion) {
     // Extreme cognitive
     let item_extreme_cognitive = create_test_item(
         DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: None,
             cyclomatic: 15,
             cognitive: 25,
         },
@@ -243,7 +238,6 @@ fn bench_classify_extreme_scores(c: &mut Criterion) {
     // Deep nesting
     let item_deep_nesting = create_test_item(
         DebtType::ComplexityHotspot {
-            adjusted_cyclomatic: None,
             cyclomatic: 15,
             cognitive: 10,
         },
@@ -278,7 +272,6 @@ fn bench_classify_batch(c: &mut Criterion) {
                         lines: 300 + (i % 200),
                     },
                     1 => DebtType::ComplexityHotspot {
-                        adjusted_cyclomatic: Some(20 + (i % 30)),
                         cyclomatic: 25 + (i % 40),
                         cognitive: 15 + (i % 20),
                     },

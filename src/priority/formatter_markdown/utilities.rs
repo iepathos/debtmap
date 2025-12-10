@@ -135,21 +135,10 @@ pub(crate) fn extract_complexity_info(debt_type: &DebtType) -> Option<String> {
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-            adjusted_cyclomatic,
-        } => {
-            // Show adjusted complexity if available (spec 182)
-            if let Some(adjusted) = adjusted_cyclomatic {
-                Some(format!(
-                    "cyclomatic={} (adj={}), cognitive={}",
-                    cyclomatic, adjusted, cognitive
-                ))
-            } else {
-                Some(format!(
-                    "cyclomatic={}, cognitive={}",
-                    cyclomatic, cognitive
-                ))
-            }
-        }
+        } => Some(format!(
+            "cyclomatic={}, cognitive={}",
+            cyclomatic, cognitive
+        )),
         DebtType::TestComplexityHotspot {
             cyclomatic,
             cognitive,

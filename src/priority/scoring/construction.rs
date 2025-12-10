@@ -220,7 +220,6 @@ pub fn create_unified_debt_item_enhanced(
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
         entropy_details: entropy_details.clone(),
-        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
         entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
         entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,
@@ -495,7 +494,6 @@ fn build_unified_debt_item(
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
         entropy_details: entropy_details.clone(),
-        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
         entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
         entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,
@@ -739,9 +737,6 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 cyclomatic_complexity: func.cyclomatic,
                 cognitive_complexity: func.cognitive,
                 entropy_details: entropy_details.clone(),
-                entropy_adjusted_cyclomatic: entropy_details
-                    .as_ref()
-                    .map(|e| e.adjusted_complexity),
                 entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
                 entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
                 is_pure: func.is_pure,
@@ -887,7 +882,6 @@ pub fn create_unified_debt_item_with_data_flow(
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
         entropy_details: entropy_details.clone(),
-        entropy_adjusted_cyclomatic: entropy_details.as_ref().map(|e| e.adjusted_complexity),
         entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
         entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,

@@ -428,7 +428,6 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         cyclomatic_complexity: extract_cyclomatic_complexity(&context.debt_type),
         cognitive_complexity: context.function_info.cognitive,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         is_pure: Some(context.function_info.is_pure),
@@ -536,15 +535,12 @@ fn generate_standard_recommendation(
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-            adjusted_cyclomatic,
         } => {
-            // Use adjusted complexity if available (spec 182)
-            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
             // Always try to use intelligent pattern-based recommendations
             // The DataFlowGraph is passed through but may still be None in some cases
             generate_complexity_recommendation_with_patterns_and_coverage(
                 func,
-                effective_cyclomatic,
+                *cyclomatic,
                 *cognitive,
                 coverage,
                 data_flow,
@@ -1321,7 +1317,6 @@ mod tests {
             calculate_risk_factor(&DebtType::ComplexityHotspot {
                 cyclomatic: 20,
                 cognitive: 25,
-                adjusted_cyclomatic: None,
             }),
             0.35
         );
@@ -1382,7 +1377,6 @@ mod tests {
         let complexity = DebtType::ComplexityHotspot {
             cyclomatic: 20,
             cognitive: 25,
-            adjusted_cyclomatic: None,
         };
         assert_eq!(calculate_lines_reduction(&complexity), 0);
     }
@@ -1418,7 +1412,6 @@ mod tests {
             extract_cyclomatic_complexity(&DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
-                adjusted_cyclomatic: None,
             }),
             15
         );
@@ -1493,7 +1486,6 @@ mod tests {
         let debt_type = DebtType::ComplexityHotspot {
             cyclomatic: 15,
             cognitive: 20,
-            adjusted_cyclomatic: None,
         };
 
         let score = UnifiedScore {

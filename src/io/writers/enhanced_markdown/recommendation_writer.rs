@@ -112,7 +112,6 @@ mod tests {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
-                adjusted_cyclomatic: None,
             },
             recommendation: ActionableRecommendation {
                 primary_action: "Refactor complex function".to_string(),
@@ -155,7 +154,6 @@ mod tests {
             upstream_callers: vec![],
             downstream_callees: vec![],
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: Some(false),

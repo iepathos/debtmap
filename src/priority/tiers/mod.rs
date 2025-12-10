@@ -204,7 +204,6 @@ mod tests {
             cyclomatic_complexity: complexity,
             cognitive_complexity: complexity,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: Some(false),

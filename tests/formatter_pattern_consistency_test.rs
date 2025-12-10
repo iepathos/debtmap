@@ -22,7 +22,6 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
         debt_type: DebtType::ComplexityHotspot {
             cyclomatic: 15,
             cognitive: 35,
-            adjusted_cyclomatic: None,
         },
         cyclomatic_complexity: 15,
         cognitive_complexity: 35,
@@ -68,7 +67,6 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
         purity_confidence: None,
         purity_level: None,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         god_object_indicators: None,
@@ -109,7 +107,6 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
         debt_type: DebtType::ComplexityHotspot {
             cyclomatic: 15,
             cognitive: 35,
-            adjusted_cyclomatic: None,
         },
         cyclomatic_complexity: 12,
         cognitive_complexity: 28,
@@ -155,7 +152,6 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
         purity_confidence: None,
         purity_level: None,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         god_object_indicators: None,

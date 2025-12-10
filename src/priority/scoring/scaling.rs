@@ -57,16 +57,11 @@ fn apply_exponential_scaling(base_score: f64, debt_type: &DebtType, config: &Sca
         // Architectural issues get strong exponential scaling
         DebtType::GodObject { .. } => config.god_object_exponent,
 
-        // High complexity gets moderate exponential scaling (use adjusted complexity - spec 182)
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            adjusted_cyclomatic,
-            ..
-        } => {
-            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
-            if effective_cyclomatic > 30 {
+        // High complexity gets moderate exponential scaling
+        DebtType::ComplexityHotspot { cyclomatic, .. } => {
+            if *cyclomatic > 30 {
                 config.high_complexity_exponent
-            } else if effective_cyclomatic > 15 {
+            } else if *cyclomatic > 15 {
                 config.moderate_complexity_exponent
             } else {
                 1.0
@@ -140,15 +135,10 @@ pub fn calculate_final_score(
     // Determine exponent (for transparency)
     let exponent = match debt_type {
         DebtType::GodObject { .. } => config.god_object_exponent,
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            adjusted_cyclomatic,
-            ..
-        } => {
-            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
-            if effective_cyclomatic > 30 {
+        DebtType::ComplexityHotspot { cyclomatic, .. } => {
+            if *cyclomatic > 30 {
                 config.high_complexity_exponent
-            } else if effective_cyclomatic > 15 {
+            } else if *cyclomatic > 15 {
                 config.moderate_complexity_exponent
             } else {
                 1.0
@@ -251,7 +241,6 @@ mod tests {
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: cyclomatic,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: None,
@@ -540,7 +529,6 @@ mod tests {
                     DebtType::ComplexityHotspot {
                         cyclomatic: 35,
                         cognitive: 40,
-                        adjusted_cyclomatic: None,
                     }
                 } else {
                     DebtType::TestingGap {

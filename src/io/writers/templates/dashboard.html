@@ -610,12 +610,12 @@
                 const items = data.items || [];
                 functions = items
                     .filter(item => item.Function)
-                    .filter(item => item.Function.debt_type?.ComplexityHotspot?.adjusted_cyclomatic)
+                    .filter(item => item.Function.debt_type?.ComplexityHotspot)
                     .map(item => {
                         const func = item.Function;
                         return {
                             name: func.location?.function || func.name || 'unknown',
-                            cyclomatic: func.debt_type.ComplexityHotspot.adjusted_cyclomatic,
+                            cyclomatic: func.debt_type.ComplexityHotspot.cyclomatic,
                             cognitive: func.cognitive_complexity || 0
                         };
                     });
@@ -1400,7 +1400,7 @@
                         const func = item.Function;
                         return {
                             cyclomatic: func.cyclomatic_complexity || 0,
-                            adjusted: func.debt_type?.ComplexityHotspot?.adjusted_cyclomatic || null,
+                            adjusted: null, // adjusted_cyclomatic removed - we only dampen cognitive now
                             entropy: func.entropy_details?.score || null
                         };
                     });
@@ -1605,9 +1605,7 @@
                         cognitive: item.metrics?.cognitive_complexity || 0,
                         nesting: item.metrics?.nesting_depth || 0,
                         entropy_score: item.metrics?.entropy_score,
-                        adjusted_complexity: item.debt_type?.ComplexityHotspot ? {
-                            dampened_cyclomatic: item.debt_type.ComplexityHotspot.adjusted_cyclomatic
-                        } : null
+                        adjusted_complexity: null // adjusted_cyclomatic removed - we only dampen cognitive now
                     }));
             } else {
                 // Legacy format with wrappers
@@ -1623,9 +1621,7 @@
                             cognitive: func.metrics?.cognitive_complexity || func.cognitive || 0,
                             nesting: func.metrics?.nesting_depth || func.nesting || 0,
                             entropy_score: func.metrics?.entropy_score || func.entropy_score,
-                            adjusted_complexity: func.debt_type?.ComplexityHotspot ? {
-                                dampened_cyclomatic: func.debt_type.ComplexityHotspot.adjusted_cyclomatic
-                            } : null
+                            adjusted_complexity: null // adjusted_cyclomatic removed - we only dampen cognitive now
                         };
                     });
 

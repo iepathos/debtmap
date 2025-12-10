@@ -64,7 +64,6 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
         purity_confidence: None,
         purity_level: None,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         god_object_indicators: None,
@@ -230,7 +229,6 @@ fn test_enhanced_markdown_full_report() {
     item3.debt_type = DebtType::ComplexityHotspot {
         cyclomatic: 25,
         cognitive: 30,
-        adjusted_cyclomatic: None,
     };
     analysis.add_item(item3);
 

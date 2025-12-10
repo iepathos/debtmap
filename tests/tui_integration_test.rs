@@ -419,7 +419,6 @@ fn create_test_unified_debt_item(
         purity_confidence: None,
         purity_level: None,
         entropy_details: None,
-        entropy_adjusted_cyclomatic: None,
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         god_object_indicators: None,
@@ -478,7 +477,6 @@ fn test_data_flow_page_rendering_with_mutations() {
         DebtType::ComplexityHotspot {
             cyclomatic: 10,
             cognitive: 15,
-            adjusted_cyclomatic: None,
         },
     );
 
@@ -534,7 +532,6 @@ fn test_data_flow_page_rendering_with_io_operations() {
         DebtType::ComplexityHotspot {
             cyclomatic: 8,
             cognitive: 12,
-            adjusted_cyclomatic: None,
         },
     );
 
@@ -616,7 +613,6 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
         DebtType::ComplexityHotspot {
             cyclomatic: 12,
             cognitive: 18,
-            adjusted_cyclomatic: None,
         },
     );
 

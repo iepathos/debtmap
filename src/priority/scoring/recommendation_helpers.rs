@@ -346,14 +346,9 @@ pub(super) fn extract_coverage_percent(coverage: &Option<TransitiveCoverage>) ->
 }
 
 /// Pure function to extract cyclomatic complexity from debt type
-/// Uses adjusted complexity when available (spec 182)
 pub(super) fn extract_cyclomatic_complexity(debt_type: &DebtType) -> u32 {
     match debt_type {
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            adjusted_cyclomatic,
-            ..
-        } => adjusted_cyclomatic.unwrap_or(*cyclomatic),
+        DebtType::ComplexityHotspot { cyclomatic, .. } => *cyclomatic,
         _ => 0,
     }
 }
@@ -422,7 +417,6 @@ mod tests {
             extract_cyclomatic_complexity(&DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
-                adjusted_cyclomatic: None,
             }),
             15
         );

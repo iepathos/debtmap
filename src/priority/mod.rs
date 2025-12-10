@@ -211,10 +211,6 @@ pub enum DebtType {
     ComplexityHotspot {
         cyclomatic: u32,
         cognitive: u32,
-        /// Entropy-adjusted cyclomatic complexity (spec 182)
-        /// None if entropy analysis was not performed
-        #[serde(default)]
-        adjusted_cyclomatic: Option<u32>,
     },
     DeadCode {
         visibility: FunctionVisibility,
@@ -376,11 +372,9 @@ impl std::hash::Hash for DebtType {
             DebtType::ComplexityHotspot {
                 cyclomatic,
                 cognitive,
-                adjusted_cyclomatic,
             } => {
                 cyclomatic.hash(state);
                 cognitive.hash(state);
-                adjusted_cyclomatic.hash(state);
             }
             DebtType::DeadCode {
                 visibility,
@@ -1310,7 +1304,6 @@ mod tests {
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: cognitive,
             entropy_details: None,
-            entropy_adjusted_cyclomatic: None,
             entropy_adjusted_cognitive: None,
             entropy_dampening_factor: None,
             is_pure: Some(false),

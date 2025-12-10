@@ -56,7 +56,6 @@ fn test_complex_function_max_5_steps() {
     let debt = DebtType::ComplexityHotspot {
         cyclomatic: 45,
         cognitive: 55,
-        adjusted_cyclomatic: None,
     };
 
     let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None)
@@ -289,7 +288,6 @@ fn test_batch_recommendations_are_concise() {
             DebtType::ComplexityHotspot {
                 cyclomatic: 30,
                 cognitive: 40,
-                adjusted_cyclomatic: None,
             },
             "complex_func_1",
         ),
@@ -314,7 +312,6 @@ fn test_batch_recommendations_are_concise() {
             DebtType::ComplexityHotspot {
                 cyclomatic: 50,
                 cognitive: 65,
-                adjusted_cyclomatic: None,
             },
             "very_complex_func",
         ),
@@ -395,7 +392,6 @@ fn test_actual_ripgrep_file_if_available() {
     let debt = DebtType::ComplexityHotspot {
         cyclomatic: 38,
         cognitive: 48,
-        adjusted_cyclomatic: None,
     };
 
     let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None)
