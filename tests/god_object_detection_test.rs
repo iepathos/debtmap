@@ -43,22 +43,13 @@ fn test_detects_file_with_many_standalone_functions() {
 
     let file = syn::parse_file(code).expect("Failed to parse");
     let detector = GodObjectDetector::with_source_content(code);
-    let analysis = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
 
-    assert_eq!(
-        analysis.method_count, 30,
-        "Should count all 30 standalone functions"
-    );
-    // With complexity weighting, 30 simple functions (complexity 1 each) should have
-    // a low weighted count (~5.77) which is well below the threshold of 20
+    // With per-struct analysis, standalone functions don't trigger god object detection
+    // Empty result means no god objects found
     assert!(
-        !analysis.is_god_object,
-        "File with 30 simple functions should NOT be flagged as god object with complexity weighting"
-    );
-    assert!(
-        analysis.god_object_score.value() < 100.0,
-        "God object score should be less than 100 for simple functions, got {}",
-        analysis.god_object_score
+        analyses.is_empty(),
+        "File with 30 simple standalone functions should NOT be flagged as god object"
     );
 }
 
@@ -79,29 +70,13 @@ fn test_detects_rust_call_graph_scenario() {
 
     let file = syn::parse_file(&code).expect("Failed to parse");
     let detector = GodObjectDetector::with_source_content(&code);
-    let analysis = detector.analyze_comprehensive(Path::new("rust_call_graph.rs"), &file);
+    let analyses = detector.analyze_comprehensive(Path::new("rust_call_graph.rs"), &file);
 
-    assert_eq!(
-        analysis.method_count, 270,
-        "Should count all 270 standalone functions"
-    );
-
-    // With new conservative scoring, 270 simple functions may not reach the god object
-    // threshold of 70. This is CORRECT behavior - we want to distinguish between:
-    // - Many simple procedural functions (score 30-50, not flagged)
-    // - Truly problematic god objects with multiple severe violations (score 70+, flagged)
-
-    // The key assertion: the analysis should run and produce a reasonable score
+    // With per-struct analysis, standalone functions don't trigger god object detection
+    // Empty result means no god objects found
     assert!(
-        analysis.god_object_score.value() >= 30.0,
-        "Should have at least moderate score for 270 functions, got {}",
-        analysis.god_object_score
-    );
-
-    // Method count violation should be detected
-    assert!(
-        analysis.method_count > 20,
-        "Should exceed method count threshold"
+        analyses.is_empty(),
+        "File with 270 simple standalone functions should NOT be flagged as god object"
     );
 }
 
@@ -180,25 +155,14 @@ fn test_mixed_struct_and_functions() {
 
     let file = syn::parse_file(code).expect("Failed to parse");
     let detector = GodObjectDetector::with_source_content(code);
-    let analysis = detector.analyze_comprehensive(Path::new("mixed.rs"), &file);
+    let analyses = detector.analyze_comprehensive(Path::new("mixed.rs"), &file);
 
     // After spec 118: Only count impl methods for struct analysis, not standalone functions
     // This prevents false positives for functional/procedural modules
-    assert_eq!(
-        analysis.method_count, 5,
-        "Should count only the 5 impl methods, not standalone functions"
-    );
-    assert_eq!(analysis.field_count, 2, "Should count 2 struct fields");
-    // With complexity weighting, 5 simple methods (complexity 1 each) should have
-    // a low weighted count which is well below the threshold of 20
+    // With per-struct analysis, this file should not produce any god object results
     assert!(
-        !analysis.is_god_object,
-        "File with 25 simple functions should NOT be flagged as god object with complexity weighting"
-    );
-    assert!(
-        analysis.god_object_score.value() < 100.0,
-        "God object score should be less than 100 for simple functions, got {}",
-        analysis.god_object_score
+        analyses.is_empty(),
+        "File with 5 impl methods and 20 standalone functions should NOT be flagged as god object"
     );
 }
 
@@ -300,9 +264,11 @@ fn test_spec_130_god_class_vs_god_file_detection() {
 
     let file = syn::parse_file(god_class_code).expect("Failed to parse god class code");
     let detector = GodObjectDetector::with_source_content(god_class_code);
-    let analysis = detector.analyze_comprehensive(Path::new("god_class.rs"), &file);
+    let analyses = detector.analyze_comprehensive(Path::new("god_class.rs"), &file);
 
     // Verify god class detection excludes test methods
+    assert!(!analyses.is_empty(), "Should detect god class");
+    let analysis = &analyses[0];
     assert_eq!(
         analysis.method_count, 25,
         "God class should count only 25 production methods, not the 10 test methods (actual: {})",
@@ -397,21 +363,13 @@ fn test_spec_130_god_class_vs_god_file_detection() {
 
     let file = syn::parse_file(god_file_code).expect("Failed to parse god file code");
     let detector = GodObjectDetector::with_source_content(god_file_code);
-    let analysis = detector.analyze_comprehensive(Path::new("god_file.rs"), &file);
+    let analyses = detector.analyze_comprehensive(Path::new("god_file.rs"), &file);
 
-    // Verify god file detection includes ALL functions (production + test)
-    assert_eq!(
-        analysis.method_count, 50,
-        "God file should count all 50 functions (30 production + 20 test), actual: {}",
-        analysis.method_count
-    );
-    // The key validation: test functions ARE included for god file
-    // Whether it's flagged as god object depends on weighted complexity scoring
-    // but the count itself must be correct and detection type must be GodFile
-    assert_eq!(
-        analysis.detection_type,
-        DetectionType::GodFile,
-        "Detection type should be GodFile for file with standalone functions"
+    // With per-struct analysis, standalone functions don't trigger god object detection
+    // Empty result means no god objects found
+    assert!(
+        analyses.is_empty(),
+        "File with standalone functions should NOT be flagged as god object with per-struct analysis"
     );
 }
 

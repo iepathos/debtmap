@@ -390,6 +390,7 @@ mod tests {
                     detection_type: crate::organization::DetectionType::GodFile,
                     struct_name: None,
                     struct_line: None,
+                    struct_location: None,
                     visibility_breakdown: None,
                     domain_count: 0,
                     domain_diversity: 0.0,

@@ -168,6 +168,7 @@ fn test_analyze_simple_code() {
         domain_diversity_metrics: None,
         struct_name: None,
         struct_line: None,
+        struct_location: None,
     };
 
     let call_graph = std::collections::HashMap::new();
@@ -231,6 +232,7 @@ fn test_timeout_budget() {
         domain_diversity_metrics: None,
         struct_name: None,
         struct_line: None,
+        struct_location: None,
     };
 
     let call_graph = std::collections::HashMap::new();
