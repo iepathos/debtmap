@@ -921,38 +921,43 @@ mod tests {
 
     #[test]
     fn test_calculate_context_multiplier_for_example() {
+        // Context dampening is now opt-in (default disabled)
+        // File type is still detected, but multiplier defaults to 1.0
         let path = PathBuf::from("examples/demo.rs");
         let (multiplier, file_type) = calculate_context_multiplier(&path);
 
         assert_eq!(file_type, FileType::Example);
-        assert_eq!(multiplier, 0.1); // 90% reduction
+        assert_eq!(multiplier, 1.0); // No dampening by default (opt-in)
     }
 
     #[test]
     fn test_calculate_context_multiplier_for_test() {
+        // Context dampening is now opt-in (default disabled)
         let path = PathBuf::from("tests/integration_test.rs");
         let (multiplier, file_type) = calculate_context_multiplier(&path);
 
         assert_eq!(file_type, FileType::Test);
-        assert_eq!(multiplier, 0.2); // 80% reduction
+        assert_eq!(multiplier, 1.0); // No dampening by default (opt-in)
     }
 
     #[test]
     fn test_calculate_context_multiplier_for_benchmark() {
+        // Context dampening is now opt-in (default disabled)
         let path = PathBuf::from("benches/perf.rs");
         let (multiplier, file_type) = calculate_context_multiplier(&path);
 
         assert_eq!(file_type, FileType::Benchmark);
-        assert_eq!(multiplier, 0.3); // 70% reduction
+        assert_eq!(multiplier, 1.0); // No dampening by default (opt-in)
     }
 
     #[test]
     fn test_calculate_context_multiplier_for_build_script() {
+        // Context dampening is now opt-in (default disabled)
         let path = PathBuf::from("build.rs");
         let (multiplier, file_type) = calculate_context_multiplier(&path);
 
         assert_eq!(file_type, FileType::BuildScript);
-        assert_eq!(multiplier, 0.3); // 70% reduction
+        assert_eq!(multiplier, 1.0); // No dampening by default (opt-in)
     }
 
     #[test]

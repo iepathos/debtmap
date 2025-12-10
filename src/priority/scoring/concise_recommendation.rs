@@ -637,7 +637,7 @@ fn generate_state_machine_recommendation(
     _match_expression_count: u32,
     cyclomatic: u32,
     cognitive: u32,
-    _nesting: u32,
+    nesting: u32,
     metrics: &FunctionMetrics,
 ) -> Option<ActionableRecommendation> {
     // Extract signals from metrics (spec 203)
@@ -646,12 +646,20 @@ fn generate_state_machine_recommendation(
         .as_ref()
         .and_then(|lang| match lang {
             crate::core::LanguageSpecificData::Rust(rust) => rust.state_machine_signals.as_ref(),
-        })?;
+        });
 
-    // Early return if no work needed (spec 203)
-    if signals.complex_inline_arms == 0 {
-        return None;
-    }
+    // If no signals or no complex arms detected, fall back to generic recommendation
+    // Don't filter out - complexity thresholds already determined this is debt
+    let signals = match signals {
+        Some(s) if s.complex_inline_arms > 0 => s,
+        _ => {
+            // Fall back to generic complexity recommendation
+            return Some(generate_moderate_recommendation(
+                cyclomatic, cognitive, metrics,
+            ));
+        }
+    };
+    let _ = nesting; // Used in fallback path
 
     let language = crate::core::Language::from_path(&metrics.file);
 
@@ -828,7 +836,7 @@ fn generate_coordinator_recommendation(
 }
 
 /// Generate recommendation for dispatcher pattern (spec 189, spec 201)
-/// Returns None for clean dispatchers (no inline logic) to prevent generation of "no action needed" items
+/// Falls back to generic recommendation if no inline logic detected
 fn generate_dispatcher_recommendation(
     branch_count: u32,
     cognitive_ratio: f64,
@@ -839,11 +847,14 @@ fn generate_dispatcher_recommendation(
 ) -> Option<ActionableRecommendation> {
     let language = crate::core::Language::from_path(&metrics.file);
 
-    // Clean dispatcher (no inline logic) - don't generate recommendation (spec 201)
-    // This follows the Low Tier pattern (classification.rs:87-92)
+    // If no inline logic detected, fall back to generic recommendation
+    // Don't filter out - complexity thresholds already determined this is debt
     if inline_logic_branches == 0 {
-        return None;
+        return Some(generate_moderate_recommendation(
+            cyclomatic, cognitive, metrics,
+        ));
     }
+    let _ = (branch_count, cognitive_ratio); // Used for specific recommendation below
 
     // Dispatcher with inline logic - recommend extraction
     let extraction_impact = RefactoringImpact::extract_function(inline_logic_branches);
@@ -1727,11 +1738,14 @@ mod tests {
         );
     }
 
-    // Tests for spec 201: Prevent "no action needed" items from being generated
+    // Tests for spec 201: Pattern detection should not filter out debt items
+    // Complexity thresholds already determined an item is debt - pattern detection
+    // should only tailor the recommendation, not gate whether it appears
 
     #[test]
-    fn test_clean_dispatcher_returns_none() {
-        // Clean dispatcher with no inline logic should return None
+    fn test_clean_dispatcher_falls_back_to_generic() {
+        // Clean dispatcher with no inline logic should fall back to generic recommendation
+        // (not return None which would filter out the debt item)
         let result = generate_dispatcher_recommendation(
             10,  // branch_count
             0.5, // cognitive_ratio
@@ -1742,8 +1756,8 @@ mod tests {
         );
 
         assert!(
-            result.is_none(),
-            "Clean dispatcher (inline_logic_branches=0) should return None, preventing 'no action needed' items"
+            result.is_some(),
+            "Clean dispatcher should return a fallback recommendation, not None"
         );
     }
 
@@ -1769,6 +1783,67 @@ mod tests {
             rec.primary_action.contains("Extract inline logic"),
             "Should recommend extracting inline logic, got: {}",
             rec.primary_action
+        );
+    }
+
+    // Core invariant: generate_concise_recommendation NEVER returns None for ComplexityHotspot
+    // Pattern detection tailors recommendations but should not filter out debt items.
+    // Complexity thresholds already determined this IS debt - honor that decision.
+
+    #[test]
+    fn complexity_hotspot_always_returns_recommendation() {
+        // Pure test: verify the core invariant holds for various complexity levels
+        let test_cases = [
+            (5, 8, "low complexity"),
+            (9, 16, "moderate complexity - like reconcile_state"),
+            (15, 20, "high complexity"),
+            (48, 303, "extreme complexity"),
+        ];
+
+        for (cyclomatic, cognitive, description) in test_cases {
+            let metrics = create_test_metrics(cyclomatic, cognitive);
+            let result = generate_concise_recommendation(
+                &DebtType::ComplexityHotspot {
+                    cyclomatic,
+                    cognitive,
+                    adjusted_cyclomatic: None,
+                },
+                &metrics,
+                FunctionRole::PureLogic,
+                &None,
+            );
+
+            assert!(
+                result.is_some(),
+                "ComplexityHotspot should ALWAYS return Some for {} (cyclomatic={}, cognitive={})",
+                description,
+                cyclomatic,
+                cognitive
+            );
+        }
+    }
+
+    #[test]
+    fn complexity_hotspot_without_language_signals_returns_recommendation() {
+        // Edge case: function metrics without Rust-specific signals
+        // Should fall back to generic recommendation, not return None
+        let mut metrics = create_test_metrics(12, 18);
+        metrics.language_specific = None; // No language-specific data
+
+        let result = generate_concise_recommendation(
+            &DebtType::ComplexityHotspot {
+                cyclomatic: 12,
+                cognitive: 18,
+                adjusted_cyclomatic: None,
+            },
+            &metrics,
+            FunctionRole::Orchestrator,
+            &None,
+        );
+
+        assert!(
+            result.is_some(),
+            "Should return fallback recommendation when language_specific is None"
         );
     }
 }

@@ -558,7 +558,7 @@ pub fn default_documentation_multiplier() -> f64 {
 }
 
 pub fn default_enable_context_dampening() -> bool {
-    true // Enable by default
+    false // Disabled by default - only apply when --context flag is specified
 }
 
 /// Data flow scoring configuration (spec 218)

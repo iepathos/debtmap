@@ -20,12 +20,21 @@ use crate::priority::{
 /// metric (how hard to understand) that is reduced by repetitive patterns.
 pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
     func.entropy_score.as_ref().map(|entropy_score| {
-        // Use the new framework's dampening calculation
-        let calculator = crate::complexity::entropy_core::UniversalEntropyCalculator::new(
-            crate::complexity::entropy_core::EntropyConfig::default(),
-        );
-        let dampening_value = calculator.apply_dampening(entropy_score);
-        let dampening_factor = (dampening_value / 2.0).clamp(0.5, 1.0); // Normalize to 0.5-1.0 range
+        // Only apply dampening for LOW entropy (repetitive patterns)
+        // High entropy indicates real complexity that shouldn't be dampened
+        // Threshold: entropy < 0.4 indicates significant repetition
+        let is_repetitive = entropy_score.token_entropy < 0.4;
+
+        let dampening_factor = if is_repetitive {
+            // Use pattern_repetition to determine dampening amount
+            // High repetition (close to 1.0) = more dampening (lower factor)
+            // pattern_repetition of 0.5+ means significant repetition
+            let repetition_dampening = 1.0 - (entropy_score.pattern_repetition * 0.5);
+            repetition_dampening.clamp(0.5, 1.0)
+        } else {
+            // High entropy = no dampening, complexity is real
+            1.0
+        };
 
         // Only apply dampening to cognitive complexity (perceptual metric)
         // NOT to cyclomatic complexity (structural metric - path count doesn't change)

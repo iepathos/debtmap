@@ -120,9 +120,13 @@ impl ComplexityNormalization {
         (value as f64 / self.max_cyclomatic).min(1.0) * 100.0
     }
 
-    /// Normalize cognitive complexity to 0-100 scale
+    /// Normalize cognitive complexity - no cap applied
+    /// Extreme cognitive complexity should produce extreme scores
+    /// to properly prioritize deeply nested, hard-to-understand code
     pub fn normalize_cognitive(&self, value: u32) -> f64 {
-        (value as f64 / self.max_cognitive).min(1.0) * 100.0
+        // No .min(1.0) cap - cognitive complexity above max_cognitive
+        // produces scores above 100, reflecting true maintenance burden
+        (value as f64 / self.max_cognitive) * 100.0
     }
 }
 
@@ -258,11 +262,16 @@ mod tests {
     }
 
     #[test]
-    fn normalization_caps_at_100() {
+    fn cyclomatic_caps_at_100_cognitive_does_not() {
         let norm = ComplexityNormalization::default();
 
+        // Cyclomatic is capped at 100 (structural metric)
         assert_eq!(norm.normalize_cyclomatic(100), 100.0);
-        assert_eq!(norm.normalize_cognitive(200), 100.0);
+
+        // Cognitive is NOT capped - extreme nesting should produce extreme scores
+        // With max_cognitive=100, cognitive=200 produces 200.0
+        assert_eq!(norm.normalize_cognitive(200), 200.0);
+        assert_eq!(norm.normalize_cognitive(300), 300.0);
     }
 
     #[test]

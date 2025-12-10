@@ -229,12 +229,22 @@ impl MatchAnalyzer {
         visitor.visit_block(&func.block);
 
         if visitor.match_count == 1 && visitor.is_primary_match {
+            // Only apply pattern scaling if arms are simple
+            // Complex arms with if/match/loops inside should NOT get complexity reduction
+            // is_simple_mapping is TRUE only if ALL arms are simple literals/paths/returns
+            // If not all simple, don't apply ExhaustiveMatch scaling either
+            let pattern_type = if visitor.is_simple_mapping {
+                PatternType::SimpleMapping
+            } else if visitor.all_arms_simple {
+                // ExhaustiveMatch only for truly simple dispatch (e.g., enum matching)
+                PatternType::ExhaustiveMatch
+            } else {
+                // Complex arms = no scaling reduction
+                PatternType::Standard
+            };
+
             MatchCharacteristics {
-                pattern_type: if visitor.is_simple_mapping {
-                    PatternType::SimpleMapping
-                } else {
-                    PatternType::ExhaustiveMatch
-                },
+                pattern_type,
                 arm_count: visitor.max_arms,
                 max_arm_complexity: visitor.max_arm_complexity,
                 is_simple_mapping: visitor.is_simple_mapping,
@@ -255,6 +265,7 @@ struct MatchPatternVisitor {
     is_simple_mapping: bool,
     is_primary_match: bool,
     has_wildcard: bool,
+    all_arms_simple: bool, // True if all arms are simple (no control flow inside)
 }
 
 impl<'ast> syn::visit::Visit<'ast> for MatchPatternVisitor {
@@ -274,6 +285,8 @@ impl<'ast> syn::visit::Visit<'ast> for MatchPatternVisitor {
             )
         });
 
+        // Track whether all arms are simple (no control flow)
+        self.all_arms_simple = all_simple;
         if all_simple {
             self.is_simple_mapping = true;
         }
