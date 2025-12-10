@@ -323,12 +323,13 @@ fn format_grouped_item(
 
     // Aggregated metrics
     let metrics = grouping::aggregate_metrics(group);
-    let coverage_str = metrics
-        .coverage
-        .map(|c| format!("{:.0}%", c.direct * 100.0))
-        .unwrap_or_else(|| "N/A".to_string());
 
-    let mut metric_parts = vec![format!("Cov:{}", coverage_str)];
+    let mut metric_parts = Vec::new();
+
+    // Only show coverage if available (skip N/A)
+    if let Some(cov) = metrics.coverage {
+        metric_parts.push(format!("Cov:{:.0}%", cov.direct * 100.0));
+    }
 
     if metrics.cognitive_complexity > 0 {
         metric_parts.push(format!("Cog:{}", metrics.cognitive_complexity));
@@ -471,16 +472,17 @@ fn format_list_item(
         }
         _ => {
             // Regular function item
-            let coverage_str = item
-                .transitive_coverage
-                .as_ref()
-                .map(|c| format!("{:.0}%", c.direct * 100.0))
-                .unwrap_or_else(|| "N/A".to_string());
-
             // Format complexity with entropy adjustment if available
             let complexity_str = format_complexity_metric(item);
 
-            let mut metric_parts = vec![format!("Cov:{}", coverage_str), complexity_str];
+            let mut metric_parts = Vec::new();
+
+            // Only show coverage if available (skip N/A)
+            if let Some(cov) = &item.transitive_coverage {
+                metric_parts.push(format!("Cov:{:.0}%", cov.direct * 100.0));
+            }
+
+            metric_parts.push(complexity_str);
 
             // Add LOC for function length (spec 207: changed from Len: to LOC:)
             if item.function_length > 0 {
