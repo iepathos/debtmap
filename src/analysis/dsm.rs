@@ -76,7 +76,7 @@ pub struct DsmMetrics {
 pub struct DependencyMatrix {
     /// Module names in row/column order
     pub modules: Vec<String>,
-    /// Adjacency matrix: matrix[row][col] = row depends on col
+    /// Adjacency matrix: `matrix[row][col]` = row depends on col
     pub matrix: Vec<Vec<DsmCell>>,
     /// Detected cycles
     pub cycles: Vec<CycleInfo>,

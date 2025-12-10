@@ -307,7 +307,7 @@ impl GodObjectDetector {
         self.max_responsibilities
     }
 
-    /// Per-struct comprehensive analysis returning Vec<GodObjectAnalysis>.
+    /// Per-struct comprehensive analysis returning `Vec<GodObjectAnalysis>`.
     ///
     /// Spec 201: Analyzes each struct/type individually rather than aggregating
     /// file-level metrics. This prevents false positives where simple DTOs in
