@@ -1697,7 +1697,8 @@ fn apply_file_analysis_results(
     coverage_data: Option<&risk::lcov::LcovData>,
 ) {
     use crate::priority::god_object_aggregation::{
-        aggregate_from_raw_metrics, aggregate_god_object_metrics, extract_member_functions,
+        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
+        aggregate_god_object_metrics, extract_member_functions,
     };
 
     for file_data in processed_files {
@@ -1708,15 +1709,20 @@ fn apply_file_analysis_results(
             // Aggregate from raw metrics for complexity AND dependencies (includes ALL functions)
             let mut aggregated_metrics = aggregate_from_raw_metrics(&file_data.raw_functions);
 
-            // Enrich with coverage and contextual risk from unified items
+            // Aggregate coverage from ALL raw functions (not just debt items)
+            // This ensures god objects show accurate coverage even when member
+            // functions are filtered out by complexity thresholds.
+            if let Some(lcov) = coverage_data {
+                aggregated_metrics.weighted_coverage =
+                    aggregate_coverage_from_raw_metrics(&file_data.raw_functions, lcov);
+            }
+
+            // Enrich with contextual risk
             // NOTE: Dependencies are already aggregated from raw metrics (complete architectural view).
-            // We only enrich with coverage and risk here.
             let member_functions =
                 extract_member_functions(unified.items.iter(), &file_data.file_path);
             if !member_functions.is_empty() {
                 let item_metrics = aggregate_god_object_metrics(&member_functions);
-                // Only merge coverage data from debt items (dependencies come from raw metrics)
-                aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
 
                 // Spec 248: Prefer direct file-level git analysis over member aggregation
                 aggregated_metrics.aggregated_contextual_risk = risk_analyzer

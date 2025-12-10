@@ -32,6 +32,7 @@ use crate::core::FunctionMetrics;
 use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
+use crate::risk::lcov::LcovData;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -398,12 +399,76 @@ pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<Entro
     })
 }
 
+/// Aggregate coverage from raw FunctionMetrics using LCOV data.
+///
+/// This function looks up coverage for ALL functions in the file from LCOV data,
+/// not just those that became UnifiedDebtItems. This ensures god objects show
+/// accurate coverage metrics even when member functions are filtered out by
+/// complexity thresholds.
+///
+/// Returns a weighted average coverage based on function length.
+pub fn aggregate_coverage_from_raw_metrics(
+    functions: &[FunctionMetrics],
+    coverage: &LcovData,
+) -> Option<TransitiveCoverage> {
+    if functions.is_empty() {
+        return None;
+    }
+
+    // Collect coverage data for each function
+    let mut coverage_data: Vec<(f64, usize, Vec<usize>)> = Vec::with_capacity(functions.len());
+
+    for func in functions {
+        let end_line = func.line + func.length.saturating_sub(1);
+        // Use get_function_coverage_with_bounds for accurate AST-based matching
+        let direct_coverage = coverage
+            .get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line)
+            .unwrap_or(0.0);
+
+        let uncovered = coverage
+            .get_function_uncovered_lines(&func.file, &func.name, func.line)
+            .unwrap_or_default();
+
+        coverage_data.push((direct_coverage, func.length, uncovered));
+    }
+
+    let total_length: usize = coverage_data.iter().map(|(_, len, _)| len).sum();
+    if total_length == 0 {
+        return None;
+    }
+
+    // Calculate weighted average coverage
+    let weighted_direct = coverage_data
+        .iter()
+        .map(|(cov, len, _)| cov * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
+    // Collect all uncovered lines (deduplicated)
+    let all_uncovered: Vec<usize> = coverage_data
+        .iter()
+        .flat_map(|(_, _, uncovered)| uncovered.iter().copied())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    Some(TransitiveCoverage {
+        direct: weighted_direct,
+        transitive: weighted_direct, // For god objects, transitive == direct
+        propagated_from: vec![],
+        uncovered_lines: all_uncovered,
+    })
+}
+
 /// Aggregate metrics directly from raw FunctionMetrics (for ALL functions including tests).
 ///
 /// This function aggregates complexity and dependencies from raw function metrics
 /// before any filtering, ensuring god objects show:
 /// - TRUE complexity of all their functions
 /// - TRUE architectural dependencies (complete blast radius)
+///
+/// Note: Coverage is NOT aggregated here. Use `aggregate_coverage_from_raw_metrics`
+/// separately with LCOV data for coverage metrics.
 pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAggregatedMetrics {
     let total_cyclomatic = functions.iter().map(|f| f.cyclomatic).sum();
     let total_cognitive = functions.iter().map(|f| f.cognitive).sum();
