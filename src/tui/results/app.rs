@@ -11,8 +11,8 @@ pub fn get_coverage(item: &UnifiedDebtItem) -> Option<f64> {
 }
 
 use super::{
-    detail_view, dsm_view, filter::Filter, layout, list_view, navigation, search::SearchState,
-    sort::SortCriteria,
+    detail_view, dsm_view, filter::Filter, layout, list_view, nav_state, navigation,
+    search::SearchState, sort::SortCriteria,
 };
 
 /// View mode for the TUI
@@ -140,6 +140,10 @@ pub struct ResultsApp {
     dsm_scroll_x: usize,
     /// DSM view vertical scroll offset (Spec 205)
     dsm_scroll_y: usize,
+    /// Navigation history for back navigation (Spec 203)
+    nav_history: Vec<ViewMode>,
+    /// Whether DSM feature is enabled (Spec 203)
+    dsm_enabled: bool,
 }
 
 impl ResultsApp {
@@ -164,6 +168,8 @@ impl ResultsApp {
             status_message: None,
             dsm_scroll_x: 0,
             dsm_scroll_y: 0,
+            nav_history: Vec::new(),
+            dsm_enabled: true, // DSM feature enabled by default
         }
     }
 
@@ -588,6 +594,59 @@ impl ResultsApp {
     /// Set DSM vertical scroll offset (Spec 205)
     pub fn set_dsm_scroll_y(&mut self, offset: usize) {
         self.dsm_scroll_y = offset;
+    }
+
+    // ========================================================================
+    // Navigation State Machine (Spec 203)
+    // ========================================================================
+
+    /// Get navigation history for back navigation.
+    pub fn nav_history(&self) -> &[ViewMode] {
+        &self.nav_history
+    }
+
+    /// Push view mode to navigation history.
+    pub fn push_nav_history(&mut self, mode: ViewMode) {
+        self.nav_history.push(mode);
+    }
+
+    /// Pop from navigation history.
+    pub fn pop_nav_history(&mut self) -> Option<ViewMode> {
+        self.nav_history.pop()
+    }
+
+    /// Clear navigation history.
+    pub fn clear_nav_history(&mut self) {
+        self.nav_history.clear();
+    }
+
+    /// Check if DSM feature is enabled.
+    pub fn dsm_enabled(&self) -> bool {
+        self.dsm_enabled
+    }
+
+    /// Check if there's a selection (for navigation guards).
+    pub fn has_selection(&self) -> bool {
+        self.selected_index < self.item_count()
+    }
+
+    /// Check if there are items (for navigation guards).
+    pub fn has_items(&self) -> bool {
+        self.item_count() > 0
+    }
+
+    /// Get available navigation actions for current state.
+    pub fn available_nav_actions(&self) -> Vec<(&'static str, &'static str)> {
+        nav_state::available_actions(
+            &nav_state::NavigationState {
+                view_mode: self.view_mode,
+                detail_page: self.detail_page,
+                history: self.nav_history.clone(),
+                dsm_enabled: self.dsm_enabled,
+            },
+            self.has_items(),
+            self.has_selection(),
+        )
     }
 }
 
