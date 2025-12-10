@@ -9,9 +9,9 @@
 //! - Page 6: Responsibilities (role and responsibility analysis)
 //!
 //! Navigation:
-//! - Tab/←→: Switch pages
+//! - ←→/hl: Switch pages
 //! - 1-6: Jump to page
-//! - n/p: Navigate items (preserves page)
+//! - ↑↓/jk: Navigate items (preserves page)
 
 pub mod components;
 pub mod data_flow;
