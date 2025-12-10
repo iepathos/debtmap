@@ -984,10 +984,10 @@ fn generate_repetitive_validation_recommendation(
         ),
         rationale: format!(
             "Repetitive validation pattern detected (entropy {:.2}, {} checks). \
-             Low entropy ({:.2}) indicates boilerplate, not complexity. \
-             Adjusted complexity: {} → {} (reflects actual cognitive load). \
+             Low entropy indicates boilerplate, not genuine complexity - \
+             cognitive load is dampened accordingly. \
              Refactoring improves maintainability and reduces error-prone boilerplate.",
-            entropy, validation_count, entropy, cyclomatic, adjusted_cyclomatic
+            entropy, validation_count
         ),
         implementation_steps: vec![],
         related_items: vec![],

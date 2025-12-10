@@ -335,9 +335,15 @@ pub fn calculate_unified_priority_with_debt(
     };
     let role_adjusted_score = base_score * clamped_role_multiplier;
 
+    // Apply structural quality adjustment based on nesting/cyclomatic ratio
+    // High ratio = deeply nested relative to branches = bad structure = boost score
+    // Low ratio = flat structure = good structure = reduce score
+    let structural_multiplier = calculate_structural_quality_multiplier(func.nesting, func.cyclomatic);
+    let structure_adjusted_score = role_adjusted_score * structural_multiplier;
+
     // Add debt-based adjustments
     let debt_adjustment = calculate_debt_adjustment(func, debt_aggregator);
-    let debt_adjusted_score = role_adjusted_score + debt_adjustment;
+    let debt_adjusted_score = structure_adjusted_score + debt_adjustment;
 
     // Normalize to 0-10 scale
     let normalized_score = normalize_final_score(debt_adjusted_score);
@@ -459,6 +465,33 @@ fn apply_purity_adjustment(cyclomatic: u32, cognitive: u32, adjustment: f64) -> 
         (cyclomatic as f64 * adjustment) as u32,
         (cognitive as f64 * adjustment) as u32,
     )
+}
+
+/// Calculate structural quality multiplier based on nesting/cyclomatic ratio.
+///
+/// This captures how "deeply nested" code is relative to its branching complexity.
+/// - High ratio (nesting/cyclo > 0.5) = deeply nested = bad structure = boost score (1.2-1.5x)
+/// - Medium ratio (0.2-0.5) = moderate nesting = neutral (1.0x)
+/// - Low ratio (< 0.2) = flat structure = good structure = reduce score (0.7-0.9x)
+///
+/// Examples:
+/// - validate_and_transform_data: nesting=5, cyclo=8, ratio=0.625 → 1.3x (bad)
+/// - process_user_data: nesting=1, cyclo=11, ratio=0.09 → 0.8x (good)
+fn calculate_structural_quality_multiplier(nesting: u32, cyclomatic: u32) -> f64 {
+    if cyclomatic == 0 {
+        return 1.0;
+    }
+
+    let ratio = nesting as f64 / cyclomatic as f64;
+
+    match ratio {
+        r if r >= 0.6 => 1.5,  // Very deeply nested - major penalty
+        r if r >= 0.5 => 1.3,  // Deeply nested - significant penalty
+        r if r >= 0.4 => 1.15, // Moderately nested - minor penalty
+        r if r >= 0.2 => 1.0,  // Normal structure - neutral
+        r if r >= 0.1 => 0.85, // Flat structure - minor bonus
+        _ => 0.7,              // Very flat structure - significant bonus
+    }
 }
 
 /// Calculate the role multiplier based on function role and complexity.
