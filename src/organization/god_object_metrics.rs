@@ -257,6 +257,7 @@ mod tests {
             detection_type: crate::organization::DetectionType::GodClass,
             struct_name: None,
             struct_line: None,
+            struct_location: None, // Spec 201: Added for per-struct analysis
             visibility_breakdown: None, // Spec 134: Added for test compatibility
             domain_count: 0,
             domain_diversity: 0.0,

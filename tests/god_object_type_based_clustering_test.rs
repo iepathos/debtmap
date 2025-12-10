@@ -22,12 +22,16 @@ fn test_type_based_clustering_on_formatter() {
     let file = syn::parse_file(&source).expect("Failed to parse formatter.rs");
 
     let detector = GodObjectDetector::with_source_content(&source);
-    let analysis = detector.analyze_comprehensive(formatter_path, &file);
+    let analyses = detector.analyze_comprehensive(formatter_path, &file);
 
     // If formatter.rs has utilities modules from behavioral clustering,
     // type-based should be used instead
-    if !analysis.recommended_splits.is_empty() {
+    if let Some(analysis) = analyses.first() {
         let splits = &analysis.recommended_splits;
+        if splits.is_empty() {
+            return;
+        }
+
         // Check if any splits use type-based method
         let has_type_based = splits
             .iter()
@@ -79,11 +83,14 @@ fn test_type_based_clustering_on_god_object_analysis() {
     let file = syn::parse_file(&source).expect("Failed to parse god_object_analysis.rs");
 
     let detector = GodObjectDetector::with_source_content(&source);
-    let analysis = detector.analyze_comprehensive(analysis_path, &file);
+    let analyses = detector.analyze_comprehensive(analysis_path, &file);
 
     // If the file produces splits, verify they don't have utilities modules
-    if !analysis.recommended_splits.is_empty() {
+    if let Some(analysis) = analyses.first() {
         let splits = &analysis.recommended_splits;
+        if splits.is_empty() {
+            return;
+        }
         for split in splits {
             // No utilities modules should be recommended
             assert!(
@@ -158,7 +165,7 @@ fn test_type_based_clustering_quality() {
 
     let file = syn::parse_file(code).expect("Failed to parse");
     let detector = GodObjectDetector::with_source_content(code);
-    let _analysis = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let _analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
 
     // This code should be analyzed without errors
     // The exact behavior depends on the god object detection thresholds
@@ -210,11 +217,14 @@ fn test_utilities_trigger_type_based_fallback() {
 
     let file = syn::parse_file(code).expect("Failed to parse");
     let detector = GodObjectDetector::with_source_content(code);
-    let analysis = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
 
     // Verify no utilities modules in recommendations
-    if !analysis.recommended_splits.is_empty() {
+    if let Some(analysis) = analyses.first() {
         let splits = &analysis.recommended_splits;
+        if splits.is_empty() {
+            return;
+        }
         for split in splits {
             assert!(
                 !split.suggested_name.contains("utilities")

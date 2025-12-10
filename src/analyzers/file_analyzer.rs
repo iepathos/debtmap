@@ -93,6 +93,7 @@ impl UnifiedFileAnalyzer {
                     detection_type: crate::organization::DetectionType::GodFile,
                     struct_name: None,
                     struct_line: None,
+                    struct_location: None, // Spec 201
                     visibility_breakdown: None,
                     domain_count: 0,
                     domain_diversity: 0.0,
@@ -241,6 +242,7 @@ impl UnifiedFileAnalyzer {
                 detection_type: crate::organization::DetectionType::GodFile,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None, // Spec 201
                 visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,

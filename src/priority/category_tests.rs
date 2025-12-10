@@ -117,6 +117,7 @@ mod tests {
                         cross_domain_severity: None,
                         struct_name: None,
                         struct_line: None,
+                        struct_location: None,
                         domain_diversity_metrics: None,
                     })
                 } else {

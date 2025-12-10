@@ -1407,6 +1407,7 @@ fn detect_god_object_analysis(
                 detection_type: crate::organization::DetectionType::GodFile,
                 struct_name: None, // Size-based detection is always GodFile
                 struct_line: None,
+                struct_location: None,
                 visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
