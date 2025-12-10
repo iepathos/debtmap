@@ -997,9 +997,9 @@ mod tests {
             analysis_method: Default::default(),
             cross_domain_severity: None,
             domain_diversity_metrics: None,
-                aggregated_entropy: None,
-                aggregated_error_swallowing_count: None,
-                aggregated_error_swallowing_patterns: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
         });
         let score2 = metrics.calculate_score();
 
@@ -1458,9 +1458,9 @@ mod tests {
             analysis_method: Default::default(),
             cross_domain_severity: None,
             domain_diversity_metrics: None,
-                aggregated_entropy: None,
-                aggregated_error_swallowing_count: None,
-                aggregated_error_swallowing_patterns: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
         });
         let factors = metrics.get_score_factors();
         assert!((factors.god_object_multiplier - 1.17).abs() < 0.01); // 1.0 + (8.5 / 50.0)
