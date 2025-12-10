@@ -191,42 +191,49 @@ fn render_file_coupling_section(
 /// Render classification badge with semantic coloring (spec 203).
 ///
 /// Displays classification as a colored badge like `[STABLE CORE]`
+/// Uses the standard label-value column layout for consistency.
 fn render_classification_badge(
     lines: &mut Vec<Line<'static>>,
     classification: &str,
     theme: &Theme,
-    width: u16,
+    _width: u16,
 ) {
+    const INDENT: usize = 2;
+    const LABEL_WIDTH: usize = 24;
+    const GAP: usize = 4;
+
     let badge_text = format!("[{}]", classification.to_uppercase());
     let badge_style = theme.coupling_badge_style(classification);
 
-    // Calculate padding for alignment (similar to add_label_value)
-    let label = "classification";
-    let label_width = 16.min(width.saturating_sub(4) as usize / 2);
-    let padding = label_width.saturating_sub(label.len());
-    let dots = ".".repeat(padding);
+    let label_with_indent = format!("{}{}", " ".repeat(INDENT), "classification");
+    let padded_label = format!("{:width$}", label_with_indent, width = LABEL_WIDTH);
+    let gap = " ".repeat(GAP);
 
     lines.push(Line::from(vec![
-        Span::styled(label.to_string(), Style::default().fg(theme.text)),
-        Span::styled(dots, theme.dotted_leader_style()),
+        Span::raw(padded_label),
+        Span::raw(gap),
         Span::styled(badge_text, badge_style),
     ]));
 }
 
 /// Render instability as a progress bar with color gradient (spec 203).
 ///
-/// Format: `instability.....0.40 ████████░░░░░░░░░░░░`
+/// Format: `  instability              0.40 ████████░░░░░░░░░░░░`
+/// Uses standard label-value column layout with progress bar appended.
 /// Color: Green (0.0) -> Yellow (0.5) -> Red (1.0)
 fn render_instability_bar(
     lines: &mut Vec<Line<'static>>,
     instability: f64,
     theme: &Theme,
-    width: u16,
+    _width: u16,
 ) {
-    let label = "instability";
-    let label_width = 16.min(width.saturating_sub(4) as usize / 2);
-    let padding = label_width.saturating_sub(label.len());
-    let dots = ".".repeat(padding);
+    const INDENT: usize = 2;
+    const LABEL_WIDTH: usize = 24;
+    const GAP: usize = 4;
+
+    let label_with_indent = format!("{}{}", " ".repeat(INDENT), "instability");
+    let padded_label = format!("{:width$}", label_with_indent, width = LABEL_WIDTH);
+    let gap = " ".repeat(GAP);
 
     // Progress bar configuration
     let bar_width = 20;
@@ -238,11 +245,11 @@ fn render_instability_bar(
     let empty_bar: String = "░".repeat(empty);
 
     lines.push(Line::from(vec![
-        Span::styled(label.to_string(), Style::default().fg(theme.text)),
-        Span::styled(dots, theme.dotted_leader_style()),
+        Span::raw(padded_label),
+        Span::raw(gap),
         Span::styled(
             format!("{:.2} ", instability),
-            Style::default().fg(theme.text),
+            Style::default().fg(theme.primary),
         ),
         Span::styled(filled_bar, Style::default().fg(bar_color)),
         Span::styled(empty_bar, Style::default().fg(theme.muted)),
