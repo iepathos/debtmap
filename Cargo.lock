@@ -824,7 +824,7 @@ dependencies = [
  "tokio",
  "toml 0.9.8",
  "trybuild",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.2",
  "walkdir",
  "which",
  "xxhash-rust",
