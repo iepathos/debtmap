@@ -1190,11 +1190,28 @@ impl ParallelUnifiedAnalysisBuilder {
                     }
                     // Dependencies are already populated from raw metrics (complete architectural view)
 
+                    // Enrich god_analysis with aggregated entropy and error swallowing data
+                    let mut god_analysis = god_analysis.clone();
+                    god_analysis.aggregated_entropy =
+                        aggregated_metrics.aggregated_entropy.clone();
+                    god_analysis.aggregated_error_swallowing_count =
+                        if aggregated_metrics.total_error_swallowing_count > 0 {
+                            Some(aggregated_metrics.total_error_swallowing_count)
+                        } else {
+                            None
+                        };
+                    god_analysis.aggregated_error_swallowing_patterns =
+                        if !aggregated_metrics.error_swallowing_patterns.is_empty() {
+                            Some(aggregated_metrics.error_swallowing_patterns.clone())
+                        } else {
+                            None
+                        };
+
                     // Create god object UnifiedDebtItem using same function as sequential path
                     let god_item = crate::builders::unified_analysis::create_god_object_debt_item(
                         &file_item.metrics.path,
                         &file_item.metrics,
-                        god_analysis,
+                        &god_analysis,
                         aggregated_metrics,
                         coverage_data,
                     );
