@@ -14,6 +14,7 @@
 //! - Effect-based analysis patterns for testability and composability (Spec 207)
 //! - Data flow analysis for state transition and mutation tracking (Spec 201)
 //! - Dependency Structure Matrix (DSM) for architectural visualization (Spec 205)
+//! - Analysis workflow state machine with checkpoint/resume support (Spec 202)
 
 pub mod attribution;
 pub mod call_graph;
@@ -39,6 +40,7 @@ pub mod purity_propagation;
 pub mod rust_patterns;
 pub mod type_flow_tracker;
 pub mod type_signatures;
+pub mod workflow;
 
 pub use call_graph::{
     AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
@@ -100,6 +102,11 @@ pub use type_signatures::{
     extract_rust_signature, CanonicalType, GenericBound, Parameter, TypeBasedClassification,
     TypeMatcher, TypeNormalizer, TypePattern, TypePatternLibrary, TypeSignature,
     TypeSignatureAnalyzer,
+};
+pub use workflow::{
+    load_checkpoint, run_analysis, save_checkpoint, AnalysisConfig as WorkflowConfig, AnalysisEnv,
+    AnalysisPhase, AnalysisResults as WorkflowResults, AnalysisState, FileSystem, ProgressReporter,
+    RealAnalysisEnv, WorkflowRunner,
 };
 
 #[cfg(test)]
