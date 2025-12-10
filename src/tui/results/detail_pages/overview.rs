@@ -182,10 +182,38 @@ pub fn render(
         theme,
         area.width,
     );
+    // Show cognitive complexity with entropy dampening if applicable
+    let cognitive_display = if is_god_object {
+        // For god objects, check aggregated entropy
+        item.god_object_indicators
+            .as_ref()
+            .and_then(|g| g.aggregated_entropy.as_ref())
+            .filter(|e| e.dampening_factor < 1.0)
+            .map(|e| {
+                format!(
+                    "{} → {} (dampened)",
+                    e.original_complexity, e.adjusted_cognitive
+                )
+            })
+            .unwrap_or_else(|| item.cognitive_complexity.to_string())
+    } else {
+        // For regular functions, check entropy_details
+        item.entropy_details
+            .as_ref()
+            .filter(|e| e.dampening_factor < 1.0)
+            .map(|e| {
+                format!(
+                    "{} → {} (dampened)",
+                    e.original_complexity, e.adjusted_cognitive
+                )
+            })
+            .unwrap_or_else(|| item.cognitive_complexity.to_string())
+    };
+
     add_label_value(
         &mut lines,
         cognitive_label,
-        item.cognitive_complexity.to_string(),
+        cognitive_display,
         theme,
         area.width,
     );
