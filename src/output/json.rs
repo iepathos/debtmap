@@ -150,6 +150,8 @@ mod tests {
             contextual_risk: None, // spec 203
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 
@@ -388,6 +390,7 @@ mod tests {
                     detection_type: crate::organization::DetectionType::GodFile,
                     struct_name: None,
                     struct_line: None,
+                    struct_location: None,
                     visibility_breakdown: None,
                     domain_count: 0,
                     domain_diversity: 0.0,
@@ -399,6 +402,7 @@ mod tests {
                 function_scores: vec![],
                 god_object_type: None,
                 file_type: None,
+                ..Default::default()
             },
             score: 606.0, // Higher than function items
             priority_rank: 1,

@@ -40,6 +40,8 @@ fn create_test_metrics(name: &str, file: PathBuf, line: usize) -> FunctionMetric
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 

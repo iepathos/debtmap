@@ -4,6 +4,7 @@
 //! including detailed recommendations and summary tables.
 
 use crate::formatting::FormattingConfig;
+use crate::output::unified::{classify_coupling, CouplingClassification};
 use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 
 use crate::priority::formatter_verbosity as verbosity;
@@ -94,6 +95,40 @@ pub use helpers::{
     extract_complexity_info, extract_dependency_info, format_debt_type, format_impact, format_role,
 };
 
+// === Coupling display helpers (spec 202) ===
+
+/// Format truncated list with (+N more) suffix for display
+fn format_truncated_list(items: &[String], max: usize) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    if items.len() <= max {
+        items.join(", ")
+    } else {
+        let shown: Vec<_> = items.iter().take(max).collect();
+        format!(
+            "{} (+{} more)",
+            shown
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+            items.len() - max
+        )
+    }
+}
+
+/// Get the display label for a coupling classification
+fn coupling_classification_label(classification: &CouplingClassification) -> &'static str {
+    match classification {
+        CouplingClassification::StableCore => "stable core",
+        CouplingClassification::UtilityModule => "utility",
+        CouplingClassification::LeafModule => "leaf",
+        CouplingClassification::Isolated => "isolated",
+        CouplingClassification::HighlyCoupled => "highly coupled",
+    }
+}
+
 // Format file-level priority items with detailed information
 pub fn format_file_priority_item_with_verbosity(
     output: &mut String,
@@ -151,6 +186,39 @@ pub fn format_file_priority_item_with_verbosity(
         item.metrics.avg_complexity
     )
     .unwrap();
+
+    // Coupling section (spec 202)
+    let total_coupling = item.metrics.afferent_coupling + item.metrics.efferent_coupling;
+    if total_coupling >= 2 {
+        let classification = classify_coupling(
+            item.metrics.afferent_coupling,
+            item.metrics.efferent_coupling,
+        );
+        let label = coupling_classification_label(&classification);
+
+        writeln!(
+            output,
+            "{} Ca={} ({}), Ce={}, I={:.2}",
+            "├─ COUPLING:".bright_blue(),
+            item.metrics.afferent_coupling,
+            label,
+            item.metrics.efferent_coupling,
+            item.metrics.instability
+        )
+        .unwrap();
+
+        // Dependents list (incoming)
+        if !item.metrics.dependents.is_empty() {
+            let display = format_truncated_list(&item.metrics.dependents, 3);
+            writeln!(output, "   {} {}", "←".dimmed(), display).unwrap();
+        }
+
+        // Dependencies list (outgoing)
+        if !item.metrics.dependencies_list.is_empty() {
+            let display = format_truncated_list(&item.metrics.dependencies_list, 3);
+            writeln!(output, "   {} {}", "→".dimmed(), display).unwrap();
+        }
+    }
 
     // God object details (if applicable)
     if let Some(ref god_analysis) = item.metrics.god_object_analysis {
@@ -241,5 +309,77 @@ fn format_file_rationale(item: &crate::priority::FileDebtItem) -> String {
     } else {
         "File-level refactoring will improve overall code organization and maintainability."
             .to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // === Tests for format_truncated_list (spec 202) ===
+
+    #[test]
+    fn test_format_truncated_list_empty() {
+        let items: Vec<String> = vec![];
+        assert_eq!(format_truncated_list(&items, 3), "");
+    }
+
+    #[test]
+    fn test_format_truncated_list_under_limit() {
+        let items = vec!["a.rs".to_string(), "b.rs".to_string()];
+        assert_eq!(format_truncated_list(&items, 3), "a.rs, b.rs");
+    }
+
+    #[test]
+    fn test_format_truncated_list_at_limit() {
+        let items = vec!["a.rs".to_string(), "b.rs".to_string(), "c.rs".to_string()];
+        assert_eq!(format_truncated_list(&items, 3), "a.rs, b.rs, c.rs");
+    }
+
+    #[test]
+    fn test_format_truncated_list_over_limit() {
+        let items = vec![
+            "a.rs".to_string(),
+            "b.rs".to_string(),
+            "c.rs".to_string(),
+            "d.rs".to_string(),
+            "e.rs".to_string(),
+        ];
+        assert_eq!(
+            format_truncated_list(&items, 3),
+            "a.rs, b.rs, c.rs (+2 more)"
+        );
+    }
+
+    #[test]
+    fn test_format_truncated_list_single_item() {
+        let items = vec!["only.rs".to_string()];
+        assert_eq!(format_truncated_list(&items, 3), "only.rs");
+    }
+
+    // === Tests for coupling_classification_label (spec 202) ===
+
+    #[test]
+    fn test_coupling_classification_labels() {
+        assert_eq!(
+            coupling_classification_label(&CouplingClassification::StableCore),
+            "stable core"
+        );
+        assert_eq!(
+            coupling_classification_label(&CouplingClassification::UtilityModule),
+            "utility"
+        );
+        assert_eq!(
+            coupling_classification_label(&CouplingClassification::LeafModule),
+            "leaf"
+        );
+        assert_eq!(
+            coupling_classification_label(&CouplingClassification::Isolated),
+            "isolated"
+        );
+        assert_eq!(
+            coupling_classification_label(&CouplingClassification::HighlyCoupled),
+            "highly coupled"
+        );
     }
 }

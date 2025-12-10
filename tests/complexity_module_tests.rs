@@ -33,6 +33,8 @@ fn test_complexity_calculator_new() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(!calc.is_complex(&metrics));
 }
@@ -65,6 +67,8 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -100,6 +104,8 @@ fn test_complexity_calculator_is_complex_cognitive() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -135,6 +141,8 @@ fn test_complexity_calculator_is_complex_both() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -170,6 +178,8 @@ fn test_complexity_calculator_is_not_complex() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(
         !calc.is_complex(&metrics),
@@ -205,6 +215,8 @@ fn test_complexity_calculator_calculate_score_low() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -241,6 +253,8 @@ fn test_complexity_calculator_calculate_score_medium() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -277,6 +291,8 @@ fn test_complexity_calculator_calculate_score_high() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -313,6 +329,8 @@ fn test_complexity_calculator_calculate_score_zero() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(score, 0, "Score should be 0 when metrics are 0");
@@ -428,6 +446,8 @@ fn test_complexity_calculator_boundary_values() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(!calc.is_complex(&metrics_zero));
 
@@ -456,6 +476,8 @@ fn test_complexity_calculator_boundary_values() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(!calc.is_complex(&metrics_one));
 
@@ -484,6 +506,8 @@ fn test_complexity_calculator_boundary_values() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     assert!(calc.is_complex(&metrics_two));
 }
@@ -517,6 +541,8 @@ fn test_complexity_score_proportions() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
     assert_eq!(
@@ -549,6 +575,8 @@ fn test_complexity_score_proportions() {
         purity_reason: None,
         call_dependencies: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
     assert_eq!(

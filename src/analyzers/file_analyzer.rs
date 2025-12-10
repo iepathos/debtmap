@@ -93,6 +93,7 @@ impl UnifiedFileAnalyzer {
                     detection_type: crate::organization::DetectionType::GodFile,
                     struct_name: None,
                     struct_line: None,
+                    struct_location: None, // Spec 201
                     visibility_breakdown: None,
                     domain_count: 0,
                     domain_diversity: 0.0,
@@ -241,6 +242,7 @@ impl UnifiedFileAnalyzer {
                 detection_type: crate::organization::DetectionType::GodFile,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None, // Spec 201
                 visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
@@ -279,6 +281,12 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             function_scores: Vec::new(),
             god_object_type,
             file_type,
+            // Spec 201: File-level dependency metrics (populated during analysis aggregation)
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            dependents: Vec::new(),
+            dependencies_list: Vec::new(),
         })
     }
 
@@ -335,6 +343,12 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             function_scores,
             god_object_type,
             file_type,
+            // Spec 201: File-level dependency metrics (populated during analysis aggregation)
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            dependents: Vec::new(),
+            dependencies_list: Vec::new(),
         }
     }
 }
@@ -401,6 +415,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 

@@ -9,6 +9,10 @@ pub enum OutputFormat {
     Markdown,
     Terminal,
     Html,
+    /// Graphviz DOT format for dependency visualization (Spec 204)
+    Dot,
+    /// Dependency Structure Matrix format for module dependency analysis (Spec 205)
+    Dsm,
 }
 
 pub trait OutputWriter {
@@ -22,6 +26,12 @@ pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
         OutputFormat::Markdown => Box::new(MarkdownWriter::new(io::stdout())),
         OutputFormat::Terminal => Box::new(TerminalWriter::default()),
         OutputFormat::Html => Box::new(HtmlWriter::new(io::stdout())),
+        // DOT format is handled separately via the output module, not through OutputWriter trait
+        // Fall back to terminal for legacy code paths that use create_writer
+        OutputFormat::Dot => Box::new(TerminalWriter::default()),
+        // DSM format is handled separately via the output module (Spec 205)
+        // Fall back to terminal for legacy code paths that use create_writer
+        OutputFormat::Dsm => Box::new(TerminalWriter::default()),
     }
 }
 
@@ -174,6 +184,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }];
 
         AnalysisResults {
@@ -357,6 +369,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -388,6 +402,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -419,6 +435,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -450,6 +468,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -485,6 +505,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             });
         }
 
@@ -532,6 +554,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -558,6 +582,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
         ];
 

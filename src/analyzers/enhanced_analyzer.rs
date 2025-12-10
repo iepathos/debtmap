@@ -20,11 +20,6 @@ fn determine_file_type(path: &Path) -> FileType {
     }
 }
 
-/// Pure function to check if analysis indicates a god object
-fn is_god_object_analysis(analysis: &GodObjectAnalysis) -> bool {
-    analysis.is_god_object
-}
-
 /// Pure function to extract metrics from functions
 fn extract_function_metrics(functions: &[FunctionMetrics]) -> (usize, u32) {
     let function_count = functions.len();
@@ -65,6 +60,7 @@ fn create_god_object_analysis(
         detection_type: crate::organization::DetectionType::GodFile,
         struct_name: None,
         struct_line: None,
+        struct_location: None,      // Spec 201: Added for per-struct analysis
         visibility_breakdown: None, // Spec 134: Added for compatibility
         domain_count: 0,
         domain_diversity: 0.0,
@@ -76,18 +72,16 @@ fn create_god_object_analysis(
 }
 
 /// I/O function to detect god object in Rust files
+///
+/// Spec 201: Uses per-struct analysis. Returns the first god object found,
+/// or None if no structs qualify as god objects.
 fn detect_rust_god_object(path: &Path, content: &str) -> Result<Option<GodObjectAnalysis>> {
     syn::parse_file(content)
         .map(|ast| {
             let detector = GodObjectDetector::with_source_content(content);
-            detector.analyze_comprehensive(path, &ast)
-        })
-        .map(|analysis| {
-            if is_god_object_analysis(&analysis) {
-                Some(analysis)
-            } else {
-                None
-            }
+            let analyses = detector.analyze_comprehensive(path, &ast);
+            // Return the first god object found, if any
+            analyses.into_iter().find(|a| a.is_god_object)
         })
         .or(Ok(None))
 }

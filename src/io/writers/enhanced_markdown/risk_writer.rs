@@ -167,6 +167,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test2.rs"),
@@ -193,6 +195,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test3.rs"),
@@ -219,6 +223,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
         ];
 

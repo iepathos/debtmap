@@ -400,9 +400,9 @@ impl ParallelUnifiedAnalysisBuilder {
     ) {
         let start = Instant::now();
 
-        // Subtask 0: Initialize (data flow graph, purity, test detection) - PARALLEL
+        // Subtask 0: Aggregate debt (data flow graph, purity, test detection, debt aggregation) - PARALLEL
         if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Active, None);
+            manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Active, None);
         }
 
         // Execute parallel initialization tasks
@@ -413,16 +413,7 @@ impl ParallelUnifiedAnalysisBuilder {
         self.report_phase1_completion(phase1_time);
 
         if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Completed, None);
-            std::thread::sleep(std::time::Duration::from_millis(150));
-        }
-
-        // Subtask 1: Aggregate debt (included in phase 1)
-        if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Active, None);
-        }
-        if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Completed, None);
+            manager.tui_update_subtask(5, 0, crate::tui::app::StageStatus::Completed, None);
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
 
@@ -708,12 +699,12 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
 
-        // Subtask 2: Score functions (main computational loop with progress) - PARALLEL
+        // Subtask 1: Score functions (main computational loop with progress) - PARALLEL
         let total_metrics = metrics.len();
         if let Some(manager) = ProgressManager::global() {
             manager.tui_update_subtask(
-                6,
-                2,
+                5,
+                1,
                 crate::tui::app::StageStatus::Active,
                 Some((0, total_metrics)),
             );
@@ -746,8 +737,8 @@ impl ParallelUnifiedAnalysisBuilder {
 
         if let Some(manager) = ProgressManager::global() {
             manager.tui_update_subtask(
-                6,
-                2,
+                5,
+                1,
                 crate::tui::app::StageStatus::Completed,
                 Some((total_metrics, total_metrics)),
             );
@@ -973,6 +964,7 @@ impl ParallelUnifiedAnalysisBuilder {
                         detection_type: crate::organization::DetectionType::GodFile,
                         struct_name: None,
                         struct_line: None,
+                        struct_location: None,
                         visibility_breakdown: None,
                         domain_count: 0,
                         domain_diversity: 0.0,
@@ -1161,7 +1153,9 @@ impl ParallelUnifiedAnalysisBuilder {
                 }
             }
 
-            unified.add_file_item(file_item);
+            // Spec 201: Enrich file item with dependency metrics aggregated from function-level data
+            let file_item_with_deps = enrich_file_item_with_dependencies(file_item, &unified.items);
+            unified.add_file_item(file_item_with_deps);
         }
 
         agg_progress.set_message("Sorting by priority and calculating impact");
@@ -1218,6 +1212,29 @@ impl ParallelUnifiedAnalysisBuilder {
 
         (unified, self.timings)
     }
+}
+
+/// Enrich file item with dependency metrics aggregated from function-level data (spec 201)
+fn enrich_file_item_with_dependencies(
+    mut file_item: crate::priority::FileDebtItem,
+    unified_items: &im::Vector<crate::priority::UnifiedDebtItem>,
+) -> crate::priority::FileDebtItem {
+    use crate::priority::god_object_aggregation::{
+        aggregate_dependency_metrics, extract_member_functions,
+    };
+
+    let member_functions = extract_member_functions(unified_items.iter(), &file_item.metrics.path);
+    let (callers, callees, afferent, efferent) = aggregate_dependency_metrics(&member_functions);
+
+    // Update file metrics with aggregated dependency data
+    file_item.metrics.afferent_coupling = afferent;
+    file_item.metrics.efferent_coupling = efferent;
+    file_item.metrics.instability =
+        crate::output::unified::calculate_instability(afferent, efferent);
+    file_item.metrics.dependents = callers.into_iter().take(10).collect();
+    file_item.metrics.dependencies_list = callees.into_iter().take(10).collect();
+
+    file_item
 }
 
 /// Trait for parallel analysis

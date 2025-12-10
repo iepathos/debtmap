@@ -8,6 +8,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle keyboard input and return true if should quit
 pub fn handle_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
+    // Clear status message on any key press (except on first press that sets it)
+    app.clear_status_message();
+
     match app.view_mode() {
         ViewMode::List => handle_list_key(app, key),
         ViewMode::Detail => handle_detail_key(app, key),
@@ -15,6 +18,7 @@ pub fn handle_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         ViewMode::SortMenu => handle_sort_menu_key(app, key),
         ViewMode::FilterMenu => handle_filter_menu_key(app, key),
         ViewMode::Help => handle_help_key(app, key),
+        ViewMode::Dsm => handle_dsm_key(app, key),
     }
 }
 
@@ -83,10 +87,16 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             app.set_view_mode(ViewMode::Help);
         }
 
+        // DSM view (Spec 205)
+        KeyCode::Char('m') => {
+            app.set_view_mode(ViewMode::Dsm);
+        }
+
         // Actions (clipboard, editor)
         KeyCode::Char('c') => {
             if let Some(item) = app.selected_item() {
-                super::actions::copy_path_to_clipboard(&item.location.file)?;
+                let message = super::actions::copy_path_to_clipboard(&item.location.file)?;
+                app.set_status_message(message);
             }
         }
         KeyCode::Char('e') => {
@@ -116,42 +126,61 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             app.set_view_mode(ViewMode::List);
         }
 
-        // Page navigation
-        KeyCode::Tab | KeyCode::Right => {
-            let next_page = app.detail_page().next();
-            app.set_detail_page(next_page);
+        // Page navigation (only cycles through available pages)
+        KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
+            app.next_available_page();
         }
-        KeyCode::BackTab | KeyCode::Left => {
-            let prev_page = app.detail_page().prev();
-            app.set_detail_page(prev_page);
+        KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => {
+            app.prev_available_page();
         }
 
-        // Jump to specific page
+        // Jump to specific page (only if available)
         KeyCode::Char('1') => {
-            app.set_detail_page(super::app::DetailPage::Overview);
+            if app.is_page_available(super::app::DetailPage::Overview) {
+                app.set_detail_page(super::app::DetailPage::Overview);
+            }
         }
         KeyCode::Char('2') => {
-            app.set_detail_page(super::app::DetailPage::Dependencies);
+            if app.is_page_available(super::app::DetailPage::Dependencies) {
+                app.set_detail_page(super::app::DetailPage::Dependencies);
+            }
         }
         KeyCode::Char('3') => {
-            app.set_detail_page(super::app::DetailPage::GitContext);
+            if app.is_page_available(super::app::DetailPage::GitContext) {
+                app.set_detail_page(super::app::DetailPage::GitContext);
+            }
         }
         KeyCode::Char('4') => {
-            app.set_detail_page(super::app::DetailPage::Patterns);
+            if app.is_page_available(super::app::DetailPage::Patterns) {
+                app.set_detail_page(super::app::DetailPage::Patterns);
+            }
+        }
+        KeyCode::Char('5') => {
+            if app.is_page_available(super::app::DetailPage::DataFlow) {
+                app.set_detail_page(super::app::DetailPage::DataFlow);
+            }
+        }
+        KeyCode::Char('6') => {
+            if app.is_page_available(super::app::DetailPage::Responsibilities) {
+                app.set_detail_page(super::app::DetailPage::Responsibilities);
+            }
         }
 
-        // Navigate to next/previous item (preserve page)
-        KeyCode::Char('n') | KeyCode::Down | KeyCode::Char('j') => {
+        // Navigate to next/previous item (preserve page if available)
+        KeyCode::Down | KeyCode::Char('j') => {
             move_selection(app, 1);
+            app.ensure_valid_page();
         }
-        KeyCode::Char('p') | KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up | KeyCode::Char('k') => {
             move_selection(app, -1);
+            app.ensure_valid_page();
         }
 
         // Actions
         KeyCode::Char('c') => {
             if let Some(item) = app.selected_item() {
-                super::actions::copy_path_to_clipboard(&item.location.file)?;
+                let message = super::actions::copy_page_to_clipboard(item, app.detail_page())?;
+                app.set_status_message(message);
             }
         }
         KeyCode::Char('e') | KeyCode::Char('o') => {
@@ -310,6 +339,51 @@ fn handle_filter_menu_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 fn handle_help_key(app: &mut ResultsApp, _key: KeyEvent) -> Result<bool> {
     // Any key exits help
     app.set_view_mode(ViewMode::List);
+    Ok(false)
+}
+
+/// Handle keys in DSM view (Spec 205)
+fn handle_dsm_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
+    match key.code {
+        // Back to list
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
+            app.set_view_mode(ViewMode::List);
+        }
+
+        // Help
+        KeyCode::Char('?') => {
+            app.set_view_mode(ViewMode::Help);
+        }
+
+        // Navigation within DSM (scroll if matrix is large)
+        KeyCode::Up | KeyCode::Char('k') => {
+            let current = app.dsm_scroll_y();
+            if current > 0 {
+                app.set_dsm_scroll_y(current - 1);
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.set_dsm_scroll_y(app.dsm_scroll_y() + 1);
+        }
+        KeyCode::Left | KeyCode::Char('h') => {
+            let current = app.dsm_scroll_x();
+            if current > 0 {
+                app.set_dsm_scroll_x(current - 1);
+            }
+        }
+        KeyCode::Right | KeyCode::Char('l') => {
+            app.set_dsm_scroll_x(app.dsm_scroll_x() + 1);
+        }
+
+        // Reset scroll
+        KeyCode::Home | KeyCode::Char('g') => {
+            app.set_dsm_scroll_x(0);
+            app.set_dsm_scroll_y(0);
+        }
+
+        _ => {}
+    }
+
     Ok(false)
 }
 

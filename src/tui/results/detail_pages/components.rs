@@ -25,10 +25,11 @@ pub fn add_section_header(lines: &mut Vec<Line<'static>>, title: &str, theme: &T
 ///
 /// # Example
 /// ```text
-/// cyclomatic    15
-/// cognitive     22
-/// rationale     This is a long explanation that wraps
-///               onto the next line with proper alignment
+/// cyclomatic              15
+/// cognitive               22
+/// accumulated cyclomatic  162
+/// rationale               This is a long explanation that wraps
+///                         onto the next line with proper alignment
 /// ```
 pub fn add_label_value(
     lines: &mut Vec<Line<'static>>,
@@ -38,9 +39,9 @@ pub fn add_label_value(
     width: u16,
 ) {
     const INDENT: usize = 2;
-    const LABEL_WIDTH: usize = 20; // Fixed column width for alignment
+    const LABEL_WIDTH: usize = 24; // Fixed column width for alignment (fits "accumulated cyclomatic")
     const GAP: usize = 4; // Breathing room between label and value
-    const VALUE_COLUMN: usize = LABEL_WIDTH + GAP; // Column where values start (24)
+    const VALUE_COLUMN: usize = LABEL_WIDTH + GAP; // Column where values start (28)
 
     let label_with_indent = format!("{}{}", " ".repeat(INDENT), label);
     let padded_label = format!("{:width$}", label_with_indent, width = LABEL_WIDTH);

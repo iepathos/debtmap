@@ -64,16 +64,16 @@ pub fn render(
                 area.width,
             );
 
-            lines.push(Line::from(vec![
-                Span::raw("  cognitive complexity  "),
-                Span::styled(
-                    format!(
-                        "{} → {} (dampened)",
-                        entropy.original_complexity, entropy.adjusted_cognitive
-                    ),
-                    Style::default().fg(theme.primary),
+            add_label_value(
+                &mut lines,
+                "cognitive complexity",
+                format!(
+                    "{} → {} (dampened)",
+                    entropy.original_complexity, entropy.adjusted_cognitive
                 ),
-            ]));
+                theme,
+                area.width,
+            );
         } else {
             add_label_value(&mut lines, "dampening", "No".to_string(), theme, area.width);
         }
@@ -219,6 +219,30 @@ pub fn render(
                 theme,
                 area.width,
             );
+        }
+
+        add_blank_line(&mut lines);
+    }
+
+    // Error Swallowing section
+    if item.error_swallowing_count.is_some() || item.error_swallowing_patterns.is_some() {
+        has_any_data = true;
+        add_section_header(&mut lines, "error handling", theme);
+
+        if let Some(count) = item.error_swallowing_count {
+            add_label_value(
+                &mut lines,
+                "errors swallowed",
+                count.to_string(),
+                theme,
+                area.width,
+            );
+        }
+
+        if let Some(ref patterns) = item.error_swallowing_patterns {
+            for pattern in patterns {
+                add_label_value(&mut lines, "pattern", pattern.clone(), theme, area.width);
+            }
         }
 
         add_blank_line(&mut lines);
