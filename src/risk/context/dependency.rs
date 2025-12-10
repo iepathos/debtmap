@@ -299,31 +299,38 @@ impl DependencyRiskProvider {
 
     fn calculate_dependency_depth(&self, function_name: &str) -> usize {
         if let Some(module) = self.calculator.find_module_for_function(function_name) {
-            self.calculate_module_depth(&module.name, &mut HashSet::new())
+            self.calculate_module_depth_iterative(&module.name)
         } else {
             0
         }
     }
 
-    fn calculate_module_depth(&self, module_name: &str, visited: &mut HashSet<String>) -> usize {
-        if visited.contains(module_name) {
-            return 0;
+    /// Iterative calculation of module depth to avoid stack overflow on large graphs.
+    /// Uses BFS to find the maximum depth in the dependency tree.
+    fn calculate_module_depth_iterative(&self, start_module: &str) -> usize {
+        let mut visited = HashSet::new();
+        let mut max_depth = 0;
+
+        // Stack holds (module_name, current_depth)
+        let mut stack: Vec<(String, usize)> = vec![(start_module.to_string(), 0)];
+
+        while let Some((module_name, depth)) = stack.pop() {
+            if visited.contains(&module_name) {
+                continue;
+            }
+
+            visited.insert(module_name.clone());
+            max_depth = max_depth.max(depth);
+
+            let deps = self.calculator.graph.get_dependencies(&module_name);
+            for dep in deps {
+                if !visited.contains(&dep.to) {
+                    stack.push((dep.to.clone(), depth + 1));
+                }
+            }
         }
 
-        visited.insert(module_name.to_string());
-
-        let deps = self.calculator.graph.get_dependencies(module_name);
-        if deps.is_empty() {
-            return 0;
-        }
-
-        let max_depth = deps
-            .iter()
-            .map(|d| self.calculate_module_depth(&d.to, visited))
-            .max()
-            .unwrap_or(0);
-
-        max_depth + 1
+        max_depth
     }
 }
 

@@ -17,6 +17,7 @@ pub mod actions;
 pub mod app;
 pub mod detail_pages;
 pub mod detail_view;
+pub mod dsm_view;
 pub mod filter;
 pub mod grouping;
 pub mod layout;

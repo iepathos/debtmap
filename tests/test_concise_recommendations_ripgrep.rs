@@ -43,6 +43,8 @@ fn create_complex_metrics(
         composition_metrics: None,
         language_specific: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 

@@ -542,6 +542,10 @@ pub enum OutputFormat {
     Markdown,
     Terminal,
     Html,
+    /// Graphviz DOT format for dependency visualization
+    Dot,
+    /// Dependency Structure Matrix format for module dependency analysis
+    Dsm,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -570,6 +574,8 @@ impl From<OutputFormat> for crate::io::output::OutputFormat {
             OutputFormat::Markdown => crate::io::output::OutputFormat::Markdown,
             OutputFormat::Terminal => crate::io::output::OutputFormat::Terminal,
             OutputFormat::Html => crate::io::output::OutputFormat::Html,
+            OutputFormat::Dot => crate::io::output::OutputFormat::Dot,
+            OutputFormat::Dsm => crate::io::output::OutputFormat::Dsm,
         }
     }
 }

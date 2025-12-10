@@ -1087,6 +1087,7 @@ mod tests {
                 function_scores: vec![],
                 god_object_type: None,
                 file_type: None,
+                ..Default::default()
             },
             score: 50.0,
             priority_rank: 1,
@@ -1328,6 +1329,8 @@ mod tests {
             contextual_risk: None, // spec 203
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 

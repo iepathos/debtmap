@@ -62,6 +62,8 @@ end_of_record
                 purity_reason: None,
                 call_dependencies: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -133,6 +135,8 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
                 purity_reason: None,
                 call_dependencies: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -205,6 +209,8 @@ fn test_analyze_risk_without_coverage() {
                 purity_reason: None,
                 call_dependencies: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

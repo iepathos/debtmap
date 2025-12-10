@@ -136,12 +136,14 @@ impl<'a> ContextLossAnalyzer<'a> {
             return;
         }
 
-        // Check for into() or From conversions that might lose context
+        // Check for into() conversions that might lose context
+        // Only flag if the receiver looks like an error variable
         if method_name == "into" {
-            let line = self.get_line_number(method_call.method.span());
+            if !Self::receiver_looks_like_error(&method_call.receiver) {
+                return;
+            }
 
-            // Check if this is likely an error conversion
-            // This is a heuristic - we'd need type information for accuracy
+            let line = self.get_line_number(method_call.method.span());
             self.add_debt_item(
                 line,
                 ContextLossPattern::IntoErrorConversion,
@@ -154,15 +156,42 @@ impl<'a> ContextLossAnalyzer<'a> {
         let method_name = method_call.method.to_string();
 
         if method_name == "to_string" || method_name == "to_owned" {
-            // Check if this is on an error type (heuristic)
-            let line = self.get_line_number(method_call.method.span());
+            // Only flag if the receiver looks like an error variable
+            // Without type information, we use naming heuristics
+            if !Self::receiver_looks_like_error(&method_call.receiver) {
+                return;
+            }
 
-            // Look for patterns like err.to_string() in error handling contexts
+            let line = self.get_line_number(method_call.method.span());
             self.add_debt_item(
                 line,
                 ContextLossPattern::StringErrorConversion,
                 "Converting error to string loses type information",
             );
+        }
+    }
+
+    /// Check if the receiver of a method call looks like an error variable.
+    /// Uses naming heuristics since we don't have type information.
+    fn receiver_looks_like_error(receiver: &Expr) -> bool {
+        match receiver {
+            // Direct variable access: err.to_string(), e.to_string(), error.to_string()
+            Expr::Path(path) => {
+                if let Some(ident) = path.path.get_ident() {
+                    let name = ident.to_string().to_lowercase();
+                    matches!(name.as_str(), "err" | "error" | "e")
+                } else {
+                    false
+                }
+            }
+            // Method call chain: something.unwrap_err().to_string()
+            Expr::MethodCall(inner) => {
+                let method = inner.method.to_string();
+                matches!(method.as_str(), "unwrap_err" | "expect_err")
+            }
+            // Try expression: (expr?).to_string() - unlikely but check anyway
+            Expr::Try(_) => false,
+            _ => false,
         }
     }
 }
@@ -543,5 +572,81 @@ mod tests {
         let items = analyze_error_context(&file, Path::new("test.rs"), Some(&suppression));
         // Test should verify suppression works when implemented
         assert!(!items.is_empty()); // Currently no suppression is actually implemented
+    }
+
+    // False positive tests - these patterns should NOT be flagged as error swallowing
+
+    #[test]
+    fn test_path_to_string_lossy_is_not_error_swallowing() {
+        // This is a common pattern for converting paths to strings
+        // It has nothing to do with error handling
+        let code = r#"
+            fn example(path: &std::path::Path) -> String {
+                path.to_string_lossy().to_string()
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        // Filter for StringErrorConversion items specifically
+        let string_conversion_items: Vec<_> = items
+            .iter()
+            .filter(|item| item.message.contains("string"))
+            .collect();
+
+        assert!(
+            string_conversion_items.is_empty(),
+            "path.to_string_lossy().to_string() should NOT be flagged as error swallowing. Found: {:?}",
+            string_conversion_items
+        );
+    }
+
+    #[test]
+    fn test_display_to_string_is_not_error_swallowing() {
+        // Converting Display types to String is normal, not error swallowing
+        let code = r#"
+            fn example(name: &str) -> String {
+                format!("Hello, {}", name).to_string()
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        let string_conversion_items: Vec<_> = items
+            .iter()
+            .filter(|item| item.message.contains("string"))
+            .collect();
+
+        assert!(
+            string_conversion_items.is_empty(),
+            "Normal to_string() calls should NOT be flagged. Found: {:?}",
+            string_conversion_items
+        );
+    }
+
+    #[test]
+    fn test_into_for_type_conversion_is_not_error_swallowing() {
+        // Using into() for normal type conversions is not error swallowing
+        let code = r#"
+            fn example(s: &str) -> String {
+                s.into()
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        let into_items: Vec<_> = items
+            .iter()
+            .filter(|item| item.message.contains("into()"))
+            .collect();
+
+        assert!(
+            into_items.is_empty(),
+            "Normal into() type conversions should NOT be flagged. Found: {:?}",
+            into_items
+        );
     }
 }

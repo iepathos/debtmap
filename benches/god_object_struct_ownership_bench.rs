@@ -183,11 +183,15 @@ fn validate_memory_efficiency() {
 
     for _ in 0..ITERATIONS {
         let detector = GodObjectDetector::with_source_content(&source_content);
-        let analysis = detector.analyze_comprehensive(config_path, &file);
+        let analyses = detector.analyze_comprehensive(config_path, &file);
 
-        // Verify we produce results
+        // Verify we produce results - either god objects found or empty means no god objects
+        // Spec 201: analyze_comprehensive now returns Vec<GodObjectAnalysis>
         assert!(
-            !analysis.recommended_splits.is_empty() || !analysis.is_god_object,
+            analyses.is_empty()
+                || analyses
+                    .iter()
+                    .any(|a| !a.recommended_splits.is_empty() || a.is_god_object),
             "Analysis should produce results"
         );
     }

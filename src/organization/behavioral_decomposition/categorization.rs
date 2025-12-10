@@ -297,8 +297,7 @@ impl BehavioralCategorizer {
 
         const UTILITY_PREFIXES: &[&str] = &["helper_", "util_"];
 
-        UTILITY_EXACT.contains(&name)
-            || UTILITY_PREFIXES.iter().any(|&kw| name.starts_with(kw))
+        UTILITY_EXACT.contains(&name) || UTILITY_PREFIXES.iter().any(|&kw| name.starts_with(kw))
     }
 }
 

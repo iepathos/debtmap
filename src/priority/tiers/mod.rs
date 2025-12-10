@@ -223,6 +223,8 @@ mod tests {
             contextual_risk: None,
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 

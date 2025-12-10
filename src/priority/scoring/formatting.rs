@@ -327,6 +327,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         assert_eq!(determine_visibility(&pub_func), FunctionVisibility::Public);
@@ -391,6 +393,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[]);
@@ -424,6 +428,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[10, 11, 12, 15, 20, 21]);

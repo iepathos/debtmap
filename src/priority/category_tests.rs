@@ -76,6 +76,8 @@ mod tests {
             contextual_risk: None, // spec 203
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 
@@ -115,6 +117,7 @@ mod tests {
                         cross_domain_severity: None,
                         struct_name: None,
                         struct_line: None,
+                        struct_location: None,
                         domain_diversity_metrics: None,
                     })
                 } else {
@@ -123,6 +126,7 @@ mod tests {
                 function_scores: vec![],
                 god_object_type: None,
                 file_type: None,
+                ..Default::default()
             },
             score,
             priority_rank: 1,

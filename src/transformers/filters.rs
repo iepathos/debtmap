@@ -235,6 +235,8 @@ mod tests {
                         composition_metrics: None,
                         language_specific: None,
                         purity_level: None,
+                        error_swallowing_count: None,
+                        error_swallowing_patterns: None,
                     },
                     FunctionMetrics {
                         name: "high_complexity".to_string(),
@@ -261,6 +263,8 @@ mod tests {
                         composition_metrics: None,
                         language_specific: None,
                         purity_level: None,
+                        error_swallowing_count: None,
+                        error_swallowing_patterns: None,
                     },
                 ],
                 cyclomatic_complexity: 17,
@@ -449,6 +453,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -475,6 +481,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
         ];
 
