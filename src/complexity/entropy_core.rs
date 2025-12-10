@@ -255,6 +255,20 @@ impl UniversalEntropyCalculator {
         score.effective_complexity * dampening
     }
 
+    /// Calculate dampening factor from entropy and repetition values.
+    ///
+    /// This pure function computes a dampening factor without requiring a full
+    /// EntropyScore struct. Useful for aggregation where only weighted averages
+    /// of entropy and repetition are known.
+    ///
+    /// Returns a factor in range [0.5, 1.0] suitable for adjusting complexity.
+    pub fn calculate_dampening_factor(&self, token_entropy: f64, pattern_repetition: f64) -> f64 {
+        let effective = self.adjust_complexity(token_entropy, pattern_repetition, 0.0);
+        // Scale effective complexity to a dampening factor
+        // Higher effective complexity = higher dampening (less reduction)
+        (effective / 2.0).clamp(0.5, 1.0)
+    }
+
     /// Evict oldest cache entry when cache is full
     fn evict_oldest(&mut self) {
         if let Some(oldest_key) = self.cache.keys().next().cloned() {

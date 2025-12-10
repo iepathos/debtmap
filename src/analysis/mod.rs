@@ -13,12 +13,14 @@
 //! - Type signature-based classification for improved responsibility detection
 //! - Effect-based analysis patterns for testability and composability (Spec 207)
 //! - Data flow analysis for state transition and mutation tracking (Spec 201)
+//! - Dependency Structure Matrix (DSM) for architectural visualization (Spec 205)
 
 pub mod attribution;
 pub mod call_graph;
 pub mod context_detection;
 pub mod data_flow;
 pub mod diagnostics;
+pub mod dsm;
 pub mod effects;
 pub mod file_context;
 pub mod framework_patterns;
@@ -46,6 +48,7 @@ pub use context_detection::{ContextAnalysis, ContextDetector, FunctionContext};
 pub use data_flow::{
     ControlFlowGraph, DataFlowAnalysis, EscapeAnalysis, LivenessInfo, TaintAnalysis, VarId,
 };
+pub use dsm::{CycleInfo, CycleSeverity, DependencyMatrix, DsmCell, DsmMetrics};
 pub use file_context::{FileContext, FileContextDetector, TestFileConfidence};
 pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,

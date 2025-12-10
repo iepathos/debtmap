@@ -30,7 +30,9 @@
 //! assert!(metrics.weighted_coverage.is_some());
 //! ```
 
+use crate::complexity::entropy_core::{EntropyConfig, EntropyScore, UniversalEntropyCalculator};
 use crate::core::FunctionMetrics;
+use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
 use std::collections::HashSet;
@@ -48,6 +50,12 @@ pub struct GodObjectAggregatedMetrics {
     pub upstream_dependencies: usize,
     pub downstream_dependencies: usize,
     pub aggregated_contextual_risk: Option<ContextualRisk>,
+    /// Total count of error swallowing patterns across all functions
+    pub total_error_swallowing_count: u32,
+    /// Unique error swallowing pattern types found
+    pub error_swallowing_patterns: Vec<String>,
+    /// Aggregated entropy analysis from member functions
+    pub aggregated_entropy: Option<EntropyDetails>,
 }
 
 /// Extract member functions for a file.
@@ -189,13 +197,90 @@ pub fn aggregate_contextual_risk(members: &[&UnifiedDebtItem]) -> Option<Context
     })
 }
 
+/// Aggregate error swallowing metrics from FunctionMetrics.
+pub fn aggregate_error_swallowing(functions: &[FunctionMetrics]) -> (u32, Vec<String>) {
+    let total_count = functions
+        .iter()
+        .filter_map(|f| f.error_swallowing_count)
+        .sum();
+
+    let mut unique_patterns: HashSet<String> = HashSet::new();
+    for func in functions {
+        if let Some(ref patterns) = func.error_swallowing_patterns {
+            unique_patterns.extend(patterns.iter().cloned());
+        }
+    }
+
+    (total_count, unique_patterns.into_iter().collect())
+}
+
+/// Aggregate entropy analysis from member UnifiedDebtItems.
+///
+/// Returns weighted average entropy metrics based on function length.
+/// Uses original (undampened) complexity values for the aggregate summary.
+pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<EntropyDetails> {
+    let entropy_data: Vec<_> = members
+        .iter()
+        .filter_map(|m| m.entropy_details.as_ref().map(|e| (e, m.function_length)))
+        .collect();
+
+    if entropy_data.is_empty() {
+        return None;
+    }
+
+    let total_length: usize = entropy_data.iter().map(|(_, len)| len).sum();
+    if total_length == 0 {
+        return None;
+    }
+
+    // Weighted average of entropy scores
+    let weighted_entropy = entropy_data
+        .iter()
+        .map(|(e, len)| e.entropy_score * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
+    // Weighted average of pattern repetition
+    let weighted_repetition = entropy_data
+        .iter()
+        .map(|(e, len)| e.pattern_repetition * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
+    // Weighted average of dampening factor
+    let weighted_dampening = entropy_data
+        .iter()
+        .map(|(e, len)| e.dampening_factor * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
+    // Sum original complexity across all members
+    let total_original: u32 = entropy_data
+        .iter()
+        .map(|(e, _)| e.original_complexity)
+        .sum();
+    let total_adjusted: u32 = entropy_data.iter().map(|(e, _)| e.adjusted_cognitive).sum();
+
+    Some(EntropyDetails {
+        entropy_score: weighted_entropy,
+        pattern_repetition: weighted_repetition,
+        original_complexity: total_original,
+        adjusted_complexity: total_adjusted,
+        dampening_factor: weighted_dampening,
+        adjusted_cognitive: total_adjusted,
+    })
+}
+
 /// Aggregate all metrics (composition of above functions).
 pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAggregatedMetrics {
     let (total_cyc, total_cog, max_nest) = aggregate_complexity_metrics(members);
     let weighted_cov = aggregate_coverage_metrics(members);
     let (callers, callees, up_count, down_count) = aggregate_dependency_metrics(members);
     let contextual_risk = aggregate_contextual_risk(members);
+    let entropy = aggregate_entropy_metrics(members);
 
+    // Note: Error swallowing is aggregated from raw FunctionMetrics, not UnifiedDebtItem
+    // This function sets defaults; use aggregate_from_raw_metrics for full error swallowing data
     GodObjectAggregatedMetrics {
         total_cyclomatic: total_cyc,
         total_cognitive: total_cog,
@@ -206,7 +291,83 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
         upstream_dependencies: up_count,
         downstream_dependencies: down_count,
         aggregated_contextual_risk: contextual_risk,
+        total_error_swallowing_count: 0,
+        error_swallowing_patterns: Vec::new(),
+        aggregated_entropy: entropy,
     }
+}
+
+// =============================================================================
+// Pure helper functions for entropy aggregation (Stillwater principles)
+// =============================================================================
+
+/// Extracts entropy data tuples from function metrics.
+///
+/// Pure function - filters functions that have entropy scores and returns
+/// tuples of (entropy_score, length, cognitive_complexity).
+fn extract_entropy_data(functions: &[FunctionMetrics]) -> Vec<(&EntropyScore, usize, u32)> {
+    functions
+        .iter()
+        .filter_map(|f| f.entropy_score.as_ref().map(|e| (e, f.length, f.cognitive)))
+        .collect()
+}
+
+/// Calculates weighted average of a metric from entropy data.
+///
+/// Pure function that computes a length-weighted average using the provided
+/// extractor function.
+fn weighted_average<F>(data: &[(&EntropyScore, usize, u32)], total_length: usize, f: F) -> f64
+where
+    F: Fn(&EntropyScore) -> f64,
+{
+    data.iter()
+        .map(|(e, len, _)| f(e) * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64
+}
+
+/// Sums a u32 field from entropy data tuples.
+///
+/// Pure function for aggregating cognitive complexity values.
+fn sum_cognitive(data: &[(&EntropyScore, usize, u32)]) -> u32 {
+    data.iter().map(|(_, _, cog)| cog).sum()
+}
+
+/// Calculates total length from entropy data tuples.
+fn total_length(data: &[(&EntropyScore, usize, u32)]) -> usize {
+    data.iter().map(|(_, len, _)| *len).sum()
+}
+
+/// Aggregate entropy from raw FunctionMetrics.
+///
+/// Returns weighted average entropy based on function length from ALL functions,
+/// not just those that became debt items.
+///
+/// Composed from pure helper functions following Stillwater principles.
+pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<EntropyDetails> {
+    let data = extract_entropy_data(functions);
+    let len = total_length(&data);
+
+    if data.is_empty() || len == 0 {
+        return None;
+    }
+
+    let entropy = weighted_average(&data, len, |e| e.token_entropy);
+    let repetition = weighted_average(&data, len, |e| e.pattern_repetition);
+    let total_cognitive = sum_cognitive(&data);
+
+    let calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
+    let dampening_factor = calculator.calculate_dampening_factor(entropy, repetition);
+    let adjusted_cognitive = (total_cognitive as f64 * dampening_factor) as u32;
+
+    Some(EntropyDetails {
+        entropy_score: entropy,
+        pattern_repetition: repetition,
+        original_complexity: total_cognitive,
+        adjusted_complexity: adjusted_cognitive,
+        dampening_factor,
+        adjusted_cognitive,
+    })
 }
 
 /// Aggregate metrics directly from raw FunctionMetrics (for ALL functions including tests).
@@ -218,8 +379,12 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
     let total_cognitive = functions.iter().map(|f| f.cognitive).sum();
     let max_nesting = functions.iter().map(|f| f.nesting).max().unwrap_or(0);
 
-    // No coverage or dependency data available from raw metrics
-    // These will need to come from unified items if available
+    // Aggregate error swallowing from raw metrics
+    let (total_error_swallowing, error_patterns) = aggregate_error_swallowing(functions);
+
+    // Aggregate entropy from raw metrics (available for all functions)
+    let aggregated_entropy = aggregate_entropy_from_raw(functions);
+
     GodObjectAggregatedMetrics {
         total_cyclomatic,
         total_cognitive,
@@ -230,6 +395,9 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         aggregated_contextual_risk: None,
+        total_error_swallowing_count: total_error_swallowing,
+        error_swallowing_patterns: error_patterns,
+        aggregated_entropy,
     }
 }
 
@@ -319,6 +487,8 @@ mod tests {
             contextual_risk: None,
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 
@@ -426,5 +596,560 @@ mod tests {
         assert_eq!(metrics.total_cognitive, 25);
         assert_eq!(metrics.max_nesting_depth, 5);
         assert!(metrics.weighted_coverage.is_none()); // No coverage data
+    }
+
+    #[test]
+    fn test_aggregate_error_swallowing() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "func1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 5,
+                cognitive: 5,
+                nesting: 1,
+                length: 20,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: Some(2),
+                error_swallowing_patterns: Some(vec![
+                    "if let Ok(...) without else branch".to_string()
+                ]),
+            },
+            FunctionMetrics {
+                name: "func2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 25,
+                cyclomatic: 3,
+                cognitive: 3,
+                nesting: 1,
+                length: 15,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: Some(3),
+                error_swallowing_patterns: Some(vec![
+                    "if let Ok(...) without else branch".to_string(),
+                    "let _ = discarding Result".to_string(),
+                ]),
+            },
+            FunctionMetrics {
+                name: "func3".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 50,
+                cyclomatic: 2,
+                cognitive: 2,
+                nesting: 1,
+                length: 10,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None, // No error swallowing
+                error_swallowing_patterns: None,
+            },
+        ];
+
+        let (total, patterns) = aggregate_error_swallowing(&functions);
+
+        assert_eq!(total, 5); // 2 + 3 = 5
+        assert_eq!(patterns.len(), 2); // 2 unique patterns
+        assert!(patterns.contains(&"if let Ok(...) without else branch".to_string()));
+        assert!(patterns.contains(&"let _ = discarding Result".to_string()));
+    }
+
+    #[test]
+    fn test_aggregate_entropy_metrics_weighted_average() {
+        // Create items with different entropy details and lengths
+        let mut item1 = create_test_item("file.rs", 10, 20, 2, 100); // length 100
+        item1.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.4,
+            pattern_repetition: 0.6,
+            original_complexity: 20,
+            adjusted_complexity: 16,
+            dampening_factor: 0.8,
+            adjusted_cognitive: 16,
+        });
+
+        let mut item2 = create_test_item("file.rs", 15, 30, 3, 200); // length 200
+        item2.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.5,
+            pattern_repetition: 0.3,
+            original_complexity: 30,
+            adjusted_complexity: 27,
+            dampening_factor: 0.9,
+            adjusted_cognitive: 27,
+        });
+
+        let members = vec![&item1, &item2];
+        let result = aggregate_entropy_metrics(&members).expect("should have entropy");
+
+        // Weighted average: (100*0.4 + 200*0.5) / 300 = 140/300 ≈ 0.467
+        assert!((result.entropy_score - 0.467).abs() < 0.01);
+
+        // Weighted repetition: (100*0.6 + 200*0.3) / 300 = 120/300 = 0.4
+        assert!((result.pattern_repetition - 0.4).abs() < 0.01);
+
+        // Weighted dampening: (100*0.8 + 200*0.9) / 300 = 260/300 ≈ 0.867
+        assert!((result.dampening_factor - 0.867).abs() < 0.01);
+
+        // Sums: 20 + 30 = 50, 16 + 27 = 43
+        assert_eq!(result.original_complexity, 50);
+        assert_eq!(result.adjusted_cognitive, 43);
+    }
+
+    #[test]
+    fn test_aggregate_entropy_metrics_empty() {
+        let item1 = create_test_item("file.rs", 10, 20, 2, 100);
+        let item2 = create_test_item("file.rs", 15, 30, 3, 200);
+        // Neither has entropy_details
+
+        let members = vec![&item1, &item2];
+        let result = aggregate_entropy_metrics(&members);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_entropy_metrics_partial() {
+        // Only one item has entropy
+        let mut item1 = create_test_item("file.rs", 10, 20, 2, 100);
+        item1.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.4,
+            pattern_repetition: 0.6,
+            original_complexity: 20,
+            adjusted_complexity: 16,
+            dampening_factor: 0.8,
+            adjusted_cognitive: 16,
+        });
+
+        let item2 = create_test_item("file.rs", 15, 30, 3, 200); // No entropy
+
+        let members = vec![&item1, &item2];
+        let result = aggregate_entropy_metrics(&members).expect("should have entropy from item1");
+
+        // Only item1 contributes, so values are from item1 only
+        assert!((result.entropy_score - 0.4).abs() < 0.001);
+        assert_eq!(result.original_complexity, 20);
+    }
+
+    #[test]
+    fn test_aggregate_god_object_metrics_includes_entropy() {
+        let mut item1 = create_test_item("file.rs", 10, 20, 2, 100);
+        item1.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.4,
+            pattern_repetition: 0.6,
+            original_complexity: 20,
+            adjusted_complexity: 16,
+            dampening_factor: 0.8,
+            adjusted_cognitive: 16,
+        });
+
+        let members = vec![&item1];
+        let metrics = aggregate_god_object_metrics(&members);
+
+        assert!(metrics.aggregated_entropy.is_some());
+        let entropy = metrics.aggregated_entropy.unwrap();
+        assert!((entropy.entropy_score - 0.4).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_aggregate_from_raw_metrics_includes_error_swallowing() {
+        let functions = vec![FunctionMetrics {
+            name: "func1".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 10,
+            cognitive: 15,
+            nesting: 3,
+            length: 50,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: Some(4),
+            error_swallowing_patterns: Some(vec!["match with ignored Err variant".to_string()]),
+        }];
+
+        let metrics = aggregate_from_raw_metrics(&functions);
+
+        assert_eq!(metrics.total_cyclomatic, 10);
+        assert_eq!(metrics.total_cognitive, 15);
+        assert_eq!(metrics.total_error_swallowing_count, 4);
+        assert_eq!(metrics.error_swallowing_patterns.len(), 1);
+        assert!(metrics
+            .error_swallowing_patterns
+            .contains(&"match with ignored Err variant".to_string()));
+    }
+
+    #[test]
+    fn test_aggregate_entropy_from_raw() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let functions = vec![
+            FunctionMetrics {
+                name: "func1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 10,
+                cognitive: 20,
+                nesting: 2,
+                length: 100,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: Some(RawEntropyScore {
+                    token_entropy: 0.4,
+                    pattern_repetition: 0.6,
+                    branch_similarity: 0.0,
+                    effective_complexity: 5.0,
+                    unique_variables: 0,
+                    max_nesting: 0,
+                    dampening_applied: 0.0,
+                }),
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+            FunctionMetrics {
+                name: "func2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 50,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 1,
+                length: 50,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: Some(RawEntropyScore {
+                    token_entropy: 0.5,
+                    pattern_repetition: 0.3,
+                    branch_similarity: 0.0,
+                    effective_complexity: 3.0,
+                    unique_variables: 0,
+                    max_nesting: 0,
+                    dampening_applied: 0.0,
+                }),
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+        ];
+
+        let result = aggregate_entropy_from_raw(&functions).expect("should have entropy");
+
+        // Weighted average: (100*0.4 + 50*0.5) / 150 = 65/150 ≈ 0.433
+        assert!((result.entropy_score - 0.433).abs() < 0.01);
+
+        // Weighted repetition: (100*0.6 + 50*0.3) / 150 = 75/150 = 0.5
+        assert!((result.pattern_repetition - 0.5).abs() < 0.01);
+
+        // Original complexity: 20 + 10 = 30
+        assert_eq!(result.original_complexity, 30);
+    }
+
+    #[test]
+    fn test_aggregate_from_raw_metrics_includes_entropy() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let functions = vec![FunctionMetrics {
+            name: "func1".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 10,
+            cognitive: 20,
+            nesting: 2,
+            length: 100,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: Some(RawEntropyScore {
+                token_entropy: 0.4,
+                pattern_repetition: 0.6,
+                branch_similarity: 0.0,
+                effective_complexity: 5.0,
+                unique_variables: 0,
+                max_nesting: 0,
+                dampening_applied: 0.0,
+            }),
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+        }];
+
+        let metrics = aggregate_from_raw_metrics(&functions);
+
+        assert!(metrics.aggregated_entropy.is_some());
+        let entropy = metrics.aggregated_entropy.unwrap();
+        assert!((entropy.entropy_score - 0.4).abs() < 0.001);
+        assert_eq!(entropy.original_complexity, 20);
+    }
+
+    // =========================================================================
+    // Tests for pure helper functions (Stillwater refactoring)
+    // =========================================================================
+
+    #[test]
+    fn test_extract_entropy_data_filters_correctly() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let functions = vec![
+            FunctionMetrics {
+                name: "with_entropy".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 1,
+                length: 50,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: Some(RawEntropyScore {
+                    token_entropy: 0.4,
+                    pattern_repetition: 0.6,
+                    branch_similarity: 0.0,
+                    effective_complexity: 5.0,
+                    unique_variables: 0,
+                    max_nesting: 0,
+                    dampening_applied: 0.0,
+                }),
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+            FunctionMetrics {
+                name: "without_entropy".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 50,
+                cyclomatic: 3,
+                cognitive: 5,
+                nesting: 1,
+                length: 25,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None, // No entropy
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+        ];
+
+        let data = extract_entropy_data(&functions);
+        assert_eq!(data.len(), 1); // Only one function has entropy
+        assert_eq!(data[0].1, 50); // Length of function with entropy
+        assert_eq!(data[0].2, 10); // Cognitive of function with entropy
+    }
+
+    #[test]
+    fn test_weighted_average_calculation() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let e1 = RawEntropyScore {
+            token_entropy: 0.4,
+            pattern_repetition: 0.6,
+            branch_similarity: 0.0,
+            effective_complexity: 5.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+        let e2 = RawEntropyScore {
+            token_entropy: 0.6,
+            pattern_repetition: 0.2,
+            branch_similarity: 0.0,
+            effective_complexity: 3.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+
+        // length 100, cognitive 20 and length 50, cognitive 10
+        let data: Vec<(&RawEntropyScore, usize, u32)> = vec![(&e1, 100, 20), (&e2, 50, 10)];
+
+        // (100*0.4 + 50*0.6) / 150 = 70/150 ≈ 0.467
+        let avg = weighted_average(&data, 150, |e| e.token_entropy);
+        assert!((avg - 0.467).abs() < 0.01);
+
+        // (100*0.6 + 50*0.2) / 150 = 70/150 ≈ 0.467
+        let rep = weighted_average(&data, 150, |e| e.pattern_repetition);
+        assert!((rep - 0.467).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_sum_cognitive() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let e = RawEntropyScore {
+            token_entropy: 0.4,
+            pattern_repetition: 0.6,
+            branch_similarity: 0.0,
+            effective_complexity: 5.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+
+        let data: Vec<(&RawEntropyScore, usize, u32)> =
+            vec![(&e, 100, 20), (&e, 50, 15), (&e, 25, 5)];
+
+        let total = sum_cognitive(&data);
+        assert_eq!(total, 40); // 20 + 15 + 5
+    }
+
+    #[test]
+    fn test_total_length() {
+        use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
+
+        let e = RawEntropyScore {
+            token_entropy: 0.4,
+            pattern_repetition: 0.6,
+            branch_similarity: 0.0,
+            effective_complexity: 5.0,
+            unique_variables: 0,
+            max_nesting: 0,
+            dampening_applied: 0.0,
+        };
+
+        let data: Vec<(&RawEntropyScore, usize, u32)> = vec![(&e, 100, 20), (&e, 50, 15)];
+
+        let total = total_length(&data);
+        assert_eq!(total, 150); // 100 + 50
+    }
+
+    #[test]
+    fn test_calculate_dampening_factor_direct() {
+        use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
+
+        let calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
+
+        // Test with various entropy/repetition combinations
+        let dampening = calculator.calculate_dampening_factor(0.4, 0.6);
+        assert!((0.5..=1.0).contains(&dampening));
+
+        // Low entropy, high repetition should result in lower effective complexity
+        let low_dampening = calculator.calculate_dampening_factor(0.2, 0.8);
+        assert!(low_dampening >= 0.5);
+
+        // High entropy, low repetition should result in higher effective complexity
+        let high_dampening = calculator.calculate_dampening_factor(0.8, 0.2);
+        assert!(high_dampening <= 1.0);
     }
 }

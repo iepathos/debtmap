@@ -392,19 +392,39 @@ fn print_metrics_explanation() {
 
 // Configure rayon global thread pool once at startup
 fn configure_thread_pool(jobs: usize) {
+    // Use 8MB stack for rayon threads to handle deeply nested AST traversals
+    const RAYON_STACK_SIZE: usize = 8 * 1024 * 1024;
+
+    let mut builder = rayon::ThreadPoolBuilder::new().stack_size(RAYON_STACK_SIZE);
+
     if jobs > 0 {
-        if let Err(e) = rayon::ThreadPoolBuilder::new()
-            .num_threads(jobs)
-            .build_global()
-        {
-            // Already configured - this is fine, just ignore
-            eprintln!("Note: Thread pool already configured: {}", e);
-        }
+        builder = builder.num_threads(jobs);
+    }
+
+    if let Err(e) = builder.build_global() {
+        // Already configured - this is fine, just ignore
+        eprintln!("Note: Thread pool already configured: {}", e);
     }
 }
 
 // Main orchestrator function
 fn main() -> Result<()> {
+    // Spawn the actual main logic on a thread with a larger stack (16MB)
+    // to handle deeply nested AST traversals without stack overflow.
+    // The default main thread stack is often ~1MB which is insufficient
+    // for recursive syn::visit patterns on large/complex Rust files.
+    const STACK_SIZE: usize = 16 * 1024 * 1024; // 16MB
+
+    let result = std::thread::Builder::new()
+        .stack_size(STACK_SIZE)
+        .spawn(main_inner)?
+        .join()
+        .map_err(|e| anyhow::anyhow!("Thread panic: {:?}", e))?;
+
+    result
+}
+
+fn main_inner() -> Result<()> {
     // Support ARGUMENTS environment variable for backward compatibility
     let cli = if let Ok(args_str) = std::env::var("ARGUMENTS") {
         // Parse space-separated arguments from environment variable
@@ -535,6 +555,14 @@ fn main() -> Result<()> {
                         debtmap::commands::validate_improvement::OutputFormat::Terminal
                     }
                     debtmap::cli::OutputFormat::Html => {
+                        debtmap::commands::validate_improvement::OutputFormat::Terminal
+                    }
+                    debtmap::cli::OutputFormat::Dot => {
+                        // DOT format not applicable for improvement validation, use terminal
+                        debtmap::commands::validate_improvement::OutputFormat::Terminal
+                    }
+                    debtmap::cli::OutputFormat::Dsm => {
+                        // DSM format not applicable for improvement validation, use terminal
                         debtmap::commands::validate_improvement::OutputFormat::Terminal
                     }
                 },
@@ -1622,6 +1650,16 @@ fn handle_compare_command(
         debtmap::cli::OutputFormat::Json => serde_json::to_string_pretty(&comparison)?,
         debtmap::cli::OutputFormat::Markdown => format_comparison_markdown(&comparison),
         debtmap::cli::OutputFormat::Html => format_comparison_markdown(&comparison),
+        debtmap::cli::OutputFormat::Dot => {
+            // DOT format not applicable for comparison, use terminal
+            print_comparison_terminal(&comparison);
+            return Ok(());
+        }
+        debtmap::cli::OutputFormat::Dsm => {
+            // DSM format not applicable for comparison, use terminal
+            print_comparison_terminal(&comparison);
+            return Ok(());
+        }
         debtmap::cli::OutputFormat::Terminal => {
             print_comparison_terminal(&comparison);
             return Ok(());

@@ -167,9 +167,10 @@ fn add_provider_to_aggregator(
     };
 
     // Update subsection to Active state
+    // Context stage is at index 4 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
     if let Some(index) = subsection_index {
         if let Some(manager) = crate::progress::ProgressManager::global() {
-            manager.tui_update_subtask(6, index, crate::tui::app::StageStatus::Active, None);
+            manager.tui_update_subtask(4, index, crate::tui::app::StageStatus::Active, None);
         }
     }
 
@@ -182,9 +183,10 @@ fn add_provider_to_aggregator(
     };
 
     // Update subsection to Completed state and add visibility pause (spec 219)
+    // Context stage is at index 4 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
     if let Some(index) = subsection_index {
         if let Some(manager) = crate::progress::ProgressManager::global() {
-            manager.tui_update_subtask(6, index, crate::tui::app::StageStatus::Completed, None);
+            manager.tui_update_subtask(4, index, crate::tui::app::StageStatus::Completed, None);
             // 150ms visibility pause for user feedback
             std::thread::sleep(std::time::Duration::from_millis(150));
         }

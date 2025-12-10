@@ -738,6 +738,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 
@@ -839,6 +841,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let mut call_graph = CallGraph::new();
@@ -898,6 +902,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let call_graph = CallGraph::new(); // Empty call graph - no callers
@@ -940,6 +946,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let mut call_graph = CallGraph::new();
@@ -1013,6 +1021,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let on_key_down = FunctionMetrics {
@@ -1040,6 +1050,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let mut call_graph = CallGraph::new();
@@ -1118,6 +1130,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let mut call_graph = CallGraph::new();

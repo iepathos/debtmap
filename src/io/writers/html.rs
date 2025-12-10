@@ -262,6 +262,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }];
 
         AnalysisResults {
@@ -607,6 +609,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
             FunctionMetrics {
                 name: "low_entropy_func".to_string(),
@@ -641,6 +645,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
         ];
 

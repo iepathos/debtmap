@@ -78,6 +78,8 @@ fn create_test_item(
         is_pure: None,
         purity_confidence: None,
         purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
         god_object_indicators: None,
         tier: None,
         function_context: None,

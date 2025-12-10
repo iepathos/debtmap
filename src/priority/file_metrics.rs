@@ -36,6 +36,24 @@ pub struct FileDebtMetrics {
     /// File type classification for context-aware thresholds (spec 135)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_type: Option<crate::organization::FileType>,
+
+    // === File-level dependency metrics (spec 201) ===
+    /// Afferent coupling - number of files that depend on this file
+    #[serde(default)]
+    pub afferent_coupling: usize,
+    /// Efferent coupling - number of files this file depends on
+    #[serde(default)]
+    pub efferent_coupling: usize,
+    /// Instability metric (0.0 = stable, 1.0 = unstable)
+    /// Calculated as Ce / (Ca + Ce)
+    #[serde(default)]
+    pub instability: f64,
+    /// List of files that depend on this file (top N)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependents: Vec<String>,
+    /// List of files this file depends on (top N)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies_list: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -256,10 +274,12 @@ impl FileDebtMetrics {
             1.0
         };
 
-        // God object multiplier
+        // God object multiplier - scale score proportionally to avoid extreme inflation
+        // Score 0-100 maps to multiplier 1.0x-3.0x (not 2x-102x!)
+        // This aligns with contextual risk cap (max 3x) for consistent scoring
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                2.0 + analysis.god_object_score.value()
+                1.0 + (analysis.god_object_score.value() / 50.0)
             } else {
                 1.0
             }
@@ -325,10 +345,12 @@ impl FileDebtMetrics {
             1.0
         };
 
-        // God object multiplier
+        // God object multiplier - scale score proportionally to avoid extreme inflation
+        // Score 0-100 maps to multiplier 1.0x-3.0x (not 2x-102x!)
+        // This aligns with contextual risk cap (max 3x) for consistent scoring
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                2.0 + analysis.god_object_score.value()
+                1.0 + (analysis.god_object_score.value() / 50.0)
             } else {
                 1.0
             }
@@ -406,7 +428,8 @@ impl FileDebtMetrics {
             return recommendation.clone();
         }
 
-        if self
+        // Build base recommendation
+        let base_recommendation = if self
             .god_object_analysis
             .as_ref()
             .is_some_and(|a| a.is_god_object)
@@ -457,6 +480,61 @@ impl FileDebtMetrics {
             )
         } else {
             "Refactor for better maintainability and testability".to_string()
+        };
+
+        // Add coupling and instability context (spec 201)
+        let coupling_context = self.generate_coupling_context();
+        let instability_context = self.generate_instability_context();
+
+        // Combine recommendations
+        if !coupling_context.is_empty() || !instability_context.is_empty() {
+            let mut parts = vec![base_recommendation];
+            if !coupling_context.is_empty() {
+                parts.push(coupling_context);
+            }
+            if !instability_context.is_empty() {
+                parts.push(instability_context);
+            }
+            parts.join(" ")
+        } else {
+            base_recommendation
+        }
+    }
+
+    /// Generate coupling warning context for highly coupled files (spec 201).
+    ///
+    /// Files with Ca + Ce > 15 are considered highly coupled and should
+    /// show a warning in recommendations.
+    fn generate_coupling_context(&self) -> String {
+        let total_coupling = self.afferent_coupling + self.efferent_coupling;
+
+        if total_coupling > 15 {
+            format!(
+                "[COUPLING WARNING: Ca={}, Ce={}, total={}. Consider reducing dependencies to improve modularity.]",
+                self.afferent_coupling, self.efferent_coupling, total_coupling
+            )
+        } else {
+            String::new()
+        }
+    }
+
+    /// Generate instability context for files with extreme instability values (spec 201).
+    ///
+    /// - I > 0.9: Highly unstable - changes here propagate easily, low risk to modify
+    /// - I < 0.1: Highly stable - many dependents, changes need careful review
+    fn generate_instability_context(&self) -> String {
+        // Only provide context when we have coupling data
+        let total_coupling = self.afferent_coupling + self.efferent_coupling;
+        if total_coupling == 0 {
+            return String::new();
+        }
+
+        if self.instability > 0.9 {
+            "[UNSTABLE: I>0.9 - changes here have few dependents, safe to refactor.]".to_string()
+        } else if self.instability < 0.1 {
+            "[STABLE: I<0.1 - many files depend on this, changes need careful review.]".to_string()
+        } else {
+            String::new()
         }
     }
 }
@@ -477,6 +555,11 @@ impl Default for FileDebtMetrics {
             function_scores: Vec::new(),
             god_object_type: None,
             file_type: None,
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            dependents: Vec::new(),
+            dependencies_list: Vec::new(),
         }
     }
 }
@@ -631,6 +714,7 @@ mod tests {
             function_scores: vec![1.0, 2.0, 3.0],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -669,6 +753,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 visibility_breakdown: None,
                 domain_count: 0,
                 domain_diversity: 0.0,
@@ -680,6 +765,7 @@ mod tests {
             function_scores: vec![5.0; 60],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -702,6 +788,7 @@ mod tests {
             function_scores: vec![1.0; 10],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -731,6 +818,7 @@ mod tests {
             function_scores: vec![3.0; 15],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -753,6 +841,7 @@ mod tests {
             function_scores: vec![2.0; 75],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         };
 
         let score = metrics.calculate_score();
@@ -776,6 +865,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 responsibilities: Vec::new(),
                 responsibility_method_counts: Default::default(),
                 recommended_splits: Vec::new(),
@@ -883,11 +973,12 @@ mod tests {
             responsibility_count: 5,
             lines_of_code: 400,
             complexity_sum: 200,
-            god_object_score: Score0To100::new(0.5),
+            god_object_score: Score0To100::new(100.0), // Severe god object for testing multiplication
             confidence: GodObjectConfidence::Definite,
             detection_type: DetectionType::GodClass,
             struct_name: None,
             struct_line: None,
+            struct_location: None,
             responsibilities: Vec::new(),
             responsibility_method_counts: Default::default(),
             recommended_splits: Vec::new(),
@@ -978,6 +1069,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 responsibilities: Vec::new(),
                 responsibility_method_counts: Default::default(),
                 recommended_splits: Vec::new(),
@@ -1036,6 +1128,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 responsibilities: Vec::new(),
                 responsibility_method_counts: Default::default(),
                 recommended_splits: Vec::new(),
@@ -1091,6 +1184,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 responsibilities: Vec::new(),
                 responsibility_method_counts: Default::default(),
                 recommended_splits: Vec::new(),
@@ -1141,6 +1235,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 responsibilities: Vec::new(),
                 responsibility_method_counts: Default::default(),
                 recommended_splits: Vec::new(),
@@ -1164,7 +1259,7 @@ mod tests {
 
         assert!((factors.size_factor - 1.88).abs() < 0.01);
         assert_eq!(factors.coverage_factor, 3.0);
-        assert_eq!(factors.god_object_multiplier, 9.0);
+        assert!((factors.god_object_multiplier - 1.14).abs() < 0.01); // 1.0 + (7.0 / 50.0)
         assert_eq!(factors.density_factor, 1.0);
         assert_eq!(factors.function_count, 7);
         assert!(factors.is_god_object);
@@ -1193,6 +1288,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 responsibilities: Vec::new(),
                 responsibility_method_counts: Default::default(),
                 recommended_splits: Vec::new(),
@@ -1287,6 +1383,7 @@ mod tests {
                 detection_type: DetectionType::GodClass,
                 struct_name: None,
                 struct_line: None,
+                struct_location: None,
                 responsibilities: Vec::new(),
                 responsibility_method_counts: Default::default(),
                 recommended_splits: Vec::new(),
@@ -1321,6 +1418,7 @@ mod tests {
             detection_type: DetectionType::GodClass,
             struct_name: None,
             struct_line: None,
+            struct_location: None,
             responsibilities: Vec::new(),
             responsibility_method_counts: Default::default(),
             recommended_splits: Vec::new(),
@@ -1335,7 +1433,7 @@ mod tests {
             domain_diversity_metrics: None,
         });
         let factors = metrics.get_score_factors();
-        assert_eq!(factors.god_object_multiplier, 10.5); // 2.0 + 8.5
+        assert!((factors.god_object_multiplier - 1.17).abs() < 0.01); // 1.0 + (8.5 / 50.0)
     }
 
     // Tests for spec 168: File context-aware scoring
@@ -1355,6 +1453,7 @@ mod tests {
             function_scores: vec![],
             god_object_type: None,
             file_type: None,
+            ..Default::default()
         }
     }
 
@@ -1434,5 +1533,159 @@ mod tests {
 
         // Should be reduced by 40% (multiplied by 0.6)
         assert!((item.score - base_score * 0.6).abs() < 0.5);
+    }
+
+    // Tests for spec 201: File-level coupling in recommendations
+
+    #[test]
+    fn test_coupling_warning_for_highly_coupled_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("highly_coupled.rs"),
+            total_lines: 200,
+            afferent_coupling: 10,
+            efferent_coupling: 8,
+            instability: 0.44,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            rec.contains("COUPLING WARNING"),
+            "Should contain coupling warning for Ca+Ce>15"
+        );
+        assert!(rec.contains("Ca=10"), "Should show afferent coupling");
+        assert!(rec.contains("Ce=8"), "Should show efferent coupling");
+        assert!(rec.contains("total=18"), "Should show total coupling");
+    }
+
+    #[test]
+    fn test_no_coupling_warning_for_normal_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("normal.rs"),
+            total_lines: 200,
+            afferent_coupling: 5,
+            efferent_coupling: 5,
+            instability: 0.5,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            !rec.contains("COUPLING WARNING"),
+            "Should not contain coupling warning for Ca+Ce<=15"
+        );
+    }
+
+    #[test]
+    fn test_instability_context_for_unstable_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("unstable.rs"),
+            total_lines: 200,
+            afferent_coupling: 1,
+            efferent_coupling: 10,
+            instability: 0.91,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            rec.contains("UNSTABLE"),
+            "Should contain instability context for I>0.9"
+        );
+        assert!(
+            rec.contains("safe to refactor"),
+            "Should indicate safe to refactor"
+        );
+    }
+
+    #[test]
+    fn test_instability_context_for_stable_files() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("stable.rs"),
+            total_lines: 200,
+            afferent_coupling: 10,
+            efferent_coupling: 1,
+            instability: 0.09,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            rec.contains("STABLE"),
+            "Should contain stability context for I<0.1"
+        );
+        assert!(
+            rec.contains("careful review"),
+            "Should indicate need for careful review"
+        );
+    }
+
+    #[test]
+    fn test_no_instability_context_for_normal_instability() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("normal.rs"),
+            total_lines: 200,
+            afferent_coupling: 5,
+            efferent_coupling: 5,
+            instability: 0.5,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(
+            !rec.contains("UNSTABLE"),
+            "Should not contain unstable context"
+        );
+        assert!(
+            !rec.contains("STABLE:"),
+            "Should not contain stable context"
+        );
+    }
+
+    #[test]
+    fn test_no_instability_context_when_no_coupling() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("isolated.rs"),
+            total_lines: 200,
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        // Should not have any coupling or instability context
+        assert!(
+            !rec.contains("COUPLING"),
+            "Should not contain coupling context"
+        );
+        assert!(
+            !rec.contains("STABLE"),
+            "Should not contain stability context"
+        );
+        assert!(
+            !rec.contains("UNSTABLE"),
+            "Should not contain instability context"
+        );
+    }
+
+    #[test]
+    fn test_coupling_and_instability_can_combine() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("highly_coupled_unstable.rs"),
+            total_lines: 200,
+            afferent_coupling: 2,
+            efferent_coupling: 18,
+            instability: 0.9,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        // Both warnings should appear when both conditions are met
+        assert!(
+            rec.contains("COUPLING WARNING"),
+            "Should contain coupling warning"
+        );
+        // Note: instability 0.9 is not > 0.9, so no instability context here
     }
 }

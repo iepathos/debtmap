@@ -11,7 +11,7 @@ pub fn get_coverage(item: &UnifiedDebtItem) -> Option<f64> {
 }
 
 use super::{
-    detail_view, filter::Filter, layout, list_view, navigation, search::SearchState,
+    detail_view, dsm_view, filter::Filter, layout, list_view, navigation, search::SearchState,
     sort::SortCriteria,
 };
 
@@ -30,6 +30,8 @@ pub enum ViewMode {
     FilterMenu,
     /// Help overlay
     Help,
+    /// Dependency Structure Matrix view (Spec 205)
+    Dsm,
 }
 
 /// Detail page selection for multi-page detail view
@@ -40,6 +42,7 @@ pub enum DetailPage {
     GitContext,
     Patterns,
     DataFlow,
+    Responsibilities,
 }
 
 impl DetailPage {
@@ -50,18 +53,20 @@ impl DetailPage {
             DetailPage::Dependencies => DetailPage::GitContext,
             DetailPage::GitContext => DetailPage::Patterns,
             DetailPage::Patterns => DetailPage::DataFlow,
-            DetailPage::DataFlow => DetailPage::Overview,
+            DetailPage::DataFlow => DetailPage::Responsibilities,
+            DetailPage::Responsibilities => DetailPage::Overview,
         }
     }
 
     /// Get previous page with wrapping
     pub fn prev(self) -> Self {
         match self {
-            DetailPage::Overview => DetailPage::DataFlow,
+            DetailPage::Overview => DetailPage::Responsibilities,
             DetailPage::Dependencies => DetailPage::Overview,
             DetailPage::GitContext => DetailPage::Dependencies,
             DetailPage::Patterns => DetailPage::GitContext,
             DetailPage::DataFlow => DetailPage::Patterns,
+            DetailPage::Responsibilities => DetailPage::DataFlow,
         }
     }
 
@@ -73,6 +78,7 @@ impl DetailPage {
             2 => Some(DetailPage::GitContext),
             3 => Some(DetailPage::Patterns),
             4 => Some(DetailPage::DataFlow),
+            5 => Some(DetailPage::Responsibilities),
             _ => None,
         }
     }
@@ -85,6 +91,7 @@ impl DetailPage {
             DetailPage::GitContext => 2,
             DetailPage::Patterns => 3,
             DetailPage::DataFlow => 4,
+            DetailPage::Responsibilities => 5,
         }
     }
 
@@ -96,6 +103,7 @@ impl DetailPage {
             DetailPage::GitContext => "Git Context",
             DetailPage::Patterns => "Patterns",
             DetailPage::DataFlow => "Data Flow",
+            DetailPage::Responsibilities => "Responsibilities",
         }
     }
 }
@@ -126,6 +134,12 @@ pub struct ResultsApp {
     detail_page: DetailPage,
     /// Whether to group items by location
     show_grouped: bool,
+    /// Status message to display temporarily (cleared on next key press)
+    status_message: Option<String>,
+    /// DSM view horizontal scroll offset (Spec 205)
+    dsm_scroll_x: usize,
+    /// DSM view vertical scroll offset (Spec 205)
+    dsm_scroll_y: usize,
 }
 
 impl ResultsApp {
@@ -147,6 +161,9 @@ impl ResultsApp {
             needs_redraw: false,
             detail_page: DetailPage::Overview,
             show_grouped: true, // Default: grouping enabled
+            status_message: None,
+            dsm_scroll_x: 0,
+            dsm_scroll_y: 0,
         }
     }
 
@@ -166,6 +183,7 @@ impl ResultsApp {
             ViewMode::SortMenu => list_view::render_with_sort_menu(frame, self),
             ViewMode::FilterMenu => list_view::render_with_filter_menu(frame, self),
             ViewMode::Help => layout::render_help_overlay(frame, self),
+            ViewMode::Dsm => dsm_view::render(frame, self),
         }
     }
 
@@ -421,6 +439,21 @@ impl ResultsApp {
             .unwrap_or(false)
     }
 
+    /// Check if responsibilities data is available for current item
+    fn has_responsibilities_data(&self) -> bool {
+        self.selected_item()
+            .map(|item| {
+                // Has god object responsibilities
+                item.god_object_indicators
+                    .as_ref()
+                    .map(|ind| ind.is_god_object && !ind.responsibilities.is_empty())
+                    .unwrap_or(false)
+                    // Or has single responsibility category
+                    || item.responsibility_category.is_some()
+            })
+            .unwrap_or(false)
+    }
+
     /// Get available pages for current item (skip pages with no data)
     pub fn available_pages(&self) -> Vec<DetailPage> {
         let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
@@ -437,12 +470,71 @@ impl ResultsApp {
             pages.push(DetailPage::DataFlow);
         }
 
+        if self.has_responsibilities_data() {
+            pages.push(DetailPage::Responsibilities);
+        }
+
         pages
     }
 
     /// Get total page count for current item
     pub fn page_count(&self) -> usize {
         self.available_pages().len()
+    }
+
+    /// Get the index of current page within available pages (for display)
+    /// Returns 0 if current page is not in available pages
+    pub fn current_page_index(&self) -> usize {
+        let available = self.available_pages();
+        available
+            .iter()
+            .position(|&p| p == self.detail_page)
+            .unwrap_or(0)
+    }
+
+    /// Navigate to next available page (wrapping)
+    pub fn next_available_page(&mut self) {
+        let available = self.available_pages();
+        if available.is_empty() {
+            return;
+        }
+        let current_idx = available
+            .iter()
+            .position(|&p| p == self.detail_page)
+            .unwrap_or(0);
+        let next_idx = (current_idx + 1) % available.len();
+        self.detail_page = available[next_idx];
+    }
+
+    /// Navigate to previous available page (wrapping)
+    pub fn prev_available_page(&mut self) {
+        let available = self.available_pages();
+        if available.is_empty() {
+            return;
+        }
+        let current_idx = available
+            .iter()
+            .position(|&p| p == self.detail_page)
+            .unwrap_or(0);
+        let prev_idx = if current_idx == 0 {
+            available.len() - 1
+        } else {
+            current_idx - 1
+        };
+        self.detail_page = available[prev_idx];
+    }
+
+    /// Check if a page is available for the current item
+    pub fn is_page_available(&self, page: DetailPage) -> bool {
+        self.available_pages().contains(&page)
+    }
+
+    /// Ensure current page is valid for the selected item
+    /// If current page isn't available, reset to Overview
+    pub fn ensure_valid_page(&mut self) {
+        if !self.is_page_available(self.detail_page) {
+            self.detail_page = DetailPage::Overview;
+        }
     }
 
     /// Toggle grouping on/off
@@ -465,6 +557,41 @@ impl ResultsApp {
             format!("{} items", self.filtered_indices.len())
         }
     }
+
+    /// Set status message to display temporarily
+    pub fn set_status_message(&mut self, message: String) {
+        self.status_message = Some(message);
+    }
+
+    /// Get current status message
+    pub fn status_message(&self) -> Option<&str> {
+        self.status_message.as_deref()
+    }
+
+    /// Clear status message
+    pub fn clear_status_message(&mut self) {
+        self.status_message = None;
+    }
+
+    /// Get DSM horizontal scroll offset (Spec 205)
+    pub fn dsm_scroll_x(&self) -> usize {
+        self.dsm_scroll_x
+    }
+
+    /// Set DSM horizontal scroll offset (Spec 205)
+    pub fn set_dsm_scroll_x(&mut self, offset: usize) {
+        self.dsm_scroll_x = offset;
+    }
+
+    /// Get DSM vertical scroll offset (Spec 205)
+    pub fn dsm_scroll_y(&self) -> usize {
+        self.dsm_scroll_y
+    }
+
+    /// Set DSM vertical scroll offset (Spec 205)
+    pub fn set_dsm_scroll_y(&mut self, offset: usize) {
+        self.dsm_scroll_y = offset;
+    }
 }
 
 #[cfg(test)]
@@ -477,16 +604,18 @@ mod tests {
         assert_eq!(DetailPage::Dependencies.next(), DetailPage::GitContext);
         assert_eq!(DetailPage::GitContext.next(), DetailPage::Patterns);
         assert_eq!(DetailPage::Patterns.next(), DetailPage::DataFlow);
-        assert_eq!(DetailPage::DataFlow.next(), DetailPage::Overview);
+        assert_eq!(DetailPage::DataFlow.next(), DetailPage::Responsibilities);
+        assert_eq!(DetailPage::Responsibilities.next(), DetailPage::Overview);
     }
 
     #[test]
     fn test_detail_page_prev_wraps_backward() {
-        assert_eq!(DetailPage::Overview.prev(), DetailPage::DataFlow);
+        assert_eq!(DetailPage::Overview.prev(), DetailPage::Responsibilities);
         assert_eq!(DetailPage::Dependencies.prev(), DetailPage::Overview);
         assert_eq!(DetailPage::GitContext.prev(), DetailPage::Dependencies);
         assert_eq!(DetailPage::Patterns.prev(), DetailPage::GitContext);
         assert_eq!(DetailPage::DataFlow.prev(), DetailPage::Patterns);
+        assert_eq!(DetailPage::Responsibilities.prev(), DetailPage::DataFlow);
     }
 
     #[test]
@@ -496,7 +625,11 @@ mod tests {
         assert_eq!(DetailPage::from_index(2), Some(DetailPage::GitContext));
         assert_eq!(DetailPage::from_index(3), Some(DetailPage::Patterns));
         assert_eq!(DetailPage::from_index(4), Some(DetailPage::DataFlow));
-        assert_eq!(DetailPage::from_index(5), None);
+        assert_eq!(
+            DetailPage::from_index(5),
+            Some(DetailPage::Responsibilities)
+        );
+        assert_eq!(DetailPage::from_index(6), None);
     }
 
     #[test]
@@ -506,6 +639,7 @@ mod tests {
         assert_eq!(DetailPage::GitContext.index(), 2);
         assert_eq!(DetailPage::Patterns.index(), 3);
         assert_eq!(DetailPage::DataFlow.index(), 4);
+        assert_eq!(DetailPage::Responsibilities.index(), 5);
     }
 
     #[test]
@@ -515,5 +649,6 @@ mod tests {
         assert_eq!(DetailPage::GitContext.name(), "Git Context");
         assert_eq!(DetailPage::Patterns.name(), "Patterns");
         assert_eq!(DetailPage::DataFlow.name(), "Data Flow");
+        assert_eq!(DetailPage::Responsibilities.name(), "Responsibilities");
     }
 }

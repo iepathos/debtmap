@@ -84,6 +84,8 @@ fn create_untested_item() -> UnifiedDebtItem {
         contextual_risk: None, // spec 203
         file_line_count: None,
         responsibility_category: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
     }
 }
 

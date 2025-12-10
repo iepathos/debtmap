@@ -89,6 +89,12 @@ pub struct FunctionMetrics {
     // Refined purity classification (replaces is_pure eventually)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purity_level: Option<PurityLevel>,
+
+    // Error swallowing metrics - count of error handling issues within this function
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_swallowing_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_swallowing_patterns: Option<Vec<String>>,
 }
 
 /// Language-specific data to avoid memory overhead for non-applicable files
@@ -137,6 +143,8 @@ impl FunctionMetrics {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 

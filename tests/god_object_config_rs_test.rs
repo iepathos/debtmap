@@ -235,34 +235,36 @@ fn test_struct_ownership_analysis_quality() {
 
     let file = syn::parse_file(&source_content).expect("Failed to parse test file");
     let detector = GodObjectDetector::with_source_content(&source_content);
-    let analysis = detector.analyze_comprehensive(config_path, &file);
+    let analyses = detector.analyze_comprehensive(config_path, &file);
 
     // Each struct should be assigned to exactly one module
     let mut all_structs = std::collections::HashSet::new();
-    for split in &analysis.recommended_splits {
-        for struct_name in &split.structs_to_move {
-            assert!(
-                !all_structs.contains(struct_name),
-                "Struct '{}' appears in multiple module splits",
-                struct_name
-            );
-            all_structs.insert(struct_name.clone());
+    if let Some(analysis) = analyses.first() {
+        for split in &analysis.recommended_splits {
+            for struct_name in &split.structs_to_move {
+                assert!(
+                    !all_structs.contains(struct_name),
+                    "Struct '{}' appears in multiple module splits",
+                    struct_name
+                );
+                all_structs.insert(struct_name.clone());
+            }
         }
-    }
 
-    // If we have structs, they should be distributed among the modules
-    if !all_structs.is_empty() {
-        let modules_with_structs = analysis
-            .recommended_splits
-            .iter()
-            .filter(|s| !s.structs_to_move.is_empty())
-            .count();
+        // If we have structs, they should be distributed among the modules
+        if !all_structs.is_empty() {
+            let modules_with_structs = analysis
+                .recommended_splits
+                .iter()
+                .filter(|s| !s.structs_to_move.is_empty())
+                .count();
 
-        assert!(
-            modules_with_structs >= 2,
-            "Structs should be distributed among multiple modules, found in {} modules",
-            modules_with_structs
-        );
+            assert!(
+                modules_with_structs >= 2,
+                "Structs should be distributed among multiple modules, found in {} modules",
+                modules_with_structs
+            );
+        }
     }
 }
 
@@ -274,28 +276,30 @@ fn test_module_size_warnings() {
 
     let file = syn::parse_file(&source_content).expect("Failed to parse test file");
     let detector = GodObjectDetector::with_source_content(&source_content);
-    let analysis = detector.analyze_comprehensive(config_path, &file);
+    let analyses = detector.analyze_comprehensive(config_path, &file);
 
     // Check if any modules have warnings for borderline sizes
-    for split in &analysis.recommended_splits {
-        if let Some(warning) = &split.warning {
-            // Warning should be meaningful
-            assert!(
-                !warning.is_empty(),
-                "Warning should not be empty for module '{}'",
-                split.suggested_name
-            );
-
-            // If warned about size, the module should be relatively large
-            if warning.to_lowercase().contains("size")
-                || warning.to_lowercase().contains("borderline")
-            {
+    if let Some(analysis) = analyses.first() {
+        for split in &analysis.recommended_splits {
+            if let Some(warning) = &split.warning {
+                // Warning should be meaningful
                 assert!(
-                    split.method_count >= 15,
-                    "Size warning for '{}' but only has {} methods",
-                    split.suggested_name,
-                    split.method_count
+                    !warning.is_empty(),
+                    "Warning should not be empty for module '{}'",
+                    split.suggested_name
                 );
+
+                // If warned about size, the module should be relatively large
+                if warning.to_lowercase().contains("size")
+                    || warning.to_lowercase().contains("borderline")
+                {
+                    assert!(
+                        split.method_count >= 15,
+                        "Size warning for '{}' but only has {} methods",
+                        split.suggested_name,
+                        split.method_count
+                    );
+                }
             }
         }
     }

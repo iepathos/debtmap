@@ -40,42 +40,62 @@ pub fn detect_circular_dependencies(splits: &[ModuleSplit]) -> Vec<Vec<String>> 
     cycles
 }
 
+/// Iterative DFS cycle detection to avoid stack overflow on large graphs.
+///
+/// Uses an explicit stack with frame state tracking to simulate recursive DFS.
 fn dfs_find_cycles(
-    node: &str,
+    start_node: &str,
     graph: &HashMap<String, Vec<String>>,
     visited: &mut HashSet<String>,
     rec_stack: &mut HashSet<String>,
-    current_path: &mut Vec<String>,
+    _current_path: &mut [String], // Kept for API compatibility but unused
     cycles: &mut Vec<Vec<String>>,
 ) {
-    visited.insert(node.to_string());
-    rec_stack.insert(node.to_string());
-    current_path.push(node.to_string());
+    // Stack frame: (node, is_entering)
+    // is_entering=true: first visit to this node
+    // is_entering=false: returning from processing children
+    let mut stack: Vec<(String, bool)> = vec![(start_node.to_string(), true)];
+    let mut path: Vec<String> = Vec::new();
 
-    if let Some(neighbors) = graph.get(node) {
-        for neighbor in neighbors {
-            if !visited.contains(neighbor) {
-                dfs_find_cycles(neighbor, graph, visited, rec_stack, current_path, cycles);
-            } else if rec_stack.contains(neighbor) {
-                // Found a cycle
-                if let Some(cycle_start) = current_path.iter().position(|n| n == neighbor) {
-                    let mut cycle = current_path[cycle_start..].to_vec();
-                    cycle.sort();
-                    // Only add if not already present (avoid duplicates)
-                    if !cycles.iter().any(|c| {
-                        let mut sorted_c = c.clone();
-                        sorted_c.sort();
-                        sorted_c == cycle
-                    }) {
-                        cycles.push(current_path[cycle_start..].to_vec());
+    while let Some((node, is_entering)) = stack.pop() {
+        if is_entering {
+            // First visit to this node
+            visited.insert(node.clone());
+            rec_stack.insert(node.clone());
+            path.push(node.clone());
+
+            // Push a "return" frame to clean up when done
+            stack.push((node.clone(), false));
+
+            // Process neighbors
+            if let Some(neighbors) = graph.get(&node) {
+                for neighbor in neighbors.iter().rev() {
+                    if !visited.contains(neighbor) {
+                        // Unvisited node - push for processing
+                        stack.push((neighbor.clone(), true));
+                    } else if rec_stack.contains(neighbor) {
+                        // Found a cycle
+                        if let Some(cycle_start) = path.iter().position(|n| n == neighbor) {
+                            let mut cycle = path[cycle_start..].to_vec();
+                            cycle.sort();
+                            // Only add if not already present (avoid duplicates)
+                            if !cycles.iter().any(|c| {
+                                let mut sorted_c = c.clone();
+                                sorted_c.sort();
+                                sorted_c == cycle
+                            }) {
+                                cycles.push(path[cycle_start..].to_vec());
+                            }
+                        }
                     }
                 }
             }
+        } else {
+            // Returning from this node - clean up
+            path.pop();
+            rec_stack.remove(&node);
         }
     }
-
-    current_path.pop();
-    rec_stack.remove(node);
 }
 
 #[cfg(test)]

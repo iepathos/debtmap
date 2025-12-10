@@ -302,6 +302,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let pattern = detector.detect(&func);
@@ -341,6 +343,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let pattern = detector.detect(&func);
@@ -379,6 +383,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         let pattern = detector.detect(&func);
@@ -423,6 +429,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }];
 
         let result = tracker.analyze_patterns(&functions);
