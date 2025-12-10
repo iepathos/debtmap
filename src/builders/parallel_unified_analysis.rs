@@ -939,6 +939,7 @@ impl ParallelUnifiedAnalysisBuilder {
                     analyzed
                 } else if actual_line_count > 2000 || file_metrics.function_count > 50 {
                     // Heuristic threshold met - create god object even if analysis said no
+                    // But preserve responsibilities from analysis if available
 
                     // Calculate god object score (0-100 scale)
                     // Base score on number of methods and LOC
@@ -947,18 +948,66 @@ impl ParallelUnifiedAnalysisBuilder {
                     let loc_score = ((actual_line_count as f64 / 2000.0) * 50.0).min(50.0);
                     let god_score = method_score + loc_score;
 
+                    // Use responsibilities from analysis if available, otherwise estimate
+                    let (responsibilities, responsibility_method_counts) =
+                        if let Some(ref analysis) = analyzed {
+                            if !analysis.responsibilities.is_empty() {
+                                // Use real responsibilities from analysis
+                                (
+                                    analysis.responsibilities.clone(),
+                                    analysis.responsibility_method_counts.clone(),
+                                )
+                            } else {
+                                // Analysis exists but no responsibilities - estimate
+                                let estimated_resp_count =
+                                    (file_metrics.function_count / 10).max(1).min(10);
+                                let resps: Vec<String> = (1..=estimated_resp_count)
+                                    .map(|i| format!("responsibility_{}", i))
+                                    .collect();
+                                let counts: std::collections::HashMap<String, usize> = resps
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.clone(),
+                                            file_metrics.function_count / estimated_resp_count,
+                                        )
+                                    })
+                                    .collect();
+                                (resps, counts)
+                            }
+                        } else {
+                            // No analysis at all - estimate
+                            let estimated_resp_count =
+                                (file_metrics.function_count / 10).max(1).min(10);
+                            let resps: Vec<String> = (1..=estimated_resp_count)
+                                .map(|i| format!("responsibility_{}", i))
+                                .collect();
+                            let counts: std::collections::HashMap<String, usize> = resps
+                                .iter()
+                                .map(|r| {
+                                    (
+                                        r.clone(),
+                                        file_metrics.function_count / estimated_resp_count,
+                                    )
+                                })
+                                .collect();
+                            (resps, counts)
+                        };
+
+                    let responsibility_count = responsibilities.len();
+
                     Some(crate::organization::GodObjectAnalysis {
                         is_god_object: true,
                         method_count: file_metrics.function_count,
                         field_count: 0,
-                        responsibility_count: 5,
+                        responsibility_count,
                         lines_of_code: actual_line_count,
                         complexity_sum: file_metrics.total_complexity,
                         god_object_score: Score0To100::new(god_score),
                         recommended_splits: Vec::new(),
                         confidence: crate::organization::GodObjectConfidence::Probable,
-                        responsibilities: Vec::new(),
-                        responsibility_method_counts: std::collections::HashMap::new(),
+                        responsibilities,
+                        responsibility_method_counts,
                         purity_distribution: None,
                         module_structure: None,
                         detection_type: crate::organization::DetectionType::GodFile,
