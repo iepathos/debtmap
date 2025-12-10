@@ -854,6 +854,7 @@ dependencies = [
  "once_cell",
  "pathdiff",
  "petgraph 0.8.3",
+ "premortem",
  "pretty_assertions",
  "proc-macro2",
  "proptest",
@@ -2272,6 +2273,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "premortem"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19f445aff17d01fcdcca829c322984688159cb6e89f12ba4c0c91297f8c4eb6c"
+dependencies = [
+ "premortem-derive",
+ "regex",
+ "serde",
+ "serde_json",
+ "stillwater",
+ "thiserror 1.0.69",
+ "toml 0.8.23",
+ "toml_edit",
+]
+
+[[package]]
+name = "premortem-derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1556d95aa9e11da45b819431cbed3d6f8ce5557b21adaa42b4002334239c2ff3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

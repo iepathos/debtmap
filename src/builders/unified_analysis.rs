@@ -1712,7 +1712,8 @@ fn apply_file_analysis_results(
 
             // Enrich god_analysis with aggregated entropy and error swallowing data
             let mut enriched_god_analysis = god_analysis.clone();
-            enriched_god_analysis.aggregated_entropy = aggregated_metrics.aggregated_entropy.clone();
+            enriched_god_analysis.aggregated_entropy =
+                aggregated_metrics.aggregated_entropy.clone();
             enriched_god_analysis.aggregated_error_swallowing_count =
                 if aggregated_metrics.total_error_swallowing_count > 0 {
                     Some(aggregated_metrics.total_error_swallowing_count)

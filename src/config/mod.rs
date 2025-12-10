@@ -11,6 +11,8 @@ mod thresholds;
 
 // Core configuration types
 mod accessors;
+pub mod analysis_config;
+pub mod cli_validation;
 mod core;
 mod loader;
 pub mod multi_source;
@@ -94,6 +96,18 @@ pub use accessors::*;
 
 // Re-export preset types (spec 205)
 pub use presets::{merge_preset_with_config, PresetLevel};
+
+// Re-export analysis config types (spec 201)
+pub use analysis_config::{
+    format_config_errors, AnalysisConfig, AnalysisConfigBuilder, ConfigValidationError,
+    TracedAnalysisValue,
+};
+
+// Re-export CLI validation types (spec 201)
+pub use cli_validation::{
+    build_analysis_config_from_cli, format_cli_errors, validate_analyze_args, CliValidationError,
+    CliValidationResult,
+};
 
 #[cfg(test)]
 mod tests {
