@@ -7,18 +7,15 @@
 //!
 //! - **Complexity**: SUM of all functions (total burden)
 //! - **Coverage**: Weighted average by function length
-//! - **Dependencies**: Deduplicated from UnifiedDebtItems only (debt-focused)
+//! - **Dependencies**: Aggregated from ALL raw FunctionMetrics (complete architectural view)
 //! - **Contextual Risk**: Average across member functions
 //!
-//! ## Dependency Aggregation Note
+//! ## Dependency Aggregation
 //!
-//! Dependencies aggregate only from functions that became UnifiedDebtItems
-//! (passed complexity/coverage thresholds). This provides a debt-focused view
-//! of dependencies rather than complete architectural dependencies. Simple
-//! functions (getters, setters) are filtered out and don't contribute.
-//!
-//! This means god objects may show zero dependencies if all their functions
-//! are too simple to become debt items, which is working as intended.
+//! Dependencies are aggregated from raw FunctionMetrics to provide a complete
+//! architectural view of god object dependencies. This ensures that even if
+//! individual functions don't exceed complexity thresholds, the god object
+//! still shows all its cross-file dependencies for proper assessment.
 //!
 //! # Examples
 //!
@@ -214,6 +211,37 @@ pub fn aggregate_error_swallowing(functions: &[FunctionMetrics]) -> (u32, Vec<St
     (total_count, unique_patterns.into_iter().collect())
 }
 
+/// Aggregate dependency metrics from raw FunctionMetrics.
+///
+/// This provides a complete architectural view of dependencies by aggregating
+/// from ALL functions in the file, not just those that became debt items.
+/// This ensures god objects show their true blast radius.
+pub fn aggregate_dependency_metrics_from_raw(
+    functions: &[FunctionMetrics],
+) -> (Vec<String>, Vec<String>, usize, usize) {
+    let mut unique_callers: HashSet<String> = HashSet::new();
+    let mut unique_callees: HashSet<String> = HashSet::new();
+
+    for func in functions {
+        if let Some(ref callers) = func.upstream_callers {
+            unique_callers.extend(callers.iter().cloned());
+        }
+        if let Some(ref callees) = func.downstream_callees {
+            unique_callees.extend(callees.iter().cloned());
+        }
+    }
+
+    let upstream_count = unique_callers.len();
+    let downstream_count = unique_callees.len();
+
+    (
+        unique_callers.into_iter().collect(),
+        unique_callees.into_iter().collect(),
+        upstream_count,
+        downstream_count,
+    )
+}
+
 /// Aggregate entropy analysis from member UnifiedDebtItems.
 ///
 /// Returns weighted average entropy metrics based on function length.
@@ -372,8 +400,10 @@ pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<Entro
 
 /// Aggregate metrics directly from raw FunctionMetrics (for ALL functions including tests).
 ///
-/// This function aggregates complexity from raw function metrics before any filtering,
-/// ensuring god objects show the TRUE complexity of all their functions.
+/// This function aggregates complexity and dependencies from raw function metrics
+/// before any filtering, ensuring god objects show:
+/// - TRUE complexity of all their functions
+/// - TRUE architectural dependencies (complete blast radius)
 pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAggregatedMetrics {
     let total_cyclomatic = functions.iter().map(|f| f.cyclomatic).sum();
     let total_cognitive = functions.iter().map(|f| f.cognitive).sum();
@@ -385,15 +415,23 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
     // Aggregate entropy from raw metrics (available for all functions)
     let aggregated_entropy = aggregate_entropy_from_raw(functions);
 
+    // Aggregate dependencies from raw metrics (complete architectural view)
+    let (
+        unique_upstream_callers,
+        unique_downstream_callees,
+        upstream_dependencies,
+        downstream_dependencies,
+    ) = aggregate_dependency_metrics_from_raw(functions);
+
     GodObjectAggregatedMetrics {
         total_cyclomatic,
         total_cognitive,
         max_nesting_depth: max_nesting,
         weighted_coverage: None,
-        unique_upstream_callers: Vec::new(),
-        unique_downstream_callees: Vec::new(),
-        upstream_dependencies: 0,
-        downstream_dependencies: 0,
+        unique_upstream_callers,
+        unique_downstream_callees,
+        upstream_dependencies,
+        downstream_dependencies,
         aggregated_contextual_risk: None,
         total_error_swallowing_count: total_error_swallowing,
         error_swallowing_patterns: error_patterns,
@@ -1151,5 +1189,123 @@ mod tests {
         // High entropy, low repetition should result in higher effective complexity
         let high_dampening = calculator.calculate_dampening_factor(0.8, 0.2);
         assert!(high_dampening <= 1.0);
+    }
+
+    #[test]
+    fn test_aggregate_dependency_metrics_from_raw() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "func1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 1,
+                length: 50,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: Some(vec!["caller1".to_string(), "caller2".to_string()]),
+                downstream_callees: Some(vec!["callee1".to_string()]),
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+            FunctionMetrics {
+                name: "func2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                cyclomatic: 3,
+                cognitive: 5,
+                nesting: 1,
+                length: 30,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: Some(vec!["caller2".to_string(), "caller3".to_string()]), // caller2 is duplicate
+                downstream_callees: Some(vec!["callee2".to_string(), "callee3".to_string()]),
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+            },
+        ];
+
+        let (callers, callees, upstream_count, downstream_count) =
+            aggregate_dependency_metrics_from_raw(&functions);
+
+        // Should deduplicate: caller1, caller2, caller3 = 3 unique
+        assert_eq!(upstream_count, 3);
+        // Should deduplicate: callee1, callee2, callee3 = 3 unique
+        assert_eq!(downstream_count, 3);
+
+        assert!(callers.contains(&"caller1".to_string()));
+        assert!(callers.contains(&"caller2".to_string()));
+        assert!(callers.contains(&"caller3".to_string()));
+
+        assert!(callees.contains(&"callee1".to_string()));
+        assert!(callees.contains(&"callee2".to_string()));
+        assert!(callees.contains(&"callee3".to_string()));
+    }
+
+    #[test]
+    fn test_aggregate_from_raw_metrics_includes_dependencies() {
+        let functions = vec![FunctionMetrics {
+            name: "func1".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 5,
+            cognitive: 10,
+            nesting: 1,
+            length: 50,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: Some(vec!["caller1".to_string(), "caller2".to_string()]),
+            downstream_callees: Some(vec!["callee1".to_string()]),
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+        }];
+
+        let metrics = aggregate_from_raw_metrics(&functions);
+
+        // Dependencies should be populated from raw metrics
+        assert_eq!(metrics.upstream_dependencies, 2);
+        assert_eq!(metrics.downstream_dependencies, 1);
+        assert_eq!(metrics.unique_upstream_callers.len(), 2);
+        assert_eq!(metrics.unique_downstream_callees.len(), 1);
     }
 }

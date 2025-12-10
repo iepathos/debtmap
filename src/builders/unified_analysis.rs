@@ -1705,23 +1705,18 @@ fn apply_file_analysis_results(
         if let Some(god_analysis) = &file_data.god_analysis {
             update_function_god_indicators(unified, &file_data.file_path, god_analysis);
 
-            // Aggregate from raw metrics first for complexity (includes ALL functions, even tests)
+            // Aggregate from raw metrics for complexity AND dependencies (includes ALL functions)
             let mut aggregated_metrics = aggregate_from_raw_metrics(&file_data.raw_functions);
 
-            // Enrich with coverage/dependencies/risk from unified items
-            // NOTE: Dependencies aggregate only from "problematic" functions that became debt items.
-            // This provides a debt-focused view rather than complete architectural dependencies.
+            // Enrich with coverage and contextual risk from unified items
+            // NOTE: Dependencies are already aggregated from raw metrics (complete architectural view).
+            // We only enrich with coverage and risk here.
             let member_functions =
                 extract_member_functions(unified.items.iter(), &file_data.file_path);
             if !member_functions.is_empty() {
                 let item_metrics = aggregate_god_object_metrics(&member_functions);
-                // Merge all contextual data from debt items
+                // Only merge coverage data from debt items (dependencies come from raw metrics)
                 aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
-                aggregated_metrics.unique_upstream_callers = item_metrics.unique_upstream_callers;
-                aggregated_metrics.unique_downstream_callees =
-                    item_metrics.unique_downstream_callees;
-                aggregated_metrics.upstream_dependencies = item_metrics.upstream_dependencies;
-                aggregated_metrics.downstream_dependencies = item_metrics.downstream_dependencies;
 
                 // Spec 248: Prefer direct file-level git analysis over member aggregation
                 aggregated_metrics.aggregated_contextual_risk = risk_analyzer
@@ -1744,7 +1739,7 @@ fn apply_file_analysis_results(
                         )
                     });
             }
-            // If member_functions is empty, dependencies remain at 0 (no debt items = no deps to show)
+            // Dependencies are already populated from raw metrics (complete architectural view)
 
             // NEW (spec 207): Create god object debt item for TUI display
             let god_item = create_god_object_debt_item(
