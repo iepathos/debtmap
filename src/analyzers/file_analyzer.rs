@@ -101,6 +101,9 @@ impl UnifiedFileAnalyzer {
                     analysis_method: Default::default(),
                     cross_domain_severity: None,
                     domain_diversity_metrics: None,
+                    aggregated_entropy: None,
+                    aggregated_error_swallowing_count: None,
+                    aggregated_error_swallowing_patterns: None,
                 }),
                 None,
             )
@@ -250,6 +253,9 @@ impl UnifiedFileAnalyzer {
                 analysis_method: Default::default(),
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
+                aggregated_entropy: None,
+                aggregated_error_swallowing_count: None,
+                aggregated_error_swallowing_patterns: None,
             })
         } else {
             None

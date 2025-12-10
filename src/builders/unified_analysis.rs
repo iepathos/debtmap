@@ -1415,6 +1415,9 @@ fn detect_god_object_analysis(
                 analysis_method: crate::organization::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
+                aggregated_entropy: None,
+                aggregated_error_swallowing_count: None,
+                aggregated_error_swallowing_patterns: None,
             });
         }
     }
@@ -1704,10 +1707,26 @@ fn apply_file_analysis_results(
     for file_data in processed_files {
         // Update god object indicators for functions in this file
         if let Some(god_analysis) = &file_data.god_analysis {
-            update_function_god_indicators(unified, &file_data.file_path, god_analysis);
-
             // Aggregate from raw metrics for complexity AND dependencies (includes ALL functions)
             let mut aggregated_metrics = aggregate_from_raw_metrics(&file_data.raw_functions);
+
+            // Enrich god_analysis with aggregated entropy and error swallowing data
+            let mut enriched_god_analysis = god_analysis.clone();
+            enriched_god_analysis.aggregated_entropy = aggregated_metrics.aggregated_entropy.clone();
+            enriched_god_analysis.aggregated_error_swallowing_count =
+                if aggregated_metrics.total_error_swallowing_count > 0 {
+                    Some(aggregated_metrics.total_error_swallowing_count)
+                } else {
+                    None
+                };
+            enriched_god_analysis.aggregated_error_swallowing_patterns =
+                if !aggregated_metrics.error_swallowing_patterns.is_empty() {
+                    Some(aggregated_metrics.error_swallowing_patterns.clone())
+                } else {
+                    None
+                };
+
+            update_function_god_indicators(unified, &file_data.file_path, &enriched_god_analysis);
 
             // Aggregate coverage from ALL raw functions (not just debt items)
             // This ensures god objects show accurate coverage even when member
@@ -1751,7 +1770,7 @@ fn apply_file_analysis_results(
             let god_item = create_god_object_debt_item(
                 &file_data.file_path,
                 &file_data.file_metrics,
-                god_analysis,
+                &enriched_god_analysis,
                 aggregated_metrics,
                 coverage_data,
             );

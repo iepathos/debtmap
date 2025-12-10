@@ -286,6 +286,9 @@ impl GodObjectDetector {
             analysis_method: super::core_types::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
         }
     }
 
@@ -499,6 +502,9 @@ impl GodObjectDetector {
             analysis_method: super::core_types::SplitAnalysisMethod::MethodBased,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
         })
     }
 
@@ -629,6 +635,9 @@ impl GodObjectDetector {
             analysis_method: super::core_types::SplitAnalysisMethod::MethodBased,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
         }
     }
 }

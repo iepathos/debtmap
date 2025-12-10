@@ -119,6 +119,9 @@ mod tests {
                         struct_line: None,
                         struct_location: None,
                         domain_diversity_metrics: None,
+                        aggregated_entropy: None,
+                        aggregated_error_swallowing_count: None,
+                        aggregated_error_swallowing_patterns: None,
                     })
                 } else {
                     None

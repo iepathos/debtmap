@@ -169,6 +169,9 @@ fn test_analyze_simple_code() {
         struct_name: None,
         struct_line: None,
         struct_location: None,
+        aggregated_entropy: None,
+        aggregated_error_swallowing_count: None,
+        aggregated_error_swallowing_patterns: None,
     };
 
     let call_graph = std::collections::HashMap::new();
@@ -233,6 +236,9 @@ fn test_timeout_budget() {
         struct_name: None,
         struct_line: None,
         struct_location: None,
+        aggregated_entropy: None,
+        aggregated_error_swallowing_count: None,
+        aggregated_error_swallowing_patterns: None,
     };
 
     let call_graph = std::collections::HashMap::new();

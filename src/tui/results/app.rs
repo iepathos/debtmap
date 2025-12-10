@@ -174,7 +174,7 @@ impl ResultsApp {
 
     /// Render the current view
     pub fn render(&mut self, frame: &mut Frame) {
-        self.terminal_size = (frame.size().width, frame.size().height);
+        self.terminal_size = (frame.area().width, frame.area().height);
 
         match self.view_mode {
             ViewMode::List => list_view::render(frame, self),
@@ -403,11 +403,23 @@ impl ResultsApp {
                     || item.is_pure.is_some()
                     || item.language_specific.is_some()
                     || item.entropy_details.is_some()
+                    || item.error_swallowing_count.is_some()
+                    || item.error_swallowing_patterns.is_some()
                     || self
                         .analysis
                         .data_flow_graph
                         .get_purity_info(&func_id)
                         .is_some()
+                    // Check for god object aggregated pattern data
+                    || item.god_object_indicators.as_ref().map(|god| {
+                        god.is_god_object
+                            && (god.aggregated_entropy.is_some()
+                                || god.aggregated_error_swallowing_count.is_some()
+                                || god.aggregated_error_swallowing_patterns
+                                    .as_ref()
+                                    .map(|p| !p.is_empty())
+                                    .unwrap_or(false))
+                    }).unwrap_or(false)
             })
             .unwrap_or(false)
     }

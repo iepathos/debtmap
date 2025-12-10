@@ -18,7 +18,7 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
     super::list_view::render(frame, app);
 
     // Calculate centered area for help overlay
-    let area = frame.size();
+    let area = frame.area();
     let help_area = centered_rect(60, 80, area);
 
     // Clear the area first

@@ -22,7 +22,7 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
             Constraint::Min(0),    // Content
             Constraint::Length(2), // Footer
         ])
-        .split(frame.size());
+        .split(frame.area());
 
     // Render header with page indicator
     render_header(frame, app, chunks[0], &theme);

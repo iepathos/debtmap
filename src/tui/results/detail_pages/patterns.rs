@@ -224,7 +224,7 @@ pub fn render(
         add_blank_line(&mut lines);
     }
 
-    // Error Swallowing section
+    // Error Swallowing section (for regular functions)
     if item.error_swallowing_count.is_some() || item.error_swallowing_patterns.is_some() {
         has_any_data = true;
         add_section_header(&mut lines, "error handling", theme);
@@ -246,6 +246,102 @@ pub fn render(
         }
 
         add_blank_line(&mut lines);
+    }
+
+    // God Object Aggregated Patterns (for god objects)
+    if let Some(ref god_indicators) = item.god_object_indicators {
+        if god_indicators.is_god_object {
+            // Show aggregated entropy for god objects
+            if let Some(ref entropy) = god_indicators.aggregated_entropy {
+                has_any_data = true;
+                add_section_header(&mut lines, "god object entropy (aggregated)", theme);
+
+                let entropy_desc = if entropy.entropy_score < 0.3 {
+                    "low (repetitive)"
+                } else if entropy.entropy_score < 0.5 {
+                    "medium (typical)"
+                } else {
+                    "high (chaotic)"
+                };
+
+                add_label_value(
+                    &mut lines,
+                    "entropy",
+                    format!("{:.3} {}", entropy.entropy_score, entropy_desc),
+                    theme,
+                    area.width,
+                );
+
+                add_label_value(
+                    &mut lines,
+                    "repetition",
+                    format!("{:.3}", entropy.pattern_repetition),
+                    theme,
+                    area.width,
+                );
+
+                add_label_value(
+                    &mut lines,
+                    "total complexity",
+                    format!(
+                        "{} (original) → {} (adjusted)",
+                        entropy.original_complexity, entropy.adjusted_cognitive
+                    ),
+                    theme,
+                    area.width,
+                );
+
+                if entropy.dampening_factor < 1.0 {
+                    add_label_value(
+                        &mut lines,
+                        "dampening",
+                        format!("{:.3}x reduction", entropy.dampening_factor),
+                        theme,
+                        area.width,
+                    );
+                }
+
+                add_blank_line(&mut lines);
+            }
+
+            // Show aggregated error swallowing for god objects
+            let has_error_data = god_indicators.aggregated_error_swallowing_count.is_some()
+                || god_indicators
+                    .aggregated_error_swallowing_patterns
+                    .as_ref()
+                    .map(|p| !p.is_empty())
+                    .unwrap_or(false);
+
+            if has_error_data {
+                has_any_data = true;
+                add_section_header(&mut lines, "god object error handling (aggregated)", theme);
+
+                if let Some(count) = god_indicators.aggregated_error_swallowing_count {
+                    add_label_value(
+                        &mut lines,
+                        "errors swallowed",
+                        format!("{} across all functions", count),
+                        theme,
+                        area.width,
+                    );
+                }
+
+                if let Some(ref patterns) = god_indicators.aggregated_error_swallowing_patterns {
+                    add_label_value(
+                        &mut lines,
+                        "unique patterns",
+                        patterns.len().to_string(),
+                        theme,
+                        area.width,
+                    );
+                    for pattern in patterns {
+                        add_label_value(&mut lines, "pattern", pattern.clone(), theme, area.width);
+                    }
+                }
+
+                add_blank_line(&mut lines);
+            }
+        }
     }
 
     // If no data available

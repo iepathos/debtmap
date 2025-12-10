@@ -36,7 +36,7 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
             Constraint::Min(0),    // List
             Constraint::Length(2), // Footer
         ])
-        .split(frame.size());
+        .split(frame.area());
 
     // Render header
     render_header(frame, app, chunks[0], &theme);
@@ -55,7 +55,7 @@ pub fn render_with_search(frame: &mut Frame, app: &ResultsApp) {
 
     // Then overlay search input
     let theme = Theme::default();
-    let area = frame.size();
+    let area = frame.area();
 
     // Create search box in center
     let search_area = Rect {
@@ -83,7 +83,7 @@ pub fn render_with_sort_menu(frame: &mut Frame, app: &ResultsApp) {
     render(frame, app);
 
     let theme = Theme::default();
-    let area = frame.size();
+    let area = frame.area();
 
     // Create sort menu in center
     let menu_area = Rect {
@@ -131,7 +131,7 @@ pub fn render_with_filter_menu(frame: &mut Frame, app: &ResultsApp) {
     render(frame, app);
 
     let theme = Theme::default();
-    let area = frame.size();
+    let area = frame.area();
 
     // Create filter menu in center
     let menu_area = Rect {

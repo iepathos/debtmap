@@ -960,7 +960,7 @@ impl ParallelUnifiedAnalysisBuilder {
                             } else {
                                 // Analysis exists but no responsibilities - estimate
                                 let estimated_resp_count =
-                                    (file_metrics.function_count / 10).max(1).min(10);
+                                    (file_metrics.function_count / 10).clamp(1, 10);
                                 let resps: Vec<String> = (1..=estimated_resp_count)
                                     .map(|i| format!("responsibility_{}", i))
                                     .collect();
@@ -978,7 +978,7 @@ impl ParallelUnifiedAnalysisBuilder {
                         } else {
                             // No analysis at all - estimate
                             let estimated_resp_count =
-                                (file_metrics.function_count / 10).max(1).min(10);
+                                (file_metrics.function_count / 10).clamp(1, 10);
                             let resps: Vec<String> = (1..=estimated_resp_count)
                                 .map(|i| format!("responsibility_{}", i))
                                 .collect();
@@ -1021,6 +1021,9 @@ impl ParallelUnifiedAnalysisBuilder {
                         analysis_method: Default::default(),
                         cross_domain_severity: None,
                         domain_diversity_metrics: None,
+                        aggregated_entropy: None,
+                        aggregated_error_swallowing_count: None,
+                        aggregated_error_swallowing_patterns: None,
                     })
                 } else {
                     // No god object detected and heuristic not met

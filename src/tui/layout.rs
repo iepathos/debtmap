@@ -59,7 +59,7 @@ pub fn calculate_layout(area: Rect) -> Vec<Rect> {
 
 /// Render the TUI with adaptive layout
 pub fn render_adaptive(frame: &mut Frame, app: &App) {
-    let mode = LayoutMode::from_terminal_width(frame.size().width);
+    let mode = LayoutMode::from_terminal_width(frame.area().width);
 
     match mode {
         LayoutMode::Full | LayoutMode::Standard => render_ui(frame, app),

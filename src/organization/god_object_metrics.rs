@@ -265,6 +265,9 @@ mod tests {
             analysis_method: crate::organization::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None, // Spec 152: Added for test compatibility
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
         }
     }
 

@@ -68,6 +68,9 @@ fn create_god_object_analysis(
         analysis_method: crate::organization::SplitAnalysisMethod::None,
         cross_domain_severity: None,
         domain_diversity_metrics: None, // Spec 152: Added for struct-based analysis
+        aggregated_entropy: None,
+        aggregated_error_swallowing_count: None,
+        aggregated_error_swallowing_patterns: None,
     }
 }
 

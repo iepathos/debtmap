@@ -14,7 +14,7 @@ use super::theme::Theme;
 /// Render the full TUI interface
 pub fn render_ui(frame: &mut Frame, app: &App) {
     let theme = Theme::default_theme();
-    let chunks = calculate_layout(frame.size());
+    let chunks = calculate_layout(frame.area());
 
     render_header(frame, app, &theme, chunks[0]);
     render_pipeline(frame, app, &theme, chunks[1]);
@@ -24,7 +24,7 @@ pub fn render_ui(frame: &mut Frame, app: &App) {
 /// Render compact view (no sub-tasks)
 pub fn render_compact(frame: &mut Frame, app: &App) {
     let theme = Theme::default_theme();
-    let chunks = calculate_layout(frame.size());
+    let chunks = calculate_layout(frame.area());
 
     render_header(frame, app, &theme, chunks[0]);
     render_pipeline_compact(frame, app, &theme, chunks[1]);
@@ -34,7 +34,7 @@ pub fn render_compact(frame: &mut Frame, app: &App) {
 /// Render minimal view (just progress bar)
 pub fn render_minimal(frame: &mut Frame, app: &App) {
     let theme = Theme::default_theme();
-    let area = frame.size();
+    let area = frame.area();
 
     // Simple centered progress bar
     let chunks = Layout::default()

@@ -21,7 +21,7 @@ use ratatui::{
 /// Render the DSM view
 pub fn render(frame: &mut Frame, app: &ResultsApp) {
     let theme = Theme::default();
-    let area = frame.size();
+    let area = frame.area();
 
     // Build the DSM from file items
     let matrix = build_dsm(app);
