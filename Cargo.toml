@@ -99,7 +99,7 @@ indicatif = { version = "0.18", features = ["rayon"] }
 
 # TUI framework
 ratatui = "0.28"
-crossterm = "0.27"
+crossterm = "0.29"
 unicode-width = "0.2"
 num_cpus = "1.16"
 arboard = "3.3"  # Clipboard access (cross-platform)
