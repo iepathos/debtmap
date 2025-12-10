@@ -1,7 +1,12 @@
 //! Keyboard navigation handling.
+//!
+//! This module handles keyboard input and delegates to the navigation state
+//! machine (nav_state.rs) for state transitions. Guards are used to validate
+//! transitions, and history is tracked for proper back navigation.
 
 use super::app::{ResultsApp, ViewMode};
 use super::filter::{CoverageFilter, Filter, SeverityFilter};
+use super::nav_state::{self, can_enter_detail, can_enter_dsm, can_enter_help};
 use super::sort::SortCriteria;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -59,37 +64,53 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             move_selection(app, page_size);
         }
 
-        // Enter detail view
+        // Enter detail view - guarded transition
         KeyCode::Enter => {
-            if app.item_count() > 0 {
+            if can_enter_detail(app.view_mode(), app.has_items(), app.has_selection()) {
+                app.push_nav_history(ViewMode::List);
                 app.set_view_mode(ViewMode::Detail);
             }
         }
 
-        // Search
+        // Search - guarded transition
         KeyCode::Char('/') => {
-            app.search_mut().clear();
-            app.set_view_mode(ViewMode::Search);
+            if nav_state::can_enter_search(app.view_mode()) {
+                app.search_mut().clear();
+                app.push_nav_history(ViewMode::List);
+                app.set_view_mode(ViewMode::Search);
+            }
         }
 
-        // Sort menu
+        // Sort menu - guarded transition
         KeyCode::Char('s') => {
-            app.set_view_mode(ViewMode::SortMenu);
+            if nav_state::can_enter_sort_menu(app.view_mode()) {
+                app.push_nav_history(ViewMode::List);
+                app.set_view_mode(ViewMode::SortMenu);
+            }
         }
 
-        // Filter menu
+        // Filter menu - guarded transition
         KeyCode::Char('f') => {
-            app.set_view_mode(ViewMode::FilterMenu);
+            if nav_state::can_enter_filter_menu(app.view_mode()) {
+                app.push_nav_history(ViewMode::List);
+                app.set_view_mode(ViewMode::FilterMenu);
+            }
         }
 
-        // Help
+        // Help - guarded transition
         KeyCode::Char('?') => {
-            app.set_view_mode(ViewMode::Help);
+            if can_enter_help(app.view_mode()) {
+                app.push_nav_history(ViewMode::List);
+                app.set_view_mode(ViewMode::Help);
+            }
         }
 
-        // DSM view (Spec 205)
+        // DSM view (Spec 205) - guarded transition
         KeyCode::Char('m') => {
-            app.set_view_mode(ViewMode::Dsm);
+            if can_enter_dsm(app.view_mode(), app.dsm_enabled()) {
+                app.push_nav_history(ViewMode::List);
+                app.set_view_mode(ViewMode::Dsm);
+            }
         }
 
         // Actions (clipboard, editor)
@@ -121,9 +142,9 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 /// Handle keys in detail view
 fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     match key.code {
-        // Back to list
+        // Back - use history-based navigation
         KeyCode::Esc | KeyCode::Char('q') => {
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         // Page navigation (only cycles through available pages)
@@ -190,9 +211,12 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             }
         }
 
-        // Help
+        // Help - guarded transition with history
         KeyCode::Char('?') => {
-            app.set_view_mode(ViewMode::Help);
+            if can_enter_help(app.view_mode()) {
+                app.push_nav_history(ViewMode::Detail);
+                app.set_view_mode(ViewMode::Help);
+            }
         }
 
         _ => {}
@@ -204,17 +228,17 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 /// Handle keys in search mode
 fn handle_search_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     match key.code {
-        // Exit search
+        // Exit search - use history-based navigation
         KeyCode::Esc => {
             app.search_mut().clear();
             app.apply_search();
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
-        // Execute search
+        // Execute search and go back
         KeyCode::Enter => {
             app.apply_search();
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         // Edit query
@@ -249,29 +273,30 @@ fn handle_search_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 /// Handle keys in sort menu
 fn handle_sort_menu_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     match key.code {
+        // Back - use history-based navigation
         KeyCode::Esc | KeyCode::Char('q') => {
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         KeyCode::Char('1') => {
             app.set_sort_by(SortCriteria::Score);
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('2') => {
             app.set_sort_by(SortCriteria::Coverage);
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('3') => {
             app.set_sort_by(SortCriteria::Complexity);
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('4') => {
             app.set_sort_by(SortCriteria::FilePath);
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('5') => {
             app.set_sort_by(SortCriteria::FunctionName);
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         _ => {}
@@ -283,50 +308,51 @@ fn handle_sort_menu_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 /// Handle keys in filter menu
 fn handle_filter_menu_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     match key.code {
+        // Back - use history-based navigation
         KeyCode::Esc | KeyCode::Char('q') => {
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         // Severity filters
         KeyCode::Char('1') => {
             app.add_filter(Filter::Severity(SeverityFilter::Critical));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('2') => {
             app.add_filter(Filter::Severity(SeverityFilter::High));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('3') => {
             app.add_filter(Filter::Severity(SeverityFilter::Medium));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('4') => {
             app.add_filter(Filter::Severity(SeverityFilter::Low));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         // Coverage filters
         KeyCode::Char('n') => {
             app.add_filter(Filter::Coverage(CoverageFilter::None));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('l') => {
             app.add_filter(Filter::Coverage(CoverageFilter::Low));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('m') => {
             app.add_filter(Filter::Coverage(CoverageFilter::Medium));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
         KeyCode::Char('h') => {
             app.add_filter(Filter::Coverage(CoverageFilter::High));
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         // Clear filters
         KeyCode::Char('c') => {
             app.clear_filters();
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
         _ => {}
@@ -337,22 +363,25 @@ fn handle_filter_menu_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
 /// Handle keys in help overlay
 fn handle_help_key(app: &mut ResultsApp, _key: KeyEvent) -> Result<bool> {
-    // Any key exits help
-    app.set_view_mode(ViewMode::List);
+    // Any key exits help - use history-based navigation
+    navigate_back(app);
     Ok(false)
 }
 
 /// Handle keys in DSM view (Spec 205)
 fn handle_dsm_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     match key.code {
-        // Back to list
+        // Back - use history-based navigation
         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
-            app.set_view_mode(ViewMode::List);
+            navigate_back(app);
         }
 
-        // Help
+        // Help - guarded transition with history
         KeyCode::Char('?') => {
-            app.set_view_mode(ViewMode::Help);
+            if can_enter_help(app.view_mode()) {
+                app.push_nav_history(ViewMode::Dsm);
+                app.set_view_mode(ViewMode::Help);
+            }
         }
 
         // Navigation within DSM (scroll if matrix is large)
@@ -416,4 +445,18 @@ fn adjust_scroll(app: &mut ResultsApp) {
         // Selection below visible area
         app.set_scroll_offset(selected.saturating_sub(visible_rows - 1));
     }
+}
+
+/// Navigate back using history-based navigation.
+///
+/// Uses the navigation history to return to the previous view.
+/// If no history exists and not at root (List), returns to List.
+/// If already at root with no history, does nothing.
+fn navigate_back(app: &mut ResultsApp) {
+    if let Some(previous) = app.pop_nav_history() {
+        app.set_view_mode(previous);
+    } else if app.view_mode() != ViewMode::List {
+        app.set_view_mode(ViewMode::List);
+    }
+    // Already at root with no history - do nothing
 }
