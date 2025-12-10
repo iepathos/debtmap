@@ -523,6 +523,8 @@ mod tests {
             contextual_risk: None, // spec 203
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         };
 
         assert_eq!(estimate_effort(&item), 8); // 4 * 2
@@ -615,6 +617,8 @@ mod tests {
                         composition_metrics: None,
                         language_specific: None,
                         purity_level: None,
+                        error_swallowing_count: None,
+                        error_swallowing_patterns: None,
                     },
                     FunctionMetrics {
                         name: "func2".to_string(),
@@ -641,6 +645,8 @@ mod tests {
                         composition_metrics: None,
                         language_specific: None,
                         purity_level: None,
+                        error_swallowing_count: None,
+                        error_swallowing_patterns: None,
                     },
                     FunctionMetrics {
                         name: "func3".to_string(),
@@ -667,6 +673,8 @@ mod tests {
                         composition_metrics: None,
                         language_specific: None,
                         purity_level: None,
+                        error_swallowing_count: None,
+                        error_swallowing_patterns: None,
                     },
                 ],
                 summary: ComplexitySummary {
@@ -776,6 +784,8 @@ mod tests {
             contextual_risk: None, // spec 203
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }];
 
         let deps = extract_module_dependencies(&items);

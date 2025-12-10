@@ -138,6 +138,12 @@ pub struct UnifiedDebtItem {
     /// None if behavioral category cannot be inferred with high confidence (>= 0.7).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub responsibility_category: Option<String>,
+    /// Count of error swallowing patterns detected in this function
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_swallowing_count: Option<u32>,
+    /// Types of error swallowing patterns detected
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_swallowing_patterns: Option<Vec<String>>,
 }
 
 impl UnifiedDebtItem {

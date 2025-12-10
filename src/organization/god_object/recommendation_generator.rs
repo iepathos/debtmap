@@ -43,7 +43,7 @@ use crate::organization::struct_patterns::{PatternAnalysis, StructPattern};
 /// };
 ///
 /// let rec = generate_recommendation(&classification, None);
-/// assert!(rec.contains("5 responsibilities"));
+/// assert!(rec.contains("5 distinct responsibilities"));
 /// assert!(rec.contains("5 focused modules"));
 /// ```
 pub fn generate_recommendation(

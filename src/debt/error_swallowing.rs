@@ -317,10 +317,167 @@ pub fn detect_error_swallowing(
     detector.detect(file)
 }
 
+/// Detect error swallowing patterns within a single function block.
+/// Returns (count, patterns) for populating FunctionMetrics.
+pub fn detect_error_swallowing_in_function(block: &syn::Block) -> (u32, Vec<String>) {
+    let mut detector = FunctionErrorSwallowingDetector::new();
+    detector.visit_block(block);
+    (detector.count, detector.patterns)
+}
+
+/// Lightweight detector for per-function error swallowing analysis.
+/// Unlike ErrorSwallowingDetector, this doesn't create DebtItems - just counts patterns.
+struct FunctionErrorSwallowingDetector {
+    count: u32,
+    patterns: Vec<String>,
+}
+
+impl FunctionErrorSwallowingDetector {
+    fn new() -> Self {
+        Self {
+            count: 0,
+            patterns: Vec::new(),
+        }
+    }
+
+    fn add_pattern(&mut self, pattern: ErrorSwallowingPattern) {
+        self.count += 1;
+        let desc = pattern.description().to_string();
+        if !self.patterns.contains(&desc) {
+            self.patterns.push(desc);
+        }
+    }
+
+    fn check_if_let_ok(&mut self, expr_if: &ExprIf) {
+        if !ErrorSwallowingDetector::is_if_let_ok_pattern(&expr_if.cond) {
+            return;
+        }
+
+        if let Some((pattern, _)) =
+            ErrorSwallowingDetector::classify_error_handling(&expr_if.else_branch)
+        {
+            self.add_pattern(pattern);
+        }
+    }
+
+    fn check_let_underscore(&mut self, stmt: &Stmt) {
+        if let Stmt::Local(local) = stmt {
+            if let Pat::Wild(_) = &local.pat {
+                if let Some(init) = &local.init {
+                    if is_result_type(&init.expr) {
+                        self.add_pattern(ErrorSwallowingPattern::LetUnderscoreResult);
+                    }
+                }
+            }
+        }
+    }
+
+    fn check_ok_method(&mut self, method_call: &ExprMethodCall) {
+        let ident = &method_call.method;
+        if ident == "ok" && method_call.args.is_empty() {
+            self.add_pattern(ErrorSwallowingPattern::OkMethodDiscard);
+        }
+    }
+
+    fn check_unwrap_or_methods(&mut self, method_call: &ExprMethodCall) {
+        let ident = &method_call.method;
+        let method_name = ident.to_string();
+        if method_name == "unwrap_or" {
+            self.add_pattern(ErrorSwallowingPattern::UnwrapOrNoLog);
+        } else if method_name == "unwrap_or_default" {
+            self.add_pattern(ErrorSwallowingPattern::UnwrapOrDefaultNoLog);
+        }
+    }
+
+    fn check_match_expr(&mut self, expr_match: &ExprMatch) {
+        for arm in &expr_match.arms {
+            if let Pat::TupleStruct(pat_tuple) = &arm.pat {
+                if let Some(path) = pat_tuple.path.get_ident() {
+                    if path == "Err" && is_empty_expr(&arm.body) {
+                        self.add_pattern(ErrorSwallowingPattern::MatchIgnoredErr);
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Visit<'_> for FunctionErrorSwallowingDetector {
+    fn visit_expr_if(&mut self, node: &ExprIf) {
+        self.check_if_let_ok(node);
+        syn::visit::visit_expr_if(self, node);
+    }
+
+    fn visit_stmt(&mut self, node: &Stmt) {
+        self.check_let_underscore(node);
+        syn::visit::visit_stmt(self, node);
+    }
+
+    fn visit_expr_method_call(&mut self, node: &ExprMethodCall) {
+        self.check_ok_method(node);
+        self.check_unwrap_or_methods(node);
+        syn::visit::visit_expr_method_call(self, node);
+    }
+
+    fn visit_expr_match(&mut self, node: &ExprMatch) {
+        self.check_match_expr(node);
+        syn::visit::visit_expr_match(self, node);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use syn::{parse_quote, parse_str, Pat};
+
+    #[test]
+    fn test_detect_error_swallowing_in_function() {
+        let block: syn::Block = parse_quote! {{
+            if let Ok(value) = some_function() {
+                println!("{}", value);
+            }
+            let _ = another_result();
+        }};
+
+        let (count, patterns) = detect_error_swallowing_in_function(&block);
+
+        assert_eq!(count, 2, "Should detect 2 error swallowing patterns");
+        assert!(
+            patterns.iter().any(|p| p.contains("if let Ok")),
+            "Should detect if let Ok pattern"
+        );
+        assert!(
+            patterns.iter().any(|p| p.contains("let _")),
+            "Should detect let _ pattern"
+        );
+    }
+
+    #[test]
+    fn test_detect_error_swallowing_in_function_no_issues() {
+        let block: syn::Block = parse_quote! {{
+            let value = some_function()?;
+            println!("{}", value);
+        }};
+
+        let (count, patterns) = detect_error_swallowing_in_function(&block);
+
+        assert_eq!(count, 0, "Should detect 0 error swallowing patterns");
+        assert!(patterns.is_empty(), "Should have no patterns");
+    }
+
+    #[test]
+    fn test_detect_error_swallowing_in_function_multiple_same_type() {
+        let block: syn::Block = parse_quote! {{
+            if let Ok(a) = func_a() { use_a(a); }
+            if let Ok(b) = func_b() { use_b(b); }
+            if let Ok(c) = func_c() { use_c(c); }
+        }};
+
+        let (count, patterns) = detect_error_swallowing_in_function(&block);
+
+        assert_eq!(count, 3, "Should count all 3 occurrences");
+        assert_eq!(patterns.len(), 1, "Should have only 1 unique pattern type");
+    }
 
     #[test]
     fn test_if_let_ok_no_else() {

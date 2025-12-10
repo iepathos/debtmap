@@ -27,6 +27,7 @@ pub struct ScalingConfig {
     pub high_dependency_boost: f64,  // total deps > 15
     pub entry_point_boost: f64,      // entry points
     pub complex_untested_boost: f64, // complexity > 20 + untested
+    pub error_swallowing_boost: f64, // functions with error swallowing patterns
 }
 
 impl Default for ScalingConfig {
@@ -39,6 +40,7 @@ impl Default for ScalingConfig {
             high_dependency_boost: 1.2,
             entry_point_boost: 1.15,
             complex_untested_boost: 1.25,
+            error_swallowing_boost: 1.15, // 15% boost for error swallowing patterns
         }
     }
 }
@@ -106,6 +108,11 @@ fn apply_risk_boosts(score: f64, item: &UnifiedDebtItem, config: &ScalingConfig)
         boost *= config.complex_untested_boost;
     }
 
+    // Error swallowing indicates poor error handling practices
+    if item.error_swallowing_count.unwrap_or(0) > 0 {
+        boost *= config.error_swallowing_boost;
+    }
+
     score * boost
 }
 
@@ -167,6 +174,9 @@ pub fn calculate_final_score(
     }
     if is_untested(item) && item.cyclomatic_complexity > 20 {
         boost *= config.complex_untested_boost;
+    }
+    if item.error_swallowing_count.unwrap_or(0) > 0 {
+        boost *= config.error_swallowing_boost;
     }
 
     // Step 3: Apply risk boosts
@@ -261,6 +271,8 @@ mod tests {
             contextual_risk: None, // spec 203
             file_line_count: None,
             responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 
@@ -447,6 +459,62 @@ mod tests {
             scaled >= 1.0,
             "Scaled score should be at least 1.0, got {}",
             scaled
+        );
+    }
+
+    #[test]
+    fn test_error_swallowing_boost() {
+        let config = ScalingConfig::default();
+
+        // Create item without error swallowing
+        let item_no_swallowing = create_test_item(
+            10.0,
+            DebtType::TestingGap {
+                coverage: 0.5,
+                cyclomatic: 10,
+                cognitive: 12,
+            },
+            5,
+            5,
+            FunctionRole::PureLogic,
+            10,
+        );
+
+        // Create item with error swallowing
+        let mut item_with_swallowing = create_test_item(
+            10.0,
+            DebtType::TestingGap {
+                coverage: 0.5,
+                cyclomatic: 10,
+                cognitive: 12,
+            },
+            5,
+            5,
+            FunctionRole::PureLogic,
+            10,
+        );
+        item_with_swallowing.error_swallowing_count = Some(3);
+        item_with_swallowing.error_swallowing_patterns =
+            Some(vec!["if_let_ok_without_else".to_string()]);
+
+        let boosted_no_swallowing = apply_risk_boosts(10.0, &item_no_swallowing, &config);
+        let boosted_with_swallowing = apply_risk_boosts(10.0, &item_with_swallowing, &config);
+
+        // Item with error swallowing should have higher score
+        assert!(
+            boosted_with_swallowing > boosted_no_swallowing,
+            "Error swallowing should boost score. Without: {}, With: {}",
+            boosted_no_swallowing,
+            boosted_with_swallowing
+        );
+
+        // Should apply 1.15 boost
+        let expected_boost = 10.0 * config.error_swallowing_boost;
+        assert!(
+            (boosted_with_swallowing - expected_boost).abs() < 0.1,
+            "Expected ~{}, got {}",
+            expected_boost,
+            boosted_with_swallowing
         );
     }
 

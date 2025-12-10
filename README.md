@@ -9,13 +9,11 @@
 [![License](https://img.shields.io/badge/license-MIT)](LICENSE)
 [![Downloads](https://img.shields.io/crates/d/debtmap)](https://crates.io/crates/debtmap)
 
-**Stop wasting time on meaningless complexity metrics.** Debtmap identifies actual bug hotspots using multi-signal risk analysis: cognitive complexity with pattern recognition, test coverage gaps, git change frequency, bug frequency in related git commits, and entropy-based false positive reduction. Answers "what should I refactor first?" with data-driven prioritization. Fewer false positives than traditional static analysis tools with actionable recommendations to fix the issues.
+Debtmap identifies risk hotspots using multi-signal risk analysis: cognitive complexity with pattern recognition, test coverage gaps, git change frequency, bug frequency in related git commits, and entropy-based false positive reduction.
 
 📚 **[Read the full documentation](https://iepathos.github.io/debtmap/)** for detailed guides, examples, and API reference.
 
 ## Why Debtmap?
-
-Traditional code quality tools only measure static complexity—flagging everything with high cyclomatic complexity as "technical debt," including simple repetitive patterns that are easy to maintain. This creates overwhelming noise that obscures genuine problems.
 
 **Debtmap uses multi-signal analysis to identify *actual* risk:**
 

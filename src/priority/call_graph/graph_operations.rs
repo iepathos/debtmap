@@ -375,45 +375,79 @@ impl CallGraph {
     }
 
     /// Check if a function is recursive (calls itself directly or through a cycle)
+    ///
+    /// Uses iterative DFS with explicit stack to avoid stack overflow on large graphs.
     pub fn is_recursive(&self, func_id: &FunctionId) -> bool {
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
-        self.has_cycle_dfs(func_id, &mut visited, &mut rec_stack)
+        self.has_cycle_dfs_iterative(func_id, &mut visited, &mut rec_stack)
     }
 
-    /// DFS helper to detect cycles
-    fn has_cycle_dfs(
+    /// Iterative DFS helper to detect cycles.
+    ///
+    /// Uses a two-phase approach with explicit stack:
+    /// - Enter phase: Mark node as visited, add to recursion stack, schedule children
+    /// - Exit phase: Remove node from recursion stack after all children processed
+    ///
+    /// This avoids stack overflow that can occur with recursive DFS on large graphs.
+    fn has_cycle_dfs_iterative(
         &self,
-        func_id: &FunctionId,
+        start: &FunctionId,
         visited: &mut HashSet<FunctionId>,
         rec_stack: &mut HashSet<FunctionId>,
     ) -> bool {
-        if !visited.contains(func_id) {
-            visited.insert(func_id.clone());
-            rec_stack.insert(func_id.clone());
+        /// Stack entry state for cycle detection DFS
+        enum CycleState {
+            Enter(FunctionId),
+            Exit(FunctionId),
+        }
 
-            for callee in self.get_callees(func_id) {
-                if rec_stack.contains(&callee) {
-                    return true;
+        let mut stack = Vec::with_capacity(self.nodes.len().min(1024));
+        stack.push(CycleState::Enter(start.clone()));
+
+        while let Some(state) = stack.pop() {
+            match state {
+                CycleState::Enter(node) => {
+                    if visited.contains(&node) {
+                        continue;
+                    }
+
+                    visited.insert(node.clone());
+                    rec_stack.insert(node.clone());
+
+                    // Schedule exit (remove from rec_stack) after processing children
+                    stack.push(CycleState::Exit(node.clone()));
+
+                    // Process callees - check for cycles and schedule unvisited
+                    for callee in self.get_callees(&node) {
+                        if rec_stack.contains(&callee) {
+                            return true; // Cycle found
+                        }
+                        if !visited.contains(&callee) {
+                            stack.push(CycleState::Enter(callee));
+                        }
+                    }
                 }
-                if !visited.contains(&callee) && self.has_cycle_dfs(&callee, visited, rec_stack) {
-                    return true;
+                CycleState::Exit(node) => {
+                    rec_stack.remove(&node);
                 }
             }
         }
-        rec_stack.remove(func_id);
+
         false
     }
 
     /// Topological sort of functions for bottom-up analysis
     /// Returns functions in dependency order (leaves first, roots last)
+    ///
+    /// Uses iterative DFS with explicit stack to avoid stack overflow on large graphs.
     pub fn topological_sort(&self) -> Result<Vec<FunctionId>, String> {
         let mut visited = HashSet::new();
         let mut result = Vector::new();
 
         for func_id in self.nodes.keys() {
             if !visited.contains(func_id) {
-                self.topo_sort_dfs(func_id, &mut visited, &mut result)?;
+                self.topo_sort_dfs_iterative(func_id, &mut visited, &mut result);
             }
         }
 
@@ -421,23 +455,52 @@ impl CallGraph {
         Ok(result.iter().cloned().collect())
     }
 
-    /// DFS helper for topological sort
-    fn topo_sort_dfs(
+    /// Iterative DFS helper for topological sort.
+    ///
+    /// Uses a two-phase approach with explicit stack:
+    /// - Visit phase: Mark node as visited, schedule children
+    /// - Finish phase: Add node to result after all children processed
+    ///
+    /// This avoids stack overflow that can occur with recursive DFS on large graphs.
+    fn topo_sort_dfs_iterative(
         &self,
-        func_id: &FunctionId,
+        start: &FunctionId,
         visited: &mut HashSet<FunctionId>,
         result: &mut Vector<FunctionId>,
-    ) -> Result<(), String> {
-        visited.insert(func_id.clone());
-
-        for callee in self.get_callees(func_id) {
-            if !visited.contains(&callee) {
-                self.topo_sort_dfs(&callee, visited, result)?;
-            }
+    ) {
+        /// Stack entry state for topological sort DFS
+        enum TopoState {
+            Visit(FunctionId),
+            Finish(FunctionId),
         }
 
-        result.push_back(func_id.clone());
-        Ok(())
+        let mut stack = Vec::with_capacity(self.nodes.len().min(1024));
+        stack.push(TopoState::Visit(start.clone()));
+
+        while let Some(state) = stack.pop() {
+            match state {
+                TopoState::Visit(node) => {
+                    if visited.contains(&node) {
+                        continue;
+                    }
+
+                    visited.insert(node.clone());
+
+                    // Schedule finish (add to result) after processing children
+                    stack.push(TopoState::Finish(node.clone()));
+
+                    // Add unvisited children
+                    for callee in self.get_callees(&node) {
+                        if !visited.contains(&callee) {
+                            stack.push(TopoState::Visit(callee));
+                        }
+                    }
+                }
+                TopoState::Finish(node) => {
+                    result.push_back(node);
+                }
+            }
+        }
     }
 }
 

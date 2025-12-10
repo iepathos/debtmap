@@ -19,7 +19,7 @@ use crate::core::{
 use crate::debt::async_errors::detect_async_errors;
 use crate::debt::error_context::analyze_error_context;
 use crate::debt::error_propagation::analyze_error_propagation;
-use crate::debt::error_swallowing::detect_error_swallowing;
+use crate::debt::error_swallowing::{detect_error_swallowing, detect_error_swallowing_in_function};
 use crate::debt::panic_patterns::detect_panic_patterns;
 use crate::debt::patterns::{
     find_code_smells_with_suppression, find_todos_and_fixmes_with_suppression,
@@ -774,6 +774,9 @@ impl FunctionVisitor {
             }
         };
 
+        // Detect error swallowing patterns per-function
+        let (error_count, error_patterns) = detect_error_swallowing_in_function(block);
+
         FunctionMetrics {
             name: context.name,
             file: context.file,
@@ -807,6 +810,16 @@ impl FunctionVisitor {
             composition_metrics,
             language_specific,
             purity_level: metadata.purity_info.2,
+            error_swallowing_count: if error_count > 0 {
+                Some(error_count)
+            } else {
+                None
+            },
+            error_swallowing_patterns: if error_patterns.is_empty() {
+                None
+            } else {
+                Some(error_patterns)
+            },
         }
     }
 
@@ -1175,6 +1188,8 @@ impl FunctionVisitor {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }
     }
 
@@ -1625,6 +1640,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1651,6 +1668,8 @@ mod tests {
                 composition_metrics: None,
                 language_specific: None,
                 purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
             },
         ];
 
@@ -1695,6 +1714,8 @@ mod tests {
             composition_metrics: None,
             language_specific: None,
             purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
         }];
         let debt_items = vec![];
         let dependencies = vec![Dependency {
