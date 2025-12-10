@@ -939,6 +939,7 @@ impl ParallelUnifiedAnalysisBuilder {
                     analyzed
                 } else if actual_line_count > 2000 || file_metrics.function_count > 50 {
                     // Heuristic threshold met - create god object even if analysis said no
+                    // But preserve responsibilities from analysis if available
 
                     // Calculate god object score (0-100 scale)
                     // Base score on number of methods and LOC
@@ -947,18 +948,66 @@ impl ParallelUnifiedAnalysisBuilder {
                     let loc_score = ((actual_line_count as f64 / 2000.0) * 50.0).min(50.0);
                     let god_score = method_score + loc_score;
 
+                    // Use responsibilities from analysis if available, otherwise estimate
+                    let (responsibilities, responsibility_method_counts) =
+                        if let Some(ref analysis) = analyzed {
+                            if !analysis.responsibilities.is_empty() {
+                                // Use real responsibilities from analysis
+                                (
+                                    analysis.responsibilities.clone(),
+                                    analysis.responsibility_method_counts.clone(),
+                                )
+                            } else {
+                                // Analysis exists but no responsibilities - estimate
+                                let estimated_resp_count =
+                                    (file_metrics.function_count / 10).max(1).min(10);
+                                let resps: Vec<String> = (1..=estimated_resp_count)
+                                    .map(|i| format!("responsibility_{}", i))
+                                    .collect();
+                                let counts: std::collections::HashMap<String, usize> = resps
+                                    .iter()
+                                    .map(|r| {
+                                        (
+                                            r.clone(),
+                                            file_metrics.function_count / estimated_resp_count,
+                                        )
+                                    })
+                                    .collect();
+                                (resps, counts)
+                            }
+                        } else {
+                            // No analysis at all - estimate
+                            let estimated_resp_count =
+                                (file_metrics.function_count / 10).max(1).min(10);
+                            let resps: Vec<String> = (1..=estimated_resp_count)
+                                .map(|i| format!("responsibility_{}", i))
+                                .collect();
+                            let counts: std::collections::HashMap<String, usize> = resps
+                                .iter()
+                                .map(|r| {
+                                    (
+                                        r.clone(),
+                                        file_metrics.function_count / estimated_resp_count,
+                                    )
+                                })
+                                .collect();
+                            (resps, counts)
+                        };
+
+                    let responsibility_count = responsibilities.len();
+
                     Some(crate::organization::GodObjectAnalysis {
                         is_god_object: true,
                         method_count: file_metrics.function_count,
                         field_count: 0,
-                        responsibility_count: 5,
+                        responsibility_count,
                         lines_of_code: actual_line_count,
                         complexity_sum: file_metrics.total_complexity,
                         god_object_score: Score0To100::new(god_score),
                         recommended_splits: Vec::new(),
                         confidence: crate::organization::GodObjectConfidence::Probable,
-                        responsibilities: Vec::new(),
-                        responsibility_method_counts: std::collections::HashMap::new(),
+                        responsibilities,
+                        responsibility_method_counts,
                         purity_distribution: None,
                         module_structure: None,
                         detection_type: crate::organization::DetectionType::GodFile,
@@ -1092,29 +1141,26 @@ impl ParallelUnifiedAnalysisBuilder {
                 if god_analysis.is_god_object {
                     // Aggregate from raw metrics first for complexity (includes ALL functions, even tests)
                     use crate::priority::god_object_aggregation::{
-                        aggregate_from_raw_metrics, aggregate_god_object_metrics,
-                        extract_member_functions,
+                        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
+                        aggregate_god_object_metrics, extract_member_functions,
                     };
 
                     let mut aggregated_metrics = aggregate_from_raw_metrics(&raw_functions);
 
-                    // Enrich with coverage/dependencies/risk from unified items
-                    // NOTE: Dependencies aggregate only from "problematic" functions that became debt items.
-                    // This provides a debt-focused view rather than complete architectural dependencies.
+                    // Aggregate coverage from ALL raw functions (not just debt items)
+                    // This ensures god objects show accurate coverage even when member
+                    // functions are filtered out by complexity thresholds.
+                    if let Some(lcov) = coverage_data {
+                        aggregated_metrics.weighted_coverage =
+                            aggregate_coverage_from_raw_metrics(&raw_functions, lcov);
+                    }
+
+                    // Enrich with contextual risk
+                    // NOTE: Dependencies are already aggregated from raw metrics (complete architectural view).
                     let member_functions =
                         extract_member_functions(unified.items.iter(), &file_item.metrics.path);
                     if !member_functions.is_empty() {
                         let item_metrics = aggregate_god_object_metrics(&member_functions);
-                        // Merge all contextual data from debt items
-                        aggregated_metrics.weighted_coverage = item_metrics.weighted_coverage;
-                        aggregated_metrics.unique_upstream_callers =
-                            item_metrics.unique_upstream_callers;
-                        aggregated_metrics.unique_downstream_callees =
-                            item_metrics.unique_downstream_callees;
-                        aggregated_metrics.upstream_dependencies =
-                            item_metrics.upstream_dependencies;
-                        aggregated_metrics.downstream_dependencies =
-                            item_metrics.downstream_dependencies;
 
                         // Spec 248: Prefer direct file-level git analysis over member aggregation
                         aggregated_metrics.aggregated_contextual_risk = self
@@ -1139,7 +1185,7 @@ impl ParallelUnifiedAnalysisBuilder {
                                 )
                             });
                     }
-                    // If member_functions is empty, dependencies remain at 0 (no debt items = no deps to show)
+                    // Dependencies are already populated from raw metrics (complete architectural view)
 
                     // Create god object UnifiedDebtItem using same function as sequential path
                     let god_item = crate::builders::unified_analysis::create_god_object_debt_item(

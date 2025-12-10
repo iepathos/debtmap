@@ -35,14 +35,6 @@ pub fn render(frame: &mut Frame, item: &UnifiedDebtItem, area: Rect, theme: &The
         }
     }
 
-    // If no responsibility data available
-    if lines.is_empty() {
-        lines.push(Line::from(vec![Span::styled(
-            "No responsibility data available",
-            Style::default().fg(theme.muted),
-        )]));
-    }
-
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
         .wrap(Wrap { trim: false });
@@ -63,7 +55,9 @@ fn render_god_object_responsibilities(
         return false;
     };
 
-    if !indicators.is_god_object || indicators.responsibilities.is_empty() {
+    // Show responsibilities even if score is below threshold (is_god_object = false)
+    // The data is still useful for understanding file structure
+    if indicators.responsibilities.is_empty() {
         return false;
     }
 
@@ -90,16 +84,19 @@ fn render_god_object_responsibilities(
 }
 
 /// Render single responsibility category for non-god-object functions.
+/// Always shows something - falls back to "unclassified" if no category detected.
 fn render_single_responsibility(
     lines: &mut Vec<Line<'static>>,
     item: &UnifiedDebtItem,
     theme: &Theme,
     width: u16,
 ) {
-    if let Some(ref category) = item.responsibility_category {
-        add_section_header(lines, "responsibility", theme);
-        add_label_value(lines, "category", category.to_lowercase(), theme, width);
-    }
+    add_section_header(lines, "responsibility", theme);
+    let category = item
+        .responsibility_category
+        .as_deref()
+        .unwrap_or("unclassified");
+    add_label_value(lines, "category", category.to_lowercase(), theme, width);
 }
 
 /// Render explanatory note for god objects.

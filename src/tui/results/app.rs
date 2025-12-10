@@ -439,23 +439,9 @@ impl ResultsApp {
             .unwrap_or(false)
     }
 
-    /// Check if responsibilities data is available for current item
-    fn has_responsibilities_data(&self) -> bool {
-        self.selected_item()
-            .map(|item| {
-                // Has god object responsibilities
-                item.god_object_indicators
-                    .as_ref()
-                    .map(|ind| ind.is_god_object && !ind.responsibilities.is_empty())
-                    .unwrap_or(false)
-                    // Or has single responsibility category
-                    || item.responsibility_category.is_some()
-            })
-            .unwrap_or(false)
-    }
-
     /// Get available pages for current item (skip pages with no data)
     pub fn available_pages(&self) -> Vec<DetailPage> {
+        // Responsibilities page is always shown (with "unclassified" fallback)
         let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
 
         if self.has_git_context() {
@@ -470,9 +456,8 @@ impl ResultsApp {
             pages.push(DetailPage::DataFlow);
         }
 
-        if self.has_responsibilities_data() {
-            pages.push(DetailPage::Responsibilities);
-        }
+        // Always include Responsibilities page
+        pages.push(DetailPage::Responsibilities);
 
         pages
     }
