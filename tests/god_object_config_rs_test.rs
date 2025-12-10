@@ -241,12 +241,12 @@ fn test_struct_ownership_analysis_quality() {
     let mut all_structs = std::collections::HashSet::new();
     if let Some(analysis) = analyses.first() {
         for split in &analysis.recommended_splits {
-        for struct_name in &split.structs_to_move {
-            assert!(
-                !all_structs.contains(struct_name),
-                "Struct '{}' appears in multiple module splits",
-                struct_name
-            );
+            for struct_name in &split.structs_to_move {
+                assert!(
+                    !all_structs.contains(struct_name),
+                    "Struct '{}' appears in multiple module splits",
+                    struct_name
+                );
                 all_structs.insert(struct_name.clone());
             }
         }
@@ -281,26 +281,26 @@ fn test_module_size_warnings() {
     // Check if any modules have warnings for borderline sizes
     if let Some(analysis) = analyses.first() {
         for split in &analysis.recommended_splits {
-        if let Some(warning) = &split.warning {
-            // Warning should be meaningful
-            assert!(
-                !warning.is_empty(),
-                "Warning should not be empty for module '{}'",
-                split.suggested_name
-            );
-
-            // If warned about size, the module should be relatively large
-            if warning.to_lowercase().contains("size")
-                || warning.to_lowercase().contains("borderline")
-            {
+            if let Some(warning) = &split.warning {
+                // Warning should be meaningful
                 assert!(
-                    split.method_count >= 15,
-                    "Size warning for '{}' but only has {} methods",
-                    split.suggested_name,
-                    split.method_count
+                    !warning.is_empty(),
+                    "Warning should not be empty for module '{}'",
+                    split.suggested_name
                 );
+
+                // If warned about size, the module should be relatively large
+                if warning.to_lowercase().contains("size")
+                    || warning.to_lowercase().contains("borderline")
+                {
+                    assert!(
+                        split.method_count >= 15,
+                        "Size warning for '{}' but only has {} methods",
+                        split.suggested_name,
+                        split.method_count
+                    );
+                }
             }
-        }
         }
     }
 }

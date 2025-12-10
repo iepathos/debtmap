@@ -317,7 +317,9 @@ fn test_provides_specific_method_extraction_recommendations() {
     // Verify we got module split recommendations
     // (per-struct analysis may not detect simple fixtures with low complexity methods)
     if analyses.is_empty() {
-        eprintln!("Note: Fixture not detected as god object with per-struct analysis. Skipping test.");
+        eprintln!(
+            "Note: Fixture not detected as god object with per-struct analysis. Skipping test."
+        );
         return;
     }
     let analysis = &analyses[0];
@@ -530,7 +532,9 @@ fn test_complete_zed_editor_analysis() {
     // Verify god object is detected (this fixture is intentionally a god object)
     // (per-struct analysis may not detect simple fixtures with low complexity methods)
     if analyses.is_empty() {
-        eprintln!("Note: Fixture not detected as god object with per-struct analysis. Skipping test.");
+        eprintln!(
+            "Note: Fixture not detected as god object with per-struct analysis. Skipping test."
+        );
         return;
     }
     let analysis = &analyses[0];
