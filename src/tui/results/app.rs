@@ -657,28 +657,28 @@ impl ResultsApp {
         self.status_message = None;
     }
 
-    /// Get DSM horizontal scroll offset (Spec 205)
+    /// Get DSM horizontal scroll offset
     pub fn dsm_scroll_x(&self) -> usize {
         self.dsm_scroll_x
     }
 
-    /// Set DSM horizontal scroll offset (Spec 205)
+    /// Set DSM horizontal scroll offset
     pub fn set_dsm_scroll_x(&mut self, offset: usize) {
         self.dsm_scroll_x = offset;
     }
 
-    /// Get DSM vertical scroll offset (Spec 205)
+    /// Get DSM vertical scroll offset
     pub fn dsm_scroll_y(&self) -> usize {
         self.dsm_scroll_y
     }
 
-    /// Set DSM vertical scroll offset (Spec 205)
+    /// Set DSM vertical scroll offset
     pub fn set_dsm_scroll_y(&mut self, offset: usize) {
         self.dsm_scroll_y = offset;
     }
 
     // ========================================================================
-    // Navigation State Machine (Spec 203)
+    // Navigation State Machine
     // ========================================================================
 
     /// Get navigation history for back navigation.
