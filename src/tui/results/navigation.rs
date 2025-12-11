@@ -200,7 +200,7 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         // Actions
         KeyCode::Char('c') => {
             if let Some(item) = app.selected_item() {
-                let message = super::actions::copy_page_to_clipboard(item, app.detail_page())?;
+                let message = super::actions::copy_page_to_clipboard(item, app.detail_page(), app)?;
                 app.set_status_message(message);
             }
         }

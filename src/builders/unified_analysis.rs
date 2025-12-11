@@ -1011,7 +1011,8 @@ fn create_unified_analysis_parallel(
     let _ = debt_items; // Silence unused warning
 
     // Phase 3: Parallel file analysis
-    let file_items = builder.execute_phase3_parallel(&enriched_metrics, coverage_data, no_god_object);
+    let file_items =
+        builder.execute_phase3_parallel(&enriched_metrics, coverage_data, no_god_object);
 
     // Build final unified analysis
     let (mut unified, timings) = builder.build(

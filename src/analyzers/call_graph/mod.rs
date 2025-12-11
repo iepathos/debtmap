@@ -951,7 +951,9 @@ mod tests {
 
         // Should call generate_suggestions (same file)
         assert!(
-            callees.iter().any(|c| c.name.contains("generate_suggestions")),
+            callees
+                .iter()
+                .any(|c| c.name.contains("generate_suggestions")),
             "diagnose_coverage_file should call generate_suggestions. Found callees: {:?}",
             callees.iter().map(|c| &c.name).collect::<Vec<_>>()
         );
@@ -971,7 +973,9 @@ mod tests {
         );
 
         assert!(
-            callers.iter().any(|c| c.name.contains("diagnose_coverage_file")),
+            callers
+                .iter()
+                .any(|c| c.name.contains("diagnose_coverage_file")),
             "parse_lcov_file should be called by diagnose_coverage_file. Found callers: {:?}",
             callers.iter().map(|c| &c.name).collect::<Vec<_>>()
         );
@@ -979,7 +983,9 @@ mod tests {
         // TEST 3: generate_suggestions should have upstream callers
         let callers = graph.get_callers(suggestions_fn);
         assert!(
-            callers.iter().any(|c| c.name.contains("diagnose_coverage_file")),
+            callers
+                .iter()
+                .any(|c| c.name.contains("diagnose_coverage_file")),
             "generate_suggestions should be called by diagnose_coverage_file. Found callers: {:?}",
             callers.iter().map(|c| &c.name).collect::<Vec<_>>()
         );

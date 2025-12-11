@@ -227,7 +227,11 @@ mod tests {
                 "src/commands/diagnose_coverage.rs",
                 6,
             ),
-            create_test_function_metric("generate_suggestions", "src/commands/diagnose_coverage.rs", 12),
+            create_test_function_metric(
+                "generate_suggestions",
+                "src/commands/diagnose_coverage.rs",
+                12,
+            ),
             create_test_function_metric("parse_lcov_file", "src/risk/lcov.rs", 8),
         ];
 
@@ -429,7 +433,12 @@ mod tests {
         // Debug: print call graph state
         eprintln!("\nCall graph functions (with their extracted line numbers):");
         for func in call_graph.get_all_functions() {
-            eprintln!("  {}:{} (line {})", func.file.display(), func.name, func.line);
+            eprintln!(
+                "  {}:{} (line {})",
+                func.file.display(),
+                func.name,
+                func.line
+            );
         }
 
         // Populate the metrics with call graph data

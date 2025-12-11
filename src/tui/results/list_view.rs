@@ -304,7 +304,9 @@ fn format_grouped_item(
     is_selected: bool,
     theme: &Theme,
 ) -> ListItem<'static> {
-    let severity_color = severity_color(&group.max_severity);
+    // Color based on combined score, not max individual severity
+    let severity = Severity::from_score_100(group.combined_score);
+    let severity_color = severity_to_color(severity);
     let indicator = if is_selected { "▸ " } else { "  " };
 
     let file_name = group
@@ -342,7 +344,7 @@ fn format_grouped_item(
         metric_parts.push(format!("LOC:{}", metrics.function_length));
     }
 
-    // Single line: indicator, rank, severity, score, location, badge, metrics
+    // Single line: indicator, rank, score (colored by severity), location, badge, metrics
     let line = Line::from(vec![
         Span::styled(indicator, Style::default().fg(theme.accent())),
         Span::styled(
@@ -350,12 +352,8 @@ fn format_grouped_item(
             Style::default().fg(theme.muted),
         ),
         Span::styled(
-            format!("{:<8}", group.max_severity),
-            Style::default().fg(severity_color),
-        ),
-        Span::styled(
             format!("{:<7.1}", group.combined_score),
-            Style::default().fg(theme.primary),
+            Style::default().fg(severity_color),
         ),
         Span::raw("  "),
         Span::styled(
@@ -429,10 +427,8 @@ fn format_list_item(
     is_selected: bool,
     theme: &Theme,
 ) -> ListItem<'static> {
-    let severity = Severity::from_score_100(item.unified_score.final_score.value())
-        .as_str()
-        .to_lowercase();
-    let severity_color = severity_color(&severity);
+    let severity = Severity::from_score_100(item.unified_score.final_score.value());
+    let severity_color = severity_to_color(severity);
 
     let indicator = if is_selected { "▸ " } else { "  " };
 
@@ -503,12 +499,8 @@ fn format_list_item(
             Style::default().fg(theme.muted),
         ),
         Span::styled(
-            format!("{:<8}", severity),
-            Style::default().fg(severity_color),
-        ),
-        Span::styled(
             format!("{:<7.1}", item.unified_score.final_score.value()),
-            Style::default().fg(theme.primary),
+            Style::default().fg(severity_color),
         ),
         Span::raw("  "),
         Span::styled(location_str, Style::default().fg(theme.secondary())),
@@ -562,14 +554,13 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     frame.render_widget(footer, footer_area);
 }
 
-/// Get color for severity level
-fn severity_color(severity: &str) -> Color {
+/// Get color for severity level from Severity enum
+fn severity_to_color(severity: Severity) -> Color {
     match severity {
-        "critical" => Color::Red,
-        "high" => Color::LightRed,
-        "medium" => Color::Yellow,
-        "low" => Color::Green,
-        _ => Color::White,
+        Severity::Critical => Color::Red,
+        Severity::High => Color::LightRed,
+        Severity::Medium => Color::Yellow,
+        Severity::Low => Color::Green,
     }
 }
 
