@@ -5,6 +5,7 @@ pub mod pattern_output;
 pub mod progress;
 pub mod real;
 pub mod traits;
+pub mod view_formatters;
 pub mod walker;
 pub mod writers;
 

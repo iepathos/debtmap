@@ -10,6 +10,10 @@ pub mod terminal;
 pub mod unified;
 
 use crate::io::output::OutputWriter;
+use crate::io::view_formatters;
+use crate::priority::tiers::TierConfig;
+use crate::priority::view::{PreparedDebtView, SortCriteria, ViewConfig};
+use crate::priority::view_pipeline;
 use crate::{core::AnalysisResults, formatting::FormattingConfig, io, priority, risk};
 use anyhow::Result;
 use std::path::PathBuf;
@@ -23,6 +27,122 @@ pub struct OutputConfig {
     pub output_format: Option<crate::cli::OutputFormat>,
     pub formatting_config: FormattingConfig,
     pub show_filter_stats: bool,
+}
+
+// ============================================================================
+// SPEC 252: UNIFIED VIEW OUTPUT (New API)
+// ============================================================================
+
+/// Output unified priorities using the new view pipeline (Spec 252).
+///
+/// This function prepares a view once and passes it to the appropriate formatter,
+/// ensuring consistent data across all output formats.
+///
+/// # Arguments
+///
+/// * `analysis` - The analysis results to output
+/// * `config` - Output configuration
+///
+/// # Returns
+///
+/// Result indicating success or failure.
+pub fn output_with_prepared_view(
+    analysis: &priority::UnifiedAnalysis,
+    config: &OutputConfig,
+) -> Result<()> {
+    // Build ViewConfig from OutputConfig
+    let view_config = build_view_config(config);
+    let tier_config = TierConfig::default();
+
+    // Single view preparation (the key to spec 252)
+    let view = view_pipeline::prepare_view(analysis, &view_config, &tier_config);
+
+    // Route to appropriate formatter based on output format
+    output_prepared_view(&view, config)
+}
+
+/// Outputs a prepared view using the specified format.
+///
+/// This is the core routing function that dispatches to format-specific handlers.
+fn output_prepared_view(view: &PreparedDebtView, config: &OutputConfig) -> Result<()> {
+    match &config.output_format {
+        Some(crate::cli::OutputFormat::Json) => {
+            let include_scoring_details = config.verbosity >= 2;
+            let json = view_formatters::format_json(view, include_scoring_details);
+            write_output(&json, &config.output_file)
+        }
+        Some(crate::cli::OutputFormat::Markdown) => {
+            let md_config = view_formatters::MarkdownConfig {
+                verbosity: config.verbosity,
+                show_filter_stats: config.show_filter_stats,
+            };
+            let markdown = view_formatters::format_markdown(view, &md_config);
+            write_output(&markdown, &config.output_file)
+        }
+        _ => {
+            // Terminal output (default)
+            if is_markdown_file(&config.output_file) {
+                let md_config = view_formatters::MarkdownConfig {
+                    verbosity: config.verbosity,
+                    show_filter_stats: config.show_filter_stats,
+                };
+                let markdown = view_formatters::format_markdown(view, &md_config);
+                write_output(&markdown, &config.output_file)
+            } else {
+                let term_config = view_formatters::TerminalConfig {
+                    verbosity: config.verbosity,
+                    use_color: config.formatting_config.color.should_use_color(),
+                    summary_mode: config.summary,
+                };
+                let terminal = view_formatters::format_terminal(view, &term_config);
+                write_output(&terminal, &config.output_file)
+            }
+        }
+    }
+}
+
+/// Builds ViewConfig from OutputConfig.
+fn build_view_config(config: &OutputConfig) -> ViewConfig {
+    // Calculate the limit from top/tail
+    let limit = match (config.top, config.tail) {
+        (Some(n), _) => Some(n),
+        (_, Some(n)) => Some(n),
+        _ => None,
+    };
+
+    // Get threshold from environment or default
+    let min_score_threshold = std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD")
+        .ok()
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(3.0);
+
+    ViewConfig {
+        min_score_threshold,
+        exclude_t4_maintenance: true, // Default for terminal output
+        limit,
+        sort_by: SortCriteria::Score, // Default sort
+        compute_groups: false,        // No grouping for non-TUI output
+    }
+}
+
+/// Writes output to file or stdout.
+fn write_output(content: &str, output_file: &Option<PathBuf>) -> Result<()> {
+    use crate::progress::ProgressManager;
+
+    // Clear progress bars before output
+    if let Some(pm) = ProgressManager::global() {
+        let _ = pm.clear();
+    }
+
+    if let Some(path) = output_file {
+        if let Some(parent) = path.parent() {
+            io::ensure_dir(parent)?;
+        }
+        std::fs::write(path, content)?;
+    } else {
+        println!("{content}");
+    }
+    Ok(())
 }
 
 pub use dot::*;

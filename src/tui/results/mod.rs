@@ -8,8 +8,14 @@
 //! ```rust,ignore
 //! use debtmap::tui::results::ResultsExplorer;
 //!
+//! // Option 1: Create from UnifiedAnalysis (existing API)
 //! let analysis = perform_analysis()?;
 //! let mut explorer = ResultsExplorer::new(analysis)?;
+//! explorer.run()?;
+//!
+//! // Option 2: Create from PreparedDebtView (spec 252 - unified pipeline)
+//! let view = prepare_view_for_tui(&analysis);
+//! let mut explorer = ResultsExplorer::from_prepared_view(view, &analysis)?;
 //! explorer.run()?;
 //! ```
 
@@ -36,6 +42,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
+use crate::priority::view::PreparedDebtView;
 use crate::priority::UnifiedAnalysis;
 use app::ResultsApp;
 
@@ -46,7 +53,9 @@ pub struct ResultsExplorer {
 }
 
 impl ResultsExplorer {
-    /// Create a new results explorer from analysis results
+    /// Create a new results explorer from analysis results.
+    ///
+    /// This is the original API that internally creates a view.
     pub fn new(analysis: UnifiedAnalysis) -> Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
@@ -56,6 +65,32 @@ impl ResultsExplorer {
         let terminal = Terminal::new(backend)?;
 
         let app = ResultsApp::new(analysis);
+
+        Ok(Self { terminal, app })
+    }
+
+    /// Create a new results explorer from a prepared view (Spec 252).
+    ///
+    /// This constructor accepts a `PreparedDebtView` that was prepared
+    /// by the view pipeline, ensuring consistent data across all outputs.
+    ///
+    /// The `analysis` parameter is still needed for:
+    /// - Call graph access (for dependency traversal in detail views)
+    /// - Data flow graph access (for purity analysis in detail views)
+    ///
+    /// # Arguments
+    ///
+    /// * `view` - The prepared view from `prepare_view_for_tui()`
+    /// * `analysis` - The original analysis (for call graph and data flow access)
+    pub fn from_prepared_view(view: PreparedDebtView, analysis: UnifiedAnalysis) -> Result<Self> {
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+        let backend = CrosstermBackend::new(stdout);
+        let terminal = Terminal::new(backend)?;
+
+        let app = ResultsApp::from_prepared_view(view, analysis);
 
         Ok(Self { terminal, app })
     }
