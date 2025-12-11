@@ -1,4 +1,5 @@
 use colored::Color;
+use serde::{Deserialize, Serialize};
 
 /// Severity classification for technical debt items.
 ///
@@ -17,7 +18,7 @@ use colored::Color;
 /// assert_eq!(sev, Severity::Critical);
 /// assert_eq!(sev.as_str(), "CRITICAL");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Severity {
     Low,
     Medium,
@@ -140,6 +141,41 @@ impl Severity {
             Self::Low => Color::Green,
         }
     }
+
+    /// Returns the numeric rank for this severity level.
+    ///
+    /// Higher values indicate higher priority. This is useful for
+    /// explicit numeric comparisons and sorting.
+    ///
+    /// # Returns
+    ///
+    /// - Critical: 4
+    /// - High: 3
+    /// - Medium: 2
+    /// - Low: 1
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use debtmap::priority::classification::Severity;
+    ///
+    /// assert_eq!(Severity::Critical.rank(), 4);
+    /// assert_eq!(Severity::High.rank(), 3);
+    /// assert_eq!(Severity::Medium.rank(), 2);
+    /// assert_eq!(Severity::Low.rank(), 1);
+    ///
+    /// // Can be used for comparisons
+    /// assert!(Severity::Critical.rank() > Severity::High.rank());
+    /// ```
+    #[inline]
+    pub const fn rank(self) -> u8 {
+        match self {
+            Self::Low => 1,
+            Self::Medium => 2,
+            Self::High => 3,
+            Self::Critical => 4,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -241,5 +277,26 @@ mod tests {
         assert_eq!(Severity::from_score_100(30.1), Severity::Medium);
         assert_eq!(Severity::from_score_100(13.2), Severity::Low);
         assert_eq!(Severity::from_score_100(7.35), Severity::Low);
+    }
+
+    #[test]
+    fn severity_rank_values() {
+        assert_eq!(Severity::Critical.rank(), 4);
+        assert_eq!(Severity::High.rank(), 3);
+        assert_eq!(Severity::Medium.rank(), 2);
+        assert_eq!(Severity::Low.rank(), 1);
+    }
+
+    #[test]
+    fn severity_rank_ordering_matches_enum_ordering() {
+        // Verify rank ordering is consistent with Ord implementation
+        assert!(Severity::Critical.rank() > Severity::High.rank());
+        assert!(Severity::High.rank() > Severity::Medium.rank());
+        assert!(Severity::Medium.rank() > Severity::Low.rank());
+
+        // And matches Ord
+        assert!(Severity::Critical > Severity::High);
+        assert!(Severity::High > Severity::Medium);
+        assert!(Severity::Medium > Severity::Low);
     }
 }
