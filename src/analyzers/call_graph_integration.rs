@@ -208,4 +208,265 @@ mod tests {
         let formatted = format_function_name(&func_id);
         assert_eq!(formatted, "test.py:my_function");
     }
+
+    /// Test cross-file call graph population.
+    ///
+    /// This reproduces the scenario where:
+    /// - diagnose_coverage.rs has function `diagnose_coverage_file` calling `parse_lcov_file`
+    /// - lcov.rs has function `parse_lcov_file`
+    ///
+    /// The call graph should properly populate upstream_callers and downstream_callees.
+    #[test]
+    fn test_populate_call_graph_data_cross_file() {
+        use crate::analyzers::rust_call_graph::extract_call_graph_multi_file;
+
+        // Create function metrics that match the call graph
+        let metrics = vec![
+            create_test_function_metric(
+                "diagnose_coverage_file",
+                "src/commands/diagnose_coverage.rs",
+                6,
+            ),
+            create_test_function_metric("generate_suggestions", "src/commands/diagnose_coverage.rs", 12),
+            create_test_function_metric("parse_lcov_file", "src/risk/lcov.rs", 8),
+        ];
+
+        // Build call graph from source code
+        let file1_code = r#"
+            use crate::risk::lcov::parse_lcov_file;
+            use anyhow::Result;
+            use std::path::Path;
+
+            pub fn diagnose_coverage_file(lcov_path: &Path, format: &str) -> Result<()> {
+                let lcov_data = parse_lcov_file(lcov_path)?;
+                let total_files = lcov_data.functions.len();
+                let suggestions = generate_suggestions(total_files);
+                Ok(())
+            }
+
+            fn generate_suggestions(total_files: usize) -> Vec<String> {
+                vec![]
+            }
+        "#;
+
+        let file2_code = r#"
+            use anyhow::Result;
+            use std::path::Path;
+
+            pub struct LcovData {
+                pub functions: std::collections::HashMap<String, Vec<()>>,
+            }
+
+            pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
+                Ok(LcovData {
+                    functions: std::collections::HashMap::new(),
+                })
+            }
+        "#;
+
+        let file1 = syn::parse_str::<syn::File>(file1_code).expect("Failed to parse file1");
+        let file2 = syn::parse_str::<syn::File>(file2_code).expect("Failed to parse file2");
+
+        let files = vec![
+            (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
+            (file2, PathBuf::from("src/risk/lcov.rs")),
+        ];
+
+        let call_graph = extract_call_graph_multi_file(&files);
+
+        // Debug: print call graph state
+        eprintln!("Call graph functions:");
+        for func in call_graph.get_all_functions() {
+            let callers_vec = call_graph.get_callers(&func);
+            let callers: Vec<_> = callers_vec.iter().map(|f| &f.name).collect();
+            let callees_vec = call_graph.get_callees(&func);
+            let callees: Vec<_> = callees_vec.iter().map(|f| &f.name).collect();
+            eprintln!(
+                "  {}:{} (line {}) - callers: {:?}, callees: {:?}",
+                func.file.display(),
+                func.name,
+                func.line,
+                callers,
+                callees
+            );
+        }
+
+        // Populate the metrics with call graph data
+        let result = populate_call_graph_data(metrics, &call_graph);
+
+        // Debug: print populated metrics
+        eprintln!("\nPopulated metrics:");
+        for metric in &result {
+            eprintln!(
+                "  {}:{} (line {}) - upstream: {:?}, downstream: {:?}",
+                metric.file.display(),
+                metric.name,
+                metric.line,
+                metric.upstream_callers,
+                metric.downstream_callees
+            );
+        }
+
+        // Find diagnose_coverage_file
+        let diagnose_metric = result
+            .iter()
+            .find(|m| m.name == "diagnose_coverage_file")
+            .expect("diagnose_coverage_file should exist");
+
+        // Should have downstream callees
+        assert!(
+            diagnose_metric.downstream_callees.is_some(),
+            "diagnose_coverage_file should have downstream_callees. Got: {:?}",
+            diagnose_metric.downstream_callees
+        );
+
+        let callees = diagnose_metric.downstream_callees.as_ref().unwrap();
+        eprintln!("diagnose_coverage_file callees: {:?}", callees);
+
+        // Should include parse_lcov_file
+        assert!(
+            callees.iter().any(|c| c.contains("parse_lcov_file")),
+            "diagnose_coverage_file should call parse_lcov_file. Found: {:?}",
+            callees
+        );
+
+        // Should include generate_suggestions
+        assert!(
+            callees.iter().any(|c| c.contains("generate_suggestions")),
+            "diagnose_coverage_file should call generate_suggestions. Found: {:?}",
+            callees
+        );
+
+        // Find parse_lcov_file
+        let parse_metric = result
+            .iter()
+            .find(|m| m.name == "parse_lcov_file")
+            .expect("parse_lcov_file should exist");
+
+        // Should have upstream callers
+        assert!(
+            parse_metric.upstream_callers.is_some(),
+            "parse_lcov_file should have upstream_callers. Got: {:?}",
+            parse_metric.upstream_callers
+        );
+
+        let callers = parse_metric.upstream_callers.as_ref().unwrap();
+        assert!(
+            callers.iter().any(|c| c.contains("diagnose_coverage_file")),
+            "parse_lcov_file should be called by diagnose_coverage_file. Found: {:?}",
+            callers
+        );
+    }
+
+    /// Test that call graph integration works even with mismatched line numbers.
+    ///
+    /// In the real world, FunctionMetrics may have different line numbers than what
+    /// the call graph extractor discovers (due to comments, attributes, etc.).
+    /// The fuzzy matching should still find the right functions.
+    #[test]
+    fn test_populate_call_graph_data_with_mismatched_lines() {
+        use crate::analyzers::rust_call_graph::extract_call_graph_multi_file;
+
+        // Function metrics with DIFFERENT line numbers than the call graph will have
+        // (simulating the real world where AST line != call graph line)
+        let metrics = vec![
+            create_test_function_metric(
+                "diagnose_coverage_file",
+                "src/commands/diagnose_coverage.rs",
+                63, // Real line in actual file
+            ),
+            create_test_function_metric(
+                "generate_suggestions",
+                "src/commands/diagnose_coverage.rs",
+                202, // Real line in actual file
+            ),
+            create_test_function_metric("parse_lcov_file", "src/risk/lcov.rs", 268),
+        ];
+
+        // Build call graph from source code - this will use line 6, 12, 8
+        let file1_code = r#"
+            use crate::risk::lcov::parse_lcov_file;
+            use anyhow::Result;
+            use std::path::Path;
+
+            pub fn diagnose_coverage_file(lcov_path: &Path, format: &str) -> Result<()> {
+                let lcov_data = parse_lcov_file(lcov_path)?;
+                let total_files = lcov_data.functions.len();
+                let suggestions = generate_suggestions(total_files);
+                Ok(())
+            }
+
+            fn generate_suggestions(total_files: usize) -> Vec<String> {
+                vec![]
+            }
+        "#;
+
+        let file2_code = r#"
+            use anyhow::Result;
+            use std::path::Path;
+
+            pub struct LcovData {
+                pub functions: std::collections::HashMap<String, Vec<()>>,
+            }
+
+            pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
+                Ok(LcovData {
+                    functions: std::collections::HashMap::new(),
+                })
+            }
+        "#;
+
+        let file1 = syn::parse_str::<syn::File>(file1_code).expect("Failed to parse file1");
+        let file2 = syn::parse_str::<syn::File>(file2_code).expect("Failed to parse file2");
+
+        let files = vec![
+            (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
+            (file2, PathBuf::from("src/risk/lcov.rs")),
+        ];
+
+        let call_graph = extract_call_graph_multi_file(&files);
+
+        // Debug: print call graph state
+        eprintln!("\nCall graph functions (with their extracted line numbers):");
+        for func in call_graph.get_all_functions() {
+            eprintln!("  {}:{} (line {})", func.file.display(), func.name, func.line);
+        }
+
+        // Populate the metrics with call graph data
+        let result = populate_call_graph_data(metrics, &call_graph);
+
+        // Debug: print populated metrics
+        eprintln!("\nPopulated metrics (with their DIFFERENT line numbers):");
+        for metric in &result {
+            eprintln!(
+                "  {}:{} (line {}) - upstream: {:?}, downstream: {:?}",
+                metric.file.display(),
+                metric.name,
+                metric.line,
+                metric.upstream_callers,
+                metric.downstream_callees
+            );
+        }
+
+        // Find diagnose_coverage_file
+        let diagnose_metric = result
+            .iter()
+            .find(|m| m.name == "diagnose_coverage_file")
+            .expect("diagnose_coverage_file should exist");
+
+        // This is the KEY assertion - even with mismatched line numbers,
+        // fuzzy matching should still work
+        assert!(
+            diagnose_metric.downstream_callees.is_some(),
+            "BUG: diagnose_coverage_file should have downstream_callees even with mismatched line numbers. Got: {:?}",
+            diagnose_metric.downstream_callees
+        );
+
+        let callees = diagnose_metric.downstream_callees.as_ref().unwrap();
+        assert!(
+            callees.iter().any(|c| c.contains("parse_lcov_file")),
+            "BUG: diagnose_coverage_file should call parse_lcov_file. Found: {:?}",
+            callees
+        );
+    }
 }

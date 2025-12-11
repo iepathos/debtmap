@@ -859,4 +859,204 @@ mod tests {
             "format_compact should be a caller"
         );
     }
+
+    /// Test cross-module function calls via `use` imports.
+    ///
+    /// This reproduces the issue where `diagnose_coverage_file` calls `parse_lcov_file`
+    /// from another module but the call graph shows 0 dependencies.
+    ///
+    /// Structure:
+    /// - File 1 (commands/diagnose.rs): has `use crate::risk::lcov::parse_lcov_file;`
+    ///   and calls `parse_lcov_file(path)?` and `generate_suggestions(...)`
+    /// - File 2 (risk/lcov.rs): defines `parse_lcov_file`
+    #[test]
+    fn test_cross_module_call_via_use_import() {
+        use crate::analyzers::rust_call_graph::extract_call_graph_multi_file;
+
+        // File 1: commands/diagnose_coverage.rs
+        let file1_code = r#"
+            use crate::risk::lcov::parse_lcov_file;
+            use anyhow::Result;
+            use std::path::Path;
+
+            pub fn diagnose_coverage_file(lcov_path: &Path, format: &str) -> Result<()> {
+                let lcov_data = parse_lcov_file(lcov_path)?;
+                let total_files = lcov_data.functions.len();
+                let suggestions = generate_suggestions(total_files);
+                Ok(())
+            }
+
+            fn generate_suggestions(total_files: usize) -> Vec<String> {
+                vec![]
+            }
+        "#;
+
+        // File 2: risk/lcov.rs
+        let file2_code = r#"
+            use anyhow::Result;
+            use std::path::Path;
+
+            pub struct LcovData {
+                pub functions: std::collections::HashMap<String, Vec<()>>,
+            }
+
+            pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
+                Ok(LcovData {
+                    functions: std::collections::HashMap::new(),
+                })
+            }
+        "#;
+
+        let file1 = parse_rust_code(file1_code);
+        let file2 = parse_rust_code(file2_code);
+
+        let files = vec![
+            (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
+            (file2, PathBuf::from("src/risk/lcov.rs")),
+        ];
+
+        let graph = extract_call_graph_multi_file(&files);
+
+        // Debug: print all functions found
+        let all_funcs: Vec<_> = graph
+            .get_all_functions()
+            .map(|f| format!("{}:{}", f.file.display(), f.name))
+            .collect();
+        eprintln!("All functions in graph: {:?}", all_funcs);
+
+        // Find diagnose_coverage_file
+        let diagnose_fn = graph
+            .get_all_functions()
+            .find(|f| f.name.contains("diagnose_coverage_file"))
+            .expect("diagnose_coverage_file should exist in call graph");
+
+        // Find parse_lcov_file
+        let parse_fn = graph
+            .get_all_functions()
+            .find(|f| f.name.contains("parse_lcov_file"))
+            .expect("parse_lcov_file should exist in call graph");
+
+        // Find generate_suggestions (same file call)
+        let suggestions_fn = graph
+            .get_all_functions()
+            .find(|f| f.name.contains("generate_suggestions"))
+            .expect("generate_suggestions should exist in call graph");
+
+        // TEST 1: diagnose_coverage_file should have downstream callees
+        let callees = graph.get_callees(diagnose_fn);
+        eprintln!(
+            "Callees of diagnose_coverage_file: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // Should call generate_suggestions (same file)
+        assert!(
+            callees.iter().any(|c| c.name.contains("generate_suggestions")),
+            "diagnose_coverage_file should call generate_suggestions. Found callees: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // Should call parse_lcov_file (cross-module via use import)
+        assert!(
+            callees.iter().any(|c| c.name.contains("parse_lcov_file")),
+            "diagnose_coverage_file should call parse_lcov_file (cross-module). Found callees: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // TEST 2: parse_lcov_file should have upstream callers
+        let callers = graph.get_callers(parse_fn);
+        eprintln!(
+            "Callers of parse_lcov_file: {:?}",
+            callers.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        assert!(
+            callers.iter().any(|c| c.name.contains("diagnose_coverage_file")),
+            "parse_lcov_file should be called by diagnose_coverage_file. Found callers: {:?}",
+            callers.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // TEST 3: generate_suggestions should have upstream callers
+        let callers = graph.get_callers(suggestions_fn);
+        assert!(
+            callers.iter().any(|c| c.name.contains("diagnose_coverage_file")),
+            "generate_suggestions should be called by diagnose_coverage_file. Found callers: {:?}",
+            callers.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+    }
+
+    /// Test that method calls on returned values are tracked.
+    ///
+    /// `lcov_data.functions.len()` should NOT create a call to user code,
+    /// but `lcov_data.get_overall_coverage()` SHOULD if it's defined in user code.
+    #[test]
+    fn test_method_call_on_returned_struct() {
+        use crate::analyzers::rust_call_graph::extract_call_graph_multi_file;
+
+        let file1_code = r#"
+            use crate::data::MyData;
+
+            pub fn process_data() -> usize {
+                let data = get_data();
+                data.calculate_total()
+            }
+
+            fn get_data() -> MyData {
+                MyData::new()
+            }
+        "#;
+
+        let file2_code = r#"
+            pub struct MyData {
+                value: usize,
+            }
+
+            impl MyData {
+                pub fn new() -> Self {
+                    MyData { value: 42 }
+                }
+
+                pub fn calculate_total(&self) -> usize {
+                    self.value
+                }
+            }
+        "#;
+
+        let file1 = parse_rust_code(file1_code);
+        let file2 = parse_rust_code(file2_code);
+
+        let files = vec![
+            (file1, PathBuf::from("src/commands/process.rs")),
+            (file2, PathBuf::from("src/data/mod.rs")),
+        ];
+
+        let graph = extract_call_graph_multi_file(&files);
+
+        // Find process_data
+        let process_fn = graph
+            .get_all_functions()
+            .find(|f| f.name.contains("process_data"))
+            .expect("process_data should exist");
+
+        let callees = graph.get_callees(process_fn);
+        eprintln!(
+            "Callees of process_data: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // Should call get_data (same file)
+        assert!(
+            callees.iter().any(|c| c.name.contains("get_data")),
+            "process_data should call get_data. Found: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // Should call calculate_total (cross-module method call)
+        // This is the tricky one - method call on a returned struct
+        assert!(
+            callees.iter().any(|c| c.name.contains("calculate_total")),
+            "process_data should call calculate_total (method on returned struct). Found: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+    }
 }

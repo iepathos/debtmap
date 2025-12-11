@@ -982,9 +982,14 @@ fn create_unified_analysis_parallel(
     let (data_flow_graph, _purity, test_only_functions, debt_aggregator) =
         builder.execute_phase1_parallel(metrics, debt_items);
 
+    // Populate call graph data into function metrics for better analysis
+    // This enriches metrics with upstream_callers and downstream_callees
+    let enriched_metrics =
+        call_graph_integration::populate_call_graph_data(metrics.to_vec(), call_graph);
+
     // Phase 2: Parallel function processing
     let items = builder.execute_phase2_parallel(
-        metrics,
+        &enriched_metrics,
         &test_only_functions,
         &debt_aggregator,
         &data_flow_graph,
@@ -1006,7 +1011,7 @@ fn create_unified_analysis_parallel(
     let _ = debt_items; // Silence unused warning
 
     // Phase 3: Parallel file analysis
-    let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
+    let file_items = builder.execute_phase3_parallel(&enriched_metrics, coverage_data, no_god_object);
 
     // Build final unified analysis
     let (mut unified, timings) = builder.build(

@@ -75,72 +75,68 @@ pub fn render(
     frame.render_widget(paragraph, area);
 }
 
-/// Render file-level coupling metrics section with enhanced visualization (spec 201, 203).
+/// Render function-level coupling metrics section with enhanced visualization.
 ///
-/// Looks up file-level metrics from the analysis and displays:
+/// For regular functions, displays function-level dependency data:
 /// - Coupling classification badge with color coding
-/// - Afferent coupling (Ca) - files that depend on this file
-/// - Efferent coupling (Ce) - files this file depends on
+/// - Afferent coupling (Ca) - functions that call this function
+/// - Efferent coupling (Ce) - functions this function calls
 /// - Instability progress bar with color gradient
-/// - Lists of top dependents and dependencies
+/// - Lists of callers (dependents) and callees (dependencies)
+///
+/// For god objects, aggregates file-level metrics from member functions.
 fn render_file_coupling_section(
     lines: &mut Vec<Line<'static>>,
-    app: &ResultsApp,
+    _app: &ResultsApp,
     item: &UnifiedDebtItem,
     theme: &Theme,
     width: u16,
 ) {
-    // Find the file-level metrics for this item's file
-    let file_metrics = app
-        .analysis()
-        .file_items
-        .iter()
-        .find(|f| f.metrics.path == item.location.file);
-
-    // Only show section if we have file-level coupling data
-    let Some(file_item) = file_metrics else {
-        return;
-    };
-
-    let metrics = &file_item.metrics;
+    // Use function-level dependency data from the item itself
+    let afferent_coupling = item.upstream_dependencies;
+    let efferent_coupling = item.downstream_dependencies;
 
     // Only show if we have meaningful coupling data
-    let total_coupling = metrics.afferent_coupling + metrics.efferent_coupling;
-    if total_coupling == 0 && metrics.instability == 0.0 {
+    let total_coupling = afferent_coupling + efferent_coupling;
+    if total_coupling == 0 {
         return;
     }
+
+    // Calculate instability: Ce / (Ca + Ce)
+    let instability = if total_coupling > 0 {
+        efferent_coupling as f64 / total_coupling as f64
+    } else {
+        0.0
+    };
 
     lines.push(Line::from(""));
     add_section_header(lines, "coupling profile", theme);
 
     // Classification badge with color (spec 203)
-    let classification = derive_coupling_classification(
-        metrics.afferent_coupling,
-        metrics.efferent_coupling,
-        metrics.instability,
-    );
+    let classification =
+        derive_coupling_classification(afferent_coupling, efferent_coupling, instability);
     render_classification_badge(lines, &classification, theme, width);
 
-    // Afferent coupling (Ca)
+    // Afferent coupling (Ca) - functions that call this function
     add_label_value(
         lines,
         "afferent (ca)",
-        metrics.afferent_coupling.to_string(),
+        afferent_coupling.to_string(),
         theme,
         width,
     );
 
-    // Efferent coupling (Ce)
+    // Efferent coupling (Ce) - functions this function calls
     add_label_value(
         lines,
         "efferent (ce)",
-        metrics.efferent_coupling.to_string(),
+        efferent_coupling.to_string(),
         theme,
         width,
     );
 
     // Instability with progress bar (spec 203)
-    render_instability_bar(lines, metrics.instability, theme, width);
+    render_instability_bar(lines, instability, theme, width);
 
     // Add context note for extreme values
     if total_coupling > 15 {
@@ -151,7 +147,7 @@ fn render_file_coupling_section(
                 Style::default().fg(theme.muted),
             ),
         ]));
-    } else if metrics.instability < 0.1 && metrics.afferent_coupling > 0 {
+    } else if instability < 0.1 && afferent_coupling > 0 {
         lines.push(Line::from(vec![
             Span::styled("Note: ", Style::default().fg(theme.primary)),
             Span::styled(
@@ -159,7 +155,7 @@ fn render_file_coupling_section(
                 Style::default().fg(theme.muted),
             ),
         ]));
-    } else if metrics.instability > 0.9 {
+    } else if instability > 0.9 {
         lines.push(Line::from(vec![
             Span::styled("Note: ", Style::default().fg(theme.success)),
             Span::styled(
@@ -169,20 +165,20 @@ fn render_file_coupling_section(
         ]));
     }
 
-    // Dependents list (who uses this) - spec 203
+    // Dependents list (who calls this function)
     render_dependency_list(
         lines,
-        &metrics.dependents,
-        "dependents (who uses this)",
+        &item.upstream_callers,
+        "dependents (who calls this)",
         theme,
         width,
     );
 
-    // Dependencies list (what this uses) - spec 203
+    // Dependencies list (what this function calls)
     render_dependency_list(
         lines,
-        &metrics.dependencies_list,
-        "dependencies (what this uses)",
+        &item.downstream_callees,
+        "dependencies (what this calls)",
         theme,
         width,
     );
