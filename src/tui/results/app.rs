@@ -147,7 +147,9 @@ pub struct ResultsApp {
 }
 
 impl ResultsApp {
-    /// Create new application state from analysis results
+    /// Create new application state from analysis results.
+    ///
+    /// This is the original API that uses all items from the analysis.
     pub fn new(analysis: UnifiedAnalysis) -> Self {
         let item_count = analysis.items.len();
         let filtered_indices: Vec<usize> = (0..item_count).collect();
@@ -170,6 +172,85 @@ impl ResultsApp {
             dsm_scroll_y: 0,
             nav_history: Vec::new(),
             dsm_enabled: true, // DSM feature enabled by default
+        }
+    }
+
+    /// Create application state from a PreparedDebtView (Spec 252).
+    ///
+    /// This constructor accepts a view that was prepared by the view pipeline.
+    /// The prepared view contains pre-filtered, pre-sorted items, so we use
+    /// those indices directly.
+    ///
+    /// # Arguments
+    ///
+    /// * `view` - The prepared view from `prepare_view_for_tui()`
+    /// * `analysis` - The original analysis (for call graph and data flow access)
+    ///
+    /// # Note
+    ///
+    /// When using a prepared view:
+    /// - Filtering and sorting from the view config are already applied
+    /// - Location groups from the view are used if available
+    /// - The analysis is still needed for dependency graphs in detail views
+    pub fn from_prepared_view(
+        view: crate::priority::view::PreparedDebtView,
+        mut analysis: UnifiedAnalysis,
+    ) -> Self {
+        // Extract items from PreparedDebtView into UnifiedAnalysis
+        // We need to reconstruct the analysis with only the prepared items
+        // so that filtered_indices can map correctly
+        let prepared_items: im::Vector<UnifiedDebtItem> = view
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let crate::priority::view::ViewItem::Function(func) = item {
+                    Some((**func).clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let file_items: im::Vector<crate::priority::FileDebtItem> = view
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let crate::priority::view::ViewItem::File(file) = item {
+                    Some((**file).clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Update analysis with prepared items (preserving call graph and data flow)
+        analysis.items = prepared_items;
+        analysis.file_items = file_items;
+
+        let item_count = analysis.items.len();
+        let filtered_indices: Vec<usize> = (0..item_count).collect();
+
+        // Use grouping setting from prepared view config
+        let show_grouped = view.config.compute_groups;
+
+        Self {
+            analysis,
+            filtered_indices,
+            view_mode: ViewMode::List,
+            selected_index: 0,
+            scroll_offset: 0,
+            search: SearchState::new(),
+            filters: Vec::new(),
+            sort_by: SortCriteria::Score, // Already sorted by view pipeline
+            terminal_size: (80, 24),
+            needs_redraw: false,
+            detail_page: DetailPage::Overview,
+            show_grouped,
+            status_message: None,
+            dsm_scroll_x: 0,
+            dsm_scroll_y: 0,
+            nav_history: Vec::new(),
+            dsm_enabled: true,
         }
     }
 
