@@ -26,6 +26,7 @@ pub mod unified_analysis_queries;
 pub mod unified_analysis_utils;
 pub mod unified_scorer;
 pub mod view;
+pub mod view_pipeline;
 
 use serde::{Deserialize, Serialize};
 
@@ -53,6 +54,9 @@ pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, 
 pub use view::{
     CategoryCounts, ItemLocation, LocationGroup, PreparedDebtView, ScoreDistribution, SortCriteria,
     ViewConfig, ViewItem, ViewSummary,
+};
+pub use view_pipeline::{
+    prepare_view, prepare_view_default, prepare_view_for_terminal, prepare_view_for_tui,
 };
 
 use im::Vector;
