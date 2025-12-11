@@ -25,6 +25,7 @@ pub mod tiers;
 pub mod unified_analysis_queries;
 pub mod unified_analysis_utils;
 pub mod unified_scorer;
+pub mod view;
 
 use serde::{Deserialize, Serialize};
 
@@ -49,6 +50,10 @@ pub use tiers::{classify_tier, RecommendationTier, TierConfig};
 pub use unified_analysis_queries::UnifiedAnalysisQueries;
 pub use unified_analysis_utils::UnifiedAnalysisUtils;
 pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, UnifiedScore};
+pub use view::{
+    CategoryCounts, ItemLocation, LocationGroup, PreparedDebtView, ScoreDistribution, SortCriteria,
+    ViewConfig, ViewItem, ViewSummary,
+};
 
 use im::Vector;
 use std::collections::BTreeMap;
