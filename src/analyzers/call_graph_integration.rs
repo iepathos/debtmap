@@ -281,9 +281,9 @@ mod tests {
         // Debug: print call graph state
         eprintln!("Call graph functions:");
         for func in call_graph.get_all_functions() {
-            let callers_vec = call_graph.get_callers(&func);
+            let callers_vec = call_graph.get_callers(func);
             let callers: Vec<_> = callers_vec.iter().map(|f| &f.name).collect();
-            let callees_vec = call_graph.get_callees(&func);
+            let callees_vec = call_graph.get_callees(func);
             let callees: Vec<_> = callees_vec.iter().map(|f| &f.name).collect();
             eprintln!(
                 "  {}:{} (line {}) - callers: {:?}, callees: {:?}",
