@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2025-12-12
+
+### Added
+
+- **Unified View Data Pipeline** (Specs 250-253)
+  - New `PreparedDebtView` unified data model for consistent output across all formats
+  - View preparation pipeline separates data transformation from rendering
+  - Output format unification ensures TUI, markdown, JSON, and terminal show identical data
+  - Refactored `format_split_recommendations_markdown` for cleaner code structure
+
+- **Accurate LOC Calculation** (Spec 201)
+  - Lines of code now calculated from actual source spans, not approximations
+  - More precise function size metrics for complexity scoring
+
+- **Clean Match Dispatcher Pattern Recognition** (Spec 206)
+  - Improved detection of clean match dispatcher patterns
+  - Reduces false positives for well-structured match statements
+  - Better identification of delegation patterns vs actual complexity
+
+- **Data Flow Analysis for Impl Block Methods** (Spec 202)
+  - Enhanced data flow analysis now supports methods within impl blocks
+  - Improved accuracy of mutation tracking in object-oriented Rust code
+
+- **Multi-Debt Type Accumulation** (Spec 228)
+  - Functions now accumulate multiple independent debt classifications by default
+  - Provides comprehensive technical debt assessment per function
+  - Example: A function can be flagged as both a complexity hotspot AND have testing gaps
+  - Supports three independent debt types: Testing Gaps, Complexity Hotspots, Dead Code
+  - Each debt type appears as a separate entry in the output for the same function
+
 ### Fixed
 
 - **Severity Classification Consistency** (Spec 251)
@@ -16,15 +46,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed duplicated severity calculation logic from TUI modules
   - Improved clarity: scores 70+ are CRITICAL, 50+ are HIGH, 30+ are MEDIUM, <30 are LOW
 
-### Added
+- **Function Dependencies in TUI and JSON**
+  - Fixed function dependencies showing zeros in TUI and JSON output
+  - Dependency counts now correctly propagate through all output formats
 
-- **Multi-Debt Type Accumulation** (Spec 228)
-  - Functions now accumulate multiple independent debt classifications by default
-  - Provides comprehensive technical debt assessment per function
-  - Example: A function can be flagged as both a complexity hotspot AND have testing gaps
-  - Supports three independent debt types: Testing Gaps, Complexity Hotspots, Dead Code
-  - Each debt type appears as a separate entry in the output for the same function
-  - Integration tests added in `tests/multi_debt_integration_test.rs`
+- **TUI Display Issues**
+  - Fixed popup areas to prevent background bleed-through
+  - Improved clipboard copy to match rendered layout
+
+- **Test Stability**
+  - Fixed doctest and eliminated test race condition
+  - Improved test reliability across the suite
+
+### Changed
+
+- **View Pipeline Refactoring**
+  - Split `view_pipeline.rs` into focused modules for better maintainability
+  - Cleaner separation of concerns in the view layer
 
 ## [0.8.0] - 2025-12-05
 
