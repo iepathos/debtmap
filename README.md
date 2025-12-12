@@ -40,12 +40,12 @@ cargo install debtmap
 # Analyze your project
 debtmap analyze .
 
-# With test coverage (recommended)
+# With test coverage and context (recommended)
 cargo llvm-cov --lcov --output-path coverage.lcov
-debtmap analyze . --lcov coverage.lcov
+debtmap analyze . --lcov coverage.lcov --context
 
 # Generate HTML report
-debtmap analyze . --format html > report.html
+debtmap analyze . --lcov coverage.lcov --content --format html --output report.html
 ```
 
 ## What You Get
