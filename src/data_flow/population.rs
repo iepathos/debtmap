@@ -13,6 +13,98 @@ use crate::data_flow::{DataFlowGraph, MutationInfo};
 use crate::priority::call_graph::FunctionId;
 use std::collections::HashSet;
 
+/// Helper module for finding functions in AST (spec 202)
+///
+/// Handles both top-level `fn` items and methods inside `impl` blocks.
+mod ast_helpers {
+    use syn::{ImplItemFn, ItemFn};
+
+    /// Result of finding a function in the AST
+    pub enum FoundFunction<'a> {
+        /// Top-level function
+        TopLevel(&'a ItemFn),
+        /// Method in an impl block
+        ImplMethod(&'a ImplItemFn),
+    }
+
+    impl<'a> FoundFunction<'a> {
+        /// Get the function block
+        pub fn block(&self) -> &syn::Block {
+            match self {
+                FoundFunction::TopLevel(f) => &f.block,
+                FoundFunction::ImplMethod(m) => &m.block,
+            }
+        }
+
+        /// Get the function signature inputs for parameter extraction
+        pub fn inputs(&self) -> impl Iterator<Item = &syn::FnArg> {
+            match self {
+                FoundFunction::TopLevel(f) => f.sig.inputs.iter(),
+                FoundFunction::ImplMethod(m) => m.sig.inputs.iter(),
+            }
+        }
+    }
+
+    /// Find a function in the AST by name and line number.
+    ///
+    /// Searches both top-level functions (`syn::Item::Fn`) and methods
+    /// inside impl blocks (`syn::Item::Impl` -> `syn::ImplItem::Fn`).
+    ///
+    /// # Name Matching
+    ///
+    /// The `metric_name` parameter may be in one of two formats:
+    /// - Simple name: `"method_name"` (for top-level functions)
+    /// - Qualified name: `"TypeName::method_name"` (for impl methods)
+    ///
+    /// For impl methods, we match if either:
+    /// - The metric name equals the simple method name
+    /// - The metric name ends with `::method_name`
+    pub fn find_function_in_ast<'a>(
+        ast: &'a syn::File,
+        metric_name: &str,
+        line: usize,
+    ) -> Option<FoundFunction<'a>> {
+        for item in &ast.items {
+            match item {
+                syn::Item::Fn(item_fn) => {
+                    if let Some(span_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
+                        // For top-level functions, metric_name should match exactly
+                        // or be the simple part of a qualified name
+                        let fn_name = item_fn.sig.ident.to_string();
+                        if span_line == line && (metric_name == fn_name) {
+                            return Some(FoundFunction::TopLevel(item_fn));
+                        }
+                    }
+                }
+                syn::Item::Impl(item_impl) => {
+                    for impl_item in &item_impl.items {
+                        if let syn::ImplItem::Fn(method) = impl_item {
+                            if let Some(span_line) =
+                                method.sig.ident.span().start().line.checked_sub(1)
+                            {
+                                let method_name = method.sig.ident.to_string();
+                                // Match if:
+                                // 1. Exact match with simple method name
+                                // 2. Metric name ends with ::method_name (qualified format)
+                                let matches_name = metric_name == method_name
+                                    || metric_name.ends_with(&format!("::{}", method_name));
+
+                                if span_line == line && matches_name {
+                                    return Some(FoundFunction::ImplMethod(method));
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+}
+
+pub use ast_helpers::{find_function_in_ast, FoundFunction};
+
 /// Populate DataFlowGraph from purity analysis results
 ///
 /// Extracts and stores:
@@ -88,7 +180,7 @@ fn extract_escaping_mutations(
 /// rather than relying on function name heuristics. This provides significantly
 /// higher accuracy and coverage (~70-80% vs ~4.3% with name-based detection).
 ///
-/// # Implementation (Spec 245)
+/// # Implementation (Spec 245, Spec 202)
 ///
 /// Uses AST visitor pattern to detect:
 /// - File I/O (std::fs, File, BufReader/Writer)
@@ -96,7 +188,10 @@ fn extract_escaping_mutations(
 /// - Network I/O (TcpStream, HTTP clients)
 /// - Database I/O (query, execute, prepare)
 /// - Async I/O (tokio::fs, async-std::fs)
+///
+/// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
 pub fn populate_io_operations(data_flow: &mut DataFlowGraph, metrics: &[FunctionMetrics]) -> usize {
+    use crate::analyzers::io_detector::detect_io_operations_from_block;
     use std::fs;
 
     let mut total_ops = 0;
@@ -122,20 +217,17 @@ pub fn populate_io_operations(data_flow: &mut DataFlowGraph, metrics: &[Function
             Err(_) => continue,
         };
 
-        // Find the function by name and line number
-        for item in &file_ast.items {
-            if let syn::Item::Fn(item_fn) = item {
-                if let Some(ident_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
-                    if ident_line == metric.line && item_fn.sig.ident == metric.name {
-                        // Use AST-based I/O detector (Spec 245)
-                        let io_ops = detect_io_operations(item_fn);
+        // Find the function by name and line number (handles both top-level and impl methods)
+        if let Some(found) = find_function_in_ast(&file_ast, &metric.name, metric.line) {
+            // Use AST-based I/O detector on the function block
+            let io_ops = match found {
+                FoundFunction::TopLevel(item_fn) => detect_io_operations(item_fn),
+                FoundFunction::ImplMethod(method) => detect_io_operations_from_block(&method.block),
+            };
 
-                        for op in io_ops {
-                            data_flow.add_io_operation(func_id.clone(), op);
-                            total_ops += 1;
-                        }
-                    }
-                }
+            for op in io_ops {
+                data_flow.add_io_operation(func_id.clone(), op);
+                total_ops += 1;
             }
         }
     }
@@ -168,6 +260,8 @@ pub fn populate_variable_dependencies(
 }
 
 /// Extract variable dependencies from function metrics
+///
+/// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
 fn extract_variable_deps(metric: &FunctionMetrics) -> HashSet<String> {
     use std::fs;
 
@@ -189,24 +283,18 @@ fn extract_variable_deps(metric: &FunctionMetrics) -> HashSet<String> {
         Err(_) => return HashSet::new(),
     };
 
-    // Find the function by name and line number
-    for item in &file_ast.items {
-        if let syn::Item::Fn(item_fn) = item {
-            if let Some(ident_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
-                if ident_line == metric.line {
-                    // Extract parameter names from function signature
-                    let mut deps = HashSet::new();
-                    for input in &item_fn.sig.inputs {
-                        if let syn::FnArg::Typed(pat_type) = input {
-                            if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
-                                deps.insert(pat_ident.ident.to_string());
-                            }
-                        }
-                    }
-                    return deps;
+    // Find the function by name and line number (handles both top-level and impl methods)
+    if let Some(found) = find_function_in_ast(&file_ast, &metric.name, metric.line) {
+        // Extract parameter names from function signature
+        let mut deps = HashSet::new();
+        for input in found.inputs() {
+            if let syn::FnArg::Typed(pat_type) = input {
+                if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                    deps.insert(pat_ident.ident.to_string());
                 }
             }
         }
+        return deps;
     }
 
     HashSet::new()
@@ -215,6 +303,8 @@ fn extract_variable_deps(metric: &FunctionMetrics) -> HashSet<String> {
 /// Populate data transformations between functions
 ///
 /// Identifies transformation patterns like map, filter, fold
+///
+/// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
 pub fn populate_data_transformations(
     data_flow: &mut DataFlowGraph,
     metrics: &[FunctionMetrics],
@@ -242,17 +332,11 @@ pub fn populate_data_transformations(
             Err(_) => continue,
         };
 
-        // Find the function by name and line number
-        for item in &file_ast.items {
-            if let syn::Item::Fn(item_fn) = item {
-                if let Some(ident_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
-                    if ident_line == metric.line {
-                        // Detect transformation patterns in the function body
-                        transformation_count +=
-                            detect_transformation_patterns(&item_fn.block, data_flow, metric);
-                    }
-                }
-            }
+        // Find the function by name and line number (handles both top-level and impl methods)
+        if let Some(found) = find_function_in_ast(&file_ast, &metric.name, metric.line) {
+            // Detect transformation patterns in the function body
+            transformation_count +=
+                detect_transformation_patterns(found.block(), data_flow, metric);
         }
     }
 
@@ -491,6 +575,242 @@ fn pure_func(x: i32) -> i32 {
         assert!(
             count > 0,
             "Should detect I/O operations in read_file function"
+        );
+    }
+
+    // ============================================================
+    // Spec 202: Tests for impl block method handling
+    // ============================================================
+
+    #[test]
+    fn test_find_function_in_ast_top_level() {
+        let code = r#"
+fn top_level_func(x: i32) -> i32 {
+    x + 1
+}
+"#;
+        let ast = syn::parse_file(code).unwrap();
+
+        // Should find top-level function at line 1 (0-indexed)
+        let found = find_function_in_ast(&ast, "top_level_func", 1);
+        assert!(found.is_some(), "Should find top-level function");
+
+        // Should not find at wrong line
+        let not_found = find_function_in_ast(&ast, "top_level_func", 5);
+        assert!(not_found.is_none(), "Should not find at wrong line");
+    }
+
+    #[test]
+    fn test_find_function_in_ast_impl_method_simple_name() {
+        let code = r#"
+struct Foo;
+
+impl Foo {
+    fn method(&self) -> i32 {
+        42
+    }
+}
+"#;
+        let ast = syn::parse_file(code).unwrap();
+
+        // Should find method by simple name at line 4 (0-indexed)
+        let found = find_function_in_ast(&ast, "method", 4);
+        assert!(found.is_some(), "Should find impl method by simple name");
+
+        match found.unwrap() {
+            FoundFunction::ImplMethod(_) => { /* expected */ }
+            FoundFunction::TopLevel(_) => panic!("Should be ImplMethod, not TopLevel"),
+        }
+    }
+
+    #[test]
+    fn test_find_function_in_ast_impl_method_qualified_name() {
+        let code = r#"
+struct Bar;
+
+impl Bar {
+    fn do_something(&self, x: i32) -> i32 {
+        x * 2
+    }
+}
+"#;
+        let ast = syn::parse_file(code).unwrap();
+
+        // Should find method by qualified name (Type::method)
+        let found = find_function_in_ast(&ast, "Bar::do_something", 4);
+        assert!(found.is_some(), "Should find impl method by qualified name");
+
+        match found.unwrap() {
+            FoundFunction::ImplMethod(_) => { /* expected */ }
+            FoundFunction::TopLevel(_) => panic!("Should be ImplMethod, not TopLevel"),
+        }
+    }
+
+    #[test]
+    fn test_populate_io_operations_impl_method() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create temporary file with impl method containing I/O
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let test_code = r#"
+use std::fs::File;
+use std::io::Read;
+
+struct FileReader;
+
+impl FileReader {
+    fn read_contents(&self) -> std::io::Result<String> {
+        let mut file = File::open("data.txt")?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        Ok(contents)
+    }
+}
+"#;
+        temp_file.write_all(test_code.as_bytes()).unwrap();
+        let temp_path = temp_file.path().to_path_buf();
+
+        let mut data_flow = DataFlowGraph::new();
+        // Use qualified name format as FunctionMetrics would have
+        let metrics = vec![FunctionMetrics::new(
+            "FileReader::read_contents".to_string(),
+            temp_path.clone(),
+            7, // Line of the method
+        )];
+
+        let count = populate_io_operations(&mut data_flow, &metrics);
+
+        assert!(
+            count > 0,
+            "Should detect I/O operations in impl method (spec 202)"
+        );
+    }
+
+    #[test]
+    fn test_extract_variable_deps_impl_method() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create temporary file with impl method containing parameters
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let test_code = r#"
+struct Calculator;
+
+impl Calculator {
+    fn add(&self, a: i32, b: i32) -> i32 {
+        a + b
+    }
+}
+"#;
+        temp_file.write_all(test_code.as_bytes()).unwrap();
+        let temp_path = temp_file.path().to_path_buf();
+
+        let metric = FunctionMetrics::new("Calculator::add".to_string(), temp_path.clone(), 4);
+
+        let deps = extract_variable_deps(&metric);
+
+        // Should find parameters 'a' and 'b' (not 'self' as it's a receiver)
+        assert!(deps.contains("a"), "Should find parameter 'a'");
+        assert!(deps.contains("b"), "Should find parameter 'b'");
+    }
+
+    #[test]
+    fn test_populate_data_transformations_impl_method() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create temporary file with impl method using iterator transformations
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let test_code = r#"
+struct DataProcessor;
+
+impl DataProcessor {
+    fn process(&self, items: Vec<i32>) -> Vec<i32> {
+        items.iter()
+            .map(|x| x * 2)
+            .filter(|x| *x > 10)
+            .collect()
+    }
+}
+"#;
+        temp_file.write_all(test_code.as_bytes()).unwrap();
+        let temp_path = temp_file.path().to_path_buf();
+
+        let mut data_flow = DataFlowGraph::new();
+        let metrics = vec![FunctionMetrics::new(
+            "DataProcessor::process".to_string(),
+            temp_path.clone(),
+            4,
+        )];
+
+        let count = populate_data_transformations(&mut data_flow, &metrics);
+
+        assert!(
+            count > 0,
+            "Should detect transformation patterns in impl method (spec 202)"
+        );
+    }
+
+    #[test]
+    fn test_found_function_block() {
+        let code = r#"
+fn top_level() {
+    let x = 1;
+}
+
+struct Foo;
+
+impl Foo {
+    fn method(&self) {
+        let y = 2;
+    }
+}
+"#;
+        let ast = syn::parse_file(code).unwrap();
+
+        // Check top-level block
+        let top_level = find_function_in_ast(&ast, "top_level", 1).unwrap();
+        let block = top_level.block();
+        assert!(
+            !block.stmts.is_empty(),
+            "Top-level block should have statements"
+        );
+
+        // Check impl method block
+        let method = find_function_in_ast(&ast, "method", 8).unwrap();
+        let block = method.block();
+        assert!(
+            !block.stmts.is_empty(),
+            "Impl method block should have statements"
+        );
+    }
+
+    #[test]
+    fn test_found_function_inputs() {
+        let code = r#"
+fn top_level(a: i32, b: String) {}
+
+struct Foo;
+
+impl Foo {
+    fn method(&self, x: i32, y: bool) {}
+}
+"#;
+        let ast = syn::parse_file(code).unwrap();
+
+        // Check top-level inputs
+        let top_level = find_function_in_ast(&ast, "top_level", 1).unwrap();
+        let inputs: Vec<_> = top_level.inputs().collect();
+        assert_eq!(inputs.len(), 2, "Top-level should have 2 inputs");
+
+        // Check impl method inputs (includes &self)
+        let method = find_function_in_ast(&ast, "method", 6).unwrap();
+        let inputs: Vec<_> = method.inputs().collect();
+        assert_eq!(
+            inputs.len(),
+            3,
+            "Impl method should have 3 inputs (self + 2 params)"
         );
     }
 }

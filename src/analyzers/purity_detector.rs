@@ -209,6 +209,100 @@ impl PurityDetector {
         }
     }
 
+    /// Analyzes an impl method to determine if it's pure (spec 202)
+    ///
+    /// This is similar to `is_pure_function` but takes an `ImplItemFn` instead of `ItemFn`.
+    /// Impl methods have the same structure but are found inside `impl` blocks.
+    pub fn is_pure_impl_method(&mut self, impl_fn: &syn::ImplItemFn) -> PurityAnalysis {
+        // Reset state
+        self.has_side_effects = false;
+        self.has_mutable_params = false;
+        self.has_io_operations = false;
+        self.has_unsafe_blocks = false;
+        self.accesses_external_state = false;
+        self.modifies_external_state = false;
+        self.scope = ScopeTracker::new();
+        self.local_mutations.clear();
+        self.upvalue_mutations.clear();
+        self.closure_results.clear();
+        self.unknown_macros_count = 0;
+        self.has_pure_unsafe = false;
+
+        // Initialize scope with parameters
+        for arg in &impl_fn.sig.inputs {
+            self.scope.add_parameter(arg);
+
+            // Check function signature for mutable parameters
+            match arg {
+                syn::FnArg::Receiver(receiver) => {
+                    // Check if receiver is &mut self
+                    if receiver.reference.is_some() && receiver.mutability.is_some() {
+                        self.has_mutable_params = true;
+                        self.modifies_external_state = true;
+                    }
+                }
+                syn::FnArg::Typed(pat_type) => {
+                    // Check if the type itself is a mutable reference
+                    if self.type_has_mutable_reference(&pat_type.ty) {
+                        self.has_mutable_params = true;
+                    }
+                    // Also check if the pattern indicates mutability
+                    if self.has_mutable_reference(&pat_type.pat) {
+                        self.has_mutable_params = true;
+                    }
+                }
+            }
+        }
+
+        // Visit the function body
+        self.visit_block(&impl_fn.block);
+
+        // Perform data flow analysis to refine mutation detection
+        let cfg = ControlFlowGraph::from_block(&impl_fn.block);
+        let data_flow = DataFlowAnalysis::analyze(&cfg);
+
+        // Capture var_names from CFG for VarId translation
+        let var_names = cfg.var_names.clone();
+
+        // Filter dead mutations from local_mutations
+        let live_mutations = self.filter_dead_mutations(&cfg, &data_flow);
+
+        // Determine purity level based on mutations and side effects
+        let purity_level = if !self.has_side_effects
+            && !self.has_mutable_params
+            && !self.has_io_operations
+            && !self.has_unsafe_blocks
+            && !self.modifies_external_state
+            && !self.accesses_external_state
+            && self.local_mutations.is_empty()
+        {
+            PurityLevel::StrictlyPure
+        } else if self.has_io_operations || self.modifies_external_state {
+            PurityLevel::Impure
+        } else if self.accesses_external_state {
+            PurityLevel::ReadOnly
+        } else {
+            PurityLevel::LocallyPure
+        };
+
+        // Adjust confidence based on data flow analysis
+        let mut confidence = self.calculate_confidence_score();
+        if live_mutations.len() < self.local_mutations.len() {
+            confidence *= 1.1;
+        }
+
+        PurityAnalysis {
+            is_pure: purity_level == PurityLevel::StrictlyPure,
+            purity_level,
+            reasons: self.collect_impurity_reasons(),
+            confidence: confidence.min(1.0),
+            data_flow_info: Some(data_flow),
+            live_mutations,
+            total_mutations: self.local_mutations.len(),
+            var_names,
+        }
+    }
+
     /// Analyzes a block to determine if it's pure
     pub fn is_pure_block(&mut self, block: &Block) -> PurityAnalysis {
         // Reset state
