@@ -9,7 +9,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
@@ -65,6 +65,9 @@ pub fn render_with_search(frame: &mut Frame, app: &ResultsApp) {
         height: 3,
     };
 
+    // Clear the area first to prevent background bleed-through
+    frame.render_widget(Clear, search_area);
+
     let search_text = format!("Search: {}", app.search().query());
     let search_widget = Paragraph::new(search_text)
         .block(
@@ -92,6 +95,9 @@ pub fn render_with_sort_menu(frame: &mut Frame, app: &ResultsApp) {
         width: area.width / 3,
         height: 11,
     };
+
+    // Clear the area first to prevent background bleed-through
+    frame.render_widget(Clear, menu_area);
 
     let sort_options = super::sort::SortCriteria::all();
     let current_sort = app.sort_by();
@@ -140,6 +146,9 @@ pub fn render_with_filter_menu(frame: &mut Frame, app: &ResultsApp) {
         width: area.width / 2,
         height: 16,
     };
+
+    // Clear the area first to prevent background bleed-through
+    frame.render_widget(Clear, menu_area);
 
     let mut lines = vec![
         Line::from("Severity Filters:"),
