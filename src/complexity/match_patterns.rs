@@ -16,6 +16,15 @@ impl MatchExpressionRecognizer {
     }
 
     /// Check if a match arm is simple (return, break, single expression)
+    ///
+    /// Recognizes the following patterns as "simple":
+    /// - Direct control flow: `return`, `break`, `continue`
+    /// - Simple values: literals, paths (e.g., `42`, `Enum::Variant`)
+    /// - Simple access: method calls, field access
+    /// - Simple constructor calls: `SomeType::new()`
+    /// - Try expressions: `expr?` where `expr` is simple
+    /// - Macro invocations: `writeln!()`, `println!()`, etc.
+    /// - Blocks containing a single simple expression
     #[allow(clippy::only_used_in_recursion)]
     pub fn is_simple_arm(&self, body: &Expr) -> bool {
         match body {
@@ -30,19 +39,25 @@ impl MatchExpressionRecognizer {
                 // Check if it's a simple enum variant or struct constructor
                 matches!(&*call.func, Expr::Path(_))
             }
+            // Try expressions (? operator) - simple if inner expression is simple
+            Expr::Try(try_expr) => self.is_simple_arm(&try_expr.expr),
+            // Macro invocations (writeln!, println!, format!, etc.)
+            // Macros are typically single operations in match arms
+            Expr::Macro(_) => true,
             // Block with single return or expression
             Expr::Block(block) => {
                 let block = &block.block;
-                if block.stmts.len() == 1 {
-                    match &block.stmts[0] {
+                match block.stmts.len() {
+                    0 => true, // Empty block is simple
+                    1 => match &block.stmts[0] {
                         Stmt::Expr(expr, _) => self.is_simple_arm(expr),
                         _ => false,
+                    },
+                    2 => {
+                        // Allow one statement plus return
+                        matches!(&block.stmts[1], Stmt::Expr(Expr::Return(_), _))
                     }
-                } else if block.stmts.len() == 2 {
-                    // Allow one statement plus return
-                    matches!(&block.stmts[1], Stmt::Expr(Expr::Return(_), _))
-                } else {
-                    false
+                    _ => false,
                 }
             }
             _ => false,
@@ -476,5 +491,116 @@ mod tests {
         let info = detect_match_expression(&expr);
         // Should return None because not all arms are simple
         assert!(info.is_none());
+    }
+
+    #[test]
+    fn test_simple_arm_try_expression() {
+        let recognizer = MatchExpressionRecognizer::new();
+
+        // Simple function call with ?
+        let expr: Expr = parse_quote!(helper_fn()?);
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // Method call with ?
+        let expr: Expr = parse_quote!(self.write_header()?);
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // Chained try expressions
+        let expr: Expr = parse_quote!(foo()?.bar()?);
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // Path with try
+        let expr: Expr = parse_quote!(some_result?);
+        assert!(recognizer.is_simple_arm(&expr));
+    }
+
+    #[test]
+    fn test_simple_arm_macro_invocation() {
+        let recognizer = MatchExpressionRecognizer::new();
+
+        // writeln! macro
+        let expr: Expr = parse_quote!(writeln!(w, "text"));
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // writeln! with ?
+        let expr: Expr = parse_quote!(writeln!(w, "text")?);
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // println! macro
+        let expr: Expr = parse_quote!(println!("debug"));
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // format! macro
+        let expr: Expr = parse_quote!(format!("{}", x));
+        assert!(recognizer.is_simple_arm(&expr));
+    }
+
+    #[test]
+    fn test_simple_arm_block_with_try() {
+        let recognizer = MatchExpressionRecognizer::new();
+
+        // Block with single try expression
+        let expr: Expr = parse_quote!({ helper_fn()? });
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // Block with macro and try (with semicolon)
+        let expr: Expr = parse_quote!({ writeln!(w, "text")? });
+        assert!(recognizer.is_simple_arm(&expr));
+
+        // Empty block
+        let expr: Expr = parse_quote!({});
+        assert!(recognizer.is_simple_arm(&expr));
+    }
+
+    #[test]
+    fn test_complex_arm_not_simple() {
+        let recognizer = MatchExpressionRecognizer::new();
+
+        // Block with multiple statements
+        let expr: Expr = parse_quote!({
+            let x = compute();
+            process(x)?;
+            cleanup()
+        });
+        assert!(!recognizer.is_simple_arm(&expr));
+
+        // Conditional inside
+        let expr: Expr = parse_quote!(if cond { foo() } else { bar() });
+        assert!(!recognizer.is_simple_arm(&expr));
+
+        // Loop
+        let expr: Expr = parse_quote!(for i in 0..10 {
+            process(i)
+        });
+        assert!(!recognizer.is_simple_arm(&expr));
+    }
+
+    #[test]
+    fn test_write_section_style_match() {
+        // Match dispatcher pattern as seen in write_section
+        let block: syn::Block = parse_quote! {{
+            match section {
+                Section::Header { rank, score } => write_header(w, rank, score)?,
+                Section::Location { file, line } => writeln!(w, "{}:{}", file, line)?,
+                Section::Action { action } => writeln!(w, "{}", action)?,
+                Section::Impact { reduction } => write_impact(w, reduction)?,
+                Section::Evidence { text } => writeln!(w, "{}", text)?,
+            }
+        }};
+
+        let recognizer = MatchExpressionRecognizer::new();
+        let info = recognizer.detect(&block);
+
+        assert!(info.is_some(), "Should detect as pattern match");
+        let info = info.unwrap();
+        assert_eq!(info.condition_count, 5);
+
+        // Complexity should use logarithmic scaling
+        let adjusted = recognizer.adjust_complexity(&info, 5);
+        assert!(
+            adjusted <= 4,
+            "Adjusted complexity should be ~3-4, got {}",
+            adjusted
+        );
     }
 }
