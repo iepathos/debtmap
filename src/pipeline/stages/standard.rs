@@ -358,47 +358,95 @@ fn discover_files(path: &Path, _languages: &[Language]) -> Result<Vec<PathBuf>, 
     Ok(files)
 }
 
+/// Represents a parsed LCOV line type.
+#[derive(Debug, Clone, PartialEq)]
+enum LcovLine {
+    /// Source file declaration (SF:path)
+    SourceFile(PathBuf),
+    /// Data line with hit count (DA:line_number,hit_count)
+    DataLine { hit: bool },
+    /// End of record marker
+    EndOfRecord,
+    /// Line we don't care about (comments, other markers)
+    Ignored,
+}
+
+/// Parse a single LCOV line into its type.
+fn parse_lcov_line(line: &str) -> LcovLine {
+    if let Some(sf) = line.strip_prefix("SF:") {
+        LcovLine::SourceFile(PathBuf::from(sf))
+    } else if let Some(da) = line.strip_prefix("DA:") {
+        let hit = da
+            .split_once(',')
+            .and_then(|(_, hit_str)| hit_str.parse::<i32>().ok())
+            .map(|count| count > 0)
+            .unwrap_or(false);
+        LcovLine::DataLine { hit }
+    } else if line == "end_of_record" {
+        LcovLine::EndOfRecord
+    } else {
+        LcovLine::Ignored
+    }
+}
+
+/// Calculate coverage percentage from line hits.
+fn calculate_coverage_percentage(line_hits: &[bool]) -> f64 {
+    if line_hits.is_empty() {
+        return 0.0;
+    }
+    let covered = line_hits.iter().filter(|&&hit| hit).count();
+    (covered as f64 / line_hits.len() as f64) * 100.0
+}
+
+/// State accumulator for LCOV parsing.
+#[derive(Default)]
+struct LcovParseState {
+    coverage: CoverageData,
+    current_file: Option<PathBuf>,
+    line_hits: Vec<bool>,
+}
+
+impl LcovParseState {
+    /// Process a single parsed LCOV line, returning updated state.
+    fn process_line(mut self, line: LcovLine) -> Self {
+        match line {
+            LcovLine::SourceFile(path) => {
+                self.current_file = Some(path);
+                self.line_hits.clear();
+            }
+            LcovLine::DataLine { hit } => {
+                self.line_hits.push(hit);
+            }
+            LcovLine::EndOfRecord => {
+                if let Some(file) = self.current_file.take() {
+                    let pct = calculate_coverage_percentage(&self.line_hits);
+                    self.coverage.file_coverage.insert(file.clone(), pct);
+                    self.coverage
+                        .line_coverage
+                        .insert(file, std::mem::take(&mut self.line_hits));
+                }
+            }
+            LcovLine::Ignored => {}
+        }
+        self
+    }
+}
+
+/// Parse LCOV content into coverage data using functional composition.
+fn parse_lcov_content(content: &str) -> CoverageData {
+    content
+        .lines()
+        .map(parse_lcov_line)
+        .fold(LcovParseState::default(), LcovParseState::process_line)
+        .coverage
+}
+
 fn load_coverage_from_file(path: &Path) -> Result<CoverageData, AnalysisError> {
     let content = std::fs::read_to_string(path).map_err(|e| {
         AnalysisError::other(format!("Failed to read coverage file {:?}: {}", path, e))
     })?;
 
-    // Parse LCOV format
-    let mut coverage = CoverageData::new();
-
-    let mut current_file: Option<PathBuf> = None;
-    let mut line_hits: Vec<bool> = Vec::new();
-
-    for line in content.lines() {
-        if let Some(sf) = line.strip_prefix("SF:") {
-            current_file = Some(PathBuf::from(sf));
-            line_hits.clear();
-        } else if let Some(da) = line.strip_prefix("DA:") {
-            // DA:line_number,hit_count
-            if let Some((_, hit_str)) = da.split_once(',') {
-                let hits = hit_str.parse::<i32>().unwrap_or(0);
-                line_hits.push(hits > 0);
-            }
-        } else if line == "end_of_record" {
-            if let Some(ref file) = current_file {
-                let total_lines = line_hits.len();
-                let covered_lines = line_hits.iter().filter(|&&hit| hit).count();
-                let coverage_pct = if total_lines > 0 {
-                    (covered_lines as f64 / total_lines as f64) * 100.0
-                } else {
-                    0.0
-                };
-                coverage.file_coverage.insert(file.clone(), coverage_pct);
-                coverage
-                    .line_coverage
-                    .insert(file.clone(), line_hits.clone());
-            }
-            current_file = None;
-            line_hits.clear();
-        }
-    }
-
-    Ok(coverage)
+    Ok(parse_lcov_content(&content))
 }
 
 fn load_project_context(path: &Path) -> Result<ProjectContext, AnalysisError> {
@@ -437,6 +485,118 @@ fn load_project_context(path: &Path) -> Result<ProjectContext, AnalysisError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // === LCOV Parsing Tests ===
+
+    #[test]
+    fn parse_lcov_line_source_file() {
+        let line = "SF:/path/to/file.rs";
+        assert_eq!(
+            parse_lcov_line(line),
+            LcovLine::SourceFile(PathBuf::from("/path/to/file.rs"))
+        );
+    }
+
+    #[test]
+    fn parse_lcov_line_data_hit() {
+        let line = "DA:10,5";
+        assert_eq!(parse_lcov_line(line), LcovLine::DataLine { hit: true });
+    }
+
+    #[test]
+    fn parse_lcov_line_data_no_hit() {
+        let line = "DA:10,0";
+        assert_eq!(parse_lcov_line(line), LcovLine::DataLine { hit: false });
+    }
+
+    #[test]
+    fn parse_lcov_line_data_malformed() {
+        let line = "DA:malformed";
+        assert_eq!(parse_lcov_line(line), LcovLine::DataLine { hit: false });
+    }
+
+    #[test]
+    fn parse_lcov_line_end_of_record() {
+        assert_eq!(parse_lcov_line("end_of_record"), LcovLine::EndOfRecord);
+    }
+
+    #[test]
+    fn parse_lcov_line_ignored() {
+        assert_eq!(parse_lcov_line("TN:testname"), LcovLine::Ignored);
+        assert_eq!(parse_lcov_line(""), LcovLine::Ignored);
+        assert_eq!(parse_lcov_line("# comment"), LcovLine::Ignored);
+    }
+
+    #[test]
+    fn calculate_coverage_empty() {
+        assert_eq!(calculate_coverage_percentage(&[]), 0.0);
+    }
+
+    #[test]
+    fn calculate_coverage_all_hit() {
+        assert_eq!(calculate_coverage_percentage(&[true, true, true]), 100.0);
+    }
+
+    #[test]
+    fn calculate_coverage_none_hit() {
+        assert_eq!(calculate_coverage_percentage(&[false, false, false]), 0.0);
+    }
+
+    #[test]
+    fn calculate_coverage_mixed() {
+        assert_eq!(
+            calculate_coverage_percentage(&[true, false, true, false]),
+            50.0
+        );
+    }
+
+    #[test]
+    fn parse_lcov_content_single_file() {
+        let content = "SF:/path/to/file.rs\nDA:1,1\nDA:2,0\nDA:3,1\nend_of_record\n";
+        let coverage = parse_lcov_content(content);
+
+        let path = PathBuf::from("/path/to/file.rs");
+        assert!(coverage.file_coverage.contains_key(&path));
+
+        let pct = coverage.file_coverage.get(&path).unwrap();
+        assert!((pct - 66.666).abs() < 0.01);
+
+        let lines = coverage.line_coverage.get(&path).unwrap();
+        assert_eq!(lines, &vec![true, false, true]);
+    }
+
+    #[test]
+    fn parse_lcov_content_multiple_files() {
+        let content = "\
+SF:/a.rs
+DA:1,1
+DA:2,1
+end_of_record
+SF:/b.rs
+DA:1,0
+end_of_record
+";
+        let coverage = parse_lcov_content(content);
+
+        assert_eq!(coverage.file_coverage.len(), 2);
+        assert_eq!(
+            *coverage.file_coverage.get(&PathBuf::from("/a.rs")).unwrap(),
+            100.0
+        );
+        assert_eq!(
+            *coverage.file_coverage.get(&PathBuf::from("/b.rs")).unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
+    fn parse_lcov_content_empty() {
+        let coverage = parse_lcov_content("");
+        assert!(coverage.file_coverage.is_empty());
+        assert!(coverage.line_coverage.is_empty());
+    }
+
+    // === Stage Creation Tests ===
 
     #[test]
     fn test_file_discovery_stage_creation() {
