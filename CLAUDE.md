@@ -202,7 +202,8 @@ mod tests {
 
 ```bash
 # This command must pass before any commit
-just ci
+just fmt
+just test
 ```
 
 ### Continuous Integration Validation
