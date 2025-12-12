@@ -966,6 +966,68 @@ pub struct CapturedVar {
     pub is_mutated: bool,
 }
 
+// ============================================================================
+// Pattern Destructuring Types (Spec 252)
+// ============================================================================
+
+/// A binding extracted from a pattern.
+///
+/// Represents a single variable binding within a pattern, including
+/// information about how to access it from the source expression.
+///
+/// # Example
+///
+/// For `let (a, Point { x, y }) = source`:
+/// - `a` has `access_path = Some(TupleIndex(0))`
+/// - `x` has `access_path = Some(Nested([TupleIndex(1), NamedField("x")]))`
+/// - `y` has `access_path = Some(Nested([TupleIndex(1), NamedField("y")]))`
+#[derive(Debug, Clone)]
+pub struct PatternBinding {
+    /// The bound variable name
+    pub name: String,
+    /// Optional field path from source (for struct/tuple access)
+    pub access_path: Option<AccessPath>,
+    /// Whether binding is mutable
+    pub is_mut: bool,
+    /// Whether binding is by reference
+    pub by_ref: bool,
+}
+
+/// Path to access a field in the source expression.
+///
+/// Represents how to navigate from a source value to a specific
+/// component in a destructuring pattern.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AccessPath {
+    /// Tuple index: .0, .1, .2
+    TupleIndex(usize),
+    /// Named field: .field_name
+    NamedField(String),
+    /// Array index: [0], [1]
+    ArrayIndex(usize),
+    /// Nested access: .0.field.1
+    Nested(Vec<AccessPath>),
+    /// Slice rest: [..] starting at index
+    SliceRest(usize),
+}
+
+impl AccessPath {
+    /// Create a field access string suitable for Rvalue::FieldAccess
+    pub fn to_field_string(&self) -> String {
+        match self {
+            AccessPath::TupleIndex(idx) => idx.to_string(),
+            AccessPath::NamedField(name) => name.clone(),
+            AccessPath::ArrayIndex(idx) => format!("[{}]", idx),
+            AccessPath::SliceRest(idx) => format!("[{}:]", idx),
+            AccessPath::Nested(paths) => paths
+                .iter()
+                .map(|p| p.to_field_string())
+                .collect::<Vec<_>>()
+                .join("."),
+        }
+    }
+}
+
 /// Information about a capture detected during closure body analysis.
 #[derive(Debug, Clone)]
 struct CaptureInfo {
@@ -1113,7 +1175,7 @@ impl<'ast, 'a> Visit<'ast> for ClosureCaptureVisitor<'a> {
                 let nested_params: HashSet<String> = nested_closure
                     .inputs
                     .iter()
-                    .filter_map(|pat| extract_pattern_name(pat))
+                    .filter_map(extract_pattern_name)
                     .collect();
 
                 let nested_is_move = nested_closure.capture.is_some();
@@ -2648,25 +2710,51 @@ impl CfgBuilder {
     }
 
     fn process_local(&mut self, local: &Local) {
-        // Extract all variable bindings from the pattern
-        let vars = self.extract_vars_from_pattern(&local.pat);
+        // Extract all variable bindings from the pattern with access paths
+        let bindings = self.extract_pattern_bindings(&local.pat);
+
+        if bindings.is_empty() {
+            return; // Wildcard or unsupported pattern
+        }
 
         // Process any closures in the initializer first (to populate captured_vars)
         if let Some(init) = &local.init {
             self.process_closures_in_expr(&init.expr);
         }
 
-        // Get Rvalue from initializer
-        let init_rvalue = local
+        // Get source Rvalue from initializer
+        let source_rvalue = local
             .init
             .as_ref()
             .map(|init| self.expr_to_rvalue(&init.expr));
 
-        // Emit declaration for each binding
-        for var in vars {
+        // Get source variables for data flow tracking
+        let source_vars = local
+            .init
+            .as_ref()
+            .map(|init| self.extract_vars_from_expr(&init.expr))
+            .unwrap_or_default();
+
+        // Create declaration for each binding with appropriate access path
+        for binding in bindings {
+            let var = self.get_or_create_var(&binding.name);
+
+            // Create appropriate Rvalue based on access path
+            let init_rvalue = match (&source_rvalue, &binding.access_path) {
+                (Some(src), Some(path)) => {
+                    // Field/element access from source
+                    Some(self.create_access_rvalue(src, path, &source_vars))
+                }
+                (Some(src), None) => {
+                    // Simple binding, use source directly
+                    Some(src.clone())
+                }
+                (None, _) => None,
+            };
+
             self.current_block.push(Statement::Declare {
                 var,
-                init: init_rvalue.clone(),
+                init: init_rvalue,
                 line: None,
             });
         }
@@ -2987,7 +3075,11 @@ impl CfgBuilder {
         self.extract_vars_from_expr(expr).into_iter().next()
     }
 
-    /// Extract variable bindings from a pattern.
+    /// Extract variable bindings from a pattern (returns VarIds).
+    ///
+    /// Note: For new code, prefer `extract_pattern_bindings` which returns
+    /// full `PatternBinding` with access path information for data flow tracking.
+    #[allow(dead_code)]
     fn extract_vars_from_pattern(&mut self, pat: &Pat) -> Vec<VarId> {
         match pat {
             // Simple identifier: let x = ...
@@ -3058,6 +3150,252 @@ impl CfgBuilder {
             Pat::Paren(paren) => self.extract_vars_from_pattern(&paren.pat),
 
             _ => vec![],
+        }
+    }
+
+    /// Extract all variable bindings from a pattern with access path information.
+    ///
+    /// Unlike `extract_vars_from_pattern`, this returns full binding information
+    /// including the access path from the source expression to each binding.
+    fn extract_pattern_bindings(&self, pat: &Pat) -> Vec<PatternBinding> {
+        self.extract_pattern_bindings_with_path(pat, None)
+    }
+
+    /// Extract bindings with accumulated access path.
+    #[allow(clippy::only_used_in_recursion)]
+    fn extract_pattern_bindings_with_path(
+        &self,
+        pat: &Pat,
+        parent_path: Option<AccessPath>,
+    ) -> Vec<PatternBinding> {
+        match pat {
+            // Simple identifier: let x = ...
+            Pat::Ident(pat_ident) => {
+                vec![PatternBinding {
+                    name: pat_ident.ident.to_string(),
+                    access_path: parent_path,
+                    is_mut: pat_ident.mutability.is_some(),
+                    by_ref: pat_ident.by_ref.is_some(),
+                }]
+            }
+
+            // Tuple: let (a, b, c) = ...
+            Pat::Tuple(tuple) => tuple
+                .elems
+                .iter()
+                .enumerate()
+                .flat_map(|(i, elem)| {
+                    let path = Self::append_path(parent_path.clone(), AccessPath::TupleIndex(i));
+                    self.extract_pattern_bindings_with_path(elem, Some(path))
+                })
+                .collect(),
+
+            // Struct: let Point { x, y } = ...
+            Pat::Struct(pat_struct) => pat_struct
+                .fields
+                .iter()
+                .flat_map(|field| {
+                    let field_name = match &field.member {
+                        syn::Member::Named(ident) => ident.to_string(),
+                        syn::Member::Unnamed(idx) => idx.index.to_string(),
+                    };
+                    let path =
+                        Self::append_path(parent_path.clone(), AccessPath::NamedField(field_name));
+                    self.extract_pattern_bindings_with_path(&field.pat, Some(path))
+                })
+                .collect(),
+
+            // TupleStruct: let Some(x) = ..., let Ok(v) = ...
+            Pat::TupleStruct(tuple_struct) => tuple_struct
+                .elems
+                .iter()
+                .enumerate()
+                .flat_map(|(i, elem)| {
+                    let path = Self::append_path(parent_path.clone(), AccessPath::TupleIndex(i));
+                    self.extract_pattern_bindings_with_path(elem, Some(path))
+                })
+                .collect(),
+
+            // Slice: let [first, second, rest @ ..] = ...
+            Pat::Slice(slice) => slice
+                .elems
+                .iter()
+                .enumerate()
+                .flat_map(|(i, elem)| {
+                    // Check if this is a rest pattern (@..)
+                    if matches!(elem, Pat::Rest(_)) {
+                        return vec![];
+                    }
+                    let path = Self::append_path(parent_path.clone(), AccessPath::ArrayIndex(i));
+                    self.extract_pattern_bindings_with_path(elem, Some(path))
+                })
+                .collect(),
+
+            // Reference: let &x = ... or let &mut x = ...
+            Pat::Reference(reference) => {
+                // Inner pattern binds to dereferenced value
+                self.extract_pattern_bindings_with_path(&reference.pat, parent_path)
+            }
+
+            // Or: let Ok(v) | Err(v) = ... (all branches bind same names)
+            Pat::Or(or) => {
+                // Take bindings from first case (all cases should bind same vars)
+                or.cases
+                    .first()
+                    .map(|p| self.extract_pattern_bindings_with_path(p, parent_path))
+                    .unwrap_or_default()
+            }
+
+            // Type annotation: let x: T = ...
+            Pat::Type(pat_type) => {
+                self.extract_pattern_bindings_with_path(&pat_type.pat, parent_path)
+            }
+
+            // Paren: let (x) = ... (just wrapping)
+            Pat::Paren(paren) => self.extract_pattern_bindings_with_path(&paren.pat, parent_path),
+
+            // Rest: .. (in slices, doesn't bind a variable unless named)
+            Pat::Rest(_) => vec![],
+
+            // Wildcard: let _ = ... (no binding)
+            Pat::Wild(_) => vec![],
+
+            // Literal: match arm literal, no binding
+            Pat::Lit(_) => vec![],
+
+            // Range: match arm range, no binding
+            Pat::Range(_) => vec![],
+
+            // Path: match arm path (enum variant without data), no binding
+            Pat::Path(_) => vec![],
+
+            // Const pattern
+            Pat::Const(_) => vec![],
+
+            // Macro: can't analyze, skip
+            Pat::Macro(_) => vec![],
+
+            // Verbatim: raw tokens, skip
+            Pat::Verbatim(_) => vec![],
+
+            _ => vec![],
+        }
+    }
+
+    /// Append a child path to a parent path.
+    fn append_path(parent: Option<AccessPath>, child: AccessPath) -> AccessPath {
+        match parent {
+            Some(AccessPath::Nested(mut vec)) => {
+                vec.push(child);
+                AccessPath::Nested(vec)
+            }
+            Some(other) => AccessPath::Nested(vec![other, child]),
+            None => child,
+        }
+    }
+
+    /// Create an Rvalue representing field/element access for a pattern binding.
+    fn create_access_rvalue(
+        &self,
+        source: &Rvalue,
+        path: &AccessPath,
+        source_vars: &[VarId],
+    ) -> Rvalue {
+        // Get base variable from source
+        let base_var = match source {
+            Rvalue::Use(var) => Some(*var),
+            Rvalue::FieldAccess { base, .. } => Some(*base),
+            _ => source_vars.first().copied(),
+        };
+
+        match (base_var, path) {
+            (Some(base), AccessPath::TupleIndex(idx)) => Rvalue::FieldAccess {
+                base,
+                field: idx.to_string(),
+            },
+            (Some(base), AccessPath::NamedField(name)) => Rvalue::FieldAccess {
+                base,
+                field: name.clone(),
+            },
+            (Some(base), AccessPath::ArrayIndex(idx)) => Rvalue::FieldAccess {
+                base,
+                field: format!("[{}]", idx),
+            },
+            (Some(base), AccessPath::SliceRest(idx)) => Rvalue::FieldAccess {
+                base,
+                field: format!("[{}:]", idx),
+            },
+            (Some(base), AccessPath::Nested(paths)) => {
+                // For nested access, recursively apply each path element
+                // Start with the base and apply each path step
+                if paths.is_empty() {
+                    return Rvalue::Use(base);
+                }
+
+                // For simplicity, just use the last path element's field name
+                // Full nested tracking would require a more complex Rvalue
+                let field = path.to_field_string();
+                Rvalue::FieldAccess { base, field }
+            }
+            (None, _) => source.clone(),
+        }
+    }
+
+    /// Process a match expression pattern, binding variables from scrutinee.
+    ///
+    /// Used by match arms to bind pattern variables to fields of the scrutinee.
+    /// The scrutinee is the expression being matched against (e.g., `x` in `match x { ... }`).
+    ///
+    /// # Arguments
+    ///
+    /// * `pat` - The pattern from a match arm
+    /// * `scrutinee` - The VarId of the scrutinee variable
+    ///
+    /// # Example
+    ///
+    /// For `match pair { (a, b) => ... }`:
+    /// - `a` gets `init = Rvalue::FieldAccess { base: pair, field: "0" }`
+    /// - `b` gets `init = Rvalue::FieldAccess { base: pair, field: "1" }`
+    #[allow(dead_code)]
+    fn bind_pattern_vars(&mut self, pat: &Pat, scrutinee: VarId) {
+        let bindings = self.extract_pattern_bindings(pat);
+
+        for binding in bindings {
+            let var = self.get_or_create_var(&binding.name);
+
+            let init = match &binding.access_path {
+                Some(AccessPath::TupleIndex(idx)) => Rvalue::FieldAccess {
+                    base: scrutinee,
+                    field: idx.to_string(),
+                },
+                Some(AccessPath::NamedField(name)) => Rvalue::FieldAccess {
+                    base: scrutinee,
+                    field: name.clone(),
+                },
+                Some(AccessPath::ArrayIndex(idx)) => Rvalue::FieldAccess {
+                    base: scrutinee,
+                    field: format!("[{}]", idx),
+                },
+                Some(AccessPath::SliceRest(idx)) => Rvalue::FieldAccess {
+                    base: scrutinee,
+                    field: format!("[{}:]", idx),
+                },
+                Some(AccessPath::Nested(_)) => {
+                    // For nested access, use the full path
+                    let field = binding.access_path.as_ref().unwrap().to_field_string();
+                    Rvalue::FieldAccess {
+                        base: scrutinee,
+                        field,
+                    }
+                }
+                None => Rvalue::Use(scrutinee),
+            };
+
+            self.current_block.push(Statement::Declare {
+                var,
+                init: Some(init),
+                line: None, // Pattern doesn't have its own span easily
+            });
         }
     }
 
@@ -3949,11 +4287,7 @@ mod tests {
         let escape = EscapeAnalysis::analyze(&cfg);
 
         // Both x and y should be captured
-        assert_eq!(
-            escape.captured_vars.len(),
-            2,
-            "Should capture both x and y"
-        );
+        assert_eq!(escape.captured_vars.len(), 2, "Should capture both x and y");
 
         // Captured vars should be in escaping_vars
         for captured in &escape.captured_vars {
@@ -4710,5 +5044,284 @@ mod tests {
 
         // Should not panic
         let _taint = TaintAnalysis::analyze(&cfg, &liveness, &escape);
+    }
+
+    // ============================================================================
+    // Pattern Destructuring Tests (Spec 252)
+    // ============================================================================
+
+    #[test]
+    fn test_tuple_destructuring() {
+        let block: Block = parse_quote! {
+            {
+                let (a, b) = get_pair();
+                a + b
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // Both a and b should be tracked
+        assert!(cfg.var_names.contains(&"a".to_string()));
+        assert!(cfg.var_names.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn test_struct_destructuring() {
+        let block: Block = parse_quote! {
+            {
+                let Point { x, y } = get_point();
+                x * y
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        assert!(cfg.var_names.contains(&"x".to_string()));
+        assert!(cfg.var_names.contains(&"y".to_string()));
+    }
+
+    #[test]
+    fn test_struct_destructuring_with_rename() {
+        let block: Block = parse_quote! {
+            {
+                let Point { x: my_x, y: my_y } = get_point();
+                my_x + my_y
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        assert!(cfg.var_names.contains(&"my_x".to_string()));
+        assert!(cfg.var_names.contains(&"my_y".to_string()));
+    }
+
+    #[test]
+    fn test_option_destructuring() {
+        let block: Block = parse_quote! {
+            {
+                let Some(value) = maybe_value else { return };
+                value
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        assert!(cfg.var_names.contains(&"value".to_string()));
+    }
+
+    #[test]
+    fn test_nested_destructuring() {
+        let block: Block = parse_quote! {
+            {
+                let (a, (b, c)) = get_nested();
+                a + b + c
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        assert!(cfg.var_names.contains(&"a".to_string()));
+        assert!(cfg.var_names.contains(&"b".to_string()));
+        assert!(cfg.var_names.contains(&"c".to_string()));
+    }
+
+    #[test]
+    fn test_slice_destructuring() {
+        let block: Block = parse_quote! {
+            {
+                let [first, second] = arr;
+                first + second
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        assert!(cfg.var_names.contains(&"first".to_string()));
+        assert!(cfg.var_names.contains(&"second".to_string()));
+    }
+
+    #[test]
+    fn test_reference_pattern() {
+        let block: Block = parse_quote! {
+            {
+                let &x = some_ref;
+                x
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        assert!(cfg.var_names.contains(&"x".to_string()));
+    }
+
+    #[test]
+    fn test_or_pattern() {
+        // Test or-pattern extraction directly (or-patterns in let require irrefutable patterns)
+        let pat: Pat = parse_quote!(Ok(v) | Err(v));
+        let builder = CfgBuilder::new();
+        let bindings = builder.extract_pattern_bindings(&pat);
+
+        // v should be tracked (same name in both arms, we take from first)
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].name, "v");
+    }
+
+    #[test]
+    fn test_wildcard_pattern_no_binding() {
+        let block: Block = parse_quote! {
+            {
+                let _ = compute_and_discard();
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // No user-named variables should be tracked
+        let user_vars: Vec<_> = cfg
+            .var_names
+            .iter()
+            .filter(|n| !n.starts_with("_temp") && !n.starts_with("_"))
+            .collect();
+        // Only function name if any
+        assert!(user_vars.is_empty() || user_vars.iter().all(|n| n.contains("compute")));
+    }
+
+    #[test]
+    fn test_pattern_binding_extraction() {
+        let pat: Pat = parse_quote!((a, (b, c), Point { x, y }));
+        let builder = CfgBuilder::new();
+        let bindings = builder.extract_pattern_bindings(&pat);
+
+        let names: Vec<_> = bindings.iter().map(|b| &b.name).collect();
+        assert!(names.contains(&&"a".to_string()));
+        assert!(names.contains(&&"b".to_string()));
+        assert!(names.contains(&&"c".to_string()));
+        assert!(names.contains(&&"x".to_string()));
+        assert!(names.contains(&&"y".to_string()));
+    }
+
+    #[test]
+    fn test_access_path_for_tuple() {
+        let pat: Pat = parse_quote!((a, b));
+        let builder = CfgBuilder::new();
+        let bindings = builder.extract_pattern_bindings(&pat);
+
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(bindings[0].access_path, Some(AccessPath::TupleIndex(0)));
+        assert_eq!(bindings[1].access_path, Some(AccessPath::TupleIndex(1)));
+    }
+
+    #[test]
+    fn test_access_path_for_struct() {
+        let pat: Pat = parse_quote!(Point { x, y });
+        let builder = CfgBuilder::new();
+        let bindings = builder.extract_pattern_bindings(&pat);
+
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(
+            bindings[0].access_path,
+            Some(AccessPath::NamedField("x".to_string()))
+        );
+        assert_eq!(
+            bindings[1].access_path,
+            Some(AccessPath::NamedField("y".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_access_path_nested() {
+        let pat: Pat = parse_quote!((a, Point { x }));
+        let builder = CfgBuilder::new();
+        let bindings = builder.extract_pattern_bindings(&pat);
+
+        assert_eq!(bindings.len(), 2);
+        // a should have TupleIndex(0)
+        assert_eq!(bindings[0].access_path, Some(AccessPath::TupleIndex(0)));
+        // x should have Nested([TupleIndex(1), NamedField("x")])
+        assert_eq!(
+            bindings[1].access_path,
+            Some(AccessPath::Nested(vec![
+                AccessPath::TupleIndex(1),
+                AccessPath::NamedField("x".to_string())
+            ]))
+        );
+    }
+
+    #[test]
+    fn test_access_path_to_field_string() {
+        assert_eq!(AccessPath::TupleIndex(0).to_field_string(), "0");
+        assert_eq!(AccessPath::TupleIndex(1).to_field_string(), "1");
+        assert_eq!(
+            AccessPath::NamedField("foo".to_string()).to_field_string(),
+            "foo"
+        );
+        assert_eq!(AccessPath::ArrayIndex(0).to_field_string(), "[0]");
+        assert_eq!(AccessPath::SliceRest(2).to_field_string(), "[2:]");
+        assert_eq!(
+            AccessPath::Nested(vec![
+                AccessPath::TupleIndex(0),
+                AccessPath::NamedField("x".to_string())
+            ])
+            .to_field_string(),
+            "0.x"
+        );
+    }
+
+    #[test]
+    fn test_data_flow_through_pattern() {
+        let block: Block = parse_quote! {
+            {
+                let source = get_data();
+                let (a, b) = source;
+                a + b
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // All variables should be tracked
+        assert!(cfg.var_names.contains(&"source".to_string()));
+        assert!(cfg.var_names.contains(&"a".to_string()));
+        assert!(cfg.var_names.contains(&"b".to_string()));
+
+        // Check that statements were created with proper field access
+        let has_field_access = cfg.blocks.iter().any(|block| {
+            block.statements.iter().any(|stmt| match stmt {
+                Statement::Declare {
+                    init: Some(Rvalue::FieldAccess { field, .. }),
+                    ..
+                } => field == "0" || field == "1",
+                _ => false,
+            })
+        });
+        assert!(
+            has_field_access,
+            "Should have field access for tuple elements"
+        );
+    }
+
+    #[test]
+    fn test_pattern_mutable_binding() {
+        let pat: Pat = parse_quote!((mut a, b));
+        let builder = CfgBuilder::new();
+        let bindings = builder.extract_pattern_bindings(&pat);
+
+        assert_eq!(bindings.len(), 2);
+        assert!(bindings[0].is_mut);
+        assert!(!bindings[1].is_mut);
+    }
+
+    #[test]
+    fn test_pattern_ref_binding() {
+        let pat: Pat = parse_quote!((ref a, ref mut b));
+        let builder = CfgBuilder::new();
+        let bindings = builder.extract_pattern_bindings(&pat);
+
+        assert_eq!(bindings.len(), 2);
+        assert!(bindings[0].by_ref);
+        assert!(bindings[1].by_ref);
+        assert!(!bindings[0].is_mut);
+        assert!(bindings[1].is_mut);
     }
 }
