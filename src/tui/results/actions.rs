@@ -531,264 +531,339 @@ fn extract_git_context_text(item: &UnifiedDebtItem) -> String {
 // Patterns page extraction
 // =============================================================================
 
+/// Pure function to determine entropy level description
+fn entropy_description(score: f64) -> &'static str {
+    if score < 0.3 {
+        "low (repetitive)"
+    } else if score < 0.5 {
+        "medium (typical)"
+    } else {
+        "high (chaotic)"
+    }
+}
+
+/// Format entropy analysis section - returns None if no entropy data
+fn format_entropy_section(
+    entropy: &crate::priority::unified_scorer::EntropyDetails,
+) -> Option<String> {
+    let mut output = String::new();
+    add_section_header(&mut output, "entropy analysis");
+
+    let entropy_desc = entropy_description(entropy.entropy_score);
+    add_label_value(
+        &mut output,
+        "entropy",
+        &format!("{:.3} {}", entropy.entropy_score, entropy_desc),
+    );
+    add_label_value(
+        &mut output,
+        "repetition",
+        &format!("{:.3}", entropy.pattern_repetition),
+    );
+
+    if entropy.dampening_factor < 1.0 {
+        add_label_value(
+            &mut output,
+            "dampening",
+            &format!("{:.3}x reduction", entropy.dampening_factor),
+        );
+        add_label_value(
+            &mut output,
+            "cognitive complexity",
+            &format!(
+                "{} → {} (dampened)",
+                entropy.original_complexity, entropy.adjusted_cognitive
+            ),
+        );
+    } else {
+        add_label_value(&mut output, "dampening", "No");
+    }
+
+    add_blank_line(&mut output);
+    Some(output)
+}
+
+/// Format pattern analysis section - returns None if no significant pattern data
+fn format_pattern_analysis_section(
+    pattern_analysis: &crate::output::PatternAnalysis,
+) -> Option<String> {
+    let has_frameworks = pattern_analysis.frameworks.has_patterns();
+    let has_traits = !pattern_analysis.rust_patterns.trait_impls.is_empty();
+
+    if !has_frameworks && !has_traits {
+        return None;
+    }
+
+    let mut output = String::new();
+    add_section_header(&mut output, "pattern analysis");
+
+    if has_frameworks {
+        add_label_value(&mut output, "frameworks", "Detected");
+    }
+
+    if has_traits {
+        add_label_value(
+            &mut output,
+            "traits",
+            &pattern_analysis.rust_patterns.trait_impls.len().to_string(),
+        );
+    }
+
+    add_blank_line(&mut output);
+    Some(output)
+}
+
+/// Format detected pattern section - returns None if no detected patterns
+fn format_detected_pattern_section(
+    detected_pattern: &crate::priority::detected_pattern::DetectedPattern,
+) -> Option<String> {
+    let mut output = String::new();
+    add_section_header(&mut output, "detected patterns");
+    add_label_value(
+        &mut output,
+        "pattern",
+        &format!("{:?}", detected_pattern.pattern_type),
+    );
+    add_label_value(
+        &mut output,
+        "confidence",
+        &format!("{:.1}%", detected_pattern.confidence * 100.0),
+    );
+    add_blank_line(&mut output);
+    Some(output)
+}
+
+/// Format language-specific section - returns None if no relevant data
+fn format_language_specific_section(
+    lang_specific: &crate::core::LanguageSpecificData,
+) -> Option<String> {
+    match lang_specific {
+        crate::core::LanguageSpecificData::Rust(rust_data) => {
+            let has_trait = rust_data.trait_impl.is_some();
+            let has_async = !rust_data.async_patterns.is_empty();
+            let has_errors = !rust_data.error_patterns.is_empty();
+            let has_builders = !rust_data.builder_patterns.is_empty();
+
+            if !has_trait && !has_async && !has_errors && !has_builders {
+                return None;
+            }
+
+            let mut output = String::new();
+            add_section_header(&mut output, "language-specific (rust)");
+
+            if let Some(ref trait_impl) = rust_data.trait_impl {
+                add_label_value(&mut output, "trait", &format!("{:?}", trait_impl));
+            }
+            if has_async {
+                add_label_value(
+                    &mut output,
+                    "async",
+                    &format!("{} detected", rust_data.async_patterns.len()),
+                );
+            }
+            if has_errors {
+                add_label_value(
+                    &mut output,
+                    "errors",
+                    &format!("{} detected", rust_data.error_patterns.len()),
+                );
+            }
+            if has_builders {
+                add_label_value(
+                    &mut output,
+                    "builders",
+                    &format!("{} detected", rust_data.builder_patterns.len()),
+                );
+            }
+
+            add_blank_line(&mut output);
+            Some(output)
+        }
+    }
+}
+
+/// Format purity analysis section - returns None if no purity data
+fn format_purity_section(func_id: &FunctionId, data_flow: &DataFlowGraph) -> Option<String> {
+    let purity_info = data_flow.get_purity_info(func_id)?;
+
+    let mut output = String::new();
+    add_section_header(&mut output, "purity analysis");
+    add_label_value(
+        &mut output,
+        "pure",
+        if purity_info.is_pure { "Yes" } else { "No" },
+    );
+    add_label_value(
+        &mut output,
+        "confidence",
+        &format!("{:.1}%", purity_info.confidence * 100.0),
+    );
+
+    if !purity_info.impurity_reasons.is_empty() {
+        add_label_value(
+            &mut output,
+            "reasons",
+            &purity_info.impurity_reasons.join(", "),
+        );
+    }
+
+    add_blank_line(&mut output);
+    Some(output)
+}
+
+/// Format error handling section - returns None if no error swallowing data
+fn format_error_handling_section(
+    error_count: Option<u32>,
+    error_patterns: Option<&Vec<String>>,
+) -> Option<String> {
+    if error_count.is_none() && error_patterns.is_none() {
+        return None;
+    }
+
+    let mut output = String::new();
+    add_section_header(&mut output, "error handling");
+
+    if let Some(count) = error_count {
+        add_label_value(&mut output, "errors swallowed", &count.to_string());
+    }
+
+    if let Some(patterns) = error_patterns {
+        for pattern in patterns {
+            add_label_value(&mut output, "pattern", pattern);
+        }
+    }
+
+    add_blank_line(&mut output);
+    Some(output)
+}
+
+/// Format god object aggregated entropy section - returns None if no entropy data
+fn format_god_object_entropy_section(
+    entropy: &crate::priority::unified_scorer::EntropyDetails,
+) -> Option<String> {
+    let mut output = String::new();
+    add_section_header(&mut output, "god object entropy (aggregated)");
+
+    let entropy_desc = entropy_description(entropy.entropy_score);
+    add_label_value(
+        &mut output,
+        "entropy",
+        &format!("{:.3} {}", entropy.entropy_score, entropy_desc),
+    );
+    add_label_value(
+        &mut output,
+        "repetition",
+        &format!("{:.3}", entropy.pattern_repetition),
+    );
+    add_label_value(
+        &mut output,
+        "total complexity",
+        &format!(
+            "{} (original) → {} (adjusted)",
+            entropy.original_complexity, entropy.adjusted_cognitive
+        ),
+    );
+
+    if entropy.dampening_factor < 1.0 {
+        add_label_value(
+            &mut output,
+            "dampening",
+            &format!("{:.3}x reduction", entropy.dampening_factor),
+        );
+    }
+
+    add_blank_line(&mut output);
+    Some(output)
+}
+
+/// Format god object aggregated error handling section - returns None if no error data
+fn format_god_object_error_handling_section(
+    error_count: Option<u32>,
+    error_patterns: Option<&Vec<String>>,
+) -> Option<String> {
+    let has_count = error_count.is_some();
+    let has_patterns = error_patterns
+        .as_ref()
+        .map(|p| !p.is_empty())
+        .unwrap_or(false);
+
+    if !has_count && !has_patterns {
+        return None;
+    }
+
+    let mut output = String::new();
+    add_section_header(&mut output, "god object error handling (aggregated)");
+
+    if let Some(count) = error_count {
+        add_label_value(
+            &mut output,
+            "errors swallowed",
+            &format!("{} across all functions", count),
+        );
+    }
+
+    if let Some(patterns) = error_patterns {
+        add_label_value(&mut output, "unique patterns", &patterns.len().to_string());
+        for pattern in patterns {
+            add_label_value(&mut output, "pattern", pattern);
+        }
+    }
+
+    add_blank_line(&mut output);
+    Some(output)
+}
+
 /// Extract patterns page content as plain text (matches TUI exactly)
 fn extract_patterns_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> String {
-    let mut output = String::new();
-    let mut has_any_data = false;
-
-    // Entropy Analysis section
-    if let Some(ref entropy) = item.entropy_details {
-        has_any_data = true;
-        add_section_header(&mut output, "entropy analysis");
-
-        let entropy_desc = if entropy.entropy_score < 0.3 {
-            "low (repetitive)"
-        } else if entropy.entropy_score < 0.5 {
-            "medium (typical)"
-        } else {
-            "high (chaotic)"
-        };
-
-        add_label_value(
-            &mut output,
-            "entropy",
-            &format!("{:.3} {}", entropy.entropy_score, entropy_desc),
-        );
-        add_label_value(
-            &mut output,
-            "repetition",
-            &format!("{:.3}", entropy.pattern_repetition),
-        );
-
-        if entropy.dampening_factor < 1.0 {
-            add_label_value(
-                &mut output,
-                "dampening",
-                &format!("{:.3}x reduction", entropy.dampening_factor),
-            );
-            add_label_value(
-                &mut output,
-                "cognitive complexity",
-                &format!(
-                    "{} → {} (dampened)",
-                    entropy.original_complexity, entropy.adjusted_cognitive
-                ),
-            );
-        } else {
-            add_label_value(&mut output, "dampening", "No");
-        }
-
-        add_blank_line(&mut output);
-    }
-
-    // Pattern Analysis section
-    if let Some(ref pattern_analysis) = item.pattern_analysis {
-        has_any_data = true;
-        add_section_header(&mut output, "pattern analysis");
-
-        if pattern_analysis.frameworks.has_patterns() {
-            add_label_value(&mut output, "frameworks", "Detected");
-        }
-
-        if !pattern_analysis.rust_patterns.trait_impls.is_empty() {
-            add_label_value(
-                &mut output,
-                "traits",
-                &pattern_analysis.rust_patterns.trait_impls.len().to_string(),
-            );
-        }
-
-        add_blank_line(&mut output);
-    }
-
-    // Detected Pattern section
-    if let Some(ref detected_pattern) = item.detected_pattern {
-        has_any_data = true;
-        add_section_header(&mut output, "detected patterns");
-        add_label_value(
-            &mut output,
-            "pattern",
-            &format!("{:?}", detected_pattern.pattern_type),
-        );
-        add_label_value(
-            &mut output,
-            "confidence",
-            &format!("{:.1}%", detected_pattern.confidence * 100.0),
-        );
-        add_blank_line(&mut output);
-    }
-
-    // Language-Specific section
-    if let Some(ref lang_specific) = item.language_specific {
-        has_any_data = true;
-        add_section_header(&mut output, "language-specific (rust)");
-
-        match lang_specific {
-            crate::core::LanguageSpecificData::Rust(rust_data) => {
-                if let Some(ref trait_impl) = rust_data.trait_impl {
-                    add_label_value(&mut output, "trait", &format!("{:?}", trait_impl));
-                }
-                if !rust_data.async_patterns.is_empty() {
-                    add_label_value(
-                        &mut output,
-                        "async",
-                        &format!("{} detected", rust_data.async_patterns.len()),
-                    );
-                }
-                if !rust_data.error_patterns.is_empty() {
-                    add_label_value(
-                        &mut output,
-                        "errors",
-                        &format!("{} detected", rust_data.error_patterns.len()),
-                    );
-                }
-                if !rust_data.builder_patterns.is_empty() {
-                    add_label_value(
-                        &mut output,
-                        "builders",
-                        &format!("{} detected", rust_data.builder_patterns.len()),
-                    );
-                }
-            }
-        }
-
-        add_blank_line(&mut output);
-    }
-
-    // Purity Analysis section
     let func_id = FunctionId::new(
         item.location.file.clone(),
         item.location.function.clone(),
         item.location.line,
     );
 
-    if let Some(purity_info) = data_flow.get_purity_info(&func_id) {
-        has_any_data = true;
-        add_section_header(&mut output, "purity analysis");
-        add_label_value(
-            &mut output,
-            "pure",
-            if purity_info.is_pure { "Yes" } else { "No" },
-        );
-        add_label_value(
-            &mut output,
-            "confidence",
-            &format!("{:.1}%", purity_info.confidence * 100.0),
-        );
+    // Collect all section formatters as Options
+    let sections: Vec<Option<String>> = vec![
+        item.entropy_details
+            .as_ref()
+            .and_then(format_entropy_section),
+        item.pattern_analysis
+            .as_ref()
+            .and_then(format_pattern_analysis_section),
+        item.detected_pattern
+            .as_ref()
+            .and_then(format_detected_pattern_section),
+        item.language_specific
+            .as_ref()
+            .and_then(format_language_specific_section),
+        format_purity_section(&func_id, data_flow),
+        format_error_handling_section(
+            item.error_swallowing_count,
+            item.error_swallowing_patterns.as_ref(),
+        ),
+        item.god_object_indicators
+            .as_ref()
+            .filter(|g| g.is_god_object)
+            .and_then(|g| g.aggregated_entropy.as_ref())
+            .and_then(format_god_object_entropy_section),
+        item.god_object_indicators
+            .as_ref()
+            .filter(|g| g.is_god_object)
+            .and_then(|g| {
+                format_god_object_error_handling_section(
+                    g.aggregated_error_swallowing_count,
+                    g.aggregated_error_swallowing_patterns.as_ref(),
+                )
+            }),
+    ];
 
-        if !purity_info.impurity_reasons.is_empty() {
-            add_label_value(
-                &mut output,
-                "reasons",
-                &purity_info.impurity_reasons.join(", "),
-            );
-        }
+    // Compose sections using functional patterns
+    let output: String = sections.into_iter().flatten().collect();
 
-        add_blank_line(&mut output);
+    if output.is_empty() {
+        "No pattern data available\n".to_string()
+    } else {
+        output
     }
-
-    // Error Swallowing section
-    if item.error_swallowing_count.is_some() || item.error_swallowing_patterns.is_some() {
-        has_any_data = true;
-        add_section_header(&mut output, "error handling");
-
-        if let Some(count) = item.error_swallowing_count {
-            add_label_value(&mut output, "errors swallowed", &count.to_string());
-        }
-
-        if let Some(ref patterns) = item.error_swallowing_patterns {
-            for pattern in patterns {
-                add_label_value(&mut output, "pattern", pattern);
-            }
-        }
-
-        add_blank_line(&mut output);
-    }
-
-    // God Object Aggregated Patterns
-    if let Some(ref god_indicators) = item.god_object_indicators {
-        if god_indicators.is_god_object {
-            // Show aggregated entropy for god objects
-            if let Some(ref entropy) = god_indicators.aggregated_entropy {
-                has_any_data = true;
-                add_section_header(&mut output, "god object entropy (aggregated)");
-
-                let entropy_desc = if entropy.entropy_score < 0.3 {
-                    "low (repetitive)"
-                } else if entropy.entropy_score < 0.5 {
-                    "medium (typical)"
-                } else {
-                    "high (chaotic)"
-                };
-
-                add_label_value(
-                    &mut output,
-                    "entropy",
-                    &format!("{:.3} {}", entropy.entropy_score, entropy_desc),
-                );
-                add_label_value(
-                    &mut output,
-                    "repetition",
-                    &format!("{:.3}", entropy.pattern_repetition),
-                );
-                add_label_value(
-                    &mut output,
-                    "total complexity",
-                    &format!(
-                        "{} (original) → {} (adjusted)",
-                        entropy.original_complexity, entropy.adjusted_cognitive
-                    ),
-                );
-
-                if entropy.dampening_factor < 1.0 {
-                    add_label_value(
-                        &mut output,
-                        "dampening",
-                        &format!("{:.3}x reduction", entropy.dampening_factor),
-                    );
-                }
-
-                add_blank_line(&mut output);
-            }
-
-            // Show aggregated error swallowing for god objects
-            let has_error_data = god_indicators.aggregated_error_swallowing_count.is_some()
-                || god_indicators
-                    .aggregated_error_swallowing_patterns
-                    .as_ref()
-                    .map(|p| !p.is_empty())
-                    .unwrap_or(false);
-
-            if has_error_data {
-                has_any_data = true;
-                add_section_header(&mut output, "god object error handling (aggregated)");
-
-                if let Some(count) = god_indicators.aggregated_error_swallowing_count {
-                    add_label_value(
-                        &mut output,
-                        "errors swallowed",
-                        &format!("{} across all functions", count),
-                    );
-                }
-
-                if let Some(ref patterns) = god_indicators.aggregated_error_swallowing_patterns {
-                    add_label_value(&mut output, "unique patterns", &patterns.len().to_string());
-                    for pattern in patterns {
-                        add_label_value(&mut output, "pattern", pattern);
-                    }
-                }
-
-                add_blank_line(&mut output);
-            }
-        }
-    }
-
-    // If no data available
-    if !has_any_data {
-        output.push_str("No pattern data available\n");
-    }
-
-    output
 }
 
 // =============================================================================
