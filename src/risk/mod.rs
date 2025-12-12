@@ -328,6 +328,7 @@ mod tests {
     /// This simulates what happens when running `debtmap analyze --context`
     /// on a large codebase like debtmap itself (~4000 functions).
     #[test]
+    #[ignore] // Takes >2 minutes - run with `cargo test -- --ignored`
     fn test_analyze_many_functions_with_context_no_stack_overflow() {
         use crate::core::ComplexityMetrics;
         use crate::priority::call_graph::CallGraph;
