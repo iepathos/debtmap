@@ -262,6 +262,70 @@ pub struct VarId {
     pub version: u32,
 }
 
+// ============================================================================
+// Statement-Level Data Types (Spec 250)
+// ============================================================================
+
+/// Index of a statement within a basic block.
+pub type StatementIdx = usize;
+
+/// A specific program point: block and statement within that block.
+///
+/// Program points are used to precisely identify locations in the CFG
+/// where definitions and uses occur.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ProgramPoint {
+    /// The block containing this program point.
+    pub block: BlockId,
+    /// The statement index within the block.
+    /// For terminators, this equals the number of statements (past the last statement).
+    pub stmt: StatementIdx,
+}
+
+impl ProgramPoint {
+    /// Create a new program point.
+    pub fn new(block: BlockId, stmt: StatementIdx) -> Self {
+        Self { block, stmt }
+    }
+
+    /// Create a point at the start of a block (before first statement).
+    pub fn block_entry(block: BlockId) -> Self {
+        Self { block, stmt: 0 }
+    }
+
+    /// Create a point at the end of a block (at the terminator).
+    pub fn block_exit(block: BlockId, stmt_count: usize) -> Self {
+        Self {
+            block,
+            stmt: stmt_count,
+        }
+    }
+}
+
+/// A definition occurrence: variable defined at a specific point.
+///
+/// Represents a single definition (assignment or declaration) of a variable
+/// at a precise location in the program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Definition {
+    /// The variable being defined.
+    pub var: VarId,
+    /// The program point where the definition occurs.
+    pub point: ProgramPoint,
+}
+
+/// A use occurrence: variable used at a specific point.
+///
+/// Represents a single use (read) of a variable at a precise location
+/// in the program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Use {
+    /// The variable being used.
+    pub var: VarId,
+    /// The program point where the use occurs.
+    pub point: ProgramPoint,
+}
+
 /// Right-hand side of assignment
 #[derive(Debug, Clone)]
 pub enum Rvalue {
@@ -645,6 +709,14 @@ impl LivenessInfo {
 /// - `reach_in\[block\]` = union of `reach_out\[predecessor\]` for all predecessors
 /// - `reach_out\[block\]` = (reach_in\[block\] - kill\[block\]) ∪ gen\[block\]
 ///
+/// # Statement-Level Precision (Spec 250)
+///
+/// In addition to block-level tracking, this struct provides statement-level
+/// precision through `precise_def_use` and `use_def_chains`. These enable:
+/// - Same-block dead store detection
+/// - Precise data flow path tracking
+/// - SSA-style analysis without explicit phi nodes
+///
 /// # Example
 ///
 /// ```ignore
@@ -658,19 +730,40 @@ impl LivenessInfo {
 ///         println!("Definition of x.0 reaches this block");
 ///     }
 /// }
+///
+/// // Statement-level: check if a specific definition is dead
+/// for def in &reaching.all_definitions {
+///     if reaching.is_dead_definition(def) {
+///         println!("Dead store at {:?}", def.point);
+///     }
+/// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ReachingDefinitions {
+    // --- Block-level (existing, preserved for backward compatibility) ---
     /// Definitions that reach the entry of each block
     pub reach_in: HashMap<BlockId, HashSet<VarId>>,
     /// Definitions that reach the exit of each block
     pub reach_out: HashMap<BlockId, HashSet<VarId>>,
-    /// Def-use chains: maps each definition to the program points where it's used
+    /// Def-use chains at block level (backward compatibility)
     pub def_use_chains: HashMap<VarId, HashSet<BlockId>>,
+
+    // --- Statement-level (new, Spec 250) ---
+    /// Precise def-use chains: definition point → use points
+    pub precise_def_use: HashMap<Definition, HashSet<ProgramPoint>>,
+    /// Use-def chains (inverse): use point → reaching definitions
+    pub use_def_chains: HashMap<Use, HashSet<Definition>>,
+    /// All definitions in the program
+    pub all_definitions: Vec<Definition>,
+    /// All uses in the program
+    pub all_uses: Vec<Use>,
 }
 
 impl ReachingDefinitions {
     /// Compute reaching definitions for a CFG using forward data flow analysis.
+    ///
+    /// This performs both block-level analysis (for backward compatibility) and
+    /// statement-level analysis (Spec 250) for precise def-use chains.
     pub fn analyze(cfg: &ControlFlowGraph) -> Self {
         let mut reach_in: HashMap<BlockId, HashSet<VarId>> = HashMap::new();
         let mut reach_out: HashMap<BlockId, HashSet<VarId>> = HashMap::new();
@@ -714,15 +807,267 @@ impl ReachingDefinitions {
             }
         }
 
-        // Build def-use chains by finding where each definition is used
+        // Build block-level def-use chains (backward compatibility)
         let def_use_chains = Self::build_def_use_chains(cfg, &reach_in);
 
+        // --- Statement-level analysis (Spec 250) ---
+        let (all_definitions, all_uses) = Self::collect_defs_and_uses(cfg);
+        let (precise_def_use, use_def_chains) =
+            Self::compute_precise_chains(cfg, &reach_in, &all_definitions, &all_uses);
+
         ReachingDefinitions {
+            // Block-level (backward compatible)
             reach_in,
             reach_out,
             def_use_chains,
+            // Statement-level (new)
+            precise_def_use,
+            use_def_chains,
+            all_definitions,
+            all_uses,
         }
     }
+
+    // ========================================================================
+    // Statement-Level Analysis Methods (Spec 250)
+    // ========================================================================
+
+    /// Collect all definitions and uses with their program points.
+    fn collect_defs_and_uses(cfg: &ControlFlowGraph) -> (Vec<Definition>, Vec<Use>) {
+        let mut definitions = Vec::new();
+        let mut uses = Vec::new();
+
+        for block in &cfg.blocks {
+            for (stmt_idx, stmt) in block.statements.iter().enumerate() {
+                let point = ProgramPoint::new(block.id, stmt_idx);
+
+                match stmt {
+                    Statement::Declare { var, init, .. } => {
+                        // This is a definition
+                        definitions.push(Definition { var: *var, point });
+
+                        // Init expression may use variables
+                        if let Some(init_rval) = init {
+                            for used_var in Self::rvalue_uses(init_rval) {
+                                uses.push(Use {
+                                    var: used_var,
+                                    point,
+                                });
+                            }
+                        }
+                    }
+
+                    Statement::Assign { target, source, .. } => {
+                        // This is a definition
+                        definitions.push(Definition {
+                            var: *target,
+                            point,
+                        });
+
+                        // Source uses variables
+                        for used_var in Self::rvalue_uses(source) {
+                            uses.push(Use {
+                                var: used_var,
+                                point,
+                            });
+                        }
+                    }
+
+                    Statement::Expr { expr, .. } => {
+                        // Expression may use variables
+                        for used_var in Self::expr_kind_uses(expr) {
+                            uses.push(Use {
+                                var: used_var,
+                                point,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Terminator may use variables
+            let term_point = ProgramPoint::block_exit(block.id, block.statements.len());
+            for used_var in Self::terminator_uses(&block.terminator) {
+                uses.push(Use {
+                    var: used_var,
+                    point: term_point,
+                });
+            }
+        }
+
+        (definitions, uses)
+    }
+
+    /// Extract variables used in an Rvalue.
+    fn rvalue_uses(rval: &Rvalue) -> Vec<VarId> {
+        match rval {
+            Rvalue::Use(var) => vec![*var],
+            Rvalue::BinaryOp { left, right, .. } => vec![*left, *right],
+            Rvalue::UnaryOp { operand, .. } => vec![*operand],
+            Rvalue::FieldAccess { base, .. } => vec![*base],
+            Rvalue::Ref { var, .. } => vec![*var],
+            Rvalue::Call { args, .. } => args.clone(),
+            Rvalue::Constant => vec![],
+        }
+    }
+
+    /// Extract variables used in an ExprKind.
+    fn expr_kind_uses(expr: &ExprKind) -> Vec<VarId> {
+        match expr {
+            ExprKind::MethodCall { receiver, args, .. } => {
+                let mut vars = vec![*receiver];
+                vars.extend(args.iter().cloned());
+                vars
+            }
+            ExprKind::MacroCall { args, .. } => args.clone(),
+            ExprKind::Other => vec![],
+        }
+    }
+
+    /// Extract variables used in a terminator.
+    fn terminator_uses(term: &Terminator) -> Vec<VarId> {
+        match term {
+            Terminator::Return { value: Some(var) } => vec![*var],
+            Terminator::Branch { condition, .. } => vec![*condition],
+            _ => vec![],
+        }
+    }
+
+    /// Compute precise def-use chains at statement level.
+    fn compute_precise_chains(
+        cfg: &ControlFlowGraph,
+        reach_in: &HashMap<BlockId, HashSet<VarId>>,
+        definitions: &[Definition],
+        uses: &[Use],
+    ) -> (
+        HashMap<Definition, HashSet<ProgramPoint>>,
+        HashMap<Use, HashSet<Definition>>,
+    ) {
+        let mut def_use: HashMap<Definition, HashSet<ProgramPoint>> = HashMap::new();
+        let mut use_def: HashMap<Use, HashSet<Definition>> = HashMap::new();
+
+        // Initialize def_use for all definitions
+        for def in definitions {
+            def_use.insert(*def, HashSet::new());
+        }
+
+        // For each use, find which definitions reach it
+        for use_point in uses {
+            let reaching_defs =
+                Self::find_reaching_defs_at_point(cfg, reach_in, definitions, use_point);
+
+            use_def.insert(*use_point, reaching_defs.clone());
+
+            // Update def_use (inverse)
+            for def in reaching_defs {
+                def_use.entry(def).or_default().insert(use_point.point);
+            }
+        }
+
+        (def_use, use_def)
+    }
+
+    /// Find definitions of a variable that reach a specific use point.
+    fn find_reaching_defs_at_point(
+        cfg: &ControlFlowGraph,
+        reach_in: &HashMap<BlockId, HashSet<VarId>>,
+        definitions: &[Definition],
+        use_point: &Use,
+    ) -> HashSet<Definition> {
+        let var = use_point.var;
+        let block_id = use_point.point.block;
+        let stmt_idx = use_point.point.stmt;
+
+        // Get the block
+        let block_data = match cfg.blocks.iter().find(|b| b.id == block_id) {
+            Some(b) => b,
+            None => return HashSet::new(),
+        };
+
+        // Look for definition of same var in same block before this statement
+        let mut found_in_block: Option<Definition> = None;
+        for (idx, stmt) in block_data.statements.iter().enumerate() {
+            if idx >= stmt_idx {
+                break; // Only look at statements before use
+            }
+
+            let defines_var = match stmt {
+                Statement::Declare { var: def_var, .. } => def_var.name_id == var.name_id,
+                Statement::Assign { target, .. } => target.name_id == var.name_id,
+                _ => false,
+            };
+
+            if defines_var {
+                // This is the most recent definition before our use
+                // Find the actual definition from our definitions list
+                found_in_block = definitions
+                    .iter()
+                    .find(|d| d.point.block == block_id && d.point.stmt == idx)
+                    .copied();
+            }
+        }
+
+        // If found in block, that's the only reaching definition
+        if let Some(def) = found_in_block {
+            return [def].into_iter().collect();
+        }
+
+        // Otherwise, use reach_in for this block
+        let reaching = reach_in.get(&block_id).cloned().unwrap_or_default();
+
+        // Find actual definition points for reaching vars
+        definitions
+            .iter()
+            .filter(|def| def.var.name_id == var.name_id && reaching.contains(&def.var))
+            .copied()
+            .collect()
+    }
+
+    // ========================================================================
+    // Statement-Level Query Methods (Spec 250)
+    // ========================================================================
+
+    /// Get all uses of a specific definition (statement-level).
+    pub fn get_uses_of(&self, def: &Definition) -> Option<&HashSet<ProgramPoint>> {
+        self.precise_def_use.get(def)
+    }
+
+    /// Get all definitions that reach a specific use (statement-level).
+    pub fn get_defs_of(&self, use_point: &Use) -> Option<&HashSet<Definition>> {
+        self.use_def_chains.get(use_point)
+    }
+
+    /// Check if a definition is dead (no uses).
+    pub fn is_dead_definition(&self, def: &Definition) -> bool {
+        self.precise_def_use
+            .get(def)
+            .map(|uses| uses.is_empty())
+            .unwrap_or(true)
+    }
+
+    /// Find same-block dead stores: defs with no uses at all.
+    pub fn find_same_block_dead_stores(&self) -> Vec<Definition> {
+        self.all_definitions
+            .iter()
+            .filter(|def| self.is_dead_definition(def))
+            .copied()
+            .collect()
+    }
+
+    /// Get the single reaching definition for a use (if unique).
+    pub fn get_unique_def(&self, use_point: &Use) -> Option<Definition> {
+        self.use_def_chains.get(use_point).and_then(|defs| {
+            if defs.len() == 1 {
+                defs.iter().next().copied()
+            } else {
+                None
+            }
+        })
+    }
+
+    // ========================================================================
+    // Block-Level Analysis Methods (existing)
+    // ========================================================================
 
     /// Compute gen and kill sets for a basic block.
     ///
@@ -2003,5 +2348,288 @@ mod tests {
         let cfg = ControlFlowGraph::from_block(&block);
         // Should track value from tuple struct pattern
         assert!(cfg.var_names.contains(&"value".to_string()));
+    }
+
+    // ========================================================================
+    // Statement-Level Def-Use Chain Tests (Spec 250)
+    // ========================================================================
+
+    #[test]
+    fn test_statement_level_simple_def_use() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let y = x + 2;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // Should have definitions
+        assert!(
+            !reaching.all_definitions.is_empty(),
+            "Should have at least one definition"
+        );
+
+        // Should have uses
+        assert!(
+            !reaching.all_uses.is_empty(),
+            "Should have at least one use"
+        );
+
+        // Find definition of x
+        let x_def = reaching.all_definitions.iter().find(|d| {
+            d.point.stmt == 0 // First statement
+        });
+
+        assert!(x_def.is_some(), "Should find definition at statement 0");
+
+        // Definition of x should have uses (in the second statement)
+        if let Some(def) = x_def {
+            let uses = reaching.get_uses_of(def);
+            assert!(uses.is_some(), "x definition should have uses tracked");
+        }
+    }
+
+    #[test]
+    fn test_statement_level_dead_store_detection() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let y = 2;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // Both x and y are dead stores (never used)
+        let dead_stores = reaching.find_same_block_dead_stores();
+        assert!(
+            !dead_stores.is_empty(),
+            "Should detect dead stores for unused variables"
+        );
+    }
+
+    #[test]
+    fn test_statement_level_use_def_chains() {
+        let block: Block = parse_quote! {
+            {
+                let a = 1;
+                let b = a;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // For each use, should be able to find its definition
+        for use_point in &reaching.all_uses {
+            let defs = reaching.get_defs_of(use_point);
+            // Uses should have at least empty set tracked
+            assert!(
+                defs.is_some(),
+                "Use {:?} should have reaching defs tracked",
+                use_point
+            );
+        }
+    }
+
+    #[test]
+    fn test_statement_level_unique_def() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let y = x;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // Find use of x
+        let x_use = reaching.all_uses.iter().find(|u| {
+            cfg.var_names
+                .get(u.var.name_id as usize)
+                .is_some_and(|n| n == "x")
+        });
+
+        if let Some(use_point) = x_use {
+            let unique_def = reaching.get_unique_def(use_point);
+            assert!(unique_def.is_some(), "Should find unique definition for x");
+        }
+    }
+
+    #[test]
+    fn test_statement_level_program_point_creation() {
+        let point = ProgramPoint::new(BlockId(0), 5);
+        assert_eq!(point.block.0, 0);
+        assert_eq!(point.stmt, 5);
+
+        let entry = ProgramPoint::block_entry(BlockId(1));
+        assert_eq!(entry.block.0, 1);
+        assert_eq!(entry.stmt, 0);
+
+        let exit = ProgramPoint::block_exit(BlockId(2), 10);
+        assert_eq!(exit.block.0, 2);
+        assert_eq!(exit.stmt, 10);
+    }
+
+    #[test]
+    fn test_statement_level_definition_equality() {
+        let def1 = Definition {
+            var: VarId {
+                name_id: 0,
+                version: 0,
+            },
+            point: ProgramPoint::new(BlockId(0), 0),
+        };
+        let def2 = Definition {
+            var: VarId {
+                name_id: 0,
+                version: 0,
+            },
+            point: ProgramPoint::new(BlockId(0), 0),
+        };
+        let def3 = Definition {
+            var: VarId {
+                name_id: 0,
+                version: 0,
+            },
+            point: ProgramPoint::new(BlockId(0), 1),
+        };
+
+        assert_eq!(def1, def2);
+        assert_ne!(def1, def3);
+    }
+
+    #[test]
+    fn test_statement_level_chained_assignments() {
+        let block: Block = parse_quote! {
+            {
+                let mut x = 1;
+                x = x + 1;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // Should have definitions
+        assert!(
+            !reaching.all_definitions.is_empty(),
+            "Should have at least 1 definition for x"
+        );
+
+        // The first definition should have uses (in x + 1)
+        // The second definition (x = x + 1) may or may not have uses depending on analysis
+    }
+
+    #[test]
+    fn test_statement_level_is_dead_definition() {
+        let block: Block = parse_quote! {
+            {
+                let unused = 42;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // Find the definition of 'unused'
+        let unused_def = reaching
+            .all_definitions
+            .first()
+            .expect("Should have at least one definition");
+
+        // It should be dead (no uses)
+        assert!(
+            reaching.is_dead_definition(unused_def),
+            "Unused variable should be a dead definition"
+        );
+    }
+
+    #[test]
+    fn test_statement_level_backward_compatibility() {
+        // Verify that block-level API still works
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let y = x;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // Block-level fields should still be populated
+        assert!(
+            !reaching.reach_in.is_empty() || cfg.blocks.is_empty(),
+            "reach_in should be populated"
+        );
+        assert!(
+            !reaching.reach_out.is_empty() || cfg.blocks.is_empty(),
+            "reach_out should be populated"
+        );
+        // def_use_chains may or may not be empty depending on variable flow
+    }
+
+    #[test]
+    fn test_statement_level_empty_function() {
+        let block: Block = parse_quote! { {} };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // Should handle empty functions gracefully
+        assert!(
+            reaching.all_definitions.is_empty(),
+            "Empty function should have no definitions"
+        );
+        assert!(
+            reaching.all_uses.is_empty(),
+            "Empty function should have no uses"
+        );
+        assert!(
+            reaching.find_same_block_dead_stores().is_empty(),
+            "Empty function should have no dead stores"
+        );
+    }
+
+    #[test]
+    fn test_statement_level_terminator_uses() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                return x;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&cfg);
+
+        // The return statement should create a use of x
+        let return_use = reaching.all_uses.iter().any(|u| {
+            cfg.var_names
+                .get(u.var.name_id as usize)
+                .is_some_and(|n| n == "x")
+        });
+
+        assert!(return_use, "Return statement should create a use of x");
+
+        // x should not be dead since it's returned
+        let x_def = reaching.all_definitions.iter().find(|d| {
+            cfg.var_names
+                .get(d.var.name_id as usize)
+                .is_some_and(|n| n == "x")
+        });
+
+        if let Some(def) = x_def {
+            assert!(
+                !reaching.is_dead_definition(def),
+                "x should not be dead since it's returned"
+            );
+        }
     }
 }

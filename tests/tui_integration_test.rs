@@ -593,11 +593,7 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
             live_out: Default::default(),
             dead_stores: Default::default(),
         },
-        reaching_defs: ReachingDefinitions {
-            reach_in: Default::default(),
-            reach_out: Default::default(),
-            def_use_chains: Default::default(),
-        },
+        reaching_defs: ReachingDefinitions::default(),
         escape_info,
         taint_info: TaintAnalysis {
             tainted_vars: Default::default(),

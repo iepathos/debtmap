@@ -56,11 +56,7 @@ fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
             live_out,
             dead_stores,
         },
-        reaching_defs: ReachingDefinitions {
-            reach_in: HashMap::new(),
-            reach_out: HashMap::new(),
-            def_use_chains: HashMap::new(),
-        },
+        reaching_defs: ReachingDefinitions::default(),
         escape_info: EscapeAnalysis {
             escaping_vars,
             captured_vars: HashSet::new(),
