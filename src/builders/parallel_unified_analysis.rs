@@ -46,10 +46,13 @@ mod transformations {
 
     /// Extract full purity analysis for functions by re-analyzing
     /// This is necessary because FunctionMetrics only stores boolean purity, not full CFG analysis
+    ///
+    /// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
     pub fn extract_purity_analysis(
         metrics: &[FunctionMetrics],
     ) -> HashMap<FunctionId, crate::analyzers::purity_detector::PurityAnalysis> {
         use crate::analyzers::purity_detector::PurityDetector;
+        use crate::data_flow::population::find_function_in_ast;
         use std::fs;
 
         metrics
@@ -65,21 +68,19 @@ mod transformations {
                 let file_ast = syn::parse_file(&content).ok()?;
 
                 // Find the function in the AST by name and line number
-                for item in &file_ast.items {
-                    if let syn::Item::Fn(item_fn) = item {
-                        if let Some(ident_span) =
-                            item_fn.sig.ident.span().start().line.checked_sub(1)
-                        {
-                            if ident_span == m.line {
-                                // Run purity analysis
-                                let mut detector = PurityDetector::new();
-                                let analysis = detector.is_pure_function(item_fn);
-                                let func_id =
-                                    FunctionId::new(m.file.clone(), m.name.clone(), m.line);
-                                return Some((func_id, analysis));
-                            }
+                // (handles both top-level functions and impl methods)
+                if let Some(found) = find_function_in_ast(&file_ast, &m.name, m.line) {
+                    let mut detector = PurityDetector::new();
+                    let analysis = match found {
+                        crate::data_flow::population::FoundFunction::TopLevel(item_fn) => {
+                            detector.is_pure_function(item_fn)
                         }
-                    }
+                        crate::data_flow::population::FoundFunction::ImplMethod(impl_fn) => {
+                            detector.is_pure_impl_method(impl_fn)
+                        }
+                    };
+                    let func_id = FunctionId::new(m.file.clone(), m.name.clone(), m.line);
+                    return Some((func_id, analysis));
                 }
                 None
             })

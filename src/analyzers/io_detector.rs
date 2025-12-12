@@ -675,6 +675,17 @@ pub fn detect_io_operations(item_fn: &ItemFn) -> Vec<IoOperation> {
     visitor.operations
 }
 
+/// Detect I/O operations from a block (for impl methods - spec 202)
+///
+/// This is a variant of `detect_io_operations` that takes a block directly,
+/// allowing analysis of impl block methods which have a `Block` rather than
+/// an `ItemFn`.
+pub fn detect_io_operations_from_block(block: &syn::Block) -> Vec<IoOperation> {
+    let mut visitor = IoDetectorVisitor::new();
+    visitor.visit_block(block);
+    visitor.operations
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
