@@ -491,10 +491,12 @@ mod tests {
         ];
         functions.insert(PathBuf::from("test.rs"), function_coverages);
 
-        let mut coverage_data = LcovData::default();
-        coverage_data.functions = functions;
-        coverage_data.total_lines = 100;
-        coverage_data.lines_hit = 50;
+        let mut coverage_data = LcovData {
+            functions,
+            total_lines: 100,
+            lines_hit: 50,
+            ..Default::default()
+        };
         coverage_data.build_index(); // Rebuild index after modifying functions
 
         let analyzer = UnifiedFileAnalyzer::new(Some(coverage_data));
