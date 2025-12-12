@@ -451,11 +451,7 @@ mod tests {
             dead_stores: HashSet::new(),
         };
 
-        let reaching_defs = ReachingDefinitions {
-            reach_in: HashMap::new(),
-            reach_out: HashMap::new(),
-            def_use_chains: HashMap::new(),
-        };
+        let reaching_defs = ReachingDefinitions::default();
 
         let escape_info = EscapeAnalysis {
             escaping_vars: HashSet::new(),
