@@ -254,7 +254,9 @@ impl AnalyzeConfig<Unvalidated> {
         // Validate output path if specified
         if let Some(ref output) = self.output {
             if let Some(parent) = output.parent() {
-                if !parent.exists() {
+                // Empty parent means current directory (e.g., "file.json" has parent "")
+                // which is always valid
+                if !parent.as_os_str().is_empty() && !parent.exists() {
                     anyhow::bail!("Output directory does not exist: {}", parent.display());
                 }
             }
