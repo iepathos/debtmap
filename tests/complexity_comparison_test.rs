@@ -69,7 +69,8 @@ fn test_cognitive_vs_cyclomatic_match() {
 
     // Cyclomatic: base 1 + 3 (for 4 arms - 1)
     assert_eq!(cyclo, 4);
-    // Cognitive: 1 (base) + 4 (extra for arms)
-    assert_eq!(cognitive, 5);
+    // Cognitive: Simple pattern-matching match expressions get logarithmic scaling
+    // log2(4) = 2 for 4 simple arms (macros like println!)
+    assert_eq!(cognitive, 2);
     assert_ne!(cyclo, cognitive);
 }

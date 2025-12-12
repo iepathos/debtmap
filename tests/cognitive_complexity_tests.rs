@@ -62,9 +62,11 @@ fn test_calculate_cognitive_match_expression() {
     }};
 
     let complexity = calculate_cognitive(&block);
+    // Simple pattern-matching match expressions (all arms are simple macros/returns)
+    // get logarithmic scaling: log2(4) = 2, since pattern matching is O(1) lookup
     assert_eq!(
-        complexity, 5,
-        "Match with 4 arms should have complexity 5 (1 for match + 4 for arms)"
+        complexity, 2,
+        "Match with 4 simple arms should have complexity 2 (log2(4) with pattern adjustment)"
     );
 }
 

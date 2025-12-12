@@ -2,16 +2,42 @@
 //!
 //! This test verifies that clean dispatchers (with inline_logic_branches == 0)
 //! do NOT appear in the final output in any format (terminal, JSON, markdown).
+//!
+//! Note: These tests use the pre-built binary directly rather than `cargo run`
+//! for faster execution.
 
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Once;
 use tempfile::TempDir;
+
+static BUILD_ONCE: Once = Once::new();
+
+/// Ensure the binary is built before running tests
+fn ensure_binary_built() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let binary_path = manifest_dir.join("target/debug/debtmap");
+
+    BUILD_ONCE.call_once(|| {
+        // Build the binary if it doesn't exist or is outdated
+        let status = Command::new("cargo")
+            .args(["build", "--bin", "debtmap"])
+            .current_dir(&manifest_dir)
+            .status()
+            .expect("Failed to build debtmap binary");
+
+        assert!(status.success(), "Failed to build debtmap binary");
+    });
+
+    binary_path
+}
 
 /// Test that clean dispatchers don't appear in JSON output
 #[test]
 fn test_clean_dispatcher_not_in_json_output() {
+    let binary_path = ensure_binary_built();
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("output.json");
 
@@ -19,14 +45,9 @@ fn test_clean_dispatcher_not_in_json_output() {
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/clean_dispatcher");
 
-    // Run debtmap analyze with JSON output
-    let output = Command::new("cargo")
+    // Run debtmap analyze with JSON output (using binary directly)
+    let output = Command::new(&binary_path)
         .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
             "analyze",
             "--format",
             "json",
@@ -102,20 +123,13 @@ fn test_clean_dispatcher_not_in_json_output() {
 /// Test that clean dispatchers don't appear in terminal output
 #[test]
 fn test_clean_dispatcher_not_in_terminal_output() {
+    let binary_path = ensure_binary_built();
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/clean_dispatcher");
 
-    // Run debtmap analyze with default terminal output
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
-            "analyze",
-            test_codebase.to_str().unwrap(),
-        ])
+    // Run debtmap analyze with default terminal output (using binary directly)
+    let output = Command::new(&binary_path)
+        .args(["analyze", test_codebase.to_str().unwrap()])
         .output()
         .expect("Failed to execute debtmap command");
 
@@ -159,20 +173,16 @@ fn test_clean_dispatcher_not_in_terminal_output() {
 /// Test that clean dispatchers don't appear in markdown output
 #[test]
 fn test_clean_dispatcher_not_in_markdown_output() {
+    let binary_path = ensure_binary_built();
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("output.md");
 
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/clean_dispatcher");
 
-    // Run debtmap analyze with markdown output
-    let output = Command::new("cargo")
+    // Run debtmap analyze with markdown output (using binary directly)
+    let output = Command::new(&binary_path)
         .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
             "analyze",
             "--format",
             "markdown",
