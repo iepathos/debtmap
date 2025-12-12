@@ -32,7 +32,7 @@ pub use calculation::{
 };
 
 pub use classification::{
-    classify_risk_based_debt, classify_test_debt, determine_debt_type, is_complexity_hotspot,
+    classify_risk_based_debt, classify_test_debt, is_complexity_hotspot,
     should_surface_untested_function,
 };
 

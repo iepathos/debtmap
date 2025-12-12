@@ -809,7 +809,7 @@ fn test_high_entropy_no_dampening() {
 #[test]
 fn test_entropy_details_populated_in_debt_item() {
     use crate::complexity::entropy_core::EntropyScore;
-    use crate::priority::scoring::construction::create_unified_debt_item;
+    use crate::priority::scoring::construction::create_unified_debt_item_enhanced;
 
     let mut func = create_test_metrics();
     func.cyclomatic = 15;
@@ -827,7 +827,7 @@ fn test_entropy_details_populated_in_debt_item() {
     });
 
     let call_graph = CallGraph::new();
-    let debt_item = create_unified_debt_item(&func, &call_graph, None);
+    let debt_item = create_unified_debt_item_enhanced(&func, &call_graph, None, None);
 
     assert!(debt_item.is_some());
     let item = debt_item.unwrap();

@@ -22,17 +22,14 @@ use crate::priority::{
 
 // Re-export construction functions for backward compatibility
 pub use super::construction::{
-    create_unified_debt_item, create_unified_debt_item_enhanced,
-    create_unified_debt_item_with_aggregator,
+    create_unified_debt_item_enhanced, create_unified_debt_item_with_aggregator,
     create_unified_debt_item_with_aggregator_and_data_flow,
-    create_unified_debt_item_with_data_flow, create_unified_debt_item_with_exclusions,
+    create_unified_debt_item_with_exclusions,
     create_unified_debt_item_with_exclusions_and_data_flow,
 };
 
 // Re-export computation functions for backward compatibility
-pub(super) use super::computation::{
-    calculate_entropy_details, calculate_expected_impact, calculate_risk_score,
-};
+pub(super) use super::computation::{calculate_entropy_details, calculate_expected_impact};
 
 // Import computation functions for tests
 #[cfg(test)]
@@ -56,9 +53,6 @@ use super::recommendation_helpers::generate_full_coverage_recommendation;
 #[cfg(test)]
 use crate::priority::FunctionVisibility;
 
-// Re-export validation functions for backward compatibility
-pub(super) use super::validation::{check_complexity_hotspot, check_dead_code, check_testing_gap};
-
 // Re-export formatting and helper functions for backward compatibility
 pub use super::formatting::determine_visibility;
 pub(super) use super::formatting::is_rust_file;
@@ -75,126 +69,6 @@ pub use super::classification::{
     classify_debt_type_with_exclusions, classify_risk_based_debt, classify_simple_function_risk,
     classify_test_debt, is_complexity_hotspot, is_dead_code, is_dead_code_with_exclusions,
 };
-
-// Helper functions
-
-pub(super) fn determine_debt_type(
-    func: &FunctionMetrics,
-    coverage: &Option<TransitiveCoverage>,
-    call_graph: &CallGraph,
-    func_id: &FunctionId,
-) -> DebtType {
-    // Use functional composition to determine debt type
-    if let Some(testing_gap) = check_testing_gap(func, coverage) {
-        return testing_gap;
-    }
-
-    if let Some(complexity_debt) = check_complexity_hotspot(func) {
-        return complexity_debt;
-    }
-
-    if let Some(dead_code_debt) = check_dead_code(func, call_graph, func_id) {
-        return dead_code_debt;
-    }
-
-    // Classify remaining functions based on role and complexity
-    let role = classify_function_role(func, func_id, call_graph);
-    classify_remaining_debt(func, coverage, &role)
-}
-
-/// Pure function to classify remaining debt based on role and complexity
-fn classify_remaining_debt(
-    func: &FunctionMetrics,
-    coverage: &Option<TransitiveCoverage>,
-    role: &FunctionRole,
-) -> DebtType {
-    // Check for simple acceptable patterns first
-    if let Some(simple_debt) = classify_simple_acceptable_patterns(func, role) {
-        return simple_debt;
-    }
-
-    // Classify based on complexity indicators
-    if func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50 {
-        DebtType::Risk {
-            risk_score: calculate_risk_score(func),
-            factors: identify_risk_factors(func, coverage),
-        }
-    } else {
-        classify_simple_function_debt(role)
-    }
-}
-
-/// Pure function to classify simple acceptable patterns
-fn classify_simple_acceptable_patterns(
-    func: &FunctionMetrics,
-    role: &FunctionRole,
-) -> Option<DebtType> {
-    if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        match role {
-            FunctionRole::IOWrapper | FunctionRole::EntryPoint | FunctionRole::PatternMatch => {
-                Some(DebtType::Risk {
-                    risk_score: 0.0,
-                    factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
-                })
-            }
-            FunctionRole::PureLogic if func.length <= 10 => Some(DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Trivial pure function - not technical debt".to_string()],
-            }),
-            _ => None,
-        }
-    } else {
-        None
-    }
-}
-
-/// Pure function to classify simple function debt
-fn classify_simple_function_debt(role: &FunctionRole) -> DebtType {
-    match role {
-        FunctionRole::PureLogic => DebtType::Risk {
-            risk_score: 0.0,
-            factors: vec!["Simple pure function - minimal risk".to_string()],
-        },
-        _ => DebtType::Risk {
-            risk_score: 0.1,
-            factors: vec!["Simple function with low complexity".to_string()],
-        },
-    }
-}
-
-fn identify_risk_factors(
-    func: &FunctionMetrics,
-    coverage: &Option<TransitiveCoverage>,
-) -> Vec<String> {
-    let mut factors = Vec::new();
-
-    if func.cyclomatic > 5 {
-        factors.push(format!(
-            "Moderate complexity (cyclomatic: {})",
-            func.cyclomatic
-        ));
-    }
-
-    if func.cognitive > 8 {
-        factors.push(format!("Cognitive complexity: {}", func.cognitive));
-    }
-
-    if func.length > 50 {
-        factors.push(format!("Long function ({} lines)", func.length));
-    }
-
-    if let Some(cov) = coverage {
-        if cov.direct < 0.5 {
-            factors.push(format!("Low coverage: {:.0}%", cov.direct * 100.0));
-        }
-    }
-
-    if factors.is_empty() {
-        factors.push("Potential improvement opportunity".to_string());
-    }
-
-    factors
-}
 
 /// Enhanced version of debt type classification (legacy - kept for compatibility)
 pub fn classify_debt_type_enhanced(
