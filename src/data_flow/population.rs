@@ -566,7 +566,7 @@ fn pure_func(x: i32) -> i32 {
 
         let mut data_flow = DataFlowGraph::new();
         let metrics = vec![
-            FunctionMetrics::new("read_file".to_string(), temp_path.clone(), 5),  // 1-indexed
+            FunctionMetrics::new("read_file".to_string(), temp_path.clone(), 5), // 1-indexed
             FunctionMetrics::new("pure_func".to_string(), temp_path.clone(), 12), // 1-indexed
         ];
 
