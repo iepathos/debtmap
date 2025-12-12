@@ -166,7 +166,8 @@
 //! ```
 
 use std::collections::{HashMap, HashSet};
-use syn::{Block, Expr, ExprAssign, ExprIf, ExprReturn, ExprWhile, Local, Pat, Stmt};
+use syn::visit::Visit;
+use syn::{Block, Expr, ExprAssign, ExprClosure, ExprIf, ExprReturn, ExprWhile, Local, Pat, Stmt};
 
 /// Control Flow Graph for intra-procedural analysis.
 ///
@@ -325,7 +326,268 @@ pub enum ExprKind {
         macro_name: String,
         args: Vec<VarId>,
     },
+    /// Closure expression with captured variables
+    Closure {
+        /// Variables captured from outer scope
+        captures: Vec<VarId>,
+        /// Whether this is a `move` closure
+        is_move: bool,
+    },
     Other,
+}
+
+/// Capture mode for closure variables.
+///
+/// Determines how a variable is captured by a closure:
+/// - `ByValue`: The variable is moved into the closure (via `move` keyword)
+/// - `ByRef`: The variable is borrowed immutably (`&T`)
+/// - `ByMutRef`: The variable is borrowed mutably (`&mut T`)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureMode {
+    /// Variable is moved into the closure (move closure)
+    ByValue,
+    /// Variable is borrowed immutably (&T)
+    ByRef,
+    /// Variable is borrowed mutably (&mut T)
+    ByMutRef,
+}
+
+/// Information about a captured variable in a closure.
+#[derive(Debug, Clone)]
+pub struct CapturedVar {
+    /// The variable ID of the captured variable
+    pub var_id: VarId,
+    /// How the variable is captured
+    pub capture_mode: CaptureMode,
+    /// Whether the variable is mutated inside the closure body
+    pub is_mutated: bool,
+}
+
+/// Information about a capture detected during closure body analysis.
+#[derive(Debug, Clone)]
+struct CaptureInfo {
+    /// Name of the captured variable
+    var_name: String,
+    /// Inferred capture mode
+    mode: CaptureMode,
+    /// Whether the variable is mutated in the closure body
+    is_mutated: bool,
+}
+
+/// Visitor to detect captured variables in closure body.
+///
+/// Walks the closure body AST and identifies variables that:
+/// 1. Are referenced in the closure body
+/// 2. Are defined in the outer scope (not closure parameters)
+/// 3. Are not special names like `self` or `Self`
+struct ClosureCaptureVisitor<'a> {
+    /// Variables available in outer scope (potential captures)
+    outer_scope: &'a HashSet<String>,
+    /// Closure parameters (not captures)
+    closure_params: &'a HashSet<String>,
+    /// Detected captures
+    captures: Vec<CaptureInfo>,
+    /// Variables mutated in closure body
+    mutated_vars: HashSet<String>,
+    /// Whether this is a move closure
+    is_move: bool,
+}
+
+impl<'a> ClosureCaptureVisitor<'a> {
+    fn new(
+        outer_scope: &'a HashSet<String>,
+        closure_params: &'a HashSet<String>,
+        is_move: bool,
+    ) -> Self {
+        Self {
+            outer_scope,
+            closure_params,
+            captures: Vec::new(),
+            mutated_vars: HashSet::new(),
+            is_move,
+        }
+    }
+
+    /// Finalize capture detection by updating capture modes based on mutation info.
+    fn finalize_captures(mut self) -> Vec<CaptureInfo> {
+        for capture in &mut self.captures {
+            if self.mutated_vars.contains(&capture.var_name) {
+                capture.is_mutated = true;
+                if !self.is_move {
+                    capture.mode = CaptureMode::ByMutRef;
+                }
+            }
+        }
+        self.captures
+    }
+}
+
+impl<'ast, 'a> Visit<'ast> for ClosureCaptureVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        match expr {
+            // Variable reference - potential capture
+            Expr::Path(path) => {
+                if let Some(ident) = path.path.get_ident() {
+                    let name = ident.to_string();
+
+                    // Is it in outer scope but not a closure param?
+                    if self.outer_scope.contains(&name)
+                        && !self.closure_params.contains(&name)
+                        && name != "self"
+                        && name != "Self"
+                    {
+                        // Add as capture if not already captured
+                        if !self.captures.iter().any(|c| c.var_name == name) {
+                            let mode = if self.is_move {
+                                CaptureMode::ByValue
+                            } else {
+                                CaptureMode::ByRef // Default, may be refined to ByMutRef
+                            };
+                            self.captures.push(CaptureInfo {
+                                var_name: name,
+                                mode,
+                                is_mutated: false,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Assignment - track mutations
+            Expr::Assign(assign) => {
+                if let Expr::Path(path) = &*assign.left {
+                    if let Some(ident) = path.path.get_ident() {
+                        self.mutated_vars.insert(ident.to_string());
+                    }
+                }
+                // Continue visiting both sides
+                syn::visit::visit_expr(self, expr);
+                return;
+            }
+
+            // Binary operation with compound assignment ops (+=, -=, etc.)
+            // In syn 2.0, these have BinOp variants like AddAssign, SubAssign, etc.
+            Expr::Binary(binary) => {
+                // Check if it's a compound assignment operation
+                let is_compound_assign = matches!(
+                    binary.op,
+                    syn::BinOp::AddAssign(_)
+                        | syn::BinOp::SubAssign(_)
+                        | syn::BinOp::MulAssign(_)
+                        | syn::BinOp::DivAssign(_)
+                        | syn::BinOp::RemAssign(_)
+                        | syn::BinOp::BitAndAssign(_)
+                        | syn::BinOp::BitOrAssign(_)
+                        | syn::BinOp::BitXorAssign(_)
+                        | syn::BinOp::ShlAssign(_)
+                        | syn::BinOp::ShrAssign(_)
+                );
+                if is_compound_assign {
+                    if let Expr::Path(path) = &*binary.left {
+                        if let Some(ident) = path.path.get_ident() {
+                            self.mutated_vars.insert(ident.to_string());
+                        }
+                    }
+                }
+            }
+
+            // Method call on captured var - may mutate
+            Expr::MethodCall(method) => {
+                if let Expr::Path(path) = &*method.receiver {
+                    if let Some(ident) = path.path.get_ident() {
+                        let name = ident.to_string();
+                        // Check if it's a mutation method
+                        if is_mutation_method(&method.method.to_string()) {
+                            self.mutated_vars.insert(name);
+                        }
+                    }
+                }
+            }
+
+            // Mutable reference - indicates mutation intent
+            Expr::Reference(reference) => {
+                if reference.mutability.is_some() {
+                    if let Expr::Path(path) = &*reference.expr {
+                        if let Some(ident) = path.path.get_ident() {
+                            self.mutated_vars.insert(ident.to_string());
+                        }
+                    }
+                }
+            }
+
+            // Nested closure - recurse with extended param set
+            Expr::Closure(nested_closure) => {
+                // Create nested scope with nested closure's params
+                let mut nested_params: HashSet<String> = self.closure_params.clone();
+                for input in &nested_closure.inputs {
+                    if let Pat::Ident(pat_ident) = input {
+                        nested_params.insert(pat_ident.ident.to_string());
+                    }
+                }
+
+                let nested_is_move = nested_closure.capture.is_some();
+                let mut nested_visitor =
+                    ClosureCaptureVisitor::new(self.outer_scope, &nested_params, nested_is_move);
+                nested_visitor.visit_expr(&nested_closure.body);
+
+                // Propagate captures from nested closure
+                let nested_captures = nested_visitor.finalize_captures();
+                for capture in nested_captures {
+                    // If not already in our captures, add it
+                    if !self.captures.iter().any(|c| c.var_name == capture.var_name) {
+                        self.captures.push(capture);
+                    } else if capture.is_mutated {
+                        // Update existing capture if nested closure mutates it
+                        if let Some(existing) = self
+                            .captures
+                            .iter_mut()
+                            .find(|c| c.var_name == capture.var_name)
+                        {
+                            existing.is_mutated = true;
+                            if !self.is_move {
+                                existing.mode = CaptureMode::ByMutRef;
+                            }
+                        }
+                    }
+                }
+
+                return; // Don't visit nested closure body again
+            }
+
+            _ => {}
+        }
+
+        syn::visit::visit_expr(self, expr);
+    }
+}
+
+/// Check if a method name is known to mutate its receiver.
+fn is_mutation_method(method: &str) -> bool {
+    matches!(
+        method,
+        "push"
+            | "pop"
+            | "insert"
+            | "remove"
+            | "clear"
+            | "append"
+            | "extend"
+            | "retain"
+            | "truncate"
+            | "swap"
+            | "reverse"
+            | "sort"
+            | "sort_by"
+            | "sort_by_key"
+            | "sort_unstable"
+            | "sort_unstable_by"
+            | "dedup"
+            | "drain"
+            | "split_off"
+            | "resize"
+            | "reserve"
+            | "shrink_to_fit"
+    )
 }
 
 /// Complete data flow analysis results for a function.
@@ -589,6 +851,14 @@ impl LivenessInfo {
                 for arg in args {
                     if !def_set.contains(arg) {
                         use_set.insert(*arg);
+                    }
+                }
+            }
+            ExprKind::Closure { captures, .. } => {
+                // Captured variables are used by the closure
+                for capture in captures {
+                    if !def_set.contains(capture) {
+                        use_set.insert(*capture);
                     }
                 }
             }
@@ -874,7 +1144,7 @@ impl ReachingDefinitions {
 pub struct EscapeAnalysis {
     /// Variables that escape through returns or method calls
     pub escaping_vars: HashSet<VarId>,
-    /// Variables captured by closures (TODO: closure detection not yet implemented)
+    /// Variables captured by closures
     pub captured_vars: HashSet<VarId>,
     /// Variables that (directly or indirectly) contribute to the return value
     pub return_dependencies: HashSet<VarId>,
@@ -884,12 +1154,14 @@ impl EscapeAnalysis {
     /// Analyze which variables escape the function scope.
     ///
     /// Traces dependencies backwards from return statements to find all variables
-    /// that contribute to the return value.
+    /// that contribute to the return value. Also collects variables captured by
+    /// closures and marks them as escaping (since they may outlive their original scope).
     pub fn analyze(cfg: &ControlFlowGraph) -> Self {
         let mut escaping_vars = HashSet::new();
-        let captured_vars = HashSet::new();
+        let mut captured_vars = HashSet::new();
         let mut return_dependencies = HashSet::new();
 
+        // Collect return dependencies
         for block in &cfg.blocks {
             if let Terminator::Return { value: Some(var) } = &block.terminator {
                 return_dependencies.insert(*var);
@@ -897,6 +1169,30 @@ impl EscapeAnalysis {
             }
         }
 
+        // Collect captured variables from closures
+        for block in &cfg.blocks {
+            for stmt in &block.statements {
+                if let Statement::Expr {
+                    expr: ExprKind::Closure { captures, is_move },
+                    ..
+                } = stmt
+                {
+                    for &captured_var in captures {
+                        captured_vars.insert(captured_var);
+                        // Captured variables escape their original scope
+                        escaping_vars.insert(captured_var);
+
+                        // If closure is moved, captured vars have extended lifetime
+                        // (already marked as escaping, but this reinforces it)
+                        if *is_move {
+                            escaping_vars.insert(captured_var);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Trace return dependencies backward
         let mut worklist: Vec<VarId> = return_dependencies.iter().copied().collect();
         let mut visited = HashSet::new();
 
@@ -927,12 +1223,27 @@ impl EscapeAnalysis {
                                 &mut worklist,
                             );
                         }
+                        // Handle closure captures in return path
+                        Statement::Expr {
+                            expr: ExprKind::Closure { captures, .. },
+                            ..
+                        } => {
+                            // If this closure is in a return path, its captures
+                            // are return dependencies
+                            for &captured_var in captures {
+                                if !visited.contains(&captured_var) {
+                                    return_dependencies.insert(captured_var);
+                                    worklist.push(captured_var);
+                                }
+                            }
+                        }
                         _ => {}
                     }
                 }
             }
         }
 
+        // Mark method call arguments as escaping
         for block in &cfg.blocks {
             for stmt in &block.statements {
                 if let Statement::Expr {
@@ -1037,6 +1348,9 @@ impl TaintAnalysis {
     /// Propagates taint from mutation sites through data dependencies.
     /// Uses liveness info to ignore dead stores and escape info to determine
     /// if tainted values affect the function's observable behavior.
+    ///
+    /// Also propagates taint through closure captures - if any captured variable
+    /// is tainted, all captured vars may be affected (conservative analysis).
     pub fn analyze(
         cfg: &ControlFlowGraph,
         liveness: &LivenessInfo,
@@ -1070,6 +1384,23 @@ impl TaintAnalysis {
                                 changed = true;
                             }
                         }
+                        // Taint propagation through closures
+                        Statement::Expr {
+                            expr: ExprKind::Closure { captures, .. },
+                            ..
+                        } => {
+                            // If any captured var is tainted, consider all captured
+                            // vars as potentially affected (conservative)
+                            let any_tainted = captures.iter().any(|c| tainted_vars.contains(c));
+
+                            if any_tainted {
+                                for &captured_var in captures {
+                                    if tainted_vars.insert(captured_var) {
+                                        changed = true;
+                                    }
+                                }
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -1078,9 +1409,15 @@ impl TaintAnalysis {
 
         tainted_vars.retain(|var| !liveness.dead_stores.contains(var));
 
+        // Check if captured vars contribute to return (via escape.captured_vars)
+        let captured_tainted = tainted_vars
+            .iter()
+            .any(|var| escape.captured_vars.contains(var));
+
         let return_tainted = tainted_vars
             .iter()
-            .any(|var| escape.return_dependencies.contains(var));
+            .any(|var| escape.return_dependencies.contains(var))
+            || captured_tainted;
 
         TaintAnalysis {
             tainted_vars,
@@ -1121,6 +1458,8 @@ struct CfgBuilder {
     edges: HashMap<BlockId, Vec<(BlockId, Edge)>>,
     var_names: HashMap<String, u32>,
     var_versions: HashMap<u32, u32>,
+    /// Variables captured by closures in this function
+    captured_vars: Vec<CapturedVar>,
 }
 
 impl CfgBuilder {
@@ -1132,6 +1471,7 @@ impl CfgBuilder {
             edges: HashMap::new(),
             var_names: HashMap::new(),
             var_versions: HashMap::new(),
+            captured_vars: Vec::new(),
         }
     }
 
@@ -1157,6 +1497,11 @@ impl CfgBuilder {
         // Extract all variable bindings from the pattern
         let vars = self.extract_vars_from_pattern(&local.pat);
 
+        // Process any closures in the initializer first (to populate captured_vars)
+        if let Some(init) = &local.init {
+            self.process_closures_in_expr(&init.expr);
+        }
+
         // Get Rvalue from initializer
         let init_rvalue = local
             .init
@@ -1179,11 +1524,141 @@ impl CfgBuilder {
             Expr::While(expr_while) => self.process_while(expr_while),
             Expr::Return(expr_return) => self.process_return(expr_return),
             Expr::Assign(assign) => self.process_assign(assign),
-            _ => {
+            Expr::Closure(closure) => self.process_closure(closure),
+            Expr::MethodCall(method) => {
+                // Process any closures in method arguments
+                for arg in &method.args {
+                    self.process_closures_in_expr(arg);
+                }
+                // Also process closures in the receiver chain
+                self.process_closures_in_expr(&method.receiver);
+
                 self.current_block.push(Statement::Expr {
                     expr: ExprKind::Other,
                     line: None,
                 });
+            }
+            Expr::Call(call) => {
+                // Process any closures in function arguments
+                for arg in &call.args {
+                    self.process_closures_in_expr(arg);
+                }
+                self.current_block.push(Statement::Expr {
+                    expr: ExprKind::Other,
+                    line: None,
+                });
+            }
+            _ => {
+                // Process any closures that might be nested in this expression
+                self.process_closures_in_expr(expr);
+                self.current_block.push(Statement::Expr {
+                    expr: ExprKind::Other,
+                    line: None,
+                });
+            }
+        }
+    }
+
+    /// Recursively process an expression to find and handle any closures within it.
+    /// This is needed because closures can appear nested in method call arguments,
+    /// function call arguments, etc.
+    fn process_closures_in_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Closure(closure) => {
+                self.process_closure(closure);
+            }
+            Expr::MethodCall(method) => {
+                // Check receiver and arguments
+                self.process_closures_in_expr(&method.receiver);
+                for arg in &method.args {
+                    self.process_closures_in_expr(arg);
+                }
+            }
+            Expr::Call(call) => {
+                // Check function and arguments
+                self.process_closures_in_expr(&call.func);
+                for arg in &call.args {
+                    self.process_closures_in_expr(arg);
+                }
+            }
+            Expr::Binary(binary) => {
+                self.process_closures_in_expr(&binary.left);
+                self.process_closures_in_expr(&binary.right);
+            }
+            Expr::Unary(unary) => {
+                self.process_closures_in_expr(&unary.expr);
+            }
+            Expr::Block(block) => {
+                for stmt in &block.block.stmts {
+                    if let Stmt::Expr(expr, _) = stmt {
+                        self.process_closures_in_expr(expr);
+                    }
+                }
+            }
+            Expr::Paren(paren) => {
+                self.process_closures_in_expr(&paren.expr);
+            }
+            Expr::Tuple(tuple) => {
+                for elem in &tuple.elems {
+                    self.process_closures_in_expr(elem);
+                }
+            }
+            Expr::Array(array) => {
+                for elem in &array.elems {
+                    self.process_closures_in_expr(elem);
+                }
+            }
+            Expr::Index(index) => {
+                self.process_closures_in_expr(&index.expr);
+                self.process_closures_in_expr(&index.index);
+            }
+            Expr::Field(field) => {
+                self.process_closures_in_expr(&field.base);
+            }
+            Expr::Reference(reference) => {
+                self.process_closures_in_expr(&reference.expr);
+            }
+            Expr::If(expr_if) => {
+                self.process_closures_in_expr(&expr_if.cond);
+                for stmt in &expr_if.then_branch.stmts {
+                    if let Stmt::Expr(expr, _) = stmt {
+                        self.process_closures_in_expr(expr);
+                    }
+                }
+                if let Some((_, else_branch)) = &expr_if.else_branch {
+                    self.process_closures_in_expr(else_branch);
+                }
+            }
+            Expr::Match(expr_match) => {
+                self.process_closures_in_expr(&expr_match.expr);
+                for arm in &expr_match.arms {
+                    self.process_closures_in_expr(&arm.body);
+                }
+            }
+            Expr::Try(try_expr) => {
+                self.process_closures_in_expr(&try_expr.expr);
+            }
+            Expr::Await(await_expr) => {
+                self.process_closures_in_expr(&await_expr.base);
+            }
+            Expr::Cast(cast) => {
+                self.process_closures_in_expr(&cast.expr);
+            }
+            Expr::Range(range) => {
+                if let Some(start) = &range.start {
+                    self.process_closures_in_expr(start);
+                }
+                if let Some(end) = &range.end {
+                    self.process_closures_in_expr(end);
+                }
+            }
+            Expr::Struct(expr_struct) => {
+                for field in &expr_struct.fields {
+                    self.process_closures_in_expr(&field.expr);
+                }
+            }
+            _ => {
+                // Leaf expressions (Path, Lit, etc.) - nothing to process
             }
         }
     }
@@ -1243,6 +1718,59 @@ impl CfgBuilder {
             .or_insert_with(|| len as u32);
         let version = *self.var_versions.entry(name_id).or_insert(0);
         VarId { name_id, version }
+    }
+
+    /// Get current scope variables for capture detection.
+    fn current_scope_vars(&self) -> HashSet<String> {
+        self.var_names.keys().cloned().collect()
+    }
+
+    /// Process a closure expression, extracting captures and body information.
+    fn process_closure(&mut self, closure: &ExprClosure) {
+        // Step 1: Record outer scope variables before entering closure
+        let outer_scope_vars = self.current_scope_vars();
+
+        // Step 2: Create closure parameter scope
+        let mut closure_params: HashSet<String> = HashSet::new();
+        for input in &closure.inputs {
+            if let Pat::Ident(pat_ident) = input {
+                let param_name = pat_ident.ident.to_string();
+                closure_params.insert(param_name);
+                // Don't add to main var_names - these are closure-local
+            }
+        }
+
+        // Step 3: Visit closure body to find captures
+        let is_move = closure.capture.is_some();
+        let mut capture_visitor =
+            ClosureCaptureVisitor::new(&outer_scope_vars, &closure_params, is_move);
+        capture_visitor.visit_expr(&closure.body);
+
+        // Step 4: Finalize and record captured variables
+        let captures = capture_visitor.finalize_captures();
+
+        let capture_var_ids: Vec<VarId> = captures
+            .iter()
+            .map(|c| {
+                let var_id = self.get_or_create_var(&c.var_name);
+                // Also record in captured_vars for later analysis
+                self.captured_vars.push(CapturedVar {
+                    var_id,
+                    capture_mode: c.mode,
+                    is_mutated: c.is_mutated,
+                });
+                var_id
+            })
+            .collect();
+
+        // Step 5: Emit closure expression statement
+        self.current_block.push(Statement::Expr {
+            expr: ExprKind::Closure {
+                captures: capture_var_ids,
+                is_move,
+            },
+            line: None,
+        });
     }
 
     /// Extract all variables referenced in an expression.
@@ -2003,5 +2531,389 @@ mod tests {
         let cfg = ControlFlowGraph::from_block(&block);
         // Should track value from tuple struct pattern
         assert!(cfg.var_names.contains(&"value".to_string()));
+    }
+
+    // Closure Capture Tests (Spec 249)
+
+    #[test]
+    fn test_simple_closure_capture() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let f = |y| x + y;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // x should be in captured_vars
+        assert!(
+            cfg.var_names.contains(&"x".to_string()),
+            "x should be tracked"
+        );
+
+        // Find x's VarId and check if it's captured
+        let x_name_id = cfg.var_names.iter().position(|n| n == "x");
+        assert!(x_name_id.is_some(), "x should have a VarId");
+
+        // captured_vars should not be empty for this closure
+        assert!(!escape.captured_vars.is_empty(), "Closure should capture x");
+    }
+
+    #[test]
+    fn test_move_closure_capture() {
+        let block: Block = parse_quote! {
+            {
+                let data = vec![1, 2, 3];
+                let f = move || data.len();
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // data should be captured
+        assert!(
+            cfg.var_names.contains(&"data".to_string()),
+            "data should be tracked"
+        );
+
+        // captured_vars should contain data
+        assert!(
+            !escape.captured_vars.is_empty(),
+            "Move closure should capture data"
+        );
+    }
+
+    #[test]
+    fn test_mutable_capture() {
+        let block: Block = parse_quote! {
+            {
+                let mut counter = 0;
+                let mut inc = || counter += 1;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // counter should be captured and marked as escaping
+        assert!(
+            cfg.var_names.contains(&"counter".to_string()),
+            "counter should be tracked"
+        );
+        assert!(
+            !escape.captured_vars.is_empty(),
+            "Mutable closure should capture counter"
+        );
+    }
+
+    #[test]
+    fn test_iterator_chain_captures() {
+        let block: Block = parse_quote! {
+            {
+                let threshold = 5;
+                let items = vec![1, 2, 3, 4, 5, 6];
+                items.iter().filter(|x| **x > threshold);
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // threshold should be captured by filter closure
+        assert!(
+            cfg.var_names.contains(&"threshold".to_string()),
+            "threshold should be tracked"
+        );
+
+        // Check that threshold is in captured_vars
+        let threshold_name_id = cfg.var_names.iter().position(|n| n == "threshold");
+        if let Some(name_id) = threshold_name_id {
+            let threshold_var = VarId {
+                name_id: name_id as u32,
+                version: 0,
+            };
+            assert!(
+                escape.captured_vars.contains(&threshold_var),
+                "threshold should be captured by filter closure"
+            );
+        }
+    }
+
+    #[test]
+    fn test_nested_closure_captures() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let outer = || {
+                    let y = 2;
+                    let inner = || x + y;
+                };
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // x should be captured (propagated from nested closure)
+        assert!(
+            cfg.var_names.contains(&"x".to_string()),
+            "x should be tracked"
+        );
+        assert!(
+            !escape.captured_vars.is_empty(),
+            "Nested closures should capture x"
+        );
+    }
+
+    #[test]
+    fn test_closure_no_capture() {
+        let block: Block = parse_quote! {
+            {
+                let f = |x, y| x + y;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // No captures expected - x and y are closure parameters, not captures
+        assert!(
+            escape.captured_vars.is_empty(),
+            "Closure with only parameters should have no captures"
+        );
+    }
+
+    #[test]
+    fn test_closure_multiple_captures() {
+        let block: Block = parse_quote! {
+            {
+                let a = 1;
+                let b = 2;
+                let c = 3;
+                let f = || a + b + c;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // All three variables should be captured
+        assert!(cfg.var_names.contains(&"a".to_string()));
+        assert!(cfg.var_names.contains(&"b".to_string()));
+        assert!(cfg.var_names.contains(&"c".to_string()));
+
+        // captured_vars should have 3 entries
+        assert_eq!(
+            escape.captured_vars.len(),
+            3,
+            "Closure should capture a, b, and c"
+        );
+    }
+
+    #[test]
+    fn test_closure_capture_escaping() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let f = || x + 1;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // x should be in escaping_vars because it's captured
+        let x_name_id = cfg.var_names.iter().position(|n| n == "x");
+        if let Some(name_id) = x_name_id {
+            let x_var = VarId {
+                name_id: name_id as u32,
+                version: 0,
+            };
+            assert!(
+                escape.escaping_vars.contains(&x_var),
+                "Captured variable x should be in escaping_vars"
+            );
+        }
+    }
+
+    #[test]
+    fn test_closure_with_method_call_on_capture() {
+        let block: Block = parse_quote! {
+            {
+                let mut vec = Vec::new();
+                let f = || vec.push(1);
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // vec should be captured
+        assert!(
+            cfg.var_names.contains(&"vec".to_string()),
+            "vec should be tracked"
+        );
+        assert!(
+            !escape.captured_vars.is_empty(),
+            "Closure should capture vec"
+        );
+    }
+
+    #[test]
+    fn test_closure_expr_kind() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let f = || x;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // Find the closure expression in statements
+        let has_closure = cfg.blocks.iter().any(|block| {
+            block.statements.iter().any(|stmt| {
+                matches!(
+                    stmt,
+                    Statement::Expr {
+                        expr: ExprKind::Closure { .. },
+                        ..
+                    }
+                )
+            })
+        });
+
+        assert!(has_closure, "CFG should contain a Closure ExprKind");
+    }
+
+    #[test]
+    fn test_move_closure_by_value_capture() {
+        let block: Block = parse_quote! {
+            {
+                let x = String::new();
+                let f = move || x.len();
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // Find the closure expression and check is_move flag
+        let closure_stmt = cfg.blocks.iter().flat_map(|b| &b.statements).find(|stmt| {
+            matches!(
+                stmt,
+                Statement::Expr {
+                    expr: ExprKind::Closure { .. },
+                    ..
+                }
+            )
+        });
+
+        assert!(closure_stmt.is_some(), "Should find closure statement");
+        if let Some(Statement::Expr {
+            expr: ExprKind::Closure { is_move, .. },
+            ..
+        }) = closure_stmt
+        {
+            assert!(is_move, "Move closure should have is_move=true");
+        }
+    }
+
+    #[test]
+    fn test_taint_propagation_through_closure() {
+        let block: Block = parse_quote! {
+            {
+                let mut data = vec![1, 2, 3];
+                data.push(4); // This taints data
+                let f = || data.len();
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let liveness = LivenessInfo::analyze(&cfg);
+        let escape = EscapeAnalysis::analyze(&cfg);
+        let _taint = TaintAnalysis::analyze(&cfg, &liveness, &escape);
+
+        // data should be captured and in captured_vars
+        assert!(
+            !escape.captured_vars.is_empty(),
+            "Closure should capture data"
+        );
+
+        // Taint analysis should detect captured vars
+        // (The presence of captured vars in escaping_vars affects taint propagation)
+        assert!(
+            !escape.escaping_vars.is_empty(),
+            "Captured vars should be in escaping_vars"
+        );
+    }
+
+    #[test]
+    fn test_closure_captures_marked_as_escaping() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                let y = 2;
+                let f = || x + y;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        let escape = EscapeAnalysis::analyze(&cfg);
+
+        // Both x and y should be captured
+        assert_eq!(
+            escape.captured_vars.len(),
+            2,
+            "Should capture both x and y"
+        );
+
+        // Captured vars should be in escaping_vars
+        for captured in &escape.captured_vars {
+            assert!(
+                escape.escaping_vars.contains(captured),
+                "Captured var {:?} should be in escaping_vars",
+                captured
+            );
+        }
+    }
+
+    #[test]
+    fn test_closure_performance() {
+        use std::time::Instant;
+
+        // Function with multiple closures
+        let block: Block = parse_quote! {
+            {
+                let a = 1;
+                let b = 2;
+                let c = 3;
+                let f1 = || a + 1;
+                let f2 = || a + b;
+                let f3 = || a + b + c;
+                let f4 = move || a * b * c;
+                let result = vec![1, 2, 3]
+                    .iter()
+                    .filter(|x| **x > a)
+                    .map(|x| x + b)
+                    .collect::<Vec<_>>();
+            }
+        };
+
+        let start = Instant::now();
+        for _ in 0..100 {
+            let cfg = ControlFlowGraph::from_block(&block);
+            let _ = EscapeAnalysis::analyze(&cfg);
+        }
+        let elapsed = start.elapsed();
+
+        // 100 iterations should complete in <1000ms (10ms per iteration)
+        assert!(
+            elapsed.as_millis() < 1000,
+            "Performance regression: {:?} for 100 iterations (>10ms per iteration)",
+            elapsed
+        );
     }
 }
