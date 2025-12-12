@@ -55,18 +55,22 @@ fn with_methods_override_correctly() {
 
 #[test]
 fn with_methods_accept_none_without_changing() {
-    // Clean up any environment variables from previous tests
-    std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+    // Use permissive() for deterministic baseline (avoids env var race conditions)
+    let original = ItemFilterConfig::permissive()
+        .with_min_score(Some(10.0))
+        .with_min_cyclomatic(Some(5))
+        .with_min_cognitive(Some(8));
 
-    let original_score = ItemFilterConfig::from_environment().min_score;
-
-    let config = ItemFilterConfig::from_environment()
+    let config = original
+        .clone()
         .with_min_score(None)
         .with_min_cyclomatic(None)
         .with_min_cognitive(None);
 
     // Should remain unchanged when passing None
-    assert_eq!(config.min_score, original_score);
+    assert_eq!(config.min_score, original.min_score);
+    assert_eq!(config.min_cyclomatic, original.min_cyclomatic);
+    assert_eq!(config.min_cognitive, original.min_cognitive);
 }
 
 #[test]

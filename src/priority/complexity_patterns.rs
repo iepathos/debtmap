@@ -206,11 +206,11 @@ impl ComplexityPattern {
     /// let pattern = ComplexityPattern::detect(&metrics);
     /// assert!(matches!(pattern, ComplexityPattern::HighNesting { .. }));
     ///
-    /// // High branching example
+    /// // High branching example (ratio >= 2.0 to avoid Dispatcher classification)
     /// let metrics = ComplexityMetrics {
     ///     cyclomatic: 18,
-    ///     cognitive: 35,  // 1.9x ratio
-    ///     nesting: 2,
+    ///     cognitive: 40,  // 2.2x ratio (>= 2.0 avoids Dispatcher)
+    ///     nesting: 3,
     ///     entropy_score: Some(0.30),
     ///     state_signals: None,
     ///     coordinator_signals: None,
