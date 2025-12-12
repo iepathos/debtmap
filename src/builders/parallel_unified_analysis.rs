@@ -1122,6 +1122,19 @@ impl ParallelUnifiedAnalysisBuilder {
         let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
         unified.data_flow_graph = data_flow_graph;
 
+        // Spec 201: Register all analyzed files for accurate total LOC calculation
+        // Use LocCounter to get accurate line counts for all files
+        use crate::metrics::loc_counter::LocCounter;
+        let loc_counter = LocCounter::default();
+        for (file_item, _) in &file_data {
+            if let Ok(loc_count) = loc_counter.count_file(&file_item.metrics.path) {
+                unified.register_analyzed_file(
+                    file_item.metrics.path.clone(),
+                    loc_count.physical_lines,
+                );
+            }
+        }
+
         // Add purity information
         for (func_name, is_pure) in purity_analysis {
             if let Some(item) = unified
