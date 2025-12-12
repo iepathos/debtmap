@@ -814,13 +814,15 @@ fn test_entropy_details_populated_in_debt_item() {
     let mut func = create_test_metrics();
     func.cyclomatic = 15;
     func.cognitive = 20;
+    // Spec 206: Set nesting > 2 to avoid clean dispatcher classification (returns None)
+    func.nesting = 3;
     func.entropy_score = Some(EntropyScore {
         token_entropy: 0.6,
         pattern_repetition: 0.7,
         branch_similarity: 0.5,
         effective_complexity: 0.4,
         unique_variables: 8,
-        max_nesting: 2,
+        max_nesting: 3,
         dampening_applied: 1.0,
     });
 

@@ -827,8 +827,8 @@ fn generate_coordinator_recommendation(
     }
 }
 
-/// Generate recommendation for dispatcher pattern (spec 189, spec 201)
-/// Falls back to generic recommendation if no inline logic detected
+/// Generate recommendation for dispatcher pattern (spec 189, spec 201, spec 206)
+/// Returns None for clean dispatchers that need no refactoring
 fn generate_dispatcher_recommendation(
     branch_count: u32,
     cognitive_ratio: f64,
@@ -839,8 +839,15 @@ fn generate_dispatcher_recommendation(
 ) -> Option<ActionableRecommendation> {
     let language = crate::core::Language::from_path(&metrics.file);
 
-    // If no inline logic detected, fall back to generic recommendation
-    // Don't filter out - complexity thresholds already determined this is debt
+    // Spec 206: Clean dispatcher with no inline logic and flat structure needs no refactoring
+    // This is a well-structured dispatcher pattern - suppress recommendation
+    if inline_logic_branches == 0 && metrics.nesting <= 2 {
+        // Clean dispatcher: all arms delegate, flat structure, no inline logic
+        // This is intentional architecture, not debt
+        return None;
+    }
+
+    // If no inline logic but higher nesting, fall back to generic recommendation
     if inline_logic_branches == 0 {
         return Some(generate_moderate_recommendation(
             cyclomatic, cognitive, metrics,
@@ -1296,7 +1303,9 @@ mod tests {
 
     #[test]
     fn test_max_5_steps_per_recommendation() {
-        let metrics = create_test_metrics(20, 25);
+        // Spec 206: Use nesting > 2 to avoid clean dispatcher (returns None)
+        let mut metrics = create_test_metrics(20, 25);
+        metrics.nesting = 3; // Avoid dispatcher pattern
         let rec = generate_concise_recommendation(
             &DebtType::ComplexityHotspot {
                 cyclomatic: 20,
@@ -1619,10 +1628,11 @@ mod tests {
 
     #[test]
     fn test_high_branching_pattern_recommendation() {
-        let mut metrics = create_test_metrics(25, 20);
-        metrics.nesting = 2; // Low nesting, high branching
+        // Spec 206: nesting > 2 needed to avoid Dispatcher classification
+        let mut metrics = create_test_metrics(25, 45);
+        metrics.nesting = 3; // Moderate nesting, high branching (ratio 1.8, but nesting > 2)
 
-        let rec = generate_complexity_steps(25, 20, &metrics)
+        let rec = generate_complexity_steps(25, 45, &metrics)
             .expect("Test should generate recommendation for high branching");
 
         assert!(
@@ -1663,7 +1673,9 @@ mod tests {
     fn test_chaotic_structure_pattern_recommendation() {
         use crate::complexity::entropy_core::EntropyScore;
 
+        // Spec 206: need nesting > 2 or ratio >= 2.0 to avoid Dispatcher classification
         let mut metrics = create_test_metrics(20, 30);
+        metrics.nesting = 3; // Avoid dispatcher pattern (nesting > 2)
         metrics.entropy_score = Some(EntropyScore {
             token_entropy: 0.45, // High entropy for chaotic detection
             pattern_repetition: 0.2,
@@ -1707,18 +1719,19 @@ mod tests {
             .expect("Test should generate recommendation for nesting");
         assert!(nesting_rec.primary_action.contains("nesting"));
 
-        // High branching pattern
-        let branching_metrics = create_test_metrics(25, 20);
-        let branching_rec = generate_complexity_steps(25, 20, &branching_metrics)
+        // High branching pattern (spec 206: need nesting > 2 to avoid Dispatcher)
+        let mut branching_metrics = create_test_metrics(25, 45);
+        branching_metrics.nesting = 3; // Avoid dispatcher pattern
+        let branching_rec = generate_complexity_steps(25, 45, &branching_metrics)
             .expect("Test should generate recommendation for branching");
         assert!(
             branching_rec.primary_action.contains("Split")
                 || branching_rec.primary_action.contains("function")
         );
 
-        // Moderate complexity pattern
-        let moderate_metrics = create_test_metrics(10, 18);
-        let moderate_rec = generate_complexity_steps(10, 18, &moderate_metrics)
+        // Moderate complexity pattern (spec 206: cyclo < 10 avoids Dispatcher threshold)
+        let moderate_metrics = create_test_metrics(9, 18);
+        let moderate_rec = generate_complexity_steps(9, 18, &moderate_metrics)
             .expect("Test should generate recommendation for moderate");
         assert!(
             moderate_rec.primary_action.contains("Reduce")
@@ -1732,21 +1745,45 @@ mod tests {
     // should only tailor the recommendation, not gate whether it appears
 
     #[test]
-    fn test_clean_dispatcher_falls_back_to_generic() {
-        // Clean dispatcher with no inline logic should fall back to generic recommendation
-        // (not return None which would filter out the debt item)
+    fn test_clean_dispatcher_returns_none() {
+        // Spec 206: Clean dispatcher with no inline logic and flat nesting returns None
+        // (this is intentional architecture, not debt)
+        let mut metrics = create_test_metrics(26, 40);
+        metrics.nesting = 1; // Flat structure
+
         let result = generate_dispatcher_recommendation(
-            10,  // branch_count
-            0.5, // cognitive_ratio
-            0,   // inline_logic_branches (clean dispatcher)
-            10,  // cyclomatic
-            5,   // cognitive
-            &create_test_metrics(10, 5),
+            26,   // branch_count
+            1.54, // cognitive_ratio
+            0,    // inline_logic_branches (clean dispatcher)
+            26,   // cyclomatic
+            40,   // cognitive
+            &metrics,
+        );
+
+        assert!(
+            result.is_none(),
+            "Clean dispatcher with flat nesting should return None (no refactoring needed)"
+        );
+    }
+
+    #[test]
+    fn test_clean_dispatcher_high_nesting_falls_back() {
+        // Clean dispatcher with higher nesting falls back to generic recommendation
+        let mut metrics = create_test_metrics(20, 25);
+        metrics.nesting = 3; // Higher nesting (not typical dispatcher)
+
+        let result = generate_dispatcher_recommendation(
+            20,   // branch_count
+            1.25, // cognitive_ratio
+            0,    // inline_logic_branches (clean dispatcher)
+            20,   // cyclomatic
+            25,   // cognitive
+            &metrics,
         );
 
         assert!(
             result.is_some(),
-            "Clean dispatcher should return a fallback recommendation, not None"
+            "Clean dispatcher with higher nesting should return fallback recommendation"
         );
     }
 
@@ -1775,22 +1812,25 @@ mod tests {
         );
     }
 
-    // Core invariant: generate_concise_recommendation NEVER returns None for ComplexityHotspot
-    // Pattern detection tailors recommendations but should not filter out debt items.
-    // Complexity thresholds already determined this IS debt - honor that decision.
+    // Spec 201/206: Pattern detection tailors recommendations.
+    // Spec 206 exception: Clean dispatchers (flat structure, no inline logic) return None
+    // because they represent intentional architecture, not debt.
 
     #[test]
     fn complexity_hotspot_always_returns_recommendation() {
-        // Pure test: verify the core invariant holds for various complexity levels
+        // Test that non-dispatcher patterns always return recommendations
+        // Spec 206: cyclo >= 10, nesting <= 2, ratio < 2.0 => Dispatcher (may return None)
+        // Use nesting > 2 or cyclo < 10 to avoid dispatcher classification
         let test_cases = [
-            (5, 8, "low complexity"),
-            (9, 16, "moderate complexity - like reconcile_state"),
-            (15, 20, "high complexity"),
-            (48, 303, "extreme complexity"),
+            (5, 8, 2, "low complexity (below dispatcher threshold)"),
+            (9, 16, 2, "moderate complexity (below dispatcher threshold)"),
+            (15, 20, 3, "high complexity with nesting > 2"),
+            (48, 303, 3, "extreme complexity with nesting > 2"),
         ];
 
-        for (cyclomatic, cognitive, description) in test_cases {
-            let metrics = create_test_metrics(cyclomatic, cognitive);
+        for (cyclomatic, cognitive, nesting, description) in test_cases {
+            let mut metrics = create_test_metrics(cyclomatic, cognitive);
+            metrics.nesting = nesting;
             let result = generate_concise_recommendation(
                 &DebtType::ComplexityHotspot {
                     cyclomatic,
@@ -1803,24 +1843,51 @@ mod tests {
 
             assert!(
                 result.is_some(),
-                "ComplexityHotspot should ALWAYS return Some for {} (cyclomatic={}, cognitive={})",
+                "ComplexityHotspot should return Some for {} (cyclomatic={}, cognitive={}, nesting={})",
                 description,
                 cyclomatic,
-                cognitive
+                cognitive,
+                nesting
             );
         }
     }
 
     #[test]
+    fn clean_dispatcher_returns_none_for_complexity_hotspot() {
+        // Spec 206: Clean dispatcher (flat structure, no inline logic) returns None
+        // This is intentional architecture, not debt
+        // Clean dispatcher: cognitive <= cyclomatic * 1.5 (no inline logic)
+        // cyclomatic=26, expected_max=39, use cognitive=38 to be under
+        let mut metrics = create_test_metrics(26, 38);
+        metrics.nesting = 1; // Flat structure
+
+        let result = generate_concise_recommendation(
+            &DebtType::ComplexityHotspot {
+                cyclomatic: 26,
+                cognitive: 38,
+            },
+            &metrics,
+            FunctionRole::PureLogic,
+            &None,
+        );
+
+        assert!(
+            result.is_none(),
+            "Clean dispatcher should return None (not debt, intentional architecture)"
+        );
+    }
+
+    #[test]
     fn complexity_hotspot_without_language_signals_returns_recommendation() {
         // Edge case: function metrics without Rust-specific signals
-        // Should fall back to generic recommendation, not return None
-        let mut metrics = create_test_metrics(12, 18);
+        // Spec 206: cyclo=12, nesting=2 matches dispatcher, but without inline logic = clean
+        // Use cyclo < 10 to avoid dispatcher classification
+        let mut metrics = create_test_metrics(9, 18);
         metrics.language_specific = None; // No language-specific data
 
         let result = generate_concise_recommendation(
             &DebtType::ComplexityHotspot {
-                cyclomatic: 12,
+                cyclomatic: 9,
                 cognitive: 18,
             },
             &metrics,
