@@ -1154,13 +1154,20 @@ impl CfgBuilder {
     }
 
     fn process_local(&mut self, local: &Local) {
-        if let Pat::Ident(pat_ident) = &local.pat {
-            let var = self.get_or_create_var(&pat_ident.ident.to_string());
-            let init = local.init.as_ref().map(|_init| Rvalue::Constant);
+        // Extract all variable bindings from the pattern
+        let vars = self.extract_vars_from_pattern(&local.pat);
 
+        // Get Rvalue from initializer
+        let init_rvalue = local
+            .init
+            .as_ref()
+            .map(|init| self.expr_to_rvalue(&init.expr));
+
+        // Emit declaration for each binding
+        for var in vars {
             self.current_block.push(Statement::Declare {
                 var,
-                init,
+                init: init_rvalue.clone(),
                 line: None,
             });
         }
@@ -1181,8 +1188,12 @@ impl CfgBuilder {
         }
     }
 
-    fn process_if(&mut self, _expr_if: &ExprIf) {
-        let condition = self.get_or_create_var("_temp");
+    fn process_if(&mut self, expr_if: &ExprIf) {
+        // Extract actual condition variable(s)
+        let condition = self
+            .extract_primary_var(&expr_if.cond)
+            .unwrap_or_else(|| self.get_or_create_var("_cond"));
+
         let then_block = BlockId(self.block_counter + 1);
         let else_block = BlockId(self.block_counter + 2);
 
@@ -1198,13 +1209,24 @@ impl CfgBuilder {
         self.finalize_current_block(Terminator::Goto { target: loop_head });
     }
 
-    fn process_return(&mut self, _expr_return: &ExprReturn) {
-        self.finalize_current_block(Terminator::Return { value: None });
+    fn process_return(&mut self, expr_return: &ExprReturn) {
+        // Extract actual returned variable
+        let value = expr_return
+            .expr
+            .as_ref()
+            .and_then(|e| self.extract_primary_var(e));
+
+        self.finalize_current_block(Terminator::Return { value });
     }
 
-    fn process_assign(&mut self, _assign: &ExprAssign) {
-        let target = self.get_or_create_var("_temp");
-        let source = Rvalue::Constant;
+    fn process_assign(&mut self, assign: &ExprAssign) {
+        // Extract actual target variable
+        let target = self
+            .extract_primary_var(&assign.left)
+            .unwrap_or_else(|| self.get_or_create_var("_unknown"));
+
+        // Convert RHS to proper Rvalue
+        let source = self.expr_to_rvalue(&assign.right);
 
         self.current_block.push(Statement::Assign {
             target,
@@ -1221,6 +1243,395 @@ impl CfgBuilder {
             .or_insert_with(|| len as u32);
         let version = *self.var_versions.entry(name_id).or_insert(0);
         VarId { name_id, version }
+    }
+
+    /// Extract all variables referenced in an expression.
+    /// Returns a list of VarIds for variables that appear in the expression.
+    fn extract_vars_from_expr(&mut self, expr: &Expr) -> Vec<VarId> {
+        match expr {
+            // Path: x, foo::bar
+            Expr::Path(path) => {
+                if let Some(ident) = path.path.get_ident() {
+                    vec![self.get_or_create_var(&ident.to_string())]
+                } else if let Some(seg) = path.path.segments.last() {
+                    vec![self.get_or_create_var(&seg.ident.to_string())]
+                } else {
+                    vec![]
+                }
+            }
+
+            // Field access: x.field, x.y.z
+            Expr::Field(field) => self.extract_vars_from_expr(&field.base),
+
+            // Method call: receiver.method(args)
+            Expr::MethodCall(method) => {
+                let mut vars = self.extract_vars_from_expr(&method.receiver);
+                for arg in &method.args {
+                    vars.extend(self.extract_vars_from_expr(arg));
+                }
+                vars
+            }
+
+            // Binary: a + b, x && y
+            Expr::Binary(binary) => {
+                let mut vars = self.extract_vars_from_expr(&binary.left);
+                vars.extend(self.extract_vars_from_expr(&binary.right));
+                vars
+            }
+
+            // Unary: !x, *ptr, -n
+            Expr::Unary(unary) => self.extract_vars_from_expr(&unary.expr),
+
+            // Index: arr[i]
+            Expr::Index(index) => {
+                let mut vars = self.extract_vars_from_expr(&index.expr);
+                vars.extend(self.extract_vars_from_expr(&index.index));
+                vars
+            }
+
+            // Call: f(a, b, c)
+            Expr::Call(call) => {
+                let mut vars = self.extract_vars_from_expr(&call.func);
+                for arg in &call.args {
+                    vars.extend(self.extract_vars_from_expr(arg));
+                }
+                vars
+            }
+
+            // Reference: &x, &mut x
+            Expr::Reference(reference) => self.extract_vars_from_expr(&reference.expr),
+
+            // Paren: (expr)
+            Expr::Paren(paren) => self.extract_vars_from_expr(&paren.expr),
+
+            // Block: { expr }
+            Expr::Block(block) => block
+                .block
+                .stmts
+                .last()
+                .and_then(|stmt| {
+                    if let Stmt::Expr(expr, _) = stmt {
+                        Some(self.extract_vars_from_expr(expr))
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default(),
+
+            // Tuple: (a, b, c)
+            Expr::Tuple(tuple) => tuple
+                .elems
+                .iter()
+                .flat_map(|e| self.extract_vars_from_expr(e))
+                .collect(),
+
+            // Cast: x as T
+            Expr::Cast(cast) => self.extract_vars_from_expr(&cast.expr),
+
+            // Array: [a, b, c]
+            Expr::Array(array) => array
+                .elems
+                .iter()
+                .flat_map(|e| self.extract_vars_from_expr(e))
+                .collect(),
+
+            // Repeat: [x; N]
+            Expr::Repeat(repeat) => self.extract_vars_from_expr(&repeat.expr),
+
+            // Struct: Foo { field: value }
+            Expr::Struct(expr_struct) => expr_struct
+                .fields
+                .iter()
+                .flat_map(|f| self.extract_vars_from_expr(&f.expr))
+                .collect(),
+
+            // Range: a..b, a..=b
+            Expr::Range(range) => {
+                let mut vars = Vec::new();
+                if let Some(start) = &range.start {
+                    vars.extend(self.extract_vars_from_expr(start));
+                }
+                if let Some(end) = &range.end {
+                    vars.extend(self.extract_vars_from_expr(end));
+                }
+                vars
+            }
+
+            // Try: expr?
+            Expr::Try(try_expr) => self.extract_vars_from_expr(&try_expr.expr),
+
+            // Await: expr.await
+            Expr::Await(await_expr) => self.extract_vars_from_expr(&await_expr.base),
+
+            // Literals and other non-variable expressions
+            Expr::Lit(_) => vec![],
+
+            // Default: return empty for unsupported expressions
+            _ => vec![],
+        }
+    }
+
+    /// Extract the primary variable from an expression (for assignment targets, returns).
+    /// Returns the first/main variable, or None if expression has no variable.
+    fn extract_primary_var(&mut self, expr: &Expr) -> Option<VarId> {
+        self.extract_vars_from_expr(expr).into_iter().next()
+    }
+
+    /// Extract variable bindings from a pattern.
+    fn extract_vars_from_pattern(&mut self, pat: &Pat) -> Vec<VarId> {
+        match pat {
+            // Simple identifier: let x = ...
+            Pat::Ident(pat_ident) => {
+                vec![self.get_or_create_var(&pat_ident.ident.to_string())]
+            }
+
+            // Tuple: let (a, b) = ...
+            Pat::Tuple(tuple) => tuple
+                .elems
+                .iter()
+                .flat_map(|p| self.extract_vars_from_pattern(p))
+                .collect(),
+
+            // Struct: let Point { x, y } = ...
+            Pat::Struct(pat_struct) => pat_struct
+                .fields
+                .iter()
+                .flat_map(|field| self.extract_vars_from_pattern(&field.pat))
+                .collect(),
+
+            // TupleStruct: let Some(x) = ...
+            Pat::TupleStruct(tuple_struct) => tuple_struct
+                .elems
+                .iter()
+                .flat_map(|p| self.extract_vars_from_pattern(p))
+                .collect(),
+
+            // Slice: let [first, rest @ ..] = ...
+            Pat::Slice(slice) => slice
+                .elems
+                .iter()
+                .flat_map(|p| self.extract_vars_from_pattern(p))
+                .collect(),
+
+            // Reference: let &x = ... or let &mut x = ...
+            Pat::Reference(reference) => self.extract_vars_from_pattern(&reference.pat),
+
+            // Or: let A | B = ...
+            Pat::Or(or) => or
+                .cases
+                .first()
+                .map(|p| self.extract_vars_from_pattern(p))
+                .unwrap_or_default(),
+
+            // Type: let x: T = ...
+            Pat::Type(pat_type) => self.extract_vars_from_pattern(&pat_type.pat),
+
+            // Wildcard: let _ = ...
+            Pat::Wild(_) => vec![],
+
+            // Literal patterns: match on literal
+            Pat::Lit(_) => vec![],
+
+            // Rest: ..
+            Pat::Rest(_) => vec![],
+
+            // Range pattern: 1..=10
+            Pat::Range(_) => vec![],
+
+            // Path pattern: None, MyEnum::Variant
+            Pat::Path(_) => vec![],
+
+            // Const pattern
+            Pat::Const(_) => vec![],
+
+            // Paren pattern: (pat)
+            Pat::Paren(paren) => self.extract_vars_from_pattern(&paren.pat),
+
+            _ => vec![],
+        }
+    }
+
+    /// Convert an expression to an Rvalue, extracting actual variables.
+    fn expr_to_rvalue(&mut self, expr: &Expr) -> Rvalue {
+        match expr {
+            // Simple variable use
+            Expr::Path(path) => {
+                if let Some(var) = self.extract_primary_var(&Expr::Path(path.clone())) {
+                    Rvalue::Use(var)
+                } else {
+                    Rvalue::Constant
+                }
+            }
+
+            // Binary operation
+            Expr::Binary(binary) => {
+                let left = self.extract_primary_var(&binary.left);
+                let right = self.extract_primary_var(&binary.right);
+
+                if let (Some(l), Some(r)) = (left, right) {
+                    Rvalue::BinaryOp {
+                        op: Self::convert_bin_op(&binary.op),
+                        left: l,
+                        right: r,
+                    }
+                } else if let Some(l) = left {
+                    // Right side is constant
+                    Rvalue::Use(l)
+                } else if let Some(r) = right {
+                    // Left side is constant
+                    Rvalue::Use(r)
+                } else {
+                    Rvalue::Constant
+                }
+            }
+
+            // Unary operation
+            Expr::Unary(unary) => {
+                if let Some(operand) = self.extract_primary_var(&unary.expr) {
+                    Rvalue::UnaryOp {
+                        op: Self::convert_un_op(&unary.op),
+                        operand,
+                    }
+                } else {
+                    Rvalue::Constant
+                }
+            }
+
+            // Field access
+            Expr::Field(field) => {
+                if let Some(base) = self.extract_primary_var(&field.base) {
+                    let field_name = match &field.member {
+                        syn::Member::Named(ident) => ident.to_string(),
+                        syn::Member::Unnamed(index) => index.index.to_string(),
+                    };
+                    Rvalue::FieldAccess {
+                        base,
+                        field: field_name,
+                    }
+                } else {
+                    Rvalue::Constant
+                }
+            }
+
+            // Reference
+            Expr::Reference(reference) => {
+                if let Some(var) = self.extract_primary_var(&reference.expr) {
+                    Rvalue::Ref {
+                        var,
+                        mutable: reference.mutability.is_some(),
+                    }
+                } else {
+                    Rvalue::Constant
+                }
+            }
+
+            // Function call
+            Expr::Call(call) => {
+                let func_name = Self::extract_func_name(&call.func);
+                let args = call
+                    .args
+                    .iter()
+                    .filter_map(|arg| self.extract_primary_var(arg))
+                    .collect();
+                Rvalue::Call {
+                    func: func_name,
+                    args,
+                }
+            }
+
+            // Method call
+            Expr::MethodCall(method) => {
+                let func_name = method.method.to_string();
+                let mut args = vec![];
+                if let Some(recv) = self.extract_primary_var(&method.receiver) {
+                    args.push(recv);
+                }
+                args.extend(
+                    method
+                        .args
+                        .iter()
+                        .filter_map(|a| self.extract_primary_var(a)),
+                );
+                Rvalue::Call {
+                    func: func_name,
+                    args,
+                }
+            }
+
+            // Paren: (expr) - unwrap
+            Expr::Paren(paren) => self.expr_to_rvalue(&paren.expr),
+
+            // Cast: x as T - preserve the variable
+            Expr::Cast(cast) => self.expr_to_rvalue(&cast.expr),
+
+            // Block: { expr } - use final expression
+            Expr::Block(block) => {
+                if let Some(Stmt::Expr(expr, _)) = block.block.stmts.last() {
+                    self.expr_to_rvalue(expr)
+                } else {
+                    Rvalue::Constant
+                }
+            }
+
+            // Index: arr[i]
+            Expr::Index(index) => {
+                if let Some(base) = self.extract_primary_var(&index.expr) {
+                    // Treat as field access with index as field name
+                    Rvalue::FieldAccess {
+                        base,
+                        field: "[index]".to_string(),
+                    }
+                } else {
+                    Rvalue::Constant
+                }
+            }
+
+            // Literals and other constant expressions
+            Expr::Lit(_) => Rvalue::Constant,
+
+            // Default fallback
+            _ => Rvalue::Constant,
+        }
+    }
+
+    fn extract_func_name(func: &Expr) -> String {
+        match func {
+            Expr::Path(path) => path
+                .path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::"),
+            _ => "unknown".to_string(),
+        }
+    }
+
+    fn convert_bin_op(op: &syn::BinOp) -> BinOp {
+        match op {
+            syn::BinOp::Add(_) | syn::BinOp::AddAssign(_) => BinOp::Add,
+            syn::BinOp::Sub(_) | syn::BinOp::SubAssign(_) => BinOp::Sub,
+            syn::BinOp::Mul(_) | syn::BinOp::MulAssign(_) => BinOp::Mul,
+            syn::BinOp::Div(_) | syn::BinOp::DivAssign(_) => BinOp::Div,
+            syn::BinOp::Eq(_) => BinOp::Eq,
+            syn::BinOp::Ne(_) => BinOp::Ne,
+            syn::BinOp::Lt(_) => BinOp::Lt,
+            syn::BinOp::Gt(_) => BinOp::Gt,
+            syn::BinOp::Le(_) => BinOp::Le,
+            syn::BinOp::Ge(_) => BinOp::Ge,
+            syn::BinOp::And(_) => BinOp::And,
+            syn::BinOp::Or(_) => BinOp::Or,
+            _ => BinOp::Add, // Fallback for bitwise ops, rem, shl, shr
+        }
+    }
+
+    fn convert_un_op(op: &syn::UnOp) -> UnOp {
+        match op {
+            syn::UnOp::Neg(_) => UnOp::Neg,
+            syn::UnOp::Not(_) => UnOp::Not,
+            syn::UnOp::Deref(_) => UnOp::Deref,
+            _ => UnOp::Not, // Fallback for unknown ops
+        }
     }
 
     fn finalize_current_block(&mut self, terminator: Terminator) {
@@ -1320,5 +1731,277 @@ mod tests {
 
         let analysis = DataFlowAnalysis::from_block(&block);
         assert!(!analysis.liveness.live_in.is_empty() || !analysis.liveness.live_out.is_empty());
+    }
+
+    // Expression Extraction Tests (Spec 248)
+
+    #[test]
+    fn test_extract_simple_path() {
+        let block: Block = parse_quote! {
+            {
+                let x = y;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should have both x and y tracked, not _temp
+        assert!(cfg.var_names.contains(&"x".to_string()));
+        assert!(cfg.var_names.contains(&"y".to_string()));
+    }
+
+    #[test]
+    fn test_extract_binary_op() {
+        let block: Block = parse_quote! {
+            {
+                let result = a + b;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track result, a, and b
+        assert!(cfg.var_names.contains(&"result".to_string()));
+        assert!(cfg.var_names.contains(&"a".to_string()));
+        assert!(cfg.var_names.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn test_extract_field_access() {
+        let block: Block = parse_quote! {
+            {
+                let x = point.field;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track x and point (base variable)
+        assert!(cfg.var_names.contains(&"x".to_string()));
+        assert!(cfg.var_names.contains(&"point".to_string()));
+    }
+
+    #[test]
+    fn test_tuple_pattern() {
+        let block: Block = parse_quote! {
+            {
+                let (a, b, c) = tuple;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track a, b, c from tuple destructuring
+        assert!(cfg.var_names.contains(&"a".to_string()));
+        assert!(cfg.var_names.contains(&"b".to_string()));
+        assert!(cfg.var_names.contains(&"c".to_string()));
+        assert!(cfg.var_names.contains(&"tuple".to_string()));
+    }
+
+    #[test]
+    fn test_struct_pattern() {
+        let block: Block = parse_quote! {
+            {
+                let Point { x, y } = point;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track x and y from struct destructuring
+        assert!(cfg.var_names.contains(&"x".to_string()));
+        assert!(cfg.var_names.contains(&"y".to_string()));
+        assert!(cfg.var_names.contains(&"point".to_string()));
+    }
+
+    #[test]
+    fn test_assignment_tracks_actual_variables() {
+        let block: Block = parse_quote! {
+            {
+                let mut x = 0;
+                x = y + z;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track x, y, z not just _temp
+        assert!(cfg.var_names.contains(&"x".to_string()));
+        assert!(cfg.var_names.contains(&"y".to_string()));
+        assert!(cfg.var_names.contains(&"z".to_string()));
+        // Should not have _temp placeholder
+        assert!(!cfg.var_names.contains(&"_temp".to_string()));
+    }
+
+    #[test]
+    fn test_return_with_variable() {
+        let block: Block = parse_quote! {
+            {
+                let x = 1;
+                return x;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // Should have return with actual variable
+        let exit_block = cfg
+            .blocks
+            .iter()
+            .find(|b| matches!(b.terminator, Terminator::Return { .. }));
+
+        assert!(exit_block.is_some());
+        if let Some(block) = exit_block {
+            if let Terminator::Return { value } = &block.terminator {
+                assert!(value.is_some(), "Return should track actual variable");
+            }
+        }
+    }
+
+    #[test]
+    fn test_if_condition_tracks_variable() {
+        let block: Block = parse_quote! {
+            {
+                if flag {
+                    1
+                } else {
+                    2
+                }
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track flag variable, not _temp
+        assert!(cfg.var_names.contains(&"flag".to_string()));
+        assert!(!cfg.var_names.contains(&"_temp".to_string()));
+    }
+
+    #[test]
+    fn test_method_call_extracts_receiver_and_args() {
+        let block: Block = parse_quote! {
+            {
+                let result = receiver.method(arg1, arg2);
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track receiver and arguments
+        assert!(cfg.var_names.contains(&"result".to_string()));
+        assert!(cfg.var_names.contains(&"receiver".to_string()));
+        assert!(cfg.var_names.contains(&"arg1".to_string()));
+        assert!(cfg.var_names.contains(&"arg2".to_string()));
+    }
+
+    #[test]
+    fn test_nested_field_access() {
+        let block: Block = parse_quote! {
+            {
+                let z = x.y.z;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track base variable x
+        assert!(cfg.var_names.contains(&"z".to_string()));
+        assert!(cfg.var_names.contains(&"x".to_string()));
+    }
+
+    #[test]
+    fn test_function_call_extracts_args() {
+        let block: Block = parse_quote! {
+            {
+                let result = compute(a, b, c);
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track result and all arguments
+        assert!(cfg.var_names.contains(&"result".to_string()));
+        assert!(cfg.var_names.contains(&"a".to_string()));
+        assert!(cfg.var_names.contains(&"b".to_string()));
+        assert!(cfg.var_names.contains(&"c".to_string()));
+    }
+
+    #[test]
+    fn test_rvalue_binary_op_structure() {
+        let block: Block = parse_quote! {
+            {
+                let sum = x + y;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // Find the declaration statement
+        let decl_stmt = cfg
+            .blocks
+            .iter()
+            .flat_map(|b| &b.statements)
+            .find(|s| matches!(s, Statement::Declare { .. }));
+
+        assert!(decl_stmt.is_some());
+        if let Some(Statement::Declare {
+            init: Some(rvalue), ..
+        }) = decl_stmt
+        {
+            // Should be a BinaryOp, not Constant
+            assert!(
+                matches!(rvalue, Rvalue::BinaryOp { .. }),
+                "Expected BinaryOp, got {:?}",
+                rvalue
+            );
+        }
+    }
+
+    #[test]
+    fn test_rvalue_field_access_structure() {
+        let block: Block = parse_quote! {
+            {
+                let val = obj.field;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+
+        // Find the declaration statement
+        let decl_stmt = cfg
+            .blocks
+            .iter()
+            .flat_map(|b| &b.statements)
+            .find(|s| matches!(s, Statement::Declare { .. }));
+
+        assert!(decl_stmt.is_some());
+        if let Some(Statement::Declare {
+            init: Some(rvalue), ..
+        }) = decl_stmt
+        {
+            // Should be a FieldAccess, not Constant
+            assert!(
+                matches!(rvalue, Rvalue::FieldAccess { .. }),
+                "Expected FieldAccess, got {:?}",
+                rvalue
+            );
+        }
+    }
+
+    #[test]
+    fn test_slice_pattern() {
+        let block: Block = parse_quote! {
+            {
+                let [first, second] = arr;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track first and second from slice destructuring
+        assert!(cfg.var_names.contains(&"first".to_string()));
+        assert!(cfg.var_names.contains(&"second".to_string()));
+    }
+
+    #[test]
+    fn test_tuple_struct_pattern() {
+        let block: Block = parse_quote! {
+            {
+                let Some(value) = option;
+            }
+        };
+
+        let cfg = ControlFlowGraph::from_block(&block);
+        // Should track value from tuple struct pattern
+        assert!(cfg.var_names.contains(&"value".to_string()));
     }
 }
