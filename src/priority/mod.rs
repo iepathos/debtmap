@@ -83,6 +83,10 @@ pub struct UnifiedAnalysis {
     /// Filter statistics for debugging (spec 242)
     #[serde(skip)]
     pub stats: FilterStatistics,
+    /// All analyzed files with their line counts (Spec 201)
+    /// Used for accurate total LOC calculation including files without debt items
+    #[serde(skip)]
+    pub analyzed_files: std::collections::HashMap<PathBuf, usize>,
 }
 
 // Single function analysis for evidence-based risk calculation
@@ -862,6 +866,22 @@ impl UnifiedAnalysis {
             has_coverage_data: false,
             timings: None,
             stats: FilterStatistics::new(),
+            analyzed_files: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register an analyzed file and its line count (Spec 201)
+    ///
+    /// This ensures accurate total LOC calculation by including files
+    /// even if they have no debt items.
+    pub fn register_analyzed_file(&mut self, path: PathBuf, line_count: usize) {
+        self.analyzed_files.insert(path, line_count);
+    }
+
+    /// Register multiple analyzed files at once (Spec 201)
+    pub fn register_analyzed_files(&mut self, files: impl IntoIterator<Item = (PathBuf, usize)>) {
+        for (path, line_count) in files {
+            self.analyzed_files.insert(path, line_count);
         }
     }
 
@@ -873,20 +893,19 @@ impl UnifiedAnalysis {
         let mut _functions_to_test = 0;
         let mut total_debt_score = 0.0;
 
-        // Track unique files to avoid double-counting LOC (spec 204 optimization)
-        // Use cached line counts from items instead of file I/O
+        // Spec 201: Start with all analyzed files for accurate total LOC
+        // This ensures files without debt items still contribute to the total
         let mut unique_files: std::collections::HashMap<std::path::PathBuf, usize> =
-            std::collections::HashMap::new();
+            self.analyzed_files.clone();
 
         for item in &self.items {
             // Sum up all final scores as the total debt score
             total_debt_score += item.unified_score.final_score.value();
 
             // Use cached file line count from item if available (spec 204)
+            // This may override the analyzed_files value with more accurate counts
             if let Some(line_count) = item.file_line_count {
-                unique_files
-                    .entry(item.location.file.clone())
-                    .or_insert(line_count);
+                unique_files.insert(item.location.file.clone(), line_count);
             }
 
             // Only count functions that actually need testing
@@ -933,7 +952,7 @@ impl UnifiedAnalysis {
             }
         }
 
-        // Sum up unique file line counts (no file I/O needed - spec 204)
+        // Sum up unique file line counts (Spec 201: includes all analyzed files)
         let total_lines_of_code: usize = unique_files.values().sum();
 
         // Coverage improvement is the estimated overall project coverage gain
@@ -1040,6 +1059,7 @@ impl UnifiedAnalysis {
             has_coverage_data: self.has_coverage_data,
             timings: self.timings.clone(),
             stats: self.stats.clone(),
+            analyzed_files: self.analyzed_files.clone(),
         }
     }
 

@@ -1202,11 +1202,21 @@ fn analyze_files_for_debt(
     project_path: &Path,
 ) {
     use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
+    use crate::metrics::loc_counter::LocCounter;
 
     // Pure functional pipeline for file analysis
     let file_groups = group_functions_by_file(metrics);
     let total_files = file_groups.len();
     let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
+
+    // Spec 201: Register all analyzed files for accurate total LOC calculation
+    // Use the LOC counter to get accurate line counts for all files
+    let loc_counter = LocCounter::default();
+    for file_path in file_groups.keys() {
+        if let Ok(loc_count) = loc_counter.count_file(file_path) {
+            unified.register_analyzed_file(file_path.clone(), loc_count.physical_lines);
+        }
+    }
 
     // Initialize progress tracking (maintaining design consistency with subtask 2)
     if let Some(manager) = crate::progress::ProgressManager::global() {

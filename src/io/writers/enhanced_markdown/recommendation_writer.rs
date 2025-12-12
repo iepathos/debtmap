@@ -194,6 +194,7 @@ mod tests {
             has_coverage_data: false,
             timings: None,
             stats: crate::priority::FilterStatistics::new(),
+            analyzed_files: std::collections::HashMap::new(),
         }
     }
 

@@ -1609,6 +1609,7 @@ fn json_to_analysis(
         has_coverage_data: json.overall_coverage.is_some(),
         timings: None,
         stats: debtmap::priority::FilterStatistics::new(),
+        analyzed_files: std::collections::HashMap::new(),
     }
 }
 

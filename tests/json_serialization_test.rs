@@ -23,6 +23,7 @@ fn test_unified_analysis_json_serialization() {
         has_coverage_data: false,
         timings: None,
         stats: FilterStatistics::new(),
+        analyzed_files: std::collections::HashMap::new(),
     };
 
     // Attempt to serialize to JSON
