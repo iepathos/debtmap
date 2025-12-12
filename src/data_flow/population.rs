@@ -67,31 +67,31 @@ mod ast_helpers {
         for item in &ast.items {
             match item {
                 syn::Item::Fn(item_fn) => {
-                    if let Some(span_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
-                        // For top-level functions, metric_name should match exactly
-                        // or be the simple part of a qualified name
-                        let fn_name = item_fn.sig.ident.to_string();
-                        if span_line == line && (metric_name == fn_name) {
-                            return Some(FoundFunction::TopLevel(item_fn));
-                        }
+                    // FunctionMetrics.line uses 1-indexed span.start().line,
+                    // so compare directly without converting to 0-indexed
+                    let span_line = item_fn.sig.ident.span().start().line;
+                    // For top-level functions, metric_name should match exactly
+                    // or be the simple part of a qualified name
+                    let fn_name = item_fn.sig.ident.to_string();
+                    if span_line == line && (metric_name == fn_name) {
+                        return Some(FoundFunction::TopLevel(item_fn));
                     }
                 }
                 syn::Item::Impl(item_impl) => {
                     for impl_item in &item_impl.items {
                         if let syn::ImplItem::Fn(method) = impl_item {
-                            if let Some(span_line) =
-                                method.sig.ident.span().start().line.checked_sub(1)
-                            {
-                                let method_name = method.sig.ident.to_string();
-                                // Match if:
-                                // 1. Exact match with simple method name
-                                // 2. Metric name ends with ::method_name (qualified format)
-                                let matches_name = metric_name == method_name
-                                    || metric_name.ends_with(&format!("::{}", method_name));
+                            // FunctionMetrics.line uses 1-indexed span.start().line,
+                            // so compare directly without converting to 0-indexed
+                            let span_line = method.sig.ident.span().start().line;
+                            let method_name = method.sig.ident.to_string();
+                            // Match if:
+                            // 1. Exact match with simple method name
+                            // 2. Metric name ends with ::method_name (qualified format)
+                            let matches_name = metric_name == method_name
+                                || metric_name.ends_with(&format!("::{}", method_name));
 
-                                if span_line == line && matches_name {
-                                    return Some(FoundFunction::ImplMethod(method));
-                                }
+                            if span_line == line && matches_name {
+                                return Some(FoundFunction::ImplMethod(method));
                             }
                         }
                     }
@@ -566,8 +566,8 @@ fn pure_func(x: i32) -> i32 {
 
         let mut data_flow = DataFlowGraph::new();
         let metrics = vec![
-            FunctionMetrics::new("read_file".to_string(), temp_path.clone(), 4),
-            FunctionMetrics::new("pure_func".to_string(), temp_path.clone(), 11),
+            FunctionMetrics::new("read_file".to_string(), temp_path.clone(), 5),  // 1-indexed
+            FunctionMetrics::new("pure_func".to_string(), temp_path.clone(), 12), // 1-indexed
         ];
 
         let count = populate_io_operations(&mut data_flow, &metrics);
@@ -591,8 +591,8 @@ fn top_level_func(x: i32) -> i32 {
 "#;
         let ast = syn::parse_file(code).unwrap();
 
-        // Should find top-level function at line 1 (0-indexed)
-        let found = find_function_in_ast(&ast, "top_level_func", 1);
+        // Should find top-level function at line 2 (1-indexed, line 1 is empty after r#")
+        let found = find_function_in_ast(&ast, "top_level_func", 2);
         assert!(found.is_some(), "Should find top-level function");
 
         // Should not find at wrong line
@@ -613,8 +613,8 @@ impl Foo {
 "#;
         let ast = syn::parse_file(code).unwrap();
 
-        // Should find method by simple name at line 4 (0-indexed)
-        let found = find_function_in_ast(&ast, "method", 4);
+        // Should find method by simple name at line 5 (1-indexed)
+        let found = find_function_in_ast(&ast, "method", 5);
         assert!(found.is_some(), "Should find impl method by simple name");
 
         match found.unwrap() {
@@ -636,8 +636,8 @@ impl Bar {
 "#;
         let ast = syn::parse_file(code).unwrap();
 
-        // Should find method by qualified name (Type::method)
-        let found = find_function_in_ast(&ast, "Bar::do_something", 4);
+        // Should find method by qualified name (Type::method) at line 5 (1-indexed)
+        let found = find_function_in_ast(&ast, "Bar::do_something", 5);
         assert!(found.is_some(), "Should find impl method by qualified name");
 
         match found.unwrap() {
@@ -676,7 +676,7 @@ impl FileReader {
         let metrics = vec![FunctionMetrics::new(
             "FileReader::read_contents".to_string(),
             temp_path.clone(),
-            7, // Line of the method
+            8, // Line of the method (1-indexed)
         )];
 
         let count = populate_io_operations(&mut data_flow, &metrics);
@@ -706,7 +706,7 @@ impl Calculator {
         temp_file.write_all(test_code.as_bytes()).unwrap();
         let temp_path = temp_file.path().to_path_buf();
 
-        let metric = FunctionMetrics::new("Calculator::add".to_string(), temp_path.clone(), 4);
+        let metric = FunctionMetrics::new("Calculator::add".to_string(), temp_path.clone(), 5); // 1-indexed
 
         let deps = extract_variable_deps(&metric);
 
@@ -741,7 +741,7 @@ impl DataProcessor {
         let metrics = vec![FunctionMetrics::new(
             "DataProcessor::process".to_string(),
             temp_path.clone(),
-            4,
+            5, // 1-indexed
         )];
 
         let count = populate_data_transformations(&mut data_flow, &metrics);
@@ -769,16 +769,16 @@ impl Foo {
 "#;
         let ast = syn::parse_file(code).unwrap();
 
-        // Check top-level block
-        let top_level = find_function_in_ast(&ast, "top_level", 1).unwrap();
+        // Check top-level block (line 2, 1-indexed)
+        let top_level = find_function_in_ast(&ast, "top_level", 2).unwrap();
         let block = top_level.block();
         assert!(
             !block.stmts.is_empty(),
             "Top-level block should have statements"
         );
 
-        // Check impl method block
-        let method = find_function_in_ast(&ast, "method", 8).unwrap();
+        // Check impl method block (line 9, 1-indexed)
+        let method = find_function_in_ast(&ast, "method", 9).unwrap();
         let block = method.block();
         assert!(
             !block.stmts.is_empty(),
@@ -799,13 +799,13 @@ impl Foo {
 "#;
         let ast = syn::parse_file(code).unwrap();
 
-        // Check top-level inputs
-        let top_level = find_function_in_ast(&ast, "top_level", 1).unwrap();
+        // Check top-level inputs (line 2, 1-indexed)
+        let top_level = find_function_in_ast(&ast, "top_level", 2).unwrap();
         let inputs: Vec<_> = top_level.inputs().collect();
         assert_eq!(inputs.len(), 2, "Top-level should have 2 inputs");
 
-        // Check impl method inputs (includes &self)
-        let method = find_function_in_ast(&ast, "method", 6).unwrap();
+        // Check impl method inputs (includes &self) (line 7, 1-indexed)
+        let method = find_function_in_ast(&ast, "method", 7).unwrap();
         let inputs: Vec<_> = method.inputs().collect();
         assert_eq!(
             inputs.len(),
