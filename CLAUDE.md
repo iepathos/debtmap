@@ -201,12 +201,8 @@ mod tests {
 ### Required Commands Before Commit
 
 ```bash
-# These commands must pass before any commit
-cargo test --all-features    # All tests pass
-cargo clippy --all-targets --all-features -- -D warnings  # No warnings
-cargo fmt --all -- --check  # Code is formatted
-cargo doc --no-deps         # Documentation builds
-cargo deny check             # License and security compliance
+# This command must pass before any commit
+just ci
 ```
 
 ### Continuous Integration Validation
@@ -364,7 +360,8 @@ Use these agents proactively when working on debtmap:
 - Use `Result<T>` for fallible operations
 - Prefer iterator chains over manual loops
 - Document complex analysis algorithms
-- Run full test suite before pushing (`cargo test --all-features`)
+- Run full test suite before pushing (`just test`)
 - Use appropriate parallel processing for CPU-intensive analysis
 
 This project exemplifies functional programming principles in Rust while maintaining high performance for code analysis tasks.
+- don't use release build only debug build for testing changes locally
