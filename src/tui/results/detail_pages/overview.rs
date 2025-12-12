@@ -38,7 +38,13 @@ fn build_location_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> 
         theme,
         width,
     );
-    add_label_value(&mut lines, "line", item.location.line.to_string(), theme, width);
+    add_label_value(
+        &mut lines,
+        "line",
+        item.location.line.to_string(),
+        theme,
+        width,
+    );
     add_blank_line(&mut lines);
     lines
 }
@@ -75,7 +81,11 @@ fn build_score_section(
         add_label_value(
             &mut lines,
             "total",
-            format!("{:.1}  [{}]", item.unified_score.final_score.value(), severity),
+            format!(
+                "{:.1}  [{}]",
+                item.unified_score.final_score.value(),
+                severity
+            ),
             theme,
             width,
         );
@@ -85,7 +95,11 @@ fn build_score_section(
 }
 
 /// Build god object structure section (pure) - returns empty if not a god object
-fn build_god_object_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
+fn build_god_object_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
     if let DebtType::GodObject {
@@ -119,7 +133,13 @@ fn build_god_object_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -
             add_label_value(&mut lines, "fields", field_count.to_string(), theme, width);
         }
 
-        add_label_value(&mut lines, "responsibilities", responsibilities.to_string(), theme, width);
+        add_label_value(
+            &mut lines,
+            "responsibilities",
+            responsibilities.to_string(),
+            theme,
+            width,
+        );
         add_label_value(&mut lines, "loc", debt_lines.to_string(), theme, width);
         add_blank_line(&mut lines);
     }
@@ -128,25 +148,51 @@ fn build_god_object_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -
 }
 
 /// Build complexity metrics section (pure)
-fn build_complexity_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
+fn build_complexity_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     add_section_header(&mut lines, "complexity", theme);
 
     let is_god_object = matches!(item.debt_type, DebtType::GodObject { .. });
     let (cyclomatic_label, cognitive_label, nesting_label) = if is_god_object {
-        ("accumulated cyclomatic", "accumulated cognitive", "max nesting")
+        (
+            "accumulated cyclomatic",
+            "accumulated cognitive",
+            "max nesting",
+        )
     } else {
         ("cyclomatic", "cognitive", "nesting")
     };
 
-    add_label_value(&mut lines, cyclomatic_label, item.cyclomatic_complexity.to_string(), theme, width);
+    add_label_value(
+        &mut lines,
+        cyclomatic_label,
+        item.cyclomatic_complexity.to_string(),
+        theme,
+        width,
+    );
 
     let cognitive_display = format_cognitive_display(item, is_god_object);
     add_label_value(&mut lines, cognitive_label, cognitive_display, theme, width);
-    add_label_value(&mut lines, nesting_label, item.nesting_depth.to_string(), theme, width);
+    add_label_value(
+        &mut lines,
+        nesting_label,
+        item.nesting_depth.to_string(),
+        theme,
+        width,
+    );
 
     if !is_god_object {
-        add_label_value(&mut lines, "loc", item.function_length.to_string(), theme, width);
+        add_label_value(
+            &mut lines,
+            "loc",
+            item.function_length.to_string(),
+            theme,
+            width,
+        );
     }
     add_blank_line(&mut lines);
     lines
@@ -159,13 +205,23 @@ fn format_cognitive_display(item: &UnifiedDebtItem, is_god_object: bool) -> Stri
             .as_ref()
             .and_then(|g| g.aggregated_entropy.as_ref())
             .filter(|e| e.dampening_factor < 1.0)
-            .map(|e| format!("{} → {} (dampened)", e.original_complexity, e.adjusted_cognitive))
+            .map(|e| {
+                format!(
+                    "{} → {} (dampened)",
+                    e.original_complexity, e.adjusted_cognitive
+                )
+            })
             .unwrap_or_else(|| item.cognitive_complexity.to_string())
     } else {
         item.entropy_details
             .as_ref()
             .filter(|e| e.dampening_factor < 1.0)
-            .map(|e| format!("{} → {} (dampened)", e.original_complexity, e.adjusted_cognitive))
+            .map(|e| {
+                format!(
+                    "{} → {} (dampened)",
+                    e.original_complexity, e.adjusted_cognitive
+                )
+            })
             .unwrap_or_else(|| item.cognitive_complexity.to_string())
     }
 }
@@ -185,12 +241,28 @@ fn build_coverage_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> 
 }
 
 /// Build recommendation section lines (pure)
-fn build_recommendation_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
+fn build_recommendation_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     add_section_header(&mut lines, "recommendation", theme);
-    add_label_value(&mut lines, "action", item.recommendation.primary_action.clone(), theme, width);
+    add_label_value(
+        &mut lines,
+        "action",
+        item.recommendation.primary_action.clone(),
+        theme,
+        width,
+    );
     add_blank_line(&mut lines);
-    add_label_value(&mut lines, "rationale", item.recommendation.rationale.clone(), theme, width);
+    add_label_value(
+        &mut lines,
+        "rationale",
+        item.recommendation.rationale.clone(),
+        theme,
+        width,
+    );
     add_blank_line(&mut lines);
     lines
 }
@@ -609,12 +681,13 @@ mod tests {
     #[test]
     fn coverage_section_with_data_shows_percentage() {
         let mut item = complexity_item("func");
-        item.transitive_coverage = Some(crate::priority::coverage_propagation::TransitiveCoverage {
-            direct: 0.85,
-            transitive: 0.72,
-            propagated_from: vec![],
-            uncovered_lines: vec![],
-        });
+        item.transitive_coverage =
+            Some(crate::priority::coverage_propagation::TransitiveCoverage {
+                direct: 0.85,
+                transitive: 0.72,
+                propagated_from: vec![],
+                uncovered_lines: vec![],
+            });
         let theme = Theme::default();
 
         let lines = build_coverage_section(&item, &theme, 80);
