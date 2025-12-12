@@ -10,165 +10,6 @@ use std::collections::HashSet;
 const UNTESTED_COMPLEXITY_THRESHOLD: u32 = 15;
 const UNTESTED_DEPENDENCY_THRESHOLD: usize = 10;
 
-/// Determine the primary debt type for a function
-pub fn determine_debt_type(
-    func: &FunctionMetrics,
-    coverage: &Option<TransitiveCoverage>,
-    call_graph: &CallGraph,
-    func_id: &FunctionId,
-) -> DebtType {
-    // Early return for testing gaps
-    if let Some(testing_gap) = check_testing_gap(func, coverage) {
-        return testing_gap;
-    }
-
-    // Early return for complexity hotspots
-    if let Some(hotspot) = check_complexity_hotspot(func) {
-        return hotspot;
-    }
-
-    // Early return for dead code
-    if let Some(dead_code) = check_dead_code(func, call_graph, func_id) {
-        return dead_code;
-    }
-
-    // Classify based on role and complexity
-    let role = classify_function_role(func, func_id, call_graph);
-    classify_by_role_and_complexity(func, &role, coverage)
-}
-
-// Pure helper functions for debt classification
-fn check_testing_gap(
-    func: &FunctionMetrics,
-    coverage: &Option<TransitiveCoverage>,
-) -> Option<DebtType> {
-    coverage
-        .as_ref()
-        .filter(|cov| cov.direct < 0.2 && !func.is_test)
-        .map(|cov| DebtType::TestingGap {
-            coverage: cov.direct,
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        })
-}
-
-/// Determine if a function is a complexity hotspot.
-///
-/// Uses entropy-adjusted cyclomatic complexity when available (spec 182).
-/// This prevents false positives for functions with repetitive, predictable structure.
-///
-/// Excludes Low tier functions (spec 180) as they're already maintainable:
-/// - Low tier: cyclo < 8 AND cognitive < 15 → No debt item (maintenance only)
-/// - Moderate+: cyclo >= 8 OR cognitive >= 15 → Report as ComplexityHotspot
-///
-/// # Thresholds
-/// - Cyclomatic (or adjusted): > 10
-/// - Cognitive: > 15
-///
-/// # Returns
-/// `Some(DebtType::ComplexityHotspot)` if function exceeds thresholds and is not Low tier.
-fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
-    // Use adjusted complexity if available (spec 182)
-    let effective_cyclomatic = func
-        .adjusted_complexity
-        .map(|adj| adj.round() as u32)
-        .unwrap_or(func.cyclomatic);
-
-    // Check if function exceeds complexity thresholds
-    let is_complex = effective_cyclomatic > 10 || func.cognitive > 15;
-
-    if !is_complex {
-        return None;
-    }
-
-    // Spec 180: Filter out Low tier complexity (< 8 cyclomatic, < 15 cognitive)
-    // These are maintenance-only recommendations ("Maintain current low complexity")
-    // Only report Moderate+ tier as actual debt requiring action
-    let is_low_tier = effective_cyclomatic < 8 && func.cognitive < 15;
-
-    if is_low_tier {
-        // Low tier - already maintainable, no action needed
-        return None;
-    }
-
-    // Moderate+ tier - report as complexity hotspot requiring attention
-    Some(DebtType::ComplexityHotspot {
-        cyclomatic: func.cyclomatic,
-        cognitive: func.cognitive,
-    })
-}
-
-fn check_dead_code(
-    func: &FunctionMetrics,
-    call_graph: &CallGraph,
-    func_id: &FunctionId,
-) -> Option<DebtType> {
-    is_dead_code(func, call_graph, func_id, None).then(|| DebtType::DeadCode {
-        visibility: determine_visibility(func),
-        cyclomatic: func.cyclomatic,
-        cognitive: func.cognitive,
-        usage_hints: generate_usage_hints(func, call_graph, func_id),
-    })
-}
-
-fn classify_by_role_and_complexity(
-    func: &FunctionMetrics,
-    role: &FunctionRole,
-    coverage: &Option<TransitiveCoverage>,
-) -> DebtType {
-    // Handle simple functions
-    if is_simple_function(func) {
-        return classify_simple_by_role(func, role);
-    }
-
-    // Handle complex functions
-    if needs_risk_assessment(func) {
-        return DebtType::Risk {
-            risk_score: calculate_risk_score(func),
-            factors: identify_risk_factors(func, coverage),
-        };
-    }
-
-    // Default case for functions that fall between simple and complex
-    match role {
-        FunctionRole::PureLogic => DebtType::Risk {
-            risk_score: 0.0,
-            factors: vec!["Simple pure function - minimal risk".to_string()],
-        },
-        _ => DebtType::Risk {
-            risk_score: 0.1,
-            factors: vec!["Simple function with low complexity".to_string()],
-        },
-    }
-}
-
-fn is_simple_function(func: &FunctionMetrics) -> bool {
-    func.cyclomatic <= 3 && func.cognitive <= 5
-}
-
-fn needs_risk_assessment(func: &FunctionMetrics) -> bool {
-    func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50
-}
-
-fn classify_simple_by_role(func: &FunctionMetrics, role: &FunctionRole) -> DebtType {
-    use FunctionRole::*;
-
-    match role {
-        IOWrapper | EntryPoint | PatternMatch | Debug => DebtType::Risk {
-            risk_score: 0.0,
-            factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
-        },
-        PureLogic if func.length <= 10 => DebtType::Risk {
-            risk_score: 0.0,
-            factors: vec!["Trivial pure function - not technical debt".to_string()],
-        },
-        _ => DebtType::Risk {
-            risk_score: 0.1,
-            factors: vec!["Simple function with low complexity".to_string()],
-        },
-    }
-}
-
 /// Check if a function is dead code
 pub fn is_dead_code(
     func: &FunctionMetrics,
@@ -246,15 +87,87 @@ fn check_testing_gap_predicate(
     })
 }
 
-/// Check for complexity hotspot - pure predicate for multi-debt accumulation
-fn check_complexity_hotspot_predicate(func: &FunctionMetrics) -> Option<DebtType> {
-    if is_complexity_hotspot_by_metrics(func.cyclomatic, func.cognitive) {
-        Some(DebtType::ComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        })
+/// Check for complexity hotspot using entropy-dampened values (spec 201)
+///
+/// This is the single source of truth for complexity hotspot detection.
+/// Uses dampened complexity values to avoid false positives on dispatcher patterns.
+///
+/// # Dampening Logic (from spec 68)
+/// - `adjusted_complexity` is used for cyclomatic (already dampened during entropy analysis)
+/// - Cognitive complexity is dampened inline using token entropy
+/// - Functions with low entropy (< 0.2) get dampened cognitive scores
+///
+/// # Thresholds
+/// - Effective cyclomatic: > 10
+/// - Effective cognitive: > 15
+///
+/// # Returns
+/// `Some(DebtType::ComplexityHotspot)` with RAW values (for display) if function
+/// exceeds thresholds after dampening. Returns `None` if not a hotspot.
+fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
+    let effective_cyclomatic = get_effective_cyclomatic(func);
+    let effective_cognitive = get_effective_cognitive(func);
+
+    // Check if function exceeds complexity thresholds using dampened values
+    let is_complex = effective_cyclomatic > 10 || effective_cognitive > 15;
+
+    if !is_complex {
+        return None;
+    }
+
+    // Spec 180: Filter out Low tier complexity (< 8 effective cyclomatic, < 15 effective cognitive)
+    // These are maintenance-only recommendations ("Maintain current low complexity")
+    let is_low_tier = effective_cyclomatic < 8 && effective_cognitive < 15;
+
+    if is_low_tier {
+        return None;
+    }
+
+    // Report as complexity hotspot with RAW values for display
+    // The effective (dampened) values were used for classification decisions
+    Some(DebtType::ComplexityHotspot {
+        cyclomatic: func.cyclomatic, // Raw for display
+        cognitive: func.cognitive,   // Raw for display
+    })
+}
+
+/// Get effective cyclomatic complexity using entropy-adjusted value (spec 201)
+///
+/// Uses `adjusted_complexity` if available (computed during entropy analysis),
+/// otherwise falls back to raw cyclomatic.
+fn get_effective_cyclomatic(func: &FunctionMetrics) -> u32 {
+    func.adjusted_complexity
+        .map(|adj| adj.round() as u32)
+        .unwrap_or(func.cyclomatic)
+}
+
+/// Get effective cognitive complexity using entropy dampening (spec 201)
+///
+/// Applies dampening factor to cognitive complexity based on token entropy.
+/// Low entropy (< 0.2) indicates repetitive patterns (e.g., dispatchers),
+/// which get dampened cognitive scores.
+fn get_effective_cognitive(func: &FunctionMetrics) -> u32 {
+    if let Some(entropy) = &func.entropy_score {
+        let factor = calculate_cognitive_dampening_factor(entropy.token_entropy);
+        (func.cognitive as f64 * factor).round() as u32
     } else {
-        None
+        func.cognitive
+    }
+}
+
+/// Calculate dampening factor for cognitive complexity based on token entropy (spec 68)
+///
+/// Low entropy (< 0.2) indicates repetitive, predictable structure (dispatchers, matchers).
+/// These get dampened cognitive scores because the complexity is mechanical, not cognitive.
+///
+/// - entropy >= 0.2: factor = 1.0 (no dampening)
+/// - entropy < 0.2: factor = 0.5 to 1.0 (proportional dampening)
+fn calculate_cognitive_dampening_factor(token_entropy: f64) -> f64 {
+    if token_entropy < 0.2 {
+        // Linear interpolation from 0.5 (at entropy=0) to 1.0 (at entropy=0.2)
+        (0.5_f64).max(1.0 - (0.5 * (0.2 - token_entropy) / 0.2))
+    } else {
+        1.0
     }
 }
 
@@ -317,7 +230,7 @@ pub fn classify_all_debt_types(
     // Compose all independent debt checks using iterator chains (functional style)
     let debt_types: Vec<DebtType> = vec![
         check_testing_gap_predicate(func, coverage),
-        check_complexity_hotspot_predicate(func),
+        check_complexity_hotspot(func),
         check_dead_code_with_exclusions_predicate(
             func,
             call_graph,
@@ -695,10 +608,6 @@ fn generate_usage_hints(
 // Pure helper functions
 fn has_testing_gap(coverage: f64, is_test: bool) -> bool {
     coverage < 0.2 && !is_test
-}
-
-fn is_complexity_hotspot_by_metrics(cyclomatic: u32, cognitive: u32) -> bool {
-    cyclomatic > 5 || cognitive > 8
 }
 
 #[cfg(test)]
@@ -1173,15 +1082,6 @@ mod tests {
         assert!(!has_testing_gap(0.5, true));
     }
 
-    #[test]
-    fn test_is_complexity_hotspot_by_metrics() {
-        assert!(is_complexity_hotspot_by_metrics(6, 5));
-        assert!(is_complexity_hotspot_by_metrics(3, 9));
-        assert!(is_complexity_hotspot_by_metrics(10, 10));
-        assert!(!is_complexity_hotspot_by_metrics(5, 8));
-        assert!(!is_complexity_hotspot_by_metrics(3, 5));
-    }
-
     fn test_extract_visibility(func: &FunctionMetrics) -> FunctionVisibility {
         match func.visibility.as_deref() {
             Some("pub") => FunctionVisibility::Public,
@@ -1439,6 +1339,172 @@ mod tests {
         assert!(
             result.is_none(),
             "Low tier function should not generate ComplexityHotspot debt"
+        );
+    }
+
+    // Spec 201: Tests for dampened complexity in classification
+
+    /// Helper to create an entropy score for tests
+    fn create_test_entropy_score(
+        token_entropy: f64,
+    ) -> crate::complexity::entropy_core::EntropyScore {
+        crate::complexity::entropy_core::EntropyScore {
+            token_entropy,
+            pattern_repetition: 0.5,
+            branch_similarity: 0.5,
+            effective_complexity: token_entropy,
+            unique_variables: 10,
+            max_nesting: 2,
+            dampening_applied: if token_entropy < 0.2 {
+                0.5 + (token_entropy / 0.4)
+            } else {
+                1.0
+            },
+        }
+    }
+
+    #[test]
+    fn test_dispatcher_with_low_entropy_not_flagged() {
+        let mut func = create_test_function("render", None);
+        func.cyclomatic = 8;
+        func.cognitive = 10;
+        func.entropy_score = Some(create_test_entropy_score(0.12)); // Low entropy = dispatcher pattern
+        func.adjusted_complexity = None; // No adjusted_complexity, but has entropy
+
+        let result = check_complexity_hotspot(&func);
+
+        // Dampened cognitive: 10 * 0.7 = 7, below threshold 15
+        // Effective cyclomatic: 8, below threshold 10
+        assert!(
+            result.is_none(),
+            "Dispatcher with low entropy should not be flagged as complexity hotspot"
+        );
+    }
+
+    #[test]
+    fn test_genuinely_complex_still_flagged() {
+        let mut func = create_test_function("complex_logic", None);
+        func.cyclomatic = 15;
+        func.cognitive = 25;
+        func.entropy_score = Some(create_test_entropy_score(0.85)); // High entropy = genuinely complex
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+
+        // No dampening applied (high entropy)
+        // cyclomatic 15 > 10 OR cognitive 25 > 15 => flagged
+        assert!(
+            result.is_some(),
+            "Genuinely complex function should be flagged"
+        );
+    }
+
+    #[test]
+    fn test_effective_cyclomatic_uses_adjusted_when_available() {
+        let mut func = create_test_function("adjusted_func", None);
+        func.cyclomatic = 20; // Raw is high
+        func.adjusted_complexity = Some(5.5); // But adjusted is low
+
+        let effective = get_effective_cyclomatic(&func);
+        assert_eq!(effective, 6, "Should use adjusted complexity rounded");
+    }
+
+    #[test]
+    fn test_effective_cyclomatic_falls_back_to_raw() {
+        let mut func = create_test_function("raw_func", None);
+        func.cyclomatic = 15;
+        func.adjusted_complexity = None;
+
+        let effective = get_effective_cyclomatic(&func);
+        assert_eq!(effective, 15, "Should fall back to raw cyclomatic");
+    }
+
+    #[test]
+    fn test_effective_cognitive_with_low_entropy() {
+        let mut func = create_test_function("dispatcher", None);
+        func.cognitive = 20;
+        func.entropy_score = Some(create_test_entropy_score(0.1)); // Very low entropy
+
+        let effective = get_effective_cognitive(&func);
+        // With entropy=0.1: factor = 1.0 - (0.5 * (0.2 - 0.1) / 0.2) = 1.0 - 0.25 = 0.75
+        // effective = 20 * 0.75 = 15
+        assert_eq!(effective, 15, "Should apply dampening for low entropy");
+    }
+
+    #[test]
+    fn test_effective_cognitive_with_high_entropy() {
+        let mut func = create_test_function("complex", None);
+        func.cognitive = 20;
+        func.entropy_score = Some(create_test_entropy_score(0.5)); // High entropy (> 0.2)
+
+        let effective = get_effective_cognitive(&func);
+        assert_eq!(effective, 20, "No dampening for high entropy");
+    }
+
+    #[test]
+    fn test_cognitive_dampening_factor_boundaries() {
+        // At entropy = 0.0: factor = 0.5 (max dampening)
+        let factor_zero = calculate_cognitive_dampening_factor(0.0);
+        assert!(
+            (factor_zero - 0.5).abs() < 0.001,
+            "Factor at entropy=0 should be 0.5"
+        );
+
+        // At entropy = 0.1: factor = 0.75 (midpoint)
+        let factor_mid = calculate_cognitive_dampening_factor(0.1);
+        assert!(
+            (factor_mid - 0.75).abs() < 0.001,
+            "Factor at entropy=0.1 should be 0.75"
+        );
+
+        // At entropy = 0.2: factor = 1.0 (no dampening)
+        let factor_threshold = calculate_cognitive_dampening_factor(0.2);
+        assert!(
+            (factor_threshold - 1.0).abs() < 0.001,
+            "Factor at entropy=0.2 should be 1.0"
+        );
+
+        // At entropy > 0.2: factor = 1.0 (no dampening)
+        let factor_high = calculate_cognitive_dampening_factor(0.8);
+        assert!(
+            (factor_high - 1.0).abs() < 0.001,
+            "Factor at entropy>0.2 should be 1.0"
+        );
+    }
+
+    #[test]
+    fn test_production_path_uses_dampened_values() {
+        use std::collections::HashSet;
+
+        // This test verifies the production path (classify_all_debt_types)
+        // correctly uses dampened values via check_complexity_hotspot
+
+        let mut func = create_test_function("render", None);
+        func.cyclomatic = 8;
+        func.cognitive = 10;
+        func.entropy_score = Some(create_test_entropy_score(0.12)); // Low entropy = dispatcher
+
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+        let framework_exclusions = HashSet::new();
+
+        let debt_types = classify_all_debt_types(
+            &func,
+            &call_graph,
+            &func_id,
+            &framework_exclusions,
+            None,
+            None,
+        );
+
+        // Should not contain ComplexityHotspot because dampened values are below thresholds
+        let has_complexity_hotspot = debt_types
+            .iter()
+            .any(|dt| matches!(dt, DebtType::ComplexityHotspot { .. }));
+
+        assert!(
+            !has_complexity_hotspot,
+            "Dispatcher function should not be flagged as ComplexityHotspot in production path"
         );
     }
 }

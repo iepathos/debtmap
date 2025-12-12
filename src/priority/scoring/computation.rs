@@ -51,29 +51,6 @@ pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetail
     })
 }
 
-/// Pure function - calculates risk score from function metrics
-/// Returns a score from 0.0 to 10.0 based on complexity and length
-pub(super) fn calculate_risk_score(func: &FunctionMetrics) -> f64 {
-    // Better scaling for complexity risk (0-1 range)
-    // Cyclomatic 10 = 0.33, 20 = 0.67, 30+ = 1.0
-    let cyclo_risk = (func.cyclomatic as f64 / 30.0).min(1.0);
-
-    // Cognitive complexity tends to be higher, so scale differently
-    // Cognitive 15 = 0.33, 30 = 0.67, 45+ = 1.0
-    let cognitive_risk = (func.cognitive as f64 / 45.0).min(1.0);
-
-    // Length risk - functions over 100 lines are definitely risky
-    let length_risk = (func.length as f64 / 100.0).min(1.0);
-
-    // Average the three risk factors
-    // Complexity is most important, then cognitive, then length
-    let weighted_risk = cyclo_risk * 0.4 + cognitive_risk * 0.4 + length_risk * 0.2;
-
-    // Scale to 0-10 range for final risk score
-    // Note: Coverage is handled separately in the unified scoring system
-    weighted_risk * 10.0
-}
-
 /// Pure function - calculates how many functions should be extracted
 /// Based on cyclomatic and cognitive complexity
 pub(super) fn calculate_functions_to_extract(cyclomatic: u32, cognitive: u32) -> u32 {
@@ -250,74 +227,6 @@ pub(super) fn calculate_expected_impact(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_calculate_risk_score_low_complexity() {
-        let func = FunctionMetrics {
-            name: "test".to_string(),
-            file: "test.rs".into(),
-            line: 1,
-            cyclomatic: 5,
-            cognitive: 3,
-            nesting: 1,
-            length: 20,
-            is_test: false,
-            visibility: None,
-            is_trait_method: false,
-            in_test_module: false,
-            entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
-            purity_reason: None,
-            call_dependencies: None,
-            detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-            composition_metrics: None,
-            language_specific: None,
-            purity_level: None,
-            error_swallowing_count: None,
-            error_swallowing_patterns: None,
-        };
-        let risk = calculate_risk_score(&func);
-        assert!(risk < 3.0, "Low complexity should have low risk score");
-    }
-
-    #[test]
-    fn test_calculate_risk_score_high_complexity() {
-        let func = FunctionMetrics {
-            name: "test".to_string(),
-            file: "test.rs".into(),
-            line: 1,
-            cyclomatic: 30,
-            cognitive: 45,
-            nesting: 3,
-            length: 100,
-            is_test: false,
-            visibility: None,
-            is_trait_method: false,
-            in_test_module: false,
-            entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
-            purity_reason: None,
-            call_dependencies: None,
-            detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-            composition_metrics: None,
-            language_specific: None,
-            purity_level: None,
-            error_swallowing_count: None,
-            error_swallowing_patterns: None,
-        };
-        let risk = calculate_risk_score(&func);
-        assert!(risk >= 8.0, "High complexity should have high risk score");
-    }
 
     #[test]
     fn test_calculate_functions_to_extract() {
