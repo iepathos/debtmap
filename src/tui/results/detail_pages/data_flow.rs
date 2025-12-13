@@ -31,30 +31,40 @@ pub fn render(
 
     let mut lines = Vec::new();
 
-    // Mutation Analysis Section
+    // Mutation Analysis Section (spec 257: binary signals)
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
         add_section_header(&mut lines, "mutation analysis", theme);
 
         add_label_value(
             &mut lines,
-            "total",
-            mutation_info.total_mutations.to_string(),
+            "has mutations",
+            if mutation_info.has_mutations {
+                "yes"
+            } else {
+                "no"
+            }
+            .to_string(),
             theme,
             area.width,
         );
 
         add_label_value(
             &mut lines,
-            "mutations",
-            mutation_info.live_mutations.len().to_string(),
+            "escaping",
+            if mutation_info.has_escaping_mutations {
+                "yes"
+            } else {
+                "no"
+            }
+            .to_string(),
             theme,
             area.width,
         );
 
-        if !mutation_info.live_mutations.is_empty() {
+        if !mutation_info.detected_mutations.is_empty() {
             add_blank_line(&mut lines);
-            add_section_header(&mut lines, "mutations", theme);
-            for mutation in &mutation_info.live_mutations {
+            add_section_header(&mut lines, "detected mutations (best-effort)", theme);
+            for mutation in &mutation_info.detected_mutations {
                 lines.push(Line::from(vec![
                     Span::raw("                        "), // Align to value column (24 chars)
                     Span::styled(mutation.clone(), Style::default().fg(Color::Yellow)),

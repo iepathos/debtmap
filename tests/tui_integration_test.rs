@@ -462,11 +462,12 @@ fn test_data_flow_page_rendering_with_mutations() {
         location.line,
     );
 
-    // Add mutation info
+    // Add mutation info (spec 257: binary signals)
     let mutation_info = MutationInfo {
-        total_mutations: 5,
-        live_mutations: vec!["x".to_string(), "y".to_string()],
-        escaping_mutations: [String::from("x")].iter().cloned().collect(),
+        has_mutations: true,
+        has_escaping_mutations: true,
+        detected_mutations: vec!["x".to_string(), "y".to_string()],
+        escaping_vars: vec!["x".to_string()],
     };
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
 
@@ -479,12 +480,13 @@ fn test_data_flow_page_rendering_with_mutations() {
         },
     );
 
-    // Verify mutation data is accessible
+    // Verify mutation data is accessible (spec 257: binary signals)
     let retrieved_mutation = data_flow.get_mutation_info(&func_id);
     assert!(retrieved_mutation.is_some());
     let mutation = retrieved_mutation.unwrap();
-    assert_eq!(mutation.total_mutations, 5);
-    assert_eq!(mutation.live_mutations.len(), 2);
+    assert!(mutation.has_mutations);
+    assert!(mutation.has_escaping_mutations);
+    assert_eq!(mutation.detected_mutations.len(), 2);
 }
 
 #[test]
@@ -637,13 +639,14 @@ fn test_data_flow_markdown_formatting() {
         location.line,
     );
 
-    // Add comprehensive data flow information
+    // Add comprehensive data flow information (spec 257: binary signals)
     data_flow.set_mutation_info(
         func_id.clone(),
         MutationInfo {
-            total_mutations: 10,
-            live_mutations: vec!["counter".to_string(), "state".to_string()],
-            escaping_mutations: ["counter".to_string()].iter().cloned().collect(),
+            has_mutations: true,
+            has_escaping_mutations: true,
+            detected_mutations: vec!["counter".to_string(), "state".to_string()],
+            escaping_vars: vec!["counter".to_string()],
         },
     );
 
@@ -656,13 +659,13 @@ fn test_data_flow_markdown_formatting() {
         },
     );
 
-    // Verify all data is present for markdown formatting
+    // Verify all data is present for markdown formatting (spec 257: binary signals)
     assert!(data_flow.get_mutation_info(&func_id).is_some());
     assert!(data_flow.get_io_operations(&func_id).is_some());
 
     let mutation = data_flow.get_mutation_info(&func_id).unwrap();
-    assert_eq!(mutation.total_mutations, 10);
-    assert_eq!(mutation.live_mutations.len(), 2);
+    assert!(mutation.has_mutations);
+    assert_eq!(mutation.detected_mutations.len(), 2);
 
     let io_ops = data_flow.get_io_operations(&func_id).unwrap();
     assert_eq!(io_ops.len(), 1);

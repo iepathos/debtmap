@@ -256,19 +256,21 @@ fn format_data_flow_section(
 
     result.push_str("\n**Data Flow Analysis**\n\n");
 
-    // Mutation analysis
+    // Mutation analysis (spec 257: binary signals)
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
-        result.push_str(&format!(
-            "- Mutations: {} total, {} tracked\n",
-            mutation_info.total_mutations,
-            mutation_info.live_mutations.len()
-        ));
+        let mutation_status = if mutation_info.has_mutations {
+            if mutation_info.has_escaping_mutations {
+                "detected (some may escape)"
+            } else {
+                "detected (local only)"
+            }
+        } else {
+            "none detected"
+        };
+        result.push_str(&format!("- Mutations: {}\n", mutation_status));
 
-        if mutation_info.live_mutations.len() <= 2 && mutation_info.total_mutations > 2 {
-            result.push_str(&format!(
-                "  - **Almost Pure**: Only {} mutation(s), consider extracting pure subset\n",
-                mutation_info.live_mutations.len()
-            ));
+        if mutation_info.is_pure() {
+            result.push_str("  - **Pure Function**: No mutations detected\n");
         }
     }
 

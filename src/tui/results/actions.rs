@@ -880,24 +880,32 @@ fn extract_data_flow_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> 
 
     let mut output = String::new();
 
-    // Mutation Analysis Section
+    // Mutation Analysis Section (spec 257: binary signals)
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
         add_section_header(&mut output, "mutation analysis");
         add_label_value(
             &mut output,
-            "total",
-            &mutation_info.total_mutations.to_string(),
+            "has mutations",
+            if mutation_info.has_mutations {
+                "yes"
+            } else {
+                "no"
+            },
         );
         add_label_value(
             &mut output,
-            "mutations",
-            &mutation_info.live_mutations.len().to_string(),
+            "escaping",
+            if mutation_info.has_escaping_mutations {
+                "yes"
+            } else {
+                "no"
+            },
         );
 
-        if !mutation_info.live_mutations.is_empty() {
+        if !mutation_info.detected_mutations.is_empty() {
             add_blank_line(&mut output);
-            add_section_header(&mut output, "mutations");
-            for mutation in &mutation_info.live_mutations {
+            add_section_header(&mut output, "detected mutations (best-effort)");
+            for mutation in &mutation_info.detected_mutations {
                 output.push_str(&format!("                            {}\n", mutation));
             }
         }
