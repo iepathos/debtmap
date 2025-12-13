@@ -83,10 +83,11 @@ fn test_warning_displayed_once_not_multiple_times() {
 
     // Count how many times eprintln! appears in the function
     let eprintln_count = tip_section
-        .split("fn ")  // Stop at next function
+        .split("fn ") // Stop at next function
         .next()
         .unwrap_or(tip_section)
-        .matches("eprintln!").count();
+        .matches("eprintln!")
+        .count();
 
     // The warning should have multiple eprintln! calls (for multi-line output)
     assert!(

@@ -121,16 +121,23 @@ pub fn perform_unified_analysis_with_options(
     emit_coverage_tip(coverage_data.is_none(), suppress_coverage_tip);
 
     let coverage_time = coverage_start.elapsed();
-    let coverage_metric = if coverage_data.is_some() { "loaded" } else { "skipped" };
+    let coverage_metric = if coverage_data.is_some() {
+        "loaded"
+    } else {
+        "skipped"
+    };
     report_stage_complete(2, coverage_metric);
 
     // Enrich metrics with call graph data
-    let enriched_metrics =
-        call_graph_integration::populate_call_graph_data(results.complexity.metrics.clone(), &call_graph);
+    let enriched_metrics = call_graph_integration::populate_call_graph_data(
+        results.complexity.metrics.clone(),
+        &call_graph,
+    );
 
     // Progress: Purity stage
     report_stage_start(3);
-    let enriched_metrics = core::orchestration::run_purity_propagation(&enriched_metrics, &call_graph);
+    let enriched_metrics =
+        core::orchestration::run_purity_propagation(&enriched_metrics, &call_graph);
     report_stage_complete(3, format!("{} functions analyzed", enriched_metrics.len()));
 
     // Progress: Context stage
@@ -356,7 +363,9 @@ fn create_parallel_analysis(
     risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
 ) -> UnifiedAnalysis {
-    use parallel_unified_analysis::{ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions};
+    use parallel_unified_analysis::{
+        ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
+    };
 
     let options = ParallelUnifiedAnalysisOptions {
         parallel: true,
@@ -390,7 +399,8 @@ fn create_parallel_analysis(
         function_pointer_used_functions,
     );
 
-    let file_items = builder.execute_phase3_parallel(&enriched_metrics, coverage_data, no_god_object);
+    let file_items =
+        builder.execute_phase3_parallel(&enriched_metrics, coverage_data, no_god_object);
 
     let (mut unified, timings) =
         builder.build(data_flow_graph, purity, items, file_items, coverage_data);
@@ -443,7 +453,10 @@ fn process_file_analysis(
             Some(&processed.file_context),
         );
 
-        let has_god_object = processed.god_analysis.as_ref().is_some_and(|a| a.is_god_object);
+        let has_god_object = processed
+            .god_analysis
+            .as_ref()
+            .is_some_and(|a| a.is_god_object);
 
         // Use adjusted score for threshold check (same as parallel path)
         if file_item.score > 50.0 || has_god_object {
