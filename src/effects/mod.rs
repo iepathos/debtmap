@@ -90,8 +90,20 @@
 //! }
 //! ```
 
+pub mod combinators;
 mod core;
+pub mod io;
 pub mod progress;
 
 // Re-export everything from core
 pub use core::*;
+
+// Re-export key functions from submodules for convenience
+pub use combinators::{
+    filter_effect, filter_map_effect, first, fold_effect, par_traverse_effect, second,
+    sequence_effects, traverse_effect, zip_effect,
+};
+pub use io::{
+    file_exists_effect, is_dir_effect, is_file_effect, read_file_bytes_effect, read_file_effect,
+    write_file_effect,
+};
