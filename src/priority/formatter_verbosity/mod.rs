@@ -8,6 +8,12 @@
 //! - **Spec 204**: Uses `item.detected_pattern` for pattern display
 //! - **Spec 205**: Follows modular structure pattern
 //!
+//! ## Architecture (Stillwater Philosophy)
+//!
+//! Each module follows "Pure Core, Imperative Shell":
+//! - Pure classification functions for decision logic
+//! - Section formatters that compose pure functions for output
+//!
 //! ## Consistency Guarantees
 //!
 //! Coverage labels, severity classification, and pattern detection are
@@ -15,7 +21,9 @@
 
 pub mod body;
 pub mod complexity;
+pub mod context;
 pub mod coverage;
+pub mod git_history;
 pub mod sections;
 
 use crate::formatting::FormattingConfig;
