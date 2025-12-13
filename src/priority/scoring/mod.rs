@@ -9,6 +9,7 @@ pub mod context_aware;
 pub mod coverage_expectations;
 pub mod coverage_scoring;
 pub mod debt_item;
+pub mod effects; // Spec 268: Effect-based scoring with Reader pattern
 pub mod facade_scoring; // Spec 170: Module facade detection and scoring adjustment
 pub mod file_context_scoring; // Spec 166: Test file detection and context-aware scoring
 pub mod formatting;
@@ -69,5 +70,9 @@ pub use file_context_scoring::{
 pub use facade_scoring::adjust_score_for_facade;
 
 pub use scaling::{calculate_final_score, ScalingConfig};
+
+pub use effects::{
+    calculate_score_effect, calculate_scores_effect, get_weights_effect, ScoringEnv, TestScoringEnv,
+};
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

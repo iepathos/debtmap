@@ -24,6 +24,8 @@ use crate::config::DebtmapConfig;
 use crate::env::AnalysisEnv;
 use crate::errors::AnalysisError;
 use crate::io::traits::{Cache, CoverageData, CoverageLoader, FileCoverage, FileSystem};
+use crate::progress::implementations::{RecordingProgressSink, SilentProgressSink};
+use crate::progress::traits::{HasProgress, ProgressSink};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -65,6 +67,7 @@ pub struct DebtmapTestEnv {
     coverage: Arc<RwLock<CoverageData>>,
     cache: Arc<RwLock<HashMap<String, Vec<u8>>>>,
     config: DebtmapConfig,
+    progress: Arc<dyn ProgressSink>,
 }
 
 impl DebtmapTestEnv {
@@ -81,7 +84,48 @@ impl DebtmapTestEnv {
             coverage: Arc::new(RwLock::new(CoverageData::new())),
             cache: Arc::new(RwLock::new(HashMap::new())),
             config: DebtmapConfig::default(),
+            progress: Arc::new(SilentProgressSink),
         }
+    }
+
+    /// Create a test environment with a recording progress sink.
+    ///
+    /// This returns both the environment and the recorder, allowing tests
+    /// to verify progress events.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let (env, recorder) = DebtmapTestEnv::with_recording_progress();
+    /// // ... run effect that reports progress ...
+    /// assert_eq!(recorder.stages(), vec!["Analysis"]);
+    /// ```
+    pub fn with_recording_progress() -> (Self, Arc<RecordingProgressSink>) {
+        let recorder = Arc::new(RecordingProgressSink::new());
+        let env = Self {
+            files: Arc::new(RwLock::new(HashMap::new())),
+            coverage: Arc::new(RwLock::new(CoverageData::new())),
+            cache: Arc::new(RwLock::new(HashMap::new())),
+            config: DebtmapConfig::default(),
+            progress: recorder.clone(),
+        };
+        (env, recorder)
+    }
+
+    /// Set a custom progress sink.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use std::sync::Arc;
+    /// use debtmap::progress::implementations::RecordingProgressSink;
+    ///
+    /// let recorder = Arc::new(RecordingProgressSink::new());
+    /// let env = DebtmapTestEnv::new()
+    ///     .with_progress(recorder.clone());
+    /// ```
+    pub fn with_progress(self, progress: Arc<dyn ProgressSink>) -> Self {
+        Self { progress, ..self }
     }
 
     /// Add a file to the mock file system.
@@ -331,6 +375,13 @@ impl CoverageLoader for DebtmapTestEnv {
     }
 }
 
+// Implement HasProgress trait
+impl HasProgress for DebtmapTestEnv {
+    fn progress(&self) -> &dyn ProgressSink {
+        &*self.progress
+    }
+}
+
 // Implement Cache trait
 impl Cache for DebtmapTestEnv {
     fn get(&self, key: &str) -> Option<Vec<u8>> {
@@ -518,5 +569,37 @@ mod tests {
 
         let bytes = env.file_system().read_bytes(Path::new("test.rs")).unwrap();
         assert_eq!(bytes, b"fn main() {}");
+    }
+
+    #[test]
+    fn test_has_progress_silent() {
+        let env = DebtmapTestEnv::new();
+
+        // Silent progress sink should not panic
+        env.progress().start_stage("Test");
+        env.progress().report("Test", 0, 10);
+        env.progress().complete_stage("Test");
+    }
+
+    #[test]
+    fn test_with_recording_progress() {
+        let (env, recorder) = DebtmapTestEnv::with_recording_progress();
+
+        env.progress().start_stage("Analysis");
+        env.progress().report("Analysis", 5, 10);
+        env.progress().complete_stage("Analysis");
+
+        assert_eq!(recorder.stages(), vec!["Analysis"]);
+        assert_eq!(recorder.completed_stages(), vec!["Analysis"]);
+        assert_eq!(recorder.event_count(), 3);
+    }
+
+    #[test]
+    fn test_with_progress_custom() {
+        let recorder = Arc::new(RecordingProgressSink::new());
+        let env = DebtmapTestEnv::new().with_progress(recorder.clone());
+
+        env.progress().start_stage("Custom");
+        assert_eq!(recorder.stages(), vec!["Custom"]);
     }
 }
