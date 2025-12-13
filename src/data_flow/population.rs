@@ -411,7 +411,7 @@ fn is_transformation_method(name: &str) -> bool {
 mod tests {
     use super::*;
     use crate::analysis::data_flow::{
-        DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
+        DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis,
     };
     use crate::core::PurityLevel;
     use std::collections::{HashMap, HashSet};
@@ -425,11 +425,6 @@ mod tests {
         use crate::analyzers::purity_detector::LocalMutation;
 
         // Create minimal data flow analysis
-        let liveness = LivenessInfo {
-            live_in: HashMap::new(),
-            live_out: HashMap::new(),
-        };
-
         let reaching_defs = ReachingDefinitions::default();
 
         let escape_info = EscapeAnalysis {
@@ -445,7 +440,6 @@ mod tests {
         };
 
         let data_flow = DataFlowAnalysis {
-            liveness,
             reaching_defs,
             escape_info,
             taint_info,

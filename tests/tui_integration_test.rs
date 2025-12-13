@@ -567,9 +567,7 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
     );
 
     // Add escape analysis - create a minimal DataFlowAnalysis
-    use debtmap::analysis::data_flow::{
-        EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-    };
+    use debtmap::analysis::data_flow::{EscapeAnalysis, ReachingDefinitions, TaintAnalysis};
     use std::collections::HashSet;
 
     let var1 = VarId {
@@ -588,10 +586,6 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
     };
 
     let cfg_analysis = DataFlowAnalysis {
-        liveness: LivenessInfo {
-            live_in: Default::default(),
-            live_out: Default::default(),
-        },
         reaching_defs: ReachingDefinitions::default(),
         escape_info,
         taint_info: TaintAnalysis {

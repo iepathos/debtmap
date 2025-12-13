@@ -654,8 +654,7 @@ mod tests {
     #[test]
     fn test_varid_translation() {
         use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-            VarId,
+            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
         };
         use std::collections::HashMap;
 
@@ -663,10 +662,6 @@ mod tests {
 
         // Create minimal analysis
         let analysis = DataFlowAnalysis {
-            liveness: LivenessInfo {
-                live_in: HashMap::new(),
-                live_out: HashMap::new(),
-            },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
                 escaping_vars: HashSet::new(),
@@ -698,18 +693,13 @@ mod tests {
     #[test]
     fn test_translation_with_missing_id() {
         use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-            VarId,
+            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
         };
         use std::collections::HashMap;
 
         let var_names = vec!["x".to_string()];
 
         let analysis = DataFlowAnalysis {
-            liveness: LivenessInfo {
-                live_in: HashMap::new(),
-                live_out: HashMap::new(),
-            },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
                 escaping_vars: HashSet::new(),
@@ -735,8 +725,7 @@ mod tests {
     #[test]
     fn test_escaping_var_translation() {
         use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-            VarId,
+            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
         };
         use std::collections::HashMap;
 
@@ -750,10 +739,6 @@ mod tests {
         });
 
         let analysis = DataFlowAnalysis {
-            liveness: LivenessInfo {
-                live_in: HashMap::new(),
-                live_out: HashMap::new(),
-            },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
                 escaping_vars,
@@ -778,8 +763,7 @@ mod tests {
     #[test]
     fn test_return_dependency_translation() {
         use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-            VarId,
+            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
         };
         use std::collections::HashMap;
 
@@ -797,10 +781,6 @@ mod tests {
         });
 
         let analysis = DataFlowAnalysis {
-            liveness: LivenessInfo {
-                live_in: HashMap::new(),
-                live_out: HashMap::new(),
-            },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
                 escaping_vars: HashSet::new(),
@@ -828,8 +808,7 @@ mod tests {
     #[test]
     fn test_tainted_var_translation() {
         use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-            VarId,
+            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
         };
         use std::collections::HashMap;
 
@@ -847,10 +826,6 @@ mod tests {
         });
 
         let analysis = DataFlowAnalysis {
-            liveness: LivenessInfo {
-                live_in: HashMap::new(),
-                live_out: HashMap::new(),
-            },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
                 escaping_vars: HashSet::new(),
