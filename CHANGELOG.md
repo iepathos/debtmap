@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2025-12-13
+
+### Added
+
+- **Effects System Expansion** (Spec 268)
+  - Extended Stillwater effects integration across the codebase
+  - Improved effect composition patterns for analysis pipelines
+
+- **Effects-Based Progress System** (Spec 262)
+  - Replaced callback-based progress reporting with Stillwater effects
+  - Cleaner separation of progress concerns from core analysis logic
+
+- **Call Graph Purity Propagation** (Spec 261)
+  - Purity information now propagates through the call graph
+  - Functions calling impure functions are correctly marked as impure
+  - More accurate purity analysis across the entire codebase
+
+- **Improved Purity Display Actionability** (Spec 260)
+  - Enhanced TUI display of purity information with actionable insights
+  - Clearer guidance on why functions are marked pure or impure
+
+- **Match Expression CFG Modeling** (Spec 253)
+  - Control flow graph now correctly models match expressions
+  - Improved accuracy of data flow analysis through pattern matching
+
+- **Pattern Destructuring Support for CFG** (Spec 252)
+  - CFG analysis now handles pattern destructuring correctly
+  - Better tracking of variable bindings in complex patterns
+
+### Changed
+
+- **Pure Core Extraction for Unified Analysis** (Spec 265)
+  - Extracted pure business logic from unified_analysis module
+  - Improved testability and functional composition
+
+- **Data Flow Module Decomposition** (Spec 264)
+  - Split monolithic data flow analysis into focused modules
+  - Better separation of concerns in data flow analysis
+
+- **Modular CLI Structure** (Spec 267)
+  - Decomposed main.rs into modular CLI components
+  - Cleaner organization of command-line interface code
+
+- **TUI Actions Decomposition** (Spec 269)
+  - Split TUI action handling into focused modules
+  - Improved maintainability of interactive interface code
+
+- **Simplified Mutation Analysis** (Spec 257)
+  - Reduced mutation analysis to binary signals (mutates/doesn't mutate)
+  - Removed over-engineered complexity tracking
+  - Clearer, more actionable mutation information
+
+- **Removed CFG Liveness Complexity** (Spec 258)
+  - Simplified control flow graph analysis
+  - Removed unnecessary liveness tracking overhead
+
+- **Removed Dead Store Analysis** (Spec 256)
+  - Eliminated dead store detection which produced too many false positives
+  - Focused analysis on higher-value signals
+
+- **Purity Analysis Relocated**
+  - Moved purity analysis from patterns page to data flow page in TUI
+  - More logical organization of analysis results
+
+### Fixed
+
+- **Data Flow Page Visibility**
+  - Fixed Data Flow page not showing when purity info is available
+  - Ensures users can access purity analysis results
+
+- **Constants False Positive in Purity Analysis** (Spec 259)
+  - Fixed constants being incorrectly flagged in purity analysis
+  - More accurate identification of truly impure code
+
+- **False Positive Dead Stores for Pattern Bindings**
+  - Eliminated incorrect dead store warnings for pattern-bound variables
+
+- **Option/Collection Unwrap Elimination** (Spec 266)
+  - Replaced unsafe unwrap calls on Options and collections with proper error handling
+  - Improved robustness and safety
+
+- **Critical Unwrap Elimination for Lock Safety** (Spec 263)
+  - Replaced unwrap on mutex locks with proper error handling
+  - Prevents potential panics in concurrent code
+
+### Internal
+
+- Removed escape and taint analysis from data flow module (unused complexity)
+- Removed dead cfg_analysis checks from display logic
+- Applied clippy fixes across the codebase
+- Cleaned up implemented spec files
+
 ## [0.9.1] - 2025-12-12
 
 ### Added
