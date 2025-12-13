@@ -12,7 +12,8 @@ use ratatui::Frame;
 
 use super::{
     detail_view, dsm_view, filter::Filter, layout, list_state::ListState, list_view, nav_state,
-    navigation, query_state::QueryState, search::SearchState, sort::SortCriteria,
+    navigation, page_availability, query_state::QueryState, search::SearchState,
+    sort::SortCriteria,
 };
 
 /// Helper to get coverage percentage from UnifiedDebtItem
@@ -460,27 +461,12 @@ impl ResultsApp {
     }
 
     // ========================================================================
-    // DETAIL PAGE HELPERS
+    // DETAIL PAGE HELPERS (delegating to page_availability module)
     // ========================================================================
 
     /// Get available pages for current item (skip pages with no data)
     pub fn available_pages(&self) -> Vec<DetailPage> {
-        let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
-
-        if self.has_git_context() {
-            pages.push(DetailPage::GitContext);
-        }
-
-        if self.has_pattern_data() {
-            pages.push(DetailPage::Patterns);
-        }
-
-        if self.has_data_flow_data() {
-            pages.push(DetailPage::DataFlow);
-        }
-
-        pages.push(DetailPage::Responsibilities);
-        pages
+        page_availability::available_pages(self.selected_item(), &self.analysis.data_flow_graph)
     }
 
     /// Get total page count for current item
@@ -499,46 +485,38 @@ impl ResultsApp {
 
     /// Navigate to next available page (wrapping)
     pub fn next_available_page(&mut self) {
-        let available = self.available_pages();
-        if available.is_empty() {
-            return;
-        }
-        let current_idx = available
-            .iter()
-            .position(|&p| p == self.nav.detail_page)
-            .unwrap_or(0);
-        let next_idx = (current_idx + 1) % available.len();
-        self.nav.detail_page = available[next_idx];
+        self.nav.detail_page = page_availability::next_available_page(
+            self.nav.detail_page,
+            self.selected_item(),
+            &self.analysis.data_flow_graph,
+        );
     }
 
     /// Navigate to previous available page (wrapping)
     pub fn prev_available_page(&mut self) {
-        let available = self.available_pages();
-        if available.is_empty() {
-            return;
-        }
-        let current_idx = available
-            .iter()
-            .position(|&p| p == self.nav.detail_page)
-            .unwrap_or(0);
-        let prev_idx = if current_idx == 0 {
-            available.len() - 1
-        } else {
-            current_idx - 1
-        };
-        self.nav.detail_page = available[prev_idx];
+        self.nav.detail_page = page_availability::prev_available_page(
+            self.nav.detail_page,
+            self.selected_item(),
+            &self.analysis.data_flow_graph,
+        );
     }
 
     /// Check if a page is available for the current item
     pub fn is_page_available(&self, page: DetailPage) -> bool {
-        self.available_pages().contains(&page)
+        page_availability::is_page_available(
+            page,
+            self.selected_item(),
+            &self.analysis.data_flow_graph,
+        )
     }
 
     /// Ensure current page is valid for the selected item
     pub fn ensure_valid_page(&mut self) {
-        if !self.is_page_available(self.nav.detail_page) {
-            self.nav.detail_page = DetailPage::Overview;
-        }
+        self.nav.detail_page = page_availability::ensure_valid_page(
+            self.nav.detail_page,
+            self.selected_item(),
+            &self.analysis.data_flow_graph,
+        );
     }
 
     // ========================================================================
@@ -580,82 +558,6 @@ impl ResultsApp {
         } else {
             format!("{} items", self.query.filtered_indices().len())
         }
-    }
-
-    // ========================================================================
-    // PRIVATE HELPERS
-    // ========================================================================
-
-    fn has_git_context(&self) -> bool {
-        self.selected_item()
-            .and_then(|item| item.contextual_risk.as_ref())
-            .is_some()
-    }
-
-    fn has_pattern_data(&self) -> bool {
-        self.selected_item()
-            .map(|item| {
-                let func_id = crate::priority::call_graph::FunctionId::new(
-                    item.location.file.clone(),
-                    item.location.function.clone(),
-                    item.location.line,
-                );
-
-                item.pattern_analysis.is_some()
-                    || item.detected_pattern.is_some()
-                    || item.is_pure.is_some()
-                    || item.language_specific.is_some()
-                    || item.entropy_details.is_some()
-                    || item.error_swallowing_count.is_some()
-                    || item.error_swallowing_patterns.is_some()
-                    || self
-                        .analysis
-                        .data_flow_graph
-                        .get_purity_info(&func_id)
-                        .is_some()
-                    || item
-                        .god_object_indicators
-                        .as_ref()
-                        .map(|god| {
-                            god.is_god_object
-                                && (god.aggregated_entropy.is_some()
-                                    || god.aggregated_error_swallowing_count.is_some()
-                                    || god
-                                        .aggregated_error_swallowing_patterns
-                                        .as_ref()
-                                        .map(|p| !p.is_empty())
-                                        .unwrap_or(false))
-                        })
-                        .unwrap_or(false)
-            })
-            .unwrap_or(false)
-    }
-
-    fn has_data_flow_data(&self) -> bool {
-        self.selected_item()
-            .map(|item| {
-                let func_id = crate::priority::call_graph::FunctionId::new(
-                    item.location.file.clone(),
-                    item.location.function.clone(),
-                    item.location.line,
-                );
-
-                self.analysis
-                    .data_flow_graph
-                    .get_purity_info(&func_id)
-                    .is_some()
-                    || self
-                        .analysis
-                        .data_flow_graph
-                        .get_mutation_info(&func_id)
-                        .is_some()
-                    || self
-                        .analysis
-                        .data_flow_graph
-                        .get_io_operations(&func_id)
-                        .is_some()
-            })
-            .unwrap_or(false)
     }
 }
 

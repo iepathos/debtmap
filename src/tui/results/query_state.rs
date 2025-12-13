@@ -181,3 +181,85 @@ mod tests {
         assert!(state.filtered_indices().is_empty());
     }
 }
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn create_empty_analysis() -> UnifiedAnalysis {
+        UnifiedAnalysis::new(crate::priority::call_graph::CallGraph::new())
+    }
+
+    proptest! {
+        /// Property: new QueryState has sequential indices from 0 to count-1.
+        #[test]
+        fn new_state_has_sequential_indices(count in 0usize..1000) {
+            let state = QueryState::new(count);
+            let indices = state.filtered_indices();
+
+            prop_assert_eq!(indices.len(), count);
+            for (i, &idx) in indices.iter().enumerate() {
+                prop_assert_eq!(idx, i);
+            }
+        }
+
+        /// Property: filters start empty.
+        #[test]
+        fn new_state_has_no_filters(count in 0usize..100) {
+            let state = QueryState::new(count);
+            prop_assert!(state.filters().is_empty());
+        }
+
+        /// Property: sort criteria is preserved after set.
+        #[test]
+        fn sort_criteria_preserved(criteria_idx in 0usize..5) {
+            let criteria = match criteria_idx {
+                0 => SortCriteria::Score,
+                1 => SortCriteria::Complexity,
+                2 => SortCriteria::FilePath,
+                3 => SortCriteria::FunctionName,
+                _ => SortCriteria::Coverage,
+            };
+
+            let analysis = create_empty_analysis();
+            let mut state = QueryState::new(0);
+            state.set_sort_by(criteria, &analysis);
+
+            prop_assert_eq!(state.sort_by(), criteria);
+        }
+
+        /// Property: filtered_indices never contains duplicates.
+        #[test]
+        fn no_duplicate_indices(count in 0usize..100) {
+            let state = QueryState::new(count);
+            let indices = state.filtered_indices();
+
+            let mut seen = std::collections::HashSet::new();
+            for &idx in indices {
+                prop_assert!(
+                    seen.insert(idx),
+                    "Duplicate index {} found",
+                    idx
+                );
+            }
+        }
+
+        /// Property: filtered indices are always valid for the initial count.
+        #[test]
+        fn indices_within_bounds(count in 1usize..100) {
+            let state = QueryState::new(count);
+            for &idx in state.filtered_indices() {
+                prop_assert!(idx < count, "Index {} >= count {}", idx, count);
+            }
+        }
+
+        /// Property: search query roundtrips correctly.
+        #[test]
+        fn search_query_roundtrip(query in ".*") {
+            let mut state = QueryState::new(0);
+            state.search_mut().set_query(query.clone());
+            prop_assert_eq!(state.search().query(), &query);
+        }
+    }
+}

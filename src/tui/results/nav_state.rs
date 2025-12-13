@@ -831,3 +831,135 @@ mod tests {
         assert_eq!(state.dsm_scroll_y, 0);
     }
 }
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Strategy for generating ViewMode values.
+    fn view_mode_strategy() -> impl Strategy<Value = ViewMode> {
+        prop_oneof![
+            Just(ViewMode::List),
+            Just(ViewMode::Detail),
+            Just(ViewMode::Search),
+            Just(ViewMode::SortMenu),
+            Just(ViewMode::FilterMenu),
+            Just(ViewMode::Help),
+            Just(ViewMode::Dsm),
+        ]
+    }
+
+    proptest! {
+        /// Property: valid_destinations is consistent with is_valid_transition.
+        ///
+        /// If a mode is in valid_destinations, then is_valid_transition should return true.
+        #[test]
+        fn valid_destinations_consistent(from in view_mode_strategy()) {
+            let destinations = valid_destinations(from);
+            for to in destinations {
+                prop_assert!(
+                    is_valid_transition(from, to),
+                    "valid_destinations({:?}) contains {:?} but is_valid_transition returns false",
+                    from, to
+                );
+            }
+        }
+
+        /// Property: navigation history is LIFO.
+        ///
+        /// Push/pop sequence should be last-in-first-out.
+        #[test]
+        fn history_is_lifo(modes in proptest::collection::vec(view_mode_strategy(), 0..10)) {
+            let mut state = NavigationState::new(false);
+
+            // Push all modes
+            for &mode in &modes {
+                state.push_and_set_view(mode);
+            }
+
+            // Pop should return in reverse order (but we get the mode we navigated TO,
+            // not FROM, because go_back returns what we set view_mode to)
+            for &expected in modes.iter().rev() {
+                let current = state.view_mode;
+                prop_assert_eq!(current, expected);
+                state.go_back();
+            }
+        }
+
+        /// Property: clear_history empties history.
+        #[test]
+        fn clear_history_empties(
+            push_count in 0usize..20
+        ) {
+            let mut state = NavigationState::new(true);
+
+            for _ in 0..push_count {
+                state.push_and_set_view(ViewMode::Detail);
+            }
+
+            state.clear_history();
+            prop_assert!(state.history.is_empty());
+        }
+
+        /// Property: navigate_back from non-root without history goes to List.
+        #[test]
+        fn back_without_history_goes_to_list(mode in view_mode_strategy()) {
+            if mode == ViewMode::List {
+                return Ok(());
+            }
+
+            let mut state = NavigationState::new(false);
+            state.view_mode = mode;
+            // Intentionally don't push to history
+
+            let result = navigate_back(&mut state);
+            prop_assert!(result.is_success());
+            prop_assert_eq!(state.view_mode, ViewMode::List);
+        }
+
+        /// Property: can_enter_help is false only when already in Help.
+        #[test]
+        fn help_blocked_only_from_help(mode in view_mode_strategy()) {
+            let can_enter = can_enter_help(mode);
+            prop_assert_eq!(can_enter, mode != ViewMode::Help);
+        }
+
+        /// Property: detail page navigation is cyclic.
+        ///
+        /// Navigating forward through all pages and back should preserve state.
+        #[test]
+        fn detail_page_navigation_cyclic(
+            forward_count in 0usize..20
+        ) {
+            let mut state = NavigationState::new(false);
+            state.view_mode = ViewMode::Detail;
+            let initial_page = state.detail_page;
+
+            // Navigate forward multiple times
+            for _ in 0..forward_count {
+                let _ = navigate_detail_page(&mut state, true);
+            }
+
+            // Navigate backward the same number of times
+            for _ in 0..forward_count {
+                let _ = navigate_detail_page(&mut state, false);
+            }
+
+            prop_assert_eq!(state.detail_page, initial_page);
+        }
+
+        /// Property: DSM scroll reset zeros both dimensions.
+        #[test]
+        fn dsm_scroll_reset_zeros(x in 0usize..1000, y in 0usize..1000) {
+            let mut state = NavigationState::new(true);
+            state.dsm_scroll_x = x;
+            state.dsm_scroll_y = y;
+
+            state.reset_dsm_scroll();
+
+            prop_assert_eq!(state.dsm_scroll_x, 0);
+            prop_assert_eq!(state.dsm_scroll_y, 0);
+        }
+    }
+}

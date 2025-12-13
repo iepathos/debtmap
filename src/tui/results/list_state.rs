@@ -209,3 +209,127 @@ mod tests {
         assert_eq!(range, 0..0);
     }
 }
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Property: selection is always valid after set_selected_index.
+        ///
+        /// No matter what index we try to set, the resulting selection must be
+        /// within valid bounds (0 to item_count-1, or 0 if empty).
+        #[test]
+        fn selection_always_valid(
+            input_index in 0usize..10000,
+            item_count in 0usize..1000
+        ) {
+            let mut state = ListState::new();
+            state.set_selected_index(input_index, item_count);
+
+            let selected = state.selected_index();
+            if item_count == 0 {
+                prop_assert_eq!(selected, 0);
+            } else {
+                prop_assert!(selected < item_count, "Selected {} >= count {}", selected, item_count);
+            }
+        }
+
+        /// Property: clamp_selection is idempotent.
+        ///
+        /// Applying clamp twice gives the same result as applying once.
+        #[test]
+        fn clamp_is_idempotent(
+            index in 0usize..10000,
+            item_count in 0usize..1000
+        ) {
+            let once = clamp_selection(index, item_count);
+            let twice = clamp_selection(once, item_count);
+            prop_assert_eq!(once, twice);
+        }
+
+        /// Property: clamp_selection output is always valid.
+        ///
+        /// For any input, the result is within [0, max(0, item_count-1)].
+        #[test]
+        fn clamp_output_always_valid(
+            index in 0usize..10000,
+            item_count in 0usize..1000
+        ) {
+            let result = clamp_selection(index, item_count);
+            if item_count == 0 {
+                prop_assert_eq!(result, 0);
+            } else {
+                prop_assert!(result < item_count);
+            }
+        }
+
+        /// Property: visible range end is capped at total_items.
+        ///
+        /// This property verifies that the end of the range never exceeds total_items.
+        /// Note: When scroll_offset > total_items, the range will be inverted (start > end),
+        /// which is an empty range. This is expected behavior - the caller is responsible
+        /// for keeping scroll_offset within bounds.
+        #[test]
+        fn visible_range_end_capped(
+            scroll_offset in 0usize..100,
+            viewport_height in 0usize..100,
+            total_items in 0usize..200
+        ) {
+            let range = calculate_visible_range(scroll_offset, viewport_height, total_items);
+
+            // End should not exceed total_items (this is the contract the function guarantees)
+            prop_assert!(range.end <= total_items);
+        }
+
+        /// Property: visible range is valid when scroll_offset is within bounds.
+        ///
+        /// When scroll_offset <= total_items, the range should be valid (start <= end).
+        #[test]
+        fn visible_range_valid_with_bounded_scroll(
+            total_items in 1usize..200,
+            viewport_height in 0usize..100,
+            scroll_factor in 0.0f64..1.0
+        ) {
+            // Generate scroll_offset bounded by total_items
+            let scroll_offset = (scroll_factor * total_items as f64) as usize;
+
+            let range = calculate_visible_range(scroll_offset, viewport_height, total_items);
+            prop_assert!(range.start <= range.end, "start {} > end {} with scroll={}, total={}", range.start, range.end, scroll_offset, total_items);
+            prop_assert!(range.end <= total_items);
+        }
+
+        /// Property: toggle_grouping is reversible.
+        ///
+        /// Two toggles should return to original state.
+        #[test]
+        fn toggle_grouping_reversible(initial_grouped: bool) {
+            let mut state = ListState::default();
+            state.set_grouped(initial_grouped);
+
+            let before = state.is_grouped();
+            state.toggle_grouping();
+            state.toggle_grouping();
+            let after = state.is_grouped();
+
+            prop_assert_eq!(before, after);
+        }
+
+        /// Property: reset always results in zero state.
+        #[test]
+        fn reset_always_zeros(
+            selected in 0usize..1000,
+            scroll in 0usize..1000
+        ) {
+            let mut state = ListState::new();
+            state.set_selected_index(selected, 1000);
+            state.set_scroll_offset(scroll);
+
+            state.reset();
+
+            prop_assert_eq!(state.selected_index(), 0);
+            prop_assert_eq!(state.scroll_offset(), 0);
+        }
+    }
+}
