@@ -1,7 +1,7 @@
 //! Data flow page (Page 5) - Data flow analysis details.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
-use crate::data_flow::DataFlowGraph;
+use crate::data_flow::{DataFlowGraph, PurityInfo};
 use crate::priority::call_graph::FunctionId;
 use crate::priority::UnifiedDebtItem;
 use crate::tui::results::app::ResultsApp;
@@ -13,6 +13,45 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
+
+/// Render purity analysis section. Returns true if anything was rendered.
+fn render_purity_section(
+    lines: &mut Vec<Line<'static>>,
+    purity_info: &PurityInfo,
+    theme: &Theme,
+    width: u16,
+) -> bool {
+    add_section_header(lines, "purity analysis", theme);
+
+    add_label_value(
+        lines,
+        "pure",
+        if purity_info.is_pure { "Yes" } else { "No" }.to_string(),
+        theme,
+        width,
+    );
+
+    add_label_value(
+        lines,
+        "confidence",
+        format!("{:.1}%", purity_info.confidence * 100.0),
+        theme,
+        width,
+    );
+
+    if !purity_info.impurity_reasons.is_empty() {
+        add_label_value(
+            lines,
+            "reasons",
+            purity_info.impurity_reasons.join(", "),
+            theme,
+            width,
+        );
+    }
+
+    add_blank_line(lines);
+    true
+}
 
 /// Render data flow page showing data flow analysis
 pub fn render(
@@ -30,6 +69,11 @@ pub fn render(
     );
 
     let mut lines = Vec::new();
+
+    // Purity Analysis Section (moved from patterns page - conceptually belongs here)
+    if let Some(purity_info) = data_flow.get_purity_info(&func_id) {
+        render_purity_section(&mut lines, purity_info, theme, area.width);
+    }
 
     // Mutation Analysis Section (spec 257: binary signals)
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {

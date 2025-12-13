@@ -2,10 +2,8 @@
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
 use crate::core::LanguageSpecificData;
-use crate::data_flow::{DataFlowGraph, PurityInfo};
 use crate::organization::god_object::GodObjectAnalysis;
 use crate::output::PatternAnalysis;
-use crate::priority::call_graph::FunctionId;
 use crate::priority::detected_pattern::DetectedPattern;
 use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::UnifiedDebtItem;
@@ -189,45 +187,6 @@ fn render_language_specific_section(
     true
 }
 
-/// Render purity analysis section. Returns true if anything was rendered.
-fn render_purity_section(
-    lines: &mut Vec<Line<'static>>,
-    purity_info: &PurityInfo,
-    theme: &Theme,
-    width: u16,
-) -> bool {
-    add_section_header(lines, "purity analysis", theme);
-
-    add_label_value(
-        lines,
-        "pure",
-        if purity_info.is_pure { "Yes" } else { "No" }.to_string(),
-        theme,
-        width,
-    );
-
-    add_label_value(
-        lines,
-        "confidence",
-        format!("{:.1}%", purity_info.confidence * 100.0),
-        theme,
-        width,
-    );
-
-    if !purity_info.impurity_reasons.is_empty() {
-        add_label_value(
-            lines,
-            "reasons",
-            purity_info.impurity_reasons.join(", "),
-            theme,
-            width,
-        );
-    }
-
-    add_blank_line(lines);
-    true
-}
-
 /// Render error handling section. Returns true if anything was rendered.
 fn render_error_handling_section(
     lines: &mut Vec<Line<'static>>,
@@ -383,7 +342,6 @@ pub fn render(
     frame: &mut Frame,
     _app: &ResultsApp,
     item: &UnifiedDebtItem,
-    data_flow: &DataFlowGraph,
     area: Rect,
     theme: &Theme,
 ) {
@@ -391,7 +349,7 @@ pub fn render(
     let width = area.width;
 
     // Compose all section renderers
-    let has_any_data = render_all_sections(&mut lines, item, data_flow, theme, width);
+    let has_any_data = render_all_sections(&mut lines, item, theme, width);
 
     // If no data available
     if !has_any_data {
@@ -412,7 +370,6 @@ pub fn render(
 fn render_all_sections(
     lines: &mut Vec<Line<'static>>,
     item: &UnifiedDebtItem,
-    data_flow: &DataFlowGraph,
     theme: &Theme,
     width: u16,
 ) -> bool {
@@ -438,15 +395,7 @@ fn render_all_sections(
         has_any_data |= render_language_specific_section(lines, lang_specific, theme, width);
     }
 
-    // Purity Analysis section
-    let func_id = FunctionId::new(
-        item.location.file.clone(),
-        item.location.function.clone(),
-        item.location.line,
-    );
-    if let Some(purity_info) = data_flow.get_purity_info(&func_id) {
-        has_any_data |= render_purity_section(lines, purity_info, theme, width);
-    }
+    // Purity analysis moved to Data Flow page (Page 5)
 
     // Error Swallowing section (for regular functions)
     if item.error_swallowing_count.is_some() || item.error_swallowing_patterns.is_some() {

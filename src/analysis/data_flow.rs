@@ -2712,8 +2712,8 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        assert!(!cfg.blocks.is_empty());
+        let graph = ControlFlowGraph::from_block(&block);
+        assert!(!graph.blocks.is_empty());
     }
 
     // Escape analysis tests removed - analysis no longer exists
@@ -2747,10 +2747,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should have both x and y tracked, not _temp
-        assert!(cfg.var_names.contains(&"x".to_string()));
-        assert!(cfg.var_names.contains(&"y".to_string()));
+        assert!(graph.var_names.contains(&"x".to_string()));
+        assert!(graph.var_names.contains(&"y".to_string()));
     }
 
     #[test]
@@ -2761,11 +2761,11 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track result, a, and b
-        assert!(cfg.var_names.contains(&"result".to_string()));
-        assert!(cfg.var_names.contains(&"a".to_string()));
-        assert!(cfg.var_names.contains(&"b".to_string()));
+        assert!(graph.var_names.contains(&"result".to_string()));
+        assert!(graph.var_names.contains(&"a".to_string()));
+        assert!(graph.var_names.contains(&"b".to_string()));
     }
 
     #[test]
@@ -2776,10 +2776,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track x and point (base variable)
-        assert!(cfg.var_names.contains(&"x".to_string()));
-        assert!(cfg.var_names.contains(&"point".to_string()));
+        assert!(graph.var_names.contains(&"x".to_string()));
+        assert!(graph.var_names.contains(&"point".to_string()));
     }
 
     #[test]
@@ -2790,12 +2790,12 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track a, b, c from tuple destructuring
-        assert!(cfg.var_names.contains(&"a".to_string()));
-        assert!(cfg.var_names.contains(&"b".to_string()));
-        assert!(cfg.var_names.contains(&"c".to_string()));
-        assert!(cfg.var_names.contains(&"tuple".to_string()));
+        assert!(graph.var_names.contains(&"a".to_string()));
+        assert!(graph.var_names.contains(&"b".to_string()));
+        assert!(graph.var_names.contains(&"c".to_string()));
+        assert!(graph.var_names.contains(&"tuple".to_string()));
     }
 
     #[test]
@@ -2806,11 +2806,11 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track x and y from struct destructuring
-        assert!(cfg.var_names.contains(&"x".to_string()));
-        assert!(cfg.var_names.contains(&"y".to_string()));
-        assert!(cfg.var_names.contains(&"point".to_string()));
+        assert!(graph.var_names.contains(&"x".to_string()));
+        assert!(graph.var_names.contains(&"y".to_string()));
+        assert!(graph.var_names.contains(&"point".to_string()));
     }
 
     #[test]
@@ -2822,13 +2822,13 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track x, y, z not just _temp
-        assert!(cfg.var_names.contains(&"x".to_string()));
-        assert!(cfg.var_names.contains(&"y".to_string()));
-        assert!(cfg.var_names.contains(&"z".to_string()));
+        assert!(graph.var_names.contains(&"x".to_string()));
+        assert!(graph.var_names.contains(&"y".to_string()));
+        assert!(graph.var_names.contains(&"z".to_string()));
         // Should not have _temp placeholder
-        assert!(!cfg.var_names.contains(&"_temp".to_string()));
+        assert!(!graph.var_names.contains(&"_temp".to_string()));
     }
 
     #[test]
@@ -2840,10 +2840,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // Should have return with actual variable
-        let exit_block = cfg
+        let exit_block = graph
             .blocks
             .iter()
             .find(|b| matches!(b.terminator, Terminator::Return { .. }));
@@ -2868,10 +2868,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track flag variable, not _temp
-        assert!(cfg.var_names.contains(&"flag".to_string()));
-        assert!(!cfg.var_names.contains(&"_temp".to_string()));
+        assert!(graph.var_names.contains(&"flag".to_string()));
+        assert!(!graph.var_names.contains(&"_temp".to_string()));
     }
 
     #[test]
@@ -2882,12 +2882,12 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track receiver and arguments
-        assert!(cfg.var_names.contains(&"result".to_string()));
-        assert!(cfg.var_names.contains(&"receiver".to_string()));
-        assert!(cfg.var_names.contains(&"arg1".to_string()));
-        assert!(cfg.var_names.contains(&"arg2".to_string()));
+        assert!(graph.var_names.contains(&"result".to_string()));
+        assert!(graph.var_names.contains(&"receiver".to_string()));
+        assert!(graph.var_names.contains(&"arg1".to_string()));
+        assert!(graph.var_names.contains(&"arg2".to_string()));
     }
 
     #[test]
@@ -2898,10 +2898,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track base variable x
-        assert!(cfg.var_names.contains(&"z".to_string()));
-        assert!(cfg.var_names.contains(&"x".to_string()));
+        assert!(graph.var_names.contains(&"z".to_string()));
+        assert!(graph.var_names.contains(&"x".to_string()));
     }
 
     #[test]
@@ -2912,12 +2912,12 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track result and all arguments
-        assert!(cfg.var_names.contains(&"result".to_string()));
-        assert!(cfg.var_names.contains(&"a".to_string()));
-        assert!(cfg.var_names.contains(&"b".to_string()));
-        assert!(cfg.var_names.contains(&"c".to_string()));
+        assert!(graph.var_names.contains(&"result".to_string()));
+        assert!(graph.var_names.contains(&"a".to_string()));
+        assert!(graph.var_names.contains(&"b".to_string()));
+        assert!(graph.var_names.contains(&"c".to_string()));
     }
 
     #[test]
@@ -2928,10 +2928,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // Find the declaration statement
-        let decl_stmt = cfg
+        let decl_stmt = graph
             .blocks
             .iter()
             .flat_map(|b| &b.statements)
@@ -2959,10 +2959,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // Find the declaration statement
-        let decl_stmt = cfg
+        let decl_stmt = graph
             .blocks
             .iter()
             .flat_map(|b| &b.statements)
@@ -2990,10 +2990,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track first and second from slice destructuring
-        assert!(cfg.var_names.contains(&"first".to_string()));
-        assert!(cfg.var_names.contains(&"second".to_string()));
+        assert!(graph.var_names.contains(&"first".to_string()));
+        assert!(graph.var_names.contains(&"second".to_string()));
     }
 
     #[test]
@@ -3004,9 +3004,9 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         // Should track value from tuple struct pattern
-        assert!(cfg.var_names.contains(&"value".to_string()));
+        assert!(graph.var_names.contains(&"value".to_string()));
     }
 
     // ========================================================================
@@ -3022,8 +3022,8 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // Should have definitions
         assert!(
@@ -3060,8 +3060,8 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // Both x and y are dead stores (never used)
         let dead_stores = reaching.find_same_block_dead_stores();
@@ -3080,8 +3080,8 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // For each use, should be able to find its definition
         for use_point in &reaching.all_uses {
@@ -3104,12 +3104,12 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // Find use of x
         let x_use = reaching.all_uses.iter().find(|u| {
-            cfg.var_names
+            graph.var_names
                 .get(u.var.name_id as usize)
                 .is_some_and(|n| n == "x")
         });
@@ -3172,8 +3172,8 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // Should have definitions
         assert!(
@@ -3193,8 +3193,8 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // Find the definition of 'unused'
         let unused_def = reaching
@@ -3219,16 +3219,16 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // Block-level fields should still be populated
         assert!(
-            !reaching.reach_in.is_empty() || cfg.blocks.is_empty(),
+            !reaching.reach_in.is_empty() || graph.blocks.is_empty(),
             "reach_in should be populated"
         );
         assert!(
-            !reaching.reach_out.is_empty() || cfg.blocks.is_empty(),
+            !reaching.reach_out.is_empty() || graph.blocks.is_empty(),
             "reach_out should be populated"
         );
         // def_use_chains may or may not be empty depending on variable flow
@@ -3238,8 +3238,8 @@ mod tests {
     fn test_statement_level_empty_function() {
         let block: Block = parse_quote! { {} };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // Should handle empty functions gracefully
         assert!(
@@ -3265,12 +3265,12 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        let reaching = ReachingDefinitions::analyze(&cfg);
+        let graph = ControlFlowGraph::from_block(&block);
+        let reaching = ReachingDefinitions::analyze(&graph);
 
         // The return statement should create a use of x
         let return_use = reaching.all_uses.iter().any(|u| {
-            cfg.var_names
+            graph.var_names
                 .get(u.var.name_id as usize)
                 .is_some_and(|n| n == "x")
         });
@@ -3279,7 +3279,7 @@ mod tests {
 
         // x should not be dead since it's returned
         let x_def = reaching.all_definitions.iter().find(|d| {
-            cfg.var_names
+            graph.var_names
                 .get(d.var.name_id as usize)
                 .is_some_and(|n| n == "x")
         });
@@ -3479,17 +3479,17 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // Should have: entry block with Match terminator, 2 arm blocks, (join block may exist)
         assert!(
-            cfg.blocks.len() >= 3,
+            graph.blocks.len() >= 3,
             "Expected at least 3 blocks, got {}",
-            cfg.blocks.len()
+            graph.blocks.len()
         );
 
         // Find the match terminator
-        let match_term = cfg
+        let match_term = graph
             .blocks
             .iter()
             .find(|b| matches!(b.terminator, Terminator::Match { .. }));
@@ -3512,14 +3512,14 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // 'value' and 'e' should be tracked as variables
         assert!(
-            cfg.var_names.contains(&"value".to_string()),
+            graph.var_names.contains(&"value".to_string()),
             "Should track 'value'"
         );
-        assert!(cfg.var_names.contains(&"e".to_string()), "Should track 'e'");
+        assert!(graph.var_names.contains(&"e".to_string()), "Should track 'e'");
     }
 
     #[test]
@@ -3534,13 +3534,13 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // Should handle match with guard without panicking
-        assert!(!cfg.blocks.is_empty());
+        assert!(!graph.blocks.is_empty());
 
         // Find match terminator
-        let match_term = cfg
+        let match_term = graph
             .blocks
             .iter()
             .find(|b| matches!(b.terminator, Terminator::Match { .. }));
@@ -3559,23 +3559,23 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // 'input' should be tracked
         assert!(
-            cfg.var_names.contains(&"input".to_string()),
+            graph.var_names.contains(&"input".to_string()),
             "Should track scrutinee 'input'"
         );
 
         // Find match terminator and verify scrutinee is tracked
-        if let Some(block) = cfg
+        if let Some(block) = graph
             .blocks
             .iter()
             .find(|b| matches!(b.terminator, Terminator::Match { .. }))
         {
             if let Terminator::Match { scrutinee, .. } = &block.terminator {
                 // Scrutinee should have a valid name_id
-                let name = cfg.var_names.get(scrutinee.name_id as usize);
+                let name = graph.var_names.get(scrutinee.name_id as usize);
                 assert!(name.is_some(), "Scrutinee should have a valid name");
             }
         }
@@ -3592,15 +3592,15 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // x and y should be tracked from struct destructuring
         assert!(
-            cfg.var_names.contains(&"x".to_string()),
+            graph.var_names.contains(&"x".to_string()),
             "Should track 'x' from struct pattern"
         );
         assert!(
-            cfg.var_names.contains(&"y".to_string()),
+            graph.var_names.contains(&"y".to_string()),
             "Should track 'y' from struct pattern"
         );
     }
@@ -3618,9 +3618,7 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
-        
-        
+        let _graph = ControlFlowGraph::from_block(&block);
 
         // Analysis should complete without panicking
         // Match patterns are handled correctly
@@ -3638,10 +3636,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // Find the match block and verify it has Match terminator
-        let match_block = cfg
+        let match_block = graph
             .blocks
             .iter()
             .find(|b| matches!(b.terminator, Terminator::Match { .. }));
@@ -3673,10 +3671,10 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // Should handle nested match without panicking
-        let match_count = cfg
+        let match_count = graph
             .blocks
             .iter()
             .filter(|b| matches!(b.terminator, Terminator::Match { .. }))
@@ -3700,12 +3698,12 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
         
         
 
         // Full data flow analysis should complete without panicking
-        assert!(!cfg.blocks.is_empty());
+        assert!(!graph.blocks.is_empty());
     }
 
     #[test]
@@ -3719,15 +3717,15 @@ mod tests {
             }
         };
 
-        let _cfg = ControlFlowGraph::from_block(&block);
+        let graph = ControlFlowGraph::from_block(&block);
 
         // a and b should be tracked
         assert!(
-            cfg.var_names.contains(&"a".to_string()),
+            graph.var_names.contains(&"a".to_string()),
             "Should track 'a' from tuple pattern"
         );
         assert!(
-            cfg.var_names.contains(&"b".to_string()),
+            graph.var_names.contains(&"b".to_string()),
             "Should track 'b' from tuple pattern"
         );
     }
@@ -3752,9 +3750,9 @@ mod tests {
 
         let start = Instant::now();
         for _ in 0..100 {
-            let _cfg = ControlFlowGraph::from_block(&block);
+            let graph = ControlFlowGraph::from_block(&block);
             // Escape/taint analysis removed - just test CFG construction performance
-            let _ = DataFlowAnalysis::analyze(&cfg);
+            let _ = DataFlowAnalysis::analyze(&graph);
         }
         let elapsed = start.elapsed();
 

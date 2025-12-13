@@ -44,14 +44,9 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
             DetailPage::GitContext => {
                 detail_pages::git_context::render(frame, app, item, content_area, &theme)
             }
-            DetailPage::Patterns => detail_pages::patterns::render(
-                frame,
-                app,
-                item,
-                &app.analysis().data_flow_graph,
-                content_area,
-                &theme,
-            ),
+            DetailPage::Patterns => {
+                detail_pages::patterns::render(frame, app, item, content_area, &theme)
+            }
             DetailPage::DataFlow => detail_pages::data_flow::render(
                 frame,
                 app,

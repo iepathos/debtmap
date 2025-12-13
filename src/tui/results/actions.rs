@@ -51,7 +51,7 @@ fn extract_page_text(item: &UnifiedDebtItem, page: DetailPage, app: &ResultsApp)
         DetailPage::Overview => extract_overview_text(item, app),
         DetailPage::Dependencies => extract_dependencies_text(item, app),
         DetailPage::GitContext => extract_git_context_text(item),
-        DetailPage::Patterns => extract_patterns_text(item, &app.analysis().data_flow_graph),
+        DetailPage::Patterns => extract_patterns_text(item),
         DetailPage::DataFlow => extract_data_flow_text(item, &app.analysis().data_flow_graph),
         DetailPage::Responsibilities => extract_responsibilities_text(item),
     }
@@ -814,14 +814,9 @@ fn format_god_object_error_handling_section(
 }
 
 /// Extract patterns page content as plain text (matches TUI exactly)
-fn extract_patterns_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> String {
-    let func_id = FunctionId::new(
-        item.location.file.clone(),
-        item.location.function.clone(),
-        item.location.line,
-    );
-
+fn extract_patterns_text(item: &UnifiedDebtItem) -> String {
     // Collect all section formatters as Options
+    // Purity analysis moved to Data Flow page (Page 5)
     let sections: Vec<Option<String>> = vec![
         item.entropy_details
             .as_ref()
@@ -835,7 +830,6 @@ fn extract_patterns_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> S
         item.language_specific
             .as_ref()
             .and_then(format_language_specific_section),
-        format_purity_section(&func_id, data_flow),
         format_error_handling_section(
             item.error_swallowing_count,
             item.error_swallowing_patterns.as_ref(),
@@ -879,6 +873,11 @@ fn extract_data_flow_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> 
     );
 
     let mut output = String::new();
+
+    // Purity Analysis Section (moved from patterns page - conceptually belongs here)
+    if let Some(section) = format_purity_section(&func_id, data_flow) {
+        output.push_str(&section);
+    }
 
     // Mutation Analysis Section (spec 257: binary signals)
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
