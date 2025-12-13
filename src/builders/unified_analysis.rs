@@ -510,11 +510,19 @@ fn report_stage_start(stage: usize) {
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_start_stage(stage);
     }
+    // Also update unified progress for call graph stage (stage 1 -> phase 1)
+    if stage == 1 {
+        crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(1));
+    }
 }
 
 fn report_stage_complete(stage: usize, metric: impl Into<String>) {
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_complete_stage(stage, metric.into());
+    }
+    // Also update unified progress for call graph stage (stage 1 -> phase 1)
+    if stage == 1 {
+        crate::io::progress::AnalysisProgress::with_global(|p| p.complete_phase());
     }
 }
 
