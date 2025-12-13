@@ -520,6 +520,7 @@ impl ResultsApp {
                     item.location.line,
                 );
 
+                // Check for data that's actually rendered on the data flow page
                 self.analysis
                     .data_flow_graph
                     .get_purity_info(&func_id)
@@ -533,11 +534,6 @@ impl ResultsApp {
                         .analysis
                         .data_flow_graph
                         .get_io_operations(&func_id)
-                        .is_some()
-                    || self
-                        .analysis
-                        .data_flow_graph
-                        .get_cfg_analysis(&func_id)
                         .is_some()
             })
             .unwrap_or(false)

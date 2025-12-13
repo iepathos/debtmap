@@ -244,13 +244,12 @@ fn format_data_flow_section(
 
     let mut result = String::new();
 
-    // Check if we have any data flow information
+    // Check if we have any data flow information that's actually rendered
     let has_mutation = data_flow.get_mutation_info(&func_id).is_some();
     let has_io = data_flow.get_io_operations(&func_id).is_some();
-    let has_cfg = data_flow.get_cfg_analysis(&func_id).is_some();
     let has_purity = data_flow.get_purity_info(&func_id).is_some();
 
-    if !has_mutation && !has_io && !has_cfg && !has_purity {
+    if !has_mutation && !has_io && !has_purity {
         return result;
     }
 
