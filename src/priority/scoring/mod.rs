@@ -16,7 +16,14 @@ pub mod formatting;
 pub mod orchestration_adjustment;
 pub mod rebalanced; // Spec 136: Rebalanced debt scoring algorithm
 pub mod recommendation;
-pub mod recommendation_complexity; // Complexity classification and refactoring recommendations
+
+// Complexity recommendation modules (Stillwater refactoring)
+pub mod complexity_classification; // Pure complexity level classification
+pub mod complexity_generators; // Level-based recommendation generators
+pub mod dead_code_hints; // Dead code analysis and hints
+pub mod heuristic_generators; // Heuristic-based recommendation generators
+pub mod pattern_generators; // Pattern-based recommendation generators
+pub mod recommendation_complexity; // Facade re-exporting from submodules
 pub mod recommendation_debt_specific; // Specific debt type recommendations
 pub mod recommendation_extended; // Facade re-exporting from submodules
 pub mod recommendation_helpers;
