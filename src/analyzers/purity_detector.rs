@@ -1298,6 +1298,18 @@ impl ImpurityReason {
             Self::AccessesExternalState => "Function accesses external state",
         }
     }
+
+    /// Get a concise, user-friendly description for TUI display
+    pub fn display_description(&self) -> &'static str {
+        match self {
+            Self::SideEffects => "Has side effects",
+            Self::MutableParameters => "Takes &mut self or &mut T",
+            Self::IOOperations => "I/O operations (print, file, network)",
+            Self::UnsafeCode => "Contains unsafe block",
+            Self::ModifiesExternalState => "Modifies external state",
+            Self::AccessesExternalState => "Reads external state",
+        }
+    }
 }
 
 /// Extract the last segment of a macro path

@@ -682,17 +682,52 @@ fn format_language_specific_section(
     }
 }
 
+/// Get actionable fix suggestion for almost-pure functions (1-2 issues) - clipboard version
+fn get_clipboard_fix_suggestion(reasons: &[String]) -> Option<&'static str> {
+    if reasons.len() > 2 {
+        return None;
+    }
+
+    let first_reason = reasons.first()?.to_lowercase();
+
+    if first_reason.contains("i/o")
+        || first_reason.contains("print")
+        || first_reason.contains("log")
+    {
+        Some("Move logging to caller - function becomes pure")
+    } else if first_reason.contains("time") || first_reason.contains("now") {
+        Some("Pass time as parameter instead of calling now()")
+    } else if first_reason.contains("random") || first_reason.contains("rand") {
+        Some("Inject RNG as parameter for deterministic behavior")
+    } else if first_reason.contains("mutable param") || first_reason.contains("&mut") {
+        Some("Consider taking &self instead of &mut self")
+    } else {
+        None
+    }
+}
+
 /// Format purity analysis section - returns None if no purity data
 fn format_purity_section(func_id: &FunctionId, data_flow: &DataFlowGraph) -> Option<String> {
     let purity_info = data_flow.get_purity_info(func_id)?;
 
     let mut output = String::new();
     add_section_header(&mut output, "purity analysis");
-    add_label_value(
-        &mut output,
-        "pure",
-        if purity_info.is_pure { "Yes" } else { "No" },
-    );
+
+    // Show pure status with issue count for impure functions
+    let pure_display = if purity_info.is_pure {
+        "Yes".to_string()
+    } else {
+        let issue_count = purity_info.impurity_reasons.len();
+        if issue_count == 0 {
+            "No".to_string()
+        } else if issue_count == 1 {
+            "No (1 issue)".to_string()
+        } else {
+            format!("No ({} issues)", issue_count)
+        }
+    };
+
+    add_label_value(&mut output, "pure", &pure_display);
     add_label_value(
         &mut output,
         "confidence",
@@ -703,8 +738,15 @@ fn format_purity_section(func_id: &FunctionId, data_flow: &DataFlowGraph) -> Opt
         add_label_value(
             &mut output,
             "reasons",
-            &purity_info.impurity_reasons.join(", "),
+            &purity_info.impurity_reasons.join("; "),
         );
+
+        // Add fix suggestion for almost-pure functions
+        if purity_info.impurity_reasons.len() <= 2 {
+            if let Some(suggestion) = get_clipboard_fix_suggestion(&purity_info.impurity_reasons) {
+                add_label_value(&mut output, "fix", suggestion);
+            }
+        }
     }
 
     add_blank_line(&mut output);
