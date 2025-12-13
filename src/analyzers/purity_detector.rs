@@ -80,6 +80,165 @@ pub enum UnsafeOp {
     UnionFieldWrite,
 }
 
+/// Classification of path purity for constant detection (Spec 259)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PathPurity {
+    /// Definitely a constant, no purity impact
+    Constant,
+    /// Likely a constant (e.g., SCREAMING_CASE), reduce confidence slightly
+    ProbablyConstant,
+    /// Unknown path, conservative: assume external state access
+    Unknown,
+}
+
+/// Known constant path prefixes that don't affect purity
+const KNOWN_CONSTANT_PREFIXES: &[&str] = &[
+    // Numeric constants
+    "std :: i8 ::",
+    "std :: i16 ::",
+    "std :: i32 ::",
+    "std :: i64 ::",
+    "std :: i128 ::",
+    "std :: isize ::",
+    "std :: u8 ::",
+    "std :: u16 ::",
+    "std :: u32 ::",
+    "std :: u64 ::",
+    "std :: u128 ::",
+    "std :: usize ::",
+    "std :: f32 ::",
+    "std :: f64 ::",
+    // Core versions
+    "core :: i8 ::",
+    "core :: i16 ::",
+    "core :: i32 ::",
+    "core :: i64 ::",
+    "core :: i128 ::",
+    "core :: isize ::",
+    "core :: u8 ::",
+    "core :: u16 ::",
+    "core :: u32 ::",
+    "core :: u64 ::",
+    "core :: u128 ::",
+    "core :: usize ::",
+    "core :: f32 ::",
+    "core :: f64 ::",
+    // Common constants
+    "std :: mem :: size_of",
+    "std :: mem :: align_of",
+    "core :: mem :: size_of",
+    "core :: mem :: align_of",
+    // Float constants
+    "std :: f32 :: consts ::",
+    "std :: f64 :: consts ::",
+    "core :: f32 :: consts ::",
+    "core :: f64 :: consts ::",
+];
+
+/// Known constant suffixes that don't affect purity
+const KNOWN_CONSTANT_SUFFIXES: &[&str] = &[
+    ":: MAX",
+    ":: MIN",
+    ":: BITS",
+    ":: EPSILON",
+    ":: INFINITY",
+    ":: NEG_INFINITY",
+    ":: NAN",
+    ":: RADIX",
+    ":: MANTISSA_DIGITS",
+    ":: DIGITS",
+    ":: MIN_EXP",
+    ":: MAX_EXP",
+    ":: MIN_10_EXP",
+    ":: MAX_10_EXP",
+    ":: MIN_POSITIVE",
+    // Common math constants
+    ":: PI",
+    ":: TAU",
+    ":: E",
+    ":: FRAC_PI_2",
+    ":: FRAC_PI_3",
+    ":: FRAC_PI_4",
+    ":: FRAC_PI_6",
+    ":: FRAC_PI_8",
+    ":: FRAC_1_PI",
+    ":: FRAC_2_PI",
+    ":: FRAC_2_SQRT_PI",
+    ":: SQRT_2",
+    ":: FRAC_1_SQRT_2",
+    ":: LN_2",
+    ":: LN_10",
+    ":: LOG2_E",
+    ":: LOG10_E",
+    ":: LOG2_10",
+    ":: LOG10_2",
+];
+
+/// Check if a path string represents a known constant
+fn is_known_constant(path_str: &str) -> bool {
+    // Check prefixes (std :: i32 ::, core :: u64 ::, etc.)
+    for prefix in KNOWN_CONSTANT_PREFIXES {
+        if path_str.starts_with(prefix) {
+            return true;
+        }
+    }
+
+    // Check suffixes (:: MAX, :: MIN, etc.)
+    for suffix in KNOWN_CONSTANT_SUFFIXES {
+        if path_str.ends_with(suffix) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Check if a string is in SCREAMING_CASE (likely a constant)
+fn is_screaming_case(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
+        && s.chars().any(|c| c.is_alphabetic())
+}
+
+/// Check if a string is in PascalCase (likely an enum variant)
+fn is_pascal_case(s: &str) -> bool {
+    s.chars().next().is_some_and(|c| c.is_uppercase())
+        && !s.chars().all(|c| c.is_uppercase() || c == '_')
+        && s.chars().any(|c| c.is_lowercase())
+}
+
+/// Classify a path for purity analysis
+fn classify_path_purity(path_str: &str) -> PathPurity {
+    // 1. Check known constants
+    if is_known_constant(path_str) {
+        return PathPurity::Constant;
+    }
+
+    // 2. Check for SCREAMING_CASE (likely constant)
+    // Extract last segment after ::
+    let last_segment = path_str.rsplit("::").next().unwrap_or(path_str).trim();
+
+    if is_screaming_case(last_segment) {
+        return PathPurity::ProbablyConstant;
+    }
+
+    // 3. Check for enum variants (PascalCase after ::)
+    // Common patterns: Option::None, Result::Ok, MyEnum::Variant
+    if is_pascal_case(last_segment) {
+        // Additional check: if it looks like an enum variant pattern
+        // (path contains :: and ends with PascalCase identifier)
+        let segments: Vec<&str> = path_str.split("::").map(|s| s.trim()).collect();
+        if segments.len() >= 2 {
+            // Last segment is PascalCase - likely an enum variant
+            return PathPurity::ProbablyConstant;
+        }
+    }
+
+    // 4. Default: unknown, conservative
+    PathPurity::Unknown
+}
+
 impl Default for PurityDetector {
     fn default() -> Self {
         Self::new()
@@ -1040,11 +1199,24 @@ impl<'ast> Visit<'ast> for PurityDetector {
                 return; // Don't continue with default visiting
             }
             // Path expressions may access external state (constants, statics, etc.)
+            // Spec 259: Distinguish constants from actual external state
             Expr::Path(path) => {
                 let path_str = quote::quote!(#path).to_string();
                 // Check if it's accessing a module path (like std::i32::MAX)
                 if path_str.contains("::") && !self.scope.is_local(&path_str) {
-                    self.accesses_external_state = true;
+                    match classify_path_purity(&path_str) {
+                        PathPurity::Constant => {
+                            // No impact on purity - it's a compile-time constant
+                        }
+                        PathPurity::ProbablyConstant => {
+                            // Slight confidence reduction but not impure
+                            self.unknown_macros_count += 1;
+                        }
+                        PathPurity::Unknown => {
+                            // Conservative: assume external state access
+                            self.accesses_external_state = true;
+                        }
+                    }
                 }
             }
             // Method calls might have side effects
@@ -1247,8 +1419,11 @@ mod tests {
         assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
     }
 
+    // Tests for spec 259: Fix constants false positive in purity analysis
+
     #[test]
-    fn test_read_only_function() {
+    fn test_std_max_constant_is_pure() {
+        // Spec 259: std::i32::MAX is a compile-time constant, should be StrictlyPure
         let analysis = analyze_function_str(
             r#"
             fn is_valid(x: i32) -> bool {
@@ -1256,7 +1431,96 @@ mod tests {
             }
             "#,
         );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_core_constant_is_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn min_val() -> u64 {
+                core::u64::MIN
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_float_constants_are_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn is_infinite(x: f64) -> bool {
+                x == std::f64::INFINITY || x == std::f64::NEG_INFINITY
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_float_math_constants_are_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn get_pi() -> f64 {
+                std::f64::consts::PI
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_enum_variant_is_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn default_option() -> Option<i32> {
+                Option::None
+            }
+            "#,
+        );
+        // PascalCase enum variants are ProbablyConstant (reduce confidence only)
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_screaming_case_constant_is_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn get_max() -> usize {
+                config::MAX_SIZE
+            }
+            "#,
+        );
+        // SCREAMING_CASE is ProbablyConstant (still pure, reduced confidence)
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+        // Confidence should be reduced due to ProbablyConstant classification
+        assert!(analysis.confidence < 0.98);
+    }
+
+    #[test]
+    fn test_unknown_path_is_conservative() {
+        let analysis = analyze_function_str(
+            r#"
+            fn get_value() -> i32 {
+                external_crate::get_value
+            }
+            "#,
+        );
+        // Unknown paths should remain conservative (ReadOnly or Impure)
         assert_eq!(analysis.purity_level, PurityLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_multiple_constants_are_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn range_check(x: i32) -> bool {
+                x >= std::i32::MIN && x <= std::i32::MAX
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
     }
 
     #[test]
