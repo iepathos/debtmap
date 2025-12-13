@@ -35,9 +35,8 @@ use super::app::{DetailPage, ViewMode};
 
 // Re-export navigation actions for backwards compatibility
 pub use super::nav_actions::{
-    available_actions, navigate_back, navigate_detail_page, navigate_to_detail,
-    navigate_to_dsm, navigate_to_filter_menu, navigate_to_help, navigate_to_search,
-    navigate_to_sort_menu,
+    available_actions, navigate_back, navigate_detail_page, navigate_to_detail, navigate_to_dsm,
+    navigate_to_filter_menu, navigate_to_help, navigate_to_search, navigate_to_sort_menu,
 };
 
 /// Valid navigation transitions.
@@ -229,7 +228,6 @@ impl NavigationResult {
         matches!(self, NavigationResult::Success)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
