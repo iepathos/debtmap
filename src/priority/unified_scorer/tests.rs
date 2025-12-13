@@ -913,7 +913,6 @@ fn test_calculate_purity_factor_strictly_pure() {
         MutationInfo {
             live_mutations: vec![],
             total_mutations: 0,
-            dead_stores: std::collections::HashSet::new(),
             escaping_mutations: std::collections::HashSet::new(),
         },
     );
@@ -947,7 +946,6 @@ fn test_calculate_purity_factor_locally_pure() {
         MutationInfo {
             live_mutations: vec!["local_var".to_string()],
             total_mutations: 1,
-            dead_stores: std::collections::HashSet::new(),
             escaping_mutations: std::collections::HashSet::new(),
         },
     );
@@ -959,25 +957,18 @@ fn test_calculate_purity_factor_locally_pure() {
 }
 
 #[test]
-fn test_calculate_refactorability_factor_high_dead_stores() {
+fn test_calculate_refactorability_factor_returns_neutral() {
     use crate::config::DataFlowScoringConfig;
     use crate::data_flow::{DataFlowGraph, MutationInfo};
 
     let mut data_flow = DataFlowGraph::new();
     let func_id = FunctionId::new(PathBuf::from("test.rs"), "refactorable".to_string(), 30);
 
-    // High dead store ratio
-    let mut dead_stores = std::collections::HashSet::new();
-    dead_stores.insert("unused1".to_string());
-    dead_stores.insert("unused2".to_string());
-    dead_stores.insert("unused3".to_string());
-
     data_flow.set_mutation_info(
         func_id.clone(),
         MutationInfo {
             live_mutations: vec!["live1".to_string()],
-            total_mutations: 4, // 3 dead, 1 live = 75% dead
-            dead_stores,
+            total_mutations: 4,
             escaping_mutations: std::collections::HashSet::new(),
         },
     );
@@ -985,40 +976,7 @@ fn test_calculate_refactorability_factor_high_dead_stores() {
     let config = DataFlowScoringConfig::default();
     let refactor_factor = calculate_refactorability_factor(&func_id, &data_flow, &config);
 
-    // 75% dead store ratio with default boost of 0.5 should give 1.0 + (0.75 * 0.5) = 1.375
-    assert!((refactor_factor - 1.375).abs() < 0.01);
-}
-
-#[test]
-fn test_calculate_refactorability_factor_no_boost_below_threshold() {
-    use crate::config::DataFlowScoringConfig;
-    use crate::data_flow::{DataFlowGraph, MutationInfo};
-
-    let mut data_flow = DataFlowGraph::new();
-    let func_id = FunctionId::new(PathBuf::from("test.rs"), "low_dead".to_string(), 40);
-
-    // Low dead store ratio (below 30% threshold)
-    let mut dead_stores = std::collections::HashSet::new();
-    dead_stores.insert("unused1".to_string());
-
-    data_flow.set_mutation_info(
-        func_id.clone(),
-        MutationInfo {
-            live_mutations: vec![
-                "live1".to_string(),
-                "live2".to_string(),
-                "live3".to_string(),
-            ],
-            total_mutations: 4, // 1 dead, 3 live = 25% dead (below 30% threshold)
-            dead_stores,
-            escaping_mutations: std::collections::HashSet::new(),
-        },
-    );
-
-    let config = DataFlowScoringConfig::default();
-    let refactor_factor = calculate_refactorability_factor(&func_id, &data_flow, &config);
-
-    // Below threshold - no boost
+    // Dead store analysis removed - always returns 1.0
     assert_eq!(refactor_factor, 1.0);
 }
 

@@ -890,31 +890,15 @@ fn extract_data_flow_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> 
         );
         add_label_value(
             &mut output,
-            "live",
+            "mutations",
             &mutation_info.live_mutations.len().to_string(),
-        );
-        add_label_value(
-            &mut output,
-            "dead stores",
-            &mutation_info.dead_stores.len().to_string(),
         );
 
         if !mutation_info.live_mutations.is_empty() {
             add_blank_line(&mut output);
-            add_section_header(&mut output, "live mutations");
+            add_section_header(&mut output, "mutations");
             for mutation in &mutation_info.live_mutations {
                 output.push_str(&format!("                            {}\n", mutation));
-            }
-        }
-
-        if !mutation_info.dead_stores.is_empty() {
-            add_blank_line(&mut output);
-            add_section_header(&mut output, "dead stores");
-            for dead in &mutation_info.dead_stores {
-                output.push_str(&format!(
-                    "                            {} (never read)\n",
-                    dead
-                ));
             }
         }
 

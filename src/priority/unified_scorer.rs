@@ -822,31 +822,16 @@ fn classify_io_isolation(io_ops: Option<&Vec<crate::data_flow::IoOperation>>) ->
     }
 }
 
-/// Calculate refactorability factor from dead stores (spec 218).
-/// Returns a boost factor >= 1.0 where higher values increase priority.
-/// Functions with many dead stores are easier to refactor, so get higher priority.
+/// Calculate refactorability factor (spec 218).
+/// Returns a neutral factor of 1.0 (dead store analysis removed).
 fn calculate_refactorability_factor(
-    func_id: &FunctionId,
-    data_flow: &DataFlowGraph,
-    config: &crate::config::DataFlowScoringConfig,
+    _func_id: &FunctionId,
+    _data_flow: &DataFlowGraph,
+    _config: &crate::config::DataFlowScoringConfig,
 ) -> f64 {
-    let mutation_info = data_flow.get_mutation_info(func_id);
-
-    match mutation_info {
-        None => 1.0,                                    // No data - no boost
-        Some(info) if info.total_mutations == 0 => 1.0, // No mutations - no boost
-        Some(info) => {
-            let dead_store_ratio = info.dead_stores.len() as f64 / info.total_mutations as f64;
-
-            // Only boost if dead store ratio exceeds threshold
-            if dead_store_ratio >= config.min_dead_store_ratio {
-                // Linear boost based on dead store ratio
-                1.0 + (dead_store_ratio * config.dead_store_boost)
-            } else {
-                1.0
-            }
-        }
-    }
+    // Dead store analysis has been removed as it produced too many false positives.
+    // This function now returns a neutral factor.
+    1.0
 }
 
 /// Calculate pattern factor to distinguish data flow from business logic (spec 218).

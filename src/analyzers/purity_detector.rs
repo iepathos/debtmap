@@ -358,37 +358,12 @@ impl PurityDetector {
 
     fn filter_dead_mutations(
         &self,
-        cfg: &ControlFlowGraph,
-        data_flow: &DataFlowAnalysis,
+        _cfg: &ControlFlowGraph,
+        _data_flow: &DataFlowAnalysis,
     ) -> Vec<LocalMutation> {
-        // Filter out mutations to variables with dead stores
-        // Note: Due to simplified CFG construction, we need to be conservative
-        // Only filter if we find a definite match with a dead store
-        self.local_mutations
-            .iter()
-            .filter(|mutation| {
-                // Check if this mutation target is in the dead stores set
-                // Dead stores means the variable is assigned but never read
-                let is_dead = data_flow.liveness.dead_stores.iter().any(|dead_var| {
-                    // Get the variable name from the CFG's var_names vector
-                    // VarId.name_id indexes into this vector
-                    if let Some(var_name) = cfg.var_names.get(dead_var.name_id as usize) {
-                        // Match the mutation target against the variable name
-                        // Handle both simple names and field access patterns
-                        // Only match if the var_name is not a temp variable placeholder
-                        !var_name.starts_with("_temp")
-                            && (mutation.target == *var_name
-                                || mutation.target.starts_with(&format!("{}.", var_name)))
-                    } else {
-                        false
-                    }
-                });
-
-                // Keep the mutation unless we're sure it's dead
-                !is_dead
-            })
-            .cloned()
-            .collect()
+        // Dead store analysis has been removed as it produced too many false positives.
+        // Return all local mutations unchanged.
+        self.local_mutations.clone()
     }
 
     fn has_mutable_reference(&self, pat: &Pat) -> bool {

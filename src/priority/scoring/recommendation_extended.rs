@@ -967,18 +967,11 @@ fn generate_data_flow_recommendations(
     if let Some(df) = data_flow {
         let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
-        // Check for dead stores
+        // Check mutation info for almost-pure functions
         if let Some(mutation_info) = df.get_mutation_info(&func_id) {
-            if !mutation_info.dead_stores.is_empty() {
-                recommendations.push(format!(
-                    "Remove {} dead store(s) to simplify code",
-                    mutation_info.dead_stores.len()
-                ));
-            }
-
             if mutation_info.live_mutations.len() <= 2 && mutation_info.total_mutations > 2 {
                 recommendations.push(format!(
-                    "Extract pure subset (only {} live mutations out of {})",
+                    "Extract pure subset (only {} mutations out of {})",
                     mutation_info.live_mutations.len(),
                     mutation_info.total_mutations
                 ));

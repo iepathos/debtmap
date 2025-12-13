@@ -466,7 +466,6 @@ fn test_data_flow_page_rendering_with_mutations() {
     let mutation_info = MutationInfo {
         total_mutations: 5,
         live_mutations: vec!["x".to_string(), "y".to_string()],
-        dead_stores: [String::from("z")].iter().cloned().collect(),
         escaping_mutations: [String::from("x")].iter().cloned().collect(),
     };
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
@@ -486,7 +485,6 @@ fn test_data_flow_page_rendering_with_mutations() {
     let mutation = retrieved_mutation.unwrap();
     assert_eq!(mutation.total_mutations, 5);
     assert_eq!(mutation.live_mutations.len(), 2);
-    assert_eq!(mutation.dead_stores.len(), 1);
 }
 
 #[test]
@@ -591,7 +589,6 @@ fn test_data_flow_page_rendering_with_escape_analysis() {
         liveness: LivenessInfo {
             live_in: Default::default(),
             live_out: Default::default(),
-            dead_stores: Default::default(),
         },
         reaching_defs: ReachingDefinitions::default(),
         escape_info,
@@ -646,10 +643,6 @@ fn test_data_flow_markdown_formatting() {
         MutationInfo {
             total_mutations: 10,
             live_mutations: vec!["counter".to_string(), "state".to_string()],
-            dead_stores: ["temp".to_string(), "unused".to_string()]
-                .iter()
-                .cloned()
-                .collect(),
             escaping_mutations: ["counter".to_string()].iter().cloned().collect(),
         },
     );
@@ -670,7 +663,6 @@ fn test_data_flow_markdown_formatting() {
     let mutation = data_flow.get_mutation_info(&func_id).unwrap();
     assert_eq!(mutation.total_mutations, 10);
     assert_eq!(mutation.live_mutations.len(), 2);
-    assert_eq!(mutation.dead_stores.len(), 2);
 
     let io_ops = data_flow.get_io_operations(&func_id).unwrap();
     assert_eq!(io_ops.len(), 1);
