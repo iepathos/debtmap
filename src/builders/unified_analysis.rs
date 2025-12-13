@@ -1,4 +1,7 @@
 use super::{call_graph, parallel_call_graph, parallel_unified_analysis};
+
+// Re-export pure core modules (spec 265)
+pub use super::unified_analysis_phases as core;
 use crate::{
     analysis::diagnostics::{DetailLevel, DiagnosticReporter, OutputFormat},
     analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
