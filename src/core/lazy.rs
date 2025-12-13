@@ -157,7 +157,12 @@ impl<T> Lazy<T> {
                 self.value = Some(generator());
             }
         }
-        self.value.as_ref().unwrap()
+        // Safe: Either value was already Some, or we just set it via generator
+        // The only edge case is if force() is called after generator was already taken
+        // and value is still None. In that case, we panic with a clear message.
+        self.value
+            .as_ref()
+            .expect("Lazy::force called but generator was already consumed and value is None")
     }
 
     /// Check if the value has been evaluated

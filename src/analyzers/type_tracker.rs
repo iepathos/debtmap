@@ -333,7 +333,8 @@ impl TypeTracker {
             let parts: Vec<&str> = func_path.split("::").collect();
             if parts.len() >= 2 {
                 let type_name = parts[..parts.len() - 1].join("::");
-                let method_name = parts.last().unwrap().to_string();
+                // Safe: we checked parts.len() >= 2, so last() is guaranteed to return Some
+                let method_name = parts.last()?.to_string();
                 return Some((type_name, method_name));
             }
         }
@@ -521,9 +522,9 @@ pub fn extract_type_from_pattern(pat: &Pat, init: &Option<Box<Expr>>) -> Option<
             // Explicit type annotation: let x: Type = ...
             Some(extract_type_from_type(ty))
         }
-        Pat::Ident(PatIdent { .. }) if init.is_some() => {
+        Pat::Ident(PatIdent { .. }) => {
             // Type inference from initializer
-            extract_type_from_expr(init.as_ref().unwrap())
+            init.as_ref().and_then(|expr| extract_type_from_expr(expr))
         }
         _ => None,
     }
