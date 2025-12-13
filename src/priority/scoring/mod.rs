@@ -16,7 +16,9 @@ pub mod formatting;
 pub mod orchestration_adjustment;
 pub mod rebalanced; // Spec 136: Rebalanced debt scoring algorithm
 pub mod recommendation;
-pub mod recommendation_extended;
+pub mod recommendation_complexity; // Complexity classification and refactoring recommendations
+pub mod recommendation_debt_specific; // Specific debt type recommendations
+pub mod recommendation_extended; // Facade re-exporting from submodules
 pub mod recommendation_helpers;
 pub mod rust_recommendations;
 pub mod scaling; // Spec 171: Exponential scaling and risk boosting
