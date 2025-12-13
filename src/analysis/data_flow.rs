@@ -1149,7 +1149,7 @@ impl<'ast, 'a> Visit<'ast> for ClosureCaptureVisitor<'a> {
                 let nested_params: HashSet<String> = nested_closure
                     .inputs
                     .iter()
-                    .filter_map(|pat| extract_pattern_name(pat))
+                    .filter_map(extract_pattern_name)
                     .collect();
 
                 let nested_is_move = nested_closure.capture.is_some();
