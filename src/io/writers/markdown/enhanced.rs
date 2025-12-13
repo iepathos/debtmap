@@ -259,22 +259,14 @@ fn format_data_flow_section(
     // Mutation analysis
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
         result.push_str(&format!(
-            "- Mutations: {} total, {} live, {} dead stores\n",
+            "- Mutations: {} total, {} tracked\n",
             mutation_info.total_mutations,
-            mutation_info.live_mutations.len(),
-            mutation_info.dead_stores.len()
+            mutation_info.live_mutations.len()
         ));
-
-        if !mutation_info.dead_stores.is_empty() {
-            result.push_str(&format!(
-                "  - **Opportunity**: Remove {} dead store(s) to simplify code\n",
-                mutation_info.dead_stores.len()
-            ));
-        }
 
         if mutation_info.live_mutations.len() <= 2 && mutation_info.total_mutations > 2 {
             result.push_str(&format!(
-                "  - **Almost Pure**: Only {} live mutation(s), consider extracting pure subset\n",
+                "  - **Almost Pure**: Only {} mutation(s), consider extracting pure subset\n",
                 mutation_info.live_mutations.len()
             ));
         }

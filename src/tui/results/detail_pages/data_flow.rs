@@ -45,41 +45,19 @@ pub fn render(
 
         add_label_value(
             &mut lines,
-            "live",
+            "mutations",
             mutation_info.live_mutations.len().to_string(),
-            theme,
-            area.width,
-        );
-
-        add_label_value(
-            &mut lines,
-            "dead stores",
-            mutation_info.dead_stores.len().to_string(),
             theme,
             area.width,
         );
 
         if !mutation_info.live_mutations.is_empty() {
             add_blank_line(&mut lines);
-            add_section_header(&mut lines, "live mutations", theme);
+            add_section_header(&mut lines, "mutations", theme);
             for mutation in &mutation_info.live_mutations {
                 lines.push(Line::from(vec![
                     Span::raw("                        "), // Align to value column (24 chars)
                     Span::styled(mutation.clone(), Style::default().fg(Color::Yellow)),
-                ]));
-            }
-        }
-
-        if !mutation_info.dead_stores.is_empty() {
-            add_blank_line(&mut lines);
-            add_section_header(&mut lines, "dead stores", theme);
-            for dead in &mutation_info.dead_stores {
-                lines.push(Line::from(vec![
-                    Span::raw("                        "), // Align to value column (24 chars)
-                    Span::styled(
-                        format!("{} (never read)", dead),
-                        Style::default().fg(theme.muted),
-                    ),
                 ]));
             }
         }

@@ -18,7 +18,6 @@ use std::path::PathBuf;
 fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
     let mut live_in = HashMap::new();
     let live_out = HashMap::new();
-    let mut dead_stores = HashSet::new();
     let mut escaping_vars = HashSet::new();
     let mut return_deps = HashSet::new();
     let mut tainted_vars = HashSet::new();
@@ -36,9 +35,6 @@ fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
             set.insert(var_id);
             live_in.insert(BlockId(0), set);
         }
-        if i % 5 == 0 {
-            dead_stores.insert(var_id);
-        }
         if i % 7 == 0 {
             escaping_vars.insert(var_id);
         }
@@ -51,11 +47,7 @@ fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
     }
 
     DataFlowAnalysis {
-        liveness: LivenessInfo {
-            live_in,
-            live_out,
-            dead_stores,
-        },
+        liveness: LivenessInfo { live_in, live_out },
         reaching_defs: ReachingDefinitions::default(),
         escape_info: EscapeAnalysis {
             escaping_vars,
@@ -106,11 +98,6 @@ fn bench_memory_overhead(c: &mut Criterion) {
         group.bench_function(format!("translate_{}_vars", num_vars), |b| {
             let ctx = CfgAnalysisWithContext::new(var_names.clone(), analysis.clone());
             b.iter(|| {
-                // Simulate translating dead stores
-                let dead_stores: Vec<_> =
-                    ctx.analysis.liveness.dead_stores.iter().copied().collect();
-                black_box(ctx.var_names_for(dead_stores.into_iter()));
-
                 // Simulate translating escaping vars
                 let escaping: Vec<_> = ctx
                     .analysis
@@ -180,8 +167,7 @@ fn bench_data_flow_graph_memory(c: &mut Criterion) {
                         i * 10,
                     );
 
-                    // Simulate real usage pattern
-                    black_box(graph.get_dead_store_names(&func_id));
+                    // Simulate real usage pattern (dead store translation removed in spec 256)
                     black_box(graph.get_escaping_var_names(&func_id));
                     black_box(graph.get_return_dependency_names(&func_id));
                     black_box(graph.get_tainted_var_names(&func_id));

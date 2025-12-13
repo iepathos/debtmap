@@ -172,12 +172,10 @@ pub struct PurityInfo {
 /// Mutation analysis information for a function
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutationInfo {
-    /// Live mutations (after filtering out dead stores)
+    /// Mutations detected in the function
     pub live_mutations: Vec<String>,
     /// Total number of mutations detected
     pub total_mutations: usize,
-    /// Dead stores (mutations that don't affect output)
-    pub dead_stores: HashSet<String>,
     /// Escaping mutations (mutations that affect return value)
     pub escaping_mutations: HashSet<String>,
 }
@@ -359,15 +357,6 @@ impl DataFlowGraph {
         context: CfgAnalysisWithContext,
     ) {
         self.cfg_analysis_with_context.insert(func_id, context);
-    }
-
-    /// Get dead store variable names
-    pub fn get_dead_store_names(&self, func_id: &FunctionId) -> Vec<String> {
-        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
-            ctx.var_names_for(ctx.analysis.liveness.dead_stores.iter().copied())
-        } else {
-            vec![]
-        }
     }
 
     /// Get escaping variable names
@@ -657,7 +646,6 @@ mod tests {
             liveness: LivenessInfo {
                 live_in: HashMap::new(),
                 live_out: HashMap::new(),
-                dead_stores: HashSet::new(),
             },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
@@ -701,7 +689,6 @@ mod tests {
             liveness: LivenessInfo {
                 live_in: HashMap::new(),
                 live_out: HashMap::new(),
-                dead_stores: HashSet::new(),
             },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
@@ -726,51 +713,6 @@ mod tests {
     }
 
     #[test]
-    fn test_dead_store_translation() {
-        use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-            VarId,
-        };
-        use std::collections::HashMap;
-
-        let mut data_flow = DataFlowGraph::new();
-        let func_id = create_test_function_id("test");
-
-        // Create analysis with dead store
-        let mut dead_stores = HashSet::new();
-        dead_stores.insert(VarId {
-            name_id: 0,
-            version: 0,
-        });
-
-        let analysis = DataFlowAnalysis {
-            liveness: LivenessInfo {
-                live_in: HashMap::new(),
-                live_out: HashMap::new(),
-                dead_stores,
-            },
-            reaching_defs: ReachingDefinitions::default(),
-            escape_info: EscapeAnalysis {
-                escaping_vars: HashSet::new(),
-                captured_vars: HashSet::new(),
-                return_dependencies: HashSet::new(),
-            },
-            taint_info: TaintAnalysis {
-                tainted_vars: HashSet::new(),
-                taint_sources: HashMap::new(),
-                return_tainted: false,
-            },
-        };
-
-        let ctx = CfgAnalysisWithContext::new(vec!["temp".to_string()], analysis);
-
-        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
-
-        let names = data_flow.get_dead_store_names(&func_id);
-        assert_eq!(names, vec!["temp"]);
-    }
-
-    #[test]
     fn test_escaping_var_translation() {
         use crate::analysis::data_flow::{
             DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
@@ -791,7 +733,6 @@ mod tests {
             liveness: LivenessInfo {
                 live_in: HashMap::new(),
                 live_out: HashMap::new(),
-                dead_stores: HashSet::new(),
             },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
@@ -839,7 +780,6 @@ mod tests {
             liveness: LivenessInfo {
                 live_in: HashMap::new(),
                 live_out: HashMap::new(),
-                dead_stores: HashSet::new(),
             },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {
@@ -890,7 +830,6 @@ mod tests {
             liveness: LivenessInfo {
                 live_in: HashMap::new(),
                 live_out: HashMap::new(),
-                dead_stores: HashSet::new(),
             },
             reaching_defs: ReachingDefinitions::default(),
             escape_info: EscapeAnalysis {

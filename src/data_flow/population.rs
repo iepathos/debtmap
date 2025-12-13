@@ -109,7 +109,7 @@ pub use ast_helpers::{find_function_in_ast, FoundFunction};
 ///
 /// Extracts and stores:
 /// - Full CFG-based data flow analysis with variable name context
-/// - Mutation information (live vs dead stores)
+/// - Mutation information
 /// - Escape analysis results
 pub fn populate_from_purity_analysis(
     data_flow: &mut DataFlowGraph,
@@ -137,26 +137,10 @@ pub fn populate_from_purity_analysis(
     let mutation_info = MutationInfo {
         live_mutations: live_mutations.clone(),
         total_mutations: purity.total_mutations,
-        dead_stores: extract_dead_stores(purity, data_flow, func_id),
         escaping_mutations: extract_escaping_mutations(purity, data_flow, func_id),
     };
 
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
-}
-
-/// Extract dead stores from purity analysis
-///
-/// Now uses the stored CfgAnalysisWithContext to translate VarIds to variable names.
-fn extract_dead_stores(
-    _purity: &PurityAnalysis,
-    data_flow: &DataFlowGraph,
-    func_id: &FunctionId,
-) -> HashSet<String> {
-    // Use the translation layer to get dead store names
-    data_flow
-        .get_dead_store_names(func_id)
-        .into_iter()
-        .collect()
 }
 
 /// Extract escaping mutations from purity analysis
@@ -448,7 +432,6 @@ mod tests {
         let liveness = LivenessInfo {
             live_in: HashMap::new(),
             live_out: HashMap::new(),
-            dead_stores: HashSet::new(),
         };
 
         let reaching_defs = ReachingDefinitions::default();
@@ -501,23 +484,6 @@ mod tests {
         let mutation_info = data_flow.get_mutation_info(&func_id).unwrap();
         assert_eq!(mutation_info.live_mutations.len(), 1);
         assert_eq!(mutation_info.total_mutations, 2);
-        // Note: dead_stores is empty as VarId->String conversion needs CFG context
-        assert!(mutation_info.dead_stores.is_empty());
-    }
-
-    #[test]
-    fn test_extract_dead_stores() {
-        let mut data_flow = DataFlowGraph::new();
-        let func_id = create_test_function_id("test_func");
-        let purity = create_test_purity_analysis();
-
-        // Populate data flow first so we have the context
-        populate_from_purity_analysis(&mut data_flow, &func_id, &purity);
-
-        let dead_stores = extract_dead_stores(&purity, &data_flow, &func_id);
-
-        // Should return empty since test analysis has no dead stores
-        assert!(dead_stores.is_empty());
     }
 
     #[test]

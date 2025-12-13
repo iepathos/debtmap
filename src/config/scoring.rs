@@ -579,14 +579,6 @@ pub struct DataFlowScoringConfig {
     /// Weight for pattern factor (0.0-1.0, default: 0.3)
     #[serde(default = "default_pattern_weight")]
     pub pattern_weight: f64,
-
-    /// Minimum dead store ratio to trigger refactorability boost (default: 0.3)
-    #[serde(default = "default_min_dead_store_ratio")]
-    pub min_dead_store_ratio: f64,
-
-    /// Dead store boost multiplier (default: 0.5 = up to 50% boost)
-    #[serde(default = "default_dead_store_boost")]
-    pub dead_store_boost: f64,
 }
 
 impl Default for DataFlowScoringConfig {
@@ -596,8 +588,6 @@ impl Default for DataFlowScoringConfig {
             purity_weight: default_purity_weight(),
             refactorability_weight: default_refactorability_weight(),
             pattern_weight: default_pattern_weight(),
-            min_dead_store_ratio: default_min_dead_store_ratio(),
-            dead_store_boost: default_dead_store_boost(),
         }
     }
 }
@@ -616,12 +606,4 @@ pub fn default_refactorability_weight() -> f64 {
 
 pub fn default_pattern_weight() -> f64 {
     0.3
-}
-
-pub fn default_min_dead_store_ratio() -> f64 {
-    0.3 // 30% of mutations must be dead stores
-}
-
-pub fn default_dead_store_boost() -> f64 {
-    0.5 // Up to 50% boost for high dead store ratio
 }

@@ -1341,10 +1341,6 @@ pub enum ExprKind {
         /// Whether this is a `move` closure
         is_move: bool,
     },
-    /// Generic expression with tracked variable uses.
-    /// Used for expressions that don't match specific patterns but still
-    /// reference variables (e.g., field accesses like `x.field`).
-    Uses(Vec<VarId>),
     /// Expression with no tracked variable uses
     Other,
 }
@@ -1431,7 +1427,6 @@ impl DataFlowAnalysis {
 /// Liveness analysis results (computed using backward data flow).
 ///
 /// Determines which variables are "live" (will be used later) at each program point.
-/// This is crucial for identifying dead stores (assignments that are never read).
 ///
 /// # Algorithm
 ///
@@ -1444,12 +1439,6 @@ impl DataFlowAnalysis {
 /// ```ignore
 /// let cfg = ControlFlowGraph::from_block(&block);
 /// let liveness = LivenessInfo::analyze(&cfg);
-///
-/// // Check if a variable has a dead store
-/// let var_id = VarId::from_name("x");
-/// if liveness.dead_stores.contains(&var_id) {
-///     println!("Variable x has a dead store");
-/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct LivenessInfo {
@@ -1457,8 +1446,6 @@ pub struct LivenessInfo {
     pub live_in: HashMap<BlockId, HashSet<VarId>>,
     /// Variables live at the exit of each block
     pub live_out: HashMap<BlockId, HashSet<VarId>>,
-    /// Variables with dead stores (assigned but never read)
-    pub dead_stores: HashSet<VarId>,
 }
 
 impl LivenessInfo {
@@ -1510,13 +1497,7 @@ impl LivenessInfo {
             }
         }
 
-        let dead_stores = Self::find_dead_stores(cfg, &live_out);
-
-        LivenessInfo {
-            live_in,
-            live_out,
-            dead_stores,
-        }
+        LivenessInfo { live_in, live_out }
     }
 
     fn compute_use_def(block: &BasicBlock) -> (HashSet<VarId>, HashSet<VarId>) {
@@ -1637,14 +1618,6 @@ impl LivenessInfo {
                     }
                 }
             }
-            ExprKind::Uses(vars) => {
-                // Track all variable uses from generic expressions
-                for var in vars {
-                    if !def_set.contains(var) {
-                        use_set.insert(*var);
-                    }
-                }
-            }
             ExprKind::Other => {}
         }
     }
@@ -1667,98 +1640,6 @@ impl LivenessInfo {
                 successors
             }
             Terminator::Return { .. } | Terminator::Unreachable => vec![],
-        }
-    }
-
-    fn find_dead_stores(
-        cfg: &ControlFlowGraph,
-        live_out: &HashMap<BlockId, HashSet<VarId>>,
-    ) -> HashSet<VarId> {
-        let mut dead_stores = HashSet::new();
-
-        for block in &cfg.blocks {
-            let block_live_out = live_out.get(&block.id).unwrap();
-
-            for (i, stmt) in block.statements.iter().enumerate() {
-                if let Statement::Assign { target, .. } | Statement::Declare { var: target, .. } =
-                    stmt
-                {
-                    // Check if variable is live at block exit OR used later in the same block
-                    let is_live_at_exit = block_live_out.contains(target);
-                    let is_used_in_block = Self::has_use_after(block, *target, i + 1);
-
-                    if !is_live_at_exit && !is_used_in_block {
-                        dead_stores.insert(*target);
-                    }
-                }
-            }
-        }
-
-        dead_stores
-    }
-
-    /// Check if a variable is used in any statement after the given index in the block.
-    fn has_use_after(block: &BasicBlock, var: VarId, start_idx: usize) -> bool {
-        for stmt in block.statements.iter().skip(start_idx) {
-            let uses = match stmt {
-                Statement::Assign { source, .. } => Self::rvalue_uses(source),
-                Statement::Declare { init, .. } => {
-                    init.as_ref().map(Self::rvalue_uses).unwrap_or_default()
-                }
-                Statement::Expr { expr, .. } => Self::expr_kind_uses(expr),
-            };
-            if uses.contains(&var) {
-                return true;
-            }
-        }
-
-        // Also check terminator for uses
-        let terminator_uses = Self::terminator_var_uses(&block.terminator);
-        terminator_uses.contains(&var)
-    }
-
-    /// Extract variables used in an Rvalue.
-    fn rvalue_uses(rvalue: &Rvalue) -> Vec<VarId> {
-        match rvalue {
-            Rvalue::Use(var) => vec![*var],
-            Rvalue::BinaryOp { left, right, .. } => vec![*left, *right],
-            Rvalue::UnaryOp { operand, .. } => vec![*operand],
-            Rvalue::Call { args, .. } => args.clone(),
-            Rvalue::FieldAccess { base, .. } | Rvalue::Ref { var: base, .. } => vec![*base],
-            Rvalue::Constant => vec![],
-        }
-    }
-
-    /// Extract variables used in an ExprKind.
-    fn expr_kind_uses(expr: &ExprKind) -> Vec<VarId> {
-        match expr {
-            ExprKind::MethodCall { receiver, args, .. } => {
-                let mut vars = vec![*receiver];
-                vars.extend(args.iter().cloned());
-                vars
-            }
-            ExprKind::MacroCall { args, .. } => args.clone(),
-            ExprKind::Closure { captures, .. } => captures.clone(),
-            ExprKind::Uses(vars) => vars.clone(),
-            ExprKind::Other => vec![],
-        }
-    }
-
-    /// Extract variables used in a terminator.
-    fn terminator_var_uses(term: &Terminator) -> Vec<VarId> {
-        match term {
-            Terminator::Return { value: Some(var) } => vec![*var],
-            Terminator::Branch { condition, .. } => vec![*condition],
-            Terminator::Match { scrutinee, arms, .. } => {
-                let mut vars = vec![*scrutinee];
-                for arm in arms {
-                    if let Some(guard) = arm.guard {
-                        vars.push(guard);
-                    }
-                }
-                vars
-            }
-            _ => vec![],
         }
     }
 }
@@ -1988,7 +1869,6 @@ impl ReachingDefinitions {
             }
             ExprKind::MacroCall { args, .. } => args.clone(),
             ExprKind::Closure { captures, .. } => captures.clone(),
-            ExprKind::Uses(vars) => vars.clone(),
             ExprKind::Other => vec![],
         }
     }
@@ -2546,7 +2426,7 @@ impl TaintAnalysis {
     /// ```
     pub fn analyze_with_config(
         cfg: &ControlFlowGraph,
-        liveness: &LivenessInfo,
+        _liveness: &LivenessInfo,
         escape: &EscapeAnalysis,
         unknown_behavior: UnknownCallBehavior,
     ) -> Self {
@@ -2614,8 +2494,6 @@ impl TaintAnalysis {
                 }
             }
         }
-
-        tainted_vars.retain(|var| !liveness.dead_stores.contains(var));
 
         // Check if captured vars contribute to return (via escape.captured_vars)
         let captured_tainted = tainted_vars
@@ -2859,14 +2737,8 @@ impl CfgBuilder {
             _ => {
                 // Process any closures that might be nested in this expression
                 self.process_closures_in_expr(expr);
-                // Extract all variable uses from this expression (including field accesses)
-                let uses = self.extract_vars_from_expr(expr);
                 self.current_block.push(Statement::Expr {
-                    expr: if uses.is_empty() {
-                        ExprKind::Other
-                    } else {
-                        ExprKind::Uses(uses)
-                    },
+                    expr: ExprKind::Other,
                     line: None,
                 });
             }
@@ -3607,7 +3479,8 @@ mod tests {
         let cfg = ControlFlowGraph::from_block(&block);
         let liveness = LivenessInfo::analyze(&cfg);
 
-        assert!(liveness.dead_stores.is_empty());
+        // Empty function should have empty live_in/live_out sets
+        assert!(liveness.live_in.is_empty() || liveness.live_in.values().all(|v| v.is_empty()));
     }
 
     #[test]
@@ -5062,52 +4935,6 @@ mod tests {
             "Should track 'value'"
         );
         assert!(cfg.var_names.contains(&"e".to_string()), "Should track 'e'");
-    }
-
-    #[test]
-    fn test_match_pattern_binding_field_access_not_dead_store() {
-        // Test that pattern bindings accessed via field access are NOT dead stores
-        // This tests the fix for false positive dead stores in match arms
-        let block: Block = parse_quote! {
-            {
-                let data = get_data();
-                match data {
-                    Some(inner) => inner.field,
-                    None => 0,
-                }
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let liveness = LivenessInfo::analyze(&cfg);
-
-        // 'inner' should be tracked as a variable
-        assert!(
-            cfg.var_names.contains(&"inner".to_string()),
-            "Should track 'inner'"
-        );
-
-        // The CFG should have some ExprKind::Uses statements tracking variable uses
-        // from field access expressions (like `inner.field`)
-        let has_uses_stmt = cfg.blocks.iter().any(|block| {
-            block.statements.iter().any(|stmt| {
-                matches!(stmt, Statement::Expr { expr: ExprKind::Uses(vars), .. } if !vars.is_empty())
-            })
-        });
-
-        assert!(
-            has_uses_stmt,
-            "CFG should have ExprKind::Uses statements for field accesses"
-        );
-
-        // With the fix, pattern binding 'inner' used via field access should NOT be dead
-        // The liveness analysis should detect fewer dead stores than pattern bindings
-        // (inner is used, so shouldn't be dead; data is used in match, shouldn't be dead)
-        assert!(
-            liveness.dead_stores.len() <= 1,
-            "Should have at most 1 dead store, got {}: used pattern bindings shouldn't be dead",
-            liveness.dead_stores.len()
-        );
     }
 
     #[test]
