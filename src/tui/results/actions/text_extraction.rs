@@ -1,61 +1,29 @@
-//! User actions (clipboard, editor).
+//! Pure text extraction functions for TUI actions.
+//!
+//! All functions in this module are pure - they take data and return
+//! formatted strings without any I/O operations. This makes them
+//! easy to test and reason about.
+//!
+//! # Design
+//!
+//! Text extraction follows the "Pure Core, Imperative Shell" pattern:
+//! - This module contains the pure core (formatting)
+//! - Clipboard/editor modules handle I/O (imperative shell)
+//!
+//! # Module Size
+//!
+//! This module exceeds 400 lines (~1100 lines) but remains cohesive because:
+//! - All functions share the same dependencies and formatting patterns
+//! - The code is organized into clear sections (overview, dependencies, etc.)
+//! - Splitting into sub-modules would add complexity without benefit
+//! - Pure functions with no I/O are easy to test regardless of size
+//! - The primary goal of separating pure text formatting from I/O is achieved
 
-use anyhow::{Context, Result};
-use std::path::Path;
-use std::process::Command;
-
-use super::app::{DetailPage, ResultsApp};
 use crate::data_flow::DataFlowGraph;
 use crate::priority::call_graph::FunctionId;
 use crate::priority::UnifiedDebtItem;
 
-/// Copy text to system clipboard and return status message
-fn copy_to_clipboard(text: &str, description: &str) -> Result<String> {
-    use arboard::Clipboard;
-
-    match Clipboard::new() {
-        Ok(mut clipboard) => match clipboard.set_text(text) {
-            Ok(_) => Ok(format!("✓ Copied {} to clipboard", description)),
-            Err(e) => {
-                // Show error so user knows what happened
-                Ok(format!("✗ Clipboard error: {}", e))
-            }
-        },
-        Err(e) => {
-            // Clipboard not available (SSH, headless, etc.)
-            Ok(format!("✗ Clipboard not available: {}", e))
-        }
-    }
-}
-
-/// Copy file path to system clipboard and return status message
-pub fn copy_path_to_clipboard(path: &Path) -> Result<String> {
-    let path_str = path.to_string_lossy().to_string();
-    copy_to_clipboard(&path_str, "path")
-}
-
-/// Copy detail page content to clipboard and return status message
-pub fn copy_page_to_clipboard(
-    item: &UnifiedDebtItem,
-    page: DetailPage,
-    app: &ResultsApp,
-) -> Result<String> {
-    let content = extract_page_text(item, page, app);
-    copy_to_clipboard(&content, "page content")
-}
-
-/// Extract plain text content from a detail page
-/// This matches the exact layout of the rendered TUI pages
-fn extract_page_text(item: &UnifiedDebtItem, page: DetailPage, app: &ResultsApp) -> String {
-    match page {
-        DetailPage::Overview => extract_overview_text(item, app),
-        DetailPage::Dependencies => extract_dependencies_text(item, app),
-        DetailPage::GitContext => extract_git_context_text(item),
-        DetailPage::Patterns => extract_patterns_text(item),
-        DetailPage::DataFlow => extract_data_flow_text(item, &app.analysis().data_flow_graph),
-        DetailPage::Responsibilities => extract_responsibilities_text(item),
-    }
-}
+use super::super::app::{DetailPage, ResultsApp};
 
 // =============================================================================
 // Text formatting helpers (match TUI layout exactly)
@@ -82,6 +50,28 @@ fn add_label_value(output: &mut String, label: &str, value: &str) {
 /// Add blank line
 fn add_blank_line(output: &mut String) {
     output.push('\n');
+}
+
+// =============================================================================
+// Public API - Page text extraction
+// =============================================================================
+
+/// Extract plain text content from a detail page.
+/// This matches the exact layout of the rendered TUI pages.
+pub fn extract_page_text(item: &UnifiedDebtItem, page: DetailPage, app: &ResultsApp) -> String {
+    match page {
+        DetailPage::Overview => extract_overview_text(item, app),
+        DetailPage::Dependencies => extract_dependencies_text(item, app),
+        DetailPage::GitContext => extract_git_context_text(item),
+        DetailPage::Patterns => extract_patterns_text(item),
+        DetailPage::DataFlow => extract_data_flow_text(item, &app.analysis().data_flow_graph),
+        DetailPage::Responsibilities => extract_responsibilities_text(item),
+    }
+}
+
+/// Format a path as a string for clipboard copying
+pub fn format_path_text(path: &std::path::Path) -> String {
+    path.to_string_lossy().to_string()
 }
 
 // =============================================================================
@@ -1032,8 +1022,12 @@ fn extract_responsibilities_text(item: &UnifiedDebtItem) -> String {
     output
 }
 
+// =============================================================================
+// Utility functions
+// =============================================================================
+
 /// Format debt type as human-readable name
-fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
+pub fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
     use crate::priority::DebtType;
     match debt_type {
         DebtType::ComplexityHotspot { .. } => "High Complexity".to_string(),
@@ -1066,111 +1060,71 @@ fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
     }
 }
 
-/// Open file in editor (suspends TUI during editing)
-pub fn open_in_editor(path: &Path, line: Option<usize>) -> Result<()> {
-    use crossterm::{
-        cursor::MoveTo,
-        event::{DisableMouseCapture, EnableMouseCapture},
-        execute,
-        terminal::{
-            disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
-            LeaveAlternateScreen,
-        },
-    };
-    use std::io;
-
-    let editor = std::env::var("EDITOR")
-        .or_else(|_| std::env::var("VISUAL"))
-        .unwrap_or_else(|_| "vim".to_string());
-
-    let mut cmd = Command::new(&editor);
-
-    // Support common editor line number syntax
-    match (editor.as_str(), line) {
-        ("vim" | "nvim" | "vi", Some(n)) => {
-            cmd.arg(format!("+{}", n));
-            cmd.arg(path);
-        }
-        ("code" | "code-insiders", Some(n)) => {
-            cmd.arg("--goto");
-            cmd.arg(format!("{}:{}", path.display(), n));
-        }
-        ("emacs", Some(n)) => {
-            cmd.arg(format!("+{}", n));
-            cmd.arg(path);
-        }
-        ("subl" | "sublime" | "sublime_text", Some(n)) => {
-            cmd.arg(format!("{}:{}", path.display(), n));
-        }
-        ("hx" | "helix", Some(n)) => {
-            cmd.arg(format!("{}:{}", path.display(), n));
-        }
-        ("nano", Some(n)) => {
-            cmd.arg(format!("+{}", n));
-            cmd.arg(path);
-        }
-        _ => {
-            // Default: just open the file
-            cmd.arg(path);
-        }
-    }
-
-    // Suspend TUI: disable raw mode, leave alternate screen, disable mouse
-    disable_raw_mode().context("Failed to disable raw mode")?;
-    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)
-        .context("Failed to leave alternate screen")?;
-
-    // Clear the main screen to prevent flash of old terminal content
-    execute!(io::stdout(), Clear(ClearType::All), MoveTo(0, 0))
-        .context("Failed to clear screen")?;
-
-    // Launch editor and wait for it to complete
-    let status = cmd
-        .status()
-        .with_context(|| format!("Failed to launch editor: {}", editor))?;
-
-    // Resume TUI: re-enter alternate screen, enable mouse, re-enable raw mode
-    execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)
-        .context("Failed to re-enter alternate screen")?;
-    enable_raw_mode().context("Failed to re-enable raw mode")?;
-
-    // Drain any pending events from the queue to avoid stale input
-    use crossterm::event;
-    while event::poll(std::time::Duration::from_millis(0))? {
-        let _ = event::read()?;
-    }
-
-    if !status.success() {
-        anyhow::bail!("Editor exited with status: {}", status);
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
-    fn test_copy_path_succeeds_or_fails_gracefully() {
+    fn test_format_path_text() {
+        use std::path::PathBuf;
         let path = PathBuf::from("/tmp/test.rs");
-        // This might fail in CI/headless, but should not panic
-        let result = copy_path_to_clipboard(&path);
-        assert!(result.is_ok()); // Should always return Ok with status message
-        let message = result.unwrap();
-        assert!(message.contains("Copied") || message.contains("Clipboard"));
+        let text = format_path_text(&path);
+        assert_eq!(text, "/tmp/test.rs");
     }
 
     #[test]
-    #[ignore] // Requires terminal context (TUI must be active)
-    fn test_editor_command_construction() {
-        // This test requires a terminal in raw mode, which isn't available during normal test runs
-        // Manual testing: run `cargo test test_editor_command_construction -- --ignored --nocapture`
-        let path = PathBuf::from("/tmp/test.rs");
-        std::env::set_var("EDITOR", "true"); // Use `true` command (always succeeds, does nothing)
+    fn test_classify_stability() {
+        assert_eq!(classify_stability(0.5), "Stable");
+        assert_eq!(classify_stability(2.0), "Moderately Unstable");
+        assert_eq!(classify_stability(10.0), "Highly Unstable");
+    }
 
-        let result = open_in_editor(&path, Some(42));
-        assert!(result.is_ok());
+    #[test]
+    fn test_entropy_description() {
+        assert_eq!(entropy_description(0.1), "low (repetitive)");
+        assert_eq!(entropy_description(0.4), "medium (typical)");
+        assert_eq!(entropy_description(0.7), "high (chaotic)");
+    }
+
+    #[test]
+    fn test_derive_coupling_classification() {
+        assert_eq!(derive_coupling_classification(20, 5, 0.5), "Highly Coupled");
+        assert_eq!(derive_coupling_classification(1, 1, 0.5), "Isolated");
+        assert_eq!(derive_coupling_classification(8, 2, 0.2), "Stable Core");
+        assert_eq!(derive_coupling_classification(2, 8, 0.8), "Leaf Module");
+        assert_eq!(derive_coupling_classification(5, 5, 0.5), "Utility Module");
+    }
+
+    #[test]
+    fn test_get_clipboard_fix_suggestion() {
+        let io_reasons = vec!["i/o operation".to_string()];
+        assert!(get_clipboard_fix_suggestion(&io_reasons).is_some());
+
+        let time_reasons = vec!["calls now()".to_string()];
+        assert!(get_clipboard_fix_suggestion(&time_reasons).is_some());
+
+        let many_reasons = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        assert!(get_clipboard_fix_suggestion(&many_reasons).is_none());
+    }
+
+    #[test]
+    fn test_format_debt_type_name() {
+        use crate::priority::DebtType;
+        use crate::priority::Score0To100;
+
+        let complexity = DebtType::ComplexityHotspot {
+            cyclomatic: 10,
+            cognitive: 20,
+        };
+        assert_eq!(format_debt_type_name(&complexity), "High Complexity");
+
+        let god_object = DebtType::GodObject {
+            methods: 50,
+            fields: Some(20),
+            responsibilities: 5,
+            lines: 1000,
+            god_object_score: Score0To100::new(100.0),
+        };
+        assert_eq!(format_debt_type_name(&god_object), "God Object");
     }
 }
