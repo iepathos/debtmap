@@ -13,5 +13,5 @@ pub use diagnose_coverage::diagnose_coverage_file;
 pub use explain_coverage::{explain_coverage, ExplainCoverageConfig};
 pub use init::init_config;
 pub use state::{AnalyzeConfig, Unvalidated, Validated};
-pub use validate::validate_project;
+pub use validate::{validate_project, ValidateConfig, ValidationDetails};
 pub use validate_improvement::{validate_improvement, ValidateImprovementConfig};
