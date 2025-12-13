@@ -31,7 +31,7 @@
 //!      v
 //! ```
 
-use super::app::{DetailPage, ViewMode};
+use super::{detail_page::DetailPage, view_mode::ViewMode};
 
 // Re-export navigation actions for backwards compatibility
 pub use super::nav_actions::{

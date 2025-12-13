@@ -12,12 +12,12 @@
 //! 3. Updates state on success
 //! 4. Returns a NavigationResult indicating success/failure
 
-use super::app::{DetailPage, ViewMode};
 use super::nav_state::{
     can_enter_detail, can_enter_dsm, can_enter_filter_menu, can_enter_help, can_enter_search,
     can_enter_sort_menu, can_go_back, can_navigate_detail_pages, is_valid_transition,
     NavigationResult, NavigationState,
 };
+use super::{detail_page::DetailPage, view_mode::ViewMode};
 
 /// Navigate to Detail view.
 pub fn navigate_to_detail(

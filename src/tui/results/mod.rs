@@ -21,6 +21,7 @@
 
 pub mod actions;
 pub mod app;
+pub mod detail_page;
 pub mod detail_pages;
 pub mod detail_view;
 pub mod dsm_view;
@@ -36,6 +37,7 @@ pub mod page_availability;
 pub mod query_state;
 pub mod search;
 pub mod sort;
+pub mod view_mode;
 
 use anyhow::Result;
 use crossterm::{

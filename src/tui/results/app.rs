@@ -16,102 +16,13 @@ use super::{
     sort::SortCriteria,
 };
 
+// Re-export for backwards compatibility
+pub use super::detail_page::DetailPage;
+pub use super::view_mode::ViewMode;
+
 /// Helper to get coverage percentage from UnifiedDebtItem
 pub fn get_coverage(item: &UnifiedDebtItem) -> Option<f64> {
     item.transitive_coverage.as_ref().map(|c| c.direct)
-}
-
-/// View mode for the TUI
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ViewMode {
-    /// Main list view
-    List,
-    /// Detail view for selected item
-    Detail,
-    /// Search input mode
-    Search,
-    /// Sort menu
-    SortMenu,
-    /// Filter menu
-    FilterMenu,
-    /// Help overlay
-    Help,
-    /// Dependency Structure Matrix view (Spec 205)
-    Dsm,
-}
-
-/// Detail page selection for multi-page detail view
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DetailPage {
-    Overview,
-    Dependencies,
-    GitContext,
-    Patterns,
-    DataFlow,
-    Responsibilities,
-}
-
-impl DetailPage {
-    /// Get next page with wrapping
-    pub fn next(self) -> Self {
-        match self {
-            DetailPage::Overview => DetailPage::Dependencies,
-            DetailPage::Dependencies => DetailPage::GitContext,
-            DetailPage::GitContext => DetailPage::Patterns,
-            DetailPage::Patterns => DetailPage::DataFlow,
-            DetailPage::DataFlow => DetailPage::Responsibilities,
-            DetailPage::Responsibilities => DetailPage::Overview,
-        }
-    }
-
-    /// Get previous page with wrapping
-    pub fn prev(self) -> Self {
-        match self {
-            DetailPage::Overview => DetailPage::Responsibilities,
-            DetailPage::Dependencies => DetailPage::Overview,
-            DetailPage::GitContext => DetailPage::Dependencies,
-            DetailPage::Patterns => DetailPage::GitContext,
-            DetailPage::DataFlow => DetailPage::Patterns,
-            DetailPage::Responsibilities => DetailPage::DataFlow,
-        }
-    }
-
-    /// Create from 0-based index
-    pub fn from_index(idx: usize) -> Option<Self> {
-        match idx {
-            0 => Some(DetailPage::Overview),
-            1 => Some(DetailPage::Dependencies),
-            2 => Some(DetailPage::GitContext),
-            3 => Some(DetailPage::Patterns),
-            4 => Some(DetailPage::DataFlow),
-            5 => Some(DetailPage::Responsibilities),
-            _ => None,
-        }
-    }
-
-    /// Get 0-based index
-    pub fn index(self) -> usize {
-        match self {
-            DetailPage::Overview => 0,
-            DetailPage::Dependencies => 1,
-            DetailPage::GitContext => 2,
-            DetailPage::Patterns => 3,
-            DetailPage::DataFlow => 4,
-            DetailPage::Responsibilities => 5,
-        }
-    }
-
-    /// Get display name for page
-    pub fn name(self) -> &'static str {
-        match self {
-            DetailPage::Overview => "Overview",
-            DetailPage::Dependencies => "Dependencies",
-            DetailPage::GitContext => "Git Context",
-            DetailPage::Patterns => "Patterns",
-            DetailPage::DataFlow => "Data Flow",
-            DetailPage::Responsibilities => "Responsibilities",
-        }
-    }
 }
 
 /// Main application state - slim coordinator.
@@ -558,64 +469,5 @@ impl ResultsApp {
         } else {
             format!("{} items", self.query.filtered_indices().len())
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_detail_page_next_wraps_forward() {
-        assert_eq!(DetailPage::Overview.next(), DetailPage::Dependencies);
-        assert_eq!(DetailPage::Dependencies.next(), DetailPage::GitContext);
-        assert_eq!(DetailPage::GitContext.next(), DetailPage::Patterns);
-        assert_eq!(DetailPage::Patterns.next(), DetailPage::DataFlow);
-        assert_eq!(DetailPage::DataFlow.next(), DetailPage::Responsibilities);
-        assert_eq!(DetailPage::Responsibilities.next(), DetailPage::Overview);
-    }
-
-    #[test]
-    fn test_detail_page_prev_wraps_backward() {
-        assert_eq!(DetailPage::Overview.prev(), DetailPage::Responsibilities);
-        assert_eq!(DetailPage::Dependencies.prev(), DetailPage::Overview);
-        assert_eq!(DetailPage::GitContext.prev(), DetailPage::Dependencies);
-        assert_eq!(DetailPage::Patterns.prev(), DetailPage::GitContext);
-        assert_eq!(DetailPage::DataFlow.prev(), DetailPage::Patterns);
-        assert_eq!(DetailPage::Responsibilities.prev(), DetailPage::DataFlow);
-    }
-
-    #[test]
-    fn test_detail_page_from_index() {
-        assert_eq!(DetailPage::from_index(0), Some(DetailPage::Overview));
-        assert_eq!(DetailPage::from_index(1), Some(DetailPage::Dependencies));
-        assert_eq!(DetailPage::from_index(2), Some(DetailPage::GitContext));
-        assert_eq!(DetailPage::from_index(3), Some(DetailPage::Patterns));
-        assert_eq!(DetailPage::from_index(4), Some(DetailPage::DataFlow));
-        assert_eq!(
-            DetailPage::from_index(5),
-            Some(DetailPage::Responsibilities)
-        );
-        assert_eq!(DetailPage::from_index(6), None);
-    }
-
-    #[test]
-    fn test_detail_page_index() {
-        assert_eq!(DetailPage::Overview.index(), 0);
-        assert_eq!(DetailPage::Dependencies.index(), 1);
-        assert_eq!(DetailPage::GitContext.index(), 2);
-        assert_eq!(DetailPage::Patterns.index(), 3);
-        assert_eq!(DetailPage::DataFlow.index(), 4);
-        assert_eq!(DetailPage::Responsibilities.index(), 5);
-    }
-
-    #[test]
-    fn test_detail_page_name() {
-        assert_eq!(DetailPage::Overview.name(), "Overview");
-        assert_eq!(DetailPage::Dependencies.name(), "Dependencies");
-        assert_eq!(DetailPage::GitContext.name(), "Git Context");
-        assert_eq!(DetailPage::Patterns.name(), "Patterns");
-        assert_eq!(DetailPage::DataFlow.name(), "Data Flow");
-        assert_eq!(DetailPage::Responsibilities.name(), "Responsibilities");
     }
 }

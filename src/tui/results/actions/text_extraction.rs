@@ -23,7 +23,7 @@ use crate::data_flow::DataFlowGraph;
 use crate::priority::call_graph::FunctionId;
 use crate::priority::UnifiedDebtItem;
 
-use super::super::app::{DetailPage, ResultsApp};
+use super::super::{app::ResultsApp, detail_page::DetailPage};
 
 // =============================================================================
 // Text formatting helpers (match TUI layout exactly)

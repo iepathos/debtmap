@@ -12,7 +12,7 @@
 use crate::data_flow::DataFlowGraph;
 use crate::priority::{call_graph::FunctionId, UnifiedDebtItem};
 
-use super::app::DetailPage;
+use super::detail_page::DetailPage;
 
 /// Check if item has git context data.
 ///

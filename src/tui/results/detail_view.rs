@@ -1,7 +1,7 @@
 //! Detail view rendering for selected debt item.
 
-use super::app::{DetailPage, ResultsApp};
 use super::detail_pages;
+use super::{app::ResultsApp, detail_page::DetailPage};
 use crate::tui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},

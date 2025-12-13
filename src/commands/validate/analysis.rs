@@ -10,20 +10,12 @@ use crate::priority::UnifiedAnalysis;
 use std::path::PathBuf;
 
 /// Options for configuring unified analysis during validation.
+#[derive(Default)]
 pub struct ValidationAnalysisOptions {
     /// Whether parallel processing is enabled
     pub parallel: bool,
     /// Number of parallel jobs (0 = auto)
     pub jobs: usize,
-}
-
-impl Default for ValidationAnalysisOptions {
-    fn default() -> Self {
-        Self {
-            parallel: false,
-            jobs: 0,
-        }
-    }
 }
 
 /// Read parallel processing settings from environment.

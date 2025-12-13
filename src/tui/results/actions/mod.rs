@@ -33,7 +33,7 @@ pub use clipboard::copy_to_clipboard;
 pub use editor::open_in_editor;
 pub use text_extraction::{extract_page_text, format_debt_type_name, format_path_text};
 
-use super::app::{DetailPage, ResultsApp};
+use super::{app::ResultsApp, detail_page::DetailPage};
 use crate::priority::UnifiedDebtItem;
 use anyhow::Result;
 use std::path::Path;

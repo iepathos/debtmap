@@ -4,10 +4,10 @@
 //! machine (nav_state.rs) for state transitions. Guards are used to validate
 //! transitions, and history is tracked for proper back navigation.
 
-use super::app::{ResultsApp, ViewMode};
 use super::filter::{CoverageFilter, Filter, SeverityFilter};
 use super::nav_state::{self, can_enter_detail, can_enter_dsm, can_enter_help};
 use super::sort::SortCriteria;
+use super::{app::ResultsApp, detail_page::DetailPage, view_mode::ViewMode};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -157,33 +157,33 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
         // Jump to specific page (only if available)
         KeyCode::Char('1') => {
-            if app.is_page_available(super::app::DetailPage::Overview) {
-                app.set_detail_page(super::app::DetailPage::Overview);
+            if app.is_page_available(DetailPage::Overview) {
+                app.set_detail_page(DetailPage::Overview);
             }
         }
         KeyCode::Char('2') => {
-            if app.is_page_available(super::app::DetailPage::Dependencies) {
-                app.set_detail_page(super::app::DetailPage::Dependencies);
+            if app.is_page_available(DetailPage::Dependencies) {
+                app.set_detail_page(DetailPage::Dependencies);
             }
         }
         KeyCode::Char('3') => {
-            if app.is_page_available(super::app::DetailPage::GitContext) {
-                app.set_detail_page(super::app::DetailPage::GitContext);
+            if app.is_page_available(DetailPage::GitContext) {
+                app.set_detail_page(DetailPage::GitContext);
             }
         }
         KeyCode::Char('4') => {
-            if app.is_page_available(super::app::DetailPage::Patterns) {
-                app.set_detail_page(super::app::DetailPage::Patterns);
+            if app.is_page_available(DetailPage::Patterns) {
+                app.set_detail_page(DetailPage::Patterns);
             }
         }
         KeyCode::Char('5') => {
-            if app.is_page_available(super::app::DetailPage::DataFlow) {
-                app.set_detail_page(super::app::DetailPage::DataFlow);
+            if app.is_page_available(DetailPage::DataFlow) {
+                app.set_detail_page(DetailPage::DataFlow);
             }
         }
         KeyCode::Char('6') => {
-            if app.is_page_available(super::app::DetailPage::Responsibilities) {
-                app.set_detail_page(super::app::DetailPage::Responsibilities);
+            if app.is_page_available(DetailPage::Responsibilities) {
+                app.set_detail_page(DetailPage::Responsibilities);
             }
         }
 
