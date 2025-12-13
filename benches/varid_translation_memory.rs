@@ -4,8 +4,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::analysis::data_flow::{
-    BlockId, DataFlowAnalysis, EscapeAnalysis, LivenessInfo, ReachingDefinitions, TaintAnalysis,
-    VarId,
+    DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
 };
 use debtmap::data_flow::{CfgAnalysisWithContext, DataFlowGraph};
 use debtmap::priority::call_graph::FunctionId;
@@ -16,8 +15,6 @@ use std::path::PathBuf;
 
 /// Create a realistic DataFlowAnalysis with the given number of variables
 fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
-    let mut live_in = HashMap::new();
-    let live_out = HashMap::new();
     let mut escaping_vars = HashSet::new();
     let mut return_deps = HashSet::new();
     let mut tainted_vars = HashSet::new();
@@ -30,11 +27,6 @@ fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
         };
 
         // Add to various sets to simulate real analysis
-        if i % 3 == 0 {
-            let mut set = HashSet::new();
-            set.insert(var_id);
-            live_in.insert(BlockId(0), set);
-        }
         if i % 7 == 0 {
             escaping_vars.insert(var_id);
         }
@@ -47,7 +39,6 @@ fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
     }
 
     DataFlowAnalysis {
-        liveness: LivenessInfo { live_in, live_out },
         reaching_defs: ReachingDefinitions::default(),
         escape_info: EscapeAnalysis {
             escaping_vars,
