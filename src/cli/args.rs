@@ -1,6 +1,12 @@
+//! CLI argument definitions using Clap
+//!
+//! This module contains all CLI argument parsing definitions, including
+//! the main CLI struct and all subcommands.
+
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+/// Complexity threshold presets for different project types
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ThresholdPreset {
     /// Strict thresholds for high code quality standards
@@ -11,6 +17,7 @@ pub enum ThresholdPreset {
     Lenient,
 }
 
+/// Debug output format options
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum DebugFormatArg {
     /// Human-readable text format
@@ -19,6 +26,7 @@ pub enum DebugFormatArg {
     Json,
 }
 
+/// Functional analysis profile for purity checking
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum FunctionalAnalysisProfile {
     /// Strict profile for codebases emphasizing functional purity
@@ -29,6 +37,7 @@ pub enum FunctionalAnalysisProfile {
     Lenient,
 }
 
+/// Debtmap - Code complexity and technical debt analyzer
 #[derive(Parser, Debug)]
 #[command(name = "debtmap")]
 #[command(about = "Rust code complexity and technical debt analyzer", long_about = None)]
@@ -46,6 +55,7 @@ pub struct Cli {
     pub config: Option<PathBuf>,
 }
 
+/// Available CLI subcommands
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum Commands {
@@ -536,6 +546,7 @@ pub enum Commands {
     },
 }
 
+/// Output format options
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum OutputFormat {
     Json,
@@ -548,6 +559,7 @@ pub enum OutputFormat {
     Dsm,
 }
 
+/// Priority levels for debt items
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum Priority {
     Low,
@@ -580,6 +592,7 @@ impl From<OutputFormat> for crate::io::output::OutputFormat {
     }
 }
 
+/// Parse CLI arguments using Clap
 pub fn parse_args() -> Cli {
     Cli::parse()
 }
@@ -590,7 +603,6 @@ mod tests {
 
     #[test]
     fn test_priority_conversion() {
-        // Test conversion from CLI Priority to core Priority
         assert_eq!(
             crate::core::Priority::from(Priority::Low),
             crate::core::Priority::Low
@@ -611,7 +623,6 @@ mod tests {
 
     #[test]
     fn test_output_format_conversion() {
-        // Test conversion from CLI OutputFormat to io::output::OutputFormat
         assert_eq!(
             crate::io::output::OutputFormat::from(OutputFormat::Json),
             crate::io::output::OutputFormat::Json
@@ -702,7 +713,6 @@ mod tests {
 
     #[test]
     fn test_priority_ordering() {
-        // Test that Priority enum ordering is correct
         assert!(Priority::Low < Priority::Medium);
         assert!(Priority::Medium < Priority::High);
         assert!(Priority::High < Priority::Critical);
@@ -710,7 +720,6 @@ mod tests {
 
     #[test]
     fn test_output_format_equality() {
-        // Test OutputFormat equality
         assert_eq!(OutputFormat::Json, OutputFormat::Json);
         assert_ne!(OutputFormat::Json, OutputFormat::Markdown);
         assert_ne!(OutputFormat::Terminal, OutputFormat::Json);
@@ -718,19 +727,13 @@ mod tests {
 
     #[test]
     fn test_parse_args_wrapper() {
-        // Since parse_args() calls Cli::parse() which requires actual CLI args,
-        // we'll test it indirectly through the Cli structure
         use clap::Parser;
 
-        // Verify that the parse_args function would work with valid arguments
         let test_args = vec!["debtmap", "analyze", "."];
         let cli = Cli::parse_from(test_args);
 
-        // Verify the CLI was parsed correctly
         match cli.command {
-            Commands::Analyze { .. } => {
-                // Success - the structure was created properly
-            }
+            Commands::Analyze { .. } => {}
             _ => panic!("Expected Analyze command from test args"),
         }
     }
@@ -759,7 +762,7 @@ mod tests {
 
         match cli.command {
             Commands::Analyze { no_multi_pass, .. } => {
-                assert!(!no_multi_pass); // multi-pass is default (flag not set)
+                assert!(!no_multi_pass);
             }
             _ => panic!("Expected Analyze command"),
         }

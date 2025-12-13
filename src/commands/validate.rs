@@ -8,6 +8,7 @@ use crate::{cli, config, core::*, risk};
 use anyhow::Result;
 use std::path::PathBuf;
 
+#[derive(Debug)]
 pub struct ValidateConfig {
     pub path: PathBuf,
     pub config: Option<PathBuf>,
