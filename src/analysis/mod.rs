@@ -47,7 +47,7 @@ pub use call_graph::{
     FunctionPointerTracker, RustCallGraph, RustCallGraphBuilder, TraitRegistry,
 };
 pub use context_detection::{ContextAnalysis, ContextDetector, FunctionContext};
-pub use data_flow::{ControlFlowGraph, DataFlowAnalysis, EscapeAnalysis, TaintAnalysis, VarId};
+pub use data_flow::{ControlFlowGraph, DataFlowAnalysis, VarId};
 pub use dsm::{CycleInfo, CycleSeverity, DependencyMatrix, DsmCell, DsmMetrics};
 pub use file_context::{FileContext, FileContextDetector, TestFileConfidence};
 pub use framework_patterns::{

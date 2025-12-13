@@ -462,12 +462,10 @@ fn test_data_flow_page_rendering_with_mutations() {
         location.line,
     );
 
-    // Add mutation info (spec 257: binary signals)
+    // Add mutation info (spec 257: binary signals, escape analysis removed)
     let mutation_info = MutationInfo {
         has_mutations: true,
-        has_escaping_mutations: true,
         detected_mutations: vec!["x".to_string(), "y".to_string()],
-        escaping_vars: vec!["x".to_string()],
     };
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
 
@@ -485,7 +483,6 @@ fn test_data_flow_page_rendering_with_mutations() {
     assert!(retrieved_mutation.is_some());
     let mutation = retrieved_mutation.unwrap();
     assert!(mutation.has_mutations);
-    assert!(mutation.has_escaping_mutations);
     assert_eq!(mutation.detected_mutations.len(), 2);
 }
 
@@ -544,74 +541,7 @@ fn test_data_flow_page_rendering_with_io_operations() {
     assert_eq!(ops[1].operation_type, "Network Call");
 }
 
-#[test]
-fn test_data_flow_page_rendering_with_escape_analysis() {
-    use debtmap::analysis::data_flow::DataFlowAnalysis;
-    use debtmap::analysis::VarId;
-    use debtmap::data_flow::DataFlowGraph;
-    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
-    use std::path::PathBuf;
-
-    let mut data_flow = DataFlowGraph::new();
-
-    let location = Location {
-        file: PathBuf::from("src/test.rs"),
-        line: 200,
-        function: "escape_test".to_string(),
-    };
-
-    let func_id = FunctionId::new(
-        location.file.clone(),
-        location.function.clone(),
-        location.line,
-    );
-
-    // Add escape analysis - create a minimal DataFlowAnalysis
-    use debtmap::analysis::data_flow::{EscapeAnalysis, ReachingDefinitions, TaintAnalysis};
-    use std::collections::HashSet;
-
-    let var1 = VarId {
-        name_id: 1,
-        version: 0,
-    };
-    let var2 = VarId {
-        name_id: 2,
-        version: 0,
-    };
-
-    let escape_info = EscapeAnalysis {
-        escaping_vars: [var1, var2].iter().copied().collect(),
-        captured_vars: HashSet::new(),
-        return_dependencies: [var1].iter().copied().collect(),
-    };
-
-    let cfg_analysis = DataFlowAnalysis {
-        reaching_defs: ReachingDefinitions::default(),
-        escape_info,
-        taint_info: TaintAnalysis {
-            tainted_vars: Default::default(),
-            taint_sources: Default::default(),
-            return_tainted: false,
-        },
-    };
-
-    data_flow.set_cfg_analysis(func_id.clone(), cfg_analysis);
-
-    let _item = create_test_unified_debt_item(
-        location,
-        DebtType::ComplexityHotspot {
-            cyclomatic: 12,
-            cognitive: 18,
-        },
-    );
-
-    // Verify escape analysis is accessible
-    let cfg = data_flow.get_cfg_analysis(&func_id);
-    assert!(cfg.is_some());
-    let analysis = cfg.unwrap();
-    assert_eq!(analysis.escape_info.escaping_vars.len(), 2);
-    assert_eq!(analysis.escape_info.return_dependencies.len(), 1);
-}
+// Escape analysis test removed - analysis no longer exists
 
 #[test]
 fn test_data_flow_markdown_formatting() {
@@ -633,14 +563,12 @@ fn test_data_flow_markdown_formatting() {
         location.line,
     );
 
-    // Add comprehensive data flow information (spec 257: binary signals)
+    // Add comprehensive data flow information (spec 257: binary signals, escape analysis removed)
     data_flow.set_mutation_info(
         func_id.clone(),
         MutationInfo {
             has_mutations: true,
-            has_escaping_mutations: true,
             detected_mutations: vec!["counter".to_string(), "state".to_string()],
-            escaping_vars: vec!["counter".to_string()],
         },
     );
 

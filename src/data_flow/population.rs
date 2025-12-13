@@ -128,30 +128,19 @@ pub fn populate_from_purity_analysis(
     }
 
     // Extract mutation information using binary signals (spec 257)
+    // Escape analysis removed - not providing actionable debt signals
     let detected_mutations: Vec<String> = purity
         .live_mutations
         .iter()
         .map(|m| m.target.clone())
         .collect();
 
-    let escaping_vars: Vec<String> = extract_escaping_vars(data_flow, func_id);
-
     let mutation_info = MutationInfo {
         has_mutations: !detected_mutations.is_empty() || purity.total_mutations > 0,
-        has_escaping_mutations: !escaping_vars.is_empty(),
         detected_mutations,
-        escaping_vars,
     };
 
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
-}
-
-/// Extract escaping variables from data flow analysis
-///
-/// Uses the stored CfgAnalysisWithContext to translate VarIds to variable names.
-fn extract_escaping_vars(data_flow: &DataFlowGraph, func_id: &FunctionId) -> Vec<String> {
-    // Use the translation layer to get escaping variable names
-    data_flow.get_escaping_var_names(func_id)
 }
 
 /// Populate I/O operations from function metrics using AST-based detection
@@ -410,11 +399,8 @@ fn is_transformation_method(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::data_flow::{
-        DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis,
-    };
+    use crate::analysis::data_flow::{DataFlowAnalysis, ReachingDefinitions};
     use crate::core::PurityLevel;
-    use std::collections::{HashMap, HashSet};
     use std::path::PathBuf;
 
     fn create_test_function_id(name: &str) -> FunctionId {
@@ -424,25 +410,9 @@ mod tests {
     fn create_test_purity_analysis() -> PurityAnalysis {
         use crate::analyzers::purity_detector::LocalMutation;
 
-        // Create minimal data flow analysis
-        let reaching_defs = ReachingDefinitions::default();
-
-        let escape_info = EscapeAnalysis {
-            escaping_vars: HashSet::new(),
-            captured_vars: HashSet::new(),
-            return_dependencies: HashSet::new(),
-        };
-
-        let taint_info = TaintAnalysis {
-            tainted_vars: HashSet::new(),
-            taint_sources: HashMap::new(),
-            return_tainted: false,
-        };
-
+        // Create minimal data flow analysis (escape/taint removed)
         let data_flow = DataFlowAnalysis {
-            reaching_defs,
-            escape_info,
-            taint_info,
+            reaching_defs: ReachingDefinitions::default(),
         };
 
         PurityAnalysis {
@@ -476,20 +446,7 @@ mod tests {
         assert_eq!(mutation_info.detected_mutations.len(), 1);
     }
 
-    #[test]
-    fn test_extract_escaping_vars() {
-        let mut data_flow = DataFlowGraph::new();
-        let func_id = create_test_function_id("test_func");
-        let purity = create_test_purity_analysis();
-
-        // Populate data flow first so we have the context
-        populate_from_purity_analysis(&mut data_flow, &func_id, &purity);
-
-        let escaping = extract_escaping_vars(&data_flow, &func_id);
-
-        // Should return empty since test analysis has no escaping vars
-        assert!(escaping.is_empty());
-    }
+    // Escape vars test removed - escape analysis no longer provides actionable signals
 
     #[test]
     fn test_populate_io_operations() {

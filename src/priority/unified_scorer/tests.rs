@@ -912,9 +912,7 @@ fn test_calculate_purity_factor_strictly_pure() {
         func_id.clone(),
         MutationInfo {
             has_mutations: false,
-            has_escaping_mutations: false,
             detected_mutations: vec![],
-            escaping_vars: vec![],
         },
     );
 
@@ -946,9 +944,7 @@ fn test_calculate_purity_factor_locally_pure() {
         func_id.clone(),
         MutationInfo {
             has_mutations: true,
-            has_escaping_mutations: false,
             detected_mutations: vec!["local_var".to_string()],
-            escaping_vars: vec![],
         },
     );
 
@@ -971,9 +967,7 @@ fn test_calculate_refactorability_factor_returns_neutral() {
         func_id.clone(),
         MutationInfo {
             has_mutations: true,
-            has_escaping_mutations: false,
             detected_mutations: vec!["live1".to_string()],
-            escaping_vars: vec![],
         },
     );
 

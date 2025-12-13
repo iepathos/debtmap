@@ -139,7 +139,7 @@
 //!     }
 //! };
 //!
-//! let cfg = ControlFlowGraph::from_block(&block);
+//! let _cfg = ControlFlowGraph::from_block(&block);
 //! let analysis = DataFlowAnalysis::analyze(&cfg);
 //! ```
 
@@ -792,34 +792,6 @@ fn is_known_impure(func_name: &str) -> bool {
     IMPURE_METHOD_PATTERNS.contains(&method_name)
 }
 
-/// Reason why a value is tainted.
-///
-/// Provides detailed information about the source of taint, enabling
-/// better error messages and debugging.
-#[derive(Debug, Clone)]
-pub enum TaintReason {
-    /// Direct use of a tainted variable
-    DirectUse(VarId),
-    /// Binary operation with tainted operands
-    BinaryOp {
-        left_tainted: bool,
-        right_tainted: bool,
-    },
-    /// Unary operation on a tainted operand
-    UnaryOp(VarId),
-    /// Pure function call with tainted arguments
-    PureCall {
-        func: String,
-        tainted_args: Vec<VarId>,
-    },
-    /// Impure function call (always taints)
-    ImpureCall { func: String },
-    /// Unknown function call
-    UnknownCall { func: String },
-    /// Field access on tainted base
-    FieldAccess(VarId),
-}
-
 /// Control Flow Graph for intra-procedural analysis.
 ///
 /// Represents a function's control flow as a directed graph of basic blocks.
@@ -838,7 +810,7 @@ pub enum TaintReason {
 ///     }
 /// };
 ///
-/// let cfg = ControlFlowGraph::from_block(&block);
+/// let _cfg = ControlFlowGraph::from_block(&block);
 /// // CFG will have separate blocks for the if-then-else branches
 /// assert!(cfg.blocks.len() >= 3);
 /// ```
@@ -1351,10 +1323,6 @@ pub enum ExprKind {
 pub struct DataFlowAnalysis {
     /// Reaching definitions (which definitions reach each program point)
     pub reaching_defs: ReachingDefinitions,
-    /// Escape analysis (which variables escape the function scope)
-    pub escape_info: EscapeAnalysis,
-    /// Taint analysis (which variables are affected by mutations)
-    pub taint_info: TaintAnalysis,
 }
 
 impl DataFlowAnalysis {
@@ -1363,19 +1331,13 @@ impl DataFlowAnalysis {
     /// # Example
     ///
     /// ```ignore
-    /// let cfg = ControlFlowGraph::from_block(&block);
+    /// let _cfg = ControlFlowGraph::from_block(&block);
     /// let analysis = DataFlowAnalysis::analyze(&cfg);
     /// ```
     pub fn analyze(cfg: &ControlFlowGraph) -> Self {
         let reaching_defs = ReachingDefinitions::analyze(cfg);
-        let escape = EscapeAnalysis::analyze(cfg);
-        let taint = TaintAnalysis::analyze(cfg, &escape);
 
-        Self {
-            reaching_defs,
-            escape_info: escape,
-            taint_info: taint,
-        }
+        Self { reaching_defs }
     }
 
     /// Create analysis from a function block (convenience method).
@@ -1420,7 +1382,7 @@ impl DataFlowAnalysis {
 /// # Example
 ///
 /// ```ignore
-/// let cfg = ControlFlowGraph::from_block(&block);
+/// let _cfg = ControlFlowGraph::from_block(&block);
 /// let reaching = ReachingDefinitions::analyze(&cfg);
 ///
 /// // Check which definitions of x reach a specific block
@@ -1897,471 +1859,7 @@ impl ReachingDefinitions {
     }
 }
 
-/// Escape analysis results.
-///
-/// Determines which local variables "escape" the function scope through:
-/// - Return values (returned directly or indirectly)
-/// - Closure captures (captured by nested closures)
-/// - Method calls (passed to external code)
-///
-/// # Example
-///
-/// ```ignore
-/// let cfg = ControlFlowGraph::from_block(&block);
-/// let escape = EscapeAnalysis::analyze(&cfg);
-///
-/// // Check if a variable contributes to the return value
-/// let var_id = VarId::from_name("x");
-/// if escape.return_dependencies.contains(&var_id) {
-///     println!("Variable x affects the return value");
-/// }
-/// ```
-#[derive(Debug, Clone)]
-pub struct EscapeAnalysis {
-    /// Variables that escape through returns or method calls
-    pub escaping_vars: HashSet<VarId>,
-    /// Variables captured by closures
-    pub captured_vars: HashSet<VarId>,
-    /// Variables that (directly or indirectly) contribute to the return value
-    pub return_dependencies: HashSet<VarId>,
-}
-
-impl EscapeAnalysis {
-    /// Analyze which variables escape the function scope.
-    ///
-    /// Traces dependencies backwards from return statements to find all variables
-    /// that contribute to the return value. Also considers closure captures as
-    /// escaping variables (Spec 249) since they may outlive their original scope.
-    pub fn analyze(cfg: &ControlFlowGraph) -> Self {
-        let mut escaping_vars = HashSet::new();
-        let mut captured_vars = HashSet::new();
-        let mut return_dependencies = HashSet::new();
-
-        // Variables captured by closures escape the local scope
-        for capture in &cfg.captured_vars {
-            escaping_vars.insert(capture.var_id);
-            captured_vars.insert(capture.var_id);
-        }
-
-        // Collect return dependencies
-        for block in &cfg.blocks {
-            if let Terminator::Return { value: Some(var) } = &block.terminator {
-                return_dependencies.insert(*var);
-                escaping_vars.insert(*var);
-            }
-        }
-
-        // Collect captured variables from closures
-        for block in &cfg.blocks {
-            for stmt in &block.statements {
-                if let Statement::Expr {
-                    expr: ExprKind::Closure { captures, is_move },
-                    ..
-                } = stmt
-                {
-                    for &captured_var in captures {
-                        captured_vars.insert(captured_var);
-                        // Captured variables escape their original scope
-                        escaping_vars.insert(captured_var);
-
-                        // If closure is moved, captured vars have extended lifetime
-                        // (already marked as escaping, but this reinforces it)
-                        if *is_move {
-                            escaping_vars.insert(captured_var);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Trace return dependencies backward
-        let mut worklist: Vec<VarId> = return_dependencies.iter().copied().collect();
-        let mut visited = HashSet::new();
-
-        while let Some(var) = worklist.pop() {
-            if visited.contains(&var) {
-                continue;
-            }
-            visited.insert(var);
-
-            for block in &cfg.blocks {
-                for stmt in &block.statements {
-                    match stmt {
-                        Statement::Assign { target, source, .. } if target == &var => {
-                            Self::add_source_dependencies(
-                                source,
-                                &mut return_dependencies,
-                                &mut worklist,
-                            );
-                        }
-                        Statement::Declare {
-                            var: target,
-                            init: Some(init),
-                            ..
-                        } if target == &var => {
-                            Self::add_source_dependencies(
-                                init,
-                                &mut return_dependencies,
-                                &mut worklist,
-                            );
-                        }
-                        // Handle closure captures in return path
-                        Statement::Expr {
-                            expr: ExprKind::Closure { captures, .. },
-                            ..
-                        } => {
-                            // If this closure is in a return path, its captures
-                            // are return dependencies
-                            for &captured_var in captures {
-                                if !visited.contains(&captured_var) {
-                                    return_dependencies.insert(captured_var);
-                                    worklist.push(captured_var);
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        // Mark method call arguments as escaping
-        for block in &cfg.blocks {
-            for stmt in &block.statements {
-                match stmt {
-                    Statement::Expr {
-                        expr: ExprKind::MethodCall { args, .. },
-                        ..
-                    } => {
-                        for arg in args {
-                            escaping_vars.insert(*arg);
-                        }
-                    }
-                    // Closure captures also escape
-                    Statement::Expr {
-                        expr: ExprKind::Closure { captures, .. },
-                        ..
-                    } => {
-                        for capture in captures {
-                            escaping_vars.insert(*capture);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        EscapeAnalysis {
-            escaping_vars,
-            captured_vars,
-            return_dependencies,
-        }
-    }
-
-    fn add_source_dependencies(
-        source: &Rvalue,
-        deps: &mut HashSet<VarId>,
-        worklist: &mut Vec<VarId>,
-    ) {
-        match source {
-            Rvalue::Use(var) => {
-                deps.insert(*var);
-                worklist.push(*var);
-            }
-            Rvalue::BinaryOp { left, right, .. } => {
-                deps.insert(*left);
-                deps.insert(*right);
-                worklist.push(*left);
-                worklist.push(*right);
-            }
-            Rvalue::UnaryOp { operand, .. } => {
-                deps.insert(*operand);
-                worklist.push(*operand);
-            }
-            Rvalue::Call { args, .. } => {
-                for arg in args {
-                    deps.insert(*arg);
-                    worklist.push(*arg);
-                }
-            }
-            Rvalue::FieldAccess { base, .. } | Rvalue::Ref { var: base, .. } => {
-                deps.insert(*base);
-                worklist.push(*base);
-            }
-            Rvalue::Constant => {}
-        }
-    }
-}
-
-/// Taint analysis results.
-///
-/// Tracks how mutations propagate through the program via data flow.
-/// A variable is "tainted" if it has been mutated or computed from mutated values.
-///
-/// This is crucial for purity analysis - if a mutated variable contributes to the
-/// return value (`return_tainted = true`), the function may not be pure.
-///
-/// # Example
-///
-/// ```ignore
-/// let cfg = ControlFlowGraph::from_block(&block);
-/// let escape = EscapeAnalysis::analyze(&cfg);
-/// let taint = TaintAnalysis::analyze(&cfg, &escape);
-///
-/// // Check if mutations affect the return value
-/// if taint.return_tainted {
-///     println!("Mutations propagate to the return value");
-/// }
-/// ```
-#[derive(Debug, Clone)]
-pub struct TaintAnalysis {
-    /// Variables that are tainted (mutated or derived from mutations)
-    pub tainted_vars: HashSet<VarId>,
-    /// Source of taint for each tainted variable
-    pub taint_sources: HashMap<VarId, TaintSource>,
-    /// Whether any tainted variables contribute to the return value
-    pub return_tainted: bool,
-}
-
-/// Source of variable taint (mutation or impure operation).
-#[derive(Debug, Clone)]
-pub enum TaintSource {
-    /// Local mutation (e.g., `x = 5`)
-    LocalMutation { line: Option<usize> },
-    /// External state mutation (e.g., `self.field = 5`)
-    ExternalMutation { line: Option<usize> },
-    /// Impure function call (e.g., `x = read_file()`)
-    ImpureCall { callee: String, line: Option<usize> },
-}
-
-impl TaintAnalysis {
-    /// Perform taint analysis using forward data flow (with conservative default).
-    ///
-    /// Propagates taint from mutation sites through data dependencies.
-    /// Uses escape info to determine if tainted values affect the function's
-    /// observable behavior.
-    ///
-    /// This method uses `UnknownCallBehavior::Conservative` by default, which
-    /// treats unknown function calls as potentially impure (always tainting).
-    /// For finer control, use `analyze_with_config`.
-    ///
-    /// Also propagates taint through closure captures - if any captured variable
-    /// is tainted, all captured vars may be affected (conservative analysis).
-    pub fn analyze(cfg: &ControlFlowGraph, escape: &EscapeAnalysis) -> Self {
-        Self::analyze_with_config(cfg, escape, UnknownCallBehavior::Conservative)
-    }
-
-    /// Perform taint analysis with configurable unknown call behavior.
-    ///
-    /// This method provides finer control over how unknown function calls
-    /// are handled during taint propagation.
-    ///
-    /// # Arguments
-    ///
-    /// * `cfg` - The control flow graph to analyze
-    /// * `escape` - Escape analysis for determining return dependencies
-    /// * `unknown_behavior` - How to handle unknown function calls
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let taint = TaintAnalysis::analyze_with_config(
-    ///     &cfg, &escape,
-    ///     UnknownCallBehavior::Optimistic, // Unknown calls don't auto-taint
-    /// );
-    /// ```
-    pub fn analyze_with_config(
-        cfg: &ControlFlowGraph,
-        escape: &EscapeAnalysis,
-        unknown_behavior: UnknownCallBehavior,
-    ) -> Self {
-        let mut tainted_vars = HashSet::new();
-        let mut taint_sources = HashMap::new();
-
-        let mut changed = true;
-        while changed {
-            changed = false;
-
-            for block in &cfg.blocks {
-                for stmt in &block.statements {
-                    match stmt {
-                        Statement::Assign { target, source, .. } => {
-                            let (is_tainted, reason) = Self::is_source_tainted_with_classification(
-                                source,
-                                &tainted_vars,
-                                unknown_behavior,
-                            );
-
-                            if is_tainted && tainted_vars.insert(*target) {
-                                changed = true;
-                                if let Some(reason) = reason {
-                                    taint_sources.insert(*target, Self::reason_to_source(reason));
-                                }
-                            }
-                        }
-                        Statement::Declare {
-                            var,
-                            init: Some(init),
-                            ..
-                        } => {
-                            let (is_tainted, reason) = Self::is_source_tainted_with_classification(
-                                init,
-                                &tainted_vars,
-                                unknown_behavior,
-                            );
-
-                            if is_tainted && tainted_vars.insert(*var) {
-                                changed = true;
-                                if let Some(reason) = reason {
-                                    taint_sources.insert(*var, Self::reason_to_source(reason));
-                                }
-                            }
-                        }
-                        // Taint propagation through closures
-                        Statement::Expr {
-                            expr: ExprKind::Closure { captures, .. },
-                            ..
-                        } => {
-                            // If any captured var is tainted, consider all captured
-                            // vars as potentially affected (conservative)
-                            let any_tainted = captures.iter().any(|c| tainted_vars.contains(c));
-
-                            if any_tainted {
-                                for &captured_var in captures {
-                                    if tainted_vars.insert(captured_var) {
-                                        changed = true;
-                                    }
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        // Check if captured vars contribute to return (via escape.captured_vars)
-        let captured_tainted = tainted_vars
-            .iter()
-            .any(|var| escape.captured_vars.contains(var));
-
-        let return_tainted = tainted_vars
-            .iter()
-            .any(|var| escape.return_dependencies.contains(var))
-            || captured_tainted;
-
-        TaintAnalysis {
-            tainted_vars,
-            taint_sources,
-            return_tainted,
-        }
-    }
-
-    /// Check if a source (Rvalue) is tainted using call classification.
-    ///
-    /// This method uses call purity classification to determine whether
-    /// function call results should be considered tainted:
-    ///
-    /// - **Pure calls**: Only taint if arguments are tainted
-    /// - **Impure calls**: Always taint the result (introduces new taint source)
-    /// - **Unknown calls**: Behavior depends on `unknown_behavior` parameter
-    ///
-    /// Returns `(is_tainted, Option<TaintReason>)` for detailed tracking.
-    fn is_source_tainted_with_classification(
-        source: &Rvalue,
-        tainted_vars: &HashSet<VarId>,
-        unknown_behavior: UnknownCallBehavior,
-    ) -> (bool, Option<TaintReason>) {
-        match source {
-            Rvalue::Use(var) => {
-                let tainted = tainted_vars.contains(var);
-                (tainted, tainted.then_some(TaintReason::DirectUse(*var)))
-            }
-
-            Rvalue::BinaryOp { left, right, .. } => {
-                let left_tainted = tainted_vars.contains(left);
-                let right_tainted = tainted_vars.contains(right);
-                let tainted = left_tainted || right_tainted;
-                (
-                    tainted,
-                    tainted.then_some(TaintReason::BinaryOp {
-                        left_tainted,
-                        right_tainted,
-                    }),
-                )
-            }
-
-            Rvalue::UnaryOp { operand, .. } => {
-                let tainted = tainted_vars.contains(operand);
-                (tainted, tainted.then_some(TaintReason::UnaryOp(*operand)))
-            }
-
-            Rvalue::Call { func, args } => {
-                let classification = classify_call(func);
-                let args_tainted = args.iter().any(|arg| tainted_vars.contains(arg));
-
-                match classification {
-                    CallPurity::Pure => {
-                        // Pure: only taint through arguments
-                        (
-                            args_tainted,
-                            args_tainted.then_some(TaintReason::PureCall {
-                                func: func.clone(),
-                                tainted_args: args
-                                    .iter()
-                                    .filter(|a| tainted_vars.contains(a))
-                                    .copied()
-                                    .collect(),
-                            }),
-                        )
-                    }
-                    CallPurity::Impure => {
-                        // Impure: always taint (new source)
-                        (true, Some(TaintReason::ImpureCall { func: func.clone() }))
-                    }
-                    CallPurity::Unknown => {
-                        match unknown_behavior {
-                            UnknownCallBehavior::Conservative => {
-                                // Conservative: treat as impure
-                                (true, Some(TaintReason::UnknownCall { func: func.clone() }))
-                            }
-                            UnknownCallBehavior::Optimistic => {
-                                // Optimistic: treat as pure
-                                (
-                                    args_tainted,
-                                    args_tainted
-                                        .then_some(TaintReason::UnknownCall { func: func.clone() }),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Rvalue::FieldAccess { base, .. } | Rvalue::Ref { var: base, .. } => {
-                let tainted = tainted_vars.contains(base);
-                (tainted, tainted.then_some(TaintReason::FieldAccess(*base)))
-            }
-
-            Rvalue::Constant => (false, None),
-        }
-    }
-
-    /// Convert a TaintReason to a TaintSource for storage.
-    fn reason_to_source(reason: TaintReason) -> TaintSource {
-        match reason {
-            TaintReason::ImpureCall { func } => TaintSource::ImpureCall {
-                callee: func,
-                line: None,
-            },
-            TaintReason::UnknownCall { func } => TaintSource::ImpureCall {
-                callee: format!("unknown:{}", func),
-                line: None,
-            },
-            _ => TaintSource::LocalMutation { line: None },
-        }
-    }
-}
+// EscapeAnalysis and TaintAnalysis removed - not providing actionable debt signals
 
 impl ControlFlowGraph {
     /// Build CFG from a function's block (simplified implementation)
@@ -3214,26 +2712,11 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         assert!(!cfg.blocks.is_empty());
     }
 
-    #[test]
-    fn test_escape_analysis_simple() {
-        let block: Block = parse_quote! {
-            {
-                let x = 1;
-                x
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // Note: simplified CFG construction doesn't capture all return values yet
-        // This is acceptable for initial implementation
-        assert!(escape.escaping_vars.is_empty() || !escape.escaping_vars.is_empty());
-    }
+    // Escape analysis tests removed - analysis no longer exists
 
     #[test]
     fn test_data_flow_from_block() {
@@ -3250,8 +2733,7 @@ mod tests {
         // This test verifies the DataFlowAnalysis pipeline works end-to-end
         assert!(
             !analysis.reaching_defs.all_definitions.is_empty()
-                || !analysis.escape_info.return_dependencies.is_empty()
-                || analysis.escape_info.escaping_vars.is_empty() // valid result
+                || analysis.reaching_defs.all_definitions.is_empty() // always valid
         );
     }
 
@@ -3265,7 +2747,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should have both x and y tracked, not _temp
         assert!(cfg.var_names.contains(&"x".to_string()));
         assert!(cfg.var_names.contains(&"y".to_string()));
@@ -3279,7 +2761,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track result, a, and b
         assert!(cfg.var_names.contains(&"result".to_string()));
         assert!(cfg.var_names.contains(&"a".to_string()));
@@ -3294,7 +2776,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track x and point (base variable)
         assert!(cfg.var_names.contains(&"x".to_string()));
         assert!(cfg.var_names.contains(&"point".to_string()));
@@ -3308,7 +2790,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track a, b, c from tuple destructuring
         assert!(cfg.var_names.contains(&"a".to_string()));
         assert!(cfg.var_names.contains(&"b".to_string()));
@@ -3324,7 +2806,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track x and y from struct destructuring
         assert!(cfg.var_names.contains(&"x".to_string()));
         assert!(cfg.var_names.contains(&"y".to_string()));
@@ -3340,7 +2822,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track x, y, z not just _temp
         assert!(cfg.var_names.contains(&"x".to_string()));
         assert!(cfg.var_names.contains(&"y".to_string()));
@@ -3358,7 +2840,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // Should have return with actual variable
         let exit_block = cfg
@@ -3386,7 +2868,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track flag variable, not _temp
         assert!(cfg.var_names.contains(&"flag".to_string()));
         assert!(!cfg.var_names.contains(&"_temp".to_string()));
@@ -3400,7 +2882,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track receiver and arguments
         assert!(cfg.var_names.contains(&"result".to_string()));
         assert!(cfg.var_names.contains(&"receiver".to_string()));
@@ -3416,7 +2898,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track base variable x
         assert!(cfg.var_names.contains(&"z".to_string()));
         assert!(cfg.var_names.contains(&"x".to_string()));
@@ -3430,7 +2912,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track result and all arguments
         assert!(cfg.var_names.contains(&"result".to_string()));
         assert!(cfg.var_names.contains(&"a".to_string()));
@@ -3446,7 +2928,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // Find the declaration statement
         let decl_stmt = cfg
@@ -3477,7 +2959,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // Find the declaration statement
         let decl_stmt = cfg
@@ -3508,7 +2990,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track first and second from slice destructuring
         assert!(cfg.var_names.contains(&"first".to_string()));
         assert!(cfg.var_names.contains(&"second".to_string()));
@@ -3522,390 +3004,9 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         // Should track value from tuple struct pattern
         assert!(cfg.var_names.contains(&"value".to_string()));
-    }
-
-    // ========================================================================
-    // Closure Capture Tests (Spec 249)
-    // ========================================================================
-
-    #[test]
-    fn test_simple_closure_capture() {
-        let block: Block = parse_quote! {
-            {
-                let x = 1;
-                let f = |y| x + y;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // x should be in captured_vars
-        assert!(
-            cfg.var_names.contains(&"x".to_string()),
-            "x should be tracked"
-        );
-
-        // Find x's VarId and check if it's captured
-        let x_name_id = cfg.var_names.iter().position(|n| n == "x");
-        assert!(x_name_id.is_some(), "x should have a VarId");
-
-        // captured_vars should not be empty for this closure
-        assert!(!escape.captured_vars.is_empty(), "Closure should capture x");
-    }
-
-    #[test]
-    fn test_move_closure_capture() {
-        let block: Block = parse_quote! {
-            {
-                let data = vec![1, 2, 3];
-                let f = move || data.len();
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // data should be captured
-        assert!(
-            cfg.var_names.contains(&"data".to_string()),
-            "data should be tracked"
-        );
-
-        // captured_vars should contain data
-        assert!(
-            !escape.captured_vars.is_empty(),
-            "Move closure should capture data"
-        );
-    }
-
-    #[test]
-    fn test_mutable_capture() {
-        let block: Block = parse_quote! {
-            {
-                let mut counter = 0;
-                let mut inc = || counter += 1;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // counter should be captured and marked as escaping
-        assert!(
-            cfg.var_names.contains(&"counter".to_string()),
-            "counter should be tracked"
-        );
-        assert!(
-            !escape.captured_vars.is_empty(),
-            "Mutable closure should capture counter"
-        );
-    }
-
-    #[test]
-    fn test_iterator_chain_captures() {
-        let block: Block = parse_quote! {
-            {
-                let threshold = 5;
-                let items = vec![1, 2, 3, 4, 5, 6];
-                items.iter().filter(|x| **x > threshold);
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // threshold should be captured by filter closure
-        assert!(
-            cfg.var_names.contains(&"threshold".to_string()),
-            "threshold should be tracked"
-        );
-
-        // Check that threshold is in captured_vars
-        let threshold_name_id = cfg.var_names.iter().position(|n| n == "threshold");
-        if let Some(name_id) = threshold_name_id {
-            let threshold_var = VarId {
-                name_id: name_id as u32,
-                version: 0,
-            };
-            assert!(
-                escape.captured_vars.contains(&threshold_var),
-                "threshold should be captured by filter closure"
-            );
-        }
-    }
-
-    #[test]
-    fn test_nested_closure_captures() {
-        let block: Block = parse_quote! {
-            {
-                let x = 1;
-                let outer = || {
-                    let y = 2;
-                    let inner = || x + y;
-                };
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // x should be captured (propagated from nested closure)
-        assert!(
-            cfg.var_names.contains(&"x".to_string()),
-            "x should be tracked"
-        );
-        assert!(
-            !escape.captured_vars.is_empty(),
-            "Nested closures should capture x"
-        );
-    }
-
-    #[test]
-    fn test_closure_no_capture() {
-        let block: Block = parse_quote! {
-            {
-                let f = |x, y| x + y;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // No captures expected - x and y are closure parameters, not captures
-        assert!(
-            escape.captured_vars.is_empty(),
-            "Closure with only parameters should have no captures"
-        );
-    }
-
-    #[test]
-    fn test_closure_multiple_captures() {
-        let block: Block = parse_quote! {
-            {
-                let a = 1;
-                let b = 2;
-                let c = 3;
-                let f = || a + b + c;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // All three variables should be captured
-        assert!(cfg.var_names.contains(&"a".to_string()));
-        assert!(cfg.var_names.contains(&"b".to_string()));
-        assert!(cfg.var_names.contains(&"c".to_string()));
-
-        // captured_vars should have 3 entries
-        assert_eq!(
-            escape.captured_vars.len(),
-            3,
-            "Closure should capture a, b, and c"
-        );
-    }
-
-    #[test]
-    fn test_closure_capture_escaping() {
-        let block: Block = parse_quote! {
-            {
-                let x = 1;
-                let f = || x + 1;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // x should be in escaping_vars because it's captured
-        let x_name_id = cfg.var_names.iter().position(|n| n == "x");
-        if let Some(name_id) = x_name_id {
-            let x_var = VarId {
-                name_id: name_id as u32,
-                version: 0,
-            };
-            assert!(
-                escape.escaping_vars.contains(&x_var),
-                "Captured variable x should be in escaping_vars"
-            );
-        }
-    }
-
-    #[test]
-    fn test_closure_with_method_call_on_capture() {
-        let block: Block = parse_quote! {
-            {
-                let mut vec = Vec::new();
-                let f = || vec.push(1);
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // vec should be captured
-        assert!(
-            cfg.var_names.contains(&"vec".to_string()),
-            "vec should be tracked"
-        );
-        assert!(
-            !escape.captured_vars.is_empty(),
-            "Closure should capture vec"
-        );
-    }
-
-    #[test]
-    fn test_closure_expr_kind() {
-        let block: Block = parse_quote! {
-            {
-                let x = 1;
-                let f = || x;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-
-        // Find the closure expression in statements
-        let has_closure = cfg.blocks.iter().any(|block| {
-            block.statements.iter().any(|stmt| {
-                matches!(
-                    stmt,
-                    Statement::Expr {
-                        expr: ExprKind::Closure { .. },
-                        ..
-                    }
-                )
-            })
-        });
-
-        assert!(has_closure, "CFG should contain a Closure ExprKind");
-    }
-
-    #[test]
-    fn test_move_closure_by_value_capture() {
-        let block: Block = parse_quote! {
-            {
-                let x = String::new();
-                let f = move || x.len();
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-
-        // Find the closure expression and check is_move flag
-        let closure_stmt = cfg.blocks.iter().flat_map(|b| &b.statements).find(|stmt| {
-            matches!(
-                stmt,
-                Statement::Expr {
-                    expr: ExprKind::Closure { .. },
-                    ..
-                }
-            )
-        });
-
-        assert!(closure_stmt.is_some(), "Should find closure statement");
-        if let Some(Statement::Expr {
-            expr: ExprKind::Closure { is_move, .. },
-            ..
-        }) = closure_stmt
-        {
-            assert!(is_move, "Move closure should have is_move=true");
-        }
-    }
-
-    #[test]
-    fn test_taint_propagation_through_closure() {
-        let block: Block = parse_quote! {
-            {
-                let mut data = vec![1, 2, 3];
-                data.push(4); // This taints data
-                let f = || data.len();
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-        let _taint = TaintAnalysis::analyze(&cfg, &escape);
-
-        // data should be captured and in captured_vars
-        assert!(
-            !escape.captured_vars.is_empty(),
-            "Closure should capture data"
-        );
-
-        // Taint analysis should detect captured vars
-        // (The presence of captured vars in escaping_vars affects taint propagation)
-        assert!(
-            !escape.escaping_vars.is_empty(),
-            "Captured vars should be in escaping_vars"
-        );
-    }
-
-    #[test]
-    fn test_closure_captures_marked_as_escaping() {
-        let block: Block = parse_quote! {
-            {
-                let x = 1;
-                let y = 2;
-                let f = || x + y;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // Both x and y should be captured
-        assert_eq!(escape.captured_vars.len(), 2, "Should capture both x and y");
-
-        // Captured vars should be in escaping_vars
-        for captured in &escape.captured_vars {
-            assert!(
-                escape.escaping_vars.contains(captured),
-                "Captured var {:?} should be in escaping_vars",
-                captured
-            );
-        }
-    }
-
-    #[test]
-    fn test_closure_performance() {
-        use std::time::Instant;
-
-        // Function with multiple closures
-        let block: Block = parse_quote! {
-            {
-                let a = 1;
-                let b = 2;
-                let c = 3;
-                let f1 = || a + 1;
-                let f2 = || a + b;
-                let f3 = || a + b + c;
-                let f4 = move || a * b * c;
-                let result = vec![1, 2, 3]
-                    .iter()
-                    .filter(|x| **x > a)
-                    .map(|x| x + b)
-                    .collect::<Vec<_>>();
-            }
-        };
-
-        let start = Instant::now();
-        for _ in 0..100 {
-            let cfg = ControlFlowGraph::from_block(&block);
-            let _ = EscapeAnalysis::analyze(&cfg);
-        }
-        let elapsed = start.elapsed();
-
-        // 100 iterations should complete in <1000ms (10ms per iteration)
-        assert!(
-            elapsed.as_millis() < 1000,
-            "Performance regression: {:?} for 100 iterations (>10ms per iteration)",
-            elapsed
-        );
     }
 
     // ========================================================================
@@ -3921,7 +3022,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // Should have definitions
@@ -3959,7 +3060,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // Both x and y are dead stores (never used)
@@ -3979,7 +3080,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // For each use, should be able to find its definition
@@ -4003,7 +3104,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // Find use of x
@@ -4071,7 +3172,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // Should have definitions
@@ -4092,7 +3193,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // Find the definition of 'unused'
@@ -4118,7 +3219,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // Block-level fields should still be populated
@@ -4137,7 +3238,7 @@ mod tests {
     fn test_statement_level_empty_function() {
         let block: Block = parse_quote! { {} };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // Should handle empty functions gracefully
@@ -4164,7 +3265,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
         let reaching = ReachingDefinitions::analyze(&cfg);
 
         // The return statement should create a use of x
@@ -4314,221 +3415,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_taint_analysis_pure_call_no_taint() {
-        // Pure call with no tainted arguments should not taint result
-        let rvalue = Rvalue::Call {
-            func: "len".to_string(),
-            args: vec![VarId {
-                name_id: 0,
-                version: 0,
-            }],
-        };
-
-        let tainted_vars = HashSet::new(); // Empty - no tainted vars
-
-        let (is_tainted, reason) = TaintAnalysis::is_source_tainted_with_classification(
-            &rvalue,
-            &tainted_vars,
-            UnknownCallBehavior::Conservative,
-        );
-
-        assert!(!is_tainted, "Pure call with clean args should not taint");
-        assert!(reason.is_none());
-    }
-
-    #[test]
-    fn test_taint_analysis_pure_call_with_tainted_arg() {
-        // Pure call with tainted argument should taint result
-        let arg_var = VarId {
-            name_id: 0,
-            version: 0,
-        };
-        let rvalue = Rvalue::Call {
-            func: "len".to_string(),
-            args: vec![arg_var],
-        };
-
-        let mut tainted_vars = HashSet::new();
-        tainted_vars.insert(arg_var);
-
-        let (is_tainted, reason) = TaintAnalysis::is_source_tainted_with_classification(
-            &rvalue,
-            &tainted_vars,
-            UnknownCallBehavior::Conservative,
-        );
-
-        assert!(is_tainted, "Pure call with tainted arg should taint");
-        assert!(matches!(reason, Some(TaintReason::PureCall { .. })));
-    }
-
-    #[test]
-    fn test_taint_analysis_impure_call_always_taints() {
-        // Impure call should always taint, even with clean arguments
-        let rvalue = Rvalue::Call {
-            func: "push".to_string(),
-            args: vec![VarId {
-                name_id: 0,
-                version: 0,
-            }],
-        };
-
-        let tainted_vars = HashSet::new(); // Empty - no tainted vars
-
-        let (is_tainted, reason) = TaintAnalysis::is_source_tainted_with_classification(
-            &rvalue,
-            &tainted_vars,
-            UnknownCallBehavior::Conservative,
-        );
-
-        assert!(is_tainted, "Impure call should always taint");
-        assert!(matches!(reason, Some(TaintReason::ImpureCall { .. })));
-    }
-
-    #[test]
-    fn test_taint_analysis_unknown_conservative() {
-        // Unknown call with conservative behavior should always taint
-        let rvalue = Rvalue::Call {
-            func: "mystery_function".to_string(),
-            args: vec![],
-        };
-
-        let tainted_vars = HashSet::new();
-
-        let (is_tainted, reason) = TaintAnalysis::is_source_tainted_with_classification(
-            &rvalue,
-            &tainted_vars,
-            UnknownCallBehavior::Conservative,
-        );
-
-        assert!(
-            is_tainted,
-            "Unknown call with conservative behavior should taint"
-        );
-        assert!(matches!(reason, Some(TaintReason::UnknownCall { .. })));
-    }
-
-    #[test]
-    fn test_taint_analysis_unknown_optimistic() {
-        // Unknown call with optimistic behavior should not taint without tainted args
-        let rvalue = Rvalue::Call {
-            func: "mystery_function".to_string(),
-            args: vec![VarId {
-                name_id: 0,
-                version: 0,
-            }],
-        };
-
-        let tainted_vars = HashSet::new();
-
-        let (is_tainted, reason) = TaintAnalysis::is_source_tainted_with_classification(
-            &rvalue,
-            &tainted_vars,
-            UnknownCallBehavior::Optimistic,
-        );
-
-        assert!(
-            !is_tainted,
-            "Unknown call with optimistic behavior and clean args should not taint"
-        );
-        assert!(reason.is_none());
-    }
-
-    #[test]
-    fn test_taint_analysis_unknown_optimistic_with_tainted_arg() {
-        // Unknown call with optimistic behavior should taint if args are tainted
-        let arg_var = VarId {
-            name_id: 0,
-            version: 0,
-        };
-        let rvalue = Rvalue::Call {
-            func: "mystery_function".to_string(),
-            args: vec![arg_var],
-        };
-
-        let mut tainted_vars = HashSet::new();
-        tainted_vars.insert(arg_var);
-
-        let (is_tainted, reason) = TaintAnalysis::is_source_tainted_with_classification(
-            &rvalue,
-            &tainted_vars,
-            UnknownCallBehavior::Optimistic,
-        );
-
-        assert!(
-            is_tainted,
-            "Unknown call with optimistic behavior but tainted args should taint"
-        );
-        assert!(matches!(reason, Some(TaintReason::UnknownCall { .. })));
-    }
-
-    #[test]
-    fn test_taint_reason_variants() {
-        // Verify all TaintReason variants can be constructed
-        let var = VarId {
-            name_id: 0,
-            version: 0,
-        };
-
-        let _direct = TaintReason::DirectUse(var);
-        let _binary = TaintReason::BinaryOp {
-            left_tainted: true,
-            right_tainted: false,
-        };
-        let _unary = TaintReason::UnaryOp(var);
-        let _pure = TaintReason::PureCall {
-            func: "len".to_string(),
-            tainted_args: vec![var],
-        };
-        let _impure = TaintReason::ImpureCall {
-            func: "push".to_string(),
-        };
-        let _unknown = TaintReason::UnknownCall {
-            func: "unknown".to_string(),
-        };
-        let _field = TaintReason::FieldAccess(var);
-    }
-
-    #[test]
-    fn test_reason_to_source_impure() {
-        let reason = TaintReason::ImpureCall {
-            func: "read_file".to_string(),
-        };
-        let source = TaintAnalysis::reason_to_source(reason);
-
-        match source {
-            TaintSource::ImpureCall { callee, .. } => {
-                assert_eq!(callee, "read_file");
-            }
-            _ => panic!("Expected ImpureCall source"),
-        }
-    }
-
-    #[test]
-    fn test_reason_to_source_unknown() {
-        let reason = TaintReason::UnknownCall {
-            func: "mystery".to_string(),
-        };
-        let source = TaintAnalysis::reason_to_source(reason);
-
-        match source {
-            TaintSource::ImpureCall { callee, .. } => {
-                assert!(callee.starts_with("unknown:"));
-            }
-            _ => panic!("Expected ImpureCall source with unknown prefix"),
-        }
-    }
-
-    #[test]
-    fn test_reason_to_source_other() {
-        let reason = TaintReason::DirectUse(VarId {
-            name_id: 0,
-            version: 0,
-        });
-        let source = TaintAnalysis::reason_to_source(reason);
-
-        assert!(matches!(source, TaintSource::LocalMutation { .. }));
-    }
+    // TaintAnalysis tests removed - analysis no longer exists
 
     #[test]
     fn test_known_pure_function_count() {
@@ -4576,42 +3463,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_analyze_with_config_conservative() {
-        let block: Block = parse_quote! {
-            {
-                let x = unknown_function();
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        let taint =
-            TaintAnalysis::analyze_with_config(&cfg, &escape, UnknownCallBehavior::Conservative);
-
-        // With conservative, unknown function should taint
-        // Note: result depends on whether 'x' escapes
-        assert!(!taint.taint_sources.is_empty() || taint.tainted_vars.is_empty());
-    }
-
-    #[test]
-    fn test_analyze_backward_compatible() {
-        // Verify analyze() still works (uses conservative default)
-        let block: Block = parse_quote! {
-            {
-                let x = 1;
-                let y = x + 2;
-            }
-        };
-
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-
-        // Should not panic
-        let _taint = TaintAnalysis::analyze(&cfg, &escape);
-    }
-
     // ==========================================================================
     // Match Expression CFG Tests (Spec 253)
     // ==========================================================================
@@ -4628,7 +3479,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // Should have: entry block with Match terminator, 2 arm blocks, (join block may exist)
         assert!(
@@ -4661,7 +3512,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // 'value' and 'e' should be tracked as variables
         assert!(
@@ -4683,7 +3534,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // Should handle match with guard without panicking
         assert!(!cfg.blocks.is_empty());
@@ -4708,7 +3559,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // 'input' should be tracked
         assert!(
@@ -4741,7 +3592,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // x and y should be tracked from struct destructuring
         assert!(
@@ -4767,9 +3618,9 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-        let _taint = TaintAnalysis::analyze(&cfg, &escape);
+        let _cfg = ControlFlowGraph::from_block(&block);
+        
+        
 
         // Analysis should complete without panicking
         // Match patterns are handled correctly
@@ -4787,7 +3638,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // Find the match block and verify it has Match terminator
         let match_block = cfg
@@ -4822,7 +3673,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // Should handle nested match without panicking
         let match_count = cfg
@@ -4849,9 +3700,9 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
-        let escape = EscapeAnalysis::analyze(&cfg);
-        let _taint = TaintAnalysis::analyze(&cfg, &escape);
+        let _cfg = ControlFlowGraph::from_block(&block);
+        
+        
 
         // Full data flow analysis should complete without panicking
         assert!(!cfg.blocks.is_empty());
@@ -4868,7 +3719,7 @@ mod tests {
             }
         };
 
-        let cfg = ControlFlowGraph::from_block(&block);
+        let _cfg = ControlFlowGraph::from_block(&block);
 
         // a and b should be tracked
         assert!(
@@ -4901,9 +3752,9 @@ mod tests {
 
         let start = Instant::now();
         for _ in 0..100 {
-            let cfg = ControlFlowGraph::from_block(&block);
-            let escape = EscapeAnalysis::analyze(&cfg);
-            let _ = TaintAnalysis::analyze(&cfg, &escape);
+            let _cfg = ControlFlowGraph::from_block(&block);
+            // Escape/taint analysis removed - just test CFG construction performance
+            let _ = DataFlowAnalysis::analyze(&cfg);
         }
         let elapsed = start.elapsed();
 

@@ -256,14 +256,10 @@ fn format_data_flow_section(
 
     result.push_str("\n**Data Flow Analysis**\n\n");
 
-    // Mutation analysis (spec 257: binary signals)
+    // Mutation analysis (spec 257: binary signals, escape analysis removed)
     if let Some(mutation_info) = data_flow.get_mutation_info(&func_id) {
         let mutation_status = if mutation_info.has_mutations {
-            if mutation_info.has_escaping_mutations {
-                "detected (some may escape)"
-            } else {
-                "detected (local only)"
-            }
+            "detected"
         } else {
             "none detected"
         };
@@ -289,16 +285,7 @@ fn format_data_flow_section(
         }
     }
 
-    // Escape analysis
-    if let Some(cfg_analysis) = data_flow.get_cfg_analysis(&func_id) {
-        let escaping_count = cfg_analysis.escape_info.escaping_vars.len();
-        if escaping_count > 0 {
-            result.push_str(&format!(
-                "- Escaping Variables: {} affecting return value\n",
-                escaping_count
-            ));
-        }
-    }
+    // Escape/taint analysis removed - not providing actionable debt signals
 
     result
 }

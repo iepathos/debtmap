@@ -892,15 +892,7 @@ fn extract_data_flow_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> 
                 "no"
             },
         );
-        add_label_value(
-            &mut output,
-            "escaping",
-            if mutation_info.has_escaping_mutations {
-                "yes"
-            } else {
-                "no"
-            },
-        );
+        // Escape analysis removed - not providing actionable signals
 
         if !mutation_info.detected_mutations.is_empty() {
             add_blank_line(&mut output);
@@ -931,38 +923,7 @@ fn extract_data_flow_text(item: &UnifiedDebtItem, data_flow: &DataFlowGraph) -> 
         }
     }
 
-    // Escape Analysis Section
-    if let Some(cfg_ctx) = data_flow.get_cfg_analysis_with_context(&func_id) {
-        add_section_header(&mut output, "escape analysis");
-
-        let escaping_count = cfg_ctx.analysis.escape_info.escaping_vars.len();
-        add_label_value(&mut output, "escaping", &escaping_count.to_string());
-
-        // Display return dependencies
-        let return_dep_names = data_flow.get_return_dependency_names(&func_id);
-        if !return_dep_names.is_empty() {
-            add_blank_line(&mut output);
-            add_section_header(&mut output, "variables affecting return value");
-            for var_name in &return_dep_names {
-                output.push_str(&format!("                            {}\n", var_name));
-            }
-        }
-
-        // Display tainted variables
-        let tainted_names = data_flow.get_tainted_var_names(&func_id);
-        if !tainted_names.is_empty() && tainted_names.len() < 10 {
-            add_blank_line(&mut output);
-            add_section_header(&mut output, "tainted variables");
-            for var_name in &tainted_names {
-                output.push_str(&format!(
-                    "                            {} (affected by mutations)\n",
-                    var_name
-                ));
-            }
-        }
-
-        add_blank_line(&mut output);
-    }
+    // Escape/taint analysis removed - not providing actionable debt signals
 
     // If no data available
     if output.is_empty() {

@@ -175,12 +175,8 @@ pub struct PurityInfo {
 pub struct MutationInfo {
     /// Whether any mutations were detected in the function
     pub has_mutations: bool,
-    /// Whether any mutations escape the function (affect return or external state)
-    pub has_escaping_mutations: bool,
     /// Best-effort list of detected mutations (may be incomplete)
     pub detected_mutations: Vec<String>,
-    /// Best-effort list of escaping variables (may be incomplete)
-    pub escaping_vars: Vec<String>,
 }
 
 impl MutationInfo {
@@ -188,15 +184,13 @@ impl MutationInfo {
     pub fn none() -> Self {
         Self {
             has_mutations: false,
-            has_escaping_mutations: false,
             detected_mutations: Vec::new(),
-            escaping_vars: Vec::new(),
         }
     }
 
-    /// Check if the function is pure (no mutations and no escaping mutations)
+    /// Check if the function is pure (no mutations)
     pub fn is_pure(&self) -> bool {
-        !self.has_mutations && !self.has_escaping_mutations
+        !self.has_mutations
     }
 }
 
@@ -379,32 +373,7 @@ impl DataFlowGraph {
         self.cfg_analysis_with_context.insert(func_id, context);
     }
 
-    /// Get escaping variable names
-    pub fn get_escaping_var_names(&self, func_id: &FunctionId) -> Vec<String> {
-        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
-            ctx.var_names_for(ctx.analysis.escape_info.escaping_vars.iter().copied())
-        } else {
-            vec![]
-        }
-    }
-
-    /// Get return dependency variable names
-    pub fn get_return_dependency_names(&self, func_id: &FunctionId) -> Vec<String> {
-        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
-            ctx.var_names_for(ctx.analysis.escape_info.return_dependencies.iter().copied())
-        } else {
-            vec![]
-        }
-    }
-
-    /// Get tainted variable names
-    pub fn get_tainted_var_names(&self, func_id: &FunctionId) -> Vec<String> {
-        if let Some(ctx) = self.get_cfg_analysis_with_context(func_id) {
-            ctx.var_names_for(ctx.analysis.taint_info.tainted_vars.iter().copied())
-        } else {
-            vec![]
-        }
-    }
+    // Escape/taint analysis methods removed - not providing actionable debt signals
 
     /// Check if a function has side effects based on data flow analysis
     pub fn has_side_effects(&self, func_id: &FunctionId) -> bool {
@@ -653,26 +622,13 @@ mod tests {
 
     #[test]
     fn test_varid_translation() {
-        use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
-        };
-        use std::collections::HashMap;
+        use crate::analysis::data_flow::{DataFlowAnalysis, ReachingDefinitions, VarId};
 
         let var_names = vec!["x".to_string(), "y".to_string(), "buffer".to_string()];
 
-        // Create minimal analysis
+        // Create minimal analysis (escape/taint analysis removed)
         let analysis = DataFlowAnalysis {
             reaching_defs: ReachingDefinitions::default(),
-            escape_info: EscapeAnalysis {
-                escaping_vars: HashSet::new(),
-                captured_vars: HashSet::new(),
-                return_dependencies: HashSet::new(),
-            },
-            taint_info: TaintAnalysis {
-                tainted_vars: HashSet::new(),
-                taint_sources: HashMap::new(),
-                return_tainted: false,
-            },
         };
 
         let ctx = CfgAnalysisWithContext::new(var_names, analysis);
@@ -692,25 +648,12 @@ mod tests {
 
     #[test]
     fn test_translation_with_missing_id() {
-        use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
-        };
-        use std::collections::HashMap;
+        use crate::analysis::data_flow::{DataFlowAnalysis, ReachingDefinitions, VarId};
 
         let var_names = vec!["x".to_string()];
 
         let analysis = DataFlowAnalysis {
             reaching_defs: ReachingDefinitions::default(),
-            escape_info: EscapeAnalysis {
-                escaping_vars: HashSet::new(),
-                captured_vars: HashSet::new(),
-                return_dependencies: HashSet::new(),
-            },
-            taint_info: TaintAnalysis {
-                tainted_vars: HashSet::new(),
-                taint_sources: HashMap::new(),
-                return_tainted: false,
-            },
         };
 
         let ctx = CfgAnalysisWithContext::new(var_names, analysis);
@@ -722,133 +665,5 @@ mod tests {
         assert_eq!(ctx.var_name(invalid_id), "unknown_999");
     }
 
-    #[test]
-    fn test_escaping_var_translation() {
-        use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
-        };
-        use std::collections::HashMap;
-
-        let mut data_flow = DataFlowGraph::new();
-        let func_id = create_test_function_id("test");
-
-        let mut escaping_vars = HashSet::new();
-        escaping_vars.insert(VarId {
-            name_id: 0,
-            version: 0,
-        });
-
-        let analysis = DataFlowAnalysis {
-            reaching_defs: ReachingDefinitions::default(),
-            escape_info: EscapeAnalysis {
-                escaping_vars,
-                captured_vars: HashSet::new(),
-                return_dependencies: HashSet::new(),
-            },
-            taint_info: TaintAnalysis {
-                tainted_vars: HashSet::new(),
-                taint_sources: HashMap::new(),
-                return_tainted: false,
-            },
-        };
-
-        let ctx = CfgAnalysisWithContext::new(vec!["result".to_string()], analysis);
-
-        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
-
-        let names = data_flow.get_escaping_var_names(&func_id);
-        assert_eq!(names, vec!["result"]);
-    }
-
-    #[test]
-    fn test_return_dependency_translation() {
-        use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
-        };
-        use std::collections::HashMap;
-
-        let mut data_flow = DataFlowGraph::new();
-        let func_id = create_test_function_id("test");
-
-        let mut return_deps = HashSet::new();
-        return_deps.insert(VarId {
-            name_id: 0,
-            version: 0,
-        });
-        return_deps.insert(VarId {
-            name_id: 1,
-            version: 0,
-        });
-
-        let analysis = DataFlowAnalysis {
-            reaching_defs: ReachingDefinitions::default(),
-            escape_info: EscapeAnalysis {
-                escaping_vars: HashSet::new(),
-                captured_vars: HashSet::new(),
-                return_dependencies: return_deps,
-            },
-            taint_info: TaintAnalysis {
-                tainted_vars: HashSet::new(),
-                taint_sources: HashMap::new(),
-                return_tainted: false,
-            },
-        };
-
-        let ctx =
-            CfgAnalysisWithContext::new(vec!["result".to_string(), "buffer".to_string()], analysis);
-
-        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
-
-        let names = data_flow.get_return_dependency_names(&func_id);
-        assert_eq!(names.len(), 2);
-        assert!(names.contains(&"result".to_string()));
-        assert!(names.contains(&"buffer".to_string()));
-    }
-
-    #[test]
-    fn test_tainted_var_translation() {
-        use crate::analysis::data_flow::{
-            DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
-        };
-        use std::collections::HashMap;
-
-        let mut data_flow = DataFlowGraph::new();
-        let func_id = create_test_function_id("test");
-
-        let mut tainted_vars = HashSet::new();
-        tainted_vars.insert(VarId {
-            name_id: 0,
-            version: 0,
-        });
-        tainted_vars.insert(VarId {
-            name_id: 1,
-            version: 1,
-        });
-
-        let analysis = DataFlowAnalysis {
-            reaching_defs: ReachingDefinitions::default(),
-            escape_info: EscapeAnalysis {
-                escaping_vars: HashSet::new(),
-                captured_vars: HashSet::new(),
-                return_dependencies: HashSet::new(),
-            },
-            taint_info: TaintAnalysis {
-                tainted_vars,
-                taint_sources: HashMap::new(),
-                return_tainted: false,
-            },
-        };
-
-        let ctx = CfgAnalysisWithContext::new(
-            vec!["user_input".to_string(), "sanitized".to_string()],
-            analysis,
-        );
-
-        data_flow.set_cfg_analysis_with_context(func_id.clone(), ctx);
-
-        let names = data_flow.get_tainted_var_names(&func_id);
-        assert_eq!(names.len(), 2);
-        assert!(names.contains(&"user_input".to_string()));
-        assert!(names.contains(&"sanitized".to_string()));
-    }
+    // Escape/taint translation tests removed - analysis no longer provides actionable signals
 }
