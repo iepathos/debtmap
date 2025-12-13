@@ -907,13 +907,14 @@ fn test_calculate_purity_factor_strictly_pure() {
         },
     );
 
-    // No mutations
+    // No mutations (spec 257: binary signals)
     data_flow.set_mutation_info(
         func_id.clone(),
         MutationInfo {
-            live_mutations: vec![],
-            total_mutations: 0,
-            escaping_mutations: std::collections::HashSet::new(),
+            has_mutations: false,
+            has_escaping_mutations: false,
+            detected_mutations: vec![],
+            escaping_vars: vec![],
         },
     );
 
@@ -940,13 +941,14 @@ fn test_calculate_purity_factor_locally_pure() {
         },
     );
 
-    // Has local mutations
+    // Has local mutations (spec 257: binary signals)
     data_flow.set_mutation_info(
         func_id.clone(),
         MutationInfo {
-            live_mutations: vec!["local_var".to_string()],
-            total_mutations: 1,
-            escaping_mutations: std::collections::HashSet::new(),
+            has_mutations: true,
+            has_escaping_mutations: false,
+            detected_mutations: vec!["local_var".to_string()],
+            escaping_vars: vec![],
         },
     );
 
@@ -964,12 +966,14 @@ fn test_calculate_refactorability_factor_returns_neutral() {
     let mut data_flow = DataFlowGraph::new();
     let func_id = FunctionId::new(PathBuf::from("test.rs"), "refactorable".to_string(), 30);
 
+    // Spec 257: binary signals - refactorability always returns 1.0
     data_flow.set_mutation_info(
         func_id.clone(),
         MutationInfo {
-            live_mutations: vec!["live1".to_string()],
-            total_mutations: 4,
-            escaping_mutations: std::collections::HashSet::new(),
+            has_mutations: true,
+            has_escaping_mutations: false,
+            detected_mutations: vec!["live1".to_string()],
+            escaping_vars: vec![],
         },
     );
 

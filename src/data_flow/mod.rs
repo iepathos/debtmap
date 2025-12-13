@@ -169,15 +169,35 @@ pub struct PurityInfo {
     pub impurity_reasons: Vec<String>,
 }
 
-/// Mutation analysis information for a function
+/// Mutation analysis information for a function.
+/// Uses binary signals for reliability - precise counts are not guaranteed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutationInfo {
-    /// Mutations detected in the function
-    pub live_mutations: Vec<String>,
-    /// Total number of mutations detected
-    pub total_mutations: usize,
-    /// Escaping mutations (mutations that affect return value)
-    pub escaping_mutations: HashSet<String>,
+    /// Whether any mutations were detected in the function
+    pub has_mutations: bool,
+    /// Whether any mutations escape the function (affect return or external state)
+    pub has_escaping_mutations: bool,
+    /// Best-effort list of detected mutations (may be incomplete)
+    pub detected_mutations: Vec<String>,
+    /// Best-effort list of escaping variables (may be incomplete)
+    pub escaping_vars: Vec<String>,
+}
+
+impl MutationInfo {
+    /// Create a MutationInfo indicating no mutations
+    pub fn none() -> Self {
+        Self {
+            has_mutations: false,
+            has_escaping_mutations: false,
+            detected_mutations: Vec::new(),
+            escaping_vars: Vec::new(),
+        }
+    }
+
+    /// Check if the function is pure (no mutations and no escaping mutations)
+    pub fn is_pure(&self) -> bool {
+        !self.has_mutations && !self.has_escaping_mutations
+    }
 }
 
 /// CFG-based data flow analysis with variable name context for translation.

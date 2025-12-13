@@ -967,14 +967,14 @@ fn generate_data_flow_recommendations(
     if let Some(df) = data_flow {
         let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
-        // Check mutation info for almost-pure functions
+        // Check mutation info for purity-based recommendations (spec 257: binary signals)
         if let Some(mutation_info) = df.get_mutation_info(&func_id) {
-            if mutation_info.live_mutations.len() <= 2 && mutation_info.total_mutations > 2 {
-                recommendations.push(format!(
-                    "Extract pure subset (only {} mutations out of {})",
-                    mutation_info.live_mutations.len(),
-                    mutation_info.total_mutations
-                ));
+            if mutation_info.is_pure() {
+                recommendations
+                    .push("Function is pure - consider extracting as utility".to_string());
+            } else if mutation_info.has_mutations && !mutation_info.has_escaping_mutations {
+                recommendations
+                    .push("Has local mutations only - consider extracting pure subset".to_string());
             }
         }
 

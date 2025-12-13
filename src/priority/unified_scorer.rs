@@ -775,12 +775,12 @@ fn calculate_purity_factor(func_id: &FunctionId, data_flow: &DataFlowGraph) -> f
     // Get I/O operations
     let io_ops = data_flow.get_io_operations(func_id);
 
-    // Classify on purity spectrum
+    // Classify on purity spectrum (spec 257: use binary signals)
     let spectrum = if let Some(purity) = purity_info {
         if purity.is_pure && purity.confidence > 0.8 {
-            // Check if truly pure or just locally pure
+            // Check if truly pure or just locally pure using binary signals
             if let Some(mutations) = mutation_info {
-                if !mutations.live_mutations.is_empty() {
+                if mutations.has_mutations {
                     // Has local mutations but doesn't escape
                     PuritySpectrum::LocallyPure
                 } else {

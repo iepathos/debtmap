@@ -127,35 +127,31 @@ pub fn populate_from_purity_analysis(
         data_flow.set_cfg_analysis_with_context(func_id.clone(), context);
     }
 
-    // Extract mutation information
-    let live_mutations: Vec<String> = purity
+    // Extract mutation information using binary signals (spec 257)
+    let detected_mutations: Vec<String> = purity
         .live_mutations
         .iter()
         .map(|m| m.target.clone())
         .collect();
 
+    let escaping_vars: Vec<String> = extract_escaping_vars(data_flow, func_id);
+
     let mutation_info = MutationInfo {
-        live_mutations: live_mutations.clone(),
-        total_mutations: purity.total_mutations,
-        escaping_mutations: extract_escaping_mutations(purity, data_flow, func_id),
+        has_mutations: !detected_mutations.is_empty() || purity.total_mutations > 0,
+        has_escaping_mutations: !escaping_vars.is_empty(),
+        detected_mutations,
+        escaping_vars,
     };
 
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
 }
 
-/// Extract escaping mutations from purity analysis
+/// Extract escaping variables from data flow analysis
 ///
-/// Now uses the stored CfgAnalysisWithContext to translate VarIds to variable names.
-fn extract_escaping_mutations(
-    _purity: &PurityAnalysis,
-    data_flow: &DataFlowGraph,
-    func_id: &FunctionId,
-) -> HashSet<String> {
+/// Uses the stored CfgAnalysisWithContext to translate VarIds to variable names.
+fn extract_escaping_vars(data_flow: &DataFlowGraph, func_id: &FunctionId) -> Vec<String> {
     // Use the translation layer to get escaping variable names
-    data_flow
-        .get_escaping_var_names(func_id)
-        .into_iter()
-        .collect()
+    data_flow.get_escaping_var_names(func_id)
 }
 
 /// Populate I/O operations from function metrics using AST-based detection
@@ -480,14 +476,14 @@ mod tests {
         // Verify CFG analysis was stored
         assert!(data_flow.get_cfg_analysis(&func_id).is_some());
 
-        // Verify mutation info was stored
+        // Verify mutation info was stored with binary signals (spec 257)
         let mutation_info = data_flow.get_mutation_info(&func_id).unwrap();
-        assert_eq!(mutation_info.live_mutations.len(), 1);
-        assert_eq!(mutation_info.total_mutations, 2);
+        assert!(mutation_info.has_mutations);
+        assert_eq!(mutation_info.detected_mutations.len(), 1);
     }
 
     #[test]
-    fn test_extract_escaping_mutations() {
+    fn test_extract_escaping_vars() {
         let mut data_flow = DataFlowGraph::new();
         let func_id = create_test_function_id("test_func");
         let purity = create_test_purity_analysis();
@@ -495,7 +491,7 @@ mod tests {
         // Populate data flow first so we have the context
         populate_from_purity_analysis(&mut data_flow, &func_id, &purity);
 
-        let escaping = extract_escaping_mutations(&purity, &data_flow, &func_id);
+        let escaping = extract_escaping_vars(&data_flow, &func_id);
 
         // Should return empty since test analysis has no escaping vars
         assert!(escaping.is_empty());
