@@ -3109,7 +3109,8 @@ mod tests {
 
         // Find use of x
         let x_use = reaching.all_uses.iter().find(|u| {
-            graph.var_names
+            graph
+                .var_names
                 .get(u.var.name_id as usize)
                 .is_some_and(|n| n == "x")
         });
@@ -3270,7 +3271,8 @@ mod tests {
 
         // The return statement should create a use of x
         let return_use = reaching.all_uses.iter().any(|u| {
-            graph.var_names
+            graph
+                .var_names
                 .get(u.var.name_id as usize)
                 .is_some_and(|n| n == "x")
         });
@@ -3279,7 +3281,8 @@ mod tests {
 
         // x should not be dead since it's returned
         let x_def = reaching.all_definitions.iter().find(|d| {
-            graph.var_names
+            graph
+                .var_names
                 .get(d.var.name_id as usize)
                 .is_some_and(|n| n == "x")
         });
@@ -3519,7 +3522,10 @@ mod tests {
             graph.var_names.contains(&"value".to_string()),
             "Should track 'value'"
         );
-        assert!(graph.var_names.contains(&"e".to_string()), "Should track 'e'");
+        assert!(
+            graph.var_names.contains(&"e".to_string()),
+            "Should track 'e'"
+        );
     }
 
     #[test]
@@ -3699,8 +3705,6 @@ mod tests {
         };
 
         let graph = ControlFlowGraph::from_block(&block);
-        
-        
 
         // Full data flow analysis should complete without panicking
         assert!(!graph.blocks.is_empty());
