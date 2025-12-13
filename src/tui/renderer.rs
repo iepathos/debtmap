@@ -2,11 +2,13 @@
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
 };
 
+use super::animation::get_bamboo_lines;
 use super::app::{App, StageStatus, SubTask};
 use super::layout::calculate_layout;
 use super::theme::Theme;
@@ -259,16 +261,39 @@ fn render_subtask_line(
     }
 }
 
-/// Render footer statistics bar
+/// Render footer with statistics and animated zen bamboo
 fn render_footer(frame: &mut Frame, app: &App, theme: &Theme, area: ratatui::layout::Rect) {
+    // Get current bamboo animation frame
+    let bamboo_lines = get_bamboo_lines(app.animation_frame);
+    let bamboo_width = 8; // 6 chars + 2 padding
+
+    // Split footer into stats area (left) and bamboo area (right)
+    let footer_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(30),              // Stats (flexible)
+            Constraint::Length(bamboo_width), // Bamboo (fixed width)
+        ])
+        .split(area);
+
+    // Render stats on the left
     let stats = format!(
         "functions {}  │  debt {}  │  coverage {:.1}%",
         format_number(app.functions_count),
         app.debt_count,
         app.coverage_percent
     );
+    frame.render_widget(
+        Paragraph::new(stats).style(theme.metric_style()),
+        footer_chunks[0],
+    );
 
-    frame.render_widget(Paragraph::new(stats).style(theme.metric_style()), area);
+    // Render animated bamboo on the right (zen green)
+    let bamboo_text: Vec<Line> = bamboo_lines
+        .iter()
+        .map(|line| Line::from(Span::styled(*line, Style::default().fg(Color::Green))))
+        .collect();
+    frame.render_widget(Paragraph::new(bamboo_text), footer_chunks[1]);
 }
 
 /// Render a progress bar with gradient characters

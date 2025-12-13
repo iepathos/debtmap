@@ -203,7 +203,11 @@ fn complete_parsing(file_count: usize) {
 /// Extract functions, debt items, and file contexts from metrics.
 fn extract_analysis_data(
     file_metrics: &[FileMetrics],
-) -> (Vec<FunctionMetrics>, Vec<DebtItem>, HashMap<PathBuf, FileContext>) {
+) -> (
+    Vec<FunctionMetrics>,
+    Vec<DebtItem>,
+    HashMap<PathBuf, FileContext>,
+) {
     let all_functions = analysis_utils::extract_all_functions(file_metrics);
     let all_debt_items = analysis_utils::extract_all_debt_items(file_metrics);
     let file_contexts = analysis_utils::extract_file_contexts(file_metrics);

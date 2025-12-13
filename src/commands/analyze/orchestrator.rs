@@ -123,7 +123,10 @@ fn print_empty_results_help(info: &pipeline::EmptyResultsInfo) {
     eprintln!("{}", info.message);
     eprintln!("Try adjusting filters:");
     eprintln!("  - Use --min-score <value> to lower the score threshold");
-    eprintln!("  - Current min_score threshold: {}", info.current_threshold);
+    eprintln!(
+        "  - Current min_score threshold: {}",
+        info.current_threshold
+    );
     eprintln!("  - Use DEBTMAP_MIN_SCORE_THRESHOLD=0 to see all items");
 }
 
@@ -153,7 +156,13 @@ fn output_results(
 fn should_use_tui(config: &AnalyzeConfig) -> bool {
     let is_terminal = std::io::stdout().is_terminal();
     let is_ci = std::env::var("CI").is_ok();
-    pipeline::should_use_tui(config.no_tui, config.format, &config.output, is_terminal, is_ci)
+    pipeline::should_use_tui(
+        config.no_tui,
+        config.format,
+        &config.output,
+        is_terminal,
+        is_ci,
+    )
 }
 
 /// Launch interactive TUI results explorer (I/O).
