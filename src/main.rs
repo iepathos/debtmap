@@ -74,13 +74,18 @@ mod default_implementations {
 
     impl ConfigProvider for DefaultConfigProvider {
         fn get(&self, key: &str) -> Option<String> {
-            let config = self.config.read().unwrap();
-            config.get(key).cloned()
+            // Config access is best-effort - if lock is poisoned, return None
+            self.config
+                .read()
+                .ok()
+                .and_then(|config| config.get(key).cloned())
         }
 
         fn set(&mut self, key: String, value: String) {
-            let mut config = self.config.write().unwrap();
-            config.insert(key, value);
+            // Config set is best-effort - silently fail on poisoned lock
+            if let Ok(mut config) = self.config.write() {
+                config.insert(key, value);
+            }
         }
 
         fn load_from_file(&self, _path: &std::path::Path) -> Result<()> {

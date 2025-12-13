@@ -39,6 +39,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use parking_lot::Mutex;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -49,8 +50,8 @@ use layout::render_adaptive;
 
 /// TUI manager for rendering the analysis progress interface
 pub struct TuiManager {
-    terminal: Arc<std::sync::Mutex<Terminal<CrosstermBackend<io::Stdout>>>>,
-    app: Arc<std::sync::Mutex<App>>,
+    terminal: Arc<Mutex<Terminal<CrosstermBackend<io::Stdout>>>>,
+    app: Arc<Mutex<App>>,
     should_exit: Arc<AtomicBool>,
     render_thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -66,8 +67,8 @@ impl TuiManager {
         let terminal = Terminal::new(backend)?;
 
         let should_exit = Arc::new(AtomicBool::new(false));
-        let terminal = Arc::new(std::sync::Mutex::new(terminal));
-        let app = Arc::new(std::sync::Mutex::new(App::new()));
+        let terminal = Arc::new(Mutex::new(terminal));
+        let app = Arc::new(Mutex::new(App::new()));
 
         // Setup signal handlers for Ctrl+C and Ctrl+Z
         let exit_flag = should_exit.clone();
@@ -117,9 +118,10 @@ impl TuiManager {
                     break;
                 }
 
-                // Render frame
-                if let (Ok(mut terminal), Ok(mut app)) = (render_terminal.lock(), render_app.lock())
+                // Render frame - parking_lot::Mutex::lock() never fails (no poisoning)
                 {
+                    let mut terminal = render_terminal.lock();
+                    let mut app = render_app.lock();
                     app.tick();
                     let _ = terminal.draw(|f| render_adaptive(f, &app));
                 }
@@ -144,12 +146,13 @@ impl TuiManager {
     }
 
     /// Get mutable reference to the application state
-    pub fn app_mut(&mut self) -> std::sync::MutexGuard<'_, App> {
-        self.app.lock().unwrap()
+    /// parking_lot::Mutex::lock() never fails (no poisoning)
+    pub fn app_mut(&mut self) -> parking_lot::MutexGuard<'_, App> {
+        self.app.lock()
     }
 
     /// Get immutable reference to the application state (clone the Arc for read access)
-    pub fn app(&self) -> Arc<std::sync::Mutex<App>> {
+    pub fn app(&self) -> Arc<Mutex<App>> {
         self.app.clone()
     }
 
@@ -167,10 +170,10 @@ impl TuiManager {
         std::thread::sleep(std::time::Duration::from_millis(50));
 
         disable_raw_mode()?;
-        if let Ok(mut terminal) = self.terminal.lock() {
-            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-            terminal.show_cursor()?;
-        }
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        let mut terminal = self.terminal.lock();
+        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+        terminal.show_cursor()?;
         Ok(())
     }
 }

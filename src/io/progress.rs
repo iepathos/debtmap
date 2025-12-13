@@ -17,7 +17,7 @@
 //! ```
 
 use once_cell::sync::Lazy;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 
 /// Global progress tracker instance
@@ -79,7 +79,8 @@ impl AnalysisProgress {
 
     /// Initialize global progress tracker
     pub fn init_global() {
-        *GLOBAL_UNIFIED_PROGRESS.lock().unwrap() = Some(Self::new());
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        *GLOBAL_UNIFIED_PROGRESS.lock() = Some(Self::new());
     }
 
     /// Access global progress tracker with a closure
@@ -87,15 +88,15 @@ impl AnalysisProgress {
     where
         F: FnOnce(&mut AnalysisProgress) -> R,
     {
-        GLOBAL_UNIFIED_PROGRESS
-            .lock()
-            .ok()
-            .and_then(|mut guard| guard.as_mut().map(f))
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        let mut guard = GLOBAL_UNIFIED_PROGRESS.lock();
+        guard.as_mut().map(f)
     }
 
     /// Clear global progress tracker
     pub fn clear_global() {
-        *GLOBAL_UNIFIED_PROGRESS.lock().unwrap() = None;
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        *GLOBAL_UNIFIED_PROGRESS.lock() = None;
     }
 
     /// Start a specific phase (0-indexed)
