@@ -50,6 +50,8 @@
 use crate::config::DebtmapConfig;
 use crate::io::real::{MemoryCache, NoOpCache, RealCoverageLoader, RealFileSystem};
 use crate::io::traits::{Cache, CoverageLoader, FileSystem};
+use crate::progress::traits::{HasProgress, ProgressSink};
+use crate::progress::SilentProgressSink;
 use std::sync::Arc;
 
 /// Environment trait defining all I/O capabilities for analysis operations.
@@ -134,6 +136,7 @@ pub struct RealEnv {
     coverage_loader: Arc<dyn CoverageLoader>,
     cache: Arc<dyn Cache>,
     config: DebtmapConfig,
+    progress: Arc<dyn ProgressSink>,
 }
 
 impl RealEnv {
@@ -143,12 +146,40 @@ impl RealEnv {
     /// - Real file system access
     /// - Real coverage loader (LCOV, etc.)
     /// - In-memory cache (for analysis results)
+    /// - Silent progress sink (default, no output)
+    ///
+    /// For progress reporting, use [`RealEnv::with_progress`] to provide
+    /// a custom progress sink.
     pub fn new(config: DebtmapConfig) -> Self {
         Self {
             file_system: Arc::new(RealFileSystem::new()),
             coverage_loader: Arc::new(RealCoverageLoader::new()),
             cache: Arc::new(MemoryCache::new()),
             config,
+            progress: Arc::new(SilentProgressSink),
+        }
+    }
+
+    /// Create an environment with a custom progress sink.
+    ///
+    /// Use this when you need progress reporting:
+    ///
+    /// ```rust,ignore
+    /// use debtmap::progress::CliProgressSink;
+    ///
+    /// let sink = Arc::new(CliProgressSink::new(false));
+    /// let env = RealEnv::with_progress(config, sink);
+    /// ```
+    ///
+    /// For testing, use [`RecordingProgressSink`](crate::progress::RecordingProgressSink)
+    /// to capture and verify progress events.
+    pub fn with_progress(config: DebtmapConfig, progress: Arc<dyn ProgressSink>) -> Self {
+        Self {
+            file_system: Arc::new(RealFileSystem::new()),
+            coverage_loader: Arc::new(RealCoverageLoader::new()),
+            cache: Arc::new(MemoryCache::new()),
+            config,
+            progress,
         }
     }
 
@@ -161,6 +192,7 @@ impl RealEnv {
             coverage_loader: Arc::new(RealCoverageLoader::new()),
             cache: Arc::new(NoOpCache::new()),
             config,
+            progress: Arc::new(SilentProgressSink),
         }
     }
 
@@ -179,6 +211,27 @@ impl RealEnv {
             coverage_loader,
             cache,
             config,
+            progress: Arc::new(SilentProgressSink),
+        }
+    }
+
+    /// Create an environment with all custom components including progress.
+    ///
+    /// This is the most flexible constructor, allowing customization of
+    /// all environment components.
+    pub fn custom_with_progress(
+        file_system: Arc<dyn FileSystem>,
+        coverage_loader: Arc<dyn CoverageLoader>,
+        cache: Arc<dyn Cache>,
+        config: DebtmapConfig,
+        progress: Arc<dyn ProgressSink>,
+    ) -> Self {
+        Self {
+            file_system,
+            coverage_loader,
+            cache,
+            config,
+            progress,
         }
     }
 
@@ -187,6 +240,13 @@ impl RealEnv {
     /// Returns a new environment with the updated config (immutable pattern).
     pub fn with_config(self, config: DebtmapConfig) -> Self {
         Self { config, ..self }
+    }
+
+    /// Set the progress sink.
+    ///
+    /// Returns a new environment with the updated progress sink (immutable pattern).
+    pub fn set_progress(self, progress: Arc<dyn ProgressSink>) -> Self {
+        Self { progress, ..self }
     }
 }
 
@@ -209,6 +269,12 @@ impl AnalysisEnv for RealEnv {
 
     fn with_config(self, config: DebtmapConfig) -> Self {
         Self { config, ..self }
+    }
+}
+
+impl HasProgress for RealEnv {
+    fn progress(&self) -> &dyn ProgressSink {
+        &*self.progress
     }
 }
 
@@ -315,5 +381,45 @@ mod tests {
         // Both should work independently
         assert!(!env1.file_system().exists(Path::new("/nonexistent")));
         assert!(!env2.file_system().exists(Path::new("/nonexistent")));
+    }
+
+    #[test]
+    fn test_real_env_default_has_silent_progress() {
+        let env = RealEnv::default();
+
+        // Silent progress should not panic on any operation
+        env.progress().start_stage("Test");
+        env.progress().report("Test", 0, 10);
+        env.progress().complete_stage("Test");
+        env.progress().warn("Warning");
+    }
+
+    #[test]
+    fn test_real_env_with_progress() {
+        use crate::progress::RecordingProgressSink;
+
+        let recorder = Arc::new(RecordingProgressSink::new());
+        let env = RealEnv::with_progress(DebtmapConfig::default(), recorder.clone());
+
+        env.progress().start_stage("Analysis");
+        env.progress().report("Analysis", 5, 10);
+        env.progress().complete_stage("Analysis");
+
+        assert_eq!(recorder.stages(), vec!["Analysis"]);
+        assert_eq!(recorder.completed_stages(), vec!["Analysis"]);
+        assert_eq!(recorder.event_count(), 3);
+    }
+
+    #[test]
+    fn test_real_env_set_progress() {
+        use crate::progress::RecordingProgressSink;
+
+        let env = RealEnv::default();
+        let recorder = Arc::new(RecordingProgressSink::new());
+
+        let env = env.set_progress(recorder.clone());
+
+        env.progress().start_stage("Test");
+        assert_eq!(recorder.stages(), vec!["Test"]);
     }
 }
