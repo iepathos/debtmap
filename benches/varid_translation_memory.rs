@@ -3,53 +3,19 @@
 //! Verifies that the translation layer adds <10% memory overhead (NFR1 from spec 247)
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use debtmap::analysis::data_flow::{
-    DataFlowAnalysis, EscapeAnalysis, ReachingDefinitions, TaintAnalysis, VarId,
-};
+use debtmap::analysis::data_flow::{DataFlowAnalysis, ReachingDefinitions, VarId};
 use debtmap::data_flow::{CfgAnalysisWithContext, DataFlowGraph};
 use debtmap::priority::call_graph::FunctionId;
-use std::collections::{HashMap, HashSet};
 use std::hint::black_box;
 use std::mem;
 use std::path::PathBuf;
 
 /// Create a realistic DataFlowAnalysis with the given number of variables
-fn create_analysis(num_vars: usize) -> DataFlowAnalysis {
-    let mut escaping_vars = HashSet::new();
-    let mut return_deps = HashSet::new();
-    let mut tainted_vars = HashSet::new();
-
-    // Create realistic data flow analysis results
-    for i in 0..num_vars {
-        let var_id = VarId {
-            name_id: i as u32,
-            version: 0,
-        };
-
-        // Add to various sets to simulate real analysis
-        if i % 7 == 0 {
-            escaping_vars.insert(var_id);
-        }
-        if i % 11 == 0 {
-            return_deps.insert(var_id);
-        }
-        if i % 13 == 0 {
-            tainted_vars.insert(var_id);
-        }
-    }
-
+fn create_analysis(_num_vars: usize) -> DataFlowAnalysis {
+    // The DataFlowAnalysis now only contains reaching_defs
+    // EscapeAnalysis and TaintAnalysis were removed in a previous spec
     DataFlowAnalysis {
         reaching_defs: ReachingDefinitions::default(),
-        escape_info: EscapeAnalysis {
-            escaping_vars,
-            captured_vars: HashSet::new(),
-            return_dependencies: return_deps,
-        },
-        taint_info: TaintAnalysis {
-            tainted_vars,
-            taint_sources: HashMap::new(),
-            return_tainted: false,
-        },
     }
 }
 
@@ -89,35 +55,25 @@ fn bench_memory_overhead(c: &mut Criterion) {
         group.bench_function(format!("translate_{}_vars", num_vars), |b| {
             let ctx = CfgAnalysisWithContext::new(var_names.clone(), analysis.clone());
             b.iter(|| {
-                // Simulate translating escaping vars
-                let escaping: Vec<_> = ctx
+                // Simulate translating all definitions
+                let defs: Vec<_> = ctx
                     .analysis
-                    .escape_info
-                    .escaping_vars
+                    .reaching_defs
+                    .all_definitions
                     .iter()
-                    .copied()
+                    .map(|d| d.var)
                     .collect();
-                black_box(ctx.var_names_for(escaping.into_iter()));
+                black_box(ctx.var_names_for(defs.into_iter()));
 
-                // Simulate translating return dependencies
-                let return_deps: Vec<_> = ctx
+                // Simulate translating all uses
+                let uses: Vec<_> = ctx
                     .analysis
-                    .escape_info
-                    .return_dependencies
+                    .reaching_defs
+                    .all_uses
                     .iter()
-                    .copied()
+                    .map(|u| u.var)
                     .collect();
-                black_box(ctx.var_names_for(return_deps.into_iter()));
-
-                // Simulate translating tainted vars
-                let tainted: Vec<_> = ctx
-                    .analysis
-                    .taint_info
-                    .tainted_vars
-                    .iter()
-                    .copied()
-                    .collect();
-                black_box(ctx.var_names_for(tainted.into_iter()));
+                black_box(ctx.var_names_for(uses.into_iter()));
             });
         });
     }
@@ -149,8 +105,9 @@ fn bench_data_flow_graph_memory(c: &mut Criterion) {
             graph.set_cfg_analysis_with_context(func_id, ctx);
         }
 
-        group.bench_function(format!("translate_all_{}_functions", num_functions), |b| {
+        group.bench_function(format!("iterate_{}_functions", num_functions), |b| {
             b.iter(|| {
+                // Simply iterate over the function analyses to measure access overhead
                 for i in 0..num_functions {
                     let func_id = FunctionId::new(
                         PathBuf::from(format!("file{}.rs", i % 5)),
@@ -158,10 +115,10 @@ fn bench_data_flow_graph_memory(c: &mut Criterion) {
                         i * 10,
                     );
 
-                    // Simulate real usage pattern (dead store translation removed in spec 256)
-                    black_box(graph.get_escaping_var_names(&func_id));
-                    black_box(graph.get_return_dependency_names(&func_id));
-                    black_box(graph.get_tainted_var_names(&func_id));
+                    // Simulate typical access pattern
+                    if let Some(ctx) = graph.get_cfg_analysis_with_context(&func_id) {
+                        black_box(&ctx.analysis.reaching_defs);
+                    }
                 }
             });
         });
