@@ -422,6 +422,17 @@ pub use crate::effects::{
     ask_env, asks_config, asks_entropy, asks_scoring, asks_thresholds, local_with_config,
 };
 
+// Progress effects (spec 262) - composable progress reporting
+pub use crate::effects::progress::{
+    par_traverse_with_progress, report_progress, traverse_with_progress, warn_progress, with_stage,
+};
+
+// Progress traits and implementations (spec 262)
+pub use crate::progress::traits::{HasProgress, ProgressSink};
+pub use crate::progress::{
+    CliProgressSink, ProgressEvent, RecordingProgressSink, SilentProgressSink,
+};
+
 // Bracket pattern resource management (spec 206)
 pub use crate::resources::{
     bracket_io, with_file_read, with_lock_file, with_progress, with_spinner, with_temp_dir,

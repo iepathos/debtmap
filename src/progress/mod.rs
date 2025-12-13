@@ -1,19 +1,48 @@
 //! Progress feedback infrastructure for debtmap analysis.
 //!
-//! This module provides centralized progress management using the `indicatif` library.
-//! Progress bars are shown for all major analysis phases including call graph building,
-//! trait resolution, coverage loading, and unified analysis.
+//! This module provides two complementary progress reporting systems:
 //!
-//! # Progress Behavior
+//! 1. **Effects-based progress** (new): [`ProgressSink`] trait with [`HasProgress`]
+//!    environment extension for composable, testable progress reporting.
 //!
-//! - **Quiet Mode**: No progress output (respects `DEBTMAP_QUIET` env var and `--quiet` flag)
-//! - **Non-TTY**: Gracefully disables progress bars in CI and piped output
-//! - **Verbosity Levels**:
-//!   - Level 0 (default): Main progress bars only
-//!   - Level 1 (-v): Sub-phase progress and timing
-//!   - Level 2 (-vv): Detailed per-phase metrics
+//! 2. **Legacy progress** (existing): [`ProgressManager`] using `indicatif` for
+//!    direct progress bar management.
 //!
-//! # Examples
+//! # Effects-Based Progress (Recommended)
+//!
+//! The effects-based system follows the "Pure Core, Imperative Shell" principle:
+//!
+//! ```rust,ignore
+//! use debtmap::effects::progress::{with_stage, traverse_with_progress};
+//! use debtmap::progress::implementations::RecordingProgressSink;
+//!
+//! // Pure analysis function wrapped with progress reporting
+//! fn analyze_files(files: Vec<PathBuf>) -> AnalysisEffect<Vec<FileMetrics>> {
+//!     traverse_with_progress(files, "File Analysis", |path| {
+//!         analyze_file_effect(path)
+//!     })
+//! }
+//!
+//! // In tests, use RecordingProgressSink to verify behavior
+//! let recorder = Arc::new(RecordingProgressSink::new());
+//! let env = RealEnv::with_progress(config, recorder.clone());
+//! let result = analyze_files(files).run(&env).await?;
+//! assert!(recorder.stages().contains(&"File Analysis".to_string()));
+//! ```
+//!
+//! ## Progress Sink Implementations
+//!
+//! | Implementation | Use Case |
+//! |---------------|----------|
+//! | [`SilentProgressSink`] | Testing, CI, benchmarks |
+//! | [`CliProgressSink`] | Command-line tools |
+//! | [`RecordingProgressSink`] | Test assertions |
+//!
+//! # Legacy Progress System
+//!
+//! The [`ProgressManager`] provides direct control over `indicatif` progress bars.
+//! This is still used for TUI integration and will be gradually migrated to
+//! the effects-based system.
 //!
 //! ```rust,no_run
 //! use debtmap::progress::{ProgressConfig, ProgressManager, TEMPLATE_CALL_GRAPH};
@@ -24,15 +53,32 @@
 //! let progress = manager.create_bar(100, TEMPLATE_CALL_GRAPH);
 //! progress.set_message("Building call graph");
 //!
-//! // Process files...
 //! for _i in 0..100 {
-//!     // Work...
 //!     progress.inc(1);
 //! }
 //!
 //! progress.finish_with_message("Call graph complete");
 //! ```
+//!
+//! # Progress Behavior
+//!
+//! - **Quiet Mode**: No progress output (respects `DEBTMAP_QUIET` env var and `--quiet` flag)
+//! - **Non-TTY**: Gracefully disables progress bars in CI and piped output
+//! - **Verbosity Levels**:
+//!   - Level 0 (default): Main progress bars only
+//!   - Level 1 (-v): Sub-phase progress and timing
+//!   - Level 2 (-vv): Detailed per-phase metrics
 
+pub mod implementations;
+pub mod traits;
+
+// Re-export traits for convenience
+pub use implementations::{
+    CliProgressSink, ProgressEvent, RecordingProgressSink, SilentProgressSink,
+};
+pub use traits::{HasProgress, ProgressSink};
+
+// Legacy progress system - kept for backwards compatibility
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
