@@ -522,8 +522,13 @@ impl ResultsApp {
 
                 self.analysis
                     .data_flow_graph
-                    .get_mutation_info(&func_id)
+                    .get_purity_info(&func_id)
                     .is_some()
+                    || self
+                        .analysis
+                        .data_flow_graph
+                        .get_mutation_info(&func_id)
+                        .is_some()
                     || self
                         .analysis
                         .data_flow_graph
