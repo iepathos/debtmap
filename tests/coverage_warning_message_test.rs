@@ -27,15 +27,14 @@ fn test_warning_message_content_in_source() {
         "Warning should show how to provide coverage data"
     );
 
-    // Verify it's only displayed when coverage_data.is_none() and not quiet_mode
-    let warning_section = source
-        .split("Emit warning if no coverage data provided")
-        .nth(1)
-        .expect("Should find warning section");
-
+    // Verify it's displayed via emit_coverage_tip helper function
     assert!(
-        warning_section.contains("if coverage_data.is_none() && !quiet_mode"),
-        "Warning should only be displayed when no coverage data and not in quiet mode"
+        source.contains("fn emit_coverage_tip"),
+        "Should have emit_coverage_tip helper function"
+    );
+    assert!(
+        source.contains("emit_coverage_tip(coverage_data.is_none()"),
+        "Warning should be emitted when no coverage data"
     );
 }
 
@@ -76,33 +75,36 @@ fn test_warning_displayed_once_not_multiple_times() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/builders/unified_analysis.rs");
     let source = std::fs::read_to_string(&source_path).expect("Failed to read source file");
 
-    // Find the warning section
-    let warning_section = source
-        .split("if coverage_data.is_none() && !quiet_mode")
+    // Find the emit_coverage_tip function
+    let tip_section = source
+        .split("fn emit_coverage_tip")
         .nth(1)
-        .and_then(|s| s.split("if !quiet_mode").next())
-        .expect("Should find warning section");
+        .expect("Should find emit_coverage_tip function");
 
-    // Count how many times eprintln! appears in the warning section
-    let eprintln_count = warning_section.matches("eprintln!").count();
+    // Count how many times eprintln! appears in the function
+    let eprintln_count = tip_section
+        .split("fn ")  // Stop at next function
+        .next()
+        .unwrap_or(tip_section)
+        .matches("eprintln!").count();
 
     // The warning should have multiple eprintln! calls (for multi-line output)
-    // but they should all be in the same conditional block
     assert!(
         eprintln_count >= 3,
         "Warning should have multiple lines (found {})",
         eprintln_count
     );
 
-    // Verify there's no loop around the warning
-    let before_warning = source
-        .split("if coverage_data.is_none() && !quiet_mode")
-        .next()
-        .expect("Should find code before warning");
+    // Verify emit_coverage_tip is called only once in perform_unified_analysis_with_options
+    let main_fn = source
+        .split("pub fn perform_unified_analysis_with_options")
+        .nth(1)
+        .and_then(|s| s.split("pub fn").next())
+        .expect("Should find main function");
 
-    let context_before = before_warning.chars().rev().take(500).collect::<String>();
-    assert!(
-        !context_before.contains("for ") && !context_before.contains("while "),
-        "Warning should not be in a loop"
+    let emit_calls = main_fn.matches("emit_coverage_tip").count();
+    assert_eq!(
+        emit_calls, 1,
+        "emit_coverage_tip should be called exactly once in main function"
     );
 }
