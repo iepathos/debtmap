@@ -9,6 +9,15 @@
 //! Text extraction follows the "Pure Core, Imperative Shell" pattern:
 //! - This module contains the pure core (formatting)
 //! - Clipboard/editor modules handle I/O (imperative shell)
+//!
+//! # Module Size
+//!
+//! This module exceeds 400 lines (~1100 lines) but remains cohesive because:
+//! - All functions share the same dependencies and formatting patterns
+//! - The code is organized into clear sections (overview, dependencies, etc.)
+//! - Splitting into sub-modules would add complexity without benefit
+//! - Pure functions with no I/O are easy to test regardless of size
+//! - The primary goal of separating pure text formatting from I/O is achieved
 
 use crate::data_flow::DataFlowGraph;
 use crate::priority::call_graph::FunctionId;
