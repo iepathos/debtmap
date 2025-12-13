@@ -206,7 +206,10 @@ pub fn apply_community_detection(
         iterations += 1;
 
         for method in methods {
-            let current_cluster = *method_to_cluster.get(method).unwrap();
+            // Safe: method_to_cluster is built from the same methods slice
+            let Some(&current_cluster) = method_to_cluster.get(method) else {
+                continue;
+            };
 
             // Find best cluster for this method
             let mut best_cluster = current_cluster;
@@ -768,14 +771,11 @@ fn merge_tiny_clusters(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
                 external_calls: 0,
                 cohesion_score: 0.0,
             });
-        } else if !normal_clusters.is_empty() {
+        } else if let Some(largest_cluster) =
+            normal_clusters.iter_mut().max_by_key(|c| c.methods.len())
+        {
             // If we have <3 unmerged methods and no Utilities cluster exists,
             // merge them into the largest existing cluster to avoid creating tiny clusters
-            let largest_cluster = normal_clusters
-                .iter_mut()
-                .max_by_key(|c| c.methods.len())
-                .unwrap();
-
             largest_cluster.methods.extend(unmerged_methods);
         } else {
             // Edge case: no normal clusters exist, and <3 unmerged methods

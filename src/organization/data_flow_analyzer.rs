@@ -333,13 +333,17 @@ impl DataFlowAnalyzer {
                         successor, graph, index, stack, indices, lowlinks, on_stack, sccs,
                     );
                     let succ_lowlink = lowlinks[successor];
-                    let node_lowlink = lowlinks.get_mut(node).unwrap();
-                    *node_lowlink = (*node_lowlink).min(succ_lowlink);
+                    // Safe: we inserted node into lowlinks at the start of this function
+                    if let Some(node_lowlink) = lowlinks.get_mut(node) {
+                        *node_lowlink = (*node_lowlink).min(succ_lowlink);
+                    }
                 } else if on_stack.contains(successor) {
                     // Successor on stack, update lowlink
                     let succ_index = indices[successor];
-                    let node_lowlink = lowlinks.get_mut(node).unwrap();
-                    *node_lowlink = (*node_lowlink).min(succ_index);
+                    // Safe: we inserted node into lowlinks at the start of this function
+                    if let Some(node_lowlink) = lowlinks.get_mut(node) {
+                        *node_lowlink = (*node_lowlink).min(succ_index);
+                    }
                 }
             }
         }
@@ -348,14 +352,20 @@ impl DataFlowAnalyzer {
         if lowlinks[node] == indices[node] {
             let mut component = Vec::new();
             loop {
-                let w = stack.pop().unwrap();
+                // Safe: Tarjan's algorithm guarantees stack is not empty here
+                // because we pushed node at the start of this function
+                let Some(w) = stack.pop() else {
+                    break; // Defensive: shouldn't happen but avoid panic
+                };
                 on_stack.remove(&w);
                 component.push(w.clone());
                 if w == node {
                     break;
                 }
             }
-            sccs.push(component);
+            if !component.is_empty() {
+                sccs.push(component);
+            }
         }
     }
 
@@ -545,7 +555,9 @@ impl DataFlowAnalyzer {
             if ch.is_uppercase() && i > 0 {
                 result.push('_');
             }
-            result.push(ch.to_lowercase().next().unwrap());
+            // Safe: to_lowercase() always returns at least one character for any char
+            // Use unwrap_or with the original char as fallback
+            result.push(ch.to_lowercase().next().unwrap_or(ch));
         }
         result
     }

@@ -441,7 +441,12 @@ pub fn errors_to_anyhow(errors: Vec<AnalysisError>) -> anyhow::Error {
     if errors.is_empty() {
         anyhow::anyhow!("Unknown error (no errors provided)")
     } else if errors.len() == 1 {
-        errors.into_iter().next().unwrap().into()
+        // Safe: we just checked that len() == 1
+        errors
+            .into_iter()
+            .next()
+            .expect("errors should have exactly one element")
+            .into()
     } else {
         anyhow::anyhow!("Multiple errors occurred:\n{}", format_error_list(&errors))
     }
