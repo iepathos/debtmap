@@ -13,10 +13,11 @@ use crate::{
     risk::lcov::LcovData,
 };
 use indicatif::ParallelProgressIterator;
+use parking_lot::Mutex;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 // Pure functional transformations module
@@ -500,16 +501,28 @@ impl ParallelUnifiedAnalysisBuilder {
             );
         });
 
-        // Extract results
-        let data_flow = data_flow_result.lock().unwrap().take().unwrap();
-        let purity = purity_result.lock().unwrap().take().unwrap();
-        let test_funcs = test_funcs_result.lock().unwrap().take().unwrap();
-        let debt_agg = debt_agg_result.lock().unwrap().take().unwrap();
+        // Extract results - parking_lot::Mutex never panics on poisoning
+        // The tasks always complete before scope exits, so these should be Some
+        let data_flow = data_flow_result
+            .lock()
+            .take()
+            .expect("data flow analysis task completed but produced no result");
+        let purity = purity_result
+            .lock()
+            .take()
+            .expect("purity analysis task completed but produced no result");
+        let test_funcs = test_funcs_result
+            .lock()
+            .take()
+            .expect("test detection task completed but produced no result");
+        let debt_agg = debt_agg_result
+            .lock()
+            .take()
+            .expect("debt aggregation task completed but produced no result");
 
-        // Update timings
-        if let Ok(t) = timings.lock() {
-            self.timings = t.clone();
-        }
+        // Update timings - parking_lot::Mutex::lock() never fails
+        let t = timings.lock();
+        self.timings = t.clone();
 
         (data_flow, purity, test_funcs, debt_agg)
     }
@@ -577,9 +590,8 @@ impl ParallelUnifiedAnalysisBuilder {
                 data_flow.set_purity_info(func_id, purity_info);
             }
 
-            if let Ok(mut t) = timings.lock() {
-                t.data_flow_creation = start.elapsed();
-            }
+            // parking_lot::Mutex::lock() never fails (no poisoning)
+            timings.lock().data_flow_creation = start.elapsed();
 
             // Count mutations from purity results
             let mutation_count: usize = purity_results
@@ -587,9 +599,8 @@ impl ParallelUnifiedAnalysisBuilder {
                 .map(|p| p.total_mutations)
                 .sum();
 
-            if let Ok(mut r) = result.lock() {
-                *r = Some(data_flow);
-            }
+            // parking_lot::Mutex::lock() never fails (no poisoning)
+            *result.lock() = Some(data_flow);
             progress.finish_with_message(format!(
                 "Data flow complete: {} functions, {} mutations, {} I/O ops, {} deps, {} transforms",
                 purity_results.len(),
@@ -613,12 +624,9 @@ impl ParallelUnifiedAnalysisBuilder {
             progress.tick();
             let start = Instant::now();
             let purity_map = transformations::metrics_to_purity_map(&metrics);
-            if let Ok(mut t) = timings.lock() {
-                t.purity_analysis = start.elapsed();
-            }
-            if let Ok(mut r) = result.lock() {
-                *r = Some(purity_map);
-            }
+            // parking_lot::Mutex::lock() never fails (no poisoning)
+            timings.lock().purity_analysis = start.elapsed();
+            *result.lock() = Some(purity_map);
             progress.finish_with_message("Purity analysis complete");
         });
     }
@@ -636,12 +644,9 @@ impl ParallelUnifiedAnalysisBuilder {
             let start = Instant::now();
             let detector = OptimizedTestDetector::new(call_graph);
             let test_funcs = detector.find_all_test_only_functions();
-            if let Ok(mut t) = timings.lock() {
-                t.test_detection = start.elapsed();
-            }
-            if let Ok(mut r) = result.lock() {
-                *r = Some(test_funcs);
-            }
+            // parking_lot::Mutex::lock() never fails (no poisoning)
+            timings.lock().test_detection = start.elapsed();
+            *result.lock() = Some(test_funcs);
             progress.finish_with_message("Test detection complete");
         });
     }
@@ -665,12 +670,9 @@ impl ParallelUnifiedAnalysisBuilder {
                 debt_aggregator.aggregate_debt(debt_items, &function_mappings);
             }
 
-            if let Ok(mut t) = timings.lock() {
-                t.debt_aggregation = start.elapsed();
-            }
-            if let Ok(mut r) = result.lock() {
-                *r = Some(debt_aggregator);
-            }
+            // parking_lot::Mutex::lock() never fails (no poisoning)
+            timings.lock().debt_aggregation = start.elapsed();
+            *result.lock() = Some(debt_aggregator);
             progress.finish_with_message("Debt aggregation complete");
         });
     }

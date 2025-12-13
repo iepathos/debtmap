@@ -852,6 +852,7 @@ dependencies = [
  "log",
  "num_cpus",
  "once_cell",
+ "parking_lot",
  "pathdiff",
  "petgraph 0.8.3",
  "premortem",

@@ -35,7 +35,8 @@
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 // Progress bar templates - text-based for terminal compatibility
 pub const TEMPLATE_CALL_GRAPH: &str = "{msg} {pos}/{len} files ({percent}%) - {eta}";
@@ -114,12 +115,14 @@ impl ProgressManager {
     /// Initialize the global progress manager
     pub fn init_global(config: ProgressConfig) {
         let manager = Self::new(config);
-        *GLOBAL_PROGRESS.lock().unwrap() = Some(manager);
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        *GLOBAL_PROGRESS.lock() = Some(manager);
     }
 
     /// Get a reference to the global progress manager
     pub fn global() -> Option<Self> {
-        GLOBAL_PROGRESS.lock().unwrap().clone()
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        GLOBAL_PROGRESS.lock().clone()
     }
 
     /// Create a progress bar with the given length and template
@@ -127,7 +130,8 @@ impl ProgressManager {
     /// Returns a hidden progress bar if progress should not be shown or if TUI is active
     pub fn create_bar(&self, len: u64, template: &str) -> ProgressBar {
         // Hide indicatif bars if TUI is active or if progress should not be shown
-        if !self.config.should_show_progress() || *self.tui_active.lock().unwrap() {
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        if !self.config.should_show_progress() || *self.tui_active.lock() {
             return ProgressBar::hidden();
         }
 
@@ -146,7 +150,8 @@ impl ProgressManager {
     /// Returns a hidden progress bar if progress should not be shown or if TUI is active
     pub fn create_spinner(&self, msg: &str) -> ProgressBar {
         // Hide indicatif spinners if TUI is active or if progress should not be shown
-        if !self.config.should_show_progress() || *self.tui_active.lock().unwrap() {
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        if !self.config.should_show_progress() || *self.tui_active.lock() {
             return ProgressBar::hidden();
         }
 
@@ -165,7 +170,8 @@ impl ProgressManager {
     /// Create a progress bar that shows counts without a known total
     pub fn create_counter(&self, template: &str, msg: &str) -> ProgressBar {
         // Hide indicatif counters if TUI is active or if progress should not be shown
-        if !self.config.should_show_progress() || *self.tui_active.lock().unwrap() {
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        if !self.config.should_show_progress() || *self.tui_active.lock() {
             return ProgressBar::hidden();
         }
 
@@ -188,7 +194,8 @@ impl ProgressManager {
 
     /// Check if TUI is currently active
     pub fn is_tui_active(&self) -> Option<bool> {
-        Some(*self.tui_active.lock().ok()?)
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        Some(*self.tui_active.lock())
     }
 
     /// Clear all progress bars from the display
@@ -201,34 +208,33 @@ impl ProgressManager {
 
     /// Start a pipeline stage in TUI
     pub fn tui_start_stage(&self, stage_index: usize) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.start_stage(stage_index);
-                }
-            }
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            // Bind the Arc first to avoid temporary dropping
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.start_stage(stage_index);
         }
     }
 
     /// Complete a pipeline stage in TUI
     pub fn tui_complete_stage(&self, stage_index: usize, metric: impl Into<String>) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.complete_stage(stage_index, metric);
-                }
-            }
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.complete_stage(stage_index, metric);
         }
     }
 
     /// Update stage metric in TUI
     pub fn tui_update_metric(&self, stage_index: usize, metric: impl Into<String>) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.update_stage_metric(stage_index, metric);
-                }
-            }
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.update_stage_metric(stage_index, metric);
         }
     }
 
@@ -240,57 +246,52 @@ impl ProgressManager {
         status: crate::tui::app::StageStatus,
         progress: Option<(usize, usize)>,
     ) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.update_subtask(stage_index, subtask_index, status, progress);
-                }
-            }
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.update_subtask(stage_index, subtask_index, status, progress);
         }
     }
 
     /// Update overall progress in TUI
     pub fn tui_set_progress(&self, progress: f64) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.set_overall_progress(progress);
-                }
-            }
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.set_overall_progress(progress);
         }
     }
 
     /// Update statistics in TUI
     pub fn tui_update_stats(&self, functions: usize, debt: usize, coverage: f64) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.update_stats(functions, debt, coverage);
-                }
-            }
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.update_stats(functions, debt, coverage);
         }
     }
 
     /// Update only function and debt counts in TUI
     pub fn tui_update_counts(&self, functions: usize, debt: usize) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.functions_count = functions;
-                    app.debt_count = debt;
-                }
-            }
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.functions_count = functions;
+            app.debt_count = debt;
         }
     }
 
     /// Update only coverage percentage in TUI
     pub fn tui_update_coverage(&self, coverage: f64) {
-        if let Ok(guard) = self.tui_manager.lock() {
-            if let Some(ref tui) = *guard {
-                if let Ok(mut app) = tui.app().lock() {
-                    app.coverage_percent = coverage;
-                }
-            }
+        let guard = self.tui_manager.lock();
+        if let Some(ref tui) = *guard {
+            let app_arc = tui.app();
+            let mut app = app_arc.lock();
+            app.coverage_percent = coverage;
         }
     }
 
@@ -302,13 +303,13 @@ impl ProgressManager {
 
     /// Cleanup TUI on completion
     pub fn tui_cleanup(&self) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                let _ = tui.cleanup();
-            }
+        // parking_lot::Mutex::lock() never fails (no poisoning)
+        let mut guard = self.tui_manager.lock();
+        if let Some(ref mut tui) = *guard {
+            let _ = tui.cleanup();
         }
         // Mark TUI as inactive
-        *self.tui_active.lock().unwrap() = false;
+        *self.tui_active.lock() = false;
     }
 }
 
