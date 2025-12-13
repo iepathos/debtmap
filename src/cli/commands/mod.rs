@@ -5,6 +5,8 @@
 
 mod analyze;
 mod compare;
+mod validate;
 
 pub use analyze::handle_analyze_command;
 pub use compare::handle_compare_command;
+pub use validate::handle_validate_command;

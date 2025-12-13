@@ -11,7 +11,8 @@ use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{
     configure_thread_pool, get_worker_count, handle_analyze_command, handle_compare_command,
-    is_automation_mode, show_config_sources, Cli, Commands, MAIN_STACK_SIZE,
+    handle_validate_command, is_automation_mode, show_config_sources, Cli, Commands,
+    MAIN_STACK_SIZE,
 };
 use debtmap::di::create_app_container;
 use std::sync::Arc;
@@ -74,45 +75,8 @@ fn main_inner() -> Result<()> {
             debtmap::commands::init::init_config(force)?;
             Ok(())
         }
-        Commands::Validate {
-            path,
-            config,
-            coverage_file,
-            format,
-            output,
-            enable_context,
-            context_providers,
-            disable_context,
-            max_debt_density,
-            top,
-            tail,
-            summary: _,
-            semantic_off,
-            explain_score: _,
-            verbosity,
-            no_parallel,
-            jobs,
-            show_splits,
-        } => {
-            let validate_config = debtmap::commands::validate::ValidateConfig {
-                path,
-                config,
-                coverage_file,
-                format,
-                output,
-                enable_context,
-                context_providers,
-                disable_context,
-                max_debt_density,
-                top,
-                tail,
-                semantic_off,
-                verbosity,
-                no_parallel,
-                jobs,
-                show_splits,
-            };
-            debtmap::commands::validate::validate_project(validate_config)?;
+        command @ Commands::Validate { .. } => {
+            handle_validate_command(command)?;
             Ok(())
         }
         Commands::Compare {
