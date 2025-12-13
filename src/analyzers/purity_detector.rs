@@ -135,6 +135,249 @@ const KNOWN_CONSTANT_PREFIXES: &[&str] = &[
     "core :: f64 :: consts ::",
 ];
 
+/// Standard library functions known to be pure (Spec 261)
+/// These take inputs and return outputs without side effects
+pub const KNOWN_PURE_STD_FUNCTIONS: &[&str] = &[
+    // Option methods
+    "Option::map",
+    "Option::and_then",
+    "Option::or_else",
+    "Option::unwrap_or",
+    "Option::unwrap_or_else",
+    "Option::unwrap_or_default",
+    "Option::filter",
+    "Option::flatten",
+    "Option::zip",
+    "Option::ok_or",
+    "Option::ok_or_else",
+    "Option::is_some",
+    "Option::is_none",
+    "Option::as_ref",
+    "Option::as_mut",
+    "Option::cloned",
+    "Option::copied",
+    // Result methods
+    "Result::map",
+    "Result::map_err",
+    "Result::and_then",
+    "Result::or_else",
+    "Result::unwrap_or",
+    "Result::unwrap_or_else",
+    "Result::unwrap_or_default",
+    "Result::is_ok",
+    "Result::is_err",
+    "Result::ok",
+    "Result::err",
+    "Result::as_ref",
+    // Iterator methods (pure when closure is pure)
+    "Iterator::map",
+    "Iterator::filter",
+    "Iterator::filter_map",
+    "Iterator::flat_map",
+    "Iterator::fold",
+    "Iterator::reduce",
+    "Iterator::take",
+    "Iterator::skip",
+    "Iterator::take_while",
+    "Iterator::skip_while",
+    "Iterator::enumerate",
+    "Iterator::zip",
+    "Iterator::chain",
+    "Iterator::collect",
+    "Iterator::count",
+    "Iterator::sum",
+    "Iterator::product",
+    "Iterator::any",
+    "Iterator::all",
+    "Iterator::find",
+    "Iterator::position",
+    "Iterator::max",
+    "Iterator::min",
+    "Iterator::max_by",
+    "Iterator::min_by",
+    "Iterator::max_by_key",
+    "Iterator::min_by_key",
+    "Iterator::rev",
+    "Iterator::cloned",
+    "Iterator::copied",
+    "Iterator::peekable",
+    "Iterator::fuse",
+    "Iterator::flatten",
+    // Slice methods
+    "slice::iter",
+    "slice::len",
+    "slice::is_empty",
+    "slice::first",
+    "slice::last",
+    "slice::get",
+    "slice::split_at",
+    "slice::chunks",
+    "slice::windows",
+    "slice::contains",
+    "slice::starts_with",
+    "slice::ends_with",
+    "slice::binary_search",
+    // String methods
+    "str::len",
+    "str::is_empty",
+    "str::chars",
+    "str::bytes",
+    "str::contains",
+    "str::starts_with",
+    "str::ends_with",
+    "str::find",
+    "str::rfind",
+    "str::split",
+    "str::trim",
+    "str::trim_start",
+    "str::trim_end",
+    "str::to_lowercase",
+    "str::to_uppercase",
+    "str::to_string",
+    "str::parse",
+    // Vec methods (read-only)
+    "Vec::len",
+    "Vec::is_empty",
+    "Vec::capacity",
+    "Vec::iter",
+    "Vec::first",
+    "Vec::last",
+    "Vec::get",
+    "Vec::contains",
+    // HashMap methods (read-only)
+    "HashMap::len",
+    "HashMap::is_empty",
+    "HashMap::get",
+    "HashMap::contains_key",
+    "HashMap::keys",
+    "HashMap::values",
+    "HashMap::iter",
+    // Clone trait
+    "Clone::clone",
+    // Default trait
+    "Default::default",
+    // From/Into traits
+    "From::from",
+    "Into::into",
+    // Comparison traits
+    "PartialEq::eq",
+    "PartialEq::ne",
+    "PartialOrd::partial_cmp",
+    "Ord::cmp",
+    // Conversion functions
+    "std::convert::identity",
+    "std::mem::size_of",
+    "std::mem::align_of",
+    "std::mem::replace",
+    "std::mem::take",
+    "std::mem::swap",
+];
+
+/// Check if a method call is a known pure standard library function (Spec 261)
+pub fn is_known_pure_call(method_name: &str, receiver_type: Option<&str>) -> bool {
+    let full_name = match receiver_type {
+        Some(ty) => format!("{}::{}", ty, method_name),
+        None => method_name.to_string(),
+    };
+
+    KNOWN_PURE_STD_FUNCTIONS
+        .iter()
+        .any(|pure_fn| full_name.ends_with(pure_fn) || pure_fn.ends_with(&full_name))
+}
+
+/// Check if a method name alone matches a known pure method (Spec 261)
+pub fn is_known_pure_method(method_name: &str) -> bool {
+    // Check common pure methods without needing receiver type
+    const PURE_METHOD_NAMES: &[&str] = &[
+        // Option/Result methods
+        "map",
+        "and_then",
+        "or_else",
+        "unwrap_or",
+        "unwrap_or_else",
+        "unwrap_or_default",
+        "filter",
+        "flatten",
+        "zip",
+        "ok_or",
+        "ok_or_else",
+        "is_some",
+        "is_none",
+        "is_ok",
+        "is_err",
+        "ok",
+        "err",
+        "as_ref",
+        "cloned",
+        "copied",
+        // Iterator methods
+        "fold",
+        "reduce",
+        "take",
+        "skip",
+        "take_while",
+        "skip_while",
+        "enumerate",
+        "chain",
+        "collect",
+        "count",
+        "sum",
+        "product",
+        "any",
+        "all",
+        "find",
+        "position",
+        "max",
+        "min",
+        "max_by",
+        "min_by",
+        "max_by_key",
+        "min_by_key",
+        "rev",
+        "peekable",
+        "fuse",
+        // Slice/Vec/String read methods
+        "len",
+        "is_empty",
+        "first",
+        "last",
+        "get",
+        "iter",
+        "contains",
+        "starts_with",
+        "ends_with",
+        "binary_search",
+        "chars",
+        "bytes",
+        "trim",
+        "trim_start",
+        "trim_end",
+        "to_lowercase",
+        "to_uppercase",
+        "to_string",
+        "parse",
+        "split",
+        "split_at",
+        "chunks",
+        "windows",
+        "capacity",
+        "keys",
+        "values",
+        // Clone/Default/Conversion
+        "clone",
+        "default",
+        "from",
+        "into",
+        // Comparison
+        "eq",
+        "ne",
+        "partial_cmp",
+        "cmp",
+    ];
+
+    PURE_METHOD_NAMES.contains(&method_name)
+}
+
 /// Known constant suffixes that don't affect purity
 const KNOWN_CONSTANT_SUFFIXES: &[&str] = &[
     ":: MAX",
@@ -1969,5 +2212,78 @@ mod tests {
         );
 
         assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    // Tests for spec 261: Known pure std function detection
+
+    #[test]
+    fn test_is_known_pure_call_option_map() {
+        assert!(is_known_pure_call("map", Some("Option")));
+        assert!(is_known_pure_call("and_then", Some("Option")));
+        assert!(is_known_pure_call("unwrap_or", Some("Option")));
+    }
+
+    #[test]
+    fn test_is_known_pure_call_result_methods() {
+        assert!(is_known_pure_call("map", Some("Result")));
+        assert!(is_known_pure_call("map_err", Some("Result")));
+        assert!(is_known_pure_call("and_then", Some("Result")));
+        assert!(is_known_pure_call("is_ok", Some("Result")));
+    }
+
+    #[test]
+    fn test_is_known_pure_call_iterator_methods() {
+        assert!(is_known_pure_call("map", Some("Iterator")));
+        assert!(is_known_pure_call("filter", Some("Iterator")));
+        assert!(is_known_pure_call("fold", Some("Iterator")));
+        assert!(is_known_pure_call("collect", Some("Iterator")));
+        assert!(is_known_pure_call("sum", Some("Iterator")));
+    }
+
+    #[test]
+    fn test_is_known_pure_call_string_methods() {
+        assert!(is_known_pure_call("len", Some("str")));
+        assert!(is_known_pure_call("is_empty", Some("str")));
+        assert!(is_known_pure_call("contains", Some("str")));
+        assert!(is_known_pure_call("trim", Some("str")));
+    }
+
+    #[test]
+    fn test_is_known_pure_call_vec_methods() {
+        assert!(is_known_pure_call("len", Some("Vec")));
+        assert!(is_known_pure_call("is_empty", Some("Vec")));
+        assert!(is_known_pure_call("iter", Some("Vec")));
+        assert!(is_known_pure_call("get", Some("Vec")));
+    }
+
+    #[test]
+    fn test_is_known_pure_call_clone_default() {
+        assert!(is_known_pure_call("clone", Some("Clone")));
+        assert!(is_known_pure_call("default", Some("Default")));
+    }
+
+    #[test]
+    fn test_is_known_pure_method_without_receiver() {
+        assert!(is_known_pure_method("map"));
+        assert!(is_known_pure_method("filter"));
+        assert!(is_known_pure_method("collect"));
+        assert!(is_known_pure_method("len"));
+        assert!(is_known_pure_method("is_empty"));
+        assert!(is_known_pure_method("clone"));
+    }
+
+    #[test]
+    fn test_is_known_pure_method_unknown() {
+        // These should NOT be considered known pure
+        assert!(!is_known_pure_method("println"));
+        assert!(!is_known_pure_method("write"));
+        assert!(!is_known_pure_method("push")); // Mutation method
+        assert!(!is_known_pure_method("insert")); // Mutation method
+    }
+
+    #[test]
+    fn test_is_known_pure_call_std_mem() {
+        assert!(is_known_pure_call("size_of", Some("std::mem")));
+        assert!(is_known_pure_call("align_of", Some("std::mem")));
     }
 }

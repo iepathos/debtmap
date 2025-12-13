@@ -17,9 +17,13 @@
 
 mod cache;
 mod call_graph_adapter;
+mod known_pure_functions;
 
 pub use cache::PurityCache;
 pub use call_graph_adapter::PurityCallGraphAdapter;
+pub use known_pure_functions::{
+    aggregate_callee_purity, resolve_callee_purity, CalleeEvidence, CalleePurity,
+};
 
 use crate::analysis::purity_analysis::{PurityAnalysis, PurityAnalyzer, PurityLevel};
 use crate::core::FunctionMetrics;
@@ -147,6 +151,9 @@ impl PurityPropagator {
     }
 
     /// Propagate purity for a single function
+    ///
+    /// Uses call graph and known pure std functions (Spec 261) to propagate
+    /// purity information from callees to callers.
     fn propagate_for_function(&mut self, func_id: &FunctionId) -> Result<()> {
         // Get current purity result
         let mut result = self
@@ -177,43 +184,72 @@ impl PurityPropagator {
             return Ok(());
         }
 
-        // Check all dependencies
-        let mut all_deps_pure = true;
-        let mut max_depth = 0;
-        let mut unknown_count = 0;
+        // Build callee evidence using known pure functions (Spec 261)
+        let mut callee_evidence = Vec::new();
 
         for dep_id in &deps {
-            if let Some(dep_result) = self.cache.get(dep_id) {
-                if dep_result.level != PurityLevel::StrictlyPure {
-                    all_deps_pure = false;
-                    break;
-                }
+            // Get cached purity if available
+            let cached_purity = self.cache.get(dep_id).map(|r| {
+                let is_pure = r.level == PurityLevel::StrictlyPure;
+                (is_pure, r.confidence)
+            });
 
-                // Track propagation depth
-                if let PurityReason::PropagatedFromDeps { depth } = dep_result.reason {
-                    max_depth = max_depth.max(depth);
-                }
-            } else {
-                unknown_count += 1;
-                all_deps_pure = false;
-            }
+            // Resolve callee purity using known pure std functions
+            let callee_purity = resolve_callee_purity(&dep_id.name, None, cached_purity);
+
+            callee_evidence.push(CalleeEvidence {
+                callee_name: dep_id.name.clone(),
+                callee_purity,
+            });
         }
 
-        // Update purity if all deps are pure
-        if all_deps_pure && result.level != PurityLevel::Impure {
+        // Aggregate purity from all callees
+        let (all_deps_pure, aggregated_confidence, impure_reasons) =
+            aggregate_callee_purity(&callee_evidence);
+
+        // Track propagation depth for pure deps
+        let max_depth = deps
+            .iter()
+            .filter_map(|dep_id| self.cache.get(dep_id))
+            .filter_map(|r| {
+                if let PurityReason::PropagatedFromDeps { depth } = r.reason {
+                    Some(depth)
+                } else {
+                    None
+                }
+            })
+            .max()
+            .unwrap_or(0);
+
+        // Count unknown dependencies (not in cache and not known pure)
+        let unknown_count = callee_evidence
+            .iter()
+            .filter(|e| matches!(e.callee_purity, CalleePurity::Unknown))
+            .count();
+
+        // Update purity based on callee analysis
+        if all_deps_pure && result.level != PurityLevel::Impure && impure_reasons.is_empty() {
             result.level = PurityLevel::StrictlyPure;
             result.reason = PurityReason::PropagatedFromDeps {
                 depth: max_depth + 1,
             };
 
-            // Reduce confidence based on depth
-            result.confidence *= 0.9_f64.powi((max_depth + 1) as i32);
-            result.confidence = result.confidence.max(0.5);
+            // Combine confidence from depth and callee analysis
+            let depth_confidence = 0.9_f64.powi((max_depth + 1) as i32);
+            result.confidence =
+                (result.confidence * depth_confidence * aggregated_confidence).clamp(0.5, 1.0);
+        } else if !impure_reasons.is_empty() {
+            // Has impure callees
+            result.level = PurityLevel::Impure;
+            result.reason = PurityReason::SideEffects {
+                effects: impure_reasons,
+            };
+            result.confidence = aggregated_confidence;
         } else if unknown_count > 0 {
             result.reason = PurityReason::UnknownDeps {
                 count: unknown_count,
             };
-            result.confidence *= 0.8;
+            result.confidence = (result.confidence * aggregated_confidence).clamp(0.3, 1.0);
         }
 
         self.cache.insert(func_id.clone(), result);
