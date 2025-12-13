@@ -51,7 +51,7 @@ pub fn calculate_layout(area: Rect) -> Vec<Rect> {
         .constraints([
             Constraint::Length(5), // Header (title + progress bar)
             Constraint::Min(10),   // Main content (pipeline stages)
-            Constraint::Length(3), // Footer (statistics)
+            Constraint::Length(1), // Footer (statistics - single line)
         ])
         .split(area)
         .to_vec()
@@ -107,7 +107,7 @@ mod tests {
         // Verify header is 5 lines
         assert_eq!(chunks[0].height, 5);
 
-        // Verify footer is 3 lines
-        assert_eq!(chunks[2].height, 3);
+        // Verify footer is 1 line
+        assert_eq!(chunks[2].height, 1);
     }
 }
