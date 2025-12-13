@@ -5,6 +5,8 @@
 //! - Pure guard functions for conditional navigation
 //! - Navigation history for proper back navigation
 //!
+//! Navigation action functions are in the `nav_actions` module.
+//!
 //! # Navigation Graph
 //!
 //! ```text
@@ -30,6 +32,12 @@
 //! ```
 
 use super::app::{DetailPage, ViewMode};
+
+// Re-export navigation actions for backwards compatibility
+pub use super::nav_actions::{
+    available_actions, navigate_back, navigate_detail_page, navigate_to_detail, navigate_to_dsm,
+    navigate_to_filter_menu, navigate_to_help, navigate_to_search, navigate_to_sort_menu,
+};
 
 /// Valid navigation transitions.
 ///
@@ -91,6 +99,12 @@ pub struct NavigationState {
 
     /// Whether DSM feature is enabled.
     pub dsm_enabled: bool,
+
+    /// DSM horizontal scroll offset.
+    pub dsm_scroll_x: usize,
+
+    /// DSM vertical scroll offset.
+    pub dsm_scroll_y: usize,
 }
 
 impl Default for NavigationState {
@@ -107,7 +121,33 @@ impl NavigationState {
             detail_page: DetailPage::Overview,
             history: vec![],
             dsm_enabled,
+            dsm_scroll_x: 0,
+            dsm_scroll_y: 0,
         }
+    }
+
+    /// Push current view mode to history before transitioning.
+    pub fn push_and_set_view(&mut self, new_mode: ViewMode) {
+        self.history.push(self.view_mode);
+        self.view_mode = new_mode;
+    }
+
+    /// Go back to previous view mode.
+    pub fn go_back(&mut self) -> Option<ViewMode> {
+        self.history.pop().inspect(|&mode| {
+            self.view_mode = mode;
+        })
+    }
+
+    /// Clear navigation history.
+    pub fn clear_history(&mut self) {
+        self.history.clear();
+    }
+
+    /// Reset DSM scroll position.
+    pub fn reset_dsm_scroll(&mut self) {
+        self.dsm_scroll_x = 0;
+        self.dsm_scroll_y = 0;
     }
 }
 
@@ -187,208 +227,6 @@ impl NavigationResult {
     pub fn is_success(&self) -> bool {
         matches!(self, NavigationResult::Success)
     }
-}
-
-// ============================================================================
-// Navigation Actions
-// ============================================================================
-
-/// Navigate to Detail view.
-pub fn navigate_to_detail(
-    state: &mut NavigationState,
-    has_items: bool,
-    has_selection: bool,
-) -> NavigationResult {
-    if !is_valid_transition(state.view_mode, ViewMode::Detail) {
-        return NavigationResult::Invalid {
-            from: state.view_mode,
-            to: ViewMode::Detail,
-        };
-    }
-
-    if !can_enter_detail(state.view_mode, has_items, has_selection) {
-        return NavigationResult::Blocked {
-            reason: "No item selected",
-        };
-    }
-
-    state.history.push(state.view_mode);
-    state.view_mode = ViewMode::Detail;
-    state.detail_page = DetailPage::Overview;
-
-    NavigationResult::Success
-}
-
-/// Navigate to Search view.
-pub fn navigate_to_search(state: &mut NavigationState) -> NavigationResult {
-    if !is_valid_transition(state.view_mode, ViewMode::Search) {
-        return NavigationResult::Invalid {
-            from: state.view_mode,
-            to: ViewMode::Search,
-        };
-    }
-
-    if !can_enter_search(state.view_mode) {
-        return NavigationResult::Blocked {
-            reason: "Search only available from List view",
-        };
-    }
-
-    state.history.push(state.view_mode);
-    state.view_mode = ViewMode::Search;
-
-    NavigationResult::Success
-}
-
-/// Navigate to SortMenu view.
-pub fn navigate_to_sort_menu(state: &mut NavigationState) -> NavigationResult {
-    if !is_valid_transition(state.view_mode, ViewMode::SortMenu) {
-        return NavigationResult::Invalid {
-            from: state.view_mode,
-            to: ViewMode::SortMenu,
-        };
-    }
-
-    if !can_enter_sort_menu(state.view_mode) {
-        return NavigationResult::Blocked {
-            reason: "Sort menu only available from List view",
-        };
-    }
-
-    state.history.push(state.view_mode);
-    state.view_mode = ViewMode::SortMenu;
-
-    NavigationResult::Success
-}
-
-/// Navigate to FilterMenu view.
-pub fn navigate_to_filter_menu(state: &mut NavigationState) -> NavigationResult {
-    if !is_valid_transition(state.view_mode, ViewMode::FilterMenu) {
-        return NavigationResult::Invalid {
-            from: state.view_mode,
-            to: ViewMode::FilterMenu,
-        };
-    }
-
-    if !can_enter_filter_menu(state.view_mode) {
-        return NavigationResult::Blocked {
-            reason: "Filter menu only available from List view",
-        };
-    }
-
-    state.history.push(state.view_mode);
-    state.view_mode = ViewMode::FilterMenu;
-
-    NavigationResult::Success
-}
-
-/// Navigate to DSM view.
-pub fn navigate_to_dsm(state: &mut NavigationState) -> NavigationResult {
-    if !is_valid_transition(state.view_mode, ViewMode::Dsm) {
-        return NavigationResult::Invalid {
-            from: state.view_mode,
-            to: ViewMode::Dsm,
-        };
-    }
-
-    if !can_enter_dsm(state.view_mode, state.dsm_enabled) {
-        return NavigationResult::Blocked {
-            reason: "DSM feature not enabled",
-        };
-    }
-
-    state.history.push(state.view_mode);
-    state.view_mode = ViewMode::Dsm;
-
-    NavigationResult::Success
-}
-
-/// Navigate to Help view.
-pub fn navigate_to_help(state: &mut NavigationState) -> NavigationResult {
-    if !can_enter_help(state.view_mode) {
-        return NavigationResult::Blocked {
-            reason: "Already in Help view",
-        };
-    }
-
-    // Help can be accessed from most views, so we don't check transition table strictly
-    state.history.push(state.view_mode);
-    state.view_mode = ViewMode::Help;
-
-    NavigationResult::Success
-}
-
-/// Navigate back (escape).
-pub fn navigate_back(state: &mut NavigationState) -> NavigationResult {
-    if let Some(previous) = state.history.pop() {
-        state.view_mode = previous;
-        NavigationResult::Success
-    } else if state.view_mode != ViewMode::List {
-        state.view_mode = ViewMode::List;
-        NavigationResult::Success
-    } else {
-        NavigationResult::Blocked {
-            reason: "Already at root view",
-        }
-    }
-}
-
-/// Navigate detail pages (left/right).
-pub fn navigate_detail_page(state: &mut NavigationState, forward: bool) -> NavigationResult {
-    if !can_navigate_detail_pages(state.view_mode) {
-        return NavigationResult::Blocked {
-            reason: "Not in Detail view",
-        };
-    }
-
-    state.detail_page = if forward {
-        state.detail_page.next()
-    } else {
-        state.detail_page.prev()
-    };
-
-    NavigationResult::Success
-}
-
-/// Get available actions for current state (for status bar display).
-pub fn available_actions(
-    state: &NavigationState,
-    has_items: bool,
-    has_selection: bool,
-) -> Vec<(&'static str, &'static str)> {
-    let mut actions = vec![];
-
-    if can_enter_detail(state.view_mode, has_items, has_selection) {
-        actions.push(("Enter", "View details"));
-    }
-
-    if can_enter_search(state.view_mode) {
-        actions.push(("/", "Search"));
-    }
-
-    if can_enter_sort_menu(state.view_mode) {
-        actions.push(("s", "Sort"));
-    }
-
-    if can_enter_filter_menu(state.view_mode) {
-        actions.push(("f", "Filter"));
-    }
-
-    if can_enter_dsm(state.view_mode, state.dsm_enabled) {
-        actions.push(("m", "DSM view"));
-    }
-
-    if can_enter_help(state.view_mode) {
-        actions.push(("?", "Help"));
-    }
-
-    if can_go_back(state.view_mode, state.history.len()) {
-        actions.push(("Esc", "Back"));
-    }
-
-    actions.push(("q", "Quit"));
-
-    actions
 }
 
 #[cfg(test)]
@@ -498,7 +336,7 @@ mod tests {
 
     #[test]
     fn test_guards_are_pure() {
-        // Same input → same output (deterministic)
+        // Same input -> same output (deterministic)
         let r1 = can_enter_detail(ViewMode::List, true, true);
         let r2 = can_enter_detail(ViewMode::List, true, true);
         assert_eq!(r1, r2);
@@ -509,226 +347,161 @@ mod tests {
     }
 
     // ============================================================================
-    // Navigation Action Tests
+    // NavigationState Method Tests
     // ============================================================================
 
     #[test]
-    fn test_navigate_to_detail_success() {
-        let mut state = NavigationState::new(false);
+    fn test_push_and_set_view() {
+        let mut state = NavigationState::new(true);
+        assert_eq!(state.view_mode, ViewMode::List);
+        assert!(state.history.is_empty());
 
-        let result = navigate_to_detail(&mut state, true, true);
-        assert!(result.is_success());
+        state.push_and_set_view(ViewMode::Detail);
         assert_eq!(state.view_mode, ViewMode::Detail);
         assert_eq!(state.history.len(), 1);
         assert_eq!(state.history[0], ViewMode::List);
+
+        state.push_and_set_view(ViewMode::Help);
+        assert_eq!(state.view_mode, ViewMode::Help);
+        assert_eq!(state.history.len(), 2);
     }
 
     #[test]
-    fn test_navigate_to_detail_blocked_no_selection() {
-        let mut state = NavigationState::new(false);
+    fn test_go_back_with_history() {
+        let mut state = NavigationState::new(true);
+        state.push_and_set_view(ViewMode::Detail);
+        state.push_and_set_view(ViewMode::Help);
 
-        let result = navigate_to_detail(&mut state, true, false);
-        assert!(matches!(result, NavigationResult::Blocked { .. }));
+        let result = state.go_back();
+        assert_eq!(result, Some(ViewMode::Detail));
+        assert_eq!(state.view_mode, ViewMode::Detail);
+
+        let result = state.go_back();
+        assert_eq!(result, Some(ViewMode::List));
         assert_eq!(state.view_mode, ViewMode::List);
+
+        let result = state.go_back();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_clear_history() {
+        let mut state = NavigationState::new(true);
+        state.push_and_set_view(ViewMode::Detail);
+        state.push_and_set_view(ViewMode::Help);
+        assert_eq!(state.history.len(), 2);
+
+        state.clear_history();
         assert!(state.history.is_empty());
     }
 
     #[test]
-    fn test_navigate_to_detail_invalid_from_detail() {
-        let mut state = NavigationState::new(false);
-        state.view_mode = ViewMode::Detail;
-
-        let result = navigate_to_detail(&mut state, true, true);
-        assert!(matches!(result, NavigationResult::Invalid { .. }));
-    }
-
-    #[test]
-    fn test_navigate_to_search_success() {
-        let mut state = NavigationState::new(false);
-
-        let result = navigate_to_search(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Search);
-    }
-
-    #[test]
-    fn test_navigate_to_search_invalid_from_detail() {
-        let mut state = NavigationState::new(false);
-        state.view_mode = ViewMode::Detail;
-
-        let result = navigate_to_search(&mut state);
-        assert!(matches!(result, NavigationResult::Invalid { .. }));
-    }
-
-    #[test]
-    fn test_navigate_to_dsm_blocked_when_disabled() {
-        let mut state = NavigationState::new(false);
-
-        let result = navigate_to_dsm(&mut state);
-        assert!(matches!(result, NavigationResult::Blocked { .. }));
-    }
-
-    #[test]
-    fn test_navigate_to_dsm_success_when_enabled() {
-        let mut state = NavigationState::new(true);
-
-        let result = navigate_to_dsm(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Dsm);
-    }
-
-    #[test]
-    fn test_navigate_back_uses_history() {
-        let mut state = NavigationState::new(false);
-
-        // Navigate List → Detail
-        navigate_to_detail(&mut state, true, true);
-        assert_eq!(state.view_mode, ViewMode::Detail);
-
-        // Navigate Detail → Help
-        navigate_to_help(&mut state);
-        assert_eq!(state.view_mode, ViewMode::Help);
-
-        // Back goes to Detail (not List)
-        navigate_back(&mut state);
-        assert_eq!(state.view_mode, ViewMode::Detail);
-
-        // Back goes to List
-        navigate_back(&mut state);
-        assert_eq!(state.view_mode, ViewMode::List);
-    }
-
-    #[test]
-    fn test_navigate_back_blocked_at_root() {
-        let mut state = NavigationState::new(false);
-
-        let result = navigate_back(&mut state);
-        assert!(matches!(result, NavigationResult::Blocked { .. }));
-    }
-
-    #[test]
-    fn test_navigate_back_without_history() {
-        let mut state = NavigationState::new(false);
-        state.view_mode = ViewMode::Detail;
-
-        // No history but not at root - should go to List
-        let result = navigate_back(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::List);
-    }
-
-    #[test]
-    fn test_navigate_detail_page() {
-        let mut state = NavigationState::new(false);
-        state.view_mode = ViewMode::Detail;
-        state.detail_page = DetailPage::Overview;
-
-        // Forward
-        let result = navigate_detail_page(&mut state, true);
-        assert!(result.is_success());
-        assert_eq!(state.detail_page, DetailPage::Dependencies);
-
-        // Backward
-        let result = navigate_detail_page(&mut state, false);
-        assert!(result.is_success());
-        assert_eq!(state.detail_page, DetailPage::Overview);
-    }
-
-    #[test]
-    fn test_navigate_detail_page_blocked_outside_detail() {
-        let mut state = NavigationState::new(false);
-
-        let result = navigate_detail_page(&mut state, true);
-        assert!(matches!(result, NavigationResult::Blocked { .. }));
-    }
-
-    // ============================================================================
-    // Integration Tests
-    // ============================================================================
-
-    #[test]
-    fn test_typical_user_flow() {
-        let mut state = NavigationState::new(true);
-
-        // User views list
-        assert_eq!(state.view_mode, ViewMode::List);
-
-        // User selects item and views detail
-        let result = navigate_to_detail(&mut state, true, true);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Detail);
-
-        // User navigates detail pages
-        let result = navigate_detail_page(&mut state, true);
-        assert!(result.is_success());
-        assert_eq!(state.detail_page, DetailPage::Dependencies);
-
-        // User opens help
-        let result = navigate_to_help(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Help);
-
-        // User closes help (returns to detail)
-        let result = navigate_back(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Detail);
-
-        // User goes back to list
-        let result = navigate_back(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::List);
-    }
-
-    #[test]
-    fn test_search_to_detail_flow() {
-        let mut state = NavigationState::new(false);
-
-        // Start search
-        let result = navigate_to_search(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Search);
-
-        // Select search result (goes to detail)
-        let result = navigate_to_detail(&mut state, true, true);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Detail);
-
-        // Go back (should return to Search due to history)
-        let result = navigate_back(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Search);
-    }
-
-    #[test]
-    fn test_available_actions() {
+    fn test_dsm_scroll_default() {
         let state = NavigationState::new(true);
-
-        let actions = available_actions(&state, true, true);
-
-        // From List with items and selection, should have most actions
-        let action_keys: Vec<_> = actions.iter().map(|(k, _)| *k).collect();
-        assert!(action_keys.contains(&"Enter"));
-        assert!(action_keys.contains(&"/"));
-        assert!(action_keys.contains(&"s"));
-        assert!(action_keys.contains(&"f"));
-        assert!(action_keys.contains(&"m")); // DSM enabled
-        assert!(action_keys.contains(&"?"));
-        assert!(action_keys.contains(&"q"));
+        assert_eq!(state.dsm_scroll_x, 0);
+        assert_eq!(state.dsm_scroll_y, 0);
     }
 
     #[test]
-    fn test_available_actions_detail_view() {
-        let mut state = NavigationState::new(false);
-        state.view_mode = ViewMode::Detail;
-        state.history.push(ViewMode::List);
+    fn test_reset_dsm_scroll() {
+        let mut state = NavigationState::new(true);
+        state.dsm_scroll_x = 10;
+        state.dsm_scroll_y = 20;
 
-        let actions = available_actions(&state, true, true);
+        state.reset_dsm_scroll();
+        assert_eq!(state.dsm_scroll_x, 0);
+        assert_eq!(state.dsm_scroll_y, 0);
+    }
+}
 
-        // From Detail, should have fewer actions
-        let action_keys: Vec<_> = actions.iter().map(|(k, _)| *k).collect();
-        assert!(!action_keys.contains(&"/")); // No search from detail
-        assert!(!action_keys.contains(&"s")); // No sort from detail
-        assert!(action_keys.contains(&"Esc")); // Can go back
-        assert!(action_keys.contains(&"?")); // Help available
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Strategy for generating ViewMode values.
+    fn view_mode_strategy() -> impl Strategy<Value = ViewMode> {
+        prop_oneof![
+            Just(ViewMode::List),
+            Just(ViewMode::Detail),
+            Just(ViewMode::Search),
+            Just(ViewMode::SortMenu),
+            Just(ViewMode::FilterMenu),
+            Just(ViewMode::Help),
+            Just(ViewMode::Dsm),
+        ]
+    }
+
+    proptest! {
+        /// Property: valid_destinations is consistent with is_valid_transition.
+        ///
+        /// If a mode is in valid_destinations, then is_valid_transition should return true.
+        #[test]
+        fn valid_destinations_consistent(from in view_mode_strategy()) {
+            let destinations = valid_destinations(from);
+            for to in destinations {
+                prop_assert!(
+                    is_valid_transition(from, to),
+                    "valid_destinations({:?}) contains {:?} but is_valid_transition returns false",
+                    from, to
+                );
+            }
+        }
+
+        /// Property: navigation history is LIFO.
+        ///
+        /// Push/pop sequence should be last-in-first-out.
+        #[test]
+        fn history_is_lifo(modes in proptest::collection::vec(view_mode_strategy(), 0..10)) {
+            let mut state = NavigationState::new(false);
+
+            // Push all modes
+            for &mode in &modes {
+                state.push_and_set_view(mode);
+            }
+
+            // Pop should return in reverse order (but we get the mode we navigated TO,
+            // not FROM, because go_back returns what we set view_mode to)
+            for &expected in modes.iter().rev() {
+                let current = state.view_mode;
+                prop_assert_eq!(current, expected);
+                state.go_back();
+            }
+        }
+
+        /// Property: clear_history empties history.
+        #[test]
+        fn clear_history_empties(
+            push_count in 0usize..20
+        ) {
+            let mut state = NavigationState::new(true);
+
+            for _ in 0..push_count {
+                state.push_and_set_view(ViewMode::Detail);
+            }
+
+            state.clear_history();
+            prop_assert!(state.history.is_empty());
+        }
+
+        /// Property: can_enter_help is false only when already in Help.
+        #[test]
+        fn help_blocked_only_from_help(mode in view_mode_strategy()) {
+            let can_enter = can_enter_help(mode);
+            prop_assert_eq!(can_enter, mode != ViewMode::Help);
+        }
+
+        /// Property: DSM scroll reset zeros both dimensions.
+        #[test]
+        fn dsm_scroll_reset_zeros(x in 0usize..1000, y in 0usize..1000) {
+            let mut state = NavigationState::new(true);
+            state.dsm_scroll_x = x;
+            state.dsm_scroll_y = y;
+
+            state.reset_dsm_scroll();
+
+            prop_assert_eq!(state.dsm_scroll_x, 0);
+            prop_assert_eq!(state.dsm_scroll_y, 0);
+        }
     }
 }
