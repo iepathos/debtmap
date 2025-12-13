@@ -91,6 +91,12 @@ pub struct NavigationState {
 
     /// Whether DSM feature is enabled.
     pub dsm_enabled: bool,
+
+    /// DSM horizontal scroll offset.
+    pub dsm_scroll_x: usize,
+
+    /// DSM vertical scroll offset.
+    pub dsm_scroll_y: usize,
 }
 
 impl Default for NavigationState {
@@ -107,7 +113,33 @@ impl NavigationState {
             detail_page: DetailPage::Overview,
             history: vec![],
             dsm_enabled,
+            dsm_scroll_x: 0,
+            dsm_scroll_y: 0,
         }
+    }
+
+    /// Push current view mode to history before transitioning.
+    pub fn push_and_set_view(&mut self, new_mode: ViewMode) {
+        self.history.push(self.view_mode);
+        self.view_mode = new_mode;
+    }
+
+    /// Go back to previous view mode.
+    pub fn go_back(&mut self) -> Option<ViewMode> {
+        self.history.pop().inspect(|&mode| {
+            self.view_mode = mode;
+        })
+    }
+
+    /// Clear navigation history.
+    pub fn clear_history(&mut self) {
+        self.history.clear();
+    }
+
+    /// Reset DSM scroll position.
+    pub fn reset_dsm_scroll(&mut self) {
+        self.dsm_scroll_x = 0;
+        self.dsm_scroll_y = 0;
     }
 }
 
@@ -730,5 +762,72 @@ mod tests {
         assert!(!action_keys.contains(&"s")); // No sort from detail
         assert!(action_keys.contains(&"Esc")); // Can go back
         assert!(action_keys.contains(&"?")); // Help available
+    }
+
+    // ============================================================================
+    // New NavigationState Method Tests
+    // ============================================================================
+
+    #[test]
+    fn test_push_and_set_view() {
+        let mut state = NavigationState::new(true);
+        assert_eq!(state.view_mode, ViewMode::List);
+        assert!(state.history.is_empty());
+
+        state.push_and_set_view(ViewMode::Detail);
+        assert_eq!(state.view_mode, ViewMode::Detail);
+        assert_eq!(state.history.len(), 1);
+        assert_eq!(state.history[0], ViewMode::List);
+
+        state.push_and_set_view(ViewMode::Help);
+        assert_eq!(state.view_mode, ViewMode::Help);
+        assert_eq!(state.history.len(), 2);
+    }
+
+    #[test]
+    fn test_go_back_with_history() {
+        let mut state = NavigationState::new(true);
+        state.push_and_set_view(ViewMode::Detail);
+        state.push_and_set_view(ViewMode::Help);
+
+        let result = state.go_back();
+        assert_eq!(result, Some(ViewMode::Detail));
+        assert_eq!(state.view_mode, ViewMode::Detail);
+
+        let result = state.go_back();
+        assert_eq!(result, Some(ViewMode::List));
+        assert_eq!(state.view_mode, ViewMode::List);
+
+        let result = state.go_back();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_clear_history() {
+        let mut state = NavigationState::new(true);
+        state.push_and_set_view(ViewMode::Detail);
+        state.push_and_set_view(ViewMode::Help);
+        assert_eq!(state.history.len(), 2);
+
+        state.clear_history();
+        assert!(state.history.is_empty());
+    }
+
+    #[test]
+    fn test_dsm_scroll_default() {
+        let state = NavigationState::new(true);
+        assert_eq!(state.dsm_scroll_x, 0);
+        assert_eq!(state.dsm_scroll_y, 0);
+    }
+
+    #[test]
+    fn test_reset_dsm_scroll() {
+        let mut state = NavigationState::new(true);
+        state.dsm_scroll_x = 10;
+        state.dsm_scroll_y = 20;
+
+        state.reset_dsm_scroll();
+        assert_eq!(state.dsm_scroll_x, 0);
+        assert_eq!(state.dsm_scroll_y, 0);
     }
 }

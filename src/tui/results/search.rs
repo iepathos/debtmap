@@ -5,6 +5,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
 /// Search state
+#[derive(Debug)]
 pub struct SearchState {
     query: String,
     cursor_position: usize,
