@@ -6,6 +6,7 @@
 //! Following Stillwater philosophy: Pure core (phases/), imperative shell (this file).
 
 use super::{call_graph, parallel_call_graph, parallel_unified_analysis};
+use crate::observability::{set_phase_persistent, set_progress, AnalysisPhase};
 
 // Re-export pure core modules
 pub use super::unified_analysis_phases as core;
@@ -88,6 +89,9 @@ pub fn perform_unified_analysis_with_options(
         context_providers,
         disable_context,
     } = options;
+
+    // Set total file count for crash report progress tracking (spec 207)
+    set_progress(0, results.complexity.metrics.len());
 
     // Build call graph with progress reporting
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
@@ -506,6 +510,17 @@ fn process_file_analysis(
 
 // --- Progress reporting helpers ---
 
+/// Map TUI stage numbers to observability phases (spec 207)
+fn stage_to_phase(stage: usize) -> Option<AnalysisPhase> {
+    match stage {
+        1 => Some(AnalysisPhase::CallGraphBuilding),
+        2 => Some(AnalysisPhase::CoverageLoading),
+        3 => Some(AnalysisPhase::PurityAnalysis),
+        4 | 5 => Some(AnalysisPhase::DebtScoring),
+        _ => None,
+    }
+}
+
 fn report_stage_start(stage: usize) {
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_start_stage(stage);
@@ -513,6 +528,12 @@ fn report_stage_start(stage: usize) {
     // Also update unified progress for call graph stage (stage 1 -> phase 1)
     if stage == 1 {
         crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(1));
+    }
+
+    // Set observability phase for crash reports (spec 207)
+    // The phase persists until overwritten by the next stage
+    if let Some(phase) = stage_to_phase(stage) {
+        set_phase_persistent(phase);
     }
 }
 

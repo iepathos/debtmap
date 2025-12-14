@@ -352,6 +352,7 @@ pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;
 pub mod metrics;
+pub mod observability;
 pub mod organization;
 pub mod output;
 pub mod patterns;
@@ -443,3 +444,9 @@ pub use crate::resources::{
 // Testing infrastructure (spec 200) - MockEnv and test helpers
 // Note: Assertion macros are exported via #[macro_export] in testkit::assertions
 pub use crate::testkit::{ConfigBuilder, DebtmapTestEnv};
+
+// Observability infrastructure (spec 207) - panic hook and context tracking
+pub use crate::observability::{
+    get_current_context, get_progress, increment_processed, install_panic_hook, set_current_file,
+    set_phase, set_phase_persistent, set_progress, AnalysisContext, AnalysisPhase,
+};
