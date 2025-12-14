@@ -63,6 +63,10 @@ pub fn create_god_object_debt_item(
         crate::priority::RecommendationTier::T2ComplexUntested
     };
 
+    // Determine appropriate function role based on detection type (spec 233)
+    // God objects are architectural issues - classify based on their nature
+    let function_role = classify_god_object_role(god_analysis);
+
     UnifiedDebtItem {
         location: crate::priority::unified_scorer::Location {
             file: file_path.to_path_buf(),
@@ -71,7 +75,7 @@ pub fn create_god_object_debt_item(
         },
         debt_type,
         unified_score,
-        function_role: FunctionRole::Unknown,
+        function_role,
         recommendation,
         expected_impact,
         transitive_coverage: aggregated_metrics.weighted_coverage,
@@ -173,7 +177,85 @@ fn create_god_object_debt_type(god_analysis: &GodObjectAnalysis) -> DebtType {
     }
 }
 
+/// Classify function role for god object items (spec 233).
+///
+/// God objects are architectural-level debt, not function-level. However, we assign
+/// a meaningful role based on their characteristics to improve filtering and prioritization.
+///
+/// - GodClass with many methods typically acts as an Orchestrator
+/// - GodFile/GodModule with many functions typically acts as an Orchestrator
+/// - Items with high impure method count act as IOWrapper
+fn classify_god_object_role(god_analysis: &GodObjectAnalysis) -> FunctionRole {
+    // If purity distribution shows mostly impure operations, classify as IOWrapper
+    if let Some(ref purity) = god_analysis.purity_distribution {
+        // Check if more than 40% of methods are impure (I/O-related)
+        let total_methods = purity.pure_count + purity.probably_pure_count + purity.impure_count;
+        if total_methods > 0 {
+            let io_ratio = purity.impure_count as f64 / total_methods as f64;
+            if io_ratio > 0.4 {
+                return FunctionRole::IOWrapper;
+            }
+        }
+    }
+
+    // Most god objects are orchestrators - they coordinate many responsibilities
+    // They have many methods calling other parts of the system
+    if god_analysis.method_count >= 10 || god_analysis.responsibility_count >= 3 {
+        return FunctionRole::Orchestrator;
+    }
+
+    // Smaller god objects are classified as pure logic needing decomposition
+    FunctionRole::PureLogic
+}
+
+/// Calculate classification confidence for god object role (spec 233).
+///
+/// Returns a confidence score between 0.0 and 1.0 based on how strongly
+/// the analysis data supports the role classification.
+///
+/// Confidence factors:
+/// - IOWrapper: Higher impurity ratio = higher confidence
+/// - Orchestrator: More methods/responsibilities = higher confidence
+/// - PureLogic: Default classification when signals are weak (lower confidence)
+#[allow(dead_code)]
+pub fn calculate_role_confidence(god_analysis: &GodObjectAnalysis) -> f64 {
+    // Check IOWrapper classification confidence
+    if let Some(ref purity) = god_analysis.purity_distribution {
+        let total_methods = purity.pure_count + purity.probably_pure_count + purity.impure_count;
+        if total_methods > 0 {
+            let io_ratio = purity.impure_count as f64 / total_methods as f64;
+            if io_ratio > 0.4 {
+                // IOWrapper confidence: 60% base + up to 35% based on how far above 40% we are
+                // io_ratio of 1.0 = 95% confidence, io_ratio of 0.4 = 60% confidence
+                return 0.60 + ((io_ratio - 0.4) / 0.6) * 0.35;
+            }
+        }
+    }
+
+    // Check Orchestrator classification confidence
+    let method_score = (god_analysis.method_count as f64 / 20.0).min(1.0);
+    let responsibility_score = (god_analysis.responsibility_count as f64 / 5.0).min(1.0);
+
+    if god_analysis.method_count >= 10 || god_analysis.responsibility_count >= 3 {
+        // Orchestrator confidence: 65% base + up to 30% based on method/responsibility counts
+        let combined_score = (method_score + responsibility_score) / 2.0;
+        return 0.65 + combined_score * 0.30;
+    }
+
+    // PureLogic is a fallback classification - lower confidence (50-65%)
+    // More methods/responsibilities suggest we're closer to being an orchestrator
+    let fallback_score = (method_score + responsibility_score) / 2.0;
+    0.50 + fallback_score * 0.15
+}
+
 /// Determine display name and line number based on detection type (pure).
+///
+/// For GodClass: Returns the struct name and its line number.
+/// For GodFile/GodModule: Returns "[file-scope]" to clarify this is file-level debt (spec 233).
+///
+/// Using "[file-scope]" instead of the filename prevents confusion where
+/// users might think "large_file.rs" is a function name when it's actually
+/// the file being analyzed.
 fn determine_display_info(file_path: &Path, god_analysis: &GodObjectAnalysis) -> (String, usize) {
     match god_analysis.detection_type {
         crate::organization::DetectionType::GodClass => {
@@ -188,13 +270,30 @@ fn determine_display_info(file_path: &Path, god_analysis: &GodObjectAnalysis) ->
         }
         crate::organization::DetectionType::GodFile
         | crate::organization::DetectionType::GodModule => {
-            let name = file_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown");
-            (name.to_string(), 1)
+            // Use "[file-scope]" to indicate this is file-level debt, not a function (spec 233)
+            // The actual filename is already in the location.file field
+            ("[file-scope]".to_string(), 1)
         }
     }
+}
+
+/// Validate that a function-level debt item has a proper function name (spec 233).
+///
+/// Returns true if the function name is valid (not a filename or placeholder).
+/// This is used to detect potential classification issues.
+#[allow(dead_code)]
+pub fn is_valid_function_name(function_name: &str) -> bool {
+    // Check for common filename extensions
+    let filename_patterns = [".rs", ".py", ".js", ".ts", ".go", ".java", ".cpp", ".c"];
+    let is_filename = filename_patterns
+        .iter()
+        .any(|ext| function_name.ends_with(ext));
+
+    // Check for file-scope placeholder
+    let is_placeholder = function_name == "[file-scope]";
+
+    // Valid function names should not be filenames (unless it's the placeholder)
+    !is_filename || is_placeholder
 }
 
 /// Calculate impact metrics for god object (pure).
@@ -220,8 +319,25 @@ pub fn calculate_god_object_risk(god_analysis: &GodObjectAnalysis) -> f64 {
 }
 
 /// Create actionable recommendation for god object (pure).
+///
+/// Recommendations are context-specific based on the detected function role (spec 233).
 pub fn create_god_object_recommendation(
     god_analysis: &GodObjectAnalysis,
+) -> ActionableRecommendation {
+    // Classify role to generate context-specific recommendation
+    let role = classify_god_object_role(god_analysis);
+    create_god_object_recommendation_with_role(god_analysis, role)
+}
+
+/// Create actionable recommendation for god object with explicit role (pure).
+///
+/// Generates context-specific recommendations based on the function role:
+/// - Orchestrator: Extract coordination logic into smaller orchestrators
+/// - IOWrapper: Separate I/O operations from business logic
+/// - PureLogic: Split pure computation into focused modules
+fn create_god_object_recommendation_with_role(
+    god_analysis: &GodObjectAnalysis,
+    role: FunctionRole,
 ) -> ActionableRecommendation {
     // Calculate recommended split count
     let split_count = if god_analysis.recommended_splits.len() >= 2 {
@@ -230,12 +346,37 @@ pub fn create_god_object_recommendation(
         god_analysis.responsibility_count.clamp(2, 5)
     };
 
-    let primary_action = format!("Split into {} modules by responsibility", split_count);
+    // Generate role-specific primary action (spec 233)
+    let primary_action = match role {
+        FunctionRole::Orchestrator => format!(
+            "Extract {} sub-orchestrators to reduce coordination complexity",
+            split_count
+        ),
+        FunctionRole::IOWrapper => format!(
+            "Separate {} I/O handlers from business logic",
+            god_analysis.responsibility_count
+        ),
+        _ => format!("Split into {} modules by responsibility", split_count),
+    };
 
-    let rationale = format!(
-        "{} responsibilities detected with {} methods/functions - splitting will improve maintainability",
-        god_analysis.responsibility_count, god_analysis.method_count
-    );
+    // Generate role-specific rationale (spec 233)
+    let rationale = match role {
+        FunctionRole::Orchestrator => format!(
+            "High coordination complexity: {} responsibilities with {} methods - \
+            extracting sub-orchestrators will reduce cognitive load and improve testability",
+            god_analysis.responsibility_count, god_analysis.method_count
+        ),
+        FunctionRole::IOWrapper => format!(
+            "Mixed I/O concerns: {} responsibilities detected - \
+            separating I/O from pure logic enables better testing and reduces coupling",
+            god_analysis.responsibility_count
+        ),
+        _ => format!(
+            "{} responsibilities detected with {} methods/functions - \
+            splitting will improve maintainability and enable focused testing",
+            god_analysis.responsibility_count, god_analysis.method_count
+        ),
+    };
 
     ActionableRecommendation {
         primary_action,
@@ -364,7 +505,13 @@ mod tests {
         let analysis = create_test_god_analysis();
         let rec = create_god_object_recommendation(&analysis);
 
-        assert!(rec.primary_action.contains("Split into"));
+        // Default test fixture (50 methods, 5 responsibilities) is classified as Orchestrator
+        // so it should recommend extracting sub-orchestrators (spec 233)
+        assert!(
+            rec.primary_action.contains("sub-orchestrators"),
+            "Expected orchestrator recommendation, got: {}",
+            rec.primary_action
+        );
         assert!(rec.rationale.contains("5 responsibilities"));
     }
 
@@ -374,8 +521,25 @@ mod tests {
         let file_path = std::path::PathBuf::from("/path/to/large_file.rs");
         let (name, line) = determine_display_info(&file_path, &analysis);
 
-        assert_eq!(name, "large_file.rs");
+        // Spec 233: GodFile should use "[file-scope]" to avoid confusion with function names
+        assert_eq!(name, "[file-scope]");
         assert_eq!(line, 1);
+    }
+
+    #[test]
+    fn test_is_valid_function_name() {
+        // File-scope placeholder is valid (for file-level debt)
+        assert!(is_valid_function_name("[file-scope]"));
+
+        // Normal function names are valid
+        assert!(is_valid_function_name("process_data"));
+        assert!(is_valid_function_name("MyStruct"));
+        assert!(is_valid_function_name("calculate_risk"));
+
+        // Filenames are NOT valid as function names (indicates misclassification)
+        assert!(!is_valid_function_name("large_file.rs"));
+        assert!(!is_valid_function_name("module.py"));
+        assert!(!is_valid_function_name("handler.ts"));
     }
 
     #[test]
@@ -390,5 +554,254 @@ mod tests {
 
         assert_eq!(name, "MyLargeStruct");
         assert_eq!(line, 42);
+    }
+
+    // Spec 233: God object role classification tests
+
+    #[test]
+    fn test_classify_god_object_role_orchestrator_many_methods() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 20; // >= 10 methods
+        analysis.responsibility_count = 2;
+        analysis.purity_distribution = None;
+
+        let role = classify_god_object_role(&analysis);
+        assert_eq!(
+            role,
+            FunctionRole::Orchestrator,
+            "God object with many methods should be Orchestrator"
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_role_orchestrator_many_responsibilities() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 5; // < 10 methods
+        analysis.responsibility_count = 4; // >= 3 responsibilities
+        analysis.purity_distribution = None;
+
+        let role = classify_god_object_role(&analysis);
+        assert_eq!(
+            role,
+            FunctionRole::Orchestrator,
+            "God object with many responsibilities should be Orchestrator"
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_role_pure_logic_small() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 5; // < 10 methods
+        analysis.responsibility_count = 2; // < 3 responsibilities
+        analysis.purity_distribution = None;
+
+        let role = classify_god_object_role(&analysis);
+        assert_eq!(
+            role,
+            FunctionRole::PureLogic,
+            "Small god object should be PureLogic"
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_role_io_wrapper_high_impure() {
+        use crate::organization::god_object::PurityDistribution;
+
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 20;
+        analysis.responsibility_count = 4;
+        // More than 40% impure
+        analysis.purity_distribution = Some(PurityDistribution {
+            pure_count: 2,
+            probably_pure_count: 2,
+            impure_count: 6, // 6/10 = 60% > 40%
+            pure_weight_contribution: 0.2,
+            probably_pure_weight_contribution: 0.2,
+            impure_weight_contribution: 0.6,
+        });
+
+        let role = classify_god_object_role(&analysis);
+        assert_eq!(
+            role,
+            FunctionRole::IOWrapper,
+            "God object with high impure ratio should be IOWrapper"
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_role_not_io_wrapper_low_impure() {
+        use crate::organization::god_object::PurityDistribution;
+
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 20;
+        analysis.responsibility_count = 4;
+        // Less than 40% impure
+        analysis.purity_distribution = Some(PurityDistribution {
+            pure_count: 6,
+            probably_pure_count: 2,
+            impure_count: 2, // 2/10 = 20% < 40%
+            pure_weight_contribution: 0.6,
+            probably_pure_weight_contribution: 0.2,
+            impure_weight_contribution: 0.2,
+        });
+
+        let role = classify_god_object_role(&analysis);
+        assert_eq!(
+            role,
+            FunctionRole::Orchestrator,
+            "God object with low impure ratio should be Orchestrator (not IOWrapper)"
+        );
+    }
+
+    // Spec 233: Context-specific recommendation tests
+
+    #[test]
+    fn test_recommendation_orchestrator_role() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 20;
+        analysis.responsibility_count = 4;
+
+        let rec = create_god_object_recommendation_with_role(&analysis, FunctionRole::Orchestrator);
+
+        assert!(
+            rec.primary_action.contains("sub-orchestrators"),
+            "Orchestrator recommendation should mention sub-orchestrators"
+        );
+        assert!(
+            rec.rationale.contains("coordination complexity"),
+            "Orchestrator rationale should mention coordination"
+        );
+    }
+
+    #[test]
+    fn test_recommendation_io_wrapper_role() {
+        let mut analysis = create_test_god_analysis();
+        analysis.responsibility_count = 3;
+
+        let rec = create_god_object_recommendation_with_role(&analysis, FunctionRole::IOWrapper);
+
+        assert!(
+            rec.primary_action.contains("I/O handlers"),
+            "IOWrapper recommendation should mention I/O handlers"
+        );
+        assert!(
+            rec.rationale.contains("I/O concerns"),
+            "IOWrapper rationale should mention I/O concerns"
+        );
+    }
+
+    #[test]
+    fn test_recommendation_pure_logic_role() {
+        let mut analysis = create_test_god_analysis();
+        analysis.responsibility_count = 3;
+
+        let rec = create_god_object_recommendation_with_role(&analysis, FunctionRole::PureLogic);
+
+        assert!(
+            rec.primary_action.contains("Split into"),
+            "PureLogic recommendation should mention splitting"
+        );
+        assert!(
+            rec.rationale.contains("maintainability"),
+            "PureLogic rationale should mention maintainability"
+        );
+    }
+
+    // Spec 233: Role classification confidence tests
+
+    #[test]
+    fn test_confidence_io_wrapper_high() {
+        use crate::organization::god_object::PurityDistribution;
+
+        let mut analysis = create_test_god_analysis();
+        // 80% impure - very high confidence
+        analysis.purity_distribution = Some(PurityDistribution {
+            pure_count: 1,
+            probably_pure_count: 1,
+            impure_count: 8, // 8/10 = 80%
+            pure_weight_contribution: 0.1,
+            probably_pure_weight_contribution: 0.1,
+            impure_weight_contribution: 0.8,
+        });
+
+        let confidence = calculate_role_confidence(&analysis);
+        // Should be high confidence (>= 80%)
+        assert!(
+            confidence >= 0.80,
+            "High impure ratio should give high confidence: {:.2}%",
+            confidence * 100.0
+        );
+    }
+
+    #[test]
+    fn test_confidence_io_wrapper_threshold() {
+        use crate::organization::god_object::PurityDistribution;
+
+        let mut analysis = create_test_god_analysis();
+        // 50% impure - just above threshold
+        analysis.purity_distribution = Some(PurityDistribution {
+            pure_count: 3,
+            probably_pure_count: 2,
+            impure_count: 5, // 5/10 = 50%
+            pure_weight_contribution: 0.3,
+            probably_pure_weight_contribution: 0.2,
+            impure_weight_contribution: 0.5,
+        });
+
+        let confidence = calculate_role_confidence(&analysis);
+        // Should be moderate confidence (60-70%)
+        assert!(
+            (0.60..0.70).contains(&confidence),
+            "At-threshold impure ratio should give moderate confidence: {:.2}%",
+            confidence * 100.0
+        );
+    }
+
+    #[test]
+    fn test_confidence_orchestrator_high() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 25;
+        analysis.responsibility_count = 5;
+        analysis.purity_distribution = None;
+
+        let confidence = calculate_role_confidence(&analysis);
+        // Should be high confidence (>= 85%)
+        assert!(
+            confidence >= 0.85,
+            "High method/responsibility count should give high confidence: {:.2}%",
+            confidence * 100.0
+        );
+    }
+
+    #[test]
+    fn test_confidence_orchestrator_moderate() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 12;
+        analysis.responsibility_count = 3;
+        analysis.purity_distribution = None;
+
+        let confidence = calculate_role_confidence(&analysis);
+        // Should be moderate confidence (65-85%)
+        assert!(
+            (0.65..0.85).contains(&confidence),
+            "Moderate method/responsibility count should give moderate confidence: {:.2}%",
+            confidence * 100.0
+        );
+    }
+
+    #[test]
+    fn test_confidence_pure_logic_default() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 5;
+        analysis.responsibility_count = 2;
+        analysis.purity_distribution = None;
+
+        let confidence = calculate_role_confidence(&analysis);
+        // Should be lower confidence (50-65%) since it's a fallback
+        assert!(
+            (0.50..0.65).contains(&confidence),
+            "Fallback classification should have lower confidence: {:.2}%",
+            confidence * 100.0
+        );
     }
 }
