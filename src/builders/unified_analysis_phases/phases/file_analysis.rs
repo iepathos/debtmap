@@ -185,6 +185,7 @@ fn detect_god_object_from_content(
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
+                anti_pattern_report: None,
             });
         }
     }

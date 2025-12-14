@@ -445,7 +445,9 @@ pub struct IntegratedAnalysisResult {
     pub analysis_metadata: AnalysisMetadata,
 }
 
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AntiPatternReport {
     pub quality_score: f64,
     pub anti_patterns: Vec<AntiPattern>,

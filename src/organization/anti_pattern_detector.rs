@@ -11,6 +11,7 @@
 
 use crate::analyzers::type_registry::MethodSignature;
 use crate::organization::god_object::types::ModuleSplit;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Anti-pattern detector for analyzing module splits
@@ -54,7 +55,7 @@ impl Default for AntiPatternConfig {
 }
 
 /// An identified anti-pattern
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AntiPattern {
     pub pattern_type: AntiPatternType,
     pub severity: AntiPatternSeverity,
@@ -65,7 +66,8 @@ pub struct AntiPattern {
 }
 
 /// Types of anti-patterns that can be detected
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AntiPatternType {
     UtilitiesModule,
     TechnicalGrouping,
@@ -75,7 +77,8 @@ pub enum AntiPatternType {
 }
 
 /// Severity levels for anti-patterns
-#[derive(Clone, Debug, PartialEq, Ord, PartialOrd, Eq)]
+#[derive(Clone, Debug, PartialEq, Ord, PartialOrd, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum AntiPatternSeverity {
     Critical,
     High,
@@ -84,7 +87,7 @@ pub enum AntiPatternSeverity {
 }
 
 /// Quality report for a set of module splits
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SplitQualityReport {
     pub quality_score: f64,
     pub anti_patterns: Vec<AntiPattern>,

@@ -1079,6 +1079,7 @@ impl ParallelUnifiedAnalysisBuilder {
                             aggregated_error_swallowing_count: None,
                             aggregated_error_swallowing_patterns: None,
                             layering_impact: None,
+                            anti_pattern_report: None,
                         })
                     } else {
                         // No god object detected and heuristic not met
