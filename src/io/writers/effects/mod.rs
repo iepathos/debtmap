@@ -14,11 +14,11 @@
 //!
 //! # Module Structure
 //!
-//! - [`config`]: Configuration types for output generation
-//! - [`render`]: Pure rendering functions (no side effects)
-//! - [`writers`]: Single-format effect writers
-//! - [`compose`]: Multi-format composition utilities
-//! - [`report`]: Complete report generation
+//! - `config`: Configuration types for output generation
+//! - `render`: Pure rendering functions (no side effects)
+//! - `writers`: Single-format effect writers
+//! - `compose`: Multi-format composition utilities
+//! - `report`: Complete report generation
 //!
 //! # Example
 //!

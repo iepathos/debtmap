@@ -5,7 +5,7 @@
 //!
 //! - **Separation of concerns**: Pure computation logic doesn't call progress directly
 //! - **Composability**: Progress reporting composes naturally with other effects
-//! - **Testability**: Use [`RecordingProgressSink`] to verify progress behavior
+//! - **Testability**: Use test mocks to verify progress behavior
 //! - **Automatic cleanup**: Stages are completed even on error (bracket pattern)
 //!
 //! # Available Combinators

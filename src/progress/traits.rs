@@ -62,7 +62,7 @@ use std::sync::Arc;
 /// - All methods must be non-blocking
 /// - Methods may be called from multiple threads concurrently
 /// - Methods should not panic on invalid input (e.g., current > total)
-/// - The [`child`] method should return a sink that prefixes stage names
+/// - The `child` method should return a sink that prefixes stage names
 ///
 /// # Method Costs
 ///
@@ -104,7 +104,7 @@ pub trait ProgressSink: Send + Sync + 'static {
     /// Report a stage completing.
     ///
     /// This is called when a stage finishes (successfully or with error).
-    /// Implementations should clean up any resources started in [`start_stage`].
+    /// Implementations should clean up any resources started in `start_stage`.
     ///
     /// # Arguments
     ///

@@ -9,7 +9,7 @@
 //! - `gen[block]` = new definitions in this block
 //! - `kill[block]` = definitions this block overwrites
 //! - `reach_in[block]` = union of `reach_out[predecessor]` for all predecessors
-//! - `reach_out[block]` = (reach_in[block] - kill[block]) ∪ gen[block]
+//! - `reach_out\[block\]` = (reach_in\[block\] - kill\[block\]) ∪ gen\[block\]
 //!
 //! # Statement-Level Precision
 //!

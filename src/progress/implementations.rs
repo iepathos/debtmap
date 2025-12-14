@@ -13,7 +13,7 @@
 //! | Unit tests | [`SilentProgressSink`] or [`RecordingProgressSink`] |
 //! | CI/CD | [`SilentProgressSink`] |
 //! | CLI tool | [`CliProgressSink`] |
-//! | TUI mode | See [`crate::tui::progress_sink::TuiProgressSink`] |
+//! | TUI mode | See TUI module for `TuiProgressSink` |
 //!
 //! # Example: Using RecordingProgressSink in Tests
 //!
