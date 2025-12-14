@@ -125,8 +125,12 @@ pub fn resolve_all_trait_calls(
     let mut result = ResolutionResult::default();
 
     for call in unresolved_calls.iter() {
-        let implementations =
-            resolve_trait_call(call, enhanced_tracker, type_to_traits, trait_implementations);
+        let implementations = resolve_trait_call(
+            call,
+            enhanced_tracker,
+            type_to_traits,
+            trait_implementations,
+        );
 
         for impl_method_id in implementations.iter() {
             result

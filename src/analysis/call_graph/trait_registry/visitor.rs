@@ -3,9 +3,7 @@
 //! This module handles the I/O boundary of parsing Rust AST to extract
 //! trait definitions, implementations, and method calls.
 
-use super::types::{
-    TraitImplementation, TraitMethod, TraitMethodCall, TraitMethodImplementation,
-};
+use super::types::{TraitImplementation, TraitMethod, TraitMethodCall, TraitMethodImplementation};
 use crate::priority::call_graph::FunctionId;
 use im::{HashMap, HashSet, Vector};
 use std::path::PathBuf;

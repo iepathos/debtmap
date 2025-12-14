@@ -72,7 +72,8 @@ pub use io_detection::{
 };
 pub use module_structure::{
     ComponentCouplingAnalysis, ComponentDependencyGraph, Difficulty, FunctionCounts, FunctionGroup,
-    ModuleComponent, ModuleStructure, ModuleStructureAnalyzer, SplitRecommendation,
+    ModuleComponent, ModuleFacadeInfo, ModuleStructure, ModuleStructureAnalyzer,
+    OrganizationQuality, PathDeclaration, SplitRecommendation,
 };
 pub use multi_signal_aggregation::{
     AggregatedClassification, AggregationConfig, ConflictResolutionStrategy,
