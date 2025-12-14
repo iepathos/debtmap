@@ -40,6 +40,77 @@ pub fn detect_circular_dependencies(splits: &[ModuleSplit]) -> Vec<Vec<String>> 
     cycles
 }
 
+/// Check if a cycle (as sorted nodes) already exists in the cycles collection
+fn is_duplicate_cycle(cycles: &[Vec<String>], new_cycle_sorted: &[String]) -> bool {
+    cycles.iter().any(|existing| {
+        let mut sorted = existing.clone();
+        sorted.sort();
+        sorted == new_cycle_sorted
+    })
+}
+
+/// Extract a cycle from the current path starting at the given index
+fn extract_cycle(path: &[String], cycle_start_idx: usize) -> Vec<String> {
+    path[cycle_start_idx..].to_vec()
+}
+
+/// Create a sorted copy of a cycle for duplicate comparison
+fn normalize_cycle(cycle: &[String]) -> Vec<String> {
+    let mut sorted = cycle.to_vec();
+    sorted.sort();
+    sorted
+}
+
+/// Try to record a cycle if it's not a duplicate
+fn try_record_cycle(cycles: &mut Vec<Vec<String>>, path: &[String], cycle_start_idx: usize) {
+    let cycle = extract_cycle(path, cycle_start_idx);
+    let normalized = normalize_cycle(&cycle);
+    if !is_duplicate_cycle(cycles, &normalized) {
+        cycles.push(cycle);
+    }
+}
+
+/// Process entering a node: mark as visited and on recursion stack
+fn enter_node(
+    node: &str,
+    visited: &mut HashSet<String>,
+    rec_stack: &mut HashSet<String>,
+    path: &mut Vec<String>,
+) {
+    visited.insert(node.to_string());
+    rec_stack.insert(node.to_string());
+    path.push(node.to_string());
+}
+
+/// Process leaving a node: remove from recursion stack and path
+fn leave_node(node: &str, rec_stack: &mut HashSet<String>, path: &mut Vec<String>) {
+    path.pop();
+    rec_stack.remove(node);
+}
+
+/// Collect neighbor actions: returns nodes to visit and cycles found
+fn process_neighbors(
+    neighbors: &[String],
+    visited: &HashSet<String>,
+    rec_stack: &HashSet<String>,
+    path: &[String],
+) -> (Vec<String>, Vec<usize>) {
+    let mut to_visit = Vec::new();
+    let mut cycle_starts = Vec::new();
+
+    for neighbor in neighbors.iter().rev() {
+        if !visited.contains(neighbor) {
+            to_visit.push(neighbor.clone());
+        } else if rec_stack.contains(neighbor) {
+            if let Some(idx) = path.iter().position(|n| n == neighbor) {
+                cycle_starts.push(idx);
+            }
+        }
+    }
+
+    (to_visit, cycle_starts)
+}
+
 /// Iterative DFS cycle detection to avoid stack overflow on large graphs.
 ///
 /// Uses an explicit stack with frame state tracking to simulate recursive DFS.
@@ -48,52 +119,30 @@ fn dfs_find_cycles(
     graph: &HashMap<String, Vec<String>>,
     visited: &mut HashSet<String>,
     rec_stack: &mut HashSet<String>,
-    _current_path: &mut [String], // Kept for API compatibility but unused
+    _current_path: &mut [String],
     cycles: &mut Vec<Vec<String>>,
 ) {
-    // Stack frame: (node, is_entering)
-    // is_entering=true: first visit to this node
-    // is_entering=false: returning from processing children
     let mut stack: Vec<(String, bool)> = vec![(start_node.to_string(), true)];
     let mut path: Vec<String> = Vec::new();
 
     while let Some((node, is_entering)) = stack.pop() {
-        if is_entering {
-            // First visit to this node
-            visited.insert(node.clone());
-            rec_stack.insert(node.clone());
-            path.push(node.clone());
+        if !is_entering {
+            leave_node(&node, rec_stack, &mut path);
+            continue;
+        }
 
-            // Push a "return" frame to clean up when done
-            stack.push((node.clone(), false));
+        enter_node(&node, visited, rec_stack, &mut path);
+        stack.push((node.clone(), false));
 
-            // Process neighbors
-            if let Some(neighbors) = graph.get(&node) {
-                for neighbor in neighbors.iter().rev() {
-                    if !visited.contains(neighbor) {
-                        // Unvisited node - push for processing
-                        stack.push((neighbor.clone(), true));
-                    } else if rec_stack.contains(neighbor) {
-                        // Found a cycle
-                        if let Some(cycle_start) = path.iter().position(|n| n == neighbor) {
-                            let mut cycle = path[cycle_start..].to_vec();
-                            cycle.sort();
-                            // Only add if not already present (avoid duplicates)
-                            if !cycles.iter().any(|c| {
-                                let mut sorted_c = c.clone();
-                                sorted_c.sort();
-                                sorted_c == cycle
-                            }) {
-                                cycles.push(path[cycle_start..].to_vec());
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // Returning from this node - clean up
-            path.pop();
-            rec_stack.remove(&node);
+        let neighbors = graph.get(&node).map(|v| v.as_slice()).unwrap_or(&[]);
+        let (to_visit, cycle_starts) = process_neighbors(neighbors, visited, rec_stack, &path);
+
+        for idx in cycle_starts {
+            try_record_cycle(cycles, &path, idx);
+        }
+
+        for neighbor in to_visit {
+            stack.push((neighbor, true));
         }
     }
 }
@@ -190,5 +239,137 @@ mod tests {
 
         let cycles = detect_circular_dependencies(&splits);
         assert!(cycles.len() >= 2, "Should detect both cycles");
+    }
+
+    // ========================================
+    // Pure function unit tests (Stillwater style)
+    // ========================================
+
+    #[test]
+    fn test_is_duplicate_cycle_finds_match() {
+        let existing = vec![vec!["A".to_string(), "B".to_string(), "C".to_string()]];
+        let new_cycle = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        assert!(is_duplicate_cycle(&existing, &new_cycle));
+    }
+
+    #[test]
+    fn test_is_duplicate_cycle_different_order_still_matches() {
+        let existing = vec![vec!["C".to_string(), "A".to_string(), "B".to_string()]];
+        // Same nodes, different order - normalized should match
+        let new_cycle = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        assert!(is_duplicate_cycle(&existing, &new_cycle));
+    }
+
+    #[test]
+    fn test_is_duplicate_cycle_no_match() {
+        let existing = vec![vec!["A".to_string(), "B".to_string()]];
+        let new_cycle = vec!["A".to_string(), "C".to_string()];
+        assert!(!is_duplicate_cycle(&existing, &new_cycle));
+    }
+
+    #[test]
+    fn test_extract_cycle_from_middle() {
+        let path = vec![
+            "A".to_string(),
+            "B".to_string(),
+            "C".to_string(),
+            "D".to_string(),
+        ];
+        let cycle = extract_cycle(&path, 1);
+        assert_eq!(cycle, vec!["B", "C", "D"]);
+    }
+
+    #[test]
+    fn test_normalize_cycle_sorts_alphabetically() {
+        let cycle = vec!["C".to_string(), "A".to_string(), "B".to_string()];
+        let normalized = normalize_cycle(&cycle);
+        assert_eq!(normalized, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn test_process_neighbors_categorizes_correctly() {
+        let neighbors = vec![
+            "unvisited".to_string(),
+            "in_stack".to_string(),
+            "visited_done".to_string(),
+        ];
+        let mut visited = HashSet::new();
+        visited.insert("in_stack".to_string());
+        visited.insert("visited_done".to_string());
+
+        let mut rec_stack = HashSet::new();
+        rec_stack.insert("in_stack".to_string());
+
+        let path = vec!["start".to_string(), "in_stack".to_string()];
+
+        let (to_visit, cycle_starts) = process_neighbors(&neighbors, &visited, &rec_stack, &path);
+
+        // "unvisited" should be in to_visit
+        assert!(to_visit.contains(&"unvisited".to_string()));
+        // "in_stack" forms a cycle at index 1
+        assert_eq!(cycle_starts.len(), 1);
+        assert_eq!(cycle_starts[0], 1);
+        // "visited_done" is visited but not in rec_stack - no cycle, no visit
+    }
+
+    #[test]
+    fn test_process_neighbors_empty() {
+        let neighbors: Vec<String> = vec![];
+        let visited = HashSet::new();
+        let rec_stack = HashSet::new();
+        let path = vec!["start".to_string()];
+
+        let (to_visit, cycle_starts) = process_neighbors(&neighbors, &visited, &rec_stack, &path);
+
+        assert!(to_visit.is_empty());
+        assert!(cycle_starts.is_empty());
+    }
+
+    #[test]
+    fn test_enter_and_leave_node_state_management() {
+        let mut visited = HashSet::new();
+        let mut rec_stack = HashSet::new();
+        let mut path = Vec::new();
+
+        enter_node("A", &mut visited, &mut rec_stack, &mut path);
+
+        assert!(visited.contains("A"));
+        assert!(rec_stack.contains("A"));
+        assert_eq!(path, vec!["A"]);
+
+        leave_node("A", &mut rec_stack, &mut path);
+
+        assert!(visited.contains("A")); // Still visited
+        assert!(!rec_stack.contains("A")); // Removed from rec_stack
+        assert!(path.is_empty()); // Removed from path
+    }
+
+    #[test]
+    fn test_try_record_cycle_prevents_duplicates() {
+        let mut cycles = vec![vec!["A".to_string(), "B".to_string()]];
+        let path = vec!["X".to_string(), "A".to_string(), "B".to_string()];
+
+        // Try to add same cycle (different order in path)
+        try_record_cycle(&mut cycles, &path, 1);
+
+        assert_eq!(cycles.len(), 1, "Duplicate should not be added");
+    }
+
+    #[test]
+    fn test_try_record_cycle_adds_new() {
+        let mut cycles = vec![vec!["A".to_string(), "B".to_string()]];
+        let path = vec!["X".to_string(), "C".to_string(), "D".to_string()];
+
+        try_record_cycle(&mut cycles, &path, 1);
+
+        assert_eq!(cycles.len(), 2, "New cycle should be added");
+        assert!(cycles.iter().any(|c| c.contains(&"C".to_string())));
+    }
+
+    #[test]
+    fn test_empty_graph() {
+        let splits: Vec<ModuleSplit> = vec![];
+        let cycles = detect_circular_dependencies(&splits);
+        assert!(cycles.is_empty());
     }
 }
