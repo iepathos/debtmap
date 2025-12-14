@@ -84,6 +84,7 @@ where
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            total_lines: content.lines().count(),
             module_scope: None,
             classes: None,
         })
@@ -142,6 +143,7 @@ where
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            total_lines: content.lines().count(),
             module_scope: None,
             classes: None,
         })

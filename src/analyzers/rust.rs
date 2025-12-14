@@ -124,6 +124,7 @@ impl Analyzer for RustAnalyzer {
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
+                total_lines: 0,
                 module_scope: None,
                 classes: None,
             },
@@ -151,6 +152,9 @@ fn analyze_rust_file(
     enable_rust_patterns: bool,
 ) -> FileMetrics {
     let start = std::time::Instant::now();
+
+    // Capture line count from source during initial analysis to avoid redundant I/O later
+    let total_lines = ast.source.lines().count();
 
     let analysis_start = std::time::Instant::now();
     let analysis_result = analyze_ast_with_content(
@@ -198,6 +202,7 @@ fn analyze_rust_file(
         complexity_metrics,
         debt_items,
         dependencies,
+        total_lines,
     )
 }
 
@@ -263,6 +268,7 @@ fn build_file_metrics(
     (cyclomatic, cognitive): (u32, u32),
     debt_items: Vec<DebtItem>,
     dependencies: Vec<Dependency>,
+    total_lines: usize,
 ) -> FileMetrics {
     FileMetrics {
         path,
@@ -275,6 +281,7 @@ fn build_file_metrics(
         debt_items,
         dependencies,
         duplications: vec![],
+        total_lines,
         module_scope: None,
         classes: None,
     }
@@ -1729,6 +1736,7 @@ mod tests {
             (2, 3),
             debt_items.clone(),
             dependencies.clone(),
+            100, // total_lines
         );
 
         assert_eq!(metrics.path, path);

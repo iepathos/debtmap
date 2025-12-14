@@ -108,6 +108,7 @@ pub fn combine_file_metrics(metrics: Vec<FileMetrics>) -> FileMetrics {
             debt_items: Vec::new(),
             dependencies: Vec::new(),
             duplications: Vec::new(),
+            total_lines: 0,
             module_scope: None,
             classes: None,
         },
@@ -120,6 +121,7 @@ pub fn combine_file_metrics(metrics: Vec<FileMetrics>) -> FileMetrics {
             acc.debt_items.extend(m.debt_items);
             acc.dependencies.extend(m.dependencies);
             acc.duplications.extend(m.duplications);
+            acc.total_lines += m.total_lines;
             acc
         },
     )
@@ -268,6 +270,7 @@ mod tests {
             debt_items: Vec::new(),
             dependencies: Vec::new(),
             duplications: Vec::new(),
+            total_lines: 0,
             module_scope: None,
             classes: None,
         }

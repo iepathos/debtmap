@@ -340,6 +340,10 @@ pub struct FileMetrics {
     pub debt_items: Vec<DebtItem>,
     pub dependencies: Vec<Dependency>,
     pub duplications: Vec<DuplicationBlock>,
+    /// Total number of lines in the file, captured during initial parsing.
+    /// Used to avoid redundant file I/O in later analysis phases.
+    #[serde(default)]
+    pub total_lines: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub module_scope: Option<ast::ModuleScopeAnalysis>,
     #[serde(skip_serializing_if = "Option::is_none")]
