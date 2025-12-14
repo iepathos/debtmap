@@ -18,7 +18,6 @@ pub struct ValidationAnalysisOptions {
     pub jobs: usize,
 }
 
-
 /// Read parallel processing settings from environment.
 ///
 /// This reads DEBTMAP_PARALLEL and DEBTMAP_JOBS environment variables
