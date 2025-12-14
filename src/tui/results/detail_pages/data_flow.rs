@@ -54,8 +54,8 @@ fn get_fix_suggestion(reasons: &[String]) -> Option<&'static str> {
     }
 }
 
-/// Render purity analysis section with actionable details. Returns true if anything was rendered.
-fn render_purity_section(
+/// Build purity analysis section with actionable details. Returns true if anything was rendered.
+fn build_purity_section(
     lines: &mut Vec<Line<'static>>,
     purity_info: &PurityInfo,
     theme: &Theme,
@@ -110,15 +110,15 @@ fn render_purity_section(
     true
 }
 
-/// Render data flow page showing data flow analysis
-pub fn render(
-    frame: &mut Frame,
-    _app: &ResultsApp,
+/// Build all lines for the data flow page (pure function).
+///
+/// This is public so text_extraction can reuse it for clipboard copy.
+pub fn build_page_lines(
     item: &UnifiedDebtItem,
     data_flow: &DataFlowGraph,
-    area: Rect,
     theme: &Theme,
-) {
+    width: u16,
+) -> Vec<Line<'static>> {
     let func_id = FunctionId::new(
         item.location.file.clone(),
         item.location.function.clone(),
@@ -129,7 +129,7 @@ pub fn render(
 
     // Purity Analysis Section (moved from patterns page - conceptually belongs here)
     if let Some(purity_info) = data_flow.get_purity_info(&func_id) {
-        render_purity_section(&mut lines, purity_info, theme, area.width);
+        build_purity_section(&mut lines, purity_info, theme, width);
     }
 
     // Mutation Analysis Section (spec 257: binary signals)
@@ -146,7 +146,7 @@ pub fn render(
             }
             .to_string(),
             theme,
-            area.width,
+            width,
         );
 
         if !mutation_info.detected_mutations.is_empty() {
@@ -196,6 +196,20 @@ pub fn render(
             Style::default().fg(theme.muted),
         )]));
     }
+
+    lines
+}
+
+/// Render data flow page showing data flow analysis
+pub fn render(
+    frame: &mut Frame,
+    _app: &ResultsApp,
+    item: &UnifiedDebtItem,
+    data_flow: &DataFlowGraph,
+    area: Rect,
+    theme: &Theme,
+) {
+    let lines = build_page_lines(item, data_flow, theme, area.width);
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))

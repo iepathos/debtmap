@@ -20,10 +20,15 @@ use ratatui::{
 
 // ============================================================================
 // Pure Section Builders (the "still" core)
+// These are public so text_extraction can reuse them for clipboard copy.
 // ============================================================================
 
 /// Build location section lines (pure)
-fn build_location_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
+pub fn build_location_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     add_section_header(&mut lines, "location", theme);
     add_label_value(
@@ -58,7 +63,7 @@ fn build_location_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> 
 }
 
 /// Build score section lines (pure)
-fn build_score_section(
+pub fn build_score_section(
     location_items: &[&UnifiedDebtItem],
     item: &UnifiedDebtItem,
     theme: &Theme,
@@ -103,7 +108,7 @@ fn build_score_section(
 }
 
 /// Build god object structure section (pure) - returns empty if not a god object
-fn build_god_object_section(
+pub fn build_god_object_section(
     item: &UnifiedDebtItem,
     theme: &Theme,
     width: u16,
@@ -156,7 +161,7 @@ fn build_god_object_section(
 }
 
 /// Build complexity metrics section (pure)
-fn build_complexity_section(
+pub fn build_complexity_section(
     item: &UnifiedDebtItem,
     theme: &Theme,
     width: u16,
@@ -207,7 +212,7 @@ fn build_complexity_section(
 }
 
 /// Format cognitive complexity display with optional dampening info (pure)
-fn format_cognitive_display(item: &UnifiedDebtItem, is_god_object: bool) -> String {
+pub fn format_cognitive_display(item: &UnifiedDebtItem, is_god_object: bool) -> String {
     if is_god_object {
         item.god_object_indicators
             .as_ref()
@@ -235,7 +240,11 @@ fn format_cognitive_display(item: &UnifiedDebtItem, is_god_object: bool) -> Stri
 }
 
 /// Build coverage section lines (pure)
-fn build_coverage_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
+pub fn build_coverage_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     add_section_header(&mut lines, "coverage", theme);
     let coverage_value = item
@@ -251,7 +260,7 @@ fn build_coverage_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> 
 /// Build cohesion section lines (pure) - displays file cohesion metrics (spec 198)
 ///
 /// Returns empty if cohesion data is not available (e.g., file has fewer than 3 functions).
-fn build_cohesion_section(
+pub fn build_cohesion_section(
     cohesion: Option<&FileCohesionResult>,
     theme: &Theme,
     width: u16,
@@ -301,7 +310,7 @@ fn build_cohesion_section(
 }
 
 /// Build recommendation section lines (pure)
-fn build_recommendation_section(
+pub fn build_recommendation_section(
     item: &UnifiedDebtItem,
     theme: &Theme,
     width: u16,
@@ -328,7 +337,7 @@ fn build_recommendation_section(
 }
 
 /// Build debt types section lines (pure)
-fn build_debt_types_section(
+pub fn build_debt_types_section(
     location_items: &[&UnifiedDebtItem],
     item: &UnifiedDebtItem,
     theme: &Theme,
@@ -399,7 +408,7 @@ pub fn render(
 }
 
 /// Get all debt items at the same location as the selected item
-fn get_items_at_location<'a>(
+pub fn get_items_at_location<'a>(
     app: &'a ResultsApp,
     selected: &UnifiedDebtItem,
 ) -> Vec<&'a UnifiedDebtItem> {
@@ -415,7 +424,7 @@ fn get_items_at_location<'a>(
 }
 
 /// Format debt type as human-readable name
-fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
+pub fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
     #[allow(unused_imports)]
     use crate::priority::score_types::Score0To100;
     use crate::priority::DebtType;

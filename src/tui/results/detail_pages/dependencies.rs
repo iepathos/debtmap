@@ -19,14 +19,10 @@ use ratatui::{
     Frame,
 };
 
-/// Render dependencies page showing dependency metrics and blast radius
-pub fn render(
-    frame: &mut Frame,
-    app: &ResultsApp,
-    item: &UnifiedDebtItem,
-    area: Rect,
-    theme: &Theme,
-) {
+/// Build all lines for the dependencies page (pure function).
+///
+/// This is public so text_extraction can reuse it for clipboard copy.
+pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
     // Function-level Dependency Metrics section
@@ -36,14 +32,14 @@ pub fn render(
         "upstream",
         item.upstream_dependencies.to_string(),
         theme,
-        area.width,
+        width,
     );
     add_label_value(
         &mut lines,
         "downstream",
         item.downstream_dependencies.to_string(),
         theme,
-        area.width,
+        width,
     );
 
     let blast_radius = item.upstream_dependencies + item.downstream_dependencies;
@@ -52,7 +48,7 @@ pub fn render(
         "blast radius",
         blast_radius.to_string(),
         theme,
-        area.width,
+        width,
     );
 
     // Critical path indicator (simplified - based on high dependency count)
@@ -62,11 +58,24 @@ pub fn render(
         "critical",
         if is_critical { "Yes" } else { "No" }.to_string(),
         theme,
-        area.width,
+        width,
     );
 
     // File-level Coupling Metrics section (spec 201)
-    render_file_coupling_section(&mut lines, app, item, theme, area.width);
+    build_file_coupling_section(&mut lines, item, theme, width);
+
+    lines
+}
+
+/// Render dependencies page showing dependency metrics and blast radius
+pub fn render(
+    frame: &mut Frame,
+    _app: &ResultsApp,
+    item: &UnifiedDebtItem,
+    area: Rect,
+    theme: &Theme,
+) {
+    let lines = build_page_lines(item, theme, area.width);
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
@@ -75,7 +84,7 @@ pub fn render(
     frame.render_widget(paragraph, area);
 }
 
-/// Render function-level coupling metrics section with enhanced visualization.
+/// Build function-level coupling metrics section with enhanced visualization.
 ///
 /// For regular functions, displays function-level dependency data:
 /// - Coupling classification badge with color coding
@@ -85,9 +94,8 @@ pub fn render(
 /// - Lists of callers (dependents) and callees (dependencies)
 ///
 /// For god objects, aggregates file-level metrics from member functions.
-fn render_file_coupling_section(
+fn build_file_coupling_section(
     lines: &mut Vec<Line<'static>>,
-    _app: &ResultsApp,
     item: &UnifiedDebtItem,
     theme: &Theme,
     width: u16,

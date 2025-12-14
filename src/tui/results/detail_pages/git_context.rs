@@ -13,14 +13,10 @@ use ratatui::{
     Frame,
 };
 
-/// Render git context page showing change patterns and risk impact
-pub fn render(
-    frame: &mut Frame,
-    _app: &ResultsApp,
-    item: &UnifiedDebtItem,
-    area: Rect,
-    theme: &Theme,
-) {
+/// Build all lines for the git context page (pure function).
+///
+/// This is public so text_extraction can reuse it for clipboard copy.
+pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
     if let Some(ref contextual_risk) = item.contextual_risk {
@@ -45,38 +41,32 @@ pub fn render(
                     "frequency",
                     format!("{:.2} changes/month", change_frequency),
                     theme,
-                    area.width,
+                    width,
                 );
 
                 let stability = classify_stability(*change_frequency);
-                add_label_value(
-                    &mut lines,
-                    "stability",
-                    stability.to_string(),
-                    theme,
-                    area.width,
-                );
+                add_label_value(&mut lines, "stability", stability.to_string(), theme, width);
 
                 add_label_value(
                     &mut lines,
                     "bugs",
                     format!("{:.1}%", bug_density * 100.0),
                     theme,
-                    area.width,
+                    width,
                 );
                 add_label_value(
                     &mut lines,
                     "age",
                     format!("{} days", age_days),
                     theme,
-                    area.width,
+                    width,
                 );
                 add_label_value(
                     &mut lines,
                     "contributors",
                     author_count.to_string(),
                     theme,
-                    area.width,
+                    width,
                 );
                 add_blank_line(&mut lines);
             }
@@ -89,14 +79,14 @@ pub fn render(
             "base",
             format!("{:.1}", contextual_risk.base_risk),
             theme,
-            area.width,
+            width,
         );
         add_label_value(
             &mut lines,
             "contextual",
             format!("{:.1}", contextual_risk.contextual_risk),
             theme,
-            area.width,
+            width,
         );
 
         let multiplier = if contextual_risk.base_risk > 0.0 {
@@ -109,7 +99,7 @@ pub fn render(
             "multiplier",
             format!("{:.2}x", multiplier),
             theme,
-            area.width,
+            width,
         );
         add_blank_line(&mut lines);
     }
@@ -122,7 +112,7 @@ pub fn render(
             "file type",
             format!("{:?}", file_type),
             theme,
-            area.width,
+            width,
         );
 
         if let Some(multiplier) = item.context_multiplier {
@@ -132,7 +122,7 @@ pub fn render(
                 "reduction",
                 format!("{:.1}%", reduction),
                 theme,
-                area.width,
+                width,
             );
         }
         add_blank_line(&mut lines);
@@ -145,6 +135,19 @@ pub fn render(
             Style::default().fg(theme.muted),
         )]));
     }
+
+    lines
+}
+
+/// Render git context page showing change patterns and risk impact
+pub fn render(
+    frame: &mut Frame,
+    _app: &ResultsApp,
+    item: &UnifiedDebtItem,
+    area: Rect,
+    theme: &Theme,
+) {
+    let lines = build_page_lines(item, theme, area.width);
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))

@@ -16,24 +16,33 @@ use ratatui::{
     Frame,
 };
 
-/// Render responsibilities page showing responsibility information
-pub fn render(frame: &mut Frame, item: &UnifiedDebtItem, area: Rect, theme: &Theme) {
+/// Build all lines for the responsibilities page (pure function).
+///
+/// This is public so text_extraction can reuse it for clipboard copy.
+pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
     // Check for god object responsibilities first
-    let god_object_shown = render_god_object_responsibilities(&mut lines, item, theme, area.width);
+    let god_object_shown = build_god_object_responsibilities(&mut lines, item, theme, width);
 
     // Fall back to single responsibility category
     if !god_object_shown {
-        render_single_responsibility(&mut lines, item, theme, area.width);
+        build_single_responsibility(&mut lines, item, theme, width);
     }
 
     // Add explanatory note for god objects
     if let Some(indicators) = &item.god_object_indicators {
         if indicators.is_god_object {
-            render_god_object_note(&mut lines, theme);
+            build_god_object_note(&mut lines, theme);
         }
     }
+
+    lines
+}
+
+/// Render responsibilities page showing responsibility information
+pub fn render(frame: &mut Frame, item: &UnifiedDebtItem, area: Rect, theme: &Theme) {
+    let lines = build_page_lines(item, theme, area.width);
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
@@ -42,10 +51,10 @@ pub fn render(frame: &mut Frame, item: &UnifiedDebtItem, area: Rect, theme: &The
     frame.render_widget(paragraph, area);
 }
 
-/// Render god object responsibilities with method counts.
+/// Build god object responsibilities with method counts.
 ///
 /// Returns true if responsibilities were rendered.
-fn render_god_object_responsibilities(
+fn build_god_object_responsibilities(
     lines: &mut Vec<Line<'static>>,
     item: &UnifiedDebtItem,
     theme: &Theme,
@@ -83,9 +92,9 @@ fn render_god_object_responsibilities(
     true
 }
 
-/// Render single responsibility category for non-god-object functions.
+/// Build single responsibility category for non-god-object functions.
 /// Always shows something - falls back to "unclassified" if no category detected.
-fn render_single_responsibility(
+fn build_single_responsibility(
     lines: &mut Vec<Line<'static>>,
     item: &UnifiedDebtItem,
     theme: &Theme,
@@ -99,8 +108,8 @@ fn render_single_responsibility(
     add_label_value(lines, "category", category.to_lowercase(), theme, width);
 }
 
-/// Render explanatory note for god objects.
-fn render_god_object_note(lines: &mut Vec<Line<'static>>, theme: &Theme) {
+/// Build explanatory note for god objects.
+fn build_god_object_note(lines: &mut Vec<Line<'static>>, theme: &Theme) {
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
         Span::styled("Note: ", Style::default().fg(theme.primary)),

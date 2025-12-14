@@ -445,19 +445,14 @@ fn render_anti_patterns_section(
     true
 }
 
-/// Render patterns page showing detected patterns and pattern analysis
-pub fn render(
-    frame: &mut Frame,
-    _app: &ResultsApp,
-    item: &UnifiedDebtItem,
-    area: Rect,
-    theme: &Theme,
-) {
+/// Build all lines for the patterns page (pure function).
+///
+/// This is public so text_extraction can reuse it for clipboard copy.
+pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    let width = area.width;
 
     // Compose all section renderers
-    let has_any_data = render_all_sections(&mut lines, item, theme, width);
+    let has_any_data = build_all_sections(&mut lines, item, theme, width);
 
     // If no data available
     if !has_any_data {
@@ -467,6 +462,19 @@ pub fn render(
         )]));
     }
 
+    lines
+}
+
+/// Render patterns page showing detected patterns and pattern analysis
+pub fn render(
+    frame: &mut Frame,
+    _app: &ResultsApp,
+    item: &UnifiedDebtItem,
+    area: Rect,
+    theme: &Theme,
+) {
+    let lines = build_page_lines(item, theme, area.width);
+
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
         .wrap(Wrap { trim: false });
@@ -474,8 +482,8 @@ pub fn render(
     frame.render_widget(paragraph, area);
 }
 
-/// Render all pattern sections, returning true if any data was rendered
-fn render_all_sections(
+/// Build all pattern sections, returning true if any data was rendered
+fn build_all_sections(
     lines: &mut Vec<Line<'static>>,
     item: &UnifiedDebtItem,
     theme: &Theme,
