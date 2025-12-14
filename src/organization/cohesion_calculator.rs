@@ -6,6 +6,90 @@ use crate::organization::god_object::types::ModuleSplit;
 use crate::organization::struct_ownership::StructOwnershipAnalyzer;
 use crate::priority::call_graph::CallGraph;
 use std::collections::HashSet;
+use std::path::Path;
+
+/// Result of file-level cohesion calculation (spec 198)
+#[derive(Debug, Clone)]
+pub struct FileCohesionResult {
+    /// Cohesion score between 0.0 and 1.0
+    pub score: f64,
+    /// Number of internal function calls (within the same file)
+    pub internal_calls: usize,
+    /// Number of external function calls (to other files)
+    pub external_calls: usize,
+    /// Number of functions in the file that were analyzed
+    pub functions_analyzed: usize,
+}
+
+/// Minimum number of functions required for cohesion calculation (spec 198)
+const MIN_FUNCTIONS_FOR_COHESION: usize = 3;
+
+/// Calculate cohesion for a file based on function call patterns (spec 198)
+///
+/// File-level cohesion measures how tightly related the functions within a file are.
+/// High cohesion (>0.7) indicates functions work together frequently.
+/// Low cohesion (<0.4) suggests the file contains unrelated functionality.
+///
+/// Formula: cohesion = internal_calls / (internal_calls + external_calls)
+///
+/// # Arguments
+/// * `file_path` - Path to the file being analyzed
+/// * `call_graph` - The function call graph for the codebase
+///
+/// # Returns
+/// `Some(FileCohesionResult)` if the file has 3+ functions, `None` otherwise
+pub fn calculate_file_cohesion(
+    file_path: &Path,
+    call_graph: &CallGraph,
+) -> Option<FileCohesionResult> {
+    // Find all functions in this file
+    let file_functions: HashSet<String> = call_graph
+        .get_all_functions()
+        .filter(|func| func.file == file_path)
+        .map(|func| func.name.clone())
+        .collect();
+
+    let functions_count = file_functions.len();
+
+    // Only calculate cohesion if file has enough functions
+    if functions_count < MIN_FUNCTIONS_FOR_COHESION {
+        return None;
+    }
+
+    let mut internal_calls = 0;
+    let mut external_calls = 0;
+
+    // Analyze all function calls
+    for call in call_graph.get_all_calls() {
+        // Only consider calls FROM functions in this file
+        if call.caller.file != file_path {
+            continue;
+        }
+
+        // Check if the callee is in the same file (internal) or different file (external)
+        if call.callee.file == file_path {
+            internal_calls += 1;
+        } else {
+            external_calls += 1;
+        }
+    }
+
+    // Calculate cohesion score
+    let total_calls = internal_calls + external_calls;
+    let score = if total_calls == 0 {
+        // No calls - assume perfect cohesion (self-contained functions)
+        1.0
+    } else {
+        internal_calls as f64 / total_calls as f64
+    };
+
+    Some(FileCohesionResult {
+        score,
+        internal_calls,
+        external_calls,
+        functions_analyzed: functions_count,
+    })
+}
 
 /// Calculate cohesion score for a module split recommendation
 ///
@@ -231,5 +315,176 @@ mod tests {
 
         let cohesion = calculate_cohesion_score(&split, &call_graph, &ownership);
         assert_eq!(cohesion, 1.0, "No calls should default to perfect cohesion");
+    }
+
+    // Tests for file-level cohesion calculation (spec 198)
+
+    fn create_test_file_call_graph(calls: Vec<(&str, &str, &str, &str)>) -> CallGraph {
+        let mut graph = CallGraph::new();
+        let file_a = PathBuf::from("src/file_a.rs");
+        let file_b = PathBuf::from("src/file_b.rs");
+
+        // First, add all functions as nodes
+        for (caller_file, caller_func, callee_file, callee_func) in &calls {
+            let caller_path = if *caller_file == "A" {
+                &file_a
+            } else {
+                &file_b
+            };
+            let callee_path = if *callee_file == "A" {
+                &file_a
+            } else {
+                &file_b
+            };
+
+            graph.add_function(
+                FunctionId::new(caller_path.clone(), (*caller_func).to_string(), 1),
+                false,
+                false,
+                5,
+                20,
+            );
+            graph.add_function(
+                FunctionId::new(callee_path.clone(), (*callee_func).to_string(), 10),
+                false,
+                false,
+                5,
+                20,
+            );
+        }
+
+        // Then add calls
+        for (caller_file, caller_func, callee_file, callee_func) in calls {
+            let caller_path = if caller_file == "A" { &file_a } else { &file_b };
+            let callee_path = if callee_file == "A" { &file_a } else { &file_b };
+
+            let call = FunctionCall {
+                caller: FunctionId::new(caller_path.clone(), caller_func.to_string(), 1),
+                callee: FunctionId::new(callee_path.clone(), callee_func.to_string(), 10),
+                call_type: CallType::Direct,
+            };
+            graph.add_call(call);
+        }
+        graph
+    }
+
+    #[test]
+    fn test_file_cohesion_perfect() {
+        // All calls are internal (within file A)
+        let calls = vec![
+            ("A", "func1", "A", "func2"),
+            ("A", "func2", "A", "func3"),
+            ("A", "func3", "A", "func1"),
+        ];
+        let graph = create_test_file_call_graph(calls);
+        let result = calculate_file_cohesion(Path::new("src/file_a.rs"), &graph);
+
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(r.score, 1.0);
+        assert_eq!(r.internal_calls, 3);
+        assert_eq!(r.external_calls, 0);
+        assert_eq!(r.functions_analyzed, 3);
+    }
+
+    #[test]
+    fn test_file_cohesion_low() {
+        // All calls from A go to B (external)
+        let calls = vec![
+            ("A", "func1", "B", "helper1"),
+            ("A", "func2", "B", "helper2"),
+            ("A", "func3", "B", "helper3"),
+        ];
+        let graph = create_test_file_call_graph(calls);
+        let result = calculate_file_cohesion(Path::new("src/file_a.rs"), &graph);
+
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(r.score, 0.0);
+        assert_eq!(r.internal_calls, 0);
+        assert_eq!(r.external_calls, 3);
+        assert_eq!(r.functions_analyzed, 3);
+    }
+
+    #[test]
+    fn test_file_cohesion_mixed() {
+        // Mix of internal and external calls
+        let calls = vec![
+            ("A", "func1", "A", "func2"),  // internal
+            ("A", "func2", "A", "func3"),  // internal
+            ("A", "func3", "B", "helper"), // external
+        ];
+        let graph = create_test_file_call_graph(calls);
+        let result = calculate_file_cohesion(Path::new("src/file_a.rs"), &graph);
+
+        assert!(result.is_some());
+        let r = result.unwrap();
+        // 2 internal / 3 total = 0.666...
+        assert!((r.score - 0.6666).abs() < 0.01);
+        assert_eq!(r.internal_calls, 2);
+        assert_eq!(r.external_calls, 1);
+    }
+
+    #[test]
+    fn test_file_cohesion_too_few_functions() {
+        // Only 2 functions - below minimum threshold of 3
+        let mut graph = CallGraph::new();
+        let file = PathBuf::from("src/small.rs");
+        graph.add_function(
+            FunctionId::new(file.clone(), "func1".to_string(), 1),
+            false,
+            false,
+            5,
+            20,
+        );
+        graph.add_function(
+            FunctionId::new(file.clone(), "func2".to_string(), 10),
+            false,
+            false,
+            5,
+            20,
+        );
+
+        let result = calculate_file_cohesion(Path::new("src/small.rs"), &graph);
+        assert!(
+            result.is_none(),
+            "Files with <3 functions should return None"
+        );
+    }
+
+    #[test]
+    fn test_file_cohesion_no_calls() {
+        // 3 functions but no calls between them
+        let mut graph = CallGraph::new();
+        let file = PathBuf::from("src/isolated.rs");
+        graph.add_function(
+            FunctionId::new(file.clone(), "func1".to_string(), 1),
+            false,
+            false,
+            5,
+            20,
+        );
+        graph.add_function(
+            FunctionId::new(file.clone(), "func2".to_string(), 10),
+            false,
+            false,
+            5,
+            20,
+        );
+        graph.add_function(
+            FunctionId::new(file.clone(), "func3".to_string(), 20),
+            false,
+            false,
+            5,
+            20,
+        );
+
+        let result = calculate_file_cohesion(Path::new("src/isolated.rs"), &graph);
+        assert!(result.is_some());
+        let r = result.unwrap();
+        // No calls = perfect cohesion (self-contained functions)
+        assert_eq!(r.score, 1.0);
+        assert_eq!(r.internal_calls, 0);
+        assert_eq!(r.external_calls, 0);
     }
 }
