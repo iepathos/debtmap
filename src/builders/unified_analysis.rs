@@ -614,8 +614,6 @@ fn build_risk_analyzer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::risk::context::git_history::GitHistoryProvider;
-    use crate::risk::context::ContextAggregator;
 
     #[test]
     fn test_analyze_file_git_context_returns_none_when_no_context() {

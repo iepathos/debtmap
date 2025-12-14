@@ -45,7 +45,7 @@ cargo llvm-cov --lcov --output-path coverage.lcov
 debtmap analyze . --lcov coverage.lcov --context
 
 # Generate HTML report
-debtmap analyze . --lcov coverage.lcov --content --format html --output report.html
+debtmap analyze . --lcov coverage.lcov --context --format html --output report.html
 ```
 
 ## What You Get

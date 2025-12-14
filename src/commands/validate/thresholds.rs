@@ -355,6 +355,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_find_deprecated_thresholds_none() {
         let thresholds = ValidationThresholds {
             max_average_complexity: 10.0,
@@ -371,6 +372,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_find_deprecated_thresholds_some() {
         let thresholds = ValidationThresholds {
             max_average_complexity: 10.0,
