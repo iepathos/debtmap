@@ -16,6 +16,12 @@ pub struct ValidationAnalysisOptions {
     pub parallel: bool,
     /// Number of parallel jobs (0 = auto)
     pub jobs: usize,
+    /// Enable context-aware analysis
+    pub enable_context: bool,
+    /// Specific context providers to use
+    pub context_providers: Option<Vec<String>>,
+    /// Context providers to disable
+    pub disable_context: Option<Vec<String>>,
 }
 
 /// Read parallel processing settings from environment.
@@ -32,7 +38,13 @@ pub fn read_parallel_options_from_env() -> ValidationAnalysisOptions {
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(0);
 
-    ValidationAnalysisOptions { parallel, jobs }
+    ValidationAnalysisOptions {
+        parallel,
+        jobs,
+        enable_context: false,
+        context_providers: None,
+        disable_context: None,
+    }
 }
 
 /// Calculate unified analysis metrics for validation.
@@ -63,9 +75,9 @@ pub fn calculate_unified_analysis(
             no_god_object: false,
             suppress_coverage_tip: true, // Suppress coverage TIP for validate (spec 131)
             _formatting_config: Default::default(),
-            enable_context: false,
-            context_providers: None,
-            disable_context: None,
+            enable_context: options.enable_context,
+            context_providers: options.context_providers.clone(),
+            disable_context: options.disable_context.clone(),
         },
     )
     .expect("Unified analysis failed")

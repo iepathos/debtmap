@@ -32,9 +32,11 @@ pub use types::{ValidateConfig, ValidationDetails};
 use crate::commands::analyze;
 use crate::core::{AnalysisResults, Language};
 use crate::formatting::FormattingConfig;
+use crate::io;
+use crate::progress::{ProgressConfig, ProgressManager};
 use crate::utils::risk_analyzer;
 use crate::{config, risk};
-use analysis::{calculate_unified_analysis, read_parallel_options_from_env};
+use analysis::{calculate_unified_analysis, read_parallel_options_from_env, ValidationAnalysisOptions};
 use anyhow::Result;
 use output::{
     display_timing_information, generate_report_if_requested, print_parallel_status,
@@ -50,10 +52,12 @@ use thresholds::{find_deprecated_thresholds, validate_basic, validate_with_risk}
 ///
 /// This orchestrates the validation process:
 /// 1. Configures parallel processing
-/// 2. Analyzes the project
-/// 3. Optionally generates risk insights
-/// 4. Validates against thresholds
-/// 5. Reports results
+/// 2. Sets up progress display (same as analyze command)
+/// 3. Analyzes the project
+/// 4. Cleans up progress display
+/// 5. Optionally generates risk insights
+/// 6. Validates against thresholds
+/// 7. Reports results
 pub fn validate_project(config: ValidateConfig) -> Result<()> {
     let complexity_threshold = 10;
     let duplication_threshold = 50;
@@ -62,6 +66,9 @@ pub fn validate_project(config: ValidateConfig) -> Result<()> {
     let parallel_enabled = !config.no_parallel;
     let jobs = config.jobs;
     setup_parallel_processing(parallel_enabled, jobs, config.verbosity);
+
+    // I/O: Set up progress manager (same as analyze command)
+    setup_progress_manager(config.verbosity);
 
     // I/O: Run project analysis
     let results = analyze::analyze_project(
@@ -79,7 +86,7 @@ pub fn validate_project(config: ValidateConfig) -> Result<()> {
     // I/O: Generate report if requested
     generate_report_if_requested(&config, &results, &risk_insights)?;
 
-    // Perform validation and report results
+    // Perform validation and report results (includes unified analysis with call graph)
     validate_and_report(&config, &results, &risk_insights)
 }
 
@@ -97,6 +104,30 @@ fn setup_parallel_processing(enabled: bool, jobs: usize, verbosity: u8) {
     if jobs > 0 {
         std::env::set_var("DEBTMAP_JOBS", jobs.to_string());
     }
+}
+
+/// I/O: Initialize progress manager with TUI support.
+///
+/// This uses the same progress setup as the analyze command to ensure
+/// consistent progress display during analysis.
+fn setup_progress_manager(verbosity: u8) {
+    let quiet = std::env::var("DEBTMAP_QUIET").is_ok();
+    let progress_config = ProgressConfig::from_env(quiet, verbosity);
+    ProgressManager::init_global(progress_config);
+
+    // Start TUI rendering if available
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_start_stage(0);
+    }
+}
+
+/// I/O: Clean up progress display after analysis.
+fn cleanup_progress() {
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_set_progress(1.0);
+        manager.tui_cleanup();
+    }
+    io::progress::AnalysisProgress::with_global(|p| p.finish());
 }
 
 /// I/O: Get risk insights based on configuration.
@@ -145,9 +176,19 @@ fn validate_and_report(
     let deprecated = find_deprecated_thresholds(&validation_thresholds);
     warn_deprecated_thresholds(&deprecated);
 
-    // Calculate unified analysis metrics
-    let options = read_parallel_options_from_env();
+    // Calculate unified analysis metrics with same options as analyze command
+    let parallel_options = read_parallel_options_from_env();
+    let options = ValidationAnalysisOptions {
+        parallel: parallel_options.parallel,
+        jobs: parallel_options.jobs,
+        enable_context: config.enable_context,
+        context_providers: config.context_providers.clone(),
+        disable_context: config.disable_context.clone(),
+    };
     let unified = calculate_unified_analysis(results, config.coverage_file.as_ref(), &options);
+
+    // I/O: Clean up progress display before printing results
+    cleanup_progress();
 
     // I/O: Display timing if verbosity enabled
     display_timing_information(&unified, config.verbosity);
