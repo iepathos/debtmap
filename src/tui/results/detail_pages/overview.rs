@@ -4,6 +4,8 @@
 //! following Stillwater philosophy: "Pure Core, Imperative Shell".
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
+use crate::organization::{calculate_file_cohesion, FileCohesionResult};
+use crate::output::unified::CohesionClassification;
 use crate::priority::classification::Severity;
 use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::results::app::ResultsApp;
@@ -240,6 +242,58 @@ fn build_coverage_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> 
     lines
 }
 
+/// Build cohesion section lines (pure) - displays file cohesion metrics (spec 198)
+///
+/// Returns empty if cohesion data is not available (e.g., file has fewer than 3 functions).
+fn build_cohesion_section(
+    cohesion: Option<&FileCohesionResult>,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    let Some(cohesion) = cohesion else {
+        return lines;
+    };
+
+    add_section_header(&mut lines, "file cohesion", theme);
+
+    // Display score with classification
+    let classification = CohesionClassification::from_score(cohesion.score);
+    let score_display = format!(
+        "{:.1}%  [{}]",
+        cohesion.score * 100.0,
+        classification.to_string().to_lowercase()
+    );
+    add_label_value(&mut lines, "score", score_display, theme, width);
+
+    // Display call breakdown
+    add_label_value(
+        &mut lines,
+        "internal calls",
+        cohesion.internal_calls.to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "external calls",
+        cohesion.external_calls.to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "functions",
+        cohesion.functions_analyzed.to_string(),
+        theme,
+        width,
+    );
+
+    add_blank_line(&mut lines);
+    lines
+}
+
 /// Build recommendation section lines (pure)
 fn build_recommendation_section(
     item: &UnifiedDebtItem,
@@ -312,6 +366,9 @@ pub fn render(
 ) {
     let location_items = get_items_at_location(app, item);
 
+    // Calculate file cohesion for the selected item's file (spec 198)
+    let cohesion = calculate_file_cohesion(&item.location.file, &app.analysis().call_graph);
+
     // Compose pure section builders (still water pattern)
     let lines: Vec<Line<'static>> = [
         build_location_section(item, theme, area.width),
@@ -319,6 +376,7 @@ pub fn render(
         build_god_object_section(item, theme, area.width),
         build_complexity_section(item, theme, area.width),
         build_coverage_section(item, theme, area.width),
+        build_cohesion_section(cohesion.as_ref(), theme, area.width),
         build_recommendation_section(item, theme, area.width),
         build_debt_types_section(&location_items, item, theme),
     ]
@@ -800,5 +858,84 @@ mod tests {
         let item = complexity_item("func");
         let display = format_cognitive_display(&item, false);
         assert_eq!(display, "20"); // Just the cognitive complexity value
+    }
+
+    // --- build_cohesion_section tests (spec 198) ---
+
+    #[test]
+    fn cohesion_section_empty_when_no_cohesion_data() {
+        let theme = Theme::default();
+        let lines = build_cohesion_section(None, &theme, 80);
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn cohesion_section_high_cohesion() {
+        let theme = Theme::default();
+        let cohesion = FileCohesionResult {
+            score: 0.85,
+            internal_calls: 17,
+            external_calls: 3,
+            functions_analyzed: 5,
+        };
+
+        let lines = build_cohesion_section(Some(&cohesion), &theme, 80);
+
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+
+        assert!(content.contains("file cohesion"));
+        assert!(content.contains("85.0%"));
+        assert!(content.contains("high"));
+        assert!(content.contains("17")); // internal calls
+        assert!(content.contains("3")); // external calls
+        assert!(content.contains("5")); // functions
+    }
+
+    #[test]
+    fn cohesion_section_medium_cohesion() {
+        let theme = Theme::default();
+        let cohesion = FileCohesionResult {
+            score: 0.55,
+            internal_calls: 11,
+            external_calls: 9,
+            functions_analyzed: 8,
+        };
+
+        let lines = build_cohesion_section(Some(&cohesion), &theme, 80);
+
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+
+        assert!(content.contains("55.0%"));
+        assert!(content.contains("medium"));
+    }
+
+    #[test]
+    fn cohesion_section_low_cohesion() {
+        let theme = Theme::default();
+        let cohesion = FileCohesionResult {
+            score: 0.25,
+            internal_calls: 5,
+            external_calls: 15,
+            functions_analyzed: 6,
+        };
+
+        let lines = build_cohesion_section(Some(&cohesion), &theme, 80);
+
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+
+        assert!(content.contains("25.0%"));
+        assert!(content.contains("low"));
     }
 }
