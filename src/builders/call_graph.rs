@@ -105,9 +105,12 @@ where
             });
 
             let config = config::get_config();
-            discovered_files =
-                io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
-                    .context("Failed to find Rust files for call graph")?;
+            discovered_files = io::walker::find_project_files_with_config(
+                project_path,
+                vec![Language::Rust],
+                config,
+            )
+            .context("Failed to find Rust files for call graph")?;
             log::info!("Discovered {} Rust files", discovered_files.len());
 
             // Mark discover phase complete

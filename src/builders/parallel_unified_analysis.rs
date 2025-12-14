@@ -19,6 +19,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
+use tracing::{debug_span, warn};
 
 // Pure functional transformations module
 mod transformations {
@@ -62,7 +63,7 @@ mod transformations {
                 // Read file and parse to get AST
                 let content = fs::read_to_string(&m.file)
                     .map_err(|e| {
-                        eprintln!("Warning: Failed to read file {}: {}", m.file.display(), e);
+                        warn!(file = %m.file.display(), error = %e, "Failed to read file");
                         e
                     })
                     .ok()?;
@@ -1163,14 +1164,12 @@ impl ParallelUnifiedAnalysisBuilder {
         file_path: &Path,
         coverage_data: Option<&LcovData>,
     ) -> Option<crate::organization::GodObjectAnalysis> {
+        let _span = debug_span!("analyze_god_object", path = %file_path.display()).entered();
+
         // I/O: Read file content
         let content = std::fs::read_to_string(file_path)
             .map_err(|e| {
-                eprintln!(
-                    "Warning: Failed to read file {}: {}",
-                    file_path.display(),
-                    e
-                );
+                warn!(file = %file_path.display(), error = %e, "Failed to read file");
                 e
             })
             .ok()?;
@@ -1178,11 +1177,7 @@ impl ParallelUnifiedAnalysisBuilder {
         // Pure: Analyze content
         file_analysis::analyze_god_object(&content, file_path, coverage_data)
             .map_err(|e| {
-                eprintln!(
-                    "Warning: Failed to analyze god object for {}: {}",
-                    file_path.display(),
-                    e
-                );
+                warn!(file = %file_path.display(), error = %e, "Failed to analyze god object");
                 e
             })
             .ok()

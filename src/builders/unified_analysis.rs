@@ -7,6 +7,7 @@
 
 use super::{call_graph, parallel_call_graph, parallel_unified_analysis};
 use crate::observability::{set_phase_persistent, set_progress, AnalysisPhase};
+use tracing::{debug, info, info_span, warn};
 
 // Re-export pure core modules
 pub use super::unified_analysis_phases as core;
@@ -92,6 +93,20 @@ pub fn perform_unified_analysis_with_options(
         rust_files,
     } = options;
 
+    // Create top-level span for unified analysis (spec 208)
+    let span = info_span!(
+        "unified_analysis",
+        project = %project_path.display(),
+        file_count = results.complexity.metrics.len(),
+        parallel = parallel,
+    );
+    let _guard = span.enter();
+
+    info!(
+        file_count = results.complexity.metrics.len(),
+        "Starting unified analysis"
+    );
+
     // Set total file count for crash report progress tracking (spec 207)
     set_progress(0, results.complexity.metrics.len());
 
@@ -102,16 +117,30 @@ pub fn perform_unified_analysis_with_options(
     report_stage_start(1);
     let call_graph_start = std::time::Instant::now();
 
-    let (framework_exclusions, function_pointer_used_functions) = if parallel {
-        build_call_graph_with_progress(project_path, &mut call_graph, jobs, true, rust_files.as_deref())?
-    } else {
-        build_call_graph_with_progress_sequential(
-            project_path,
-            &mut call_graph,
-            verbose_macro_warnings,
-            show_macro_stats,
-            rust_files.as_deref(),
-        )?
+    let (framework_exclusions, function_pointer_used_functions) = {
+        let _span = info_span!("call_graph_building").entered();
+        info!("Building call graph");
+
+        let result = if parallel {
+            build_call_graph_with_progress(
+                project_path,
+                &mut call_graph,
+                jobs,
+                true,
+                rust_files.as_deref(),
+            )?
+        } else {
+            build_call_graph_with_progress_sequential(
+                project_path,
+                &mut call_graph,
+                verbose_macro_warnings,
+                show_macro_stats,
+                rust_files.as_deref(),
+            )?
+        };
+
+        debug!(functions = call_graph.node_count(), "Call graph built");
+        result
     };
 
     let call_graph_time = call_graph_start.elapsed();
@@ -124,7 +153,17 @@ pub fn perform_unified_analysis_with_options(
     report_stage_start(2);
     let coverage_start = std::time::Instant::now();
 
-    let coverage_data = core::phases::coverage::load_coverage_data(coverage_file.cloned())?;
+    let coverage_data = {
+        let _span = info_span!("coverage_loading").entered();
+        info!("Loading coverage data");
+        let data = core::phases::coverage::load_coverage_data(coverage_file.cloned())?;
+        if data.is_some() {
+            debug!("Coverage data loaded");
+        } else {
+            debug!("No coverage data provided");
+        }
+        data
+    };
     emit_coverage_tip(coverage_data.is_none(), suppress_coverage_tip);
 
     let coverage_time = coverage_start.elapsed();
@@ -143,45 +182,76 @@ pub fn perform_unified_analysis_with_options(
 
     // Progress: Purity stage
     report_stage_start(3);
-    let enriched_metrics =
-        core::orchestration::run_purity_propagation(&enriched_metrics, &call_graph);
+    let enriched_metrics = {
+        let _span = info_span!("purity_analysis").entered();
+        info!("Analyzing function purity");
+        let result = core::orchestration::run_purity_propagation(&enriched_metrics, &call_graph);
+        debug!(functions = result.len(), "Purity analysis complete");
+        result
+    };
     report_stage_complete(3, format!("{} functions analyzed", enriched_metrics.len()));
 
     // Progress: Context stage
     report_stage_start(4);
-    let risk_analyzer = build_risk_analyzer(
-        project_path,
-        enable_context,
-        context_providers,
-        disable_context,
-        results,
-    );
+    let risk_analyzer = {
+        let _span = info_span!("context_loading").entered();
+        info!("Loading context providers");
+        let result = build_risk_analyzer(
+            project_path,
+            enable_context,
+            context_providers,
+            disable_context,
+            results,
+        );
+        if result.is_some() {
+            debug!("Context providers loaded");
+        } else {
+            debug!("Context analysis disabled or not available");
+        }
+        result
+    };
     let context_metric = if enable_context { "loaded" } else { "skipped" };
     report_stage_complete(4, context_metric);
 
     // Progress: Debt scoring stage
     report_stage_start(5);
 
-    let result = create_unified_analysis_with_exclusions_and_timing(
-        &enriched_metrics,
-        &call_graph,
-        coverage_data.as_ref(),
-        &framework_exclusions,
-        Some(&function_pointer_used_functions),
-        Some(&results.technical_debt.items),
-        no_aggregation,
-        aggregation_method,
-        min_problematic,
-        no_god_object,
-        call_graph_time,
-        coverage_time,
-        risk_analyzer,
-        project_path,
-        parallel,
-        jobs,
-    );
+    let result = {
+        let _span = info_span!("debt_scoring").entered();
+        info!("Scoring technical debt items");
+        let result = create_unified_analysis_with_exclusions_and_timing(
+            &enriched_metrics,
+            &call_graph,
+            coverage_data.as_ref(),
+            &framework_exclusions,
+            Some(&function_pointer_used_functions),
+            Some(&results.technical_debt.items),
+            no_aggregation,
+            aggregation_method,
+            min_problematic,
+            no_god_object,
+            call_graph_time,
+            coverage_time,
+            risk_analyzer,
+            project_path,
+            parallel,
+            jobs,
+        );
+        debug!(
+            item_count = result.items.len(),
+            file_items = result.file_items.len(),
+            "Debt scoring complete"
+        );
+        result
+    };
 
     report_stage_complete(5, format!("{} items scored", result.items.len()));
+
+    info!(
+        total_items = result.items.len(),
+        file_items = result.file_items.len(),
+        "Unified analysis complete"
+    );
 
     Ok(result)
 }
@@ -559,17 +629,11 @@ fn emit_coverage_tip(no_coverage: bool, suppress: bool) {
     let tui_active = crate::progress::ProgressManager::global().is_some();
 
     if no_coverage && !quiet && !suppress && !tui_active {
-        use colored::*;
-        eprintln!();
-        eprintln!(
-            "{} Coverage data not provided. Analysis will focus on complexity and code smells.",
-            "[TIP]".bright_yellow()
+        // Use tracing for structured logging instead of eprintln!
+        warn!(
+            "Coverage data not provided. Analysis will focus on complexity and code smells. \
+             For test gap detection, provide coverage with: --lcov-file coverage.info"
         );
-        eprintln!(
-            "   For test gap detection, provide coverage with: {}",
-            "--lcov-file coverage.info".bright_cyan()
-        );
-        eprintln!();
     }
 }
 
@@ -589,38 +653,44 @@ fn build_call_graph_with_progress(
     // Track the last active subtask to mark it completed on phase transition
     let last_subtask = AtomicUsize::new(usize::MAX);
 
-    let (graph, exclusions, used_funcs) = parallel_call_graph::build_call_graph_parallel_with_files(
-        project_path,
-        call_graph.clone(),
-        thread_count,
-        rust_files,
-        |progress| {
-            // Map CallGraphPhase to TUI subtask index (stage 1)
-            // Note: DiscoveringFiles is skipped (files reused from stage 0)
-            // Subtasks: 0=parse ASTs, 1=extract calls, 2=link modules
-            let subtask_index = match progress.phase {
-                CallGraphPhase::DiscoveringFiles => return, // Skip - not shown in TUI
-                CallGraphPhase::ParsingASTs => 0,
-                CallGraphPhase::ExtractingCalls => 1,
-                CallGraphPhase::LinkingModules => 2,
-            };
-
-            if let Some(manager) = crate::progress::ProgressManager::global() {
-                // Mark previous subtask as completed if we moved to a new phase
-                let prev = last_subtask.swap(subtask_index, Ordering::Relaxed);
-                if prev != usize::MAX && prev != subtask_index {
-                    manager.tui_update_subtask(1, prev, StageStatus::Completed, None);
-                }
-
-                let progress_info = if progress.total > 0 {
-                    Some((progress.current, progress.total))
-                } else {
-                    None
+    let (graph, exclusions, used_funcs) =
+        parallel_call_graph::build_call_graph_parallel_with_files(
+            project_path,
+            call_graph.clone(),
+            thread_count,
+            rust_files,
+            |progress| {
+                // Map CallGraphPhase to TUI subtask index (stage 1)
+                // Note: DiscoveringFiles is skipped (files reused from stage 0)
+                // Subtasks: 0=parse ASTs, 1=extract calls, 2=link modules
+                let subtask_index = match progress.phase {
+                    CallGraphPhase::DiscoveringFiles => return, // Skip - not shown in TUI
+                    CallGraphPhase::ParsingASTs => 0,
+                    CallGraphPhase::ExtractingCalls => 1,
+                    CallGraphPhase::LinkingModules => 2,
                 };
-                manager.tui_update_subtask(1, subtask_index, StageStatus::Active, progress_info);
-            }
-        },
-    )?;
+
+                if let Some(manager) = crate::progress::ProgressManager::global() {
+                    // Mark previous subtask as completed if we moved to a new phase
+                    let prev = last_subtask.swap(subtask_index, Ordering::Relaxed);
+                    if prev != usize::MAX && prev != subtask_index {
+                        manager.tui_update_subtask(1, prev, StageStatus::Completed, None);
+                    }
+
+                    let progress_info = if progress.total > 0 {
+                        Some((progress.current, progress.total))
+                    } else {
+                        None
+                    };
+                    manager.tui_update_subtask(
+                        1,
+                        subtask_index,
+                        StageStatus::Active,
+                        progress_info,
+                    );
+                }
+            },
+        )?;
 
     // Mark the last subtask as completed
     if let Some(manager) = crate::progress::ProgressManager::global() {

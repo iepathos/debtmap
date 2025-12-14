@@ -15,12 +15,16 @@ use debtmap::cli::{
     MAIN_STACK_SIZE,
 };
 use debtmap::di::create_app_container;
-use debtmap::observability::install_panic_hook;
+use debtmap::observability::{init_tracing, install_panic_hook};
 use std::sync::Arc;
 
 fn main() -> Result<()> {
     // Install custom panic hook FIRST for structured crash reports (spec 207)
     install_panic_hook();
+
+    // Initialize tracing early for structured logging (spec 208)
+    // Controlled by RUST_LOG environment variable (default: warn)
+    init_tracing();
 
     // Spawn the actual main logic on a thread with a larger stack (16MB)
     // to handle deeply nested AST traversals without stack overflow.

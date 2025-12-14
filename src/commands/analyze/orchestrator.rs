@@ -90,11 +90,7 @@ fn extract_rust_files(results: &AnalysisResults) -> Vec<std::path::PathBuf> {
     results
         .file_contexts
         .keys()
-        .filter(|path| {
-            path.extension()
-                .map(|ext| ext == "rs")
-                .unwrap_or(false)
-        })
+        .filter(|path| path.extension().map(|ext| ext == "rs").unwrap_or(false))
         .cloned()
         .collect()
 }
