@@ -26,7 +26,10 @@ mod trait_registry;
 pub use cross_module::{CrossModuleTracker, ModuleBoundary, PublicApiInfo};
 pub use framework_patterns::{FrameworkPattern, FrameworkPatternDetector, PatternType};
 pub use function_pointer::{ClosureInfo, FunctionPointerInfo, FunctionPointerTracker};
-pub use trait_registry::{TraitImplementation, TraitMethod, TraitRegistry};
+pub use trait_registry::{
+    TraitImplementation, TraitMethod, TraitMethodCall, TraitMethodImplementation, TraitRegistry,
+    TraitStatistics,
+};
 
 /// Rust-specific call graph that includes trait dispatch, function pointers, and framework patterns
 #[derive(Debug, Clone)]
