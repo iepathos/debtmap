@@ -2,7 +2,9 @@
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
 use crate::core::LanguageSpecificData;
+use crate::organization::anti_pattern_detector::AntiPatternSeverity;
 use crate::organization::god_object::GodObjectAnalysis;
+use crate::organization::AntiPatternReport;
 use crate::output::PatternAnalysis;
 use crate::priority::detected_pattern::DetectedPattern;
 use crate::priority::unified_scorer::EntropyDetails;
@@ -316,11 +318,18 @@ fn render_god_object_patterns_section(
     theme: &Theme,
     width: u16,
 ) -> bool {
-    if !god_analysis.is_god_object {
-        return false;
+    // Allow anti-patterns to be shown even for non-god objects
+    let mut rendered = false;
+
+    // Render anti-patterns if present (Spec 197)
+    if let Some(ref report) = god_analysis.anti_pattern_report {
+        rendered |= render_anti_patterns_section(lines, report, theme, width);
     }
 
-    let mut rendered = false;
+    // Only show god object-specific sections for actual god objects
+    if !god_analysis.is_god_object {
+        return rendered;
+    }
 
     if let Some(ref entropy) = god_analysis.aggregated_entropy {
         rendered |= render_god_object_entropy_section(lines, entropy, theme, width);
@@ -335,6 +344,105 @@ fn render_god_object_patterns_section(
     );
 
     rendered
+}
+
+/// Render anti-pattern detection section (Spec 197). Returns true if anything was rendered.
+fn render_anti_patterns_section(
+    lines: &mut Vec<Line<'static>>,
+    report: &AntiPatternReport,
+    theme: &Theme,
+    width: u16,
+) -> bool {
+    if report.anti_patterns.is_empty() {
+        return false;
+    }
+
+    add_section_header(lines, "anti-patterns detected", theme);
+
+    // Show quality score
+    let quality_desc = if report.quality_score >= 90.0 {
+        "excellent"
+    } else if report.quality_score >= 70.0 {
+        "good"
+    } else if report.quality_score >= 50.0 {
+        "needs improvement"
+    } else {
+        "poor"
+    };
+    add_label_value(
+        lines,
+        "quality score",
+        format!("{:.0} ({})", report.quality_score, quality_desc),
+        theme,
+        width,
+    );
+
+    // Count by severity
+    let mut critical_count = 0;
+    let mut high_count = 0;
+    let mut medium_count = 0;
+    let mut low_count = 0;
+
+    for pattern in &report.anti_patterns {
+        match pattern.severity {
+            AntiPatternSeverity::Critical => critical_count += 1,
+            AntiPatternSeverity::High => high_count += 1,
+            AntiPatternSeverity::Medium => medium_count += 1,
+            AntiPatternSeverity::Low => low_count += 1,
+        }
+    }
+
+    // Show severity breakdown
+    if critical_count > 0 {
+        add_label_value(lines, "critical", critical_count.to_string(), theme, width);
+    }
+    if high_count > 0 {
+        add_label_value(lines, "high", high_count.to_string(), theme, width);
+    }
+    if medium_count > 0 {
+        add_label_value(lines, "medium", medium_count.to_string(), theme, width);
+    }
+    if low_count > 0 {
+        add_label_value(lines, "low", low_count.to_string(), theme, width);
+    }
+
+    // Show first few anti-patterns with descriptions
+    add_blank_line(lines);
+
+    for (i, pattern) in report.anti_patterns.iter().take(5).enumerate() {
+        let severity_indicator = match pattern.severity {
+            AntiPatternSeverity::Critical => "!!",
+            AntiPatternSeverity::High => "! ",
+            AntiPatternSeverity::Medium => "- ",
+            AntiPatternSeverity::Low => "  ",
+        };
+
+        let pattern_text = format!("{} {:?}", severity_indicator, pattern.pattern_type);
+        add_label_value(lines, &format!("#{}", i + 1), pattern_text, theme, width);
+
+        // Show description if it fits
+        if !pattern.description.is_empty() && width > 40 {
+            let desc = if pattern.description.len() > (width - 10) as usize {
+                format!("{}...", &pattern.description[..((width - 13) as usize)])
+            } else {
+                pattern.description.clone()
+            };
+            add_label_value(lines, "  desc", desc, theme, width);
+        }
+    }
+
+    if report.anti_patterns.len() > 5 {
+        add_label_value(
+            lines,
+            "...",
+            format!("{} more patterns", report.anti_patterns.len() - 5),
+            theme,
+            width,
+        );
+    }
+
+    add_blank_line(lines);
+    true
 }
 
 /// Render patterns page showing detected patterns and pattern analysis

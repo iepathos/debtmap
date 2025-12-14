@@ -121,6 +121,9 @@ pub struct GodObjectAnalysis {
     /// Layering impact analysis (Spec 195)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layering_impact: Option<crate::organization::LayeringImpact>,
+    /// Anti-pattern detection report (Spec 197)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anti_pattern_report: Option<crate::organization::AntiPatternReport>,
 }
 
 impl GodObjectAnalysis {
