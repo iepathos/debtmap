@@ -46,6 +46,7 @@ pub use categorization::{cluster_methods_by_behavior, is_test_method, Behavioral
 pub use clustering::{
     apply_community_detection, apply_hybrid_clustering, apply_production_ready_clustering,
     build_method_call_adjacency_matrix, build_method_call_adjacency_matrix_with_functions,
+    ClusteringResult, ClusteringWarning,
 };
 
 // Re-export analysis functions
@@ -769,7 +770,8 @@ mod tests {
         let adjacency = HashMap::new(); // Empty adjacency for simplicity
 
         // Apply production-ready clustering
-        let clusters = apply_production_ready_clustering(&methods, &adjacency);
+        let result = apply_production_ready_clustering(&methods, &adjacency);
+        let clusters = result.clusters;
 
         // Verify tests are filtered out
         let all_cluster_methods: Vec<&String> = clusters.iter().flat_map(|c| &c.methods).collect();
@@ -869,7 +871,8 @@ mod tests {
             (("set_state".to_string(), "get_state".to_string()), 1),
         ]);
 
-        let clusters = apply_production_ready_clustering(&methods, &adjacency);
+        let result = apply_production_ready_clustering(&methods, &adjacency);
+        let clusters = result.clusters;
 
         // REQUIREMENT 1: All methods must be accounted for
         let clustered_methods: std::collections::HashSet<String> =
