@@ -38,6 +38,7 @@ use quote::ToTokens;
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::{visit::Visit, Item};
+use tracing::{debug, debug_span};
 
 pub struct RustAnalyzer {
     complexity_threshold: u32,
@@ -87,18 +88,18 @@ impl Default for RustAnalyzer {
 
 impl Analyzer for RustAnalyzer {
     fn parse(&self, content: &str, path: PathBuf) -> Result<Ast> {
+        let _span = debug_span!("parse_file", path = %path.display()).entered();
+
         let start = std::time::Instant::now();
         let file = syn::parse_str::<syn::File>(content)?;
         let parse_time = start.elapsed();
 
-        if std::env::var("DEBTMAP_TIMING").is_ok() {
-            eprintln!(
-                "[TIMING] parse {}: {:.2}s ({} bytes)",
-                path.display(),
-                parse_time.as_secs_f64(),
-                content.len()
-            );
-        }
+        debug!(
+            path = %path.display(),
+            time_ms = parse_time.as_millis(),
+            bytes = content.len(),
+            "Parsed file"
+        );
 
         Ok(Ast::Rust(RustAst {
             file,
@@ -109,14 +110,23 @@ impl Analyzer for RustAnalyzer {
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
         match ast {
-            Ast::Rust(rust_ast) => analyze_rust_file(
-                rust_ast,
-                self.complexity_threshold,
-                &self.enhanced_thresholds,
-                self.use_enhanced_detection,
-                self.enable_functional_analysis,
-                self.enable_rust_patterns,
-            ),
+            Ast::Rust(rust_ast) => {
+                let _span = debug_span!("analyze_file", path = %rust_ast.path.display()).entered();
+                let result = analyze_rust_file(
+                    rust_ast,
+                    self.complexity_threshold,
+                    &self.enhanced_thresholds,
+                    self.use_enhanced_detection,
+                    self.enable_functional_analysis,
+                    self.enable_rust_patterns,
+                );
+                debug!(
+                    functions = result.complexity.functions.len(),
+                    debt_items = result.debt_items.len(),
+                    "File analysis complete"
+                );
+                result
+            }
             _ => FileMetrics {
                 path: PathBuf::new(),
                 language: Language::Rust,

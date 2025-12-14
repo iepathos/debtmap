@@ -14,7 +14,9 @@
 //! before printing the crash report, ensuring it's visible to users.
 
 use super::context::{get_current_context, get_progress, AnalysisContext};
+use super::tracing::set_tui_active;
 use std::panic::PanicHookInfo;
+use tracing::Span;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const ISSUE_URL: &str = "https://github.com/iepathos/debtmap/issues/new";
@@ -57,6 +59,9 @@ fn print_crash_report(info: &PanicHookInfo<'_>) {
 }
 
 fn exit_tui_mode() {
+    // Mark TUI as inactive so subsequent logging works
+    set_tui_active(false);
+
     // Ignore errors - we're already panicking
     let _ = crossterm::terminal::disable_raw_mode();
     let _ = crossterm::execute!(std::io::stderr(), crossterm::terminal::LeaveAlternateScreen);
@@ -103,6 +108,12 @@ fn print_context_section(context: &AnalysisContext, processed: usize, total: usi
                 "║    Phase: (not set - crash occurred before analysis started)                 ║"
             );
         }
+    }
+
+    // Print current tracing span context (spec 208)
+    let current_span = Span::current();
+    if let Some(metadata) = current_span.metadata() {
+        eprintln!("║    Span: {:<67} ║", truncate(metadata.name(), 67));
     }
 
     if let Some(file) = &context.current_file {

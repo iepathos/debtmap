@@ -346,7 +346,13 @@ pub fn build_call_graph_parallel<F>(
 where
     F: FnMut(CallGraphProgress) + Send + Sync,
 {
-    build_call_graph_parallel_with_files(project_path, base_graph, num_threads, None, progress_callback)
+    build_call_graph_parallel_with_files(
+        project_path,
+        base_graph,
+        num_threads,
+        None,
+        progress_callback,
+    )
 }
 
 /// Parallel processing entry point with optional pre-discovered files
