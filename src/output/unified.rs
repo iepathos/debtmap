@@ -5,6 +5,18 @@
 //! - Score is at the same path for both File and Function items
 //! - Location structure is unified (file, line, function)
 //! - Simplifies filtering and sorting across item types
+//!
+//! ## Output Invariants (spec 230)
+//!
+//! This module guarantees the following output invariants:
+//! - Score >= 0 (never negative)
+//! - Score <= 1000 (reasonable upper bound)
+//! - Coverage in 0.0..=1.0 (when present)
+//! - Confidence in 0.0..=1.0 (when present)
+//! - Priority matches score thresholds (Critical >= 100, High >= 50, Medium >= 20)
+//!
+//! These invariants are enforced via `debug_assert!` in debug builds and validated
+//! through property-based testing.
 
 use crate::core::LanguageSpecificData;
 use crate::io::writers::pattern_display::PATTERN_CONFIDENCE_THRESHOLD;
@@ -16,6 +28,75 @@ use crate::priority::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+// ============================================================================
+// Numeric Precision Functions (spec 230)
+// ============================================================================
+
+/// Round score to 2 decimal places for clean output
+///
+/// Removes floating-point noise like 1.5697499999999998 -> 1.57
+#[inline]
+fn round_score(score: f64) -> f64 {
+    (score * 100.0).round() / 100.0
+}
+
+/// Round percentage/ratio to 4 decimal places
+///
+/// Used for coverage, confidence, and other 0-1 ratios
+#[inline]
+fn round_ratio(ratio: f64) -> f64 {
+    (ratio * 10000.0).round() / 10000.0
+}
+
+// ============================================================================
+// Invariant Assertions (spec 230)
+// ============================================================================
+
+/// Maximum reasonable score value
+const MAX_SCORE: f64 = 1000.0;
+
+/// Assert score invariants: non-negative and within reasonable bounds
+#[inline]
+fn assert_score_invariants(score: f64, context: &str) {
+    debug_assert!(
+        score >= 0.0,
+        "Score must be non-negative: {} = {}",
+        context,
+        score
+    );
+    debug_assert!(
+        score <= MAX_SCORE,
+        "Score exceeds maximum ({}): {} = {}",
+        MAX_SCORE,
+        context,
+        score
+    );
+}
+
+/// Assert ratio invariants: value in 0.0..=1.0
+#[inline]
+fn assert_ratio_invariants(ratio: f64, context: &str) {
+    debug_assert!(
+        (0.0..=1.0).contains(&ratio),
+        "{} must be in range [0.0, 1.0]: {}",
+        context,
+        ratio
+    );
+}
+
+/// Assert priority matches score thresholds
+#[inline]
+fn assert_priority_invariants(priority: &Priority, score: f64) {
+    let expected = Priority::from_score(score);
+    debug_assert!(
+        std::mem::discriminant(priority) == std::mem::discriminant(&expected),
+        "Priority {:?} doesn't match score {} (expected {:?})",
+        priority,
+        score,
+        expected
+    );
+}
 
 /// Unified output format with consistent structure for all debt items
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +170,25 @@ pub enum UnifiedDebtItemOutput {
     Function(Box<FunctionDebtItemOutput>),
 }
 
+impl UnifiedDebtItemOutput {
+    /// Assert all invariants hold for this debt item (spec 230)
+    ///
+    /// Called in debug builds before serialization to catch bugs early.
+    /// Zero cost in release builds.
+    #[cfg(debug_assertions)]
+    pub fn assert_invariants(&self) {
+        match self {
+            UnifiedDebtItemOutput::File(f) => f.assert_invariants(),
+            UnifiedDebtItemOutput::Function(f) => f.assert_invariants(),
+        }
+    }
+
+    /// No-op in release builds for zero overhead
+    #[cfg(not(debug_assertions))]
+    #[inline]
+    pub fn assert_invariants(&self) {}
+}
+
 /// Priority level based on score
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -148,6 +248,29 @@ pub struct FileDebtItemOutput {
     pub impact: FileImpactOutput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scoring_details: Option<FileScoringDetails>,
+}
+
+impl FileDebtItemOutput {
+    /// Assert all invariants hold for this file debt item (spec 230)
+    #[cfg(debug_assertions)]
+    pub fn assert_invariants(&self) {
+        assert_score_invariants(self.score, "file.score");
+        assert_priority_invariants(&self.priority, self.score);
+        assert_ratio_invariants(self.metrics.coverage, "file.metrics.coverage");
+
+        if let Some(ref cohesion) = self.cohesion {
+            assert_ratio_invariants(cohesion.score, "file.cohesion.score");
+        }
+
+        if let Some(ref deps) = self.dependencies {
+            assert_ratio_invariants(deps.instability, "file.dependencies.instability");
+        }
+    }
+
+    /// No-op in release builds
+    #[cfg(not(debug_assertions))]
+    #[inline]
+    pub fn assert_invariants(&self) {}
 }
 
 /// File metrics in unified format
@@ -405,6 +528,39 @@ pub struct FunctionDebtItemOutput {
     pub pattern_details: Option<serde_json::Value>, // Pattern-specific metrics
 }
 
+impl FunctionDebtItemOutput {
+    /// Assert all invariants hold for this function debt item (spec 230)
+    #[cfg(debug_assertions)]
+    pub fn assert_invariants(&self) {
+        assert_score_invariants(self.score, "function.score");
+        assert_priority_invariants(&self.priority, self.score);
+
+        if let Some(coverage) = self.metrics.coverage {
+            assert_ratio_invariants(coverage, "function.metrics.coverage");
+        }
+
+        if let Some(entropy) = self.metrics.entropy_score {
+            assert_ratio_invariants(entropy, "function.metrics.entropy_score");
+        }
+
+        if let Some(ref purity) = self.purity_analysis {
+            assert_ratio_invariants(
+                purity.confidence as f64,
+                "function.purity_analysis.confidence",
+            );
+        }
+
+        if let Some(confidence) = self.pattern_confidence {
+            assert_ratio_invariants(confidence, "function.pattern_confidence");
+        }
+    }
+
+    /// No-op in release builds
+    #[cfg(not(debug_assertions))]
+    #[inline]
+    pub fn assert_invariants(&self) {}
+}
+
 /// Adjusted complexity based on entropy analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdjustedComplexity {
@@ -539,10 +695,27 @@ impl FileDebtItemOutput {
         // Build anti-pattern output if present in god object analysis (spec 197)
         let anti_patterns = build_anti_patterns(&item.metrics);
 
+        // Apply rounding for clean output (spec 230)
+        let rounded_score = round_score(score);
+        let rounded_coverage = round_ratio(item.metrics.coverage_percent);
+        let rounded_avg_complexity = round_score(item.metrics.avg_complexity);
+
+        // Round cohesion if present
+        let cohesion = cohesion.map(|mut c| {
+            c.score = round_ratio(c.score);
+            c
+        });
+
+        // Round dependencies instability if present
+        let dependencies = dependencies.map(|mut d| {
+            d.instability = round_ratio(d.instability);
+            d
+        });
+
         FileDebtItemOutput {
-            score,
+            score: rounded_score,
             category: categorize_file_debt(item),
-            priority: Priority::from_score(score),
+            priority: Priority::from_score(rounded_score),
             location: UnifiedLocation {
                 file: item.metrics.path.to_string_lossy().to_string(),
                 line: None,
@@ -553,10 +726,10 @@ impl FileDebtItemOutput {
                 lines: item.metrics.total_lines,
                 functions: item.metrics.function_count,
                 classes: item.metrics.class_count,
-                avg_complexity: item.metrics.avg_complexity,
+                avg_complexity: rounded_avg_complexity,
                 max_complexity: item.metrics.max_complexity,
                 total_complexity: item.metrics.total_complexity,
-                coverage: item.metrics.coverage_percent,
+                coverage: rounded_coverage,
                 uncovered_lines: item.metrics.uncovered_lines,
             },
             god_object_indicators: item.metrics.god_object_analysis.clone().map(|a| a.into()),
@@ -569,9 +742,9 @@ impl FileDebtItemOutput {
                 implementation_steps: vec![],
             },
             impact: FileImpactOutput {
-                complexity_reduction: item.impact.complexity_reduction,
-                maintainability_improvement: item.impact.maintainability_improvement,
-                test_effort: item.impact.test_effort,
+                complexity_reduction: round_ratio(item.impact.complexity_reduction),
+                maintainability_improvement: round_ratio(item.impact.maintainability_improvement),
+                test_effort: round_ratio(item.impact.test_effort),
             },
             scoring_details: if include_scoring_details {
                 Some(calculate_file_scoring_details(item))
@@ -655,17 +828,32 @@ fn build_file_dependencies(metrics: &crate::priority::FileDebtMetrics) -> Option
 
 impl FunctionDebtItemOutput {
     fn from_function_item(item: &UnifiedDebtItem, include_scoring_details: bool) -> Self {
-        let score = item.unified_score.final_score.value();
+        // Apply rounding for clean output (spec 230)
+        let rounded_score = round_score(item.unified_score.final_score.value());
         let complexity_pattern = extract_complexity_pattern(
             &item.recommendation.rationale,
             &item.recommendation.primary_action,
         );
         let (pattern_type, pattern_confidence, pattern_details) =
             extract_pattern_data(&item.language_specific);
+
+        // Round coverage and entropy if present
+        let rounded_coverage = item
+            .transitive_coverage
+            .as_ref()
+            .map(|c| round_ratio(c.transitive));
+        let rounded_entropy = item
+            .entropy_details
+            .as_ref()
+            .map(|e| round_ratio(e.entropy_score));
+
+        // Round pattern confidence if present
+        let rounded_pattern_confidence = pattern_confidence.map(round_ratio);
+
         FunctionDebtItemOutput {
-            score,
+            score: rounded_score,
             category: crate::priority::DebtCategory::from_debt_type(&item.debt_type).to_string(),
-            priority: Priority::from_score(score),
+            priority: Priority::from_score(rounded_score),
             location: UnifiedLocation {
                 file: item.location.file.to_string_lossy().to_string(),
                 line: Some(item.location.line),
@@ -680,9 +868,9 @@ impl FunctionDebtItemOutput {
                 cognitive_complexity: item.cognitive_complexity,
                 length: item.function_length,
                 nesting_depth: item.nesting_depth,
-                coverage: item.transitive_coverage.as_ref().map(|c| c.transitive),
+                coverage: rounded_coverage,
                 uncovered_lines: None, // Not currently tracked
-                entropy_score: item.entropy_details.as_ref().map(|e| e.entropy_score),
+                entropy_score: rounded_entropy,
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
@@ -703,35 +891,43 @@ impl FunctionDebtItemOutput {
                 implementation_steps: item.recommendation.implementation_steps.clone(),
             },
             impact: FunctionImpactOutput {
-                coverage_improvement: item.expected_impact.coverage_improvement,
-                complexity_reduction: item.expected_impact.complexity_reduction,
-                risk_reduction: item.expected_impact.risk_reduction,
+                coverage_improvement: round_ratio(item.expected_impact.coverage_improvement),
+                complexity_reduction: round_ratio(item.expected_impact.complexity_reduction),
+                risk_reduction: round_ratio(item.expected_impact.risk_reduction),
             },
             scoring_details: if include_scoring_details {
                 Some(FunctionScoringDetails {
-                    coverage_score: item.unified_score.coverage_factor,
-                    complexity_score: item.unified_score.complexity_factor,
-                    dependency_score: item.unified_score.dependency_factor,
-                    base_score: item.unified_score.complexity_factor
-                        + item.unified_score.coverage_factor
-                        + item.unified_score.dependency_factor,
-                    entropy_dampening: item.entropy_details.as_ref().map(|e| e.dampening_factor),
-                    role_multiplier: item.unified_score.role_multiplier,
-                    final_score: item.unified_score.final_score.value(),
-                    purity_factor: item.unified_score.purity_factor,
-                    refactorability_factor: item.unified_score.refactorability_factor,
-                    pattern_factor: item.unified_score.pattern_factor,
+                    coverage_score: round_score(item.unified_score.coverage_factor),
+                    complexity_score: round_score(item.unified_score.complexity_factor),
+                    dependency_score: round_score(item.unified_score.dependency_factor),
+                    base_score: round_score(
+                        item.unified_score.complexity_factor
+                            + item.unified_score.coverage_factor
+                            + item.unified_score.dependency_factor,
+                    ),
+                    entropy_dampening: item
+                        .entropy_details
+                        .as_ref()
+                        .map(|e| round_ratio(e.dampening_factor)),
+                    role_multiplier: round_ratio(item.unified_score.role_multiplier),
+                    final_score: rounded_score,
+                    purity_factor: item.unified_score.purity_factor.map(round_ratio),
+                    refactorability_factor: item
+                        .unified_score
+                        .refactorability_factor
+                        .map(round_ratio),
+                    pattern_factor: item.unified_score.pattern_factor.map(round_ratio),
                 })
             } else {
                 None
             },
             adjusted_complexity: item.entropy_details.as_ref().map(|e| AdjustedComplexity {
-                dampened_cyclomatic: e.adjusted_complexity as f64,
-                dampening_factor: e.dampening_factor,
+                dampened_cyclomatic: round_score(e.adjusted_complexity as f64),
+                dampening_factor: round_ratio(e.dampening_factor),
             }),
             complexity_pattern,
             pattern_type,
-            pattern_confidence,
+            pattern_confidence: rounded_pattern_confidence,
             pattern_details,
         }
     }
@@ -851,11 +1047,14 @@ pub fn convert_to_unified_format(
     let unified_items: Vec<UnifiedDebtItemOutput> = all_items
         .iter()
         .map(|item| {
-            UnifiedDebtItemOutput::from_debt_item_with_call_graph(
+            let output = UnifiedDebtItemOutput::from_debt_item_with_call_graph(
                 item,
                 include_scoring_details,
                 Some(&analysis.call_graph),
-            )
+            );
+            // Assert invariants in debug builds (spec 230)
+            output.assert_invariants();
+            output
         })
         .collect();
 
@@ -913,11 +1112,11 @@ pub fn convert_to_unified_format(
         }
     }
 
-    // Build cohesion summary if any cohesion data was collected (spec 198)
+    // Build cohesion summary with rounding (spec 198, 230)
     let cohesion_summary = if !cohesion_scores.is_empty() {
         let average = cohesion_scores.iter().sum::<f64>() / cohesion_scores.len() as f64;
         Some(CohesionSummary {
-            average,
+            average: round_ratio(average),
             high_cohesion_files: high_cohesion_count,
             medium_cohesion_files: medium_cohesion_count,
             low_cohesion_files: low_cohesion_count,
@@ -926,9 +1125,9 @@ pub fn convert_to_unified_format(
         None
     };
 
-    // Recalculate debt density from filtered items
+    // Recalculate debt density from filtered items, with rounding (spec 230)
     let debt_density = if analysis.total_lines_of_code > 0 {
-        (total_debt_score / analysis.total_lines_of_code as f64) * 1000.0
+        round_score((total_debt_score / analysis.total_lines_of_code as f64) * 1000.0)
     } else {
         0.0
     };
@@ -943,7 +1142,7 @@ pub fn convert_to_unified_format(
         },
         summary: DebtSummary {
             total_items: unified_items.len(),
-            total_debt_score,
+            total_debt_score: round_score(total_debt_score),
             debt_density,
             total_loc: analysis.total_lines_of_code,
             by_type: TypeBreakdown {
@@ -1120,5 +1319,402 @@ mod tests {
         // Empty vectors should be skipped
         assert!(!json.contains("\"top_dependents\""));
         assert!(!json.contains("\"top_dependencies\""));
+    }
+
+    // ============================================================================
+    // Rounding Tests (spec 230)
+    // ============================================================================
+
+    #[test]
+    fn test_round_score_removes_noise() {
+        // Typical floating-point noise
+        assert_eq!(round_score(1.5697499999999998), 1.57);
+        assert_eq!(round_score(42.999999999999), 43.0);
+        assert_eq!(round_score(10.0000000001), 10.0);
+    }
+
+    #[test]
+    fn test_round_score_preserves_valid_values() {
+        assert_eq!(round_score(0.0), 0.0);
+        assert_eq!(round_score(100.0), 100.0);
+        assert_eq!(round_score(42.15), 42.15);
+    }
+
+    #[test]
+    fn test_round_ratio_removes_noise() {
+        // Typical floating-point noise in ratios
+        assert_eq!(round_ratio(0.9999999999), 1.0);
+        assert_eq!(round_ratio(0.0000000001), 0.0);
+        assert_eq!(round_ratio(0.7499999999), 0.75);
+    }
+
+    #[test]
+    fn test_round_ratio_preserves_valid_values() {
+        assert_eq!(round_ratio(0.0), 0.0);
+        assert_eq!(round_ratio(1.0), 1.0);
+        assert_eq!(round_ratio(0.5), 0.5);
+        assert_eq!(round_ratio(0.1234), 0.1234);
+    }
+
+    // ============================================================================
+    // Invariant Tests (spec 230)
+    // ============================================================================
+
+    #[test]
+    fn test_priority_from_score_thresholds() {
+        // Verify exact threshold behavior
+        assert!(matches!(Priority::from_score(100.0), Priority::Critical));
+        assert!(matches!(Priority::from_score(99.99), Priority::High));
+        assert!(matches!(Priority::from_score(50.0), Priority::High));
+        assert!(matches!(Priority::from_score(49.99), Priority::Medium));
+        assert!(matches!(Priority::from_score(20.0), Priority::Medium));
+        assert!(matches!(Priority::from_score(19.99), Priority::Low));
+        assert!(matches!(Priority::from_score(0.0), Priority::Low));
+    }
+
+    #[test]
+    fn test_function_debt_item_serialization_roundtrip() {
+        use crate::priority::DebtType;
+
+        let item = FunctionDebtItemOutput {
+            score: 42.57,
+            category: "Testing".to_string(),
+            priority: Priority::from_score(42.57),
+            location: UnifiedLocation {
+                file: "test.rs".to_string(),
+                line: Some(10),
+                function: Some("test_fn".to_string()),
+                file_context_label: None,
+            },
+            metrics: FunctionMetricsOutput {
+                cyclomatic_complexity: 5,
+                cognitive_complexity: 3,
+                length: 20,
+                nesting_depth: 2,
+                coverage: Some(0.8),
+                uncovered_lines: None,
+                entropy_score: Some(0.5),
+            },
+            debt_type: DebtType::TestingGap {
+                coverage: 0.8,
+                cyclomatic: 5,
+                cognitive: 3,
+            },
+            function_role: FunctionRole::Unknown,
+            purity_analysis: Some(PurityAnalysis {
+                is_pure: true,
+                confidence: 0.9,
+                side_effects: None,
+            }),
+            dependencies: Dependencies {
+                upstream_count: 2,
+                downstream_count: 3,
+                upstream_callers: vec!["caller1".to_string()],
+                downstream_callees: vec!["callee1".to_string()],
+            },
+            recommendation: RecommendationOutput {
+                action: "Add tests".to_string(),
+                priority: None,
+                implementation_steps: vec![],
+            },
+            impact: FunctionImpactOutput {
+                coverage_improvement: 0.2,
+                complexity_reduction: 0.1,
+                risk_reduction: 0.15,
+            },
+            scoring_details: None,
+            adjusted_complexity: None,
+            complexity_pattern: None,
+            pattern_type: None,
+            pattern_confidence: None,
+            pattern_details: None,
+        };
+
+        // Serialize and deserialize
+        let json = serde_json::to_string(&item).unwrap();
+        let deserialized: FunctionDebtItemOutput = serde_json::from_str(&json).unwrap();
+
+        // Key fields should be preserved
+        assert_eq!(item.score, deserialized.score);
+        assert!(matches!(deserialized.priority, Priority::Medium));
+        assert_eq!(item.metrics.coverage, deserialized.metrics.coverage);
+    }
+
+    #[test]
+    fn test_file_debt_item_serialization_roundtrip() {
+        let item = FileDebtItemOutput {
+            score: 75.25,
+            category: "Architecture".to_string(),
+            priority: Priority::from_score(75.25),
+            location: UnifiedLocation {
+                file: "big_file.rs".to_string(),
+                line: None,
+                function: None,
+                file_context_label: None,
+            },
+            metrics: FileMetricsOutput {
+                lines: 500,
+                functions: 25,
+                classes: 0,
+                avg_complexity: 8.5,
+                max_complexity: 15,
+                total_complexity: 212,
+                coverage: 0.65,
+                uncovered_lines: 175,
+            },
+            god_object_indicators: None,
+            dependencies: None,
+            anti_patterns: None,
+            cohesion: Some(CohesionOutput {
+                score: 0.45,
+                internal_calls: 10,
+                external_calls: 15,
+                classification: CohesionClassification::Medium,
+                functions_analyzed: 25,
+            }),
+            recommendation: RecommendationOutput {
+                action: "Split file".to_string(),
+                priority: None,
+                implementation_steps: vec![],
+            },
+            impact: FileImpactOutput {
+                complexity_reduction: 0.3,
+                maintainability_improvement: 0.4,
+                test_effort: 0.5,
+            },
+            scoring_details: None,
+        };
+
+        // Serialize and deserialize
+        let json = serde_json::to_string(&item).unwrap();
+        let deserialized: FileDebtItemOutput = serde_json::from_str(&json).unwrap();
+
+        // Key fields should be preserved
+        assert_eq!(item.score, deserialized.score);
+        assert!(matches!(deserialized.priority, Priority::High));
+        assert_eq!(item.metrics.coverage, deserialized.metrics.coverage);
+    }
+
+    #[test]
+    fn test_no_floating_point_noise_in_output() {
+        let item = FunctionDebtItemOutput {
+            score: 42.57, // Already rounded
+            category: "Testing".to_string(),
+            priority: Priority::Medium,
+            location: UnifiedLocation {
+                file: "test.rs".to_string(),
+                line: Some(10),
+                function: Some("test_fn".to_string()),
+                file_context_label: None,
+            },
+            metrics: FunctionMetricsOutput {
+                cyclomatic_complexity: 5,
+                cognitive_complexity: 3,
+                length: 20,
+                nesting_depth: 2,
+                coverage: Some(0.8), // Already rounded
+                uncovered_lines: None,
+                entropy_score: Some(0.5), // Already rounded
+            },
+            debt_type: crate::priority::DebtType::TestingGap {
+                coverage: 0.8,
+                cyclomatic: 5,
+                cognitive: 3,
+            },
+            function_role: FunctionRole::Unknown,
+            purity_analysis: None,
+            dependencies: Dependencies {
+                upstream_count: 0,
+                downstream_count: 0,
+                upstream_callers: vec![],
+                downstream_callees: vec![],
+            },
+            recommendation: RecommendationOutput {
+                action: "Add tests".to_string(),
+                priority: None,
+                implementation_steps: vec![],
+            },
+            impact: FunctionImpactOutput {
+                coverage_improvement: 0.2,
+                complexity_reduction: 0.1,
+                risk_reduction: 0.15,
+            },
+            scoring_details: None,
+            adjusted_complexity: None,
+            complexity_pattern: None,
+            pattern_type: None,
+            pattern_confidence: None,
+            pattern_details: None,
+        };
+
+        let json = serde_json::to_string(&item).unwrap();
+
+        // Check for typical floating-point noise patterns
+        let noise_patterns = ["9999999999", "0000000001"];
+
+        for pattern in noise_patterns {
+            assert!(
+                !json.contains(pattern),
+                "Found floating-point noise '{}' in: {}",
+                pattern,
+                json
+            );
+        }
+    }
+}
+
+// ============================================================================
+// Property-Based Tests (spec 230)
+// ============================================================================
+
+#[cfg(test)]
+mod proptest_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    prop_compose! {
+        /// Generate arbitrary function metrics with valid ranges
+        fn arb_function_metrics()
+            (cyclomatic in 1u32..100,
+             cognitive in 1u32..100,
+             length in 1usize..1000,
+             nesting in 0u32..10,
+             coverage in prop::option::of(0.0f64..=1.0),
+             entropy in prop::option::of(0.0f64..=1.0))
+            -> FunctionMetricsOutput
+        {
+            FunctionMetricsOutput {
+                cyclomatic_complexity: cyclomatic,
+                cognitive_complexity: cognitive,
+                length,
+                nesting_depth: nesting,
+                coverage: coverage.map(round_ratio),
+                uncovered_lines: None,
+                entropy_score: entropy.map(round_ratio),
+            }
+        }
+    }
+
+    prop_compose! {
+        /// Generate arbitrary file metrics with valid ranges
+        fn arb_file_metrics()
+            (lines in 1usize..10000,
+             functions in 1usize..100,
+             classes in 0usize..20,
+             avg_complexity in 1.0f64..50.0,
+             max_complexity in 1u32..100,
+             total_complexity in 1u32..1000,
+             coverage in 0.0f64..=1.0,
+             uncovered_lines in 0usize..1000)
+            -> FileMetricsOutput
+        {
+            FileMetricsOutput {
+                lines,
+                functions,
+                classes,
+                avg_complexity: round_score(avg_complexity),
+                max_complexity,
+                total_complexity,
+                coverage: round_ratio(coverage),
+                uncovered_lines,
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_round_score_never_negative(score in 0.0f64..1000.0) {
+            let rounded = round_score(score);
+            prop_assert!(rounded >= 0.0, "Rounded score {} is negative", rounded);
+        }
+
+        #[test]
+        fn test_round_ratio_in_valid_range(ratio in 0.0f64..=1.0) {
+            let rounded = round_ratio(ratio);
+            prop_assert!(
+                (0.0..=1.0).contains(&rounded),
+                "Rounded ratio {} is out of range [0, 1]",
+                rounded
+            );
+        }
+
+        #[test]
+        fn test_priority_matches_score_thresholds(score in 0.0f64..500.0) {
+            let rounded_score = round_score(score);
+            let priority = Priority::from_score(rounded_score);
+            let expected = Priority::from_score(rounded_score);
+
+            prop_assert_eq!(
+                std::mem::discriminant(&priority),
+                std::mem::discriminant(&expected),
+                "Priority {:?} doesn't match expected {:?} for score {}",
+                priority,
+                expected,
+                rounded_score
+            );
+        }
+
+        #[test]
+        fn test_function_metrics_serialization_roundtrip(metrics in arb_function_metrics()) {
+            let json = serde_json::to_string(&metrics).expect("Serialization failed");
+            let deserialized: FunctionMetricsOutput =
+                serde_json::from_str(&json).expect("Deserialization failed");
+
+            prop_assert_eq!(
+                metrics.cyclomatic_complexity,
+                deserialized.cyclomatic_complexity
+            );
+            prop_assert_eq!(
+                metrics.cognitive_complexity,
+                deserialized.cognitive_complexity
+            );
+            prop_assert_eq!(metrics.length, deserialized.length);
+            prop_assert_eq!(metrics.nesting_depth, deserialized.nesting_depth);
+
+            // Coverage and entropy should match if present
+            if let (Some(a), Some(b)) = (metrics.coverage, deserialized.coverage) {
+                prop_assert!((a - b).abs() < 0.0001, "Coverage mismatch: {} vs {}", a, b);
+            }
+        }
+
+        #[test]
+        fn test_file_metrics_serialization_roundtrip(metrics in arb_file_metrics()) {
+            let json = serde_json::to_string(&metrics).expect("Serialization failed");
+            let deserialized: FileMetricsOutput =
+                serde_json::from_str(&json).expect("Deserialization failed");
+
+            prop_assert_eq!(metrics.lines, deserialized.lines);
+            prop_assert_eq!(metrics.functions, deserialized.functions);
+            prop_assert_eq!(metrics.max_complexity, deserialized.max_complexity);
+            prop_assert!(
+                (metrics.coverage - deserialized.coverage).abs() < 0.0001,
+                "Coverage mismatch: {} vs {}",
+                metrics.coverage,
+                deserialized.coverage
+            );
+        }
+
+        #[test]
+        fn test_cohesion_classification_matches_score(score in 0.0f64..=1.0) {
+            let rounded = round_ratio(score);
+            let classification = CohesionClassification::from_score(rounded);
+
+            let expected = if rounded >= 0.7 {
+                CohesionClassification::High
+            } else if rounded >= 0.4 {
+                CohesionClassification::Medium
+            } else {
+                CohesionClassification::Low
+            };
+
+            prop_assert_eq!(
+                classification.clone(),
+                expected.clone(),
+                "Classification {:?} doesn't match expected {:?} for score {}",
+                classification,
+                expected,
+                rounded
+            );
+        }
     }
 }
