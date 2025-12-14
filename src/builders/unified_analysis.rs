@@ -519,6 +519,10 @@ fn report_stage_start(stage: usize) {
 fn report_stage_complete(stage: usize, metric: impl Into<String>) {
     if let Some(manager) = crate::progress::ProgressManager::global() {
         manager.tui_complete_stage(stage, metric.into());
+        // Update overall progress: 6 stages total (0-5), each completion adds ~16.67%
+        // Stage 0 is handled by project_analysis.rs, so we handle stages 1-5 here
+        let progress = ((stage + 1) as f64) / 6.0;
+        manager.tui_set_progress(progress);
     }
     // Also update unified progress for call graph stage (stage 1 -> phase 1)
     if stage == 1 {

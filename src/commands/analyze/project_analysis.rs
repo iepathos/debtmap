@@ -243,7 +243,8 @@ fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<DuplicationBl
 fn complete_files_phase(file_count: usize) {
     if let Some(manager) = ProgressManager::global() {
         manager.tui_complete_stage(0, format!("{} files parsed", file_count));
-        manager.tui_set_progress(0.22);
+        // Stage 0 complete = 1/6 of total progress (6 stages total: 0-5)
+        manager.tui_set_progress(1.0 / 6.0);
     }
 }
 
