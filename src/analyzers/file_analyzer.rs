@@ -104,6 +104,7 @@ impl UnifiedFileAnalyzer {
                     aggregated_entropy: None,
                     aggregated_error_swallowing_count: None,
                     aggregated_error_swallowing_patterns: None,
+                    layering_impact: None,
                 }),
                 None,
             )
@@ -256,6 +257,7 @@ impl UnifiedFileAnalyzer {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             })
         } else {
             None

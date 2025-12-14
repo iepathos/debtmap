@@ -13,9 +13,8 @@
 //! 4. Returns a NavigationResult indicating success/failure
 
 use super::nav_state::{
-    can_enter_detail, can_enter_dsm, can_enter_filter_menu, can_enter_help, can_enter_search,
-    can_enter_sort_menu, can_go_back, can_navigate_detail_pages, is_valid_transition,
-    NavigationResult, NavigationState,
+    can_enter_detail, can_enter_filter_menu, can_enter_help, can_enter_search, can_enter_sort_menu,
+    can_go_back, can_navigate_detail_pages, is_valid_transition, NavigationResult, NavigationState,
 };
 use super::{detail_page::DetailPage, view_mode::ViewMode};
 
@@ -108,27 +107,6 @@ pub fn navigate_to_filter_menu(state: &mut NavigationState) -> NavigationResult 
     NavigationResult::Success
 }
 
-/// Navigate to DSM view.
-pub fn navigate_to_dsm(state: &mut NavigationState) -> NavigationResult {
-    if !is_valid_transition(state.view_mode, ViewMode::Dsm) {
-        return NavigationResult::Invalid {
-            from: state.view_mode,
-            to: ViewMode::Dsm,
-        };
-    }
-
-    if !can_enter_dsm(state.view_mode, state.dsm_enabled) {
-        return NavigationResult::Blocked {
-            reason: "DSM feature not enabled",
-        };
-    }
-
-    state.history.push(state.view_mode);
-    state.view_mode = ViewMode::Dsm;
-
-    NavigationResult::Success
-}
-
 /// Navigate to Help view.
 pub fn navigate_to_help(state: &mut NavigationState) -> NavigationResult {
     if !can_enter_help(state.view_mode) {
@@ -200,10 +178,6 @@ pub fn available_actions(
         actions.push(("f", "Filter"));
     }
 
-    if can_enter_dsm(state.view_mode, state.dsm_enabled) {
-        actions.push(("m", "DSM view"));
-    }
-
     if can_enter_help(state.view_mode) {
         actions.push(("?", "Help"));
     }
@@ -227,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_detail_success() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_to_detail(&mut state, true, true);
         assert!(result.is_success());
@@ -238,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_detail_blocked_no_selection() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_to_detail(&mut state, true, false);
         assert!(matches!(result, NavigationResult::Blocked { .. }));
@@ -248,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_detail_invalid_from_detail() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
         state.view_mode = ViewMode::Detail;
 
         let result = navigate_to_detail(&mut state, true, true);
@@ -257,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_search_success() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_to_search(&mut state);
         assert!(result.is_success());
@@ -266,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_search_invalid_from_detail() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
         state.view_mode = ViewMode::Detail;
 
         let result = navigate_to_search(&mut state);
@@ -274,25 +248,8 @@ mod tests {
     }
 
     #[test]
-    fn test_navigate_to_dsm_blocked_when_disabled() {
-        let mut state = NavigationState::new(false);
-
-        let result = navigate_to_dsm(&mut state);
-        assert!(matches!(result, NavigationResult::Blocked { .. }));
-    }
-
-    #[test]
-    fn test_navigate_to_dsm_success_when_enabled() {
-        let mut state = NavigationState::new(true);
-
-        let result = navigate_to_dsm(&mut state);
-        assert!(result.is_success());
-        assert_eq!(state.view_mode, ViewMode::Dsm);
-    }
-
-    #[test]
     fn test_navigate_back_uses_history() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         // Navigate List -> Detail
         navigate_to_detail(&mut state, true, true);
@@ -313,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_navigate_back_blocked_at_root() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_back(&mut state);
         assert!(matches!(result, NavigationResult::Blocked { .. }));
@@ -321,7 +278,7 @@ mod tests {
 
     #[test]
     fn test_navigate_back_without_history() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
         state.view_mode = ViewMode::Detail;
 
         // No history but not at root - should go to List
@@ -332,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_navigate_detail_page() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
         state.view_mode = ViewMode::Detail;
         state.detail_page = DetailPage::Overview;
 
@@ -349,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_navigate_detail_page_blocked_outside_detail() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_detail_page(&mut state, true);
         assert!(matches!(result, NavigationResult::Blocked { .. }));
@@ -361,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_typical_user_flow() {
-        let mut state = NavigationState::new(true);
+        let mut state = NavigationState::new();
 
         // User views list
         assert_eq!(state.view_mode, ViewMode::List);
@@ -394,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_search_to_detail_flow() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         // Start search
         let result = navigate_to_search(&mut state);
@@ -414,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_available_actions() {
-        let state = NavigationState::new(true);
+        let state = NavigationState::new();
 
         let actions = available_actions(&state, true, true);
 
@@ -424,14 +381,13 @@ mod tests {
         assert!(action_keys.contains(&"/"));
         assert!(action_keys.contains(&"s"));
         assert!(action_keys.contains(&"f"));
-        assert!(action_keys.contains(&"m")); // DSM enabled
         assert!(action_keys.contains(&"?"));
         assert!(action_keys.contains(&"q"));
     }
 
     #[test]
     fn test_available_actions_detail_view() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
         state.view_mode = ViewMode::Detail;
         state.history.push(ViewMode::List);
 
@@ -447,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_sort_menu_success() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_to_sort_menu(&mut state);
         assert!(result.is_success());
@@ -457,7 +413,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_filter_menu_success() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_to_filter_menu(&mut state);
         assert!(result.is_success());
@@ -467,7 +423,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_help_success() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
 
         let result = navigate_to_help(&mut state);
         assert!(result.is_success());
@@ -476,7 +432,7 @@ mod tests {
 
     #[test]
     fn test_navigate_to_help_blocked_from_help() {
-        let mut state = NavigationState::new(false);
+        let mut state = NavigationState::new();
         state.view_mode = ViewMode::Help;
 
         let result = navigate_to_help(&mut state);
@@ -498,7 +454,6 @@ mod property_tests {
             Just(ViewMode::SortMenu),
             Just(ViewMode::FilterMenu),
             Just(ViewMode::Help),
-            Just(ViewMode::Dsm),
         ]
     }
 
@@ -510,7 +465,7 @@ mod property_tests {
                 return Ok(());
             }
 
-            let mut state = NavigationState::new(false);
+            let mut state = NavigationState::new();
             state.view_mode = mode;
             // Intentionally don't push to history
 
@@ -526,7 +481,7 @@ mod property_tests {
         fn detail_page_navigation_cyclic(
             forward_count in 0usize..20
         ) {
-            let mut state = NavigationState::new(false);
+            let mut state = NavigationState::new();
             state.view_mode = ViewMode::Detail;
             let initial_page = state.detail_page;
 

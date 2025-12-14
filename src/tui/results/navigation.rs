@@ -5,7 +5,7 @@
 //! transitions, and history is tracked for proper back navigation.
 
 use super::filter::{CoverageFilter, Filter, SeverityFilter};
-use super::nav_state::{self, can_enter_detail, can_enter_dsm, can_enter_help};
+use super::nav_state::{self, can_enter_detail, can_enter_help};
 use super::sort::SortCriteria;
 use super::{app::ResultsApp, detail_page::DetailPage, page_availability, view_mode::ViewMode};
 use anyhow::Result;
@@ -23,7 +23,6 @@ pub fn handle_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         ViewMode::SortMenu => handle_sort_menu_key(app, key),
         ViewMode::FilterMenu => handle_filter_menu_key(app, key),
         ViewMode::Help => handle_help_key(app, key),
-        ViewMode::Dsm => handle_dsm_key(app, key),
     }
 }
 
@@ -99,13 +98,6 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         KeyCode::Char('?') => {
             if can_enter_help(app.nav().view_mode) {
                 app.nav_mut().push_and_set_view(ViewMode::Help);
-            }
-        }
-
-        // DSM view (Spec 205) - guarded transition
-        KeyCode::Char('m') => {
-            if can_enter_dsm(app.nav().view_mode, app.nav().dsm_enabled) {
-                app.nav_mut().push_and_set_view(ViewMode::Dsm);
             }
         }
 
@@ -395,52 +387,6 @@ fn handle_filter_menu_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 fn handle_help_key(app: &mut ResultsApp, _key: KeyEvent) -> Result<bool> {
     // Any key exits help - use history-based navigation
     navigate_back(app);
-    Ok(false)
-}
-
-/// Handle keys in DSM view (Spec 205)
-fn handle_dsm_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
-    match key.code {
-        // Back - use history-based navigation
-        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
-            navigate_back(app);
-        }
-
-        // Help - guarded transition with history
-        KeyCode::Char('?') => {
-            if can_enter_help(app.nav().view_mode) {
-                app.nav_mut().push_and_set_view(ViewMode::Help);
-            }
-        }
-
-        // Navigation within DSM (scroll if matrix is large)
-        KeyCode::Up | KeyCode::Char('k') => {
-            let current = app.nav().dsm_scroll_y;
-            if current > 0 {
-                app.nav_mut().dsm_scroll_y = current - 1;
-            }
-        }
-        KeyCode::Down | KeyCode::Char('j') => {
-            app.nav_mut().dsm_scroll_y += 1;
-        }
-        KeyCode::Left | KeyCode::Char('h') => {
-            let current = app.nav().dsm_scroll_x;
-            if current > 0 {
-                app.nav_mut().dsm_scroll_x = current - 1;
-            }
-        }
-        KeyCode::Right | KeyCode::Char('l') => {
-            app.nav_mut().dsm_scroll_x += 1;
-        }
-
-        // Reset scroll
-        KeyCode::Home | KeyCode::Char('g') => {
-            app.nav_mut().reset_dsm_scroll();
-        }
-
-        _ => {}
-    }
-
     Ok(false)
 }
 

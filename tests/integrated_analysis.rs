@@ -172,6 +172,7 @@ fn test_analyze_simple_code() {
         aggregated_entropy: None,
         aggregated_error_swallowing_count: None,
         aggregated_error_swallowing_patterns: None,
+        layering_impact: None,
     };
 
     let call_graph = std::collections::HashMap::new();
@@ -239,6 +240,7 @@ fn test_timeout_budget() {
         aggregated_entropy: None,
         aggregated_error_swallowing_count: None,
         aggregated_error_swallowing_patterns: None,
+        layering_impact: None,
     };
 
     let call_graph = std::collections::HashMap::new();

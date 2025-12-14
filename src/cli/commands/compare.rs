@@ -51,11 +51,6 @@ pub fn handle_compare_command(
             print_comparison_terminal(&comparison);
             return Ok(());
         }
-        OutputFormat::Dsm => {
-            // DSM format not applicable for comparison, use terminal
-            print_comparison_terminal(&comparison);
-            return Ok(());
-        }
         OutputFormat::Terminal => {
             print_comparison_terminal(&comparison);
             return Ok(());

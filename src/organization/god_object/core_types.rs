@@ -118,6 +118,9 @@ pub struct GodObjectAnalysis {
     /// Unique error swallowing patterns across all functions in the god object
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregated_error_swallowing_patterns: Option<Vec<String>>,
+    /// Layering impact analysis (Spec 195)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layering_impact: Option<crate::organization::LayeringImpact>,
 }
 
 impl GodObjectAnalysis {
