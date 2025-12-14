@@ -108,6 +108,7 @@ mod tests {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            total_lines: 0,
             module_scope: Some(ModuleScopeAnalysis {
                 assignments: vec![],
                 singleton_instances: vec![singleton],
