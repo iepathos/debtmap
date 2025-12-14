@@ -34,7 +34,7 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
 
     // Route to appropriate page renderer
     if let Some(item) = app.selected_item() {
-        match app.detail_page() {
+        match app.nav().detail_page {
             DetailPage::Overview => {
                 detail_pages::overview::render(frame, app, item, content_area, &theme)
             }
@@ -101,13 +101,21 @@ fn apply_horizontal_margin(area: Rect) -> Rect {
 
 /// Render header with page indicator
 fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
-    let current_page = app.current_page_index() + 1; // 1-based for display
-    let total_pages = app.page_count();
-    let page_name = app.detail_page().name();
+    use super::page_availability;
+
+    let available =
+        page_availability::available_pages(app.selected_item(), &app.analysis().data_flow_graph);
+    let current_page = available
+        .iter()
+        .position(|&p| p == app.nav().detail_page)
+        .map(|i| i + 1)
+        .unwrap_or(1); // 1-based for display
+    let total_pages = available.len();
+    let page_name = app.nav().detail_page.name();
 
     let position = format!(
         "Detail View ({}/{})  [Page {}/{}] {}",
-        app.selected_index() + 1,
+        app.list().selected_index() + 1,
         app.item_count(),
         current_page,
         total_pages,

@@ -183,8 +183,8 @@ fn render_matrix(
         return;
     }
 
-    let scroll_x = app.dsm_scroll_x();
-    let scroll_y = app.dsm_scroll_y();
+    let scroll_x = app.nav().dsm_scroll_x;
+    let scroll_y = app.nav().dsm_scroll_y;
 
     // Calculate visible area
     let name_width = 20usize; // Module name column width

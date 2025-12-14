@@ -4,6 +4,11 @@
 //! smaller state modules for list, query, and navigation state management.
 //! Following the single responsibility principle, ResultsApp serves as
 //! a slim coordinator rather than a god object.
+//!
+//! Call sites access component state directly via accessors:
+//! - `app.list()` / `app.list_mut()` for list state (selection, scrolling, grouping)
+//! - `app.query()` / `app.query_mut()` for query state (search, filters, sort)
+//! - `app.nav()` / `app.nav_mut()` for navigation state (view mode, detail page, history)
 
 use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 use anyhow::Result;
@@ -11,9 +16,8 @@ use crossterm::event::KeyEvent;
 use ratatui::Frame;
 
 use super::{
-    detail_view, dsm_view, filter::Filter, layout, list_state::ListState, list_view, nav_state,
-    navigation, page_availability, query_state::QueryState, search::SearchState,
-    sort::SortCriteria,
+    detail_view, dsm_view, layout, list_state::ListState, list_view, nav_state, navigation,
+    query_state::QueryState,
 };
 
 // Re-export for backwards compatibility
@@ -113,6 +117,40 @@ impl ResultsApp {
     }
 
     // ========================================================================
+    // STATE ACCESSORS
+    // ========================================================================
+
+    /// Get reference to list state.
+    pub fn list(&self) -> &ListState {
+        &self.list
+    }
+
+    /// Get mutable reference to list state.
+    pub fn list_mut(&mut self) -> &mut ListState {
+        &mut self.list
+    }
+
+    /// Get reference to query state.
+    pub fn query(&self) -> &QueryState {
+        &self.query
+    }
+
+    /// Get mutable reference to query state.
+    pub fn query_mut(&mut self) -> &mut QueryState {
+        &mut self.query
+    }
+
+    /// Get reference to navigation state.
+    pub fn nav(&self) -> &nav_state::NavigationState {
+        &self.nav
+    }
+
+    /// Get mutable reference to navigation state.
+    pub fn nav_mut(&mut self) -> &mut nav_state::NavigationState {
+        &mut self.nav
+    }
+
+    // ========================================================================
     // COORDINATION METHODS
     // ========================================================================
 
@@ -181,161 +219,6 @@ impl ResultsApp {
     }
 
     // ========================================================================
-    // DELEGATION TO LIST STATE
-    // ========================================================================
-
-    /// Get selected index
-    pub fn selected_index(&self) -> usize {
-        self.list.selected_index()
-    }
-
-    /// Set selected index (with bounds checking)
-    pub fn set_selected_index(&mut self, index: usize) {
-        let count = self.item_count();
-        self.list.set_selected_index(index, count);
-    }
-
-    /// Get scroll offset
-    pub fn scroll_offset(&self) -> usize {
-        self.list.scroll_offset()
-    }
-
-    /// Set scroll offset
-    pub fn set_scroll_offset(&mut self, offset: usize) {
-        self.list.set_scroll_offset(offset);
-    }
-
-    /// Toggle grouping on/off
-    pub fn toggle_grouping(&mut self) {
-        self.list.toggle_grouping();
-    }
-
-    /// Get grouping state
-    pub fn is_grouped(&self) -> bool {
-        self.list.is_grouped()
-    }
-
-    // ========================================================================
-    // DELEGATION TO QUERY STATE
-    // ========================================================================
-
-    /// Get reference to search state
-    pub fn search(&self) -> &SearchState {
-        self.query.search()
-    }
-
-    /// Get mutable reference to search state
-    pub fn search_mut(&mut self) -> &mut SearchState {
-        self.query.search_mut()
-    }
-
-    /// Get active filters
-    pub fn filters(&self) -> &[Filter] {
-        self.query.filters()
-    }
-
-    /// Get current sort criteria
-    pub fn sort_by(&self) -> SortCriteria {
-        self.query.sort_by()
-    }
-
-    /// Set sort criteria and re-sort
-    pub fn set_sort_by(&mut self, criteria: SortCriteria) {
-        self.query.set_sort_by(criteria, &self.analysis);
-    }
-
-    /// Apply search filter
-    pub fn apply_search(&mut self) {
-        self.query.apply_search(&self.analysis);
-        self.list.reset();
-    }
-
-    /// Add a filter
-    pub fn add_filter(&mut self, filter: Filter) {
-        self.query.add_filter(filter, &self.analysis);
-        self.list.reset();
-    }
-
-    /// Remove a filter
-    pub fn remove_filter(&mut self, index: usize) {
-        self.query.remove_filter(index, &self.analysis);
-    }
-
-    /// Clear all filters
-    pub fn clear_filters(&mut self) {
-        self.query.clear_filters(&self.analysis);
-    }
-
-    // ========================================================================
-    // DELEGATION TO NAVIGATION STATE
-    // ========================================================================
-
-    /// Get current view mode
-    pub fn view_mode(&self) -> ViewMode {
-        self.nav.view_mode
-    }
-
-    /// Set view mode
-    pub fn set_view_mode(&mut self, mode: ViewMode) {
-        self.nav.view_mode = mode;
-    }
-
-    /// Get current detail page
-    pub fn detail_page(&self) -> DetailPage {
-        self.nav.detail_page
-    }
-
-    /// Set detail page
-    pub fn set_detail_page(&mut self, page: DetailPage) {
-        self.nav.detail_page = page;
-    }
-
-    /// Get navigation history for back navigation.
-    pub fn nav_history(&self) -> &[ViewMode] {
-        &self.nav.history
-    }
-
-    /// Push view mode to navigation history.
-    pub fn push_nav_history(&mut self, mode: ViewMode) {
-        self.nav.history.push(mode);
-    }
-
-    /// Pop from navigation history.
-    pub fn pop_nav_history(&mut self) -> Option<ViewMode> {
-        self.nav.history.pop()
-    }
-
-    /// Clear navigation history.
-    pub fn clear_nav_history(&mut self) {
-        self.nav.clear_history();
-    }
-
-    /// Check if DSM feature is enabled.
-    pub fn dsm_enabled(&self) -> bool {
-        self.nav.dsm_enabled
-    }
-
-    /// Get DSM horizontal scroll offset
-    pub fn dsm_scroll_x(&self) -> usize {
-        self.nav.dsm_scroll_x
-    }
-
-    /// Set DSM horizontal scroll offset
-    pub fn set_dsm_scroll_x(&mut self, offset: usize) {
-        self.nav.dsm_scroll_x = offset;
-    }
-
-    /// Get DSM vertical scroll offset
-    pub fn dsm_scroll_y(&self) -> usize {
-        self.nav.dsm_scroll_y
-    }
-
-    /// Set DSM vertical scroll offset
-    pub fn set_dsm_scroll_y(&mut self, offset: usize) {
-        self.nav.dsm_scroll_y = offset;
-    }
-
-    // ========================================================================
     // UI STATE
     // ========================================================================
 
@@ -372,65 +255,6 @@ impl ResultsApp {
     }
 
     // ========================================================================
-    // DETAIL PAGE HELPERS (delegating to page_availability module)
-    // ========================================================================
-
-    /// Get available pages for current item (skip pages with no data)
-    pub fn available_pages(&self) -> Vec<DetailPage> {
-        page_availability::available_pages(self.selected_item(), &self.analysis.data_flow_graph)
-    }
-
-    /// Get total page count for current item
-    pub fn page_count(&self) -> usize {
-        self.available_pages().len()
-    }
-
-    /// Get the index of current page within available pages
-    pub fn current_page_index(&self) -> usize {
-        let available = self.available_pages();
-        available
-            .iter()
-            .position(|&p| p == self.nav.detail_page)
-            .unwrap_or(0)
-    }
-
-    /// Navigate to next available page (wrapping)
-    pub fn next_available_page(&mut self) {
-        self.nav.detail_page = page_availability::next_available_page(
-            self.nav.detail_page,
-            self.selected_item(),
-            &self.analysis.data_flow_graph,
-        );
-    }
-
-    /// Navigate to previous available page (wrapping)
-    pub fn prev_available_page(&mut self) {
-        self.nav.detail_page = page_availability::prev_available_page(
-            self.nav.detail_page,
-            self.selected_item(),
-            &self.analysis.data_flow_graph,
-        );
-    }
-
-    /// Check if a page is available for the current item
-    pub fn is_page_available(&self, page: DetailPage) -> bool {
-        page_availability::is_page_available(
-            page,
-            self.selected_item(),
-            &self.analysis.data_flow_graph,
-        )
-    }
-
-    /// Ensure current page is valid for the selected item
-    pub fn ensure_valid_page(&mut self) {
-        self.nav.detail_page = page_availability::ensure_valid_page(
-            self.nav.detail_page,
-            self.selected_item(),
-            &self.analysis.data_flow_graph,
-        );
-    }
-
-    // ========================================================================
     // NAVIGATION HELPERS
     // ========================================================================
 
@@ -444,30 +268,41 @@ impl ResultsApp {
         self.item_count() > 0
     }
 
-    /// Get available navigation actions for current state.
-    pub fn available_nav_actions(&self) -> Vec<(&'static str, &'static str)> {
-        nav_state::available_actions(
-            &nav_state::NavigationState {
-                view_mode: self.nav.view_mode,
-                detail_page: self.nav.detail_page,
-                history: self.nav.history.clone(),
-                dsm_enabled: self.nav.dsm_enabled,
-                dsm_scroll_x: self.nav.dsm_scroll_x,
-                dsm_scroll_y: self.nav.dsm_scroll_y,
-            },
-            self.has_items(),
-            self.has_selection(),
-        )
-    }
-
     /// Get count display for header
     pub fn count_display(&self) -> String {
         if self.list.is_grouped() {
-            let groups = super::grouping::group_by_location(self.filtered_items(), self.sort_by());
+            let groups =
+                super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
             let issue_count = self.query.filtered_indices().len();
             format!("{} locations ({} issues)", groups.len(), issue_count)
         } else {
             format!("{} items", self.query.filtered_indices().len())
         }
+    }
+
+    // ========================================================================
+    // QUERY COORDINATION (handles borrow issues)
+    // ========================================================================
+
+    /// Apply search and reset list (coordinates query with analysis).
+    pub fn apply_search(&mut self) {
+        self.query.apply_search(&self.analysis);
+        self.list.reset();
+    }
+
+    /// Set sort criteria (coordinates query with analysis).
+    pub fn set_sort_by(&mut self, criteria: super::sort::SortCriteria) {
+        self.query.set_sort_by(criteria, &self.analysis);
+    }
+
+    /// Add filter and reset list (coordinates query with analysis).
+    pub fn add_filter(&mut self, filter: super::filter::Filter) {
+        self.query.add_filter(filter, &self.analysis);
+        self.list.reset();
+    }
+
+    /// Clear filters (coordinates query with analysis).
+    pub fn clear_filters(&mut self) {
+        self.query.clear_filters(&self.analysis);
     }
 }

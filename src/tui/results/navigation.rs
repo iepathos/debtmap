@@ -7,7 +7,7 @@
 use super::filter::{CoverageFilter, Filter, SeverityFilter};
 use super::nav_state::{self, can_enter_detail, can_enter_dsm, can_enter_help};
 use super::sort::SortCriteria;
-use super::{app::ResultsApp, detail_page::DetailPage, view_mode::ViewMode};
+use super::{app::ResultsApp, detail_page::DetailPage, page_availability, view_mode::ViewMode};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -16,7 +16,7 @@ pub fn handle_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     // Clear status message on any key press (except on first press that sets it)
     app.clear_status_message();
 
-    match app.view_mode() {
+    match app.nav().view_mode {
         ViewMode::List => handle_list_key(app, key),
         ViewMode::Detail => handle_detail_key(app, key),
         ViewMode::Search => handle_search_key(app, key),
@@ -42,17 +42,19 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         }
         KeyCode::Char('g') | KeyCode::Home => {
             // Go to top
-            app.set_selected_index(0);
-            app.set_scroll_offset(0);
+            let count = app.item_count();
+            app.list_mut().set_selected_index(0, count);
+            app.list_mut().set_scroll_offset(0);
         }
         KeyCode::Char('G') => {
             // Toggle grouping
-            app.toggle_grouping();
+            app.list_mut().toggle_grouping();
         }
         KeyCode::End => {
             // Go to bottom
             let last = app.item_count().saturating_sub(1);
-            app.set_selected_index(last);
+            let count = app.item_count();
+            app.list_mut().set_selected_index(last, count);
             adjust_scroll(app);
         }
         KeyCode::PageUp => {
@@ -66,50 +68,44 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
         // Enter detail view - guarded transition
         KeyCode::Enter => {
-            if can_enter_detail(app.view_mode(), app.has_items(), app.has_selection()) {
-                app.push_nav_history(ViewMode::List);
-                app.set_view_mode(ViewMode::Detail);
+            if can_enter_detail(app.nav().view_mode, app.has_items(), app.has_selection()) {
+                app.nav_mut().push_and_set_view(ViewMode::Detail);
             }
         }
 
         // Search - guarded transition
         KeyCode::Char('/') => {
-            if nav_state::can_enter_search(app.view_mode()) {
-                app.search_mut().clear();
-                app.push_nav_history(ViewMode::List);
-                app.set_view_mode(ViewMode::Search);
+            if nav_state::can_enter_search(app.nav().view_mode) {
+                app.query_mut().search_mut().clear();
+                app.nav_mut().push_and_set_view(ViewMode::Search);
             }
         }
 
         // Sort menu - guarded transition
         KeyCode::Char('s') => {
-            if nav_state::can_enter_sort_menu(app.view_mode()) {
-                app.push_nav_history(ViewMode::List);
-                app.set_view_mode(ViewMode::SortMenu);
+            if nav_state::can_enter_sort_menu(app.nav().view_mode) {
+                app.nav_mut().push_and_set_view(ViewMode::SortMenu);
             }
         }
 
         // Filter menu - guarded transition
         KeyCode::Char('f') => {
-            if nav_state::can_enter_filter_menu(app.view_mode()) {
-                app.push_nav_history(ViewMode::List);
-                app.set_view_mode(ViewMode::FilterMenu);
+            if nav_state::can_enter_filter_menu(app.nav().view_mode) {
+                app.nav_mut().push_and_set_view(ViewMode::FilterMenu);
             }
         }
 
         // Help - guarded transition
         KeyCode::Char('?') => {
-            if can_enter_help(app.view_mode()) {
-                app.push_nav_history(ViewMode::List);
-                app.set_view_mode(ViewMode::Help);
+            if can_enter_help(app.nav().view_mode) {
+                app.nav_mut().push_and_set_view(ViewMode::Help);
             }
         }
 
         // DSM view (Spec 205) - guarded transition
         KeyCode::Char('m') => {
-            if can_enter_dsm(app.view_mode(), app.dsm_enabled()) {
-                app.push_nav_history(ViewMode::List);
-                app.set_view_mode(ViewMode::Dsm);
+            if can_enter_dsm(app.nav().view_mode, app.nav().dsm_enabled) {
+                app.nav_mut().push_and_set_view(ViewMode::Dsm);
             }
         }
 
@@ -149,58 +145,93 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
         // Page navigation (only cycles through available pages)
         KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
-            app.next_available_page();
+            let new_page = page_availability::next_available_page(
+                app.nav().detail_page,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            );
+            app.nav_mut().detail_page = new_page;
         }
         KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => {
-            app.prev_available_page();
+            let new_page = page_availability::prev_available_page(
+                app.nav().detail_page,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            );
+            app.nav_mut().detail_page = new_page;
         }
 
         // Jump to specific page (only if available)
         KeyCode::Char('1') => {
-            if app.is_page_available(DetailPage::Overview) {
-                app.set_detail_page(DetailPage::Overview);
+            if page_availability::is_page_available(
+                DetailPage::Overview,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::Overview;
             }
         }
         KeyCode::Char('2') => {
-            if app.is_page_available(DetailPage::Dependencies) {
-                app.set_detail_page(DetailPage::Dependencies);
+            if page_availability::is_page_available(
+                DetailPage::Dependencies,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::Dependencies;
             }
         }
         KeyCode::Char('3') => {
-            if app.is_page_available(DetailPage::GitContext) {
-                app.set_detail_page(DetailPage::GitContext);
+            if page_availability::is_page_available(
+                DetailPage::GitContext,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::GitContext;
             }
         }
         KeyCode::Char('4') => {
-            if app.is_page_available(DetailPage::Patterns) {
-                app.set_detail_page(DetailPage::Patterns);
+            if page_availability::is_page_available(
+                DetailPage::Patterns,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::Patterns;
             }
         }
         KeyCode::Char('5') => {
-            if app.is_page_available(DetailPage::DataFlow) {
-                app.set_detail_page(DetailPage::DataFlow);
+            if page_availability::is_page_available(
+                DetailPage::DataFlow,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::DataFlow;
             }
         }
         KeyCode::Char('6') => {
-            if app.is_page_available(DetailPage::Responsibilities) {
-                app.set_detail_page(DetailPage::Responsibilities);
+            if page_availability::is_page_available(
+                DetailPage::Responsibilities,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::Responsibilities;
             }
         }
 
         // Navigate to next/previous item (preserve page if available)
         KeyCode::Down | KeyCode::Char('j') => {
             move_selection(app, 1);
-            app.ensure_valid_page();
+            ensure_valid_page(app);
         }
         KeyCode::Up | KeyCode::Char('k') => {
             move_selection(app, -1);
-            app.ensure_valid_page();
+            ensure_valid_page(app);
         }
 
         // Actions
         KeyCode::Char('c') => {
             if let Some(item) = app.selected_item() {
-                let message = super::actions::copy_page_to_clipboard(item, app.detail_page(), app)?;
+                let detail_page = app.nav().detail_page;
+                let message = super::actions::copy_page_to_clipboard(item, detail_page, app)?;
                 app.set_status_message(message);
             }
         }
@@ -213,9 +244,8 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
         // Help - guarded transition with history
         KeyCode::Char('?') => {
-            if can_enter_help(app.view_mode()) {
-                app.push_nav_history(ViewMode::Detail);
-                app.set_view_mode(ViewMode::Help);
+            if can_enter_help(app.nav().view_mode) {
+                app.nav_mut().push_and_set_view(ViewMode::Help);
             }
         }
 
@@ -230,7 +260,7 @@ fn handle_search_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     match key.code {
         // Exit search - use history-based navigation
         KeyCode::Esc => {
-            app.search_mut().clear();
+            app.query_mut().search_mut().clear();
             app.apply_search();
             navigate_back(app);
         }
@@ -243,25 +273,25 @@ fn handle_search_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
         // Edit query
         KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.search_mut().insert_char(c);
+            app.query_mut().search_mut().insert_char(c);
         }
         KeyCode::Backspace => {
-            app.search_mut().delete_char();
+            app.query_mut().search_mut().delete_char();
         }
         KeyCode::Delete => {
-            app.search_mut().delete_char_forward();
+            app.query_mut().search_mut().delete_char_forward();
         }
         KeyCode::Left => {
-            app.search_mut().move_cursor_left();
+            app.query_mut().search_mut().move_cursor_left();
         }
         KeyCode::Right => {
-            app.search_mut().move_cursor_right();
+            app.query_mut().search_mut().move_cursor_right();
         }
         KeyCode::Home => {
-            app.search_mut().move_cursor_home();
+            app.query_mut().search_mut().move_cursor_home();
         }
         KeyCode::End => {
-            app.search_mut().move_cursor_end();
+            app.query_mut().search_mut().move_cursor_end();
         }
 
         _ => {}
@@ -378,36 +408,34 @@ fn handle_dsm_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
         // Help - guarded transition with history
         KeyCode::Char('?') => {
-            if can_enter_help(app.view_mode()) {
-                app.push_nav_history(ViewMode::Dsm);
-                app.set_view_mode(ViewMode::Help);
+            if can_enter_help(app.nav().view_mode) {
+                app.nav_mut().push_and_set_view(ViewMode::Help);
             }
         }
 
         // Navigation within DSM (scroll if matrix is large)
         KeyCode::Up | KeyCode::Char('k') => {
-            let current = app.dsm_scroll_y();
+            let current = app.nav().dsm_scroll_y;
             if current > 0 {
-                app.set_dsm_scroll_y(current - 1);
+                app.nav_mut().dsm_scroll_y = current - 1;
             }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            app.set_dsm_scroll_y(app.dsm_scroll_y() + 1);
+            app.nav_mut().dsm_scroll_y += 1;
         }
         KeyCode::Left | KeyCode::Char('h') => {
-            let current = app.dsm_scroll_x();
+            let current = app.nav().dsm_scroll_x;
             if current > 0 {
-                app.set_dsm_scroll_x(current - 1);
+                app.nav_mut().dsm_scroll_x = current - 1;
             }
         }
         KeyCode::Right | KeyCode::Char('l') => {
-            app.set_dsm_scroll_x(app.dsm_scroll_x() + 1);
+            app.nav_mut().dsm_scroll_x += 1;
         }
 
         // Reset scroll
         KeyCode::Home | KeyCode::Char('g') => {
-            app.set_dsm_scroll_x(0);
-            app.set_dsm_scroll_y(0);
+            app.nav_mut().reset_dsm_scroll();
         }
 
         _ => {}
@@ -418,21 +446,22 @@ fn handle_dsm_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 
 /// Move selection by delta (can be negative)
 fn move_selection(app: &mut ResultsApp, delta: isize) {
-    if app.item_count() == 0 {
+    let count = app.item_count();
+    if count == 0 {
         return;
     }
 
-    let current = app.selected_index() as isize;
-    let new_index = (current + delta).max(0).min(app.item_count() as isize - 1) as usize;
+    let current = app.list().selected_index() as isize;
+    let new_index = (current + delta).max(0).min(count as isize - 1) as usize;
 
-    app.set_selected_index(new_index);
+    app.list_mut().set_selected_index(new_index, count);
     adjust_scroll(app);
 }
 
 /// Adjust scroll offset to keep selection visible
 fn adjust_scroll(app: &mut ResultsApp) {
-    let selected = app.selected_index();
-    let scroll = app.scroll_offset();
+    let selected = app.list().selected_index();
+    let scroll = app.list().scroll_offset();
     let (_, height) = app.terminal_size();
 
     // Visible area (accounting for header and footer)
@@ -440,10 +469,11 @@ fn adjust_scroll(app: &mut ResultsApp) {
 
     if selected < scroll {
         // Selection above visible area
-        app.set_scroll_offset(selected);
+        app.list_mut().set_scroll_offset(selected);
     } else if selected >= scroll + visible_rows {
         // Selection below visible area
-        app.set_scroll_offset(selected.saturating_sub(visible_rows - 1));
+        app.list_mut()
+            .set_scroll_offset(selected.saturating_sub(visible_rows - 1));
     }
 }
 
@@ -453,10 +483,18 @@ fn adjust_scroll(app: &mut ResultsApp) {
 /// If no history exists and not at root (List), returns to List.
 /// If already at root with no history, does nothing.
 fn navigate_back(app: &mut ResultsApp) {
-    if let Some(previous) = app.pop_nav_history() {
-        app.set_view_mode(previous);
-    } else if app.view_mode() != ViewMode::List {
-        app.set_view_mode(ViewMode::List);
+    if app.nav_mut().go_back().is_none() && app.nav().view_mode != ViewMode::List {
+        app.nav_mut().view_mode = ViewMode::List;
     }
     // Already at root with no history - do nothing
+}
+
+/// Ensure current page is valid for the selected item (coordination helper)
+fn ensure_valid_page(app: &mut ResultsApp) {
+    let new_page = page_availability::ensure_valid_page(
+        app.nav().detail_page,
+        app.selected_item(),
+        &app.analysis().data_flow_graph,
+    );
+    app.nav_mut().detail_page = new_page;
 }
