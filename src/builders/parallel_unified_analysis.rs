@@ -842,10 +842,11 @@ impl ParallelUnifiedAnalysisBuilder {
         let total_files = files_map.len();
 
         // Initialize TUI progress tracking (design consistency - DESIGN.md:179)
+        // Subtask 2: File analysis (stage 5 = debt scoring)
         if let Some(manager) = crate::progress::ProgressManager::global() {
             manager.tui_update_subtask(
-                6,
-                3,
+                5,
+                2,
                 crate::tui::app::StageStatus::Active,
                 Some((0, total_files)),
             );
@@ -875,8 +876,8 @@ impl ParallelUnifiedAnalysisBuilder {
                     if current % 10 == 0 || last.elapsed() > std::time::Duration::from_millis(100) {
                         if let Some(manager) = crate::progress::ProgressManager::global() {
                             manager.tui_update_subtask(
-                                6,
-                                3,
+                                5,
+                                2,
                                 crate::tui::app::StageStatus::Active,
                                 Some((current, total_files)),
                             );
@@ -897,6 +898,16 @@ impl ParallelUnifiedAnalysisBuilder {
         self.timings.file_analysis = start.elapsed();
 
         progress.finish_and_clear();
+
+        // Mark file analysis subtask complete
+        if let Some(manager) = crate::progress::ProgressManager::global() {
+            manager.tui_update_subtask(
+                5,
+                2,
+                crate::tui::app::StageStatus::Completed,
+                Some((total_files, total_files)),
+            );
+        }
 
         file_data
     }
