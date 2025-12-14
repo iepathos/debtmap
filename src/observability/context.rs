@@ -19,8 +19,9 @@ static FILES_PROCESSED: AtomicUsize = AtomicUsize::new(0);
 static FILES_TOTAL: AtomicUsize = AtomicUsize::new(0);
 
 // Thread-local context for the current operation
+// pub(crate) allows the parallel module to access this for context propagation
 thread_local! {
-    static CURRENT_CONTEXT: RefCell<AnalysisContext> = const { RefCell::new(AnalysisContext::new()) };
+    pub(crate) static CURRENT_CONTEXT: RefCell<AnalysisContext> = const { RefCell::new(AnalysisContext::new()) };
 }
 
 /// Context snapshot for the current analysis operation.

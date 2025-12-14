@@ -61,6 +61,7 @@
 
 pub mod context;
 pub mod panic_hook;
+pub mod parallel;
 pub mod tracing;
 
 pub use context::{
@@ -68,6 +69,10 @@ pub use context::{
     set_phase_persistent, set_progress, AnalysisContext, AnalysisPhase, ContextGuard,
 };
 pub use panic_hook::install_panic_hook;
+pub use parallel::{
+    process_file_with_context, with_parallel_context, ParallelContext, ParallelContextExt,
+    ParallelContextGuard,
+};
 pub use tracing::{
     init_tracing, init_tracing_with_filter, is_debug_enabled, is_tui_active, set_tui_active,
 };
