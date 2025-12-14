@@ -33,20 +33,26 @@ fn build_location_section(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> 
         theme,
         width,
     );
-    add_label_value(
-        &mut lines,
-        "function",
-        item.location.function.clone(),
-        theme,
-        width,
-    );
-    add_label_value(
-        &mut lines,
-        "line",
-        item.location.line.to_string(),
-        theme,
-        width,
-    );
+
+    // Skip function and line for file-scope items (god files) since they're always
+    // "[file-scope]" and "1" which don't add useful information
+    if item.location.function != "[file-scope]" {
+        add_label_value(
+            &mut lines,
+            "function",
+            item.location.function.clone(),
+            theme,
+            width,
+        );
+        add_label_value(
+            &mut lines,
+            "line",
+            item.location.line.to_string(),
+            theme,
+            width,
+        );
+    }
+
     add_blank_line(&mut lines);
     lines
 }

@@ -358,6 +358,13 @@ fn format_grouped_item(
         metric_parts.push(format!("LOC:{}", metrics.function_length));
     }
 
+    // For file-scope items (god files), show just the filename without "::[file-scope]"
+    let location_display = if group.location.function == "[file-scope]" {
+        file_name.to_string()
+    } else {
+        format!("{}::{}", file_name, group.location.function)
+    };
+
     // Single line: indicator, rank, score (colored by severity), location, badge, metrics
     let line = Line::from(vec![
         Span::styled(indicator, Style::default().fg(theme.accent())),
@@ -370,10 +377,7 @@ fn format_grouped_item(
             Style::default().fg(severity_color),
         ),
         Span::raw("  "),
-        Span::styled(
-            format!("{}::{}", file_name, group.location.function),
-            Style::default().fg(theme.secondary()),
-        ),
+        Span::styled(location_display, Style::default().fg(theme.secondary())),
         Span::styled(badge, Style::default().fg(theme.muted)),
         Span::raw("  "),
         Span::styled(
