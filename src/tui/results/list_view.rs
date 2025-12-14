@@ -68,7 +68,7 @@ pub fn render_with_search(frame: &mut Frame, app: &ResultsApp) {
     // Clear the area first to prevent background bleed-through
     frame.render_widget(Clear, search_area);
 
-    let search_text = format!("Search: {}", app.search().query());
+    let search_text = format!("Search: {}", app.query().search().query());
     let search_widget = Paragraph::new(search_text)
         .block(
             Block::default()
@@ -100,7 +100,7 @@ pub fn render_with_sort_menu(frame: &mut Frame, app: &ResultsApp) {
     frame.render_widget(Clear, menu_area);
 
     let sort_options = super::sort::SortCriteria::all();
-    let current_sort = app.sort_by();
+    let current_sort = app.query().sort_by();
 
     let items: Vec<ListItem> = sort_options
         .iter()
@@ -167,13 +167,13 @@ pub fn render_with_filter_menu(frame: &mut Frame, app: &ResultsApp) {
     ];
 
     // Show active filters
-    if !app.filters().is_empty() {
+    if !app.query().filters().is_empty() {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Active filters:",
             Style::default().fg(theme.accent()),
         )));
-        for filter in app.filters() {
+        for filter in app.query().filters() {
             lines.push(Line::from(format!("  • {}", filter.display_name())));
         }
     }
@@ -215,17 +215,20 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         ]),
         Line::from(vec![
             Span::styled(
-                format!("sort {}", app.sort_by().display_name()),
+                format!("sort {}", app.query().sort_by().display_name()),
                 Style::default().fg(theme.muted),
             ),
             Span::raw("  │  "),
             Span::styled(
-                format!("filters {}", app.filters().len()),
+                format!("filters {}", app.query().filters().len()),
                 Style::default().fg(theme.muted),
             ),
             Span::raw("  │  "),
             Span::styled(
-                format!("grouping {}", if app.is_grouped() { "on" } else { "off" }),
+                format!(
+                    "grouping {}",
+                    if app.list().is_grouped() { "on" } else { "off" }
+                ),
                 Style::default().fg(theme.muted),
             ),
         ]),
@@ -246,18 +249,19 @@ fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     // Apply horizontal margin per DESIGN.md
     let list_area = apply_horizontal_margin(area);
 
-    let items: Vec<ListItem> = if app.is_grouped() {
+    let items: Vec<ListItem> = if app.list().is_grouped() {
         render_grouped_list(app, list_area, theme)
     } else {
         render_ungrouped_list(app, list_area, theme)
     };
 
     if items.is_empty() {
-        let empty_text = if app.filters().is_empty() && app.search().query().is_empty() {
-            "No debt items found"
-        } else {
-            "No items match current filters/search"
-        };
+        let empty_text =
+            if app.query().filters().is_empty() && app.query().search().query().is_empty() {
+                "No debt items found"
+            } else {
+                "No items match current filters/search"
+            };
 
         let empty = Paragraph::new(empty_text)
             .style(Style::default().fg(theme.muted))
@@ -274,10 +278,10 @@ fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
 fn render_ungrouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListItem<'static>> {
     app.filtered_items()
         .enumerate()
-        .skip(app.scroll_offset())
+        .skip(app.list().scroll_offset())
         .take(area.height as usize)
         .map(|(idx, item)| {
-            let is_selected = idx == app.selected_index();
+            let is_selected = idx == app.list().selected_index();
             format_list_item(item, idx, is_selected, theme)
         })
         .collect()
@@ -285,19 +289,20 @@ fn render_ungrouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<Lis
 
 /// Render grouped list by location
 fn render_grouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListItem<'static>> {
-    let groups = grouping::group_by_location(app.filtered_items(), app.sort_by());
+    let groups = grouping::group_by_location(app.filtered_items(), app.query().sort_by());
 
     let mut list_items = Vec::new();
 
-    for (display_index, group) in groups.iter().skip(app.scroll_offset()).enumerate() {
+    for (display_index, group) in groups.iter().skip(app.list().scroll_offset()).enumerate() {
         if list_items.len() >= area.height as usize {
             break;
         }
 
-        let is_selected = (display_index + app.scroll_offset()) == app.selected_index();
+        let is_selected =
+            (display_index + app.list().scroll_offset()) == app.list().selected_index();
         list_items.push(format_grouped_item(
             group,
-            display_index + app.scroll_offset(),
+            display_index + app.list().scroll_offset(),
             is_selected,
             theme,
         ));
@@ -529,7 +534,11 @@ fn format_list_item(
 /// Render footer with navigation hints
 fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     let position_text = if app.item_count() > 0 {
-        format!("{}/{} items", app.selected_index() + 1, app.item_count())
+        format!(
+            "{}/{} items",
+            app.list().selected_index() + 1,
+            app.item_count()
+        )
     } else {
         "0 items".to_string()
     };
