@@ -56,23 +56,62 @@ impl ParallelCallGraphBuilder {
         &self,
         project_path: &Path,
         base_graph: CallGraph,
+        progress_callback: F,
+    ) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)>
+    where
+        F: FnMut(CallGraphProgress) + Send + Sync,
+    {
+        self.build_parallel_with_files(project_path, base_graph, None, progress_callback)
+    }
+
+    /// Build call graph with parallel processing, using optional pre-discovered files
+    ///
+    /// If `rust_files` is provided, skips file discovery and uses the given files.
+    /// This avoids redundant filesystem walking when files were already discovered.
+    pub fn build_parallel_with_files<F>(
+        &self,
+        project_path: &Path,
+        base_graph: CallGraph,
+        rust_files: Option<&[PathBuf]>,
         mut progress_callback: F,
     ) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)>
     where
         F: FnMut(CallGraphProgress) + Send + Sync,
     {
-        // Phase 1: Discover files
-        progress_callback(CallGraphProgress {
-            phase: CallGraphPhase::DiscoveringFiles,
-            current: 0,
-            total: 0,
-        });
+        let discovered_files: Vec<PathBuf>;
+        let rust_files = match rust_files {
+            Some(files) => {
+                // Skip discover phase - files already known from stage 0
+                log::info!("Using {} pre-discovered Rust files", files.len());
+                files
+            }
+            None => {
+                // Phase 1: Discover files (only when not pre-discovered)
+                progress_callback(CallGraphProgress {
+                    phase: CallGraphPhase::DiscoveringFiles,
+                    current: 0,
+                    total: 0,
+                });
 
-        // Find all Rust files
-        let config = config::get_config();
-        let rust_files =
-            io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
+                let config = config::get_config();
+                discovered_files = io::walker::find_project_files_with_config(
+                    project_path,
+                    vec![Language::Rust],
+                    config,
+                )
                 .context("Failed to find Rust files for call graph")?;
+                log::info!("Discovered {} Rust files", discovered_files.len());
+
+                // Mark discover phase complete
+                progress_callback(CallGraphProgress {
+                    phase: CallGraphPhase::DiscoveringFiles,
+                    current: discovered_files.len(),
+                    total: discovered_files.len(),
+                });
+
+                &discovered_files
+            }
+        };
 
         let total_files = rust_files.len();
         log::info!("Processing {} Rust files in parallel", total_files);
@@ -94,7 +133,7 @@ impl ParallelCallGraphBuilder {
         });
 
         let parsed_files = self.parallel_parse_files_with_progress(
-            &rust_files,
+            rust_files,
             &parallel_graph,
             &mut progress_callback,
         )?;
@@ -307,6 +346,23 @@ pub fn build_call_graph_parallel<F>(
 where
     F: FnMut(CallGraphProgress) + Send + Sync,
 {
+    build_call_graph_parallel_with_files(project_path, base_graph, num_threads, None, progress_callback)
+}
+
+/// Parallel processing entry point with optional pre-discovered files
+///
+/// If `rust_files` is provided, skips file discovery and uses the given files.
+/// This avoids redundant filesystem walking when files were already discovered.
+pub fn build_call_graph_parallel_with_files<F>(
+    project_path: &Path,
+    base_graph: CallGraph,
+    num_threads: Option<usize>,
+    rust_files: Option<&[PathBuf]>,
+    progress_callback: F,
+) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)>
+where
+    F: FnMut(CallGraphProgress) + Send + Sync,
+{
     let mut config = ParallelConfig::default();
 
     if let Some(threads) = num_threads {
@@ -314,5 +370,5 @@ where
     }
 
     let builder = ParallelCallGraphBuilder::with_config(config);
-    builder.build_parallel(project_path, base_graph, progress_callback)
+    builder.build_parallel_with_files(project_path, base_graph, rust_files, progress_callback)
 }

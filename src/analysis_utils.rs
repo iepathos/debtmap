@@ -51,6 +51,9 @@ pub fn collect_file_metrics_with_errors(files: &[PathBuf]) -> AnalysisResults<Fi
     let processed_count = Arc::new(AtomicUsize::new(0));
     let processed_count_clone = Arc::clone(&processed_count);
 
+    // Calculate update interval for TUI throttling (~50-100 updates total)
+    let tui_update_interval = (total_files / 100).max(1);
+
     // Analyze files with error collection
     let (successes, failures): (Vec<_>, Vec<_>) = files_to_process
         .par_iter()
@@ -65,6 +68,19 @@ pub fn collect_file_metrics_with_errors(files: &[PathBuf]) -> AnalysisResults<Fi
                     total: total_files,
                 });
             });
+
+            // Update TUI progress (throttled to reduce lock contention)
+            // Update on interval, first file, and last file
+            if current % tui_update_interval == 0 || current == 1 || current == total_files {
+                if let Some(manager) = crate::progress::ProgressManager::global() {
+                    manager.tui_update_subtask(
+                        0,
+                        1,
+                        crate::tui::app::StageStatus::Active,
+                        Some((current, total_files)),
+                    );
+                }
+            }
 
             result
         })

@@ -51,8 +51,36 @@ fn is_test_function(function_name: &str, file_path: &Path, is_test_attr: bool) -
 pub fn process_rust_files_for_call_graph<F>(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+    progress_callback: F,
+) -> Result<(
+    HashSet<priority::call_graph::FunctionId>,
+    HashSet<priority::call_graph::FunctionId>,
+)>
+where
+    F: FnMut(CallGraphProgress),
+{
+    process_rust_files_for_call_graph_with_files(
+        project_path,
+        call_graph,
+        verbose_macro_warnings,
+        show_macro_stats,
+        None,
+        progress_callback,
+    )
+}
+
+/// Process Rust files for call graph with optional pre-discovered files
+///
+/// If `rust_files` is provided, skips file discovery and uses the given files.
+/// This avoids redundant filesystem walking when files were already discovered.
+pub fn process_rust_files_for_call_graph_with_files<F>(
+    project_path: &Path,
+    call_graph: &mut priority::CallGraph,
     _verbose_macro_warnings: bool,
     _show_macro_stats: bool,
+    rust_files: Option<&[std::path::PathBuf]>,
     mut progress_callback: F,
 ) -> Result<(
     HashSet<priority::call_graph::FunctionId>,
@@ -61,17 +89,37 @@ pub fn process_rust_files_for_call_graph<F>(
 where
     F: FnMut(CallGraphProgress),
 {
-    // Phase 1: Discover files
-    progress_callback(CallGraphProgress {
-        phase: CallGraphPhase::DiscoveringFiles,
-        current: 0,
-        total: 0,
-    });
+    let discovered_files: Vec<std::path::PathBuf>;
+    let rust_files = match rust_files {
+        Some(files) => {
+            // Skip discover phase - files already known from stage 0
+            log::info!("Using {} pre-discovered Rust files", files.len());
+            files
+        }
+        None => {
+            // Phase 1: Discover files (only when not pre-discovered)
+            progress_callback(CallGraphProgress {
+                phase: CallGraphPhase::DiscoveringFiles,
+                current: 0,
+                total: 0,
+            });
 
-    let config = config::get_config();
-    let rust_files =
-        io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
-            .context("Failed to find Rust files for call graph")?;
+            let config = config::get_config();
+            discovered_files =
+                io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
+                    .context("Failed to find Rust files for call graph")?;
+            log::info!("Discovered {} Rust files", discovered_files.len());
+
+            // Mark discover phase complete
+            progress_callback(CallGraphProgress {
+                phase: CallGraphPhase::DiscoveringFiles,
+                current: discovered_files.len(),
+                total: discovered_files.len(),
+            });
+
+            &discovered_files
+        }
+    };
 
     let total_files = rust_files.len();
 

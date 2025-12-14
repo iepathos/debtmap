@@ -791,6 +791,13 @@ impl ParallelUnifiedAnalysisBuilder {
         context: &FunctionAnalysisContext,
         progress: Option<&indicatif::ProgressBar>,
     ) -> Vec<UnifiedDebtItem> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let total_metrics = metrics.len();
+        let processed_count = AtomicUsize::new(0);
+        // Throttle TUI updates (~50-100 total updates)
+        let update_interval = (total_metrics / 100).max(1);
+
         metrics
             .par_iter()
             .progress_with(
@@ -798,7 +805,24 @@ impl ParallelUnifiedAnalysisBuilder {
                     .cloned()
                     .unwrap_or_else(indicatif::ProgressBar::hidden),
             )
-            .flat_map(|metric| self.process_single_metric(metric, test_only_functions, context))
+            .flat_map(|metric| {
+                let result = self.process_single_metric(metric, test_only_functions, context);
+
+                // Update TUI progress (throttled)
+                let current = processed_count.fetch_add(1, Ordering::Relaxed) + 1;
+                if current % update_interval == 0 || current == total_metrics {
+                    if let Some(manager) = crate::progress::ProgressManager::global() {
+                        manager.tui_update_subtask(
+                            5,
+                            1,
+                            crate::tui::app::StageStatus::Active,
+                            Some((current, total_metrics)),
+                        );
+                    }
+                }
+
+                result
+            })
             .collect()
     }
 

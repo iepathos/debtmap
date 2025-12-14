@@ -38,6 +38,8 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub enable_context: bool,
     pub context_providers: Option<Vec<String>>,
     pub disable_context: Option<Vec<String>>,
+    /// Pre-discovered Rust files from stage 0 (avoids re-walking filesystem)
+    pub rust_files: Option<Vec<PathBuf>>,
 }
 
 /// Owned options for unified analysis.

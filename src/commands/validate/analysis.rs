@@ -78,6 +78,7 @@ pub fn calculate_unified_analysis(
             enable_context: options.enable_context,
             context_providers: options.context_providers.clone(),
             disable_context: options.disable_context.clone(),
+            rust_files: None, // Validate doesn't have pre-discovered files
         },
     )
     .expect("Unified analysis failed")

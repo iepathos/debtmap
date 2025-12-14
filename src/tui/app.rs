@@ -161,11 +161,7 @@ impl App {
             PipelineStage::with_subtasks(
                 "call graph",
                 vec![
-                    SubTask {
-                        name: "discover files".to_string(),
-                        status: StageStatus::Pending,
-                        progress: None,
-                    },
+                    // Note: "discover files" removed - reuses files from stage 0
                     SubTask {
                         name: "parse ASTs".to_string(),
                         status: StageStatus::Pending,

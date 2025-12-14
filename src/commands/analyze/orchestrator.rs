@@ -57,6 +57,9 @@ fn create_analysis_options<'a>(
     config: &'a AnalyzeConfig,
     results: &'a AnalysisResults,
 ) -> unified_analysis::UnifiedAnalysisOptions<'a> {
+    // Extract Rust files from already-discovered file contexts (avoids re-walking filesystem)
+    let rust_files = extract_rust_files(results);
+
     unified_analysis::UnifiedAnalysisOptions {
         results,
         coverage_file: config.coverage_file.as_ref(),
@@ -78,7 +81,22 @@ fn create_analysis_options<'a>(
         enable_context: config.enable_context,
         context_providers: config.context_providers.clone(),
         disable_context: config.disable_context.clone(),
+        rust_files: Some(rust_files),
     }
+}
+
+/// Extract Rust file paths from analysis results (pure).
+fn extract_rust_files(results: &AnalysisResults) -> Vec<std::path::PathBuf> {
+    results
+        .file_contexts
+        .keys()
+        .filter(|path| {
+            path.extension()
+                .map(|ext| ext == "rs")
+                .unwrap_or(false)
+        })
+        .cloned()
+        .collect()
 }
 
 /// Process results and output (I/O).

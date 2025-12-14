@@ -60,6 +60,7 @@ pub fn perform_unified_analysis(
         enable_context: false,
         context_providers: None,
         disable_context: None,
+        rust_files: None, // Fallback to file discovery
     })
 }
 
@@ -88,6 +89,7 @@ pub fn perform_unified_analysis_with_options(
         enable_context,
         context_providers,
         disable_context,
+        rust_files,
     } = options;
 
     // Set total file count for crash report progress tracking (spec 207)
@@ -101,13 +103,14 @@ pub fn perform_unified_analysis_with_options(
     let call_graph_start = std::time::Instant::now();
 
     let (framework_exclusions, function_pointer_used_functions) = if parallel {
-        build_call_graph_with_progress(project_path, &mut call_graph, jobs, true)?
+        build_call_graph_with_progress(project_path, &mut call_graph, jobs, true, rust_files.as_deref())?
     } else {
         build_call_graph_with_progress_sequential(
             project_path,
             &mut call_graph,
             verbose_macro_warnings,
             show_macro_stats,
+            rust_files.as_deref(),
         )?
     };
 
@@ -575,17 +578,57 @@ fn build_call_graph_with_progress(
     call_graph: &mut CallGraph,
     jobs: usize,
     _parallel: bool,
+    rust_files: Option<&[PathBuf]>,
 ) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    use crate::builders::parallel_call_graph::CallGraphPhase;
+    use crate::tui::app::StageStatus;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     let thread_count = if jobs == 0 { None } else { Some(jobs) };
 
-    let (graph, exclusions, used_funcs) = parallel_call_graph::build_call_graph_parallel(
+    // Track the last active subtask to mark it completed on phase transition
+    let last_subtask = AtomicUsize::new(usize::MAX);
+
+    let (graph, exclusions, used_funcs) = parallel_call_graph::build_call_graph_parallel_with_files(
         project_path,
         call_graph.clone(),
         thread_count,
-        |_progress| {
-            // Progress updates handled by parallel_call_graph internally
+        rust_files,
+        |progress| {
+            // Map CallGraphPhase to TUI subtask index (stage 1)
+            // Note: DiscoveringFiles is skipped (files reused from stage 0)
+            // Subtasks: 0=parse ASTs, 1=extract calls, 2=link modules
+            let subtask_index = match progress.phase {
+                CallGraphPhase::DiscoveringFiles => return, // Skip - not shown in TUI
+                CallGraphPhase::ParsingASTs => 0,
+                CallGraphPhase::ExtractingCalls => 1,
+                CallGraphPhase::LinkingModules => 2,
+            };
+
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                // Mark previous subtask as completed if we moved to a new phase
+                let prev = last_subtask.swap(subtask_index, Ordering::Relaxed);
+                if prev != usize::MAX && prev != subtask_index {
+                    manager.tui_update_subtask(1, prev, StageStatus::Completed, None);
+                }
+
+                let progress_info = if progress.total > 0 {
+                    Some((progress.current, progress.total))
+                } else {
+                    None
+                };
+                manager.tui_update_subtask(1, subtask_index, StageStatus::Active, progress_info);
+            }
         },
     )?;
+
+    // Mark the last subtask as completed
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        let last = last_subtask.load(std::sync::atomic::Ordering::Relaxed);
+        if last != usize::MAX {
+            manager.tui_update_subtask(1, last, StageStatus::Completed, None);
+        }
+    }
 
     *call_graph = graph;
     Ok((exclusions, used_funcs))
@@ -596,14 +639,58 @@ fn build_call_graph_with_progress_sequential(
     call_graph: &mut CallGraph,
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
+    rust_files: Option<&[PathBuf]>,
 ) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
-    call_graph::process_rust_files_for_call_graph(
+    use crate::builders::parallel_call_graph::CallGraphPhase;
+    use crate::tui::app::StageStatus;
+    use std::cell::Cell;
+
+    // Track the last active subtask to mark it completed on phase transition
+    let last_subtask = Cell::new(usize::MAX);
+
+    let result = call_graph::process_rust_files_for_call_graph_with_files(
         project_path,
         call_graph,
         verbose_macro_warnings,
         show_macro_stats,
-        |_progress| {},
-    )
+        rust_files,
+        |progress| {
+            // Map CallGraphPhase to TUI subtask index (stage 1)
+            // Note: DiscoveringFiles is skipped (files reused from stage 0)
+            // Subtasks: 0=parse ASTs, 1=extract calls, 2=link modules
+            let subtask_index = match progress.phase {
+                CallGraphPhase::DiscoveringFiles => return, // Skip - not shown in TUI
+                CallGraphPhase::ParsingASTs => 0,
+                CallGraphPhase::ExtractingCalls => 1,
+                CallGraphPhase::LinkingModules => 2,
+            };
+
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                // Mark previous subtask as completed if we moved to a new phase
+                let prev = last_subtask.replace(subtask_index);
+                if prev != usize::MAX && prev != subtask_index {
+                    manager.tui_update_subtask(1, prev, StageStatus::Completed, None);
+                }
+
+                let progress_info = if progress.total > 0 {
+                    Some((progress.current, progress.total))
+                } else {
+                    None
+                };
+                manager.tui_update_subtask(1, subtask_index, StageStatus::Active, progress_info);
+            }
+        },
+    );
+
+    // Mark the last subtask as completed
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        let last = last_subtask.get();
+        if last != usize::MAX {
+            manager.tui_update_subtask(1, last, StageStatus::Completed, None);
+        }
+    }
+
+    result
 }
 
 fn build_risk_analyzer(
