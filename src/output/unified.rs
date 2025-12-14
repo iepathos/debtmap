@@ -406,9 +406,23 @@ pub struct FunctionDebtItemOutput {
 }
 
 /// Adjusted complexity based on entropy analysis
+///
+/// When high entropy is detected (repetitive patterns, similar branches),
+/// complexity is dampened because the code is easier to understand than
+/// raw complexity numbers suggest.
+///
+/// Formula: `dampened_cyclomatic = cyclomatic_complexity * dampening_factor`
+///
+/// Invariants:
+/// - When `dampening_factor = 1.0`, `dampened_cyclomatic` equals original cyclomatic
+/// - When `dampening_factor < 1.0`, `dampened_cyclomatic < cyclomatic_complexity`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdjustedComplexity {
+    /// Cyclomatic complexity adjusted by entropy dampening factor.
+    /// Formula: `cyclomatic_complexity * dampening_factor`
     pub dampened_cyclomatic: f64,
+    /// Factor applied to dampen complexity (0.0 - 1.0).
+    /// 1.0 = no dampening, <1.0 = reduced complexity weight due to repetitive patterns.
     pub dampening_factor: f64,
 }
 
@@ -726,7 +740,9 @@ impl FunctionDebtItemOutput {
                 None
             },
             adjusted_complexity: item.entropy_details.as_ref().map(|e| AdjustedComplexity {
-                dampened_cyclomatic: e.adjusted_complexity as f64,
+                // Dampened cyclomatic = cyclomatic * dampening_factor
+                // When dampening_factor = 1.0, dampened_cyclomatic equals original cyclomatic
+                dampened_cyclomatic: item.cyclomatic_complexity as f64 * e.dampening_factor,
                 dampening_factor: e.dampening_factor,
             }),
             complexity_pattern,
@@ -1120,5 +1136,173 @@ mod tests {
         // Empty vectors should be skipped
         assert!(!json.contains("\"top_dependents\""));
         assert!(!json.contains("\"top_dependencies\""));
+    }
+
+    // Tests for spec 232: Dampened cyclomatic calculation fix
+    use crate::priority::unified_scorer::EntropyDetails;
+
+    fn create_test_item_with_complexity(
+        cyclomatic: u32,
+        cognitive: u32,
+        dampening_factor: f64,
+    ) -> UnifiedDebtItem {
+        use crate::priority::{
+            ActionableRecommendation, FunctionRole, ImpactMetrics, Location, Score0To100,
+            UnifiedDebtItem, UnifiedScore,
+        };
+        use std::path::PathBuf;
+
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                function: "test_func".to_string(),
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic,
+                cognitive,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 50.0,
+                coverage_factor: 80.0,
+                dependency_factor: 50.0,
+                role_multiplier: 1.0,
+                final_score: Score0To100::new(50.0),
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+            },
+            transitive_coverage: None,
+            file_context: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 20,
+            cyclomatic_complexity: cyclomatic,
+            cognitive_complexity: cognitive,
+            entropy_details: Some(EntropyDetails {
+                entropy_score: 0.5,
+                pattern_repetition: 0.3,
+                original_complexity: cognitive,
+                adjusted_complexity: (cognitive as f64 * dampening_factor) as u32,
+                dampening_factor,
+                adjusted_cognitive: (cognitive as f64 * dampening_factor) as u32,
+            }),
+            entropy_adjusted_cognitive: None,
+            entropy_dampening_factor: Some(dampening_factor),
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+        }
+    }
+
+    #[test]
+    fn test_dampening_factor_one_preserves_cyclomatic() {
+        // Spec 232: When dampening_factor = 1.0, dampened_cyclomatic = cyclomatic
+        let item = create_test_item_with_complexity(11, 23, 1.0);
+        let output = FunctionDebtItemOutput::from_function_item(&item, false);
+
+        let adjusted = output
+            .adjusted_complexity
+            .expect("should have adjusted_complexity");
+        assert_eq!(adjusted.dampening_factor, 1.0);
+        // Critical assertion: dampened_cyclomatic should equal cyclomatic, not cognitive
+        assert_eq!(
+            adjusted.dampened_cyclomatic, 11.0,
+            "dampened_cyclomatic should equal cyclomatic_complexity when factor is 1.0"
+        );
+    }
+
+    #[test]
+    fn test_dampening_reduces_cyclomatic() {
+        // Spec 232: dampened_cyclomatic = cyclomatic * dampening_factor
+        let item = create_test_item_with_complexity(20, 40, 0.5);
+        let output = FunctionDebtItemOutput::from_function_item(&item, false);
+
+        let adjusted = output
+            .adjusted_complexity
+            .expect("should have adjusted_complexity");
+        assert_eq!(adjusted.dampening_factor, 0.5);
+        assert_eq!(
+            adjusted.dampened_cyclomatic, 10.0,
+            "dampened_cyclomatic should be cyclomatic * factor"
+        );
+    }
+
+    #[test]
+    fn test_dampened_cyclomatic_independent_of_cognitive() {
+        // Spec 232: dampened_cyclomatic should only depend on cyclomatic, not cognitive
+        // Two items with same cyclomatic but different cognitive
+        let item1 = create_test_item_with_complexity(15, 10, 0.8);
+        let item2 = create_test_item_with_complexity(15, 50, 0.8);
+
+        let output1 = FunctionDebtItemOutput::from_function_item(&item1, false);
+        let output2 = FunctionDebtItemOutput::from_function_item(&item2, false);
+
+        let adjusted1 = output1
+            .adjusted_complexity
+            .expect("should have adjusted_complexity");
+        let adjusted2 = output2
+            .adjusted_complexity
+            .expect("should have adjusted_complexity");
+
+        // Same dampened cyclomatic regardless of cognitive complexity
+        assert_eq!(
+            adjusted1.dampened_cyclomatic, adjusted2.dampened_cyclomatic,
+            "dampened_cyclomatic should be the same for items with same cyclomatic complexity"
+        );
+        assert_eq!(
+            adjusted1.dampened_cyclomatic,
+            12.0, // 15 * 0.8
+            "dampened_cyclomatic should be cyclomatic * dampening_factor"
+        );
+    }
+
+    #[test]
+    fn test_adjusted_complexity_serialization() {
+        let adjusted = AdjustedComplexity {
+            dampened_cyclomatic: 11.0,
+            dampening_factor: 1.0,
+        };
+        let json = serde_json::to_string(&adjusted).unwrap();
+        assert!(json.contains("\"dampened_cyclomatic\":11.0"));
+        assert!(json.contains("\"dampening_factor\":1.0"));
     }
 }
