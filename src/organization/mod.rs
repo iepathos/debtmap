@@ -91,6 +91,7 @@ pub use god_object::{
     StructWithMethods,
 };
 
+pub use cohesion_calculator::{calculate_file_cohesion, FileCohesionResult};
 pub use domain_classifier::classify_struct_domain_enhanced;
 pub use domain_diversity::{
     CrossDomainSeverity, DiversityScore, DomainDiversityMetrics, StructDomainClassification,

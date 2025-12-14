@@ -42,6 +42,22 @@ pub struct DebtSummary {
     pub by_type: TypeBreakdown,
     pub by_category: std::collections::HashMap<String, usize>,
     pub score_distribution: ScoreDistribution,
+    /// Codebase-wide cohesion statistics (spec 198)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cohesion: Option<CohesionSummary>,
+}
+
+/// Codebase-wide cohesion statistics (spec 198)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CohesionSummary {
+    /// Average cohesion score across all analyzed files
+    pub average: f64,
+    /// Number of files with high cohesion (>= 0.7)
+    pub high_cohesion_files: usize,
+    /// Number of files with medium cohesion (0.4 - 0.7)
+    pub medium_cohesion_files: usize,
+    /// Number of files with low cohesion (< 0.4)
+    pub low_cohesion_files: usize,
 }
 
 /// Breakdown by item type
@@ -119,6 +135,9 @@ pub struct FileDebtItemOutput {
     /// File-level dependency metrics (spec 201)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependencies: Option<FileDependencies>,
+    /// File-level cohesion metrics (spec 198)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cohesion: Option<CohesionOutput>,
     pub recommendation: RecommendationOutput,
     pub impact: FileImpactOutput,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -144,6 +163,59 @@ pub struct FileImpactOutput {
     pub complexity_reduction: f64,
     pub maintainability_improvement: f64,
     pub test_effort: f64,
+}
+
+/// File-level cohesion metrics (spec 198)
+///
+/// Measures how tightly related the functions within a file are by analyzing
+/// function call patterns. High cohesion indicates functions work together frequently.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CohesionOutput {
+    /// Cohesion score between 0.0 (no cohesion) and 1.0 (perfect cohesion)
+    pub score: f64,
+    /// Number of internal function calls (within the same file)
+    pub internal_calls: usize,
+    /// Number of external function calls (to other files)
+    pub external_calls: usize,
+    /// Classification based on cohesion thresholds
+    pub classification: CohesionClassification,
+    /// Number of functions analyzed
+    pub functions_analyzed: usize,
+}
+
+/// Cohesion classification based on score thresholds (spec 198)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CohesionClassification {
+    /// Cohesion >= 0.7
+    High,
+    /// Cohesion 0.4 - 0.7
+    Medium,
+    /// Cohesion < 0.4
+    Low,
+}
+
+impl CohesionClassification {
+    /// Classify cohesion score into high/medium/low
+    pub fn from_score(score: f64) -> Self {
+        if score >= 0.7 {
+            CohesionClassification::High
+        } else if score >= 0.4 {
+            CohesionClassification::Medium
+        } else {
+            CohesionClassification::Low
+        }
+    }
+}
+
+impl std::fmt::Display for CohesionClassification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CohesionClassification::High => write!(f, "High"),
+            CohesionClassification::Medium => write!(f, "Medium"),
+            CohesionClassification::Low => write!(f, "Low"),
+        }
+    }
 }
 
 /// File-level dependency metrics (spec 201)
@@ -359,10 +431,30 @@ pub struct FunctionScoringDetails {
 /// Convert legacy DebtItem to unified format
 impl UnifiedDebtItemOutput {
     pub fn from_debt_item(item: &DebtItem, include_scoring_details: bool) -> Self {
+        Self::from_debt_item_with_call_graph(item, include_scoring_details, None)
+    }
+
+    /// Convert legacy DebtItem to unified format with optional call graph for cohesion (spec 198)
+    pub fn from_debt_item_with_call_graph(
+        item: &DebtItem,
+        include_scoring_details: bool,
+        call_graph: Option<&crate::priority::CallGraph>,
+    ) -> Self {
         match item {
-            DebtItem::File(file_item) => UnifiedDebtItemOutput::File(Box::new(
-                FileDebtItemOutput::from_file_item(file_item, include_scoring_details),
-            )),
+            DebtItem::File(file_item) => {
+                // Calculate cohesion if call graph is available (spec 198)
+                let cohesion = call_graph.and_then(|cg| {
+                    crate::organization::calculate_file_cohesion(&file_item.metrics.path, cg)
+                        .map(|r| build_cohesion_output(&r))
+                });
+                UnifiedDebtItemOutput::File(Box::new(
+                    FileDebtItemOutput::from_file_item_with_cohesion(
+                        file_item,
+                        include_scoring_details,
+                        cohesion,
+                    ),
+                ))
+            }
             DebtItem::Function(func_item) => UnifiedDebtItemOutput::Function(Box::new(
                 FunctionDebtItemOutput::from_function_item(func_item, include_scoring_details),
             )),
@@ -371,7 +463,17 @@ impl UnifiedDebtItemOutput {
 }
 
 impl FileDebtItemOutput {
+    /// Convert from FileDebtItem without cohesion data
+    #[allow(dead_code)]
     fn from_file_item(item: &FileDebtItem, include_scoring_details: bool) -> Self {
+        Self::from_file_item_with_cohesion(item, include_scoring_details, None)
+    }
+
+    fn from_file_item_with_cohesion(
+        item: &FileDebtItem,
+        include_scoring_details: bool,
+        cohesion: Option<CohesionOutput>,
+    ) -> Self {
         let score = item.score;
 
         // Build file dependencies if coupling data is present (spec 201)
@@ -399,6 +501,7 @@ impl FileDebtItemOutput {
             },
             god_object_indicators: item.metrics.god_object_analysis.clone().map(|a| a.into()),
             dependencies,
+            cohesion,
             recommendation: RecommendationOutput {
                 action: item.recommendation.clone(),
                 priority: None,
@@ -415,6 +518,17 @@ impl FileDebtItemOutput {
                 None
             },
         }
+    }
+}
+
+/// Build CohesionOutput from FileCohesionResult (spec 198)
+fn build_cohesion_output(result: &crate::organization::FileCohesionResult) -> CohesionOutput {
+    CohesionOutput {
+        score: result.score,
+        internal_calls: result.internal_calls,
+        external_calls: result.external_calls,
+        classification: CohesionClassification::from_score(result.score),
+        functions_analyzed: result.functions_analyzed,
     }
 }
 
@@ -638,10 +752,16 @@ pub fn convert_to_unified_format(
     // Get all debt items sorted by score
     let all_items = analysis.get_top_mixed_priorities(usize::MAX);
 
-    // Convert to unified format
+    // Convert to unified format with call graph for cohesion calculation (spec 198)
     let unified_items: Vec<UnifiedDebtItemOutput> = all_items
         .iter()
-        .map(|item| UnifiedDebtItemOutput::from_debt_item(item, include_scoring_details))
+        .map(|item| {
+            UnifiedDebtItemOutput::from_debt_item_with_call_graph(
+                item,
+                include_scoring_details,
+                Some(&analysis.call_graph),
+            )
+        })
         .collect();
 
     // Calculate summary statistics from filtered items
@@ -658,6 +778,12 @@ pub fn convert_to_unified_format(
     // Calculate total debt score from filtered items only
     let total_debt_score: f64 = all_items.iter().map(|item| item.score()).sum();
 
+    // Cohesion summary statistics (spec 198)
+    let mut cohesion_scores: Vec<f64> = Vec::new();
+    let mut high_cohesion_count = 0;
+    let mut medium_cohesion_count = 0;
+    let mut low_cohesion_count = 0;
+
     for item in &unified_items {
         match item {
             UnifiedDebtItemOutput::File(f) => {
@@ -668,6 +794,15 @@ pub fn convert_to_unified_format(
                     Priority::High => score_dist.high += 1,
                     Priority::Medium => score_dist.medium += 1,
                     Priority::Low => score_dist.low += 1,
+                }
+                // Collect cohesion stats (spec 198)
+                if let Some(ref cohesion) = f.cohesion {
+                    cohesion_scores.push(cohesion.score);
+                    match cohesion.classification {
+                        CohesionClassification::High => high_cohesion_count += 1,
+                        CohesionClassification::Medium => medium_cohesion_count += 1,
+                        CohesionClassification::Low => low_cohesion_count += 1,
+                    }
                 }
             }
             UnifiedDebtItemOutput::Function(f) => {
@@ -682,6 +817,19 @@ pub fn convert_to_unified_format(
             }
         }
     }
+
+    // Build cohesion summary if any cohesion data was collected (spec 198)
+    let cohesion_summary = if !cohesion_scores.is_empty() {
+        let average = cohesion_scores.iter().sum::<f64>() / cohesion_scores.len() as f64;
+        Some(CohesionSummary {
+            average,
+            high_cohesion_files: high_cohesion_count,
+            medium_cohesion_files: medium_cohesion_count,
+            low_cohesion_files: low_cohesion_count,
+        })
+    } else {
+        None
+    };
 
     // Recalculate debt density from filtered items
     let debt_density = if analysis.total_lines_of_code > 0 {
@@ -709,6 +857,7 @@ pub fn convert_to_unified_format(
             },
             by_category: category_counts,
             score_distribution: score_dist,
+            cohesion: cohesion_summary,
         },
         items: unified_items,
     }
