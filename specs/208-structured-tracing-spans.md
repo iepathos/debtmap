@@ -493,6 +493,112 @@ if is_debug_enabled() {
 }
 ```
 
+## TUI Compatibility
+
+### Problem
+
+The TUI uses:
+- **stdout** for ratatui rendering (alternate screen)
+- **Raw mode** which affects all terminal output
+
+The tracing subscriber writes to **stderr**. During TUI mode, stderr output will either corrupt the display or be hidden.
+
+### Solution: Conditional Output
+
+```rust
+// src/observability/tracing.rs
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static TUI_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+pub fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("warn"));
+
+    tracing_subscriber::registry()
+        .with(
+            fmt::layer()
+                .with_target(false)
+                .with_writer(|| {
+                    if TUI_ACTIVE.load(Ordering::Relaxed) {
+                        Box::new(std::io::sink()) as Box<dyn std::io::Write + Send>
+                    } else {
+                        Box::new(std::io::stderr()) as Box<dyn std::io::Write + Send>
+                    }
+                })
+        )
+        .with(filter)
+        .init();
+}
+
+/// Call when TUI starts/stops
+pub fn set_tui_active(active: bool) {
+    TUI_ACTIVE.store(active, Ordering::Relaxed);
+}
+```
+
+### Integration with TuiManager
+
+```rust
+// src/tui/mod.rs
+impl TuiManager {
+    pub fn new() -> io::Result<Self> {
+        crate::observability::set_tui_active(true);
+        // ... existing setup ...
+    }
+}
+
+impl Drop for TuiManager {
+    fn drop(&mut self) {
+        crate::observability::set_tui_active(false);
+        let _ = self.cleanup();
+    }
+}
+```
+
+### Panic Hook Must Exit TUI First
+
+```rust
+// src/observability/panic_hook.rs
+fn print_crash_report(info: &PanicInfo<'_>) {
+    // Exit TUI mode FIRST so crash report is visible
+    let _ = crossterm::terminal::disable_raw_mode();
+    let _ = crossterm::execute!(
+        std::io::stdout(),
+        crossterm::terminal::LeaveAlternateScreen
+    );
+
+    // Mark TUI as inactive so subsequent logging works
+    set_tui_active(false);
+
+    // Now print crash report (visible on normal terminal)
+    eprintln!("╔════════════════════════════════════════════╗");
+    // ...
+}
+```
+
+### Alternative: File Logging During TUI
+
+For debugging TUI issues, write to a log file:
+
+```bash
+DEBTMAP_LOG_FILE=debtmap.log debtmap analyze .
+```
+
+```rust
+pub fn init_tracing() {
+    let writer: Box<dyn Write + Send> = if let Ok(path) = std::env::var("DEBTMAP_LOG_FILE") {
+        Box::new(std::fs::File::create(path).expect("Failed to create log file"))
+    } else if TUI_ACTIVE.load(Ordering::Relaxed) {
+        Box::new(std::io::sink())
+    } else {
+        Box::new(std::io::stderr())
+    };
+
+    // ... setup with writer ...
+}
+```
+
 ## Migration and Compatibility
 
 ### Breaking Changes

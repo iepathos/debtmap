@@ -226,6 +226,14 @@ pub fn install_panic_hook() {
 }
 
 fn print_crash_report(info: &PanicInfo<'_>) {
+    // CRITICAL: Exit TUI mode first so crash report is visible
+    // If TUI is active, we're in alternate screen with raw mode
+    let _ = crossterm::terminal::disable_raw_mode();
+    let _ = crossterm::execute!(
+        std::io::stdout(),
+        crossterm::terminal::LeaveAlternateScreen
+    );
+
     let context = get_current_context();
     let (processed, total) = get_progress();
 
