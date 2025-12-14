@@ -28,6 +28,7 @@ pub mod dsm_view;
 pub mod filter;
 pub mod grouping;
 pub mod layout;
+pub mod list_actions;
 pub mod list_state;
 pub mod list_view;
 pub mod nav_actions;

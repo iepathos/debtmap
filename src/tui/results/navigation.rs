@@ -3,9 +3,14 @@
 //! This module handles keyboard input and delegates to the navigation state
 //! machine (nav_state.rs) for state transitions. Guards are used to validate
 //! transitions, and history is tracked for proper back navigation.
+//!
+//! Following Stillwater philosophy:
+//! - Pure action determination in `list_actions` module
+//! - Imperative shell (this module) executes the actions
 
 use super::filter::{CoverageFilter, Filter, SeverityFilter};
-use super::nav_state::{self, can_enter_detail, can_enter_dsm, can_enter_help};
+use super::list_actions::{determine_list_action, ListAction, ListActionContext};
+use super::nav_state::can_enter_help;
 use super::sort::SortCriteria;
 use super::{app::ResultsApp, detail_page::DetailPage, page_availability, view_mode::ViewMode};
 use anyhow::Result;
@@ -27,109 +32,100 @@ pub fn handle_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     }
 }
 
-/// Handle keys in list view
+/// Handle keys in list view.
+///
+/// Uses the Stillwater pattern: pure action determination + imperative execution.
+/// The `determine_list_action` function is pure and testable; this function
+/// is the thin imperative shell that executes the determined action.
 fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
-    match key.code {
-        // Quit
-        KeyCode::Char('q') => return Ok(true),
+    // Build context for pure action determination
+    let ctx = ListActionContext {
+        has_items: app.has_items(),
+        has_selection: app.has_selection(),
+    };
 
-        // Navigation
-        KeyCode::Up | KeyCode::Char('k') => {
-            move_selection(app, -1);
-        }
-        KeyCode::Down | KeyCode::Char('j') => {
-            move_selection(app, 1);
-        }
-        KeyCode::Char('g') | KeyCode::Home => {
-            // Go to top
+    // Pure function call - determine which action to take
+    let Some(action) = determine_list_action(key, ctx) else {
+        return Ok(false);
+    };
+
+    // Imperative shell - execute the action
+    execute_list_action(app, action)
+}
+
+/// Execute a list action (imperative shell).
+///
+/// This function contains all the side effects for list view actions.
+/// It's kept separate from the pure action determination to maintain
+/// clear boundaries between pure logic and effects.
+fn execute_list_action(app: &mut ResultsApp, action: ListAction) -> Result<bool> {
+    match action {
+        ListAction::Quit => return Ok(true),
+
+        ListAction::MoveUp => move_selection(app, -1),
+        ListAction::MoveDown => move_selection(app, 1),
+
+        ListAction::JumpToTop => {
             let count = app.item_count();
             app.list_mut().set_selected_index(0, count);
             app.list_mut().set_scroll_offset(0);
         }
-        KeyCode::Char('G') => {
-            // Toggle grouping
-            app.list_mut().toggle_grouping();
-        }
-        KeyCode::End => {
-            // Go to bottom
+
+        ListAction::JumpToBottom => {
             let last = app.item_count().saturating_sub(1);
             let count = app.item_count();
             app.list_mut().set_selected_index(last, count);
             adjust_scroll(app);
         }
-        KeyCode::PageUp => {
-            let page_size = 20; // Approximate page size
+
+        ListAction::PageUp => {
+            let page_size = 20;
             move_selection(app, -(page_size as isize));
         }
-        KeyCode::PageDown => {
+
+        ListAction::PageDown => {
             let page_size = 20;
             move_selection(app, page_size);
         }
 
-        // Enter detail view - guarded transition
-        KeyCode::Enter => {
-            if can_enter_detail(app.nav().view_mode, app.has_items(), app.has_selection()) {
-                app.nav_mut().push_and_set_view(ViewMode::Detail);
-            }
+        ListAction::ToggleGrouping => {
+            app.list_mut().toggle_grouping();
         }
 
-        // Search - guarded transition
-        KeyCode::Char('/') => {
-            if nav_state::can_enter_search(app.nav().view_mode) {
-                app.query_mut().search_mut().clear();
-                app.nav_mut().push_and_set_view(ViewMode::Search);
-            }
+        ListAction::EnterDetail => {
+            app.nav_mut().push_and_set_view(ViewMode::Detail);
         }
 
-        // Sort menu - guarded transition
-        KeyCode::Char('s') => {
-            if nav_state::can_enter_sort_menu(app.nav().view_mode) {
-                app.nav_mut().push_and_set_view(ViewMode::SortMenu);
-            }
+        ListAction::EnterSearch => {
+            app.query_mut().search_mut().clear();
+            app.nav_mut().push_and_set_view(ViewMode::Search);
         }
 
-        // Filter menu - guarded transition
-        KeyCode::Char('f') => {
-            if nav_state::can_enter_filter_menu(app.nav().view_mode) {
-                app.nav_mut().push_and_set_view(ViewMode::FilterMenu);
-            }
+        ListAction::OpenSortMenu => {
+            app.nav_mut().push_and_set_view(ViewMode::SortMenu);
         }
 
-        // Help - guarded transition
-        KeyCode::Char('?') => {
-            if can_enter_help(app.nav().view_mode) {
-                app.nav_mut().push_and_set_view(ViewMode::Help);
-            }
+        ListAction::OpenFilterMenu => {
+            app.nav_mut().push_and_set_view(ViewMode::FilterMenu);
         }
 
-        // DSM view (Spec 205) - guarded transition
-        KeyCode::Char('m') => {
-            if can_enter_dsm(app.nav().view_mode, app.nav().dsm_enabled) {
-                app.nav_mut().push_and_set_view(ViewMode::Dsm);
-            }
+        ListAction::ShowHelp => {
+            app.nav_mut().push_and_set_view(ViewMode::Help);
         }
 
-        // Actions (clipboard, editor)
-        KeyCode::Char('c') => {
+        ListAction::CopyPath => {
             if let Some(item) = app.selected_item() {
                 let message = super::actions::copy_path_to_clipboard(&item.location.file)?;
                 app.set_status_message(message);
             }
         }
-        KeyCode::Char('e') => {
-            if let Some(item) = app.selected_item() {
-                super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;
-                app.request_redraw(); // Force redraw after editor suspends/resumes TUI
-            }
-        }
-        KeyCode::Char('o') => {
-            if let Some(item) = app.selected_item() {
-                super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;
-                app.request_redraw(); // Force redraw after editor suspends/resumes TUI
-            }
-        }
 
-        _ => {}
+        ListAction::OpenInEditor => {
+            if let Some(item) = app.selected_item() {
+                super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;
+                app.request_redraw();
+            }
+        }
     }
 
     Ok(false)
