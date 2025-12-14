@@ -169,67 +169,6 @@ pub fn analyze_module_smells(path: &Path, line_count: usize) -> Vec<CodeSmell> {
     smells
 }
 
-/// Detect feature envy - methods that use other class data more than their own
-/// This is a simplified version that looks for method calls on other objects
-pub fn detect_feature_envy(content: &str, path: &Path) -> Vec<CodeSmell> {
-    let mut smells = Vec::new();
-    let mut object_calls: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
-    let mut self_calls = 0;
-
-    // Count method calls per object
-    for line in content.lines() {
-        // Count self calls
-        self_calls += line.matches("self.").count();
-
-        // Look for pattern: identifier.method_call
-        // Simple regex-like pattern matching without regex
-        let trimmed = line.trim();
-        if let Some(dot_pos) = trimmed.find('.') {
-            if dot_pos > 0 {
-                let before_dot = &trimmed[..dot_pos];
-                let object_name = before_dot.split_whitespace().last().unwrap_or("");
-
-                // Skip if it's self or if it doesn't look like an identifier
-                if !object_name.is_empty()
-                    && object_name != "self"
-                    && object_name
-                        .chars()
-                        .next()
-                        .is_some_and(|c| c.is_alphabetic() || c == '_')
-                    && !object_name.contains('(')
-                    && !object_name.contains('"')
-                    && !object_name.contains('\'')
-                {
-                    *object_calls.entry(object_name.to_string()).or_insert(0) += 1;
-                }
-            }
-        }
-    }
-
-    // Check if any object is used more than self
-    for (object, count) in object_calls {
-        if count >= 3 && count > self_calls {
-            smells.push(CodeSmell {
-                smell_type: SmellType::FeatureEnvy,
-                location: path.to_path_buf(),
-                line: 1, // We don't track specific lines in this simple implementation
-                message: format!(
-                    "Possible feature envy: {} calls to '{}' vs {} self calls",
-                    count, object, self_calls
-                ),
-                severity: if count > 5 {
-                    Priority::Medium
-                } else {
-                    Priority::Low
-                },
-            });
-        }
-    }
-
-    smells
-}
-
 /// Detect data clumps - groups of parameters that often appear together
 pub fn detect_data_clumps(functions: &[FunctionMetrics]) -> Vec<CodeSmell> {
     let mut smells = Vec::new();
@@ -880,56 +819,6 @@ mod tests {
         // Test edge case with exactly threshold
         let smells = analyze_module_smells(&path, 300);
         assert_eq!(smells.len(), 0, "Module at threshold should have no smells");
-    }
-
-    #[test]
-    fn test_detect_feature_envy() {
-        let path = PathBuf::from("src/test.rs");
-
-        // Test with no feature envy
-        let content = r#"
-            fn process_data(&self) {
-                self.validate();
-                self.transform();
-                self.save();
-            }
-        "#;
-        let smells = detect_feature_envy(content, &path);
-        assert_eq!(smells.len(), 0, "Should not detect feature envy");
-
-        // Test with feature envy pattern
-        let content = r#"
-            fn process_order(&self, customer: &Customer) {
-                customer.validate_address();
-                customer.check_credit();
-                customer.update_status();
-                customer.send_notification();
-                customer.log_activity();
-                self.save();
-            }
-        "#;
-        let smells = detect_feature_envy(content, &path);
-        assert!(!smells.is_empty(), "Should detect feature envy");
-        assert_eq!(smells[0].smell_type, SmellType::FeatureEnvy);
-        assert!(smells[0].message.contains("customer"));
-
-        // Test with multiple objects
-        let content = r#"
-            fn coordinate(&self, order: &Order, payment: &Payment) {
-                order.validate();
-                order.calculate_total();
-                order.apply_discount();
-                payment.process();
-                payment.verify();
-                payment.record();
-            }
-        "#;
-        let smells = detect_feature_envy(content, &path);
-        assert_eq!(
-            smells.len(),
-            2,
-            "Should detect feature envy for both objects"
-        );
     }
 
     #[test]
