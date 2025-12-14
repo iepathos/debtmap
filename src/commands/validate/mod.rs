@@ -36,7 +36,9 @@ use crate::io;
 use crate::progress::{ProgressConfig, ProgressManager};
 use crate::utils::risk_analyzer;
 use crate::{config, risk};
-use analysis::{calculate_unified_analysis, read_parallel_options_from_env, ValidationAnalysisOptions};
+use analysis::{
+    calculate_unified_analysis, read_parallel_options_from_env, ValidationAnalysisOptions,
+};
 use anyhow::Result;
 use output::{
     display_timing_information, generate_report_if_requested, print_parallel_status,
