@@ -21,9 +21,6 @@
 //!      │                                     │
 //!      v                                     │
 //!     Detail ────────────────────────────────┤
-//!      │                                     │
-//!      v                                     │
-//!     Dsm ───────────────────────────────────┤
 //!                                            │
 //!     Help ◄─────────────────────────────────┘
 //!      │
@@ -35,7 +32,7 @@ use super::{detail_page::DetailPage, view_mode::ViewMode};
 
 // Re-export navigation actions for backwards compatibility
 pub use super::nav_actions::{
-    available_actions, navigate_back, navigate_detail_page, navigate_to_detail, navigate_to_dsm,
+    available_actions, navigate_back, navigate_detail_page, navigate_to_detail,
     navigate_to_filter_menu, navigate_to_help, navigate_to_search, navigate_to_sort_menu,
 };
 
@@ -50,7 +47,6 @@ pub const TRANSITIONS: &[(ViewMode, ViewMode)] = &[
     (ViewMode::List, ViewMode::SortMenu),
     (ViewMode::List, ViewMode::FilterMenu),
     (ViewMode::List, ViewMode::Help),
-    (ViewMode::List, ViewMode::Dsm),
     // From Detail
     (ViewMode::Detail, ViewMode::List),
     (ViewMode::Detail, ViewMode::Help),
@@ -65,10 +61,6 @@ pub const TRANSITIONS: &[(ViewMode, ViewMode)] = &[
     (ViewMode::Help, ViewMode::List),
     (ViewMode::Help, ViewMode::Detail),
     (ViewMode::Help, ViewMode::Search),
-    (ViewMode::Help, ViewMode::Dsm),
-    // From DSM
-    (ViewMode::Dsm, ViewMode::List),
-    (ViewMode::Dsm, ViewMode::Help),
 ];
 
 /// Check if a transition is valid based on the table.
@@ -96,33 +88,21 @@ pub struct NavigationState {
 
     /// Navigation history for back navigation.
     pub history: Vec<ViewMode>,
-
-    /// Whether DSM feature is enabled.
-    pub dsm_enabled: bool,
-
-    /// DSM horizontal scroll offset.
-    pub dsm_scroll_x: usize,
-
-    /// DSM vertical scroll offset.
-    pub dsm_scroll_y: usize,
 }
 
 impl Default for NavigationState {
     fn default() -> Self {
-        Self::new(false)
+        Self::new()
     }
 }
 
 impl NavigationState {
     /// Create new navigation state.
-    pub fn new(dsm_enabled: bool) -> Self {
+    pub fn new() -> Self {
         Self {
             view_mode: ViewMode::List,
             detail_page: DetailPage::Overview,
             history: vec![],
-            dsm_enabled,
-            dsm_scroll_x: 0,
-            dsm_scroll_y: 0,
         }
     }
 
@@ -143,12 +123,6 @@ impl NavigationState {
     pub fn clear_history(&mut self) {
         self.history.clear();
     }
-
-    /// Reset DSM scroll position.
-    pub fn reset_dsm_scroll(&mut self) {
-        self.dsm_scroll_x = 0;
-        self.dsm_scroll_y = 0;
-    }
 }
 
 // ============================================================================
@@ -160,13 +134,6 @@ impl NavigationState {
 /// Pure function - requires items and a selection.
 pub fn can_enter_detail(current_mode: ViewMode, has_items: bool, has_selection: bool) -> bool {
     matches!(current_mode, ViewMode::List | ViewMode::Search) && has_items && has_selection
-}
-
-/// Guard: Can enter DSM view?
-///
-/// Requires DSM feature enabled and being in a valid source mode.
-pub fn can_enter_dsm(current_mode: ViewMode, dsm_enabled: bool) -> bool {
-    matches!(current_mode, ViewMode::List) && dsm_enabled
 }
 
 /// Guard: Can enter Search?
@@ -256,7 +223,6 @@ mod tests {
         assert!(destinations.contains(&ViewMode::Help));
         assert!(destinations.contains(&ViewMode::SortMenu));
         assert!(destinations.contains(&ViewMode::FilterMenu));
-        assert!(destinations.contains(&ViewMode::Dsm));
     }
 
     #[test]
@@ -264,11 +230,10 @@ mod tests {
         let destinations = valid_destinations(ViewMode::Detail);
         assert!(destinations.contains(&ViewMode::List));
         assert!(destinations.contains(&ViewMode::Help));
-        // Detail cannot go to Search, SortMenu, FilterMenu, or Dsm
+        // Detail cannot go to Search, SortMenu, FilterMenu
         assert!(!destinations.contains(&ViewMode::Search));
         assert!(!destinations.contains(&ViewMode::SortMenu));
         assert!(!destinations.contains(&ViewMode::FilterMenu));
-        assert!(!destinations.contains(&ViewMode::Dsm));
     }
 
     // ============================================================================
@@ -294,18 +259,6 @@ mod tests {
     }
 
     #[test]
-    fn test_can_enter_dsm_requires_feature() {
-        // DSM disabled
-        assert!(!can_enter_dsm(ViewMode::List, false));
-
-        // DSM enabled
-        assert!(can_enter_dsm(ViewMode::List, true));
-
-        // DSM enabled but wrong mode
-        assert!(!can_enter_dsm(ViewMode::Detail, true));
-    }
-
-    #[test]
     fn test_can_enter_search_only_from_list() {
         assert!(can_enter_search(ViewMode::List));
         assert!(!can_enter_search(ViewMode::Detail));
@@ -317,7 +270,6 @@ mod tests {
         assert!(can_enter_help(ViewMode::List));
         assert!(can_enter_help(ViewMode::Detail));
         assert!(can_enter_help(ViewMode::Search));
-        assert!(can_enter_help(ViewMode::Dsm));
         assert!(!can_enter_help(ViewMode::Help));
     }
 
@@ -340,10 +292,6 @@ mod tests {
         let r1 = can_enter_detail(ViewMode::List, true, true);
         let r2 = can_enter_detail(ViewMode::List, true, true);
         assert_eq!(r1, r2);
-
-        let r3 = can_enter_dsm(ViewMode::List, true);
-        let r4 = can_enter_dsm(ViewMode::List, true);
-        assert_eq!(r3, r4);
     }
 
     // ============================================================================
@@ -352,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_push_and_set_view() {
-        let mut state = NavigationState::new(true);
+        let mut state = NavigationState::new();
         assert_eq!(state.view_mode, ViewMode::List);
         assert!(state.history.is_empty());
 
@@ -368,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_go_back_with_history() {
-        let mut state = NavigationState::new(true);
+        let mut state = NavigationState::new();
         state.push_and_set_view(ViewMode::Detail);
         state.push_and_set_view(ViewMode::Help);
 
@@ -386,31 +334,13 @@ mod tests {
 
     #[test]
     fn test_clear_history() {
-        let mut state = NavigationState::new(true);
+        let mut state = NavigationState::new();
         state.push_and_set_view(ViewMode::Detail);
         state.push_and_set_view(ViewMode::Help);
         assert_eq!(state.history.len(), 2);
 
         state.clear_history();
         assert!(state.history.is_empty());
-    }
-
-    #[test]
-    fn test_dsm_scroll_default() {
-        let state = NavigationState::new(true);
-        assert_eq!(state.dsm_scroll_x, 0);
-        assert_eq!(state.dsm_scroll_y, 0);
-    }
-
-    #[test]
-    fn test_reset_dsm_scroll() {
-        let mut state = NavigationState::new(true);
-        state.dsm_scroll_x = 10;
-        state.dsm_scroll_y = 20;
-
-        state.reset_dsm_scroll();
-        assert_eq!(state.dsm_scroll_x, 0);
-        assert_eq!(state.dsm_scroll_y, 0);
     }
 }
 
@@ -428,7 +358,6 @@ mod property_tests {
             Just(ViewMode::SortMenu),
             Just(ViewMode::FilterMenu),
             Just(ViewMode::Help),
-            Just(ViewMode::Dsm),
         ]
     }
 
@@ -453,7 +382,7 @@ mod property_tests {
         /// Push/pop sequence should be last-in-first-out.
         #[test]
         fn history_is_lifo(modes in proptest::collection::vec(view_mode_strategy(), 0..10)) {
-            let mut state = NavigationState::new(false);
+            let mut state = NavigationState::new();
 
             // Push all modes
             for &mode in &modes {
@@ -474,7 +403,7 @@ mod property_tests {
         fn clear_history_empties(
             push_count in 0usize..20
         ) {
-            let mut state = NavigationState::new(true);
+            let mut state = NavigationState::new();
 
             for _ in 0..push_count {
                 state.push_and_set_view(ViewMode::Detail);
@@ -489,19 +418,6 @@ mod property_tests {
         fn help_blocked_only_from_help(mode in view_mode_strategy()) {
             let can_enter = can_enter_help(mode);
             prop_assert_eq!(can_enter, mode != ViewMode::Help);
-        }
-
-        /// Property: DSM scroll reset zeros both dimensions.
-        #[test]
-        fn dsm_scroll_reset_zeros(x in 0usize..1000, y in 0usize..1000) {
-            let mut state = NavigationState::new(true);
-            state.dsm_scroll_x = x;
-            state.dsm_scroll_y = y;
-
-            state.reset_dsm_scroll();
-
-            prop_assert_eq!(state.dsm_scroll_x, 0);
-            prop_assert_eq!(state.dsm_scroll_y, 0);
         }
     }
 }

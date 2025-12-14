@@ -11,8 +11,6 @@ pub enum OutputFormat {
     Html,
     /// Graphviz DOT format for dependency visualization (Spec 204)
     Dot,
-    /// Dependency Structure Matrix format for module dependency analysis (Spec 205)
-    Dsm,
 }
 
 pub trait OutputWriter {
@@ -29,9 +27,6 @@ pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
         // DOT format is handled separately via the output module, not through OutputWriter trait
         // Fall back to terminal for legacy code paths that use create_writer
         OutputFormat::Dot => Box::new(TerminalWriter::default()),
-        // DSM format is handled separately via the output module (Spec 205)
-        // Fall back to terminal for legacy code paths that use create_writer
-        OutputFormat::Dsm => Box::new(TerminalWriter::default()),
     }
 }
 

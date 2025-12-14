@@ -32,6 +32,7 @@ pub mod god_object_metrics;
 pub mod hidden_type_extractor;
 pub mod integrated_analyzer;
 pub mod language;
+pub mod layering;
 pub mod macro_recommendations;
 pub mod module_function_classifier;
 pub mod parallel_execution_pattern;
@@ -388,3 +389,7 @@ pub use struct_init_detector::StructInitOrganizationDetector;
 // Multi-language support exports
 pub use class_ownership::{ClassOwnership, ClassOwnershipAnalyzer};
 pub use language::Language;
+pub use layering::{
+    calculate_layering_penalty, compute_layering_impact, compute_layering_score, path_to_module,
+    LayeringAnalysis, LayeringImpact, ModuleDependency,
+};

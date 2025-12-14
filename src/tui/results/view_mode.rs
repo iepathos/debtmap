@@ -21,6 +21,4 @@ pub enum ViewMode {
     FilterMenu,
     /// Help overlay showing keyboard shortcuts.
     Help,
-    /// Dependency Structure Matrix view (Spec 205).
-    Dsm,
 }

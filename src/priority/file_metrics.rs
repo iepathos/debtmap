@@ -764,6 +764,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             function_scores: vec![5.0; 60],
             god_object_type: None,
@@ -884,6 +885,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             function_count: 50,
             ..Default::default()
@@ -1000,6 +1002,7 @@ mod tests {
             aggregated_entropy: None,
             aggregated_error_swallowing_count: None,
             aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
         });
         let score2 = metrics.calculate_score();
 
@@ -1094,6 +1097,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             god_object_type: Some(boilerplate_type),
             total_lines: 7775,
@@ -1156,6 +1160,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             god_object_type: Some(god_file_type),
             total_lines: 2000,
@@ -1215,6 +1220,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             god_object_type: Some(boilerplate_type),
             total_lines: 5000,
@@ -1269,6 +1275,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             function_scores: vec![1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
             god_object_type: None,
@@ -1325,6 +1332,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             function_scores: vec![5.0; 20],
             god_object_type: None,
@@ -1423,6 +1431,7 @@ mod tests {
                 aggregated_entropy: None,
                 aggregated_error_swallowing_count: None,
                 aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
             }),
             function_scores: vec![],
             god_object_type: None,
@@ -1461,6 +1470,7 @@ mod tests {
             aggregated_entropy: None,
             aggregated_error_swallowing_count: None,
             aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
         });
         let factors = metrics.get_score_factors();
         assert!((factors.god_object_multiplier - 1.17).abs() < 0.01); // 1.0 + (8.5 / 50.0)

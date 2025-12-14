@@ -16,7 +16,7 @@ use crossterm::event::KeyEvent;
 use ratatui::Frame;
 
 use super::{
-    detail_view, dsm_view, layout, list_state::ListState, list_view, nav_state, navigation,
+    detail_view, layout, list_state::ListState, list_view, nav_state, navigation,
     query_state::QueryState,
 };
 
@@ -58,7 +58,7 @@ impl ResultsApp {
             analysis,
             list: ListState::default(),
             query: QueryState::new(item_count),
-            nav: nav_state::NavigationState::new(true), // DSM enabled by default
+            nav: nav_state::NavigationState::new(), // DSM enabled by default
             terminal_size: (80, 24),
             needs_redraw: false,
             status_message: None,
@@ -109,7 +109,7 @@ impl ResultsApp {
             analysis,
             list,
             query: QueryState::new(item_count),
-            nav: nav_state::NavigationState::new(true),
+            nav: nav_state::NavigationState::new(),
             terminal_size: (80, 24),
             needs_redraw: false,
             status_message: None,
@@ -170,7 +170,6 @@ impl ResultsApp {
             ViewMode::SortMenu => list_view::render_with_sort_menu(frame, self),
             ViewMode::FilterMenu => list_view::render_with_filter_menu(frame, self),
             ViewMode::Help => layout::render_help_overlay(frame, self),
-            ViewMode::Dsm => dsm_view::render(frame, self),
         }
     }
 

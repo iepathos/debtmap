@@ -126,9 +126,6 @@ fn main_inner() -> Result<()> {
                     debtmap::cli::OutputFormat::Dot => {
                         debtmap::commands::validate_improvement::OutputFormat::Terminal
                     }
-                    debtmap::cli::OutputFormat::Dsm => {
-                        debtmap::commands::validate_improvement::OutputFormat::Terminal
-                    }
                 },
                 quiet: quiet || is_automation_mode(),
             };

@@ -71,6 +71,7 @@ fn create_god_object_analysis(
         aggregated_entropy: None,
         aggregated_error_swallowing_count: None,
         aggregated_error_swallowing_patterns: None,
+        layering_impact: None,
     }
 }
 
