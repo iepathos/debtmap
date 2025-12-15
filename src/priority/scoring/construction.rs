@@ -10,8 +10,8 @@ use crate::core::FunctionMetrics;
 use crate::priority::score_types::Score0To100;
 use crate::priority::scoring::ContextRecommendationEngine;
 use crate::priority::unified_scorer::{
-    calculate_unified_priority, calculate_unified_priority_with_data_flow,
-    calculate_unified_priority_with_debt,
+    calculate_unified_priority, calculate_unified_priority_with_data_flow_and_role,
+    calculate_unified_priority_with_role, EntropyDetails,
 };
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
@@ -298,6 +298,104 @@ pub(crate) fn create_function_id(func: &FunctionMetrics) -> FunctionId {
     FunctionId::new(func.file.clone(), func.name.clone(), func.line)
 }
 
+/// Pre-computed values shared across all debt types for a single function (spec 205).
+///
+/// This struct caches expensive computations that are independent of debt type,
+/// eliminating redundant calculations when a function has multiple debt types.
+///
+/// # Performance Impact
+///
+/// For functions with N debt types, this reduces:
+/// - `classify_function_role()` calls from N to 1
+/// - `calculate_unified_priority_with_debt()` calls from N to 1
+/// - `calculate_entropy_details()` calls from N to 1
+/// - Context detection calls from N to 1
+pub(crate) struct FunctionScoringContext {
+    /// Unique identifier for the function
+    pub func_id: FunctionId,
+    /// Pre-computed function role (entry point, orchestrator, etc.)
+    pub role: FunctionRole,
+    /// Pre-computed unified priority score
+    pub unified_score: UnifiedScore,
+    /// Pre-computed transitive coverage data
+    pub transitive_coverage: Option<TransitiveCoverage>,
+    /// Pre-computed dependency metrics
+    pub deps: DependencyMetrics,
+    /// Pre-computed entropy details for complexity adjustment
+    pub entropy_details: Option<EntropyDetails>,
+    /// Pre-computed context analysis
+    pub context_analysis: crate::analysis::ContextAnalysis,
+}
+
+impl FunctionScoringContext {
+    /// Compute all shared values once for a function (spec 205).
+    ///
+    /// This method performs all expensive calculations upfront, allowing
+    /// the results to be reused across all debt types for the same function.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute(
+        func: &FunctionMetrics,
+        call_graph: &CallGraph,
+        coverage: Option<&LcovData>,
+        debt_aggregator: &DebtAggregator,
+        data_flow: Option<&crate::data_flow::DataFlowGraph>,
+        context_detector: &ContextDetector,
+    ) -> Self {
+        let func_id = create_function_id(func);
+
+        // Compute role ONCE (spec 205)
+        let role = classify_function_role(func, &func_id, call_graph);
+
+        // Compute score ONCE with pre-computed role (spec 205)
+        let has_coverage_data = coverage.is_some();
+        let unified_score = if let Some(df) = data_flow {
+            let config = get_data_flow_scoring_config();
+            calculate_unified_priority_with_data_flow_and_role(
+                func,
+                &func_id,
+                call_graph,
+                df,
+                coverage,
+                Some(debt_aggregator),
+                &config,
+                role,
+            )
+        } else {
+            calculate_unified_priority_with_role(
+                func,
+                &func_id,
+                call_graph,
+                coverage,
+                Some(debt_aggregator),
+                has_coverage_data,
+                role,
+            )
+        };
+
+        // Compute coverage data ONCE
+        let transitive_coverage = calculate_coverage_data(&func_id, func, call_graph, coverage);
+
+        // Compute dependencies ONCE
+        let deps = extract_dependency_metrics(func, &func_id, call_graph);
+
+        // Compute entropy details ONCE (spec 205)
+        let entropy_details = calculate_entropy_details(func);
+
+        // Compute context analysis ONCE
+        let context_analysis = context_detector.detect_context(func, &func.file);
+
+        Self {
+            func_id,
+            role,
+            unified_score,
+            transitive_coverage,
+            deps,
+            entropy_details,
+            context_analysis,
+        }
+    }
+}
+
 // Pure function: Calculate coverage data (Spec 203)
 // ALWAYS returns Some when coverage is provided, never None
 fn calculate_coverage_data(
@@ -315,89 +413,9 @@ fn calculate_coverage_data(
     })
 }
 
-// Pure function: Build debt analysis context (spec 228: multi-debt support)
-struct DebtAnalysisContext {
-    #[allow(dead_code)]
-    func_id: FunctionId,
-    debt_type: DebtType,
-    unified_score: UnifiedScore,
-    function_role: FunctionRole,
-    transitive_coverage: Option<TransitiveCoverage>,
-    recommendation: ActionableRecommendation,
-    expected_impact: ImpactMetrics,
-}
-
-// Pure function: Analyze a single debt type and create context (spec 228)
-/// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
-#[allow(clippy::too_many_arguments)]
-fn analyze_single_debt_type(
-    func: &FunctionMetrics,
-    func_id: &FunctionId,
-    debt_type: DebtType,
-    call_graph: &CallGraph,
-    coverage: Option<&LcovData>,
-    debt_aggregator: &DebtAggregator,
-    data_flow: Option<&crate::data_flow::DataFlowGraph>,
-    transitive_coverage: Option<&TransitiveCoverage>,
-) -> Option<DebtAnalysisContext> {
-    // Calculate unified score for this specific debt type
-    let has_coverage_data = coverage.is_some();
-    let unified_score = if let Some(df) = data_flow {
-        // Use data flow scoring when available (spec 218)
-        let config = get_data_flow_scoring_config();
-        calculate_unified_priority_with_data_flow(
-            func,
-            call_graph,
-            df,
-            coverage,
-            None,
-            Some(debt_aggregator),
-            &config,
-        )
-    } else {
-        calculate_unified_priority_with_debt(
-            func,
-            call_graph,
-            coverage,
-            None,
-            Some(debt_aggregator),
-            has_coverage_data,
-        )
-    };
-
-    // Determine function role
-    let function_role = classify_function_role(func, func_id, call_graph);
-
-    // Clone transitive coverage for the recommendation function
-    let coverage_for_rec = transitive_coverage.cloned();
-
-    // Generate recommendation (spec 201: may return None for clean dispatchers)
-    let recommendation = generate_recommendation_with_coverage_and_data_flow(
-        func,
-        &debt_type,
-        function_role,
-        &unified_score,
-        &coverage_for_rec,
-        data_flow,
-    )?;
-
-    // Calculate expected impact
-    let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
-
-    Some(DebtAnalysisContext {
-        func_id: func_id.clone(),
-        debt_type,
-        unified_score,
-        function_role,
-        transitive_coverage: transitive_coverage.cloned(),
-        recommendation,
-        expected_impact,
-    })
-}
-
-// Pure function: Extract dependency metrics
+// Pure function: Extract dependency metrics (spec 205: public for FunctionScoringContext)
 #[derive(Clone)]
-struct DependencyMetrics {
+pub(crate) struct DependencyMetrics {
     upstream_count: usize,
     downstream_count: usize,
     upstream_names: Vec<String>,
@@ -454,31 +472,42 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     item
 }
 
-// Pure function: Build unified debt item from components (spec 195: uses cache, spec 196: shared detectors)
-fn build_unified_debt_item(
+/// Build unified debt item from pre-computed FunctionScoringContext (spec 205).
+///
+/// This is an optimized version that uses pre-computed values from FunctionScoringContext
+/// to eliminate redundant calculations. The context must be computed once per function
+/// using `FunctionScoringContext::compute()`.
+///
+/// # Performance
+///
+/// This function avoids recalculating:
+/// - Function role classification
+/// - Unified priority score
+/// - Entropy details
+/// - Context analysis
+///
+/// These values are taken from the pre-computed context instead.
+fn build_unified_debt_item_from_context(
     func: &FunctionMetrics,
-    mut context: DebtAnalysisContext,
-    deps: DependencyMetrics,
+    debt_type: DebtType,
+    ctx: &FunctionScoringContext,
+    recommendation: ActionableRecommendation,
+    expected_impact: ImpactMetrics,
     file_line_counts: &FileLineCountCache,
-    context_detector: &ContextDetector,
     recommendation_engine: &ContextRecommendationEngine,
 ) -> UnifiedDebtItem {
-    // Apply context-aware dampening (spec 191)
+    // Apply context-aware dampening (spec 191) to pre-computed score
     let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
-    context.unified_score =
-        apply_context_multiplier_to_score(context.unified_score, context_multiplier);
+    let unified_score =
+        apply_context_multiplier_to_score(ctx.unified_score.clone(), context_multiplier);
 
-    // Detect function context (spec 122) - using shared detector (spec 196)
-    let context_analysis = context_detector.detect_context(func, &func.file);
-
-    // Generate contextual recommendation if confidence is high enough (spec 122)
-    // Using shared engine (spec 196)
-    let contextual_recommendation = if context_analysis.confidence > 0.6 {
+    // Generate contextual recommendation using pre-computed context analysis (spec 122, 205)
+    let contextual_recommendation = if ctx.context_analysis.confidence > 0.6 {
         Some(recommendation_engine.generate_recommendation(
             func,
-            context_analysis.context,
-            context_analysis.confidence,
-            context.unified_score.final_score.value(),
+            ctx.context_analysis.context,
+            ctx.context_analysis.confidence,
+            unified_score.final_score.value(),
         ))
     } else {
         None
@@ -487,9 +516,6 @@ fn build_unified_debt_item(
     // Detect complexity pattern once during construction (spec 204)
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
-
-    // Calculate entropy details once for efficiency (spec 214)
-    let entropy_details = calculate_entropy_details(func);
 
     // Look up file line count from cache (spec 195: O(1) lookup instead of file read)
     let file_line_count = get_file_line_count(&func.file, file_line_counts);
@@ -504,47 +530,60 @@ fn build_unified_debt_item(
             function: func.name.clone(),
             line: func.line,
         },
-        debt_type: context.debt_type,
-        unified_score: context.unified_score,
-        function_role: context.function_role,
-        recommendation: context.recommendation,
-        expected_impact: context.expected_impact,
-        transitive_coverage: context.transitive_coverage,
+        debt_type,
+        unified_score,
+        function_role: ctx.role,
+        recommendation,
+        expected_impact,
+        transitive_coverage: ctx.transitive_coverage.clone(),
         file_context: None,
-        upstream_dependencies: deps.upstream_count,
-        downstream_dependencies: deps.downstream_count,
-        upstream_callers: deps.upstream_names,
-        downstream_callees: deps.downstream_names,
+        upstream_dependencies: ctx.deps.upstream_count,
+        downstream_dependencies: ctx.deps.downstream_count,
+        upstream_callers: ctx.deps.upstream_names.clone(),
+        downstream_callees: ctx.deps.downstream_names.clone(),
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
-        entropy_details: entropy_details.clone(),
-        entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
-        entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
+        // Use pre-computed entropy details (spec 205)
+        entropy_details: ctx.entropy_details.clone(),
+        entropy_adjusted_cognitive: ctx.entropy_details.as_ref().map(|e| e.adjusted_cognitive),
+        entropy_dampening_factor: ctx.entropy_details.as_ref().map(|e| e.dampening_factor),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         purity_level: None,
         god_object_indicators: None,
         tier: None,
-        function_context: Some(context_analysis.context),
-        context_confidence: Some(context_analysis.confidence),
+        // Use pre-computed context analysis (spec 205)
+        function_context: Some(ctx.context_analysis.context),
+        context_confidence: Some(ctx.context_analysis.confidence),
         contextual_recommendation,
-        pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
+        pattern_analysis: None,
         context_multiplier: Some(context_multiplier),
         context_type: Some(context_type),
-        language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
-        detected_pattern,                                  // Detected complexity pattern (spec 204)
+        language_specific: func.language_specific.clone(),
+        detected_pattern,
         contextual_risk: None,
-        file_line_count,         // Cached line count (spec 204)
-        responsibility_category, // Behavioral responsibility (spec 254)
+        file_line_count,
+        responsibility_category,
         error_swallowing_count: func.error_swallowing_count,
         error_swallowing_patterns: func.error_swallowing_patterns.clone(),
     }
 }
 
-// Main function using functional composition (spec 201, spec 228: multi-debt, spec 195: cache, spec 196: parallel)
+// Main function using functional composition (spec 201, spec 205, spec 228: multi-debt, spec 195: cache, spec 196: parallel)
 /// Returns `Vec<UnifiedDebtItem>` - one per debt type found (spec 228)
+///
+/// # Performance (spec 205)
+///
+/// This function uses `FunctionScoringContext` to eliminate redundant computations:
+/// - `classify_function_role()` is called exactly once per function
+/// - `calculate_unified_priority_with_debt()` is called exactly once per function
+/// - `calculate_entropy_details()` is called exactly once per function
+/// - Context detection is done exactly once per function
+///
+/// For functions with N debt types, this reduces scoring overhead from O(N) to O(1)
+/// for shared computations.
 ///
 /// # Parallelism (spec 196)
 ///
@@ -573,48 +612,51 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     context_detector: &ContextDetector,
     recommendation_engine: &ContextRecommendationEngine,
 ) -> Vec<UnifiedDebtItem> {
-    // Step 1: Create function ID (pure)
-    let func_id = create_function_id(func);
+    // Step 1: Pre-compute ALL shared values ONCE (spec 205)
+    // This eliminates redundant computations across all debt types
+    let ctx = FunctionScoringContext::compute(
+        func,
+        call_graph,
+        coverage,
+        debt_aggregator,
+        data_flow,
+        context_detector,
+    );
 
-    // Step 2: Calculate coverage data once (reused for all debt types)
-    let transitive_coverage = calculate_coverage_data(&func_id, func, call_graph, coverage);
-
-    // Step 3: Get all debt types for this function (spec 228)
+    // Step 2: Get all debt types for this function (spec 228)
     let debt_types = classify_debt_type_with_exclusions(
         func,
         call_graph,
-        &func_id,
+        &ctx.func_id,
         framework_exclusions,
         function_pointer_used_functions,
-        transitive_coverage.as_ref(),
+        ctx.transitive_coverage.as_ref(),
     );
 
-    // Step 4: Extract dependencies once (shared across all debt items)
-    let deps = extract_dependency_metrics(func, &func_id, call_graph);
-
-    // Step 5: Create one UnifiedDebtItem per debt type (functional transformation)
+    // Step 3: Create one UnifiedDebtItem per debt type using pre-computed context
     debt_types
         .into_iter()
         .filter_map(|debt_type| {
-            // Analyze this specific debt type
-            let context = analyze_single_debt_type(
+            // Only debt-type-specific computations: recommendation and impact
+            let recommendation = generate_recommendation_with_coverage_and_data_flow(
                 func,
-                &func_id,
-                debt_type,
-                call_graph,
-                coverage,
-                debt_aggregator,
+                &debt_type,
+                ctx.role,
+                &ctx.unified_score,
+                &ctx.transitive_coverage,
                 data_flow,
-                transitive_coverage.as_ref(),
             )?;
 
-            // Build debt item (spec 195: uses cached file line counts, spec 196: shared detectors)
-            let mut item = build_unified_debt_item(
+            let expected_impact = calculate_expected_impact(func, &debt_type, &ctx.unified_score);
+
+            // Build debt item from pre-computed context (spec 205)
+            let mut item = build_unified_debt_item_from_context(
                 func,
-                context,
-                deps.clone(),
+                debt_type,
+                &ctx,
+                recommendation,
+                expected_impact,
                 file_line_counts,
-                context_detector,
                 recommendation_engine,
             );
 
