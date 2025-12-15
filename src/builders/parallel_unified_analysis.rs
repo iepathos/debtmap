@@ -999,51 +999,71 @@ impl ParallelUnifiedAnalysisBuilder {
 
             if needs_file_read {
                 if let Ok(content) = std::fs::read_to_string(file_path) {
-                let actual_line_count = content.lines().count();
-                file_metrics.total_lines = actual_line_count;
+                    let actual_line_count = content.lines().count();
+                    file_metrics.total_lines = actual_line_count;
 
-                // Recalculate uncovered lines based on actual line count
-                file_metrics.uncovered_lines =
-                    ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
+                    // Recalculate uncovered lines based on actual line count
+                    file_metrics.uncovered_lines =
+                        ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
 
-                // Handle god object detection with accurate line count
-                file_metrics.god_object_analysis = if skip_god_object_analysis {
-                    None
-                } else {
-                    let analysis_result =
-                        file_analysis::analyze_god_object(&content, file_path, coverage_data);
+                    // Handle god object detection with accurate line count
+                    file_metrics.god_object_analysis = if skip_god_object_analysis {
+                        None
+                    } else {
+                        let analysis_result =
+                            file_analysis::analyze_god_object(&content, file_path, coverage_data);
 
-                    let analyzed = analysis_result.unwrap_or(None);
+                        let analyzed = analysis_result.unwrap_or(None);
 
-                    // Use heuristic fallback if:
-                    // 1. Analysis failed (analyzed is None), OR
-                    // 2. Analysis succeeded but said not god object, BUT heuristic thresholds are met
-                    // This ensures simple god objects (many low-complexity methods) are caught
-                    if analyzed.as_ref().is_some_and(|a| a.is_god_object) {
-                        // Analysis found a god object, use it
-                        analyzed
-                    } else if actual_line_count > 2000 || file_metrics.function_count > 50 {
-                        // Heuristic threshold met - create god object even if analysis said no
-                        // But preserve responsibilities from analysis if available
+                        // Use heuristic fallback if:
+                        // 1. Analysis failed (analyzed is None), OR
+                        // 2. Analysis succeeded but said not god object, BUT heuristic thresholds are met
+                        // This ensures simple god objects (many low-complexity methods) are caught
+                        if analyzed.as_ref().is_some_and(|a| a.is_god_object) {
+                            // Analysis found a god object, use it
+                            analyzed
+                        } else if actual_line_count > 2000 || file_metrics.function_count > 50 {
+                            // Heuristic threshold met - create god object even if analysis said no
+                            // But preserve responsibilities from analysis if available
 
-                        // Calculate god object score (0-100 scale)
-                        // Base score on number of methods and LOC
-                        let method_score =
-                            ((file_metrics.function_count as f64 / 50.0) * 50.0).min(50.0);
-                        let loc_score = ((actual_line_count as f64 / 2000.0) * 50.0).min(50.0);
-                        let god_score = method_score + loc_score;
+                            // Calculate god object score (0-100 scale)
+                            // Base score on number of methods and LOC
+                            let method_score =
+                                ((file_metrics.function_count as f64 / 50.0) * 50.0).min(50.0);
+                            let loc_score = ((actual_line_count as f64 / 2000.0) * 50.0).min(50.0);
+                            let god_score = method_score + loc_score;
 
-                        // Use responsibilities from analysis if available, otherwise estimate
-                        let (responsibilities, responsibility_method_counts) =
-                            if let Some(ref analysis) = analyzed {
-                                if !analysis.responsibilities.is_empty() {
-                                    // Use real responsibilities from analysis
-                                    (
-                                        analysis.responsibilities.clone(),
-                                        analysis.responsibility_method_counts.clone(),
-                                    )
+                            // Use responsibilities from analysis if available, otherwise estimate
+                            let (responsibilities, responsibility_method_counts) =
+                                if let Some(ref analysis) = analyzed {
+                                    if !analysis.responsibilities.is_empty() {
+                                        // Use real responsibilities from analysis
+                                        (
+                                            analysis.responsibilities.clone(),
+                                            analysis.responsibility_method_counts.clone(),
+                                        )
+                                    } else {
+                                        // Analysis exists but no responsibilities - estimate
+                                        let estimated_resp_count =
+                                            (file_metrics.function_count / 10).clamp(1, 10);
+                                        let resps: Vec<String> = (1..=estimated_resp_count)
+                                            .map(|i| format!("responsibility_{}", i))
+                                            .collect();
+                                        let counts: std::collections::HashMap<String, usize> =
+                                            resps
+                                                .iter()
+                                                .map(|r| {
+                                                    (
+                                                        r.clone(),
+                                                        file_metrics.function_count
+                                                            / estimated_resp_count,
+                                                    )
+                                                })
+                                                .collect();
+                                        (resps, counts)
+                                    }
                                 } else {
-                                    // Analysis exists but no responsibilities - estimate
+                                    // No analysis at all - estimate
                                     let estimated_resp_count =
                                         (file_metrics.function_count / 10).clamp(1, 10);
                                     let resps: Vec<String> = (1..=estimated_resp_count)
@@ -1059,78 +1079,60 @@ impl ParallelUnifiedAnalysisBuilder {
                                         })
                                         .collect();
                                     (resps, counts)
-                                }
-                            } else {
-                                // No analysis at all - estimate
-                                let estimated_resp_count =
-                                    (file_metrics.function_count / 10).clamp(1, 10);
-                                let resps: Vec<String> = (1..=estimated_resp_count)
-                                    .map(|i| format!("responsibility_{}", i))
-                                    .collect();
-                                let counts: std::collections::HashMap<String, usize> = resps
-                                    .iter()
-                                    .map(|r| {
-                                        (
-                                            r.clone(),
-                                            file_metrics.function_count / estimated_resp_count,
-                                        )
-                                    })
-                                    .collect();
-                                (resps, counts)
-                            };
+                                };
 
-                        let responsibility_count = responsibilities.len();
+                            let responsibility_count = responsibilities.len();
 
-                        Some(crate::organization::GodObjectAnalysis {
-                            is_god_object: true,
-                            method_count: file_metrics.function_count,
-                            field_count: 0,
-                            responsibility_count,
-                            lines_of_code: actual_line_count,
-                            complexity_sum: file_metrics.total_complexity,
-                            god_object_score: Score0To100::new(god_score),
-                            recommended_splits: Vec::new(),
-                            confidence: crate::organization::GodObjectConfidence::Probable,
-                            responsibilities,
-                            responsibility_method_counts,
-                            purity_distribution: None,
-                            module_structure: None,
-                            detection_type: crate::organization::DetectionType::GodFile,
-                            struct_name: None,
-                            struct_line: None,
-                            struct_location: None,
-                            visibility_breakdown: None,
-                            domain_count: 0,
-                            domain_diversity: 0.0,
-                            struct_ratio: 0.0,
-                            analysis_method: Default::default(),
-                            cross_domain_severity: None,
-                            domain_diversity_metrics: None,
-                            aggregated_entropy: None,
-                            aggregated_error_swallowing_count: None,
-                            aggregated_error_swallowing_patterns: None,
-                            layering_impact: None,
-                            anti_pattern_report: None,
-                        })
-                    } else {
-                        // No god object detected and heuristic not met
-                        analyzed
-                    }
-                };
-            } else {
-                // Fallback to estimated metrics if file can't be read
-                file_metrics.god_object_analysis = if no_god_object {
-                    None
+                            Some(crate::organization::GodObjectAnalysis {
+                                is_god_object: true,
+                                method_count: file_metrics.function_count,
+                                field_count: 0,
+                                responsibility_count,
+                                lines_of_code: actual_line_count,
+                                complexity_sum: file_metrics.total_complexity,
+                                god_object_score: Score0To100::new(god_score),
+                                recommended_splits: Vec::new(),
+                                confidence: crate::organization::GodObjectConfidence::Probable,
+                                responsibilities,
+                                responsibility_method_counts,
+                                purity_distribution: None,
+                                module_structure: None,
+                                detection_type: crate::organization::DetectionType::GodFile,
+                                struct_name: None,
+                                struct_line: None,
+                                struct_location: None,
+                                visibility_breakdown: None,
+                                domain_count: 0,
+                                domain_diversity: 0.0,
+                                struct_ratio: 0.0,
+                                analysis_method: Default::default(),
+                                cross_domain_severity: None,
+                                domain_diversity_metrics: None,
+                                aggregated_entropy: None,
+                                aggregated_error_swallowing_count: None,
+                                aggregated_error_swallowing_patterns: None,
+                                layering_impact: None,
+                                anti_pattern_report: None,
+                            })
+                        } else {
+                            // No god object detected and heuristic not met
+                            analyzed
+                        }
+                    };
                 } else {
-                    self.analyze_god_object_with_io(file_path, coverage_data)
-                };
-            }
+                    // Fallback to estimated metrics if file can't be read
+                    file_metrics.god_object_analysis = if no_god_object {
+                        None
+                    } else {
+                        self.analyze_god_object_with_io(file_path, coverage_data)
+                    };
+                }
             } else {
                 // Spec 195: Use cached line count - no file I/O needed
                 file_metrics.total_lines = cached_line_count.unwrap_or(estimated_lines);
-                file_metrics.uncovered_lines =
-                    ((1.0 - file_metrics.coverage_percent) * file_metrics.total_lines as f64)
-                        as usize;
+                file_metrics.uncovered_lines = ((1.0 - file_metrics.coverage_percent)
+                    * file_metrics.total_lines as f64)
+                    as usize;
                 file_metrics.god_object_analysis = None; // Small files skip god object analysis
             }
         } // End of else block for extracted data fallback

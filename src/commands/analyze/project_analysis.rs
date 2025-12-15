@@ -184,7 +184,10 @@ fn parse_and_extract_metrics(
 }
 
 /// Result type for hybrid metrics extraction with extracted data.
-type HybridMetricsResult = (Vec<FileMetrics>, Option<HashMap<PathBuf, ExtractedFileData>>);
+type HybridMetricsResult = (
+    Vec<FileMetrics>,
+    Option<HashMap<PathBuf, ExtractedFileData>>,
+);
 
 /// Parse files using hybrid approach: extract Rust files, parse others (Spec 214).
 ///
@@ -211,7 +214,8 @@ fn parse_and_extract_metrics_hybrid(
     // Extract Rust files and convert to metrics via adapter
     let (rust_metrics, extracted_data) = if !rust_files.is_empty() {
         let extracted = extract_all_files(&rust_files);
-        let metrics = crate::extraction::adapters::metrics::all_file_metrics_from_extracted(&extracted);
+        let metrics =
+            crate::extraction::adapters::metrics::all_file_metrics_from_extracted(&extracted);
         (metrics, Some(extracted))
     } else {
         (vec![], None)

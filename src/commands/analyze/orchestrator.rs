@@ -36,7 +36,8 @@ fn run_analysis_phases(
 ) -> Result<(AnalysisResults, crate::priority::UnifiedAnalysis)> {
     // Spec 214: Use extraction with metrics adapter for single-pass parsing
     let output = project_analysis::run_analysis_with_extraction(config)?;
-    let mut unified = build_unified_analysis_options(config, &output.results, output.extracted_data)?;
+    let mut unified =
+        build_unified_analysis_options(config, &output.results, output.extracted_data)?;
 
     pipeline::apply_file_context(&mut unified, &output.results.file_contexts);
     let filtered = pipeline::filter_by_categories(unified, config.filter_categories.as_deref());
