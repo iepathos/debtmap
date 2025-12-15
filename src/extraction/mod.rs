@@ -25,30 +25,31 @@
 //! # Example
 //!
 //! ```ignore
-//! use debtmap::extraction::{ExtractedFileData, ExtractedFunctionData};
-//! use std::path::PathBuf;
+//! use debtmap::extraction::{UnifiedFileExtractor, ExtractedFileData};
+//! use std::path::Path;
 //!
 //! // Extract all data in one parse pass
-//! let file_data = extract_file(&content, &path)?;
+//! let content = std::fs::read_to_string("src/main.rs")?;
+//! let file_data = UnifiedFileExtractor::extract(Path::new("src/main.rs"), &content)?;
 //!
 //! // Use extracted data across multiple analysis phases
 //! for func in &file_data.functions {
 //!     let func_id = func.function_id(&file_data.path);
-//!     analyze_complexity(func);
-//!     build_call_graph_edges(func);
-//!     detect_io_operations(func);
+//!     println!("Function {} at line {}", func.name, func.line);
 //! }
 //! ```
 //!
 //! # Module Structure
 //!
-//! - `types` - Core data types for extracted data (this spec)
+//! - `types` - Core data types for extracted data (spec 211)
 //! - `extractor` - Single-pass file extraction logic (spec 212)
 //! - `adapters` - Conversion to existing analysis types (spec 214)
 
+mod extractor;
 mod types;
 
 // Re-export all public types
+pub use extractor::UnifiedFileExtractor;
 pub use types::{
     CallSite, CallType, ExtractedFileData, ExtractedFunctionData, ExtractedImplData,
     ExtractedStructData, FieldInfo, ImportInfo, IoOperation, IoType, MethodInfo, PatternType,
