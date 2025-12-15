@@ -215,22 +215,24 @@ fn validate_single_source_parseable(file: &FileContent) -> AnalysisValidation<Fi
 }
 
 /// Validate Rust source is parseable.
+///
+/// Spec 202: Uses UnifiedFileExtractor for parsing to ensure consistent
+/// SourceMap management across the codebase.
 fn validate_rust_parseable(file: &FileContent) -> AnalysisValidation<FileContent> {
-    // Use syn to check if the file parses
-    let result = match syn::parse_file(&file.content) {
+    // Use UnifiedFileExtractor for parsing (spec 202)
+    // This ensures SourceMap is reset after parsing
+    match crate::extraction::UnifiedFileExtractor::extract(&file.path, &file.content) {
         Ok(_) => validation_success(file.clone()),
         Err(e) => {
-            let line = e.span().start().line;
+            // Extract line from error message if possible
+            let line = 0; // UnifiedFileExtractor doesn't expose span info in error
             validation_failure(AnalysisError::parse_with_context(
                 format!("Rust parse error: {}", e),
                 &file.path,
                 line,
             ))
         }
-    };
-    // Reset SourceMap after validation to prevent overflow
-    crate::core::parsing::reset_span_locations();
-    result
+    }
 }
 
 /// Validate Python source is parseable (basic validation).

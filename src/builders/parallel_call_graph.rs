@@ -234,6 +234,8 @@ impl ParallelCallGraphBuilder {
             .collect();
 
         // Parse sequentially (syn::File is not Send)
+        // Note: DO NOT reset SourceMap here - ASTs are held and used later
+        // for call graph analysis. Span references must remain valid.
         let parsed_files: Vec<_> = file_contents
             .iter()
             .filter_map(|(file_path, content)| {
@@ -278,6 +280,8 @@ impl ParallelCallGraphBuilder {
             .collect();
 
         // Step 2: Parse files to AST with progress tracking
+        // Note: DO NOT reset SourceMap here - ASTs are held and used later
+        // for call graph analysis. Span references must remain valid.
         let total_files = file_contents.len();
         let parsed_count = Arc::new(AtomicUsize::new(0));
 

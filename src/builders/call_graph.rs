@@ -142,6 +142,8 @@ where
 
     for (idx, file_path) in rust_files.iter().enumerate() {
         if let Ok(content) = io::read_file(file_path) {
+            // Note: DO NOT reset SourceMap here - ASTs are held and used later
+            // for call graph analysis. Span references must remain valid.
             if let Ok(parsed) = syn::parse_file(&content) {
                 expanded_files.push((parsed.clone(), file_path.clone()));
                 workspace_files.push((file_path.clone(), parsed));
