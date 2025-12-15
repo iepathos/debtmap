@@ -441,9 +441,7 @@ pub fn generate_context_aware_recommendation(
 /// A valid Rust module name (snake_case)
 pub fn generate_module_name(domain_name: &str) -> String {
     // Convert to lowercase and replace spaces/hyphens with underscores
-    let sanitized = domain_name
-        .to_lowercase()
-        .replace([' ', '-'], "_");
+    let sanitized = domain_name.to_lowercase().replace([' ', '-'], "_");
 
     // Ensure it starts with a letter
     let sanitized = if sanitized
@@ -458,10 +456,7 @@ pub fn generate_module_name(domain_name: &str) -> String {
     };
 
     // Add appropriate suffix based on domain type
-    if sanitized.ends_with("ing")
-        || sanitized.ends_with("tion")
-        || sanitized.ends_with("sion")
-    {
+    if sanitized.ends_with("ing") || sanitized.ends_with("tion") || sanitized.ends_with("sion") {
         format!("{}_module", sanitized)
     } else {
         format!("{}_handler", sanitized)
