@@ -316,6 +316,9 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
 ) -> Vec<UnifiedDebtItem> {
     // Create empty cache for backward compatibility (will use fallback reads)
     let empty_cache = std::collections::HashMap::new();
+    // Create detectors for backward compatibility (spec 196: ideally shared at higher level)
+    let context_detector = crate::analysis::ContextDetector::new();
+    let recommendation_engine = crate::priority::scoring::ContextRecommendationEngine::new();
     core::phases::scoring::create_debt_items_from_metric(
         metric,
         call_graph,
@@ -327,6 +330,8 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         risk_analyzer,
         project_path,
         &empty_cache,
+        &context_detector,
+        &recommendation_engine,
     )
 }
 
