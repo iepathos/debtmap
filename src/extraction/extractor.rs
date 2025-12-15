@@ -25,9 +25,9 @@ use crate::analyzers::purity_detector::PurityDetector;
 use crate::complexity::{cognitive::calculate_cognitive, cyclomatic::calculate_cyclomatic};
 use crate::core::parsing::reset_span_locations;
 use crate::extraction::types::{
-    CallSite, CallType, ExtractedFileData, ExtractedFunctionData, ExtractedImplData,
-    ExtractedStructData, FieldInfo, ImportInfo, IoOperation, IoType, MethodInfo, PatternType,
-    PurityAnalysisData, PurityLevel, TransformationPattern,
+    CallSite, CallType, DetectedPattern, ExtractedFileData, ExtractedFunctionData,
+    ExtractedImplData, ExtractedStructData, FieldInfo, ImportInfo, IoOperation, IoType, MethodInfo,
+    PatternType, PurityAnalysisData, PurityLevel, TransformationPattern,
 };
 use anyhow::Result;
 use rayon::prelude::*;
@@ -156,7 +156,61 @@ impl UnifiedFileExtractor {
             }
         }
 
+        // Detect patterns from extracted data (spec 204: avoid re-parsing)
+        data.detected_patterns = Self::detect_patterns_from_extracted(&data);
+
         data
+    }
+
+    /// Detect code patterns from already-extracted data.
+    ///
+    /// Spec 204: Pattern detection is done during extraction to avoid re-parsing.
+    /// This uses the same thresholds as `complexity::pure::detect_patterns_pure`.
+    fn detect_patterns_from_extracted(data: &ExtractedFileData) -> Vec<DetectedPattern> {
+        let mut patterns = Vec::new();
+
+        // God object detection: structs with >5 fields
+        for s in &data.structs {
+            if s.fields.len() > 5 {
+                patterns.push(DetectedPattern::GodObject {
+                    name: s.name.clone(),
+                    field_count: s.fields.len(),
+                });
+            }
+        }
+
+        // Function patterns (excluding test functions)
+        for func in &data.functions {
+            if func.is_test || func.in_test_module {
+                continue;
+            }
+
+            // Long function detection: >50 lines (using length field)
+            if func.length > 50 {
+                patterns.push(DetectedPattern::LongFunction {
+                    name: func.name.clone(),
+                    lines: func.length,
+                });
+            }
+
+            // Many parameters detection: >5 parameters
+            if func.parameter_names.len() > 5 {
+                patterns.push(DetectedPattern::ManyParameters {
+                    name: func.name.clone(),
+                    param_count: func.parameter_names.len(),
+                });
+            }
+
+            // Deep nesting detection: >4 levels
+            if func.nesting > 4 {
+                patterns.push(DetectedPattern::DeepNesting {
+                    function_name: func.name.clone(),
+                    depth: func.nesting,
+                });
+            }
+        }
+
+        patterns
     }
 
     fn extract_module_items(
@@ -1231,6 +1285,64 @@ fn long_chain(x: i32) -> &'static str {
         assert_eq!(
             data.functions[0].nesting, 1,
             "long else-if chain should still have nesting 1"
+        );
+    }
+
+    #[test]
+    fn test_detect_god_object_pattern() {
+        let code = r#"
+struct BigStruct {
+    field1: i32,
+    field2: i32,
+    field3: i32,
+    field4: i32,
+    field5: i32,
+    field6: i32, // 6 fields > 5 threshold
+}
+"#;
+        let data = extract_test_code(code);
+        assert!(data.detected_patterns.iter().any(|p| matches!(
+            p,
+            DetectedPattern::GodObject { name, field_count: 6 } if name == "BigStruct"
+        )));
+    }
+
+    #[test]
+    fn test_detect_many_parameters_pattern() {
+        let code = r#"
+fn many_params(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) {}
+"#;
+        let data = extract_test_code(code);
+        assert!(data.detected_patterns.iter().any(|p| matches!(
+            p,
+            DetectedPattern::ManyParameters { name, param_count: 6 } if name == "many_params"
+        )));
+    }
+
+    #[test]
+    fn test_no_patterns_for_test_functions() {
+        let code = r#"
+#[test]
+fn test_with_many_params(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) {}
+"#;
+        let data = extract_test_code(code);
+        // Test function should not trigger ManyParameters pattern
+        assert!(data.detected_patterns.iter().all(|p| !matches!(
+            p,
+            DetectedPattern::ManyParameters { name, .. } if name == "test_with_many_params"
+        )));
+    }
+
+    #[test]
+    fn test_no_patterns_for_normal_code() {
+        let code = r#"
+struct SmallStruct { a: i32 }
+fn short_fn(x: i32) -> i32 { x }
+"#;
+        let data = extract_test_code(code);
+        assert!(
+            data.detected_patterns.is_empty(),
+            "Normal code should have no patterns"
         );
     }
 }

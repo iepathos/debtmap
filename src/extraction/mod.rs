@@ -52,7 +52,7 @@ mod types;
 // Re-export all public types
 pub use extractor::UnifiedFileExtractor;
 pub use types::{
-    CallSite, CallType, ExtractedFileData, ExtractedFunctionData, ExtractedImplData,
-    ExtractedStructData, FieldInfo, ImportInfo, IoOperation, IoType, MethodInfo, PatternType,
-    PurityAnalysisData, PurityLevel, TransformationPattern,
+    CallSite, CallType, DetectedPattern, ExtractedFileData, ExtractedFunctionData,
+    ExtractedImplData, ExtractedStructData, FieldInfo, ImportInfo, IoOperation, IoType, MethodInfo,
+    PatternType, PurityAnalysisData, PurityLevel, TransformationPattern,
 };
