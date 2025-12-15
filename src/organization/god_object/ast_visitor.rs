@@ -16,6 +16,8 @@ pub struct TypeAnalysis {
     pub field_count: usize,
     pub methods: Vec<String>,
     pub fields: Vec<String>,
+    /// Field type names for domain context extraction (Spec 208)
+    pub field_types: Vec<String>,
     pub responsibilities: Vec<Responsibility>,
     pub trait_implementations: usize,
     pub location: SourceLocation,
@@ -129,6 +131,42 @@ impl TypeVisitor {
         match self_ty {
             syn::Type::Path(type_path) => type_path.path.get_ident().map(|id| id.to_string()),
             _ => None,
+        }
+    }
+
+    /// Extract the primary type name from a field type (Spec 208).
+    ///
+    /// For generic types like `HashMap<String, Module>`, extracts the outer type name.
+    /// For simple types like `String`, returns the type name directly.
+    fn extract_field_type_name(ty: &syn::Type) -> String {
+        match ty {
+            syn::Type::Path(type_path) => {
+                // Get the last segment of the path (handles std::collections::HashMap, etc.)
+                type_path
+                    .path
+                    .segments
+                    .last()
+                    .map(|seg| seg.ident.to_string())
+                    .unwrap_or_else(|| "Unknown".to_string())
+            }
+            syn::Type::Reference(type_ref) => {
+                // For references, recurse on the inner type
+                Self::extract_field_type_name(&type_ref.elem)
+            }
+            syn::Type::Ptr(type_ptr) => {
+                // For pointers, recurse on the inner type
+                Self::extract_field_type_name(&type_ptr.elem)
+            }
+            syn::Type::Array(type_array) => {
+                // For arrays, recurse on the element type
+                Self::extract_field_type_name(&type_array.elem)
+            }
+            syn::Type::Slice(type_slice) => {
+                // For slices, recurse on the element type
+                Self::extract_field_type_name(&type_slice.elem)
+            }
+            syn::Type::Tuple(_) => "Tuple".to_string(),
+            _ => "Unknown".to_string(),
         }
     }
 
@@ -324,6 +362,21 @@ impl<'ast> Visit<'ast> for TypeVisitor {
             _ => Vec::new(),
         };
 
+        // Spec 208: Extract field type names for domain context
+        let field_types = match &node.fields {
+            syn::Fields::Named(fields) => fields
+                .named
+                .iter()
+                .map(|f| Self::extract_field_type_name(&f.ty))
+                .collect(),
+            syn::Fields::Unnamed(fields) => fields
+                .unnamed
+                .iter()
+                .map(|f| Self::extract_field_type_name(&f.ty))
+                .collect(),
+            syn::Fields::Unit => Vec::new(),
+        };
+
         let location = if let Some(ref extractor) = self.location_extractor {
             extractor.extract_item_location(&syn::Item::Struct(node.clone()))
         } else {
@@ -338,6 +391,7 @@ impl<'ast> Visit<'ast> for TypeVisitor {
                 field_count,
                 methods: Vec::new(),
                 fields,
+                field_types,
                 responsibilities: Vec::new(),
                 trait_implementations: 0,
                 location,
