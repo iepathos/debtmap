@@ -1,9 +1,10 @@
 use crate::analyzers::FileAnalyzer;
 use crate::core::FunctionMetrics;
 use crate::extraction::{ExtractedFileData, UnifiedFileExtractor};
-use crate::organization::GodObjectDetector;
+use crate::organization::god_object::heuristics::{
+    detect_from_content, fallback_god_object_heuristics,
+};
 use crate::priority::file_metrics::FileDebtMetrics;
-use crate::priority::score_types::Score0To100;
 use crate::risk::lcov::LcovData;
 use anyhow::Result;
 use std::path::Path;
@@ -77,6 +78,8 @@ impl UnifiedFileAnalyzer {
     }
 
     /// Simple heuristics-based god object detection for non-Rust files or fallback.
+    ///
+    /// Uses shared heuristics from `organization::god_object::heuristics` (Spec 212).
     fn analyze_god_object_simple(
         &self,
         content: &str,
@@ -84,85 +87,31 @@ impl UnifiedFileAnalyzer {
         Option<crate::organization::GodObjectAnalysis>,
         Option<crate::organization::GodObjectType>,
     ) {
-        let lines = Self::count_lines(content);
-        let function_count = content.matches("fn ").count()
-            + content.matches("def ").count()
-            + content.matches("function ").count();
-        let field_count = content.matches("pub ").count() + content.matches("self.").count() / 3;
-
-        let is_god_object = function_count > 50 || lines > 2000 || field_count > 30;
-        let god_object_score = if is_god_object {
-            ((function_count as f64 / 50.0) + (lines as f64 / 2000.0) + (field_count as f64 / 30.0))
-                / 3.0
-        } else {
-            0.0
-        };
-
-        if is_god_object {
-            (
-                Some(crate::organization::GodObjectAnalysis {
-                    is_god_object: true,
-                    method_count: function_count,
-                    field_count,
-                    responsibility_count: 5,
-                    lines_of_code: lines,
-                    complexity_sum: 0,
-                    god_object_score: Score0To100::new(god_object_score.min(1.0)),
-                    recommended_splits: Vec::new(),
-                    confidence: crate::organization::GodObjectConfidence::Possible,
-                    responsibilities: Vec::new(),
-                    responsibility_method_counts: Default::default(),
-                    purity_distribution: None,
-                    module_structure: None,
-                    detection_type: crate::organization::DetectionType::GodFile,
-                    struct_name: None,
-                    struct_line: None,
-                    struct_location: None,
-                    visibility_breakdown: None,
-                    domain_count: 0,
-                    domain_diversity: 0.0,
-                    struct_ratio: 0.0,
-                    analysis_method: Default::default(),
-                    cross_domain_severity: None,
-                    domain_diversity_metrics: None,
-                    aggregated_entropy: None,
-                    aggregated_error_swallowing_count: None,
-                    aggregated_error_swallowing_patterns: None,
-                    layering_impact: None,
-                    anti_pattern_report: None,
-                }),
-                None,
-            )
-        } else {
-            (None, None)
-        }
+        // Delegate to shared heuristics module (Spec 212 consolidation)
+        (detect_from_content(content), None)
     }
 
     /// Analyze god object from extracted data.
+    ///
+    /// Spec 212: Uses the extraction adapter as the single source of truth
+    /// for god object detection.
     fn analyze_god_object_from_data(
         &self,
         path: &Path,
-        content: &str,
-        _extracted: &ExtractedFileData,
+        _content: &str,
+        extracted: &ExtractedFileData,
     ) -> (
         Option<crate::organization::GodObjectAnalysis>,
         Option<crate::organization::GodObjectType>,
     ) {
-        // For now, we still need the AST for full god object analysis
-        // because GodObjectDetector uses syn::visit patterns
-        // This is a known limitation - spec 202 notes that some callers may still need AST access
-        if let Ok(ast) = syn::parse_file(content) {
-            let detector = GodObjectDetector::with_source_content(content);
-            let enhanced_analysis = detector.analyze_enhanced(path, &ast);
-            let analysis = enhanced_analysis.file_metrics;
+        // Use extraction adapter as single source of truth (Spec 212)
+        let analysis = crate::extraction::adapters::god_object::analyze_god_object(path, extracted);
 
-            // Reset SourceMap after analysis to prevent overflow
-            crate::core::parsing::reset_span_locations();
-
-            return (Some(analysis), Some(enhanced_analysis.classification));
-        }
-
-        (None, None)
+        // Note: GodObjectType classification is not available from the adapter
+        // since it was tightly coupled to the AST-based analysis.
+        // For most use cases, the GodObjectAnalysis.detection_type field provides
+        // sufficient classification information.
+        (analysis, None)
     }
 
     fn analyze_god_object(
@@ -282,59 +231,16 @@ impl UnifiedFileAnalyzer {
         }
     }
 
-    /// Detect god object patterns and calculate indicators
+    /// Detect god object patterns and calculate indicators.
+    ///
+    /// Uses shared heuristics from `organization::god_object::heuristics` (Spec 212).
     fn detect_god_object(
         function_count: usize,
         total_lines: usize,
     ) -> Option<crate::organization::GodObjectAnalysis> {
-        const MAX_FUNCTIONS_THRESHOLD: usize = 50;
-        const MAX_LINES_THRESHOLD: usize = 2000;
-        const ESTIMATED_FIELDS_PER_CLASS: usize = 5;
-
-        let is_god_object =
-            function_count > MAX_FUNCTIONS_THRESHOLD || total_lines > MAX_LINES_THRESHOLD;
-        let god_object_score = if is_god_object {
-            (function_count as f64 / MAX_FUNCTIONS_THRESHOLD as f64).min(2.0)
-        } else {
-            0.0
-        };
-
-        if is_god_object {
-            Some(crate::organization::GodObjectAnalysis {
-                is_god_object: true,
-                method_count: function_count,
-                field_count: function_count * ESTIMATED_FIELDS_PER_CLASS
-                    / MAX_FUNCTIONS_THRESHOLD.max(1), // Rough estimate
-                responsibility_count: 5,
-                lines_of_code: total_lines,
-                complexity_sum: 0,
-                god_object_score: Score0To100::new(god_object_score),
-                recommended_splits: Vec::new(),
-                confidence: crate::organization::GodObjectConfidence::Possible,
-                responsibilities: Vec::new(),
-                responsibility_method_counts: Default::default(),
-                purity_distribution: None,
-                module_structure: None,
-                detection_type: crate::organization::DetectionType::GodFile,
-                struct_name: None,
-                struct_line: None,
-                struct_location: None, // Spec 201
-                visibility_breakdown: None,
-                domain_count: 0,
-                domain_diversity: 0.0,
-                struct_ratio: 0.0,
-                analysis_method: Default::default(),
-                cross_domain_severity: None,
-                domain_diversity_metrics: None,
-                aggregated_entropy: None,
-                aggregated_error_swallowing_count: None,
-                aggregated_error_swallowing_patterns: None,
-                layering_impact: None,
-                anti_pattern_report: None,
-            })
-        } else {
-            None
-        }
+        // Delegate to shared heuristics module (Spec 212 consolidation)
+        // Field count estimated as 0 when not available from AST
+        fallback_god_object_heuristics(function_count, total_lines, 0, 0)
     }
 }
 
@@ -624,7 +530,8 @@ mod tests {
         assert!(function_god.is_some());
         let function_god = function_god.unwrap();
         assert!(function_god.is_god_object);
-        assert_eq!(function_god.god_object_score, Score0To100::new(1.2)); // 60/50 = 1.2
+        // Spec 212: Uses weighted scoring algorithm now
+        assert!(function_god.god_object_score.value() > 0.0);
         assert_eq!(function_god.method_count, 60);
 
         // Test god object by line count
@@ -634,12 +541,13 @@ mod tests {
         assert!(line_god.is_god_object);
         assert_eq!(line_god.method_count, 30);
 
-        // Test capped god object score
+        // Test extreme case - should produce a high score
         let extreme_god = UnifiedFileAnalyzer::detect_god_object(150, 5000);
         assert!(extreme_god.is_some());
         let extreme_god = extreme_god.unwrap();
         assert!(extreme_god.is_god_object);
-        assert_eq!(extreme_god.god_object_score, Score0To100::new(2.0)); // Capped at 2.0
+        // Spec 212: Weighted scoring produces higher scores for severe violations
+        assert!(extreme_god.god_object_score.value() > function_god.god_object_score.value());
     }
 
     #[test]

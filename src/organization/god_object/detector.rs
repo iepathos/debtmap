@@ -132,6 +132,21 @@ impl GodObjectDetector {
     ///
     /// Spec 201: Uses per-struct analysis but combines results into a single
     /// EnhancedGodObjectAnalysis for backwards compatibility.
+    ///
+    /// # Deprecation (Spec 212)
+    ///
+    /// This AST-based method is deprecated. Prefer using the extraction adapter:
+    /// `crate::extraction::adapters::god_object::analyze_god_objects()`
+    ///
+    /// The adapter provides:
+    /// - Better performance (no redundant parsing)
+    /// - Unified scoring algorithm
+    /// - Single source of truth for god object detection
+    #[deprecated(
+        since = "0.10.0",
+        note = "Use crate::extraction::adapters::god_object::analyze_god_objects() instead (Spec 212)"
+    )]
+    #[allow(deprecated)] // Internal call to own deprecated method
     pub fn analyze_enhanced(&self, path: &Path, ast: &syn::File) -> EnhancedGodObjectAnalysis {
         use super::ast_visitor::TypeVisitor;
         use super::classification_types::{EnhancedGodObjectAnalysis, GodObjectType};
@@ -315,6 +330,11 @@ impl GodObjectDetector {
     /// file-level metrics. This prevents false positives where simple DTOs in
     /// large files are incorrectly flagged as god objects.
     ///
+    /// # Deprecation (Spec 212)
+    ///
+    /// This AST-based method is deprecated. Prefer using the extraction adapter:
+    /// `crate::extraction::adapters::god_object::analyze_god_objects()`
+    ///
     /// ## Key differences from file-level analysis:
     /// - LOC is calculated per-struct using line span, not entire file
     /// - Methods/fields are counted per-struct, not aggregated
@@ -322,6 +342,10 @@ impl GodObjectDetector {
     /// - Each struct is scored independently
     ///
     /// Returns a list of structs that qualify as god objects (may be empty).
+    #[deprecated(
+        since = "0.10.0",
+        note = "Use crate::extraction::adapters::god_object::analyze_god_objects() instead (Spec 212)"
+    )]
     pub fn analyze_comprehensive(&self, _path: &Path, ast: &syn::File) -> Vec<GodObjectAnalysis> {
         use super::ast_visitor::TypeVisitor;
         use super::core_types::DetectionType;
