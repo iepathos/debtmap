@@ -4,6 +4,7 @@ pub mod injection;
 pub mod lazy;
 pub mod metrics;
 pub mod monadic;
+pub mod parsing;
 pub mod traits;
 pub mod types;
 

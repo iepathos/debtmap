@@ -219,5 +219,9 @@ where
     call_graph.merge(enhanced_graph.base_graph);
     call_graph.resolve_cross_file_calls();
 
+    // Reset SourceMap after all call graph extraction is complete
+    // Safe here because we're done using all AST spans
+    crate::core::parsing::reset_span_locations();
+
     Ok((framework_exclusions_std, function_pointer_used_std))
 }

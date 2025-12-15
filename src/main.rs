@@ -15,7 +15,7 @@ use debtmap::cli::{
     MAIN_STACK_SIZE,
 };
 use debtmap::di::create_app_container;
-use debtmap::observability::{init_tracing, install_panic_hook};
+use debtmap::observability::{extract_thread_panic_message, init_tracing, install_panic_hook};
 use std::sync::Arc;
 
 fn main() -> Result<()> {
@@ -34,7 +34,7 @@ fn main() -> Result<()> {
         .stack_size(MAIN_STACK_SIZE)
         .spawn(main_inner)?
         .join()
-        .map_err(|e| anyhow::anyhow!("Thread panic: {:?}", e))?
+        .map_err(|e| anyhow::anyhow!("Thread panic: {}", extract_thread_panic_message(&e)))?
 }
 
 fn main_inner() -> Result<()> {

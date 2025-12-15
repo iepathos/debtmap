@@ -68,7 +68,9 @@ pub use context::{
     get_current_context, get_progress, increment_processed, set_current_file, set_phase,
     set_phase_persistent, set_progress, AnalysisContext, AnalysisPhase, ContextGuard,
 };
-pub use panic_hook::install_panic_hook;
+pub use panic_hook::{
+    extract_thread_panic_message, get_last_panic_info, install_panic_hook, CapturedPanicInfo,
+};
 pub use parallel::{
     process_file_with_context, with_parallel_context, ParallelContext, ParallelContextExt,
     ParallelContextGuard,

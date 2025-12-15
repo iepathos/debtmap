@@ -50,41 +50,72 @@ mod transformations {
     /// This is necessary because FunctionMetrics only stores boolean purity, not full CFG analysis
     ///
     /// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
+    /// Spec 210: Optimized to parse each file only once instead of per-function.
+    ///           This prevents proc-macro2 SourceMap overflow on large codebases.
     pub fn extract_purity_analysis(
         metrics: &[FunctionMetrics],
     ) -> HashMap<FunctionId, crate::analyzers::purity_detector::PurityAnalysis> {
         use crate::analyzers::purity_detector::PurityDetector;
         use crate::data_flow::population::find_function_in_ast;
+        use std::collections::HashMap as StdHashMap;
         use std::fs;
 
-        metrics
-            .par_iter()
-            .filter_map(|m| {
-                // Read file and parse to get AST
-                let content = fs::read_to_string(&m.file)
-                    .map_err(|e| {
-                        warn!(file = %m.file.display(), error = %e, "Failed to read file");
-                        e
-                    })
-                    .ok()?;
-                let file_ast = syn::parse_file(&content).ok()?;
+        // Group metrics by file to parse each file only once (spec 210)
+        let mut metrics_by_file: StdHashMap<PathBuf, Vec<&FunctionMetrics>> = StdHashMap::new();
+        for m in metrics {
+            metrics_by_file.entry(m.file.clone()).or_default().push(m);
+        }
 
-                // Find the function in the AST by name and line number
-                // (handles both top-level functions and impl methods)
-                if let Some(found) = find_function_in_ast(&file_ast, &m.name, m.line) {
-                    let mut detector = PurityDetector::new();
-                    let analysis = match found {
-                        crate::data_flow::population::FoundFunction::TopLevel(item_fn) => {
-                            detector.is_pure_function(item_fn)
-                        }
-                        crate::data_flow::population::FoundFunction::ImplMethod(impl_fn) => {
-                            detector.is_pure_impl_method(impl_fn)
-                        }
-                    };
-                    let func_id = FunctionId::new(m.file.clone(), m.name.clone(), m.line);
-                    return Some((func_id, analysis));
-                }
-                None
+        // Process files in parallel, but parse each file only once
+        metrics_by_file
+            .into_par_iter()
+            .flat_map(|(file_path, file_metrics)| {
+                // Read and parse file once for all functions in it
+                let content = match fs::read_to_string(&file_path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(file = %file_path.display(), error = %e, "Failed to read file");
+                        return Vec::new();
+                    }
+                };
+
+                let file_ast = match syn::parse_file(&content) {
+                    Ok(ast) => ast,
+                    Err(_) => {
+                        // Reset before returning to prevent accumulation
+                        crate::core::parsing::reset_span_locations();
+                        return Vec::new();
+                    }
+                };
+
+                // Analyze all functions from this file
+                let results: Vec<(FunctionId, crate::analyzers::purity_detector::PurityAnalysis)> =
+                    file_metrics
+                        .iter()
+                        .filter_map(|m| {
+                            if let Some(found) = find_function_in_ast(&file_ast, &m.name, m.line) {
+                                let mut detector = PurityDetector::new();
+                                let analysis = match found {
+                                    crate::data_flow::population::FoundFunction::TopLevel(
+                                        item_fn,
+                                    ) => detector.is_pure_function(item_fn),
+                                    crate::data_flow::population::FoundFunction::ImplMethod(
+                                        impl_fn,
+                                    ) => detector.is_pure_impl_method(impl_fn),
+                                };
+                                let func_id =
+                                    FunctionId::new(m.file.clone(), m.name.clone(), m.line);
+                                Some((func_id, analysis))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                // Reset SourceMap after processing this file to prevent overflow
+                crate::core::parsing::reset_span_locations();
+
+                results
             })
             .collect()
     }

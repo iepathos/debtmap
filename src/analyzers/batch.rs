@@ -285,9 +285,12 @@ fn validate_syntax(content: &str, language: Language, path: &Path) -> Result<(),
     match language {
         Language::Rust => {
             // Try to parse as Rust
-            syn::parse_file(content).map_err(|e| {
+            let result = syn::parse_file(content).map_err(|e| {
                 AnalysisError::parse_with_path(format!("Rust syntax error: {}", e), path)
-            })?;
+            });
+            // Reset SourceMap after validation parse to prevent overflow
+            crate::core::parsing::reset_span_locations();
+            result?;
             Ok(())
         }
         Language::Python => {
@@ -425,6 +428,10 @@ fn analyze_file_content(
 
     let metrics = analyzer.analyze(&ast);
     let debt_items = metrics.debt_items.clone();
+
+    // Reset SourceMap to prevent overflow when parsing many files.
+    // Safe here because we've extracted all metrics (including line numbers) from the AST.
+    crate::core::parsing::reset_span_locations();
 
     let analysis_time = start.map(|s| s.elapsed());
 

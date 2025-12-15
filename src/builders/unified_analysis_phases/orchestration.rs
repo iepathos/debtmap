@@ -65,9 +65,9 @@ pub fn run_purity_propagation(
     let purity_analyzer = PurityAnalyzer::new();
     let mut propagator = PurityPropagator::new(adapter, purity_analyzer);
 
-    // Run propagation
+    // Run propagation - failures are expected when external dependencies are called
     if let Err(e) = propagator.propagate(metrics) {
-        log::warn!("Purity propagation failed: {}", e);
+        log::debug!("Purity propagation skipped (external deps): {}", e);
         return metrics.to_vec();
     }
 

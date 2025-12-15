@@ -68,6 +68,9 @@ impl ParallelCallGraphBuilder {
     ///
     /// If `rust_files` is provided, skips file discovery and uses the given files.
     /// This avoids redundant filesystem walking when files were already discovered.
+    ///
+    /// Spec 210: Uses batched processing to prevent proc-macro2 SourceMap overflow.
+    /// Files are processed in batches of ~200 files, with SourceMap reset between batches.
     pub fn build_parallel_with_files<F>(
         &self,
         project_path: &Path,
@@ -122,46 +125,67 @@ impl ParallelCallGraphBuilder {
         // Initialize with base graph
         parallel_graph.merge_concurrent(base_graph);
 
-        // Add minimum visibility pause
-        std::thread::sleep(std::time::Duration::from_millis(150));
+        // Spec 210: Batch size to prevent SourceMap overflow
+        // 200 files * ~50KB avg = ~10MB per batch, well under the 4GB limit
+        const BATCH_SIZE: usize = 200;
 
-        // Phase 2: Parse ASTs
-        progress_callback(CallGraphProgress {
-            phase: CallGraphPhase::ParsingASTs,
-            current: 0,
-            total: total_files,
-        });
-
-        let parsed_files = self.parallel_parse_files_with_progress(
-            rust_files,
-            &parallel_graph,
-            &mut progress_callback,
-        )?;
+        let mut all_framework_exclusions = HashSet::new();
+        let mut all_function_pointer_used = HashSet::new();
+        let mut files_processed = 0;
 
         // Add minimum visibility pause
         std::thread::sleep(std::time::Duration::from_millis(150));
 
-        // Phase 3: Extract calls
-        progress_callback(CallGraphProgress {
-            phase: CallGraphPhase::ExtractingCalls,
-            current: 0,
-            total: total_files,
-        });
+        // Process files in batches to prevent SourceMap overflow
+        for batch in rust_files.chunks(BATCH_SIZE) {
+            let batch_start = files_processed;
+            let batch_end = batch_start + batch.len();
 
-        self.parallel_multi_file_extraction(&parsed_files, &parallel_graph)?;
+            // Phase 2: Parse ASTs for this batch
+            progress_callback(CallGraphProgress {
+                phase: CallGraphPhase::ParsingASTs,
+                current: batch_start,
+                total: total_files,
+            });
 
-        // Add minimum visibility pause
-        std::thread::sleep(std::time::Duration::from_millis(150));
+            let parsed_files = self.parallel_parse_files_batch(batch, &parallel_graph)?;
 
-        // Phase 4: Link modules
+            // Phase 3: Extract calls for this batch
+            progress_callback(CallGraphProgress {
+                phase: CallGraphPhase::ExtractingCalls,
+                current: batch_start,
+                total: total_files,
+            });
+
+            self.parallel_multi_file_extraction(&parsed_files, &parallel_graph)?;
+
+            // Phase 4: Enhanced analysis for this batch
+            let (batch_framework_exclusions, batch_function_pointer_used) =
+                self.parallel_enhanced_analysis(&parsed_files, &parallel_graph)?;
+
+            all_framework_exclusions.extend(batch_framework_exclusions);
+            all_function_pointer_used.extend(batch_function_pointer_used);
+
+            files_processed = batch_end;
+
+            // Reset SourceMap after each batch to prevent overflow
+            // The parsed ASTs are no longer needed after extraction
+            crate::core::parsing::reset_span_locations();
+
+            log::debug!(
+                "Processed batch {}/{} ({} files)",
+                batch_end,
+                total_files,
+                batch.len()
+            );
+        }
+
+        // Final progress update
         progress_callback(CallGraphProgress {
             phase: CallGraphPhase::LinkingModules,
             current: 0,
             total: 0,
         });
-
-        let (framework_exclusions, function_pointer_used) =
-            self.parallel_enhanced_analysis(&parsed_files, &parallel_graph)?;
 
         // Convert to regular CallGraph
         let mut final_graph = parallel_graph.to_call_graph();
@@ -170,15 +194,52 @@ impl ParallelCallGraphBuilder {
         // Report statistics
         let stats = parallel_graph.stats();
         log::info!(
-            "Parallel call graph complete: {} nodes, {} edges, {} files processed",
+            "Parallel call graph complete: {} nodes, {} edges, {} files processed in {} batches",
             stats.total_nodes.load(std::sync::atomic::Ordering::Relaxed),
             stats.total_edges.load(std::sync::atomic::Ordering::Relaxed),
             stats
                 .files_processed
                 .load(std::sync::atomic::Ordering::Relaxed),
+            (total_files + BATCH_SIZE - 1) / BATCH_SIZE,
         );
 
-        Ok((final_graph, framework_exclusions, function_pointer_used))
+        Ok((final_graph, all_framework_exclusions, all_function_pointer_used))
+    }
+
+    /// Parse a batch of files without progress tracking (used in batched processing)
+    ///
+    /// Note: Uses sequential iteration because syn::File doesn't implement Send
+    /// when compiled with proc-macro feature (spans contain non-Send types).
+    fn parallel_parse_files_batch(
+        &self,
+        batch: &[PathBuf],
+        parallel_graph: &Arc<ParallelCallGraph>,
+    ) -> Result<Vec<(PathBuf, syn::File)>> {
+        // Read file contents in parallel (I/O bound, content is Send)
+        let file_contents: Vec<_> = batch
+            .par_iter()
+            .filter_map(|file_path| {
+                io::read_file(file_path)
+                    .map_err(|e| {
+                        log::warn!("Failed to read file {}: {}", file_path.display(), e);
+                        e
+                    })
+                    .ok()
+                    .map(|content| (file_path.clone(), content))
+            })
+            .collect();
+
+        // Parse sequentially (syn::File is not Send)
+        let parsed_files: Vec<_> = file_contents
+            .iter()
+            .filter_map(|(file_path, content)| {
+                let parsed = syn::parse_file(content).ok()?;
+                parallel_graph.stats().increment_files();
+                Some((file_path.clone(), parsed))
+            })
+            .collect();
+
+        Ok(parsed_files)
     }
 
     /// Phase 1: Read and parse files with progress tracking

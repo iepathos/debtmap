@@ -217,7 +217,7 @@ fn validate_single_source_parseable(file: &FileContent) -> AnalysisValidation<Fi
 /// Validate Rust source is parseable.
 fn validate_rust_parseable(file: &FileContent) -> AnalysisValidation<FileContent> {
     // Use syn to check if the file parses
-    match syn::parse_file(&file.content) {
+    let result = match syn::parse_file(&file.content) {
         Ok(_) => validation_success(file.clone()),
         Err(e) => {
             let line = e.span().start().line;
@@ -227,7 +227,10 @@ fn validate_rust_parseable(file: &FileContent) -> AnalysisValidation<FileContent
                 line,
             ))
         }
-    }
+    };
+    // Reset SourceMap after validation to prevent overflow
+    crate::core::parsing::reset_span_locations();
+    result
 }
 
 /// Validate Python source is parseable (basic validation).
