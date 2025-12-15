@@ -339,6 +339,7 @@ mod tests {
                 end_column: None,
                 confidence: LocationConfidence::Exact,
             },
+            impl_locations: vec![],
         }
     }
 

@@ -402,13 +402,23 @@ impl GodObjectDetector {
             return None;
         }
 
-        // Calculate per-struct LOC from line span
-        let lines_of_code = type_analysis
+        // Spec 207: Calculate per-struct LOC including impl blocks
+        // Struct definition LOC
+        let struct_loc = type_analysis
             .location
             .end_line
             .unwrap_or(type_analysis.location.line)
             .saturating_sub(type_analysis.location.line)
             + 1;
+
+        // Impl blocks LOC
+        let impl_loc: usize = type_analysis
+            .impl_locations
+            .iter()
+            .map(|loc| loc.end_line.unwrap_or(loc.line).saturating_sub(loc.line) + 1)
+            .sum();
+
+        let lines_of_code = struct_loc + impl_loc;
 
         // Use per-struct method and field counts
         let method_count = type_analysis.method_count;
@@ -1069,6 +1079,132 @@ impl ModuleTracker {
         assert!(
             cohesive_is_cohesive,
             "ModuleTracker with module-related methods SHOULD be cohesive"
+        );
+    }
+
+    /// Spec 207: Test that LOC includes impl block lines
+    #[test]
+    fn test_loc_includes_impl_blocks() {
+        use crate::organization::god_object::ast_visitor::TypeVisitor;
+        use syn::visit::Visit;
+
+        let content = r#"
+pub struct Foo {
+    a: i32,
+    b: i32,
+}
+
+impl Foo {
+    pub fn method1(&self) -> i32 {
+        self.a + self.b
+    }
+
+    pub fn method2(&self) -> i32 {
+        self.a * self.b
+    }
+}
+"#;
+
+        let ast = syn::parse_file(content).expect("parse");
+        let detector = GodObjectDetector::with_source_content(content);
+        let mut visitor = TypeVisitor::with_location_extractor(detector.location_extractor.clone());
+        visitor.visit_file(&ast);
+
+        let foo = visitor.types.get("Foo").expect("Foo should be found");
+
+        // Verify impl_locations is populated
+        assert!(
+            !foo.impl_locations.is_empty(),
+            "impl_locations should be populated"
+        );
+
+        // Calculate total LOC like analyze_single_struct does
+        let struct_loc = foo
+            .location
+            .end_line
+            .unwrap_or(foo.location.line)
+            .saturating_sub(foo.location.line)
+            + 1;
+
+        let impl_loc: usize = foo
+            .impl_locations
+            .iter()
+            .map(|loc| loc.end_line.unwrap_or(loc.line).saturating_sub(loc.line) + 1)
+            .sum();
+
+        let total_loc = struct_loc + impl_loc;
+
+        // Struct: lines 2-5 (~4 lines)
+        // Impl: lines 7-15 (~9 lines)
+        // Total should be at least 10 lines (struct + impl), not just 4 (struct only)
+        assert!(
+            total_loc >= 10,
+            "LOC should include impl blocks, got {} (struct={}, impl={})",
+            total_loc,
+            struct_loc,
+            impl_loc
+        );
+    }
+
+    /// Spec 207: Test LOC with multiple impl blocks
+    #[test]
+    fn test_loc_with_multiple_impl_blocks() {
+        use crate::organization::god_object::ast_visitor::TypeVisitor;
+        use syn::visit::Visit;
+
+        let content = r#"
+pub struct Bar { a: i32 }
+
+impl Bar {
+    pub fn new() -> Self { Self { a: 0 } }
+}
+
+impl Default for Bar {
+    fn default() -> Self { Self::new() }
+}
+
+impl Clone for Bar {
+    fn clone(&self) -> Self { Self { a: self.a } }
+}
+"#;
+
+        let ast = syn::parse_file(content).expect("parse");
+        let detector = GodObjectDetector::with_source_content(content);
+        let mut visitor = TypeVisitor::with_location_extractor(detector.location_extractor.clone());
+        visitor.visit_file(&ast);
+
+        let bar = visitor.types.get("Bar").expect("Bar should be found");
+
+        // Should have all 3 impl blocks tracked
+        assert!(
+            bar.impl_locations.len() >= 3,
+            "Should track all 3 impl blocks, got {}",
+            bar.impl_locations.len()
+        );
+
+        // Verify total LOC includes all impl blocks
+        let struct_loc = bar
+            .location
+            .end_line
+            .unwrap_or(bar.location.line)
+            .saturating_sub(bar.location.line)
+            + 1;
+
+        let impl_loc: usize = bar
+            .impl_locations
+            .iter()
+            .map(|loc| loc.end_line.unwrap_or(loc.line).saturating_sub(loc.line) + 1)
+            .sum();
+
+        let total_loc = struct_loc + impl_loc;
+
+        // Struct is 1 line, each impl is ~3 lines = ~10 total
+        assert!(
+            total_loc >= 8,
+            "LOC should include all impl blocks, got {} (struct={}, impl={})",
+            total_loc,
+            struct_loc,
+            impl_loc
         );
     }
 }
