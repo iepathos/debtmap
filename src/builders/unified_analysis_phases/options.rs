@@ -4,7 +4,9 @@
 //! with type-safe defaults and validation.
 
 use crate::core::AnalysisResults;
+use crate::extraction::ExtractedFileData;
 use crate::formatting::FormattingConfig;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Configuration error types.
@@ -40,6 +42,9 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub disable_context: Option<Vec<String>>,
     /// Pre-discovered Rust files from stage 0 (avoids re-walking filesystem)
     pub rust_files: Option<Vec<PathBuf>>,
+    /// Pre-extracted file data from unified extraction phase (spec 213).
+    /// When present, avoids re-parsing files during analysis.
+    pub extracted_data: Option<HashMap<PathBuf, ExtractedFileData>>,
 }
 
 /// Owned options for unified analysis.

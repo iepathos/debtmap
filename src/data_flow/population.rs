@@ -5,13 +5,19 @@
 //! - I/O operation detection (AST-based pattern matching)
 //! - Variable dependency analysis
 //! - Data transformation patterns
+//!
+//! # Spec 213: Extracted Data Functions
+//!
+//! This module now includes `*_from_extracted` variants that populate the
+//! DataFlowGraph from pre-extracted data, avoiding per-function file parsing.
+//! These functions should be preferred when extracted data is available.
 
-use crate::analyzers::io_detector::detect_io_operations;
 use crate::analyzers::purity_detector::PurityAnalysis;
-use crate::core::FunctionMetrics;
-use crate::data_flow::{DataFlowGraph, MutationInfo};
+use crate::data_flow::{DataFlowGraph, MutationInfo, PurityInfo};
+use crate::extraction::ExtractedFileData;
 use crate::priority::call_graph::FunctionId;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 /// Helper module for finding functions in AST (spec 202)
 ///
@@ -59,6 +65,13 @@ mod ast_helpers {
     /// For impl methods, we match if either:
     /// - The metric name equals the simple method name
     /// - The metric name ends with `::method_name`
+    ///
+    /// # Spec 213
+    ///
+    /// This function is used by the fallback purity analysis path when pre-extracted
+    /// data is not available. When `with_extracted_data()` is called on the builder,
+    /// this function is not used. It's kept for backward compatibility with non-parallel
+    /// analysis paths and testing.
     pub fn find_function_in_ast<'a>(
         ast: &'a syn::File,
         metric_name: &str,
@@ -143,257 +156,172 @@ pub fn populate_from_purity_analysis(
     data_flow.set_mutation_info(func_id.clone(), mutation_info);
 }
 
-/// Populate I/O operations from function metrics using AST-based detection
+// Note: Old per-function parsing functions (populate_io_operations, populate_variable_dependencies,
+// populate_data_transformations) were removed in Spec 213. Use the *_from_extracted variants instead
+// which work with pre-extracted data from the unified extraction pipeline.
+
+// ============================================================================
+// Spec 213: Extracted Data Functions
+// ============================================================================
+
+/// Populate purity analysis from extracted file data (pure).
 ///
-/// Detects I/O operations by analyzing function ASTs for actual I/O patterns
-/// rather than relying on function name heuristics. This provides significantly
-/// higher accuracy and coverage (~70-80% vs ~4.3% with name-based detection).
+/// # Spec 213
 ///
-/// # Implementation (Spec 245, Spec 202)
-///
-/// Uses AST visitor pattern to detect:
-/// - File I/O (std::fs, File, BufReader/Writer)
-/// - Console I/O (println!, eprintln!, stdout/stderr)
-/// - Network I/O (TcpStream, HTTP clients)
-/// - Database I/O (query, execute, prepare)
-/// - Async I/O (tokio::fs, async-std::fs)
-///
-/// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
-pub fn populate_io_operations(data_flow: &mut DataFlowGraph, metrics: &[FunctionMetrics]) -> usize {
-    use crate::analyzers::io_detector::detect_io_operations_from_block;
-    use std::fs;
-
-    let mut total_ops = 0;
-
-    for metric in metrics {
-        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-
-        // Read file and parse to get AST
-        let content = match fs::read_to_string(&metric.file) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!(
-                    "Warning: Failed to read file {} for I/O detection: {}",
-                    metric.file.display(),
-                    e
-                );
-                continue;
-            }
-        };
-
-        let file_ast = match syn::parse_file(&content) {
-            Ok(ast) => ast,
-            Err(_) => continue,
-        };
-
-        // Find the function by name and line number (handles both top-level and impl methods)
-        if let Some(found) = find_function_in_ast(&file_ast, &metric.name, metric.line) {
-            // Use AST-based I/O detector on the function block
-            let io_ops = match found {
-                FoundFunction::TopLevel(item_fn) => detect_io_operations(item_fn),
-                FoundFunction::ImplMethod(method) => detect_io_operations_from_block(&method.block),
-            };
-
-            for op in io_ops {
-                data_flow.add_io_operation(func_id.clone(), op);
-                total_ops += 1;
-            }
-        }
-    }
-
-    total_ops
-}
-
-/// Populate variable dependencies from function metrics
-///
-/// Tracks which variables each function depends on
-pub fn populate_variable_dependencies(
+/// Populates the DataFlowGraph with purity information from pre-extracted data.
+/// Avoids per-function file parsing by using the extraction results directly.
+pub fn populate_purity_from_extracted(
     data_flow: &mut DataFlowGraph,
-    metrics: &[FunctionMetrics],
-) -> usize {
-    let mut total_deps = 0;
-
-    for metric in metrics {
-        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-
-        // Extract variable dependencies from metric
-        let deps = extract_variable_deps(metric);
-
-        if !deps.is_empty() {
-            data_flow.add_variable_dependencies(func_id, deps.clone());
-            total_deps += deps.len();
-        }
-    }
-
-    total_deps
-}
-
-/// Extract variable dependencies from function metrics
-///
-/// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
-fn extract_variable_deps(metric: &FunctionMetrics) -> HashSet<String> {
-    use std::fs;
-
-    // Read file and parse to get AST
-    let content = match fs::read_to_string(&metric.file) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!(
-                "Warning: Failed to read file {}: {}",
-                metric.file.display(),
-                e
-            );
-            return HashSet::new();
-        }
-    };
-
-    let file_ast = match syn::parse_file(&content) {
-        Ok(ast) => ast,
-        Err(_) => return HashSet::new(),
-    };
-
-    // Find the function by name and line number (handles both top-level and impl methods)
-    if let Some(found) = find_function_in_ast(&file_ast, &metric.name, metric.line) {
-        // Extract parameter names from function signature
-        let mut deps = HashSet::new();
-        for input in found.inputs() {
-            if let syn::FnArg::Typed(pat_type) = input {
-                if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
-                    deps.insert(pat_ident.ident.to_string());
-                }
-            }
-        }
-        return deps;
-    }
-
-    HashSet::new()
-}
-
-/// Populate data transformations between functions
-///
-/// Identifies transformation patterns like map, filter, fold
-///
-/// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
-pub fn populate_data_transformations(
-    data_flow: &mut DataFlowGraph,
-    metrics: &[FunctionMetrics],
-) -> usize {
-    use std::fs;
-
-    let mut transformation_count = 0;
-
-    for metric in metrics {
-        // Read file and parse to get AST
-        let content = match fs::read_to_string(&metric.file) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!(
-                    "Warning: Failed to read file {}: {}",
-                    metric.file.display(),
-                    e
-                );
-                continue;
-            }
-        };
-
-        let file_ast = match syn::parse_file(&content) {
-            Ok(ast) => ast,
-            Err(_) => continue,
-        };
-
-        // Find the function by name and line number (handles both top-level and impl methods)
-        if let Some(found) = find_function_in_ast(&file_ast, &metric.name, metric.line) {
-            // Detect transformation patterns in the function body
-            transformation_count +=
-                detect_transformation_patterns(found.block(), data_flow, metric);
-        }
-    }
-
-    transformation_count
-}
-
-/// Detect data transformation patterns (map, filter, fold, etc.) in a code block
-fn detect_transformation_patterns(
-    block: &syn::Block,
-    _data_flow: &mut DataFlowGraph,
-    _metric: &FunctionMetrics,
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
 ) -> usize {
     let mut count = 0;
 
-    // Visit all statements and expressions looking for iterator method chains
-    for stmt in &block.stmts {
-        count += count_transformations_in_stmt(stmt);
+    for (path, file_data) in extracted {
+        for func in &file_data.functions {
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+
+            // Convert extracted purity to PurityInfo
+            let purity_info = PurityInfo {
+                is_pure: func.purity_analysis.is_pure,
+                confidence: func.purity_analysis.confidence,
+                impurity_reasons: Vec::new(), // Not stored in extracted data
+            };
+            data_flow.set_purity_info(func_id.clone(), purity_info);
+
+            // Convert to MutationInfo
+            let mutation_info = MutationInfo {
+                has_mutations: func.purity_analysis.has_mutations,
+                detected_mutations: func.purity_analysis.local_mutations.clone(),
+            };
+            data_flow.set_mutation_info(func_id, mutation_info);
+
+            count += 1;
+        }
     }
 
     count
 }
 
-/// Count transformation patterns in a statement
-fn count_transformations_in_stmt(stmt: &syn::Stmt) -> usize {
-    match stmt {
-        syn::Stmt::Expr(expr, _) => count_transformations_in_expr(expr),
-        syn::Stmt::Local(local) => {
-            if let Some(init) = &local.init {
-                count_transformations_in_expr(&init.expr)
-            } else {
-                0
-            }
-        }
-        _ => 0,
-    }
-}
-
-/// Count transformation patterns in an expression
-fn count_transformations_in_expr(expr: &syn::Expr) -> usize {
+/// Populate I/O operations from extracted file data (pure).
+///
+/// # Spec 213
+///
+/// Populates the DataFlowGraph with I/O operations from pre-extracted data.
+/// Avoids per-function file parsing by using the extraction results directly.
+pub fn populate_io_from_extracted(
+    data_flow: &mut DataFlowGraph,
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> usize {
     let mut count = 0;
 
-    match expr {
-        syn::Expr::MethodCall(method_call) => {
-            // Check if this is a transformation method
-            let method_name = method_call.method.to_string();
-            if is_transformation_method(&method_name) {
+    for (path, file_data) in extracted {
+        for func in &file_data.functions {
+            if func.io_operations.is_empty() {
+                continue;
+            }
+
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+
+            for io_op in &func.io_operations {
+                // Convert extraction IoOperation to data_flow IoOperation
+                let op = crate::data_flow::IoOperation {
+                    operation_type: io_op.description.clone(),
+                    variables: Vec::new(), // Not stored in extracted data
+                    line: io_op.line,
+                };
+                data_flow.add_io_operation(func_id.clone(), op);
                 count += 1;
             }
-            // Recursively check the receiver
-            count += count_transformations_in_expr(&method_call.receiver);
         }
-        syn::Expr::Call(call) => {
-            // Check arguments for nested transformations
-            for arg in &call.args {
-                count += count_transformations_in_expr(arg);
-            }
-        }
-        syn::Expr::Block(block) => {
-            for stmt in &block.block.stmts {
-                count += count_transformations_in_stmt(stmt);
-            }
-        }
-        _ => {}
     }
 
     count
 }
 
-/// Check if a method name represents a data transformation
-fn is_transformation_method(name: &str) -> bool {
-    matches!(
-        name,
-        "map"
-            | "filter"
-            | "fold"
-            | "reduce"
-            | "filter_map"
-            | "flat_map"
-            | "scan"
-            | "collect"
-            | "for_each"
-            | "any"
-            | "all"
-            | "find"
-            | "partition"
-            | "zip"
-            | "chain"
-    )
+/// Populate variable dependencies from extracted file data (pure).
+///
+/// # Spec 213
+///
+/// Populates the DataFlowGraph with variable dependencies from pre-extracted data.
+/// Uses parameter names from the extraction as dependencies.
+pub fn populate_variable_deps_from_extracted(
+    data_flow: &mut DataFlowGraph,
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> usize {
+    let mut count = 0;
+
+    for (path, file_data) in extracted {
+        for func in &file_data.functions {
+            if func.parameter_names.is_empty() {
+                continue;
+            }
+
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+
+            let deps: HashSet<String> = func.parameter_names.iter().cloned().collect();
+            count += deps.len();
+            data_flow.add_variable_dependencies(func_id, deps);
+        }
+    }
+
+    count
+}
+
+/// Populate data transformations from extracted file data (pure).
+///
+/// # Spec 213
+///
+/// Populates the DataFlowGraph with transformation patterns from pre-extracted data.
+/// The extraction already identifies map/filter/fold/etc patterns.
+pub fn populate_transformations_from_extracted(
+    _data_flow: &mut DataFlowGraph,
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> usize {
+    // Count transformation patterns across all functions
+    // Note: We don't currently store these in DataFlowGraph,
+    // but we count them for metrics purposes
+    extracted
+        .values()
+        .flat_map(|file_data| &file_data.functions)
+        .map(|func| func.transformation_patterns.len())
+        .sum()
+}
+
+/// Populate all data flow information from extracted data (pure).
+///
+/// # Spec 213
+///
+/// Convenience function that populates all data flow information from extracted
+/// file data in a single call. This is the preferred entry point when using
+/// the unified extraction pipeline.
+pub fn populate_all_from_extracted(
+    data_flow: &mut DataFlowGraph,
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> PopulationStats {
+    let purity_count = populate_purity_from_extracted(data_flow, extracted);
+    let io_count = populate_io_from_extracted(data_flow, extracted);
+    let dep_count = populate_variable_deps_from_extracted(data_flow, extracted);
+    let transform_count = populate_transformations_from_extracted(data_flow, extracted);
+
+    PopulationStats {
+        purity_entries: purity_count,
+        io_operations: io_count,
+        variable_dependencies: dep_count,
+        transformation_patterns: transform_count,
+    }
+}
+
+/// Statistics from data flow population.
+#[derive(Debug, Clone, Default)]
+pub struct PopulationStats {
+    /// Number of functions with purity analysis populated
+    pub purity_entries: usize,
+    /// Number of I/O operations populated
+    pub io_operations: usize,
+    /// Number of variable dependencies populated
+    pub variable_dependencies: usize,
+    /// Number of transformation patterns detected
+    pub transformation_patterns: usize,
 }
 
 #[cfg(test)]
@@ -447,45 +375,7 @@ mod tests {
     }
 
     // Escape vars test removed - escape analysis no longer provides actionable signals
-
-    #[test]
-    fn test_populate_io_operations() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        // Create temporary file with actual Rust code containing I/O operations
-        let mut temp_file = NamedTempFile::new().unwrap();
-        let test_code = r#"
-use std::fs::File;
-use std::io::Read;
-
-fn read_file() -> std::io::Result<String> {
-    let mut file = File::open("data.txt")?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents)
-}
-
-fn pure_func(x: i32) -> i32 {
-    x * 2
-}
-"#;
-        temp_file.write_all(test_code.as_bytes()).unwrap();
-        let temp_path = temp_file.path().to_path_buf();
-
-        let mut data_flow = DataFlowGraph::new();
-        let metrics = vec![
-            FunctionMetrics::new("read_file".to_string(), temp_path.clone(), 5), // 1-indexed
-            FunctionMetrics::new("pure_func".to_string(), temp_path.clone(), 12), // 1-indexed
-        ];
-
-        let count = populate_io_operations(&mut data_flow, &metrics);
-
-        assert!(
-            count > 0,
-            "Should detect I/O operations in read_file function"
-        );
-    }
+    // Old populate_io_operations test removed - spec 213 removed per-function parsing functions
 
     // ============================================================
     // Spec 202: Tests for impl block method handling
@@ -555,111 +445,9 @@ impl Bar {
         }
     }
 
-    #[test]
-    fn test_populate_io_operations_impl_method() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        // Create temporary file with impl method containing I/O
-        let mut temp_file = NamedTempFile::new().unwrap();
-        let test_code = r#"
-use std::fs::File;
-use std::io::Read;
-
-struct FileReader;
-
-impl FileReader {
-    fn read_contents(&self) -> std::io::Result<String> {
-        let mut file = File::open("data.txt")?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        Ok(contents)
-    }
-}
-"#;
-        temp_file.write_all(test_code.as_bytes()).unwrap();
-        let temp_path = temp_file.path().to_path_buf();
-
-        let mut data_flow = DataFlowGraph::new();
-        // Use qualified name format as FunctionMetrics would have
-        let metrics = vec![FunctionMetrics::new(
-            "FileReader::read_contents".to_string(),
-            temp_path.clone(),
-            8, // Line of the method (1-indexed)
-        )];
-
-        let count = populate_io_operations(&mut data_flow, &metrics);
-
-        assert!(
-            count > 0,
-            "Should detect I/O operations in impl method (spec 202)"
-        );
-    }
-
-    #[test]
-    fn test_extract_variable_deps_impl_method() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        // Create temporary file with impl method containing parameters
-        let mut temp_file = NamedTempFile::new().unwrap();
-        let test_code = r#"
-struct Calculator;
-
-impl Calculator {
-    fn add(&self, a: i32, b: i32) -> i32 {
-        a + b
-    }
-}
-"#;
-        temp_file.write_all(test_code.as_bytes()).unwrap();
-        let temp_path = temp_file.path().to_path_buf();
-
-        let metric = FunctionMetrics::new("Calculator::add".to_string(), temp_path.clone(), 5); // 1-indexed
-
-        let deps = extract_variable_deps(&metric);
-
-        // Should find parameters 'a' and 'b' (not 'self' as it's a receiver)
-        assert!(deps.contains("a"), "Should find parameter 'a'");
-        assert!(deps.contains("b"), "Should find parameter 'b'");
-    }
-
-    #[test]
-    fn test_populate_data_transformations_impl_method() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        // Create temporary file with impl method using iterator transformations
-        let mut temp_file = NamedTempFile::new().unwrap();
-        let test_code = r#"
-struct DataProcessor;
-
-impl DataProcessor {
-    fn process(&self, items: Vec<i32>) -> Vec<i32> {
-        items.iter()
-            .map(|x| x * 2)
-            .filter(|x| *x > 10)
-            .collect()
-    }
-}
-"#;
-        temp_file.write_all(test_code.as_bytes()).unwrap();
-        let temp_path = temp_file.path().to_path_buf();
-
-        let mut data_flow = DataFlowGraph::new();
-        let metrics = vec![FunctionMetrics::new(
-            "DataProcessor::process".to_string(),
-            temp_path.clone(),
-            5, // 1-indexed
-        )];
-
-        let count = populate_data_transformations(&mut data_flow, &metrics);
-
-        assert!(
-            count > 0,
-            "Should detect transformation patterns in impl method (spec 202)"
-        );
-    }
+    // Tests for old per-function parsing functions (populate_io_operations_impl_method,
+    // extract_variable_deps_impl_method, populate_data_transformations_impl_method)
+    // removed - spec 213 deleted per-function parsing in favor of extraction pipeline
 
     #[test]
     fn test_found_function_block() {

@@ -2,10 +2,17 @@
 //!
 //! This module handles the core project analysis logic including file discovery,
 //! parsing, and metrics extraction. Follows the Shell pattern for I/O operations.
+//!
+//! # Extraction Phase (Spec 213)
+//!
+//! The module now includes unified extraction as an early pipeline phase.
+//! Each file is parsed exactly once, with all analysis data extracted upfront.
+//! This prevents proc-macro2 SourceMap overflow on large codebases.
 
 use crate::analysis::FileContext;
 use crate::config::DebtmapConfig;
 use crate::core::{AnalysisResults, DuplicationBlock, FileMetrics, FunctionMetrics, Language};
+use crate::extraction::{ExtractedFileData, UnifiedFileExtractor};
 use crate::formatting::FormattingConfig;
 use crate::io;
 use crate::progress::ProgressManager;
@@ -14,6 +21,7 @@ use crate::utils::{analysis_helpers, language_parser};
 use crate::{analysis_utils, core::DebtItem};
 use anyhow::{Context, Result};
 use chrono::Utc;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -272,5 +280,119 @@ fn build_analysis_results(
         dependencies,
         duplications,
         file_contexts,
+    }
+}
+
+// ============================================================================
+// Unified Extraction Phase (Spec 213)
+// ============================================================================
+
+/// Batch size for extraction to prevent SourceMap overflow.
+/// 200 files * ~50KB avg = ~10MB per batch, well under the 4GB limit.
+const EXTRACTION_BATCH_SIZE: usize = 200;
+
+/// Extract all data from files in a single pass (I/O).
+///
+/// Processes files in batches to prevent proc-macro2 SourceMap overflow.
+/// Resets SourceMap between batches.
+///
+/// # Spec 213
+///
+/// This function implements the "Unified Extraction" phase that runs after
+/// file discovery. It parses each file exactly once and extracts all data
+/// needed by downstream analysis phases.
+pub fn extract_all_files(files: &[PathBuf]) -> HashMap<PathBuf, ExtractedFileData> {
+    let mut extracted = HashMap::with_capacity(files.len());
+
+    // Filter to Rust files only (extraction is Rust-specific)
+    let rust_files: Vec<_> = files
+        .iter()
+        .filter(|p| p.extension().map(|e| e == "rs").unwrap_or(false))
+        .cloned()
+        .collect();
+
+    if rust_files.is_empty() {
+        return extracted;
+    }
+
+    for batch in rust_files.chunks(EXTRACTION_BATCH_SIZE) {
+        // Read file contents in parallel (I/O bound)
+        let contents: Vec<_> = batch
+            .par_iter()
+            .filter_map(|path| {
+                std::fs::read_to_string(path)
+                    .ok()
+                    .map(|content| (path.clone(), content))
+            })
+            .collect();
+
+        // Extract data from each file
+        for (path, content) in contents {
+            match UnifiedFileExtractor::extract(&path, &content) {
+                Ok(data) => {
+                    extracted.insert(path, data);
+                }
+                Err(e) => {
+                    log::warn!("Failed to extract {}: {}", path.display(), e);
+                }
+            }
+        }
+
+        // Reset SourceMap after each batch to prevent overflow
+        crate::core::parsing::reset_span_locations();
+    }
+
+    extracted
+}
+
+/// Convert extracted function data to FunctionMetrics (pure).
+///
+/// # Spec 213
+///
+/// Creates FunctionMetrics from pre-extracted data, avoiding re-parsing.
+/// This utility function is provided for alternative analysis pipelines that
+/// may want to build metrics directly from extraction results.
+///
+/// Note: Currently the main pipeline uses extraction data for purity/I/O analysis
+/// while metrics come from the traditional parsing path. This function exists
+/// for potential future optimizations or alternative analysis flows.
+#[allow(dead_code)] // Spec 213: Utility function for alternative analysis flows
+pub fn metrics_from_extracted(
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> Vec<FunctionMetrics> {
+    extracted
+        .iter()
+        .flat_map(|(path, file_data)| {
+            file_data.functions.iter().map(|func| {
+                let mut metrics = FunctionMetrics::new(func.name.clone(), path.clone(), func.line);
+                metrics.cyclomatic = func.cyclomatic;
+                metrics.cognitive = func.cognitive;
+                metrics.nesting = func.nesting;
+                metrics.length = func.length;
+                metrics.is_test = func.is_test;
+                metrics.visibility = func.visibility.clone();
+                metrics.is_trait_method = func.is_trait_method;
+                metrics.in_test_module = func.in_test_module;
+                metrics.is_pure = Some(func.purity_analysis.is_pure);
+                metrics.purity_confidence = Some(func.purity_analysis.confidence);
+                metrics.purity_level = Some(purity_level_from_extracted(
+                    &func.purity_analysis.purity_level,
+                ));
+                metrics
+            })
+        })
+        .collect()
+}
+
+/// Convert extraction PurityLevel to core PurityLevel (pure).
+///
+/// Helper for `metrics_from_extracted` - kept for completeness of that API.
+#[allow(dead_code)] // Spec 213: Helper for metrics_from_extracted utility
+fn purity_level_from_extracted(level: &crate::extraction::PurityLevel) -> crate::core::PurityLevel {
+    match level {
+        crate::extraction::PurityLevel::StrictlyPure => crate::core::PurityLevel::StrictlyPure,
+        crate::extraction::PurityLevel::LocallyPure => crate::core::PurityLevel::LocallyPure,
+        crate::extraction::PurityLevel::ReadOnly => crate::core::PurityLevel::ReadOnly,
+        crate::extraction::PurityLevel::Impure => crate::core::PurityLevel::Impure,
     }
 }

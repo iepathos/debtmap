@@ -444,3 +444,159 @@ where
     let builder = ParallelCallGraphBuilder::with_config(config);
     builder.build_parallel_with_files(project_path, base_graph, rust_files, progress_callback)
 }
+
+// ============================================================================
+// Spec 213: Call Graph Building from Extracted Data
+// ============================================================================
+
+use crate::extraction::ExtractedFileData;
+use std::collections::HashMap;
+
+/// Build call graph from pre-extracted file data (spec 213).
+///
+/// Uses extracted call information to build the call graph without re-parsing files.
+/// This prevents proc-macro2 SourceMap overflow on large codebases.
+///
+/// # Arguments
+///
+/// * `base_graph` - Base call graph from function metrics
+/// * `extracted` - Pre-extracted file data from unified extraction phase
+///
+/// # Returns
+///
+/// Tuple of (CallGraph, framework_exclusions, function_pointer_used)
+pub fn build_call_graph_from_extracted(
+    base_graph: CallGraph,
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> (CallGraph, HashSet<FunctionId>, HashSet<FunctionId>) {
+    use crate::priority::call_graph::CallType as GraphCallType;
+
+    let parallel_graph =
+        Arc::new(crate::priority::parallel_call_graph::ParallelCallGraph::new(extracted.len()));
+
+    // Initialize with base graph
+    parallel_graph.merge_concurrent(base_graph);
+
+    // Process each file's extracted data
+    for (path, file_data) in extracted {
+        // Add functions to call graph
+        for func in &file_data.functions {
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+
+            // Add the function as a node with basic properties
+            // is_entry_point: false (will be determined by call graph analysis)
+            // is_test: use extracted value
+            // complexity: use extracted cyclomatic complexity
+            // lines: use extracted length
+            parallel_graph.add_function(
+                func_id.clone(),
+                false, // is_entry_point
+                func.is_test,
+                func.cyclomatic,
+                func.length,
+            );
+
+            // Add call edges from the extracted call sites
+            for call_site in &func.calls {
+                // Try to resolve callee to a FunctionId
+                // Direct calls: function name matches a function in the same or imported file
+                // Method calls: callee_name is just the method name, harder to resolve
+                let callee_id = resolve_callee_from_extracted(
+                    &call_site.callee_name,
+                    &call_site.call_type,
+                    path,
+                    extracted,
+                );
+
+                if let Some(callee) = callee_id {
+                    parallel_graph.add_call(func_id.clone(), callee, GraphCallType::Direct);
+                }
+            }
+        }
+
+        parallel_graph.stats().increment_files();
+    }
+
+    // Convert to regular CallGraph
+    let mut final_graph = parallel_graph.to_call_graph();
+    final_graph.resolve_cross_file_calls();
+
+    // For now, no framework exclusions or function pointer detection from extracted data
+    // These require deeper AST analysis that isn't captured in extraction
+    let framework_exclusions = HashSet::new();
+    let function_pointer_used = HashSet::new();
+
+    log::info!(
+        "Call graph from extracted data: {} nodes in {} files",
+        parallel_graph
+            .stats()
+            .total_nodes
+            .load(std::sync::atomic::Ordering::Relaxed),
+        extracted.len()
+    );
+
+    (final_graph, framework_exclusions, function_pointer_used)
+}
+
+/// Resolve a callee name to a FunctionId using extracted data.
+fn resolve_callee_from_extracted(
+    callee_name: &str,
+    call_type: &crate::extraction::CallType,
+    caller_file: &Path,
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> Option<FunctionId> {
+    use crate::extraction::CallType;
+
+    match call_type {
+        CallType::Direct | CallType::StaticMethod | CallType::TraitMethod => {
+            // Look for exact match in same file first
+            if let Some(file_data) = extracted.get(caller_file) {
+                for func in &file_data.functions {
+                    if func.qualified_name == callee_name || func.name == callee_name {
+                        return Some(FunctionId::new(
+                            caller_file.to_path_buf(),
+                            func.qualified_name.clone(),
+                            func.line,
+                        ));
+                    }
+                }
+            }
+
+            // Look in all files for qualified names (e.g., "Module::function")
+            for (path, file_data) in extracted {
+                for func in &file_data.functions {
+                    if func.qualified_name == callee_name {
+                        return Some(FunctionId::new(
+                            path.clone(),
+                            func.qualified_name.clone(),
+                            func.line,
+                        ));
+                    }
+                }
+            }
+
+            None
+        }
+        CallType::Method => {
+            // Method calls are harder to resolve without type information
+            // Just look for matching method names across all types
+            for (path, file_data) in extracted {
+                for func in &file_data.functions {
+                    // Check if this is an impl method with matching name
+                    if func.name == callee_name {
+                        return Some(FunctionId::new(
+                            path.clone(),
+                            func.qualified_name.clone(),
+                            func.line,
+                        ));
+                    }
+                }
+            }
+            None
+        }
+        CallType::Closure | CallType::FunctionPointer => {
+            // Cannot resolve closures or function pointers statically
+            None
+        }
+    }
+}
