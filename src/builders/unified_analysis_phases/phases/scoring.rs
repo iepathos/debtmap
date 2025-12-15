@@ -2,15 +2,23 @@
 //!
 //! This module provides pure functions for calculating complexity scores
 //! and prioritizing debt items without any I/O or progress reporting.
+//!
+//! # Parallelism (spec 196)
+//!
+//! The `process_metrics_to_debt_items` function uses rayon's `par_iter()` for
+//! parallel processing of function metrics. Shared detectors are created once
+//! and passed to all threads via immutable references.
 
+use crate::analysis::ContextDetector;
 use crate::core::{DebtItem, FunctionMetrics};
 use crate::data_flow::DataFlowGraph;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
-use crate::priority::scoring::debt_item;
+use crate::priority::scoring::{debt_item, ContextRecommendationEngine};
 use crate::priority::UnifiedDebtItem;
 use crate::risk::lcov::LcovData;
 use crate::risk::RiskAnalyzer;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -123,6 +131,11 @@ pub fn metrics_to_purity_map(
 /// Create debt items from a metric (pure transformation).
 ///
 /// Returns a Vec of UnifiedDebtItem - one per debt type found for the function.
+///
+/// # Parallelism (spec 196)
+///
+/// Accepts shared `context_detector` and `recommendation_engine` references
+/// to enable efficient parallel processing without redundant initialization.
 #[allow(clippy::too_many_arguments)]
 pub fn create_debt_items_from_metric(
     metric: &FunctionMetrics,
@@ -135,6 +148,8 @@ pub fn create_debt_items_from_metric(
     risk_analyzer: Option<&RiskAnalyzer>,
     project_path: &Path,
     file_line_counts: &FileLineCountCache,
+    context_detector: &ContextDetector,
+    recommendation_engine: &ContextRecommendationEngine,
 ) -> Vec<UnifiedDebtItem> {
     debt_item::create_unified_debt_item_with_aggregator_and_data_flow(
         metric,
@@ -147,10 +162,36 @@ pub fn create_debt_items_from_metric(
         risk_analyzer,
         project_path,
         file_line_counts,
+        context_detector,
+        recommendation_engine,
     )
 }
 
-/// Process multiple metrics to create debt items (pure, can be parallelized).
+/// Process multiple metrics to create debt items in parallel (spec 196).
+///
+/// # Parallelism
+///
+/// Uses rayon's `par_iter()` for automatic work-stealing parallelism.
+/// Each function is processed independently with no shared mutable state.
+///
+/// # Shared Resources
+///
+/// The `context_detector` and `recommendation_engine` are created once
+/// and shared across all threads via immutable references. This eliminates
+/// the overhead of creating 17 compiled regexes per function.
+///
+/// # Thread Safety
+///
+/// All shared references are to `Sync` types:
+/// - `ContextDetector`: Compiled regexes (read-only)
+/// - `ContextRecommendationEngine`: Static recommendations (read-only)
+/// - `HashMap<PathBuf, usize>`: File line counts (read-only)
+///
+/// # Performance
+///
+/// - Time complexity: O(n/p) where n = functions, p = cores
+/// - Space complexity: O(n) for output, O(1) shared state
+/// - Expected speedup: 2-8x on multi-core systems
 #[allow(clippy::too_many_arguments)]
 pub fn process_metrics_to_debt_items(
     metrics: &[FunctionMetrics],
@@ -167,8 +208,14 @@ pub fn process_metrics_to_debt_items(
 ) -> Vec<UnifiedDebtItem> {
     use super::call_graph::should_process_metric;
 
+    // Pre-create shared detectors once (I/O boundary) - spec 196
+    // These are Sync types that can be safely shared across threads
+    let context_detector = ContextDetector::new();
+    let recommendation_engine = ContextRecommendationEngine::new();
+
+    // Parallel processing with shared references - spec 196
     metrics
-        .iter()
+        .par_iter() // Parallel iteration with rayon
         .filter(|metric| should_process_metric(metric, call_graph, test_only_functions))
         .flat_map(|metric| {
             create_debt_items_from_metric(
@@ -182,6 +229,8 @@ pub fn process_metrics_to_debt_items(
                 risk_analyzer,
                 project_path,
                 file_line_counts,
+                &context_detector,
+                &recommendation_engine,
             )
         })
         .collect()

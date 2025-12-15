@@ -3,10 +3,12 @@
 //! This module contains all the construction and builder functions for creating
 //! UnifiedDebtItem instances from various sources with different configurations.
 
+use crate::analysis::ContextDetector;
 use crate::config::{get_context_multipliers, get_data_flow_scoring_config};
 use crate::context::{detect_file_type, FileType};
 use crate::core::FunctionMetrics;
 use crate::priority::score_types::Score0To100;
+use crate::priority::scoring::ContextRecommendationEngine;
 use crate::priority::unified_scorer::{
     calculate_unified_priority, calculate_unified_priority_with_data_flow,
     calculate_unified_priority_with_debt,
@@ -272,6 +274,9 @@ pub fn create_unified_debt_item_with_aggregator(
     use std::path::Path;
     // Create empty cache for backward compatibility (will use fallback reads)
     let empty_cache = FileLineCountCache::new();
+    // Create detectors for backward compatibility (spec 196: ideally shared at higher level)
+    let context_detector = ContextDetector::new();
+    let recommendation_engine = ContextRecommendationEngine::new();
     create_unified_debt_item_with_aggregator_and_data_flow(
         func,
         call_graph,
@@ -283,6 +288,8 @@ pub fn create_unified_debt_item_with_aggregator(
         None,           // No risk analyzer in wrapper function
         Path::new("."), // Default project path
         &empty_cache,   // Empty cache for backward compatibility
+        &context_detector,
+        &recommendation_engine,
     )
 }
 
@@ -447,26 +454,27 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     item
 }
 
-// Pure function: Build unified debt item from components (spec 195: uses cache)
+// Pure function: Build unified debt item from components (spec 195: uses cache, spec 196: shared detectors)
 fn build_unified_debt_item(
     func: &FunctionMetrics,
     mut context: DebtAnalysisContext,
     deps: DependencyMetrics,
     file_line_counts: &FileLineCountCache,
+    context_detector: &ContextDetector,
+    recommendation_engine: &ContextRecommendationEngine,
 ) -> UnifiedDebtItem {
     // Apply context-aware dampening (spec 191)
     let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
     context.unified_score =
         apply_context_multiplier_to_score(context.unified_score, context_multiplier);
 
-    // Detect function context (spec 122)
-    let context_detector = crate::analysis::ContextDetector::new();
+    // Detect function context (spec 122) - using shared detector (spec 196)
     let context_analysis = context_detector.detect_context(func, &func.file);
 
     // Generate contextual recommendation if confidence is high enough (spec 122)
+    // Using shared engine (spec 196)
     let contextual_recommendation = if context_analysis.confidence > 0.6 {
-        let engine = crate::priority::scoring::ContextRecommendationEngine::new();
-        Some(engine.generate_recommendation(
+        Some(recommendation_engine.generate_recommendation(
             func,
             context_analysis.context,
             context_analysis.confidence,
@@ -535,8 +543,21 @@ fn build_unified_debt_item(
     }
 }
 
-// Main function using functional composition (spec 201, spec 228: multi-debt, spec 195: cache)
+// Main function using functional composition (spec 201, spec 228: multi-debt, spec 195: cache, spec 196: parallel)
 /// Returns `Vec<UnifiedDebtItem>` - one per debt type found (spec 228)
+///
+/// # Parallelism (spec 196)
+///
+/// This function accepts shared `context_detector` and `recommendation_engine` references
+/// to enable parallel processing. When called from `process_metrics_to_debt_items`,
+/// these are created once and shared across all threads via immutable references.
+///
+/// # Thread Safety
+///
+/// All shared references are to `Sync` types:
+/// - `ContextDetector`: Compiled regexes (read-only)
+/// - `ContextRecommendationEngine`: Static recommendations (read-only)
+/// - `FileLineCountCache`: HashMap (read-only)
 #[allow(clippy::too_many_arguments)]
 pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     func: &FunctionMetrics,
@@ -549,6 +570,8 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     risk_analyzer: Option<&crate::risk::RiskAnalyzer>,
     project_path: &Path,
     file_line_counts: &FileLineCountCache,
+    context_detector: &ContextDetector,
+    recommendation_engine: &ContextRecommendationEngine,
 ) -> Vec<UnifiedDebtItem> {
     // Step 1: Create function ID (pure)
     let func_id = create_function_id(func);
@@ -585,8 +608,15 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
                 transitive_coverage.as_ref(),
             )?;
 
-            // Build debt item (spec 195: uses cached file line counts)
-            let mut item = build_unified_debt_item(func, context, deps.clone(), file_line_counts);
+            // Build debt item (spec 195: uses cached file line counts, spec 196: shared detectors)
+            let mut item = build_unified_debt_item(
+                func,
+                context,
+                deps.clone(),
+                file_line_counts,
+                context_detector,
+                recommendation_engine,
+            );
 
             // Analyze contextual risk if risk analyzer is provided (spec 202)
             if let Some(analyzer) = risk_analyzer {
