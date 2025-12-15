@@ -840,8 +840,25 @@ impl NestingVisitor {
 impl<'ast> Visit<'ast> for NestingVisitor {
     fn visit_expr(&mut self, expr: &'ast syn::Expr) {
         match expr {
-            syn::Expr::If(_)
-            | syn::Expr::While(_)
+            syn::Expr::If(if_expr) => {
+                // Increment nesting for the if itself
+                self.enter_nested();
+
+                // Visit condition (no additional nesting change)
+                syn::visit::visit_expr(self, &if_expr.cond);
+
+                // Visit then branch (already at incremented depth)
+                syn::visit::visit_block(self, &if_expr.then_branch);
+
+                // Leave nesting BEFORE visiting else (handles else-if correctly)
+                self.leave_nested();
+
+                // Visit else branch at original nesting level
+                if let Some((_, else_expr)) = &if_expr.else_branch {
+                    self.visit_expr(else_expr);
+                }
+            }
+            syn::Expr::While(_)
             | syn::Expr::ForLoop(_)
             | syn::Expr::Loop(_)
             | syn::Expr::Match(_) => {
@@ -1183,5 +1200,101 @@ fn private_fn() {}
 
         let private = data.functions.iter().find(|f| f.name == "private_fn");
         assert!(private.unwrap().visibility.is_none());
+    }
+
+    #[test]
+    fn test_else_if_chain_nesting() {
+        let code = r#"
+fn chain(x: i32) {
+    if x < 0 {
+        println!("negative");
+    } else if x == 0 {
+        println!("zero");
+    } else if x < 10 {
+        println!("small");
+    } else {
+        println!("big");
+    }
+}
+"#;
+        let data = extract_test_code(code);
+        assert_eq!(data.functions.len(), 1);
+        assert_eq!(
+            data.functions[0].nesting, 1,
+            "else-if chain should have nesting 1"
+        );
+    }
+
+    #[test]
+    fn test_nested_if_not_else_if() {
+        let code = r#"
+fn nested(a: bool, b: bool) {
+    if a {
+        if b {
+            println!("both");
+        }
+    }
+}
+"#;
+        let data = extract_test_code(code);
+        assert_eq!(data.functions.len(), 1);
+        assert_eq!(
+            data.functions[0].nesting, 2,
+            "nested if inside then should have nesting 2"
+        );
+    }
+
+    #[test]
+    fn test_match_with_else_if_chain_nesting() {
+        let code = r#"
+fn matcher(opt: Option<i32>) {
+    match opt {
+        Some(x) => {
+            if x < 0 {
+            } else if x == 0 {
+            } else {
+            }
+        }
+        None => {}
+    }
+}
+"#;
+        let data = extract_test_code(code);
+        assert_eq!(data.functions.len(), 1);
+        assert_eq!(
+            data.functions[0].nesting, 2,
+            "match + else-if chain should have nesting 2"
+        );
+    }
+
+    #[test]
+    fn test_long_else_if_chain_nesting() {
+        let code = r#"
+fn long_chain(x: i32) -> &'static str {
+    if x == 1 {
+        "one"
+    } else if x == 2 {
+        "two"
+    } else if x == 3 {
+        "three"
+    } else if x == 4 {
+        "four"
+    } else if x == 5 {
+        "five"
+    } else if x == 6 {
+        "six"
+    } else if x == 7 {
+        "seven"
+    } else {
+        "other"
+    }
+}
+"#;
+        let data = extract_test_code(code);
+        assert_eq!(data.functions.len(), 1);
+        assert_eq!(
+            data.functions[0].nesting, 1,
+            "long else-if chain should still have nesting 1"
+        );
     }
 }

@@ -102,7 +102,24 @@ pub fn calculate_nesting(block: &syn::Block) -> u32 {
 
     impl<'ast> Visit<'ast> for NestingVisitor {
         fn visit_expr_if(&mut self, i: &'ast syn::ExprIf) {
-            self.visit_nested(|v| syn::visit::visit_expr_if(v, i));
+            // Increment nesting for the if itself
+            self.current_depth += 1;
+            self.max_depth = self.max_depth.max(self.current_depth);
+
+            // Visit condition (no nesting change)
+            self.visit_expr(&i.cond);
+
+            // Visit then branch (already at incremented depth)
+            self.visit_block(&i.then_branch);
+
+            // Decrement before visiting else branch so else-if stays flat
+            self.current_depth -= 1;
+
+            // Visit else branch at original nesting level
+            // This handles else-if chains correctly
+            if let Some((_, else_expr)) = &i.else_branch {
+                self.visit_expr(else_expr);
+            }
         }
 
         fn visit_expr_while(&mut self, i: &'ast syn::ExprWhile) {
@@ -251,5 +268,93 @@ mod tests {
         let block: syn::Block = syn::parse_str(code).unwrap();
         let nesting = calculate_nesting(&block);
         assert_eq!(nesting, 2);
+    }
+
+    #[test]
+    fn test_else_if_chain_flat_nesting() {
+        let code = r#"
+        {
+            if a {
+                x
+            } else if b {
+                y
+            } else if c {
+                z
+            } else {
+                w
+            }
+        }
+        "#;
+        let block: syn::Block = syn::parse_str(code).unwrap();
+        assert_eq!(
+            calculate_nesting(&block),
+            1,
+            "else-if chain should have nesting 1"
+        );
+    }
+
+    #[test]
+    fn test_nested_if_inside_then() {
+        let code = r#"
+        {
+            if a {
+                if b {
+                    x
+                }
+            }
+        }
+        "#;
+        let block: syn::Block = syn::parse_str(code).unwrap();
+        assert_eq!(
+            calculate_nesting(&block),
+            2,
+            "if inside then should have nesting 2"
+        );
+    }
+
+    #[test]
+    fn test_match_with_else_if_chain() {
+        let code = r#"
+        {
+            match x {
+                A => {
+                    if a {
+                    } else if b {
+                    } else if c {
+                    }
+                }
+                _ => {}
+            }
+        }
+        "#;
+        let block: syn::Block = syn::parse_str(code).unwrap();
+        assert_eq!(
+            calculate_nesting(&block),
+            2,
+            "match + else-if chain should have nesting 2"
+        );
+    }
+
+    #[test]
+    fn test_long_else_if_chain_nesting() {
+        let code = r#"
+        {
+            if a {
+            } else if b {
+            } else if c {
+            } else if d {
+            } else if e {
+            } else if f {
+            } else if g {
+            } else if h {
+            }
+        }
+        "#;
+        let block: syn::Block = syn::parse_str(code).unwrap();
+        assert_eq!(
+            calculate_nesting(&block),
+            1,
+            "long else-if chain should still have nesting 1"
+        );
     }
 }
