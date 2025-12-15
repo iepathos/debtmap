@@ -21,6 +21,7 @@ use crate::extraction::types::{ExtractedFileData, ExtractedImplData, ExtractedSt
 use crate::organization::god_object::classifier::{
     group_methods_by_responsibility, is_cohesive_struct,
 };
+use crate::organization::god_object::scoring::calculate_god_object_score_weighted;
 use crate::organization::god_object::{
     DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis, GodObjectThresholds,
     SplitAnalysisMethod,
@@ -35,6 +36,10 @@ struct StructMetrics {
     field_count: usize,
     method_count: usize,
     method_names: Vec<String>,
+    /// Average complexity of methods (from extracted function data if available)
+    avg_complexity: f64,
+    /// Total complexity sum for all methods
+    complexity_sum: u32,
 }
 
 /// Pure function: build mapping from type names to their impl blocks.
@@ -53,10 +58,12 @@ fn build_impl_map(impls: &[ExtractedImplData]) -> HashMap<String, Vec<&Extracted
 
 /// Pure function: calculate metrics for a single struct.
 ///
-/// Aggregates method counts and names from all impl blocks for this struct.
+/// Aggregates method counts, names, and complexity from all impl blocks for this struct.
+/// Looks up complexity from extracted function data using qualified names.
 fn calculate_struct_metrics(
     struct_data: &ExtractedStructData,
     impl_blocks: &[&ExtractedImplData],
+    extracted: &ExtractedFileData,
 ) -> StructMetrics {
     let method_count: usize = impl_blocks.iter().map(|i| i.methods.len()).sum();
 
@@ -65,10 +72,34 @@ fn calculate_struct_metrics(
         .flat_map(|i| i.methods.iter().map(|m| m.name.clone()))
         .collect();
 
+    // Look up complexity from extracted functions using qualified names
+    // Methods in impl blocks should match "TypeName::method_name" pattern
+    let complexity_sum: u32 = impl_blocks
+        .iter()
+        .flat_map(|impl_block| {
+            impl_block.methods.iter().filter_map(|method| {
+                let qualified = format!("{}::{}", impl_block.type_name, method.name);
+                extracted
+                    .functions
+                    .iter()
+                    .find(|f| f.qualified_name == qualified || f.name == method.name)
+                    .map(|f| f.cyclomatic)
+            })
+        })
+        .sum();
+
+    let avg_complexity = if method_count > 0 {
+        complexity_sum as f64 / method_count as f64
+    } else {
+        0.0
+    };
+
     StructMetrics {
         field_count: struct_data.fields.len(),
         method_count,
         method_names,
+        avg_complexity,
+        complexity_sum,
     }
 }
 
@@ -88,29 +119,9 @@ fn is_god_object_candidate(
         || responsibilities.len() > thresholds.max_traits
 }
 
-/// Pure function: calculate god object score for a struct.
-///
-/// Score is based on method count and responsibility diversity.
-fn calculate_god_object_score(
-    metrics: &StructMetrics,
-    responsibilities: &HashMap<String, Vec<String>>,
-    thresholds: &GodObjectThresholds,
-) -> f64 {
-    // Method score: up to 40 points based on method count
-    let method_score =
-        (metrics.method_count as f64 / thresholds.max_methods as f64 * 40.0).min(40.0);
-
-    // Field score: up to 20 points based on field count
-    let field_score = (metrics.field_count as f64 / thresholds.max_fields as f64 * 20.0).min(20.0);
-
-    // Responsibility score: up to 40 points based on responsibility diversity
-    let resp_score =
-        (responsibilities.len() as f64 / thresholds.max_traits as f64 * 40.0).min(40.0);
-
-    method_score + field_score + resp_score
-}
-
 /// Pure function: build GodObjectAnalysis from struct metrics and responsibilities.
+///
+/// Uses the weighted scoring algorithm for consistency with detector.rs (Spec 212).
 fn build_god_object_analysis(
     struct_data: &ExtractedStructData,
     metrics: &StructMetrics,
@@ -118,7 +129,15 @@ fn build_god_object_analysis(
     total_lines: usize,
     thresholds: &GodObjectThresholds,
 ) -> GodObjectAnalysis {
-    let god_object_score = calculate_god_object_score(metrics, &responsibilities, thresholds);
+    // Use weighted scoring algorithm from scoring.rs for consistency (Spec 212)
+    let god_object_score = calculate_god_object_score_weighted(
+        metrics.method_count as f64,
+        metrics.field_count,
+        responsibilities.len(),
+        total_lines,
+        metrics.avg_complexity,
+        thresholds,
+    );
 
     // Build responsibility method counts
     let responsibility_method_counts: HashMap<String, usize> = responsibilities
@@ -135,7 +154,7 @@ fn build_god_object_analysis(
         metrics.field_count,
         responsibility_names.len(),
         total_lines,
-        0, // Complexity sum not available at struct level from extracted data
+        metrics.complexity_sum,
         thresholds,
     );
 
@@ -145,7 +164,7 @@ fn build_god_object_analysis(
         field_count: metrics.field_count,
         responsibility_count: responsibility_names.len(),
         lines_of_code: total_lines,
-        complexity_sum: 0, // Not available per-struct from extracted data
+        complexity_sum: metrics.complexity_sum,
         god_object_score: Score0To100::new(god_object_score),
         recommended_splits: vec![],
         confidence,
@@ -224,8 +243,8 @@ pub fn analyze_god_objects_with_thresholds(
                 return None;
             }
 
-            // Calculate metrics for THIS struct only
-            let metrics = calculate_struct_metrics(struct_data, impl_blocks);
+            // Calculate metrics for THIS struct only (with complexity lookup)
+            let metrics = calculate_struct_metrics(struct_data, impl_blocks, extracted);
 
             // Spec 206: Cohesion gate - skip structs with high domain cohesion
             // A struct like "CrossModuleTracker" where methods align with the
@@ -330,6 +349,13 @@ fn analyze_file_level(
     let complexity_sum: u32 = extracted.functions.iter().map(|f| f.cyclomatic).sum();
     let visibility_breakdown = build_visibility_breakdown(extracted);
 
+    // Calculate average complexity for weighted scoring
+    let avg_complexity = if method_count > 0 {
+        complexity_sum as f64 / method_count as f64
+    } else {
+        0.0
+    };
+
     let confidence = crate::organization::god_object::classifier::determine_confidence(
         method_count,
         total_fields,
@@ -339,10 +365,15 @@ fn analyze_file_level(
         thresholds,
     );
 
-    // Calculate score
-    let method_score = (method_count as f64 / thresholds.max_methods as f64 * 50.0).min(50.0);
-    let loc_score = (extracted.total_lines as f64 / thresholds.max_lines as f64 * 50.0).min(50.0);
-    let god_score = method_score + loc_score;
+    // Use weighted scoring algorithm for consistency (Spec 212)
+    let god_score = calculate_god_object_score_weighted(
+        method_count as f64,
+        total_fields,
+        responsibility_names.len(),
+        extracted.total_lines,
+        avg_complexity,
+        thresholds,
+    );
 
     Some(GodObjectAnalysis {
         is_god_object: true,

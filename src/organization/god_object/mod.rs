@@ -31,6 +31,7 @@ pub mod split_types;
 pub mod ast_visitor;
 pub mod classifier;
 pub mod detector;
+pub mod heuristics; // Spec 212: Shared fallback heuristics
 pub mod predicates;
 pub mod recommendation_generator; // Pure Core: Responsibility-aware recommendations
 pub mod recommender;
@@ -52,6 +53,9 @@ pub use classifier::{
     is_cohesive_struct,
 };
 pub use detector::GodObjectDetector;
+pub use heuristics::{
+    detect_from_content, fallback_god_object_heuristics, fallback_with_preserved_analysis,
+};
 pub use recommendation_generator::generate_recommendation;
 pub use recommender::{
     determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,

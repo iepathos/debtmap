@@ -1,7 +1,7 @@
 use crate::analysis::{FileContext, FileContextDetector};
 use crate::core::{FunctionMetrics, Language};
 use crate::extraction::UnifiedFileExtractor;
-use crate::organization::{GodObjectAnalysis, GodObjectDetector};
+use crate::organization::GodObjectAnalysis;
 use crate::priority::score_types::Score0To100;
 use anyhow::Result;
 use std::path::Path;
@@ -83,24 +83,20 @@ fn create_god_object_analysis(
 /// or None if no structs qualify as god objects.
 ///
 /// Spec 202: Uses UnifiedFileExtractor for parsing to prevent SourceMap overflow.
+///
+/// Spec 212: Uses extraction adapter as single source of truth for god object detection.
 fn detect_rust_god_object(path: &Path, content: &str) -> Result<Option<GodObjectAnalysis>> {
-    // Use UnifiedFileExtractor to ensure SourceMap is reset after parsing (spec 202)
-    // The extraction step gives us metadata, but GodObjectDetector still needs the AST
-    let _extracted = UnifiedFileExtractor::extract(path, content).ok();
+    // Use UnifiedFileExtractor to get extracted data (spec 202, 212)
+    let extracted = UnifiedFileExtractor::extract(path, content).ok();
 
-    // For god object detection, we need the AST for the detector's syn::visit patterns
-    syn::parse_file(content)
-        .map(|ast| {
-            let detector = GodObjectDetector::with_source_content(content);
-            let analyses = detector.analyze_comprehensive(path, &ast);
+    // Use extraction adapter as single source of truth (Spec 212)
+    if let Some(ref data) = extracted {
+        let analysis = crate::extraction::adapters::god_object::analyze_god_object(path, data);
+        return Ok(analysis);
+    }
 
-            // Reset SourceMap after analysis to prevent overflow (spec 202)
-            crate::core::parsing::reset_span_locations();
-
-            // Return the first god object found, if any
-            analyses.into_iter().find(|a| a.is_god_object)
-        })
-        .or(Ok(None))
+    // Fallback to heuristics if extraction failed
+    Ok(crate::organization::god_object::heuristics::detect_from_content(content))
 }
 
 /// Pure function to detect god object using generic metrics
