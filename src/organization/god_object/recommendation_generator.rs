@@ -9,9 +9,21 @@
 //! This module is part of the **Pure Core** - all functions are deterministic
 //! with no side effects. Recommendation generation is a pure transformation
 //! of analysis data.
+//!
+//! ## Spec 210: Context-Aware Recommendations
+//!
+//! This module now integrates with `context_recommendations` for:
+//! - Cohesive structs: internal refactoring recommendations
+//! - Multi-domain structs: domain-specific split recommendations
+//! - Rationale based on cohesion scores and domain analysis
 
 use super::classification_types::GodObjectType;
+use super::context_recommendations::{
+    classify_scenario, format_recommendation, generate_context_aware_recommendation,
+    LongMethodInfo, RecommendationContext,
+};
 use crate::organization::struct_patterns::{PatternAnalysis, StructPattern};
+use std::collections::HashMap;
 
 /// Generate human-readable recommendation for god object (pure function).
 ///
@@ -260,6 +272,101 @@ fn generate_pattern_observation(pattern: &StructPattern, evidence: &[String]) ->
     }
 }
 
+// ============================================================================
+// Spec 210: Context-Aware Recommendation Generation
+// ============================================================================
+
+/// Generate context-aware recommendation using cohesion and domain analysis.
+///
+/// This function produces recommendations that:
+/// 1. Consider struct cohesion before suggesting splits
+/// 2. Identify specific methods/domains to extract
+/// 3. Provide rationale based on actual metrics
+///
+/// # Arguments
+///
+/// * `struct_name` - Name of the struct being analyzed
+/// * `method_names` - All method names in the struct
+/// * `cohesion_score` - Pre-calculated cohesion score (0.0 to 1.0)
+/// * `domain_groups` - Methods grouped by behavioral domain
+/// * `method_line_counts` - Optional map of method names to line counts
+/// * `method_complexities` - Optional map of method names to complexity values
+///
+/// # Returns
+///
+/// Human-readable recommendation string with rationale
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::recommendation_generator::generate_recommendation_with_context;
+/// use std::collections::HashMap;
+///
+/// let methods = vec!["get_module".to_string(), "track_module".to_string()];
+/// let mut domain_groups = HashMap::new();
+/// domain_groups.insert("ModuleTracker".to_string(), methods.clone());
+///
+/// let rec = generate_recommendation_with_context(
+///     "CrossModuleTracker",
+///     &methods,
+///     0.75, // High cohesion
+///     &domain_groups,
+///     None,
+///     None,
+/// );
+/// assert!(rec.contains("cohesion") || rec.contains("Borderline"));
+/// ```
+pub fn generate_recommendation_with_context(
+    struct_name: &str,
+    method_names: &[String],
+    cohesion_score: f64,
+    domain_groups: &HashMap<String, Vec<String>>,
+    method_line_counts: Option<&HashMap<String, usize>>,
+    method_complexities: Option<&HashMap<String, u32>>,
+) -> String {
+    // Build long method info if line counts are available
+    let empty_line_counts = HashMap::new();
+    let empty_complexities = HashMap::new();
+    let line_counts = method_line_counts.unwrap_or(&empty_line_counts);
+    let complexities = method_complexities.unwrap_or(&empty_complexities);
+
+    let long_methods: Vec<LongMethodInfo> = line_counts
+        .iter()
+        .filter(|(_, &count)| count >= super::context_recommendations::LONG_METHOD_THRESHOLD)
+        .map(|(name, &count)| LongMethodInfo {
+            name: name.clone(),
+            line_count: count,
+            complexity: complexities.get(name).copied().unwrap_or(0),
+        })
+        .collect();
+
+    // Count substantive methods (non-accessors)
+    let accessor_prefixes = ["get_", "set_", "is_", "has_"];
+    let substantive_methods = method_names
+        .iter()
+        .filter(|m| !accessor_prefixes.iter().any(|p| m.starts_with(p)))
+        .count();
+
+    let largest_method_loc = line_counts.values().copied().max().unwrap_or(0);
+
+    // Build context
+    let context = RecommendationContext {
+        cohesion_score,
+        domain_groups: domain_groups.clone(),
+        long_methods,
+        total_methods: method_names.len(),
+        substantive_methods,
+        largest_method_loc,
+        struct_name: struct_name.to_string(),
+    };
+
+    // Classify scenario and generate recommendation
+    let scenario = classify_scenario(&context);
+    let recommendation = generate_context_aware_recommendation(&context, &scenario);
+
+    format_recommendation(&recommendation)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,5 +463,130 @@ mod tests {
         assert!(rec.contains("God Module"));
         assert!(rec.contains("80 total methods"));
         // Note: suggested_splits is empty, so no specific split count mentioned
+    }
+
+    // =========================================================================
+    // Spec 210: Context-Aware Recommendation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_context_aware_high_cohesion_with_long_methods() {
+        let methods = vec![
+            "get_module".to_string(),
+            "track_module".to_string(),
+            "analyze_workspace".to_string(),
+        ];
+        let mut domain_groups = HashMap::new();
+        domain_groups.insert("ModuleTracker".to_string(), methods.clone());
+
+        let mut line_counts = HashMap::new();
+        line_counts.insert("analyze_workspace".to_string(), 50);
+        line_counts.insert("get_module".to_string(), 10);
+
+        let rec = generate_recommendation_with_context(
+            "CrossModuleTracker",
+            &methods,
+            0.75, // High cohesion
+            &domain_groups,
+            Some(&line_counts),
+            None,
+        );
+
+        // Should recommend internal refactoring, not splitting
+        assert!(
+            rec.contains("refactor") || rec.contains("Refactor") || rec.contains("internal"),
+            "Should recommend internal refactoring for cohesive struct, got: {}",
+            rec
+        );
+        assert!(
+            !rec.contains("sub-orchestrator"),
+            "Should NOT suggest sub-orchestrators for cohesive struct"
+        );
+    }
+
+    #[test]
+    fn test_context_aware_multi_domain_god_object() {
+        let methods = vec![
+            "parse_json".to_string(),
+            "render_html".to_string(),
+            "validate_email".to_string(),
+            "send_notification".to_string(),
+        ];
+        let mut domain_groups = HashMap::new();
+        domain_groups.insert("Parsing".to_string(), vec!["parse_json".to_string()]);
+        domain_groups.insert("Rendering".to_string(), vec!["render_html".to_string()]);
+        domain_groups.insert("Validation".to_string(), vec!["validate_email".to_string()]);
+        domain_groups.insert(
+            "Communication".to_string(),
+            vec!["send_notification".to_string()],
+        );
+
+        let rec = generate_recommendation_with_context(
+            "AppManager",
+            &methods,
+            0.15, // Low cohesion
+            &domain_groups,
+            None,
+            None,
+        );
+
+        // Should recommend domain-based splitting
+        assert!(
+            rec.contains("Split") || rec.contains("domain") || rec.contains("module"),
+            "Should recommend domain splits for multi-domain struct, got: {}",
+            rec
+        );
+    }
+
+    #[test]
+    fn test_context_aware_cohesive_no_long_methods() {
+        let methods = vec!["get_module".to_string(), "track".to_string()];
+        let mut domain_groups = HashMap::new();
+        domain_groups.insert("ModuleTracker".to_string(), methods.clone());
+
+        let rec = generate_recommendation_with_context(
+            "ModuleTracker",
+            &methods,
+            0.80, // High cohesion
+            &domain_groups,
+            None, // No long methods
+            None,
+        );
+
+        // Should suggest borderline/review approach
+        assert!(
+            rec.contains("cohesion") || rec.contains("Borderline") || rec.contains("justified"),
+            "Should mention cohesion for borderline cohesive struct, got: {}",
+            rec
+        );
+    }
+
+    #[test]
+    fn test_context_aware_recommendation_includes_rationale() {
+        let methods = vec![
+            "parse_json".to_string(),
+            "render_html".to_string(),
+            "validate".to_string(),
+        ];
+        let mut domain_groups = HashMap::new();
+        domain_groups.insert("Parsing".to_string(), vec!["parse_json".to_string()]);
+        domain_groups.insert("Rendering".to_string(), vec!["render_html".to_string()]);
+        domain_groups.insert("Validation".to_string(), vec!["validate".to_string()]);
+
+        let rec = generate_recommendation_with_context(
+            "Manager",
+            &methods,
+            0.20, // Low cohesion
+            &domain_groups,
+            None,
+            None,
+        );
+
+        // Should include rationale (mentions cohesion percentage or domain count)
+        assert!(
+            rec.contains('%') || rec.contains("domain") || rec.contains("purpose"),
+            "Should include rationale, got: {}",
+            rec
+        );
     }
 }

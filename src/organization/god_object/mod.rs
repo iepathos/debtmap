@@ -30,6 +30,7 @@ pub mod split_types;
 // Main modules
 pub mod ast_visitor;
 pub mod classifier;
+pub mod context_recommendations; // Spec 210: Context-aware recommendations
 pub mod detector;
 pub mod heuristics; // Spec 212: Shared fallback heuristics
 pub mod predicates;
@@ -52,11 +53,17 @@ pub use classifier::{
     extract_domain_keywords, group_methods_by_responsibility, infer_responsibility_with_confidence,
     is_cohesive_struct,
 };
+pub use context_recommendations::{
+    build_recommendation_context, classify_scenario, format_recommendation,
+    generate_context_aware_recommendation, generate_module_name, ContextAwareRecommendation,
+    DomainSplit, GodObjectScenario, LayerSplit, LongMethodInfo, RecommendationContext,
+    HIGH_COHESION_THRESHOLD, LONG_METHOD_THRESHOLD,
+};
 pub use detector::GodObjectDetector;
 pub use heuristics::{
     detect_from_content, fallback_god_object_heuristics, fallback_with_preserved_analysis,
 };
-pub use recommendation_generator::generate_recommendation;
+pub use recommendation_generator::{generate_recommendation, generate_recommendation_with_context};
 pub use recommender::{
     determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,
     recommend_module_splits_enhanced, recommend_module_splits_enhanced_with_evidence,
