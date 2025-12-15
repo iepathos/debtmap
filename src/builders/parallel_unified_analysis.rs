@@ -47,83 +47,8 @@ mod transformations {
             .collect()
     }
 
-    /// Extract full purity analysis for functions by re-analyzing
-    /// This is necessary because FunctionMetrics only stores boolean purity, not full CFG analysis
-    ///
-    /// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
-    /// Spec 210: Optimized to parse each file only once instead of per-function.
-    ///           This prevents proc-macro2 SourceMap overflow on large codebases.
-    /// Spec 213: This function is kept as fallback when `with_extracted_data()` was not called.
-    ///           The preferred path is to pre-extract via `project_analysis::extract_all_files()`
-    ///           and pass data via `with_extracted_data()`, which avoids parsing entirely.
-    pub fn extract_purity_analysis(
-        metrics: &[FunctionMetrics],
-    ) -> HashMap<FunctionId, crate::analyzers::purity_detector::PurityAnalysis> {
-        use crate::analyzers::purity_detector::PurityDetector;
-        use crate::data_flow::population::find_function_in_ast;
-        use std::collections::HashMap as StdHashMap;
-        use std::fs;
-
-        // Group metrics by file to parse each file only once (spec 210)
-        let mut metrics_by_file: StdHashMap<PathBuf, Vec<&FunctionMetrics>> = StdHashMap::new();
-        for m in metrics {
-            metrics_by_file.entry(m.file.clone()).or_default().push(m);
-        }
-
-        // Process files in parallel, but parse each file only once
-        metrics_by_file
-            .into_par_iter()
-            .flat_map(|(file_path, file_metrics)| {
-                // Read and parse file once for all functions in it
-                let content = match fs::read_to_string(&file_path) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(file = %file_path.display(), error = %e, "Failed to read file");
-                        return Vec::new();
-                    }
-                };
-
-                let file_ast = match syn::parse_file(&content) {
-                    Ok(ast) => ast,
-                    Err(_) => {
-                        // Reset before returning to prevent accumulation
-                        crate::core::parsing::reset_span_locations();
-                        return Vec::new();
-                    }
-                };
-
-                // Analyze all functions from this file
-                let results: Vec<(
-                    FunctionId,
-                    crate::analyzers::purity_detector::PurityAnalysis,
-                )> = file_metrics
-                    .iter()
-                    .filter_map(|m| {
-                        if let Some(found) = find_function_in_ast(&file_ast, &m.name, m.line) {
-                            let mut detector = PurityDetector::new();
-                            let analysis = match found {
-                                crate::data_flow::population::FoundFunction::TopLevel(item_fn) => {
-                                    detector.is_pure_function(item_fn)
-                                }
-                                crate::data_flow::population::FoundFunction::ImplMethod(
-                                    impl_fn,
-                                ) => detector.is_pure_impl_method(impl_fn),
-                            };
-                            let func_id = FunctionId::new(m.file.clone(), m.name.clone(), m.line);
-                            Some((func_id, analysis))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                // Reset SourceMap after processing this file to prevent overflow
-                crate::core::parsing::reset_span_locations();
-
-                results
-            })
-            .collect()
-    }
+    // Note: extract_purity_analysis removed in spec 213.
+    // The fallback path now uses UnifiedFileExtractor + populate_all_from_extracted instead.
 }
 
 // Pure predicates module for filtering logic
@@ -633,42 +558,39 @@ impl ParallelUnifiedAnalysisBuilder {
                         stats.transformation_patterns,
                     )
                 } else {
-                    // Fallback: Parse files to extract purity analysis
-                    progress.set_message("Building data flow graph...");
-                    let purity_results = transformations::extract_purity_analysis(&metrics);
+                    // Fallback: Extract all files first, then populate from extracted data
+                    // (Spec 213: old per-function parsing functions removed)
+                    progress.set_message("Extracting file data (fallback path)...");
 
-                    progress.set_message("Analyzing mutations and escape analysis...");
-                    for (func_id, purity) in &purity_results {
-                        crate::data_flow::population::populate_from_purity_analysis(
-                            &mut data_flow,
-                            func_id,
-                            purity,
-                        );
-                    }
+                    // Collect unique file paths from metrics
+                    let file_paths: HashSet<PathBuf> = metrics.iter().map(|m| m.file.clone()).collect();
 
-                    // Populate I/O operations from metrics
-                    progress.set_message("Detecting I/O operations...");
-                    let io_count =
-                        crate::data_flow::population::populate_io_operations(&mut data_flow, &metrics);
+                    // Extract all data from files using the unified extractor
+                    let fallback_extracted: HashMap<PathBuf, ExtractedFileData> = file_paths
+                        .into_iter()
+                        .filter(|p| p.extension().map(|e| e == "rs").unwrap_or(false))
+                        .filter_map(|path| {
+                            std::fs::read_to_string(&path)
+                                .ok()
+                                .and_then(|content| {
+                                    crate::extraction::UnifiedFileExtractor::extract(&path, &content).ok()
+                                })
+                                .map(|data| (path, data))
+                        })
+                        .collect();
 
-                    // Populate variable dependencies
-                    progress.set_message("Analyzing variable dependencies...");
-                    let dep_count = crate::data_flow::population::populate_variable_dependencies(
+                    progress.set_message("Populating from extracted data (fallback)...");
+                    let stats = crate::data_flow::population::populate_all_from_extracted(
                         &mut data_flow,
-                        &metrics,
+                        &fallback_extracted,
                     );
-
-                    // Populate data transformations
-                    progress.set_message("Detecting data transformations...");
-                    let trans_count = crate::data_flow::population::populate_data_transformations(
-                        &mut data_flow,
-                        &metrics,
-                    );
-
-                    // Count mutations from purity results
-                    let mutation_count: usize = purity_results.values().map(|p| p.total_mutations).sum();
-
-                    (purity_results.len(), mutation_count, io_count, dep_count, trans_count)
+                    (
+                        stats.purity_entries,
+                        stats.purity_entries, // Mutations counted as part of purity
+                        stats.io_operations,
+                        stats.variable_dependencies,
+                        stats.transformation_patterns,
+                    )
                 };
 
             // Populate purity info from metrics as fallback (matches sequential behavior)
