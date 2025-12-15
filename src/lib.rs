@@ -348,6 +348,7 @@ pub mod effects;
 pub mod env;
 pub mod error;
 pub mod errors;
+pub mod extraction;
 pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;

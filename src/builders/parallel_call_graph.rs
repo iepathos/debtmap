@@ -200,10 +200,14 @@ impl ParallelCallGraphBuilder {
             stats
                 .files_processed
                 .load(std::sync::atomic::Ordering::Relaxed),
-            (total_files + BATCH_SIZE - 1) / BATCH_SIZE,
+            total_files.div_ceil(BATCH_SIZE),
         );
 
-        Ok((final_graph, all_framework_exclusions, all_function_pointer_used))
+        Ok((
+            final_graph,
+            all_framework_exclusions,
+            all_function_pointer_used,
+        ))
     }
 
     /// Parse a batch of files without progress tracking (used in batched processing)
@@ -243,6 +247,7 @@ impl ParallelCallGraphBuilder {
     }
 
     /// Phase 1: Read and parse files with progress tracking
+    #[allow(dead_code)]
     fn parallel_parse_files_with_progress<F>(
         &self,
         rust_files: &[PathBuf],
