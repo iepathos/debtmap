@@ -41,14 +41,11 @@ impl RustEntropyAnalyzer {
         visitor.variables.len()
     }
 
-    /// Calculate maximum nesting depth
+    /// Calculate maximum nesting depth.
+    ///
+    /// Uses the pure implementation for consistent results across the codebase.
     fn calculate_max_nesting(&self, item_fn: &ItemFn) -> u32 {
-        let mut visitor = NestingCalculator {
-            current_depth: 0,
-            max_depth: 0,
-        };
-        visitor.visit_item_fn(item_fn);
-        visitor.max_depth
+        crate::complexity::pure::calculate_max_nesting_depth(&item_fn.block)
     }
 
     /// Detect patterns in the function
@@ -275,21 +272,6 @@ impl Visit<'_> for VariableCounter {
     fn visit_pat_ident(&mut self, node: &syn::PatIdent) {
         self.variables.insert(node.ident.to_string());
         syn::visit::visit_pat_ident(self, node);
-    }
-}
-
-/// Visitor to calculate nesting depth
-struct NestingCalculator {
-    current_depth: u32,
-    max_depth: u32,
-}
-
-impl Visit<'_> for NestingCalculator {
-    fn visit_block(&mut self, block: &Block) {
-        self.current_depth += 1;
-        self.max_depth = self.max_depth.max(self.current_depth);
-        syn::visit::visit_block(self, block);
-        self.current_depth -= 1;
     }
 }
 

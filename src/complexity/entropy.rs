@@ -452,50 +452,42 @@ impl EntropyAnalyzer {
         1.0 - (ratio * max_reduction).min(max_reduction)
     }
 
-    /// Analyze code structure for additional context
+    /// Analyze code structure for additional context.
+    ///
+    /// Returns (unique variable count, max nesting depth).
+    /// Uses the pure nesting implementation for consistent results.
     fn analyze_code_structure(&self, block: &Block) -> (usize, u32) {
-        struct StructureAnalyzer {
+        // Use dedicated visitor for variable counting only
+        struct VariableCollector {
             unique_variables: HashSet<String>,
-            current_nesting: u32,
-            max_nesting: u32,
         }
 
-        impl StructureAnalyzer {
+        impl VariableCollector {
             fn new() -> Self {
                 Self {
                     unique_variables: HashSet::new(),
-                    current_nesting: 0,
-                    max_nesting: 0,
                 }
             }
         }
 
-        impl<'ast> Visit<'ast> for StructureAnalyzer {
+        impl<'ast> Visit<'ast> for VariableCollector {
             fn visit_expr(&mut self, expr: &'ast Expr) {
-                match expr {
-                    Expr::Path(path) => {
-                        if let Some(segment) = path.path.segments.first() {
-                            self.unique_variables.insert(segment.ident.to_string());
-                        }
+                if let Expr::Path(path) = expr {
+                    if let Some(segment) = path.path.segments.first() {
+                        self.unique_variables.insert(segment.ident.to_string());
                     }
-                    Expr::If(_)
-                    | Expr::While(_)
-                    | Expr::ForLoop(_)
-                    | Expr::Loop(_)
-                    | Expr::Match(_) => {
-                        self.current_nesting += 1;
-                        self.max_nesting = self.max_nesting.max(self.current_nesting);
-                        syn::visit::visit_expr(self, expr);
-                        self.current_nesting -= 1;
-                    }
-                    _ => syn::visit::visit_expr(self, expr),
                 }
+                syn::visit::visit_expr(self, expr);
             }
         }
 
-        let mut analyzer = StructureAnalyzer::new();
-        analyzer.visit_block(block);
-        (analyzer.unique_variables.len(), analyzer.max_nesting)
+        let mut collector = VariableCollector::new();
+        collector.visit_block(block);
+
+        // Use pure implementation for nesting calculation
+        let max_nesting = crate::complexity::pure::calculate_max_nesting_depth(block);
+
+        (collector.unique_variables.len(), max_nesting)
     }
 }
 
