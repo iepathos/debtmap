@@ -376,19 +376,29 @@ impl GodObjectDetector {
     /// Analyze a single struct for god object characteristics.
     ///
     /// Spec 201: Per-struct analysis using the struct's own metrics.
+    /// Spec 206: Cohesion gate - cohesive structs are not flagged as god objects.
     fn analyze_single_struct(
         &self,
         type_analysis: &super::ast_visitor::TypeAnalysis,
         visitor: &super::ast_visitor::TypeVisitor,
         thresholds: &super::thresholds::GodObjectThresholds,
     ) -> Option<GodObjectAnalysis> {
-        use super::classifier::{determine_confidence, group_methods_by_responsibility};
+        use super::classifier::{
+            determine_confidence, group_methods_by_responsibility, is_cohesive_struct,
+        };
         use super::recommender::recommend_module_splits;
         use super::scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
 
         // Spec 201: Skip zero-method structs immediately - they cannot be god objects
         // DTOs, data structs, and enums with no behavior are excluded
         if type_analysis.method_count == 0 {
+            return None;
+        }
+
+        // Spec 206: Cohesion gate - skip structs with high domain cohesion
+        // A struct like "CrossModuleTracker" where methods align with "module/tracker"
+        // domain is cohesive, not a god object, even if it has many methods
+        if is_cohesive_struct(&type_analysis.name, &type_analysis.methods) {
             return None;
         }
 
@@ -932,6 +942,133 @@ pub fn helper5() -> i32 { 5 }
         assert!(
             analyses.is_empty(),
             "Small functional module should not be flagged"
+        );
+    }
+
+    /// Spec 206: Test cohesion gate - cohesive structs should NOT be flagged
+    #[test]
+    fn test_cohesion_gate_skips_cohesive_tracker() {
+        // A struct like CrossModuleTracker - many methods but all domain-aligned
+        let content = r#"
+pub struct ModuleTracker {
+    modules: Vec<String>,
+    boundaries: HashMap<String, ModuleBoundary>,
+    calls: Vec<ModuleCall>,
+    imports: Vec<ModuleImport>,
+    file_to_module: HashMap<PathBuf, String>,
+    reexports: HashMap<String, Vec<String>>,
+}
+
+impl ModuleTracker {
+    pub fn new() -> Self { Self::default() }
+    pub fn analyze_module(&mut self, file: &File) -> Result<()> { Ok(()) }
+    pub fn get_module_calls(&self) -> Vec<ModuleCall> { self.calls.clone() }
+    pub fn get_module_apis(&self) -> Vec<ModuleApi> { vec![] }
+    pub fn is_module_public(&self, id: &ModuleId) -> bool { true }
+    pub fn find_module_export(&self, name: &str) -> Option<Export> { None }
+    pub fn resolve_module_call(&self, path: &str, name: &str) -> Option<FunctionId> { None }
+    pub fn get_module_statistics(&self) -> ModuleStatistics { ModuleStatistics::default() }
+    pub fn get_module_exclusions(&self) -> HashSet<FunctionId> { HashSet::new() }
+    pub fn get_visible_modules(&self) -> HashSet<FunctionId> { HashSet::new() }
+    pub fn infer_module_path(&self, path: &Path) -> String { String::new() }
+    pub fn infer_parent_module(&self, path: &str) -> Option<String> { None }
+    pub fn build_module_mappings(&mut self) {}
+    pub fn resolve_through_module(&self, modules: &[String], name: &str) -> Option<FunctionId> { None }
+    pub fn track_module_boundary(&mut self, boundary: ModuleBoundary) {}
+}
+"#;
+
+        let ast = syn::parse_file(content).expect("Failed to parse");
+        let detector = GodObjectDetector::with_source_content(content);
+        let analyses = detector.analyze_comprehensive(Path::new("test.rs"), &ast);
+
+        // ModuleTracker has 15+ methods but they all relate to "module" domain
+        // The cohesion gate should prevent it from being flagged
+        assert!(
+            analyses.is_empty(),
+            "Cohesive ModuleTracker should NOT be flagged as god object. Got {} analyses",
+            analyses.len()
+        );
+    }
+
+    /// Spec 206: Test that non-cohesive structs pass through the cohesion gate
+    /// Note: Whether they get flagged depends on scoring, which is separate from cohesion
+    #[test]
+    fn test_cohesion_gate_allows_non_cohesive_structs() {
+        use crate::organization::god_object::classifier::{
+            calculate_domain_cohesion, is_cohesive_struct,
+        };
+
+        // A struct with unrelated method domains - should NOT be cohesive
+        let struct_name = "ApplicationManager";
+        let methods: Vec<String> = vec![
+            "new",
+            "parse_json",
+            "parse_xml",
+            "render_html",
+            "render_pdf",
+            "validate_email",
+            "validate_phone",
+            "send_email",
+            "send_sms",
+            "save_to_database",
+            "load_from_database",
+            "connect_to_server",
+            "disconnect_from_server",
+            "handle_request",
+            "handle_error",
+            "log_event",
+            "track_metrics",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let cohesion = calculate_domain_cohesion(struct_name, &methods);
+        let is_cohesive = is_cohesive_struct(struct_name, &methods);
+
+        // Methods don't contain "application" or "manager" keywords
+        // So cohesion should be very low (0 or close to 0)
+        assert!(
+            cohesion < 0.1,
+            "ApplicationManager with unrelated methods should have near-zero cohesion, got {}",
+            cohesion
+        );
+
+        // Should NOT be marked as cohesive
+        assert!(
+            !is_cohesive,
+            "ApplicationManager with unrelated methods should NOT be cohesive"
+        );
+
+        // Contrast with a cohesive struct
+        let cohesive_struct = "ModuleTracker";
+        let cohesive_methods: Vec<String> = vec![
+            "new",
+            "analyze_module",
+            "get_module_calls",
+            "resolve_module_call",
+            "track_module",
+            "is_module_public",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let cohesive_cohesion = calculate_domain_cohesion(cohesive_struct, &cohesive_methods);
+        let cohesive_is_cohesive = is_cohesive_struct(cohesive_struct, &cohesive_methods);
+
+        // Methods contain "module" keyword - should be high cohesion
+        assert!(
+            cohesive_cohesion > 0.5,
+            "ModuleTracker with module-related methods should have high cohesion, got {}",
+            cohesive_cohesion
+        );
+
+        // Should be marked as cohesive
+        assert!(
+            cohesive_is_cohesive,
+            "ModuleTracker with module-related methods SHOULD be cohesive"
         );
     }
 }

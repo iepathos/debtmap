@@ -426,6 +426,223 @@ pub fn calculate_struct_ratio(struct_count: usize, total_functions: usize) -> f6
     (struct_count as f64) / (total_functions as f64)
 }
 
+/// Extract domain keywords from a struct name.
+///
+/// Splits camelCase/PascalCase and snake_case names into individual words.
+/// Filters out common non-domain words like "new", "get", "set".
+///
+/// # Arguments
+///
+/// * `struct_name` - The name of the struct to analyze
+///
+/// # Returns
+///
+/// Vector of lowercase domain keywords
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::extract_domain_keywords;
+///
+/// let keywords = extract_domain_keywords("CrossModuleTracker");
+/// assert!(keywords.contains(&"cross".to_string()));
+/// assert!(keywords.contains(&"module".to_string()));
+/// assert!(keywords.contains(&"tracker".to_string()));
+/// ```
+pub fn extract_domain_keywords(name: &str) -> Vec<String> {
+    let mut keywords = Vec::new();
+
+    // Handle snake_case
+    if name.contains('_') {
+        for part in name.split('_') {
+            if !part.is_empty() && part.len() > 1 {
+                keywords.push(part.to_lowercase());
+            }
+        }
+    } else {
+        // Handle PascalCase/camelCase
+        let mut current_word = String::new();
+        for c in name.chars() {
+            if c.is_uppercase() && !current_word.is_empty() {
+                if current_word.len() > 1 {
+                    keywords.push(current_word.to_lowercase());
+                }
+                current_word = c.to_string();
+            } else {
+                current_word.push(c);
+            }
+        }
+        if current_word.len() > 1 {
+            keywords.push(current_word.to_lowercase());
+        }
+    }
+
+    // Filter out common non-domain words
+    let non_domain_words: std::collections::HashSet<&str> = [
+        "new", "get", "set", "is", "has", "the", "a", "an", "impl", "default",
+    ]
+    .into_iter()
+    .collect();
+
+    keywords
+        .into_iter()
+        .filter(|w| !non_domain_words.contains(w.as_str()))
+        .collect()
+}
+
+/// Calculate domain cohesion score for a struct based on method names.
+///
+/// Measures how many methods contain domain keywords from the struct name.
+/// High cohesion indicates methods are related to the struct's core purpose.
+///
+/// # Arguments
+///
+/// * `struct_name` - The name of the struct
+/// * `methods` - List of method names in the struct
+///
+/// # Returns
+///
+/// Cohesion score between 0.0 (no cohesion) and 1.0 (perfect cohesion)
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::calculate_domain_cohesion;
+///
+/// let cohesion = calculate_domain_cohesion(
+///     "ModuleTracker",
+///     &["get_module".to_string(), "track_module".to_string(), "new".to_string()]
+/// );
+/// assert!(cohesion > 0.5);
+/// ```
+pub fn calculate_domain_cohesion(struct_name: &str, methods: &[String]) -> f64 {
+    if methods.is_empty() {
+        return 1.0; // Empty struct is trivially cohesive
+    }
+
+    let domain_keywords = extract_domain_keywords(struct_name);
+    if domain_keywords.is_empty() {
+        return 0.5; // Can't determine cohesion without domain keywords
+    }
+
+    // Common utility methods that don't need to match domain
+    let utility_methods: std::collections::HashSet<&str> = [
+        "new", "default", "clone", "fmt", "drop", "from", "into", "as_ref", "as_mut",
+    ]
+    .into_iter()
+    .collect();
+
+    let mut domain_aligned = 0;
+    let mut non_utility_count = 0;
+
+    for method in methods {
+        let method_lower = method.to_lowercase();
+
+        // Skip utility methods in cohesion calculation
+        if utility_methods.contains(method_lower.as_str()) {
+            continue;
+        }
+
+        non_utility_count += 1;
+
+        // Check if method name contains any domain keyword
+        let method_keywords = extract_domain_keywords(method);
+        let has_domain_keyword = domain_keywords
+            .iter()
+            .any(|dk| method_lower.contains(dk) || method_keywords.contains(dk));
+
+        if has_domain_keyword {
+            domain_aligned += 1;
+        }
+    }
+
+    if non_utility_count == 0 {
+        return 1.0; // All utility methods is cohesive
+    }
+
+    domain_aligned as f64 / non_utility_count as f64
+}
+
+/// Determine if a struct is cohesive based on domain keyword analysis.
+///
+/// A struct is considered cohesive if:
+/// 1. More than 50% of non-utility methods contain domain keywords, OR
+/// 2. The struct has a clear domain suffix (Tracker, Manager, Builder, etc.)
+///    and methods align with that pattern
+///
+/// # Arguments
+///
+/// * `struct_name` - The name of the struct
+/// * `methods` - List of method names in the struct
+///
+/// # Returns
+///
+/// `true` if the struct appears to be cohesive, `false` otherwise
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::is_cohesive_struct;
+///
+/// // Cohesive: methods align with "Module" domain
+/// assert!(is_cohesive_struct(
+///     "ModuleTracker",
+///     &["get_module".to_string(), "track_module".to_string()]
+/// ));
+///
+/// // Not cohesive: methods don't align with struct name
+/// assert!(!is_cohesive_struct(
+///     "Manager",
+///     &["parse_json".to_string(), "render_html".to_string(), "send_email".to_string()]
+/// ));
+/// ```
+pub fn is_cohesive_struct(struct_name: &str, methods: &[String]) -> bool {
+    // Threshold for cohesion - structs with >50% domain-aligned methods are cohesive
+    const COHESION_THRESHOLD: f64 = 0.5;
+
+    let cohesion = calculate_domain_cohesion(struct_name, methods);
+
+    // Also check for known cohesive patterns in struct name
+    let name_lower = struct_name.to_lowercase();
+    let cohesive_suffixes = [
+        "tracker",
+        "analyzer",
+        "builder",
+        "visitor",
+        "handler",
+        "processor",
+        "calculator",
+        "resolver",
+        "extractor",
+        "detector",
+        "validator",
+        "formatter",
+        "parser",
+        "renderer",
+        "serializer",
+        "deserializer",
+        "iterator",
+        "generator",
+        "factory",
+        "provider",
+        "repository",
+        "service",
+        "client",
+        "server",
+        "cache",
+        "pool",
+        "queue",
+        "stack",
+    ];
+
+    let has_cohesive_suffix = cohesive_suffixes
+        .iter()
+        .any(|suffix| name_lower.ends_with(suffix));
+
+    // Cohesive if: high domain alignment OR (cohesive suffix AND moderate alignment)
+    cohesion > COHESION_THRESHOLD || (has_cohesive_suffix && cohesion > 0.3)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -913,6 +1130,88 @@ mod tests {
         assert_eq!(
             analyze_function_responsibility("update_state"),
             Some("State Management".to_string())
+        );
+    }
+
+    // Domain cohesion tests
+    #[test]
+    fn test_extract_domain_keywords_camel_case() {
+        let keywords = extract_domain_keywords("CrossModuleTracker");
+        assert!(keywords.contains(&"cross".to_string()));
+        assert!(keywords.contains(&"module".to_string()));
+        assert!(keywords.contains(&"tracker".to_string()));
+    }
+
+    #[test]
+    fn test_extract_domain_keywords_snake_case() {
+        let keywords = extract_domain_keywords("call_graph_builder");
+        assert!(keywords.contains(&"call".to_string()));
+        assert!(keywords.contains(&"graph".to_string()));
+        assert!(keywords.contains(&"builder".to_string()));
+    }
+
+    #[test]
+    fn test_calculate_domain_cohesion_high() {
+        let struct_name = "ModuleTracker";
+        let methods = vec![
+            "get_module".to_string(),
+            "track_module".to_string(),
+            "resolve_module_call".to_string(),
+            "is_module_valid".to_string(),
+            "new".to_string(),
+        ];
+        let cohesion = calculate_domain_cohesion(struct_name, &methods);
+        assert!(cohesion > 0.6, "Expected high cohesion, got {}", cohesion);
+    }
+
+    #[test]
+    fn test_calculate_domain_cohesion_low() {
+        let struct_name = "GodObject";
+        let methods = vec![
+            "parse_json".to_string(),
+            "render_html".to_string(),
+            "validate_email".to_string(),
+            "send_notification".to_string(),
+            "save_to_database".to_string(),
+        ];
+        let cohesion = calculate_domain_cohesion(struct_name, &methods);
+        assert!(cohesion < 0.3, "Expected low cohesion, got {}", cohesion);
+    }
+
+    #[test]
+    fn test_is_cohesive_struct_tracker() {
+        let struct_name = "CrossModuleTracker";
+        let methods = vec![
+            "new".to_string(),
+            "analyze_workspace".to_string(),
+            "get_cross_module_calls".to_string(),
+            "get_public_apis".to_string(),
+            "is_public_api".to_string(),
+            "resolve_module_call".to_string(),
+            "get_statistics".to_string(),
+            "infer_module_path".to_string(),
+        ];
+        assert!(
+            is_cohesive_struct(struct_name, &methods),
+            "CrossModuleTracker should be detected as cohesive"
+        );
+    }
+
+    #[test]
+    fn test_is_cohesive_struct_god_object() {
+        let struct_name = "ApplicationManager";
+        let methods = vec![
+            "parse_config".to_string(),
+            "render_ui".to_string(),
+            "validate_input".to_string(),
+            "send_email".to_string(),
+            "save_data".to_string(),
+            "load_plugin".to_string(),
+            "handle_request".to_string(),
+        ];
+        assert!(
+            !is_cohesive_struct(struct_name, &methods),
+            "ApplicationManager with unrelated methods should NOT be cohesive"
         );
     }
 }

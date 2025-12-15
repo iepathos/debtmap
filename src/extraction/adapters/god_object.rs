@@ -18,7 +18,7 @@
 //! - **Composable pipeline**: Pure helper functions that can be unit tested independently.
 
 use crate::extraction::types::{ExtractedFileData, ExtractedImplData, ExtractedStructData};
-use crate::organization::god_object::classifier::group_methods_by_responsibility;
+use crate::organization::god_object::classifier::{group_methods_by_responsibility, is_cohesive_struct};
 use crate::organization::god_object::{
     DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis, GodObjectThresholds,
     SplitAnalysisMethod,
@@ -224,6 +224,13 @@ pub fn analyze_god_objects_with_thresholds(
 
             // Calculate metrics for THIS struct only
             let metrics = calculate_struct_metrics(struct_data, impl_blocks);
+
+            // Spec 206: Cohesion gate - skip structs with high domain cohesion
+            // A struct like "CrossModuleTracker" where methods align with the
+            // "module/tracker" domain is cohesive, not a god object
+            if is_cohesive_struct(&struct_data.name, &metrics.method_names) {
+                return None;
+            }
 
             // Classify responsibilities by behavioral categories
             let responsibilities = group_methods_by_responsibility(&metrics.method_names);

@@ -220,53 +220,58 @@ fn process_file_analysis(
             .is_some_and(|a| a.is_god_object);
 
         if score > 50.0 || has_god_object {
-            // Process god object if present
+            // Process god object if present AND it's actually a god object
+            // Spec 206: The cohesion gate may have filtered out god objects, so
+            // we must check is_god_object even when god_analysis exists
             if let Some(god_analysis) = &processed.god_analysis {
-                // Aggregate metrics from raw functions (pure)
-                use crate::priority::god_object_aggregation::{
-                    aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
-                };
+                if god_analysis.is_god_object {
+                    // Aggregate metrics from raw functions (pure)
+                    use crate::priority::god_object_aggregation::{
+                        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
+                    };
 
-                let mut aggregated_metrics = aggregate_from_raw_metrics(&processed.raw_functions);
+                    let mut aggregated_metrics =
+                        aggregate_from_raw_metrics(&processed.raw_functions);
 
-                // Aggregate coverage
-                if let Some(lcov) = coverage_data {
-                    aggregated_metrics.weighted_coverage =
-                        aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
-                }
-
-                // Analyze file git context
-                if let Some(analyzer) = risk_analyzer {
-                    aggregated_metrics.aggregated_contextual_risk =
-                        god_object::analyze_file_git_context(
-                            &processed.file_path,
-                            analyzer,
-                            &processed.project_root,
-                        );
-                }
-
-                // Enrich god analysis with aggregates (pure)
-                let enriched_god_analysis = god_object::enrich_god_analysis_with_aggregates(
-                    god_analysis,
-                    &aggregated_metrics,
-                );
-
-                // Update function god indicators
-                for item in unified.items.iter_mut() {
-                    if item.location.file == processed.file_path {
-                        item.god_object_indicators = Some(enriched_god_analysis.clone());
+                    // Aggregate coverage
+                    if let Some(lcov) = coverage_data {
+                        aggregated_metrics.weighted_coverage =
+                            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
                     }
-                }
 
-                // Create god object debt item (pure)
-                let god_item = god_object::create_god_object_debt_item(
-                    &processed.file_path,
-                    &processed.file_metrics,
-                    &enriched_god_analysis,
-                    aggregated_metrics,
-                    coverage_data,
-                );
-                unified.add_item(god_item);
+                    // Analyze file git context
+                    if let Some(analyzer) = risk_analyzer {
+                        aggregated_metrics.aggregated_contextual_risk =
+                            god_object::analyze_file_git_context(
+                                &processed.file_path,
+                                analyzer,
+                                &processed.project_root,
+                            );
+                    }
+
+                    // Enrich god analysis with aggregates (pure)
+                    let enriched_god_analysis = god_object::enrich_god_analysis_with_aggregates(
+                        god_analysis,
+                        &aggregated_metrics,
+                    );
+
+                    // Update function god indicators
+                    for item in unified.items.iter_mut() {
+                        if item.location.file == processed.file_path {
+                            item.god_object_indicators = Some(enriched_god_analysis.clone());
+                        }
+                    }
+
+                    // Create god object debt item (pure)
+                    let god_item = god_object::create_god_object_debt_item(
+                        &processed.file_path,
+                        &processed.file_metrics,
+                        &enriched_god_analysis,
+                        aggregated_metrics,
+                        coverage_data,
+                    );
+                    unified.add_item(god_item);
+                }
             }
 
             // Create file debt item (pure)

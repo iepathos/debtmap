@@ -46,9 +46,10 @@ pub use ast_visitor::{
     TypeVisitor,
 };
 pub use classifier::{
-    analyze_function_responsibility, calculate_struct_ratio, classify_struct_domain,
-    count_distinct_domains, determine_confidence, extract_domain_from_name,
-    group_methods_by_responsibility, infer_responsibility_with_confidence,
+    analyze_function_responsibility, calculate_domain_cohesion, calculate_struct_ratio,
+    classify_struct_domain, count_distinct_domains, determine_confidence, extract_domain_from_name,
+    extract_domain_keywords, group_methods_by_responsibility, infer_responsibility_with_confidence,
+    is_cohesive_struct,
 };
 pub use detector::GodObjectDetector;
 pub use recommendation_generator::generate_recommendation;
