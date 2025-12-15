@@ -11,8 +11,8 @@ use crate::priority::scoring::debt_item;
 use crate::priority::UnifiedDebtItem;
 use crate::risk::lcov::LcovData;
 use crate::risk::RiskAnalyzer;
-use std::collections::HashSet;
-use std::path::Path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 /// Configuration for scoring weights.
 #[derive(Debug, Clone)]
@@ -44,6 +44,44 @@ impl Default for PriorityConfig {
     fn default() -> Self {
         Self { threshold: 10.0 }
     }
+}
+
+/// Cache of file line counts for efficient lookup (spec 195).
+/// Key: file path, Value: physical line count
+pub type FileLineCountCache = HashMap<PathBuf, usize>;
+
+/// Build cache of file line counts for all unique files in metrics (spec 195).
+///
+/// This is an I/O operation that reads each unique file once.
+/// Should be called at the I/O boundary before pure debt item construction.
+///
+/// # Performance
+///
+/// - Before: O(functions) file reads (e.g., 5000 reads for 5000 functions)
+/// - After: O(files) file reads (e.g., 800 reads for 800 unique files)
+///
+/// # Pure Core Pattern
+///
+/// This is an I/O operation at the boundary. The returned HashMap
+/// enables pure lookups during debt item construction.
+pub fn build_file_line_count_cache(metrics: &[FunctionMetrics]) -> FileLineCountCache {
+    use crate::metrics::LocCounter;
+
+    let loc_counter = LocCounter::default();
+
+    // Collect unique file paths
+    let unique_files: HashSet<&PathBuf> = metrics.iter().map(|m| &m.file).collect();
+
+    // Read each file once
+    unique_files
+        .into_iter()
+        .filter_map(|path| {
+            loc_counter
+                .count_file(path)
+                .ok()
+                .map(|count| (path.clone(), count.physical_lines))
+        })
+        .collect()
 }
 
 /// Pure function to create function mappings from metrics.
@@ -96,6 +134,7 @@ pub fn create_debt_items_from_metric(
     data_flow: Option<&DataFlowGraph>,
     risk_analyzer: Option<&RiskAnalyzer>,
     project_path: &Path,
+    file_line_counts: &FileLineCountCache,
 ) -> Vec<UnifiedDebtItem> {
     debt_item::create_unified_debt_item_with_aggregator_and_data_flow(
         metric,
@@ -107,6 +146,7 @@ pub fn create_debt_items_from_metric(
         data_flow,
         risk_analyzer,
         project_path,
+        file_line_counts,
     )
 }
 
@@ -123,6 +163,7 @@ pub fn process_metrics_to_debt_items(
     data_flow: Option<&DataFlowGraph>,
     risk_analyzer: Option<&RiskAnalyzer>,
     project_path: &Path,
+    file_line_counts: &FileLineCountCache,
 ) -> Vec<UnifiedDebtItem> {
     use super::call_graph::should_process_metric;
 
@@ -140,6 +181,7 @@ pub fn process_metrics_to_debt_items(
                 data_flow,
                 risk_analyzer,
                 project_path,
+                file_line_counts,
             )
         })
         .collect()
