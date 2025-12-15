@@ -1140,12 +1140,7 @@ fn test_extraction_pipeline_speedup() {
     let rust_files: Vec<PathBuf> = walkdir::WalkDir::new(src_path)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .map(|ext| ext == "rs")
-                .unwrap_or(false)
-        })
+        .filter(|e| e.path().extension().map(|ext| ext == "rs").unwrap_or(false))
         .map(|e| e.path().to_path_buf())
         .take(50) // Limit to 50 files for reasonable test time
         .collect();
