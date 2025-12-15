@@ -89,28 +89,29 @@ mod transformations {
                 };
 
                 // Analyze all functions from this file
-                let results: Vec<(FunctionId, crate::analyzers::purity_detector::PurityAnalysis)> =
-                    file_metrics
-                        .iter()
-                        .filter_map(|m| {
-                            if let Some(found) = find_function_in_ast(&file_ast, &m.name, m.line) {
-                                let mut detector = PurityDetector::new();
-                                let analysis = match found {
-                                    crate::data_flow::population::FoundFunction::TopLevel(
-                                        item_fn,
-                                    ) => detector.is_pure_function(item_fn),
-                                    crate::data_flow::population::FoundFunction::ImplMethod(
-                                        impl_fn,
-                                    ) => detector.is_pure_impl_method(impl_fn),
-                                };
-                                let func_id =
-                                    FunctionId::new(m.file.clone(), m.name.clone(), m.line);
-                                Some((func_id, analysis))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
+                let results: Vec<(
+                    FunctionId,
+                    crate::analyzers::purity_detector::PurityAnalysis,
+                )> = file_metrics
+                    .iter()
+                    .filter_map(|m| {
+                        if let Some(found) = find_function_in_ast(&file_ast, &m.name, m.line) {
+                            let mut detector = PurityDetector::new();
+                            let analysis = match found {
+                                crate::data_flow::population::FoundFunction::TopLevel(item_fn) => {
+                                    detector.is_pure_function(item_fn)
+                                }
+                                crate::data_flow::population::FoundFunction::ImplMethod(
+                                    impl_fn,
+                                ) => detector.is_pure_impl_method(impl_fn),
+                            };
+                            let func_id = FunctionId::new(m.file.clone(), m.name.clone(), m.line);
+                            Some((func_id, analysis))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
 
                 // Reset SourceMap after processing this file to prevent overflow
                 crate::core::parsing::reset_span_locations();
