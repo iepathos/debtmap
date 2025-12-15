@@ -45,6 +45,7 @@
 //! - `extractor` - Single-pass file extraction logic (spec 212)
 //! - `adapters` - Conversion to existing analysis types (spec 214)
 
+pub mod adapters;
 mod extractor;
 mod types;
 
