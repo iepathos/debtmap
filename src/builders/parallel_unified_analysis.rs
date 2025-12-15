@@ -975,13 +975,30 @@ impl ParallelUnifiedAnalysisBuilder {
         let skip_god_object_analysis =
             no_god_object || (estimated_lines < 500 && file_metrics.function_count < 20);
 
-        // Only read file content when necessary:
-        // 1. No cached line count available, OR
-        // 2. God object analysis is needed (requires parsing)
-        let needs_file_read = cached_line_count.is_none() || !skip_god_object_analysis;
+        // Spec 214: Use extracted data when available (avoids file I/O)
+        let extracted_file_data = self
+            .extracted_data
+            .as_ref()
+            .and_then(|data| data.get(file_path));
 
-        if needs_file_read {
-            if let Ok(content) = std::fs::read_to_string(file_path) {
+        if let Some(extracted) = extracted_file_data {
+            // Use extracted data - no file I/O needed
+            file_metrics.total_lines = extracted.total_lines;
+            file_metrics.uncovered_lines =
+                ((1.0 - file_metrics.coverage_percent) * extracted.total_lines as f64) as usize;
+
+            // Use god object adapter with extracted data
+            file_metrics.god_object_analysis = if skip_god_object_analysis {
+                None
+            } else {
+                crate::extraction::adapters::god_object::analyze_god_object(file_path, extracted)
+            };
+        } else {
+            // Fallback: read file content when extracted data not available
+            let needs_file_read = cached_line_count.is_none() || !skip_god_object_analysis;
+
+            if needs_file_read {
+                if let Ok(content) = std::fs::read_to_string(file_path) {
                 let actual_line_count = content.lines().count();
                 file_metrics.total_lines = actual_line_count;
 
@@ -1108,13 +1125,15 @@ impl ParallelUnifiedAnalysisBuilder {
                     self.analyze_god_object_with_io(file_path, coverage_data)
                 };
             }
-        } else {
-            // Spec 195: Use cached line count - no file I/O needed
-            file_metrics.total_lines = cached_line_count.unwrap_or(estimated_lines);
-            file_metrics.uncovered_lines =
-                ((1.0 - file_metrics.coverage_percent) * file_metrics.total_lines as f64) as usize;
-            file_metrics.god_object_analysis = None; // Small files skip god object analysis
-        }
+            } else {
+                // Spec 195: Use cached line count - no file I/O needed
+                file_metrics.total_lines = cached_line_count.unwrap_or(estimated_lines);
+                file_metrics.uncovered_lines =
+                    ((1.0 - file_metrics.coverage_percent) * file_metrics.total_lines as f64)
+                        as usize;
+                file_metrics.god_object_analysis = None; // Small files skip god object analysis
+            }
+        } // End of else block for extracted data fallback
 
         // Calculate function scores from items already created in phase 2
         // Note: In parallel execution, items are not yet in unified analysis at this point

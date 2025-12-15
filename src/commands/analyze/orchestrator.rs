@@ -34,30 +34,25 @@ fn setup_analysis_environment(config: &AnalyzeConfig) {
 fn run_analysis_phases(
     config: &AnalyzeConfig,
 ) -> Result<(AnalysisResults, crate::priority::UnifiedAnalysis)> {
-    let results = project_analysis::run_analysis(config)?;
-    let mut unified = build_unified_analysis_options(config, &results)?;
+    // Spec 214: Use extraction with metrics adapter for single-pass parsing
+    let output = project_analysis::run_analysis_with_extraction(config)?;
+    let mut unified = build_unified_analysis_options(config, &output.results, output.extracted_data)?;
 
-    pipeline::apply_file_context(&mut unified, &results.file_contexts);
+    pipeline::apply_file_context(&mut unified, &output.results.file_contexts);
     let filtered = pipeline::filter_by_categories(unified, config.filter_categories.as_deref());
 
-    Ok((results, filtered))
+    Ok((output.results, filtered))
 }
 
 /// Build unified analysis from results (I/O).
 fn build_unified_analysis_options(
     config: &AnalyzeConfig,
     results: &AnalysisResults,
+    extracted_data: Option<
+        std::collections::HashMap<std::path::PathBuf, crate::extraction::ExtractedFileData>,
+    >,
 ) -> Result<crate::priority::UnifiedAnalysis> {
-    // Spec 213: Extract all file data upfront for large Rust codebases
-    // This prevents proc-macro2 SourceMap overflow during parallel analysis
-    let rust_files = extract_rust_files(results);
-    let extracted_data = if config.parallel && !rust_files.is_empty() {
-        let paths: Vec<_> = rust_files.iter().map(|p| p.to_path_buf()).collect();
-        Some(project_analysis::extract_all_files(&paths))
-    } else {
-        None
-    };
-
+    // Spec 214: Reuse pre-extracted data from metrics phase (no re-extraction needed)
     let options = create_analysis_options_with_extracted(config, results, extracted_data);
     unified_analysis::perform_unified_analysis_with_options(options)
 }

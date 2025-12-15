@@ -27,10 +27,30 @@ use std::path::{Path, PathBuf};
 
 use super::config::AnalyzeConfig;
 
+/// Output from project analysis including extracted data for downstream phases.
+pub struct ProjectAnalysisOutput {
+    /// The analysis results (metrics, debt, etc.)
+    pub results: AnalysisResults,
+    /// Pre-extracted Rust file data for reuse (avoids re-parsing)
+    pub extracted_data: Option<HashMap<PathBuf, ExtractedFileData>>,
+}
+
 /// Run project analysis (I/O).
+///
+/// This is the backward-compatible entry point that discards extracted data.
+/// For full single-pass benefits, use `run_analysis_with_extraction` instead.
+#[allow(dead_code)] // Kept for backward compatibility
 pub fn run_analysis(config: &AnalyzeConfig) -> Result<AnalysisResults> {
+    run_analysis_with_extraction(config).map(|output| output.results)
+}
+
+/// Run project analysis with extraction data (I/O).
+///
+/// Returns both the analysis results and the extracted data for downstream phases.
+/// This enables single-pass parsing for Rust files.
+pub fn run_analysis_with_extraction(config: &AnalyzeConfig) -> Result<ProjectAnalysisOutput> {
     let languages = language_parser::parse_languages(config.languages.clone());
-    analyze_project(
+    analyze_project_with_extraction(
         config.path.clone(),
         languages,
         config.threshold_complexity,
@@ -49,6 +69,29 @@ pub fn analyze_project(
     parallel_enabled: bool,
     formatting_config: FormattingConfig,
 ) -> Result<AnalysisResults> {
+    analyze_project_with_extraction(
+        path,
+        languages,
+        complexity_threshold,
+        duplication_threshold,
+        parallel_enabled,
+        formatting_config,
+    )
+    .map(|output| output.results)
+}
+
+/// Analyze project and return results with extracted data (I/O).
+///
+/// This is the main analysis entry point that extracts Rust files once
+/// and reuses the data for metrics and downstream analysis phases.
+pub fn analyze_project_with_extraction(
+    path: PathBuf,
+    languages: Vec<Language>,
+    complexity_threshold: u32,
+    duplication_threshold: usize,
+    parallel_enabled: bool,
+    formatting_config: FormattingConfig,
+) -> Result<ProjectAnalysisOutput> {
     setup_parallel_env(parallel_enabled);
     let config = crate::config::get_config();
     init_global_progress();
@@ -56,13 +99,17 @@ pub fn analyze_project(
     start_files_phase();
 
     let files = discover_files(&path, &languages, config)?;
-    let file_metrics = parse_and_extract_metrics(&files, parallel_enabled, formatting_config)?;
+
+    // Spec 214: Extract Rust files first, convert to metrics via adapter
+    let (file_metrics, extracted_data) =
+        parse_and_extract_metrics_hybrid(&files, parallel_enabled, formatting_config)?;
+
     let (all_functions, all_debt_items, file_contexts) = extract_analysis_data(&file_metrics);
 
     let duplications = detect_duplications(&files, duplication_threshold);
     complete_files_phase(files.len());
 
-    Ok(build_analysis_results(
+    let results = build_analysis_results(
         path,
         all_functions,
         all_debt_items,
@@ -70,7 +117,12 @@ pub fn analyze_project(
         file_contexts,
         complexity_threshold,
         &file_metrics,
-    ))
+    );
+
+    Ok(ProjectAnalysisOutput {
+        results,
+        extracted_data,
+    })
 }
 
 /// Set up parallel processing environment variable.
@@ -115,7 +167,8 @@ fn discover_files(
     Ok(files)
 }
 
-/// Parse files and extract metrics with progress tracking.
+/// Parse files and extract metrics with progress tracking (legacy).
+#[allow(dead_code)]
 fn parse_and_extract_metrics(
     files: &[PathBuf],
     parallel_enabled: bool,
@@ -128,6 +181,56 @@ fn parse_and_extract_metrics(
     complete_parsing(files.len());
 
     Ok(file_metrics)
+}
+
+/// Result type for hybrid metrics extraction with extracted data.
+type HybridMetricsResult = (Vec<FileMetrics>, Option<HashMap<PathBuf, ExtractedFileData>>);
+
+/// Parse files using hybrid approach: extract Rust files, parse others (Spec 214).
+///
+/// This function:
+/// 1. Splits files into Rust and non-Rust
+/// 2. Extracts Rust files using UnifiedFileExtractor (single parse)
+/// 3. Converts extracted data to FileMetrics via adapter
+/// 4. Parses non-Rust files using traditional analyzer
+/// 5. Returns combined metrics and extracted data for downstream reuse
+fn parse_and_extract_metrics_hybrid(
+    files: &[PathBuf],
+    parallel_enabled: bool,
+    formatting_config: FormattingConfig,
+) -> Result<HybridMetricsResult> {
+    update_file_count(files.len());
+    configure_project_size(files, parallel_enabled, formatting_config)?;
+
+    // Split files by type
+    let (rust_files, non_rust_files): (Vec<PathBuf>, Vec<PathBuf>) = files
+        .iter()
+        .cloned()
+        .partition(|p| p.extension().map(|e| e == "rs").unwrap_or(false));
+
+    // Extract Rust files and convert to metrics via adapter
+    let (rust_metrics, extracted_data) = if !rust_files.is_empty() {
+        let extracted = extract_all_files(&rust_files);
+        let metrics = crate::extraction::adapters::metrics::all_file_metrics_from_extracted(&extracted);
+        (metrics, Some(extracted))
+    } else {
+        (vec![], None)
+    };
+
+    // Parse non-Rust files using traditional path
+    let non_rust_metrics = if !non_rust_files.is_empty() {
+        analysis_utils::collect_file_metrics(&non_rust_files)
+    } else {
+        vec![]
+    };
+
+    // Combine metrics
+    let mut all_metrics = rust_metrics;
+    all_metrics.extend(non_rust_metrics);
+
+    complete_parsing(files.len());
+
+    Ok((all_metrics, extracted_data))
 }
 
 /// Update progress with file count.
