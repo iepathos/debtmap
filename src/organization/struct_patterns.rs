@@ -330,6 +330,7 @@ mod tests {
             field_count,
             methods: methods.into_iter().map(String::from).collect(),
             fields: vec![],
+            field_types: vec![],
             responsibilities: vec![],
             trait_implementations: 0,
             location: SourceLocation {

@@ -426,6 +426,363 @@ pub fn calculate_struct_ratio(struct_count: usize, total_functions: usize) -> f6
     (struct_count as f64) / (total_functions as f64)
 }
 
+// ============================================================================
+// Spec 208: Domain-Aware Responsibility Grouping
+// ============================================================================
+
+/// Domain context extracted from struct name, field names, and field types.
+///
+/// Used for domain-aware responsibility grouping (Spec 208).
+/// Methods are grouped by their alignment to the struct's domain rather than
+/// just behavioral prefixes like `get_*`, `parse_*`, etc.
+///
+/// # Examples
+///
+/// For `CrossModuleTracker`:
+/// - `primary_keywords`: ["cross", "module", "tracker"]
+/// - `secondary_keywords`: keywords from field names/types
+/// - `domain_suffix`: Some("tracker")
+#[derive(Debug, Clone)]
+pub struct DomainContext {
+    /// Primary domain keywords from struct name (e.g., "module", "tracker")
+    pub primary_keywords: Vec<String>,
+    /// Secondary keywords from field names and types
+    pub secondary_keywords: Vec<String>,
+    /// Domain suffix detected (Tracker, Manager, Builder, etc.)
+    pub domain_suffix: Option<String>,
+}
+
+impl DomainContext {
+    /// Create an empty domain context
+    pub fn empty() -> Self {
+        Self {
+            primary_keywords: Vec::new(),
+            secondary_keywords: Vec::new(),
+            domain_suffix: None,
+        }
+    }
+
+    /// Check if context has meaningful domain information
+    pub fn has_domain(&self) -> bool {
+        !self.primary_keywords.is_empty()
+    }
+
+    /// Get the primary domain name for grouping
+    ///
+    /// Returns a concatenated string of primary keywords, or "Primary" if empty.
+    pub fn primary_domain_name(&self) -> String {
+        if self.primary_keywords.is_empty() {
+            "Primary".to_string()
+        } else {
+            // Capitalize first letter of each keyword and join
+            self.primary_keywords
+                .iter()
+                .map(|k| {
+                    let mut chars = k.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("")
+        }
+    }
+}
+
+/// Extract domain context from struct name, field names, and field types.
+///
+/// Spec 208: This builds the context needed for domain-aware responsibility grouping.
+///
+/// # Arguments
+///
+/// * `struct_name` - The name of the struct
+/// * `field_names` - Names of the struct's fields
+/// * `field_types` - Type names of the struct's fields
+///
+/// # Returns
+///
+/// A `DomainContext` with extracted domain information
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::extract_domain_context;
+///
+/// let context = extract_domain_context(
+///     "ModuleTracker",
+///     &["modules".to_string(), "boundaries".to_string()],
+///     &["HashMap".to_string(), "Vec".to_string()],
+/// );
+/// assert!(context.primary_keywords.contains(&"module".to_string()));
+/// assert_eq!(context.domain_suffix, Some("tracker".to_string()));
+/// ```
+pub fn extract_domain_context(
+    struct_name: &str,
+    field_names: &[String],
+    field_types: &[String],
+) -> DomainContext {
+    // Extract keywords from struct name
+    let primary_keywords = extract_domain_keywords(struct_name);
+
+    // Extract keywords from field names and types (excluding common types)
+    let common_types: std::collections::HashSet<&str> = [
+        "vec", "hashmap", "btreemap", "hashset", "btreeset", "option", "result", "string", "str",
+        "bool", "usize", "isize", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32",
+        "f64", "box", "arc", "rc", "refcell", "cell", "mutex", "rwlock", "pathbuf", "path",
+    ]
+    .into_iter()
+    .collect();
+
+    let secondary_keywords: Vec<String> = field_names
+        .iter()
+        .chain(field_types.iter())
+        .flat_map(|name| extract_domain_keywords(name))
+        .filter(|kw| !common_types.contains(kw.as_str()))
+        .collect();
+
+    // Detect domain suffix
+    let domain_suffix = detect_domain_suffix(struct_name);
+
+    DomainContext {
+        primary_keywords,
+        secondary_keywords,
+        domain_suffix,
+    }
+}
+
+/// Detect domain suffix from struct name.
+///
+/// Common domain suffixes indicate a cohesive struct pattern.
+///
+/// # Arguments
+///
+/// * `struct_name` - The name of the struct
+///
+/// # Returns
+///
+/// The detected suffix (lowercase), or None if no common suffix found
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::detect_domain_suffix;
+///
+/// assert_eq!(detect_domain_suffix("ModuleTracker"), Some("tracker".to_string()));
+/// assert_eq!(detect_domain_suffix("RequestHandler"), Some("handler".to_string()));
+/// assert_eq!(detect_domain_suffix("SomeStruct"), None);
+/// ```
+pub fn detect_domain_suffix(struct_name: &str) -> Option<String> {
+    let cohesive_suffixes = [
+        "tracker",
+        "analyzer",
+        "builder",
+        "visitor",
+        "handler",
+        "processor",
+        "calculator",
+        "resolver",
+        "extractor",
+        "detector",
+        "validator",
+        "formatter",
+        "parser",
+        "renderer",
+        "serializer",
+        "deserializer",
+        "iterator",
+        "generator",
+        "factory",
+        "provider",
+        "repository",
+        "service",
+        "client",
+        "server",
+        "cache",
+        "pool",
+        "queue",
+        "stack",
+        "manager",
+        "controller",
+        "adapter",
+        "wrapper",
+        "proxy",
+        "decorator",
+        "observer",
+        "listener",
+        "emitter",
+        "dispatcher",
+        "scheduler",
+        "executor",
+        "runner",
+        "loader",
+        "writer",
+        "reader",
+        "mapper",
+        "converter",
+        "transformer",
+    ];
+
+    let name_lower = struct_name.to_lowercase();
+
+    for suffix in &cohesive_suffixes {
+        if name_lower.ends_with(suffix) {
+            return Some(suffix.to_string());
+        }
+    }
+
+    None
+}
+
+/// Group methods by domain alignment rather than behavioral prefix.
+///
+/// Spec 208: Domain-aware grouping considers:
+/// 1. Primary domain keywords from struct name
+/// 2. Secondary keywords from field names/types
+/// 3. Falls back to behavioral classification for unrelated methods
+///
+/// This reduces false positives where cohesive structs like `ModuleTracker`
+/// would otherwise be flagged as god objects due to diverse method prefixes.
+///
+/// # Arguments
+///
+/// * `methods` - List of method names to group
+/// * `context` - Domain context extracted from the struct
+///
+/// # Returns
+///
+/// HashMap mapping domain/responsibility names to lists of methods
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::{DomainContext, group_methods_by_domain};
+///
+/// let context = DomainContext {
+///     primary_keywords: vec!["module".to_string()],
+///     secondary_keywords: vec!["boundary".to_string()],
+///     domain_suffix: Some("tracker".to_string()),
+/// };
+///
+/// let methods = vec![
+///     "get_modules".to_string(),
+///     "track_module".to_string(),
+///     "resolve_boundary".to_string(),
+///     "new".to_string(),
+/// ];
+///
+/// let groups = group_methods_by_domain(&methods, &context);
+/// // Methods matching "module" domain should be grouped together
+/// assert!(groups.len() <= 2, "Cohesive methods should group together");
+/// ```
+pub fn group_methods_by_domain(
+    methods: &[String],
+    context: &DomainContext,
+) -> HashMap<String, Vec<String>> {
+    // If no domain context, fall back to responsibility-based grouping
+    if !context.has_domain() {
+        return group_methods_by_responsibility(methods);
+    }
+
+    let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+
+    for method in methods {
+        let domain = infer_method_domain(method, context);
+        groups.entry(domain).or_default().push(method.clone());
+    }
+
+    groups
+}
+
+/// Infer which domain a method belongs to based on context.
+///
+/// Spec 208: Checks method alignment with:
+/// 1. Primary domain keywords (struct name)
+/// 2. Secondary keywords (field names/types)
+/// 3. Falls back to behavioral classification
+///
+/// # Arguments
+///
+/// * `method` - The method name to classify
+/// * `context` - Domain context from the struct
+///
+/// # Returns
+///
+/// Domain name for the method
+fn infer_method_domain(method: &str, context: &DomainContext) -> String {
+    let method_lower = method.to_lowercase();
+    let method_keywords = extract_domain_keywords(method);
+
+    // Common utility methods that don't count toward domain classification
+    let utility_methods: std::collections::HashSet<&str> = [
+        "new",
+        "default",
+        "clone",
+        "fmt",
+        "drop",
+        "from",
+        "into",
+        "as_ref",
+        "as_mut",
+        "len",
+        "is_empty",
+        "iter",
+        "iter_mut",
+        "clear",
+        "with_capacity",
+    ]
+    .into_iter()
+    .collect();
+
+    // Utility methods go to primary domain by default
+    if utility_methods.contains(method_lower.as_str()) {
+        return context.primary_domain_name();
+    }
+
+    // Check if method aligns with primary domain keywords
+    let matches_primary = context.primary_keywords.iter().any(|pk| {
+        method_lower.contains(pk.as_str())
+            || method_keywords.iter().any(|mk| mk == pk || mk.contains(pk))
+    });
+
+    if matches_primary {
+        return context.primary_domain_name();
+    }
+
+    // Check secondary domain alignment (field names/types)
+    let matching_secondary: Vec<&String> = context
+        .secondary_keywords
+        .iter()
+        .filter(|sk| {
+            method_lower.contains(sk.as_str())
+                || method_keywords
+                    .iter()
+                    .any(|mk| mk == *sk || mk.contains(*sk))
+        })
+        .collect();
+
+    if !matching_secondary.is_empty() {
+        // Group under primary domain if secondary keyword matches
+        // This keeps cohesive structs together
+        return context.primary_domain_name();
+    }
+
+    // Check for domain suffix alignment (e.g., "tracker" suffix + "track_*" methods)
+    if let Some(ref suffix) = context.domain_suffix {
+        // Check if method contains the suffix root (e.g., "track" from "tracker")
+        let suffix_root = suffix.trim_end_matches("er").trim_end_matches("or");
+        if method_lower.contains(suffix_root) {
+            return context.primary_domain_name();
+        }
+    }
+
+    // Fall back to behavioral classification for truly unrelated methods
+    let result = infer_responsibility_with_confidence(method, None);
+    result
+        .category
+        .unwrap_or_else(|| "unclassified".to_string())
+}
+
 /// Extract domain keywords from a struct name.
 ///
 /// Splits camelCase/PascalCase and snake_case names into individual words.
@@ -1213,5 +1570,260 @@ mod tests {
             !is_cohesive_struct(struct_name, &methods),
             "ApplicationManager with unrelated methods should NOT be cohesive"
         );
+    }
+
+    // =========================================================================
+    // Spec 208: Domain-Aware Responsibility Grouping Tests
+    // =========================================================================
+
+    #[test]
+    fn test_domain_context_extraction() {
+        let context = extract_domain_context(
+            "ModuleTracker",
+            &["modules".into(), "boundaries".into()],
+            &["HashMap".into(), "Vec".into()],
+        );
+        assert!(context.primary_keywords.contains(&"module".to_string()));
+        assert!(context.primary_keywords.contains(&"tracker".to_string()));
+        assert_eq!(context.domain_suffix, Some("tracker".to_string()));
+        // Secondary keywords should include field names
+        assert!(context.secondary_keywords.contains(&"modules".to_string()));
+        assert!(context
+            .secondary_keywords
+            .contains(&"boundaries".to_string()));
+    }
+
+    #[test]
+    fn test_domain_context_filters_common_types() {
+        let context = extract_domain_context(
+            "DataStore",
+            &["items".into()],
+            &["HashMap".into(), "String".into(), "Vec".into()],
+        );
+        // Common types like HashMap, String, Vec should be filtered out
+        assert!(!context.secondary_keywords.contains(&"hashmap".to_string()));
+        assert!(!context.secondary_keywords.contains(&"string".to_string()));
+        assert!(!context.secondary_keywords.contains(&"vec".to_string()));
+    }
+
+    #[test]
+    fn test_detect_domain_suffix() {
+        assert_eq!(
+            detect_domain_suffix("ModuleTracker"),
+            Some("tracker".to_string())
+        );
+        assert_eq!(
+            detect_domain_suffix("RequestHandler"),
+            Some("handler".to_string())
+        );
+        assert_eq!(
+            detect_domain_suffix("JsonParser"),
+            Some("parser".to_string())
+        );
+        assert_eq!(
+            detect_domain_suffix("UserRepository"),
+            Some("repository".to_string())
+        );
+        assert_eq!(detect_domain_suffix("SomeStruct"), None);
+        assert_eq!(detect_domain_suffix("Config"), None);
+    }
+
+    #[test]
+    fn test_domain_context_primary_domain_name() {
+        let context = DomainContext {
+            primary_keywords: vec!["module".into(), "tracker".into()],
+            secondary_keywords: vec![],
+            domain_suffix: Some("tracker".into()),
+        };
+        assert_eq!(context.primary_domain_name(), "ModuleTracker");
+
+        let empty_context = DomainContext::empty();
+        assert_eq!(empty_context.primary_domain_name(), "Primary");
+    }
+
+    #[test]
+    fn test_group_methods_by_domain_cohesive_struct() {
+        let context = DomainContext {
+            primary_keywords: vec!["module".into()],
+            secondary_keywords: vec!["boundary".into()],
+            domain_suffix: Some("tracker".into()),
+        };
+
+        let methods = vec![
+            "get_modules".into(),
+            "track_module".into(),
+            "resolve_boundary".into(),
+            "new".into(),
+        ];
+
+        let groups = group_methods_by_domain(&methods, &context);
+
+        // Should have 1-2 groups, not 4 (all methods align with "module" domain)
+        assert!(
+            groups.len() <= 2,
+            "Cohesive methods should group together, got {} groups: {:?}",
+            groups.len(),
+            groups.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_group_methods_by_domain_god_object() {
+        let context = DomainContext {
+            primary_keywords: vec!["application".into()],
+            secondary_keywords: vec![],
+            domain_suffix: Some("manager".into()),
+        };
+
+        let methods = vec![
+            "parse_json".into(),
+            "render_html".into(),
+            "validate_email".into(),
+            "send_notification".into(),
+        ];
+
+        let groups = group_methods_by_domain(&methods, &context);
+
+        // Should have 4 groups (none match "application")
+        assert!(
+            groups.len() >= 4,
+            "Unrelated methods should stay separate, got {} groups: {:?}",
+            groups.len(),
+            groups.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_group_methods_by_domain_utility_methods() {
+        let context = DomainContext {
+            primary_keywords: vec!["module".into()],
+            secondary_keywords: vec![],
+            domain_suffix: Some("tracker".into()),
+        };
+
+        let methods = vec!["new".into(), "default".into(), "clone".into(), "len".into()];
+
+        let groups = group_methods_by_domain(&methods, &context);
+
+        // Utility methods should all be grouped under primary domain
+        assert_eq!(
+            groups.len(),
+            1,
+            "Utility methods should all group together under primary domain"
+        );
+    }
+
+    #[test]
+    fn test_group_methods_by_domain_suffix_alignment() {
+        let context = DomainContext {
+            primary_keywords: vec!["module".into()],
+            secondary_keywords: vec![],
+            domain_suffix: Some("tracker".into()),
+        };
+
+        // Methods containing "track" should align with "tracker" suffix
+        let methods = vec!["track_item".into(), "get_tracked".into(), "untrack".into()];
+
+        let groups = group_methods_by_domain(&methods, &context);
+
+        // All should be grouped under primary domain due to "track" suffix alignment
+        assert!(
+            groups.len() <= 2,
+            "Methods aligning with suffix should group together"
+        );
+    }
+
+    #[test]
+    fn test_group_methods_by_domain_empty_context() {
+        // Empty context should fall back to responsibility-based grouping
+        let context = DomainContext::empty();
+
+        let methods = vec![
+            "parse_json".into(),
+            "validate_input".into(),
+            "get_data".into(),
+        ];
+
+        let groups = group_methods_by_domain(&methods, &context);
+
+        // Should fall back to behavioral classification
+        assert!(
+            !groups.is_empty(),
+            "Should produce groups even with empty context"
+        );
+    }
+
+    #[test]
+    fn test_cross_module_tracker_domain_grouping() {
+        // Real-world test case from spec 208
+        let context = extract_domain_context(
+            "CrossModuleTracker",
+            &["modules".into(), "calls".into(), "boundaries".into()],
+            &["HashMap".into(), "Vec".into()],
+        );
+
+        let methods = vec![
+            "get_module_calls".into(),
+            "is_public_api".into(),
+            "resolve_module_call".into(),
+            "infer_module_path".into(),
+            "new".into(),
+        ];
+
+        let groups = group_methods_by_domain(&methods, &context);
+
+        // With domain-aware grouping, should produce 1-2 groups, not 4+
+        assert!(
+            groups.len() <= 2,
+            "CrossModuleTracker methods should have ≤2 domain groups, got {}: {:?}",
+            groups.len(),
+            groups.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_domain_context_has_domain() {
+        let context = DomainContext {
+            primary_keywords: vec!["module".into()],
+            secondary_keywords: vec![],
+            domain_suffix: None,
+        };
+        assert!(context.has_domain());
+
+        let empty = DomainContext::empty();
+        assert!(!empty.has_domain());
+    }
+
+    proptest! {
+        /// Verify domain context extraction is idempotent
+        #[test]
+        fn prop_domain_context_extraction_idempotent(
+            struct_name in "[A-Z][a-zA-Z0-9]{1,20}",
+            field_name in "[a-z_][a-z_0-9]{0,15}"
+        ) {
+            let fields = vec![field_name.clone()];
+            let types = vec!["String".to_string()];
+            let c1 = extract_domain_context(&struct_name, &fields, &types);
+            let c2 = extract_domain_context(&struct_name, &fields, &types);
+            prop_assert_eq!(c1.primary_keywords, c2.primary_keywords);
+            prop_assert_eq!(c1.secondary_keywords, c2.secondary_keywords);
+            prop_assert_eq!(c1.domain_suffix, c2.domain_suffix);
+        }
+
+        /// Verify domain-aware grouping is idempotent
+        #[test]
+        fn prop_group_methods_by_domain_idempotent(
+            struct_name in "[A-Z][a-zA-Z0-9]{1,15}Tracker",
+            method_name in "[a-z_][a-z_0-9]{0,15}"
+        ) {
+            let context = extract_domain_context(&struct_name, &[], &[]);
+            let methods = vec![method_name.clone()];
+            let g1 = group_methods_by_domain(&methods, &context);
+            let g2 = group_methods_by_domain(&methods, &context);
+            prop_assert_eq!(g1.len(), g2.len());
+            for key in g1.keys() {
+                prop_assert!(g2.contains_key(key));
+            }
+        }
     }
 }

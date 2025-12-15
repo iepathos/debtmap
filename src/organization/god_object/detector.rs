@@ -401,6 +401,7 @@ impl GodObjectDetector {
     ///
     /// Spec 201: Per-struct analysis using the struct's own metrics.
     /// Spec 206: Cohesion gate - cohesive structs are not flagged as god objects.
+    /// Spec 208: Domain-aware responsibility grouping.
     fn analyze_single_struct(
         &self,
         type_analysis: &super::ast_visitor::TypeAnalysis,
@@ -408,7 +409,8 @@ impl GodObjectDetector {
         thresholds: &super::thresholds::GodObjectThresholds,
     ) -> Option<GodObjectAnalysis> {
         use super::classifier::{
-            determine_confidence, group_methods_by_responsibility, is_cohesive_struct,
+            determine_confidence, extract_domain_context, group_methods_by_domain,
+            is_cohesive_struct,
         };
         use super::recommender::recommend_module_splits;
         use super::scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
@@ -449,8 +451,15 @@ impl GodObjectDetector {
         let field_count = type_analysis.field_count;
         let method_names = &type_analysis.methods;
 
-        // Group methods by responsibility for THIS struct only
-        let responsibility_groups = group_methods_by_responsibility(method_names);
+        // Spec 208: Build domain context for domain-aware grouping
+        let domain_context = extract_domain_context(
+            &type_analysis.name,
+            &type_analysis.fields,
+            &type_analysis.field_types,
+        );
+
+        // Spec 208: Use domain-aware grouping instead of prefix-based grouping
+        let responsibility_groups = group_methods_by_domain(method_names, &domain_context);
         let responsibility_count = responsibility_groups.len();
 
         // Sort responsibilities by method count
