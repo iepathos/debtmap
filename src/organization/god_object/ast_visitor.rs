@@ -19,6 +19,8 @@ pub struct TypeAnalysis {
     pub responsibilities: Vec<Responsibility>,
     pub trait_implementations: usize,
     pub location: SourceLocation,
+    /// Locations of impl blocks associated with this type (Spec 207)
+    pub impl_locations: Vec<SourceLocation>,
 }
 
 /// Represents a logical responsibility or concern within a type
@@ -196,6 +198,12 @@ impl TypeVisitor {
                 type_info.trait_implementations += 1;
             }
 
+            // Spec 207: Track impl block location for accurate LOC calculation
+            if let Some(ref extractor) = self.location_extractor {
+                let impl_location = extractor.extract_item_location(&syn::Item::Impl(node.clone()));
+                type_info.impl_locations.push(impl_location);
+            }
+
             // Spec 134 Phase 2: Track visibility of impl methods
             for item in &node.items {
                 if let syn::ImplItem::Fn(method) = item {
@@ -333,6 +341,7 @@ impl<'ast> Visit<'ast> for TypeVisitor {
                 responsibilities: Vec::new(),
                 trait_implementations: 0,
                 location,
+                impl_locations: Vec::new(),
             },
         );
     }

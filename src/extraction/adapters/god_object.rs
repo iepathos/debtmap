@@ -18,7 +18,9 @@
 //! - **Composable pipeline**: Pure helper functions that can be unit tested independently.
 
 use crate::extraction::types::{ExtractedFileData, ExtractedImplData, ExtractedStructData};
-use crate::organization::god_object::classifier::{group_methods_by_responsibility, is_cohesive_struct};
+use crate::organization::god_object::classifier::{
+    group_methods_by_responsibility, is_cohesive_struct,
+};
 use crate::organization::god_object::{
     DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis, GodObjectThresholds,
     SplitAnalysisMethod,
