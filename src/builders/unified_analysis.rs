@@ -61,7 +61,8 @@ pub fn perform_unified_analysis(
         enable_context: false,
         context_providers: None,
         disable_context: None,
-        rust_files: None, // Fallback to file discovery
+        rust_files: None,     // Fallback to file discovery
+        extracted_data: None, // Fallback to per-function parsing (spec 213)
     })
 }
 
@@ -91,6 +92,7 @@ pub fn perform_unified_analysis_with_options(
         context_providers,
         disable_context,
         rust_files,
+        extracted_data,
     } = options;
 
     // Create top-level span for unified analysis (spec 208)
@@ -236,6 +238,7 @@ pub fn perform_unified_analysis_with_options(
             project_path,
             parallel,
             jobs,
+            extracted_data,
         );
         debug!(
             item_count = result.items.len(),
@@ -287,6 +290,7 @@ pub fn create_unified_analysis_with_exclusions(
         Path::new("."),
         false,
         0,
+        None, // No extracted data - fallback to per-function parsing (spec 213)
     )
 }
 
@@ -336,6 +340,9 @@ fn create_unified_analysis_with_exclusions_and_timing(
     project_path: &Path,
     parallel: bool,
     jobs: usize,
+    extracted_data: Option<
+        std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+    >,
 ) -> UnifiedAnalysis {
     // Use parallel path if enabled
     let parallel_enabled = parallel
@@ -357,6 +364,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
             coverage_time,
             risk_analyzer,
             project_path,
+            extracted_data,
         );
     }
 
@@ -439,6 +447,9 @@ fn create_parallel_analysis(
     coverage_time: std::time::Duration,
     risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
+    extracted_data: Option<
+        std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+    >,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::{
         ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
@@ -453,6 +464,12 @@ fn create_parallel_analysis(
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options)
         .with_project_path(project_path.to_path_buf());
+
+    // Use pre-extracted data when available (spec 213)
+    // This prevents proc-macro2 SourceMap overflow on large codebases
+    if let Some(extracted) = extracted_data {
+        builder = builder.with_extracted_data(extracted);
+    }
 
     if let Some(analyzer) = risk_analyzer {
         builder = builder.with_risk_analyzer(analyzer);

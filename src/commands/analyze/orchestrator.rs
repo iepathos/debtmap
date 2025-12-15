@@ -48,14 +48,27 @@ fn build_unified_analysis_options(
     config: &AnalyzeConfig,
     results: &AnalysisResults,
 ) -> Result<crate::priority::UnifiedAnalysis> {
-    let options = create_analysis_options(config, results);
+    // Spec 213: Extract all file data upfront for large Rust codebases
+    // This prevents proc-macro2 SourceMap overflow during parallel analysis
+    let rust_files = extract_rust_files(results);
+    let extracted_data = if config.parallel && !rust_files.is_empty() {
+        let paths: Vec<_> = rust_files.iter().map(|p| p.to_path_buf()).collect();
+        Some(project_analysis::extract_all_files(&paths))
+    } else {
+        None
+    };
+
+    let options = create_analysis_options_with_extracted(config, results, extracted_data);
     unified_analysis::perform_unified_analysis_with_options(options)
 }
 
-/// Create analysis options from config.
-fn create_analysis_options<'a>(
+/// Create analysis options from config with pre-extracted data (spec 213).
+fn create_analysis_options_with_extracted<'a>(
     config: &'a AnalyzeConfig,
     results: &'a AnalysisResults,
+    extracted_data: Option<
+        std::collections::HashMap<std::path::PathBuf, crate::extraction::ExtractedFileData>,
+    >,
 ) -> unified_analysis::UnifiedAnalysisOptions<'a> {
     // Extract Rust files from already-discovered file contexts (avoids re-walking filesystem)
     let rust_files = extract_rust_files(results);
@@ -82,6 +95,7 @@ fn create_analysis_options<'a>(
         context_providers: config.context_providers.clone(),
         disable_context: config.disable_context.clone(),
         rust_files: Some(rust_files),
+        extracted_data, // Spec 213: Pre-extracted data for parallel analysis
     }
 }
 

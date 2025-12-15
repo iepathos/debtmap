@@ -53,6 +53,9 @@ mod transformations {
     /// Spec 202: Now handles methods inside impl blocks, not just top-level functions.
     /// Spec 210: Optimized to parse each file only once instead of per-function.
     ///           This prevents proc-macro2 SourceMap overflow on large codebases.
+    /// Spec 213: This function is kept as fallback when `with_extracted_data()` was not called.
+    ///           The preferred path is to pre-extract via `project_analysis::extract_all_files()`
+    ///           and pass data via `with_extracted_data()`, which avoids parsing entirely.
     pub fn extract_purity_analysis(
         metrics: &[FunctionMetrics],
     ) -> HashMap<FunctionId, crate::analyzers::purity_detector::PurityAnalysis> {

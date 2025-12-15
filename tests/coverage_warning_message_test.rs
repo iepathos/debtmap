@@ -81,19 +81,16 @@ fn test_warning_displayed_once_not_multiple_times() {
         .nth(1)
         .expect("Should find emit_coverage_tip function");
 
-    // Count how many times eprintln! appears in the function
-    let eprintln_count = tip_section
+    // Verify the function uses structured logging (warn! macro) - spec 208
+    let fn_body = tip_section
         .split("fn ") // Stop at next function
         .next()
-        .unwrap_or(tip_section)
-        .matches("eprintln!")
-        .count();
+        .unwrap_or(tip_section);
 
-    // The warning should have multiple eprintln! calls (for multi-line output)
+    // The warning should use the warn! macro for structured logging
     assert!(
-        eprintln_count >= 3,
-        "Warning should have multiple lines (found {})",
-        eprintln_count
+        fn_body.contains("warn!"),
+        "Warning should use warn! macro for structured logging"
     );
 
     // Verify emit_coverage_tip is called only once in perform_unified_analysis_with_options

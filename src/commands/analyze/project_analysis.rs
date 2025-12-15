@@ -350,6 +350,13 @@ pub fn extract_all_files(files: &[PathBuf]) -> HashMap<PathBuf, ExtractedFileDat
 /// # Spec 213
 ///
 /// Creates FunctionMetrics from pre-extracted data, avoiding re-parsing.
+/// This utility function is provided for alternative analysis pipelines that
+/// may want to build metrics directly from extraction results.
+///
+/// Note: Currently the main pipeline uses extraction data for purity/I/O analysis
+/// while metrics come from the traditional parsing path. This function exists
+/// for potential future optimizations or alternative analysis flows.
+#[allow(dead_code)] // Spec 213: Utility function for alternative analysis flows
 pub fn metrics_from_extracted(
     extracted: &HashMap<PathBuf, ExtractedFileData>,
 ) -> Vec<FunctionMetrics> {
@@ -378,6 +385,9 @@ pub fn metrics_from_extracted(
 }
 
 /// Convert extraction PurityLevel to core PurityLevel (pure).
+///
+/// Helper for `metrics_from_extracted` - kept for completeness of that API.
+#[allow(dead_code)] // Spec 213: Helper for metrics_from_extracted utility
 fn purity_level_from_extracted(level: &crate::extraction::PurityLevel) -> crate::core::PurityLevel {
     match level {
         crate::extraction::PurityLevel::StrictlyPure => crate::core::PurityLevel::StrictlyPure,

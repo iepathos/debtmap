@@ -67,6 +67,13 @@ mod ast_helpers {
     /// For impl methods, we match if either:
     /// - The metric name equals the simple method name
     /// - The metric name ends with `::method_name`
+    ///
+    /// # Spec 213
+    ///
+    /// This function is used by the fallback purity analysis path when pre-extracted
+    /// data is not available. When `with_extracted_data()` is called on the builder,
+    /// this function is not used. It's kept for backward compatibility with non-parallel
+    /// analysis paths and testing.
     pub fn find_function_in_ast<'a>(
         ast: &'a syn::File,
         metric_name: &str,
