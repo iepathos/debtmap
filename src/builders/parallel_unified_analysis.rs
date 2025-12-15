@@ -542,11 +542,11 @@ impl ParallelUnifiedAnalysisBuilder {
             let start = Instant::now();
             let mut data_flow = DataFlowGraph::from_call_graph((*call_graph).clone());
 
-            // Spec 213: Use extracted data when available to avoid re-parsing
+            // Spec 214: Use extraction adapters to populate data flow from extracted data
             let (purity_count, mutation_count, io_count, dep_count, trans_count) =
                 if let Some(ref extracted) = extracted_data {
-                    progress.set_message("Populating from extracted data (spec 213)...");
-                    let stats = crate::data_flow::population::populate_all_from_extracted(
+                    progress.set_message("Populating from extracted data (spec 214)...");
+                    let stats = crate::extraction::adapters::data_flow::populate_data_flow(
                         &mut data_flow,
                         extracted,
                     );
@@ -554,12 +554,11 @@ impl ParallelUnifiedAnalysisBuilder {
                         stats.purity_entries,
                         stats.purity_entries, // Mutations counted as part of purity
                         stats.io_operations,
-                        stats.variable_dependencies,
-                        stats.transformation_patterns,
+                        stats.variable_deps,
+                        stats.transformations,
                     )
                 } else {
-                    // Fallback: Extract all files first, then populate from extracted data
-                    // (Spec 213: old per-function parsing functions removed)
+                    // Fallback: Extract all files first, then populate via adapter
                     progress.set_message("Extracting file data (fallback path)...");
 
                     // Collect unique file paths from metrics
@@ -580,7 +579,7 @@ impl ParallelUnifiedAnalysisBuilder {
                         .collect();
 
                     progress.set_message("Populating from extracted data (fallback)...");
-                    let stats = crate::data_flow::population::populate_all_from_extracted(
+                    let stats = crate::extraction::adapters::data_flow::populate_data_flow(
                         &mut data_flow,
                         &fallback_extracted,
                     );
@@ -588,8 +587,8 @@ impl ParallelUnifiedAnalysisBuilder {
                         stats.purity_entries,
                         stats.purity_entries, // Mutations counted as part of purity
                         stats.io_operations,
-                        stats.variable_dependencies,
-                        stats.transformation_patterns,
+                        stats.variable_deps,
+                        stats.transformations,
                     )
                 };
 

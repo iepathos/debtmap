@@ -137,6 +137,21 @@ pub fn all_metrics_from_extracted(
     extracted.values().flat_map(all_function_metrics).collect()
 }
 
+/// Convert all extracted files to file metrics.
+///
+/// # Arguments
+///
+/// * `extracted` - Map of file paths to extracted file data
+///
+/// # Returns
+///
+/// A vector of `FileMetrics` for all extracted files.
+pub fn all_file_metrics_from_extracted(
+    extracted: &std::collections::HashMap<std::path::PathBuf, ExtractedFileData>,
+) -> Vec<FileMetrics> {
+    extracted.values().map(to_file_metrics).collect()
+}
+
 /// Calculate aggregate complexity metrics across all files.
 ///
 /// # Arguments

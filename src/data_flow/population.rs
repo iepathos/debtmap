@@ -1,23 +1,16 @@
-//! Data flow graph population from various analysis sources
+//! Data flow graph population from various analysis sources.
 //!
 //! This module provides functions to populate the DataFlowGraph with data from:
 //! - Purity analysis (CFG-based data flow analysis)
-//! - I/O operation detection (AST-based pattern matching)
-//! - Variable dependency analysis
-//! - Data transformation patterns
 //!
-//! # Spec 213: Extracted Data Functions
+//! # Extraction Adapters (Spec 214)
 //!
-//! This module now includes `*_from_extracted` variants that populate the
-//! DataFlowGraph from pre-extracted data, avoiding per-function file parsing.
-//! These functions should be preferred when extracted data is available.
+//! For populating DataFlowGraph from extracted file data, use the extraction
+//! adapters in `crate::extraction::adapters::data_flow` instead.
 
 use crate::analyzers::purity_detector::PurityAnalysis;
-use crate::data_flow::{DataFlowGraph, MutationInfo, PurityInfo};
-use crate::extraction::ExtractedFileData;
+use crate::data_flow::{DataFlowGraph, MutationInfo};
 use crate::priority::call_graph::FunctionId;
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 
 /// Helper module for finding functions in AST (spec 202)
 ///
@@ -157,172 +150,8 @@ pub fn populate_from_purity_analysis(
 }
 
 // Note: Old per-function parsing functions (populate_io_operations, populate_variable_dependencies,
-// populate_data_transformations) were removed in Spec 213. Use the *_from_extracted variants instead
-// which work with pre-extracted data from the unified extraction pipeline.
-
-// ============================================================================
-// Spec 213: Extracted Data Functions
-// ============================================================================
-
-/// Populate purity analysis from extracted file data (pure).
-///
-/// # Spec 213
-///
-/// Populates the DataFlowGraph with purity information from pre-extracted data.
-/// Avoids per-function file parsing by using the extraction results directly.
-pub fn populate_purity_from_extracted(
-    data_flow: &mut DataFlowGraph,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
-) -> usize {
-    let mut count = 0;
-
-    for (path, file_data) in extracted {
-        for func in &file_data.functions {
-            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
-
-            // Convert extracted purity to PurityInfo
-            let purity_info = PurityInfo {
-                is_pure: func.purity_analysis.is_pure,
-                confidence: func.purity_analysis.confidence,
-                impurity_reasons: Vec::new(), // Not stored in extracted data
-            };
-            data_flow.set_purity_info(func_id.clone(), purity_info);
-
-            // Convert to MutationInfo
-            let mutation_info = MutationInfo {
-                has_mutations: func.purity_analysis.has_mutations,
-                detected_mutations: func.purity_analysis.local_mutations.clone(),
-            };
-            data_flow.set_mutation_info(func_id, mutation_info);
-
-            count += 1;
-        }
-    }
-
-    count
-}
-
-/// Populate I/O operations from extracted file data (pure).
-///
-/// # Spec 213
-///
-/// Populates the DataFlowGraph with I/O operations from pre-extracted data.
-/// Avoids per-function file parsing by using the extraction results directly.
-pub fn populate_io_from_extracted(
-    data_flow: &mut DataFlowGraph,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
-) -> usize {
-    let mut count = 0;
-
-    for (path, file_data) in extracted {
-        for func in &file_data.functions {
-            if func.io_operations.is_empty() {
-                continue;
-            }
-
-            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
-
-            for io_op in &func.io_operations {
-                // Convert extraction IoOperation to data_flow IoOperation
-                let op = crate::data_flow::IoOperation {
-                    operation_type: io_op.description.clone(),
-                    variables: Vec::new(), // Not stored in extracted data
-                    line: io_op.line,
-                };
-                data_flow.add_io_operation(func_id.clone(), op);
-                count += 1;
-            }
-        }
-    }
-
-    count
-}
-
-/// Populate variable dependencies from extracted file data (pure).
-///
-/// # Spec 213
-///
-/// Populates the DataFlowGraph with variable dependencies from pre-extracted data.
-/// Uses parameter names from the extraction as dependencies.
-pub fn populate_variable_deps_from_extracted(
-    data_flow: &mut DataFlowGraph,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
-) -> usize {
-    let mut count = 0;
-
-    for (path, file_data) in extracted {
-        for func in &file_data.functions {
-            if func.parameter_names.is_empty() {
-                continue;
-            }
-
-            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
-
-            let deps: HashSet<String> = func.parameter_names.iter().cloned().collect();
-            count += deps.len();
-            data_flow.add_variable_dependencies(func_id, deps);
-        }
-    }
-
-    count
-}
-
-/// Populate data transformations from extracted file data (pure).
-///
-/// # Spec 213
-///
-/// Populates the DataFlowGraph with transformation patterns from pre-extracted data.
-/// The extraction already identifies map/filter/fold/etc patterns.
-pub fn populate_transformations_from_extracted(
-    _data_flow: &mut DataFlowGraph,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
-) -> usize {
-    // Count transformation patterns across all functions
-    // Note: We don't currently store these in DataFlowGraph,
-    // but we count them for metrics purposes
-    extracted
-        .values()
-        .flat_map(|file_data| &file_data.functions)
-        .map(|func| func.transformation_patterns.len())
-        .sum()
-}
-
-/// Populate all data flow information from extracted data (pure).
-///
-/// # Spec 213
-///
-/// Convenience function that populates all data flow information from extracted
-/// file data in a single call. This is the preferred entry point when using
-/// the unified extraction pipeline.
-pub fn populate_all_from_extracted(
-    data_flow: &mut DataFlowGraph,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
-) -> PopulationStats {
-    let purity_count = populate_purity_from_extracted(data_flow, extracted);
-    let io_count = populate_io_from_extracted(data_flow, extracted);
-    let dep_count = populate_variable_deps_from_extracted(data_flow, extracted);
-    let transform_count = populate_transformations_from_extracted(data_flow, extracted);
-
-    PopulationStats {
-        purity_entries: purity_count,
-        io_operations: io_count,
-        variable_dependencies: dep_count,
-        transformation_patterns: transform_count,
-    }
-}
-
-/// Statistics from data flow population.
-#[derive(Debug, Clone, Default)]
-pub struct PopulationStats {
-    /// Number of functions with purity analysis populated
-    pub purity_entries: usize,
-    /// Number of I/O operations populated
-    pub io_operations: usize,
-    /// Number of variable dependencies populated
-    pub variable_dependencies: usize,
-    /// Number of transformation patterns detected
-    pub transformation_patterns: usize,
-}
+// populate_data_transformations) were removed in Spec 213. The spec 213 extracted data functions
+// were consolidated into the extraction adapters (spec 214) - use crate::extraction::adapters::data_flow.
 
 #[cfg(test)]
 mod tests {

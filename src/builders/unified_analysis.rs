@@ -123,7 +123,14 @@ pub fn perform_unified_analysis_with_options(
         let _span = info_span!("call_graph_building").entered();
         info!("Building call graph");
 
-        let result = if parallel {
+        // Spec 214: Use extraction adapters when extracted data is available
+        let result = if let Some(ref extracted) = extracted_data {
+            info!("Building call graph from extracted data (spec 214)");
+            let (graph, exclusions, fn_pointers) =
+                parallel_call_graph::build_call_graph_from_extracted(call_graph.clone(), extracted);
+            call_graph = graph;
+            (exclusions, fn_pointers)
+        } else if parallel {
             build_call_graph_with_progress(
                 project_path,
                 &mut call_graph,

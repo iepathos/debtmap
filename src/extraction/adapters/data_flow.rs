@@ -45,7 +45,8 @@ pub fn populate_data_flow(
 
     for (path, file_data) in extracted {
         for func in &file_data.functions {
-            let func_id = FunctionId::new(path.clone(), func.name.clone(), func.line);
+            // Use qualified_name for method disambiguation (e.g., "Type::method")
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
 
             // Purity info
             stats.purity_entries += populate_purity(graph, &func_id, &func.purity_analysis);

@@ -345,54 +345,5 @@ pub fn extract_all_files(files: &[PathBuf]) -> HashMap<PathBuf, ExtractedFileDat
     extracted
 }
 
-/// Convert extracted function data to FunctionMetrics (pure).
-///
-/// # Spec 213
-///
-/// Creates FunctionMetrics from pre-extracted data, avoiding re-parsing.
-/// This utility function is provided for alternative analysis pipelines that
-/// may want to build metrics directly from extraction results.
-///
-/// Note: Currently the main pipeline uses extraction data for purity/I/O analysis
-/// while metrics come from the traditional parsing path. This function exists
-/// for potential future optimizations or alternative analysis flows.
-#[allow(dead_code)] // Spec 213: Utility function for alternative analysis flows
-pub fn metrics_from_extracted(
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
-) -> Vec<FunctionMetrics> {
-    extracted
-        .iter()
-        .flat_map(|(path, file_data)| {
-            file_data.functions.iter().map(|func| {
-                let mut metrics = FunctionMetrics::new(func.name.clone(), path.clone(), func.line);
-                metrics.cyclomatic = func.cyclomatic;
-                metrics.cognitive = func.cognitive;
-                metrics.nesting = func.nesting;
-                metrics.length = func.length;
-                metrics.is_test = func.is_test;
-                metrics.visibility = func.visibility.clone();
-                metrics.is_trait_method = func.is_trait_method;
-                metrics.in_test_module = func.in_test_module;
-                metrics.is_pure = Some(func.purity_analysis.is_pure);
-                metrics.purity_confidence = Some(func.purity_analysis.confidence);
-                metrics.purity_level = Some(purity_level_from_extracted(
-                    &func.purity_analysis.purity_level,
-                ));
-                metrics
-            })
-        })
-        .collect()
-}
-
-/// Convert extraction PurityLevel to core PurityLevel (pure).
-///
-/// Helper for `metrics_from_extracted` - kept for completeness of that API.
-#[allow(dead_code)] // Spec 213: Helper for metrics_from_extracted utility
-fn purity_level_from_extracted(level: &crate::extraction::PurityLevel) -> crate::core::PurityLevel {
-    match level {
-        crate::extraction::PurityLevel::StrictlyPure => crate::core::PurityLevel::StrictlyPure,
-        crate::extraction::PurityLevel::LocallyPure => crate::core::PurityLevel::LocallyPure,
-        crate::extraction::PurityLevel::ReadOnly => crate::core::PurityLevel::ReadOnly,
-        crate::extraction::PurityLevel::Impure => crate::core::PurityLevel::Impure,
-    }
-}
+// Note: Metrics conversion from extracted data moved to extraction adapters (spec 214).
+// Use crate::extraction::adapters::metrics for converting ExtractedFileData to FunctionMetrics.

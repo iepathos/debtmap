@@ -8,6 +8,13 @@
 //! All functions in this module are pure (no I/O, no parsing). The call graph
 //! construction is O(n*m) where n is the number of functions and m is the average
 //! number of calls per function.
+//!
+//! # Pipeline Usage
+//!
+//! The main analysis pipeline uses `crate::builders::parallel_call_graph::build_call_graph_from_extracted`
+//! which returns additional metadata (framework_exclusions, function_pointer_used).
+//! This adapter provides a simpler pure implementation useful for testing and
+//! standalone call graph analysis.
 
 use crate::extraction::types::{CallSite, CallType as ExtractedCallType, ExtractedFileData};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
@@ -31,7 +38,8 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
     // First pass: add all function nodes
     for (path, file_data) in extracted {
         for func in &file_data.functions {
-            let func_id = FunctionId::new(path.clone(), func.name.clone(), func.line);
+            // Use qualified_name for method disambiguation (e.g., "Type::method")
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
 
             graph.add_function(
                 func_id,
@@ -46,7 +54,7 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
     // Second pass: add call edges
     for (path, file_data) in extracted {
         for func in &file_data.functions {
-            let caller_id = FunctionId::new(path.clone(), func.name.clone(), func.line);
+            let caller_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
 
             for call in &func.calls {
                 if let Some(callee_id) = resolve_call(path, call, extracted) {
