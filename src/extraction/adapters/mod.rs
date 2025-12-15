@@ -87,7 +87,7 @@ pub mod metrics;
 // Re-export commonly used functions for convenience
 pub use call_graph::build_call_graph;
 pub use data_flow::{populate_data_flow, PopulationStats};
-pub use god_object::{analyze_god_object, GodObjectThresholds};
+pub use god_object::{analyze_god_object, analyze_god_objects};
 pub use metrics::{
     all_file_metrics_from_extracted, all_function_metrics, all_metrics_from_extracted,
     to_file_metrics, to_function_metrics,
