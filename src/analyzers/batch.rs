@@ -281,16 +281,17 @@ pub fn validate_single_file(path: &Path) -> AnalysisValidation<ValidatedFile> {
 }
 
 /// Validate file syntax based on language.
+///
+/// Spec 202: Uses UnifiedFileExtractor for Rust files to ensure consistent
+/// parsing and SourceMap management.
 fn validate_syntax(content: &str, language: Language, path: &Path) -> Result<(), AnalysisError> {
     match language {
         Language::Rust => {
-            // Try to parse as Rust
-            let result = syn::parse_file(content).map_err(|e| {
+            // Use UnifiedFileExtractor for parsing (spec 202)
+            // This ensures SourceMap is reset after parsing
+            crate::extraction::UnifiedFileExtractor::extract(path, content).map_err(|e| {
                 AnalysisError::parse_with_path(format!("Rust syntax error: {}", e), path)
-            });
-            // Reset SourceMap after validation parse to prevent overflow
-            crate::core::parsing::reset_span_locations();
-            result?;
+            })?;
             Ok(())
         }
         Language::Python => {

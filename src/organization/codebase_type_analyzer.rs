@@ -190,6 +190,8 @@ impl CodebaseSnapshot {
             let content = std::fs::read_to_string(entry.path())
                 .map_err(|e| format!("Failed to read {}: {}", entry.path().display(), e))?;
 
+            // Note: DO NOT reset SourceMap here - ASTs are stored in FileSnapshot
+            // and span references must remain valid for later analysis.
             let ast = syn::parse_file(&content)
                 .map_err(|e| format!("Failed to parse {}: {}", entry.path().display(), e))?;
 

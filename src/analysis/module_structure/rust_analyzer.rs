@@ -20,9 +20,18 @@ use super::types::{
 };
 
 /// Analyze a Rust source file to extract detailed module structure
+///
+/// Spec 202: Resets SourceMap after analysis (not after parsing) to ensure
+/// span lookups in the AST remain valid during analysis.
 pub fn analyze_rust_file(content: &str, _file_path: &Path) -> ModuleStructure {
-    match syn::parse_file(content) {
-        Ok(ast) => analyze_rust_ast(&ast),
+    let result = match syn::parse_file(content) {
+        Ok(ast) => {
+            // Analyze while AST spans are still valid
+            let structure = analyze_rust_ast(&ast);
+            // Reset SourceMap after all span lookups are done (spec 202)
+            crate::core::parsing::reset_span_locations();
+            structure
+        }
         Err(_) => ModuleStructure {
             total_lines: content.lines().count(),
             components: vec![],
@@ -32,7 +41,8 @@ pub fn analyze_rust_file(content: &str, _file_path: &Path) -> ModuleStructure {
             dependencies: ComponentDependencyGraph::new(),
             facade_info: None,
         },
-    }
+    };
+    result
 }
 
 /// Analyze a parsed Rust AST

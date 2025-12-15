@@ -1,5 +1,6 @@
 use crate::analysis::{FileContext, FileContextDetector};
 use crate::core::{FunctionMetrics, Language};
+use crate::extraction::UnifiedFileExtractor;
 use crate::organization::{GodObjectAnalysis, GodObjectDetector};
 use crate::priority::score_types::Score0To100;
 use anyhow::Result;
@@ -80,11 +81,22 @@ fn create_god_object_analysis(
 ///
 /// Spec 201: Uses per-struct analysis. Returns the first god object found,
 /// or None if no structs qualify as god objects.
+///
+/// Spec 202: Uses UnifiedFileExtractor for parsing to prevent SourceMap overflow.
 fn detect_rust_god_object(path: &Path, content: &str) -> Result<Option<GodObjectAnalysis>> {
+    // Use UnifiedFileExtractor to ensure SourceMap is reset after parsing (spec 202)
+    // The extraction step gives us metadata, but GodObjectDetector still needs the AST
+    let _extracted = UnifiedFileExtractor::extract(path, content).ok();
+
+    // For god object detection, we need the AST for the detector's syn::visit patterns
     syn::parse_file(content)
         .map(|ast| {
             let detector = GodObjectDetector::with_source_content(content);
             let analyses = detector.analyze_comprehensive(path, &ast);
+
+            // Reset SourceMap after analysis to prevent overflow (spec 202)
+            crate::core::parsing::reset_span_locations();
+
             // Return the first god object found, if any
             analyses.into_iter().find(|a| a.is_god_object)
         })
