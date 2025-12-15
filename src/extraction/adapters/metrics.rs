@@ -226,6 +226,7 @@ mod tests {
             impls: vec![],
             imports: vec![],
             total_lines: 50,
+            detected_patterns: vec![],
         }
     }
 

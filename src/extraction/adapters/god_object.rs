@@ -510,6 +510,7 @@ mod tests {
             }],
             imports: vec![],
             total_lines: 2500,
+            detected_patterns: vec![],
         }
     }
 
@@ -522,6 +523,7 @@ mod tests {
             impls: vec![],
             imports: vec![],
             total_lines: 50,
+            detected_patterns: vec![],
         };
 
         let result = analyze_god_object(&file_data.path, &file_data);
@@ -728,6 +730,7 @@ mod tests {
             }],
             imports: vec![],
             total_lines: 500,
+            detected_patterns: vec![],
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);
@@ -809,6 +812,7 @@ mod tests {
             ],
             imports: vec![],
             total_lines: 800,
+            detected_patterns: vec![],
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);
@@ -847,6 +851,7 @@ mod tests {
             impls: vec![], // No impl blocks
             imports: vec![],
             total_lines: 50,
+            detected_patterns: vec![],
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);
@@ -912,6 +917,7 @@ mod tests {
             ],
             imports: vec![],
             total_lines: 600,
+            detected_patterns: vec![],
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);

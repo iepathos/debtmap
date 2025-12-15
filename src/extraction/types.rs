@@ -41,6 +41,45 @@ pub struct ExtractedFileData {
     pub imports: Vec<ImportInfo>,
     /// Total lines in file
     pub total_lines: usize,
+    /// Detected code patterns (god objects, long functions, deep nesting, etc.)
+    /// Spec 204: Pre-computed during extraction to avoid re-parsing
+    pub detected_patterns: Vec<DetectedPattern>,
+}
+
+/// Code pattern detected during extraction.
+///
+/// These patterns are detected during the single extraction pass to avoid
+/// re-parsing the file for pattern detection. Spec 204 migration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DetectedPattern {
+    /// A struct with many fields (potential god object)
+    GodObject {
+        /// Name of the struct
+        name: String,
+        /// Number of fields
+        field_count: usize,
+    },
+    /// A function with many lines
+    LongFunction {
+        /// Name of the function
+        name: String,
+        /// Approximate line count
+        lines: usize,
+    },
+    /// A function with many parameters
+    ManyParameters {
+        /// Name of the function
+        name: String,
+        /// Number of parameters
+        param_count: usize,
+    },
+    /// Deeply nested control flow
+    DeepNesting {
+        /// Name of the containing function
+        function_name: String,
+        /// Maximum nesting depth found
+        depth: u32,
+    },
 }
 
 /// All data extracted for a single function.
@@ -294,6 +333,7 @@ impl ExtractedFileData {
             impls: Vec::new(),
             imports: Vec::new(),
             total_lines: 0,
+            detected_patterns: Vec::new(),
         }
     }
 
@@ -425,6 +465,7 @@ const _: () = {
     let _ = _assert_send_sync::<CallSite>;
     let _ = _assert_send_sync::<IoOperation>;
     let _ = _assert_send_sync::<TransformationPattern>;
+    let _ = _assert_send_sync::<DetectedPattern>;
 };
 
 #[cfg(test)]
@@ -523,6 +564,7 @@ mod tests {
                 is_glob: false,
             }],
             total_lines: 100,
+            detected_patterns: vec![],
         };
 
         let cloned = original.clone();
@@ -571,6 +613,7 @@ mod tests {
             impls: Vec::new(),
             imports: Vec::new(),
             total_lines: 10,
+            detected_patterns: vec![],
         };
 
         // Serialize to JSON
@@ -710,6 +753,7 @@ mod tests {
                 })
                 .collect(),
             total_lines: 200,
+            detected_patterns: vec![],
         };
 
         // Serialize to estimate memory size

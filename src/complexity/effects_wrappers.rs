@@ -30,15 +30,43 @@
 //! let complexity = run_effect(effect, config)?;
 //! ```
 
-use super::pure::{
-    calculate_cognitive_pure, calculate_cyclomatic_pure, detect_patterns_pure, Pattern,
-};
+use super::pure::Pattern;
 use crate::effects::{effect_fail, effect_pure, AnalysisEffect};
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
-use crate::extraction::UnifiedFileExtractor;
+use crate::extraction::{DetectedPattern, UnifiedFileExtractor};
 use std::path::PathBuf;
 use stillwater::effect::prelude::*;
+
+/// Convert extracted patterns to complexity patterns.
+///
+/// Spec 204: Patterns are now pre-computed during extraction to avoid re-parsing.
+fn convert_extracted_patterns(patterns: &[DetectedPattern]) -> Vec<Pattern> {
+    patterns
+        .iter()
+        .map(|p| match p {
+            DetectedPattern::GodObject { name, field_count } => Pattern::GodObject {
+                name: name.clone(),
+                field_count: *field_count,
+            },
+            DetectedPattern::LongFunction { name, lines } => Pattern::LongFunction {
+                name: name.clone(),
+                lines: *lines,
+            },
+            DetectedPattern::ManyParameters { name, param_count } => Pattern::ManyParameters {
+                name: name.clone(),
+                param_count: *param_count,
+            },
+            DetectedPattern::DeepNesting {
+                function_name,
+                depth,
+            } => Pattern::DeepNesting {
+                function_name: function_name.clone(),
+                depth: *depth,
+            },
+        })
+        .collect()
+}
 
 /// Calculate cyclomatic complexity for a file with I/O.
 ///
@@ -132,8 +160,8 @@ pub fn calculate_cognitive_effect(path: PathBuf) -> AnalysisEffect<u32> {
 /// let patterns = run_effect(effect, config)?;
 /// ```
 ///
-/// Note: Pattern detection requires AST access and is not pre-computed in
-/// ExtractedFileData. We use syn::parse_file here but reset SourceMap after (spec 202).
+/// Spec 204: Patterns are now pre-computed during extraction to avoid re-parsing.
+/// Uses UnifiedFileExtractor which handles SourceMap reset internally.
 pub fn detect_patterns_effect(path: PathBuf) -> AnalysisEffect<Vec<Pattern>> {
     from_fn(move |env: &RealEnv| {
         // Read file content
@@ -141,16 +169,13 @@ pub fn detect_patterns_effect(path: PathBuf) -> AnalysisEffect<Vec<Pattern>> {
             AnalysisError::io_with_path(format!("Failed to read file: {}", e), path.clone())
         })?;
 
-        // Parse as Rust (pattern detection needs AST access)
-        let ast = syn::parse_file(&content).map_err(|e| {
+        // Use extracted data which includes detected patterns (spec 204)
+        let extracted = UnifiedFileExtractor::extract(&path, &content).map_err(|e| {
             AnalysisError::parse(format!("Failed to parse {}: {}", path.display(), e))
         })?;
 
-        // Detect patterns using pure function
-        let patterns = detect_patterns_pure(&ast);
-
-        // Reset SourceMap after parsing to prevent overflow (spec 202)
-        crate::core::parsing::reset_span_locations();
+        // Convert extracted patterns to complexity patterns
+        let patterns = convert_extracted_patterns(&extracted.detected_patterns);
 
         Ok(patterns)
     })
@@ -182,8 +207,8 @@ pub struct ComplexityResult {
 /// println!("Cyclomatic: {}, Cognitive: {}", result.cyclomatic, result.cognitive);
 /// ```
 ///
-/// Spec 202: Uses UnifiedFileExtractor for complexity metrics but still needs
-/// AST for pattern detection. SourceMap is reset after each parsing operation.
+/// Spec 204: Uses UnifiedFileExtractor for all metrics including pattern detection.
+/// No separate parsing needed - all data is extracted in a single pass.
 pub fn analyze_complexity_effect(path: PathBuf) -> AnalysisEffect<ComplexityResult> {
     from_fn(move |env: &RealEnv| {
         // Read file content
@@ -191,7 +216,7 @@ pub fn analyze_complexity_effect(path: PathBuf) -> AnalysisEffect<ComplexityResu
             AnalysisError::io_with_path(format!("Failed to read file: {}", e), path.clone())
         })?;
 
-        // Use extracted data for complexity metrics (spec 202)
+        // Use extracted data for all metrics (spec 204)
         let extracted = UnifiedFileExtractor::extract(&path, &content).map_err(|e| {
             AnalysisError::parse(format!("Failed to parse {}: {}", path.display(), e))
         })?;
@@ -200,14 +225,8 @@ pub fn analyze_complexity_effect(path: PathBuf) -> AnalysisEffect<ComplexityResu
         let cyclomatic: u32 = extracted.functions.iter().map(|f| f.cyclomatic).sum();
         let cognitive: u32 = extracted.functions.iter().map(|f| f.cognitive).sum();
 
-        // Pattern detection requires AST access (not in ExtractedFileData)
-        let patterns = syn::parse_file(&content)
-            .map(|ast| {
-                let result = detect_patterns_pure(&ast);
-                crate::core::parsing::reset_span_locations();
-                result
-            })
-            .unwrap_or_default();
+        // Patterns are now pre-computed during extraction (spec 204)
+        let patterns = convert_extracted_patterns(&extracted.detected_patterns);
 
         Ok(ComplexityResult {
             cyclomatic,
@@ -231,36 +250,42 @@ pub fn analyze_complexity_effect(path: PathBuf) -> AnalysisEffect<ComplexityResu
 /// let complexity = run_effect(effect, config)?;
 /// ```
 ///
-/// Spec 202: Resets SourceMap after parsing.
+/// Spec 204: Uses UnifiedFileExtractor for complexity calculation.
 pub fn calculate_cyclomatic_from_string(content: String) -> AnalysisEffect<u32> {
-    let result = syn::parse_file(&content);
-    crate::core::parsing::reset_span_locations();
-    match result {
-        Ok(ast) => effect_pure(calculate_cyclomatic_pure(&ast)),
+    use std::path::Path;
+    let path = Path::new("<string>");
+    match UnifiedFileExtractor::extract(path, &content) {
+        Ok(extracted) => {
+            let total: u32 = extracted.functions.iter().map(|f| f.cyclomatic).sum();
+            effect_pure(total)
+        }
         Err(e) => effect_fail(AnalysisError::parse(format!("Parse error: {}", e))),
     }
 }
 
 /// Calculate cognitive complexity from a string.
 ///
-/// Spec 202: Resets SourceMap after parsing.
+/// Spec 204: Uses UnifiedFileExtractor for complexity calculation.
 pub fn calculate_cognitive_from_string(content: String) -> AnalysisEffect<u32> {
-    let result = syn::parse_file(&content);
-    crate::core::parsing::reset_span_locations();
-    match result {
-        Ok(ast) => effect_pure(calculate_cognitive_pure(&ast)),
+    use std::path::Path;
+    let path = Path::new("<string>");
+    match UnifiedFileExtractor::extract(path, &content) {
+        Ok(extracted) => {
+            let total: u32 = extracted.functions.iter().map(|f| f.cognitive).sum();
+            effect_pure(total)
+        }
         Err(e) => effect_fail(AnalysisError::parse(format!("Parse error: {}", e))),
     }
 }
 
 /// Detect patterns from a string.
 ///
-/// Spec 202: Resets SourceMap after parsing.
+/// Spec 204: Uses UnifiedFileExtractor for pattern detection.
 pub fn detect_patterns_from_string(content: String) -> AnalysisEffect<Vec<Pattern>> {
-    let result = syn::parse_file(&content);
-    crate::core::parsing::reset_span_locations();
-    match result {
-        Ok(ast) => effect_pure(detect_patterns_pure(&ast)),
+    use std::path::Path;
+    let path = Path::new("<string>");
+    match UnifiedFileExtractor::extract(path, &content) {
+        Ok(extracted) => effect_pure(convert_extracted_patterns(&extracted.detected_patterns)),
         Err(e) => effect_fail(AnalysisError::parse(format!("Parse error: {}", e))),
     }
 }
