@@ -123,7 +123,10 @@ pub fn create_unified_analysis(
     // Create data flow graph
     let data_flow_graph = DataFlowGraph::from_call_graph(call_graph.clone());
 
-    // Score functions (pure, main computation)
+    // Build file line count cache (spec 195: I/O at boundary, once per unique file)
+    let file_line_counts = scoring::build_file_line_count_cache(enriched_metrics);
+
+    // Score functions (pure, main computation - uses cached file line counts)
     let debt_items = scoring::process_metrics_to_debt_items(
         enriched_metrics,
         call_graph,
@@ -135,6 +138,7 @@ pub fn create_unified_analysis(
         Some(&data_flow_graph),
         ctx.risk_analyzer,
         ctx.project_path,
+        &file_line_counts,
     );
 
     // Add debt items

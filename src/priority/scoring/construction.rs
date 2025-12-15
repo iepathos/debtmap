@@ -25,12 +25,26 @@ use crate::priority::{
     UnifiedDebtItem, UnifiedScore,
 };
 use crate::risk::lcov::LcovData;
-use std::collections::HashSet;
-use std::path::Path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
-/// Calculate file line count for caching (spec 204).
+/// Type alias for file line count cache (spec 195).
+pub type FileLineCountCache = HashMap<PathBuf, usize>;
+
+/// Look up cached file line count (pure function, spec 195).
+///
+/// This is a pure O(1) lookup from the pre-built cache.
+/// Falls back to reading file if not in cache (defensive coding).
+fn get_file_line_count(file_path: &Path, cache: &FileLineCountCache) -> Option<usize> {
+    cache
+        .get(file_path)
+        .copied()
+        .or_else(|| calculate_file_line_count_from_disk(file_path))
+}
+
+/// Calculate file line count by reading from disk (fallback for cache miss).
 /// Returns None if file cannot be read.
-fn calculate_file_line_count(file_path: &Path) -> Option<usize> {
+fn calculate_file_line_count_from_disk(file_path: &Path) -> Option<usize> {
     use crate::metrics::LocCounter;
     let loc_counter = LocCounter::default();
     loc_counter
@@ -192,8 +206,8 @@ pub fn create_unified_debt_item_enhanced(
     // Calculate entropy details once for efficiency (spec 214)
     let entropy_details = calculate_entropy_details(func);
 
-    // Cache file line count during item creation (spec 204)
-    let file_line_count = calculate_file_line_count(&func.file);
+    // Calculate file line count (this function doesn't use the cache since it's a standalone API)
+    let file_line_count = calculate_file_line_count_from_disk(&func.file);
 
     // Analyze responsibility category during construction (spec 254)
     let responsibility_category =
@@ -256,6 +270,8 @@ pub fn create_unified_debt_item_with_aggregator(
     debt_aggregator: &DebtAggregator,
 ) -> Vec<UnifiedDebtItem> {
     use std::path::Path;
+    // Create empty cache for backward compatibility (will use fallback reads)
+    let empty_cache = FileLineCountCache::new();
     create_unified_debt_item_with_aggregator_and_data_flow(
         func,
         call_graph,
@@ -266,6 +282,7 @@ pub fn create_unified_debt_item_with_aggregator(
         None,           // DataFlowGraph will be provided by the new function
         None,           // No risk analyzer in wrapper function
         Path::new("."), // Default project path
+        &empty_cache,   // Empty cache for backward compatibility
     )
 }
 
@@ -430,11 +447,12 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     item
 }
 
-// Pure function: Build unified debt item from components
+// Pure function: Build unified debt item from components (spec 195: uses cache)
 fn build_unified_debt_item(
     func: &FunctionMetrics,
     mut context: DebtAnalysisContext,
     deps: DependencyMetrics,
+    file_line_counts: &FileLineCountCache,
 ) -> UnifiedDebtItem {
     // Apply context-aware dampening (spec 191)
     let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
@@ -465,8 +483,8 @@ fn build_unified_debt_item(
     // Calculate entropy details once for efficiency (spec 214)
     let entropy_details = calculate_entropy_details(func);
 
-    // Cache file line count during item creation (spec 204)
-    let file_line_count = calculate_file_line_count(&func.file);
+    // Look up file line count from cache (spec 195: O(1) lookup instead of file read)
+    let file_line_count = get_file_line_count(&func.file, file_line_counts);
 
     // Analyze responsibility category during construction (spec 254)
     let responsibility_category =
@@ -517,7 +535,7 @@ fn build_unified_debt_item(
     }
 }
 
-// Main function using functional composition (spec 201, spec 228: multi-debt)
+// Main function using functional composition (spec 201, spec 228: multi-debt, spec 195: cache)
 /// Returns `Vec<UnifiedDebtItem>` - one per debt type found (spec 228)
 #[allow(clippy::too_many_arguments)]
 pub fn create_unified_debt_item_with_aggregator_and_data_flow(
@@ -530,6 +548,7 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
     risk_analyzer: Option<&crate::risk::RiskAnalyzer>,
     project_path: &Path,
+    file_line_counts: &FileLineCountCache,
 ) -> Vec<UnifiedDebtItem> {
     // Step 1: Create function ID (pure)
     let func_id = create_function_id(func);
@@ -566,8 +585,8 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
                 transitive_coverage.as_ref(),
             )?;
 
-            // Build debt item
-            let mut item = build_unified_debt_item(func, context, deps.clone());
+            // Build debt item (spec 195: uses cached file line counts)
+            let mut item = build_unified_debt_item(func, context, deps.clone(), file_line_counts);
 
             // Analyze contextual risk if risk analyzer is provided (spec 202)
             if let Some(analyzer) = risk_analyzer {
@@ -608,6 +627,8 @@ pub fn create_unified_debt_item_with_exclusions(
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> Vec<UnifiedDebtItem> {
+    // Create empty cache for backward compatibility (will use fallback reads)
+    let empty_cache = FileLineCountCache::new();
     create_unified_debt_item_with_exclusions_and_data_flow(
         func,
         call_graph,
@@ -615,6 +636,7 @@ pub fn create_unified_debt_item_with_exclusions(
         framework_exclusions,
         function_pointer_used_functions,
         None,
+        &empty_cache,
     )
 }
 
@@ -625,6 +647,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
+    file_line_counts: &FileLineCountCache,
 ) -> Vec<UnifiedDebtItem> {
     let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
@@ -697,7 +720,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
     let entropy_details = calculate_entropy_details(func);
-    let file_line_count = calculate_file_line_count(&func.file);
+    // Look up file line count from cache (spec 195: O(1) lookup instead of file read)
+    let file_line_count = get_file_line_count(&func.file, file_line_counts);
 
     // Create one UnifiedDebtItem per debt type (spec 228)
     debt_types

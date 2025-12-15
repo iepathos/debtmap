@@ -314,6 +314,8 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
 ) -> Vec<UnifiedDebtItem> {
+    // Create empty cache for backward compatibility (will use fallback reads)
+    let empty_cache = std::collections::HashMap::new();
     core::phases::scoring::create_debt_items_from_metric(
         metric,
         call_graph,
@@ -324,6 +326,7 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         data_flow,
         risk_analyzer,
         project_path,
+        &empty_cache,
     )
 }
 
@@ -385,7 +388,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
     let debt_aggregator = core::phases::scoring::setup_debt_aggregator(metrics, debt_items);
     let data_flow = crate::data_flow::DataFlowGraph::from_call_graph(call_graph.clone());
 
-    // Process metrics to debt items
+    // Build file line count cache (spec 195: I/O at boundary, once per unique file)
+    let file_line_counts = core::phases::scoring::build_file_line_count_cache(metrics);
+
+    // Process metrics to debt items (uses cached file line counts)
     let items = core::phases::scoring::process_metrics_to_debt_items(
         metrics,
         call_graph,
@@ -397,6 +403,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         Some(&data_flow),
         risk_analyzer.as_ref(),
         project_path,
+        &file_line_counts,
     );
 
     for item in items {
