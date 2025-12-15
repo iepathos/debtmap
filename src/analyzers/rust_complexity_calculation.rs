@@ -8,7 +8,6 @@ use crate::complexity::{
     cognitive::calculate_cognitive_with_patterns,
     visitor_detector::{PatternInfo, PatternType},
 };
-use syn::visit::Visit;
 
 /// Calculate cyclomatic complexity with visitor pattern detection.
 ///
@@ -82,97 +81,11 @@ fn try_detect_visitor_pattern(
 ///
 /// Counts nesting levels of control flow structures (if, while, for, loop, match).
 /// Returns the maximum depth encountered.
+///
+/// Uses the pure implementation from `complexity::pure::calculate_max_nesting_depth`
+/// as the single source of truth for consistent nesting calculations.
 pub fn calculate_nesting(block: &syn::Block) -> u32 {
-    struct NestingVisitor {
-        current_depth: u32,
-        max_depth: u32,
-    }
-
-    impl NestingVisitor {
-        fn visit_nested<F>(&mut self, f: F)
-        where
-            F: FnOnce(&mut Self),
-        {
-            self.current_depth += 1;
-            self.max_depth = self.max_depth.max(self.current_depth);
-            f(self);
-            self.current_depth -= 1;
-        }
-    }
-
-    impl<'ast> Visit<'ast> for NestingVisitor {
-        fn visit_expr_if(&mut self, i: &'ast syn::ExprIf) {
-            // Increment nesting for the if itself
-            self.current_depth += 1;
-            self.max_depth = self.max_depth.max(self.current_depth);
-
-            // Visit condition (no nesting change)
-            self.visit_expr(&i.cond);
-
-            // Visit then branch (already at incremented depth)
-            self.visit_block(&i.then_branch);
-
-            // Decrement before visiting else branch so else-if stays flat
-            self.current_depth -= 1;
-
-            // Visit else branch at original nesting level
-            // This handles else-if chains correctly
-            if let Some((_, else_expr)) = &i.else_branch {
-                self.visit_expr(else_expr);
-            }
-        }
-
-        fn visit_expr_while(&mut self, i: &'ast syn::ExprWhile) {
-            self.visit_nested(|v| syn::visit::visit_expr_while(v, i));
-        }
-
-        fn visit_expr_for_loop(&mut self, i: &'ast syn::ExprForLoop) {
-            self.visit_nested(|v| syn::visit::visit_expr_for_loop(v, i));
-        }
-
-        fn visit_expr_loop(&mut self, i: &'ast syn::ExprLoop) {
-            self.visit_nested(|v| syn::visit::visit_expr_loop(v, i));
-        }
-
-        fn visit_expr_match(&mut self, i: &'ast syn::ExprMatch) {
-            self.current_depth += 1;
-            self.max_depth = self.max_depth.max(self.current_depth);
-
-            self.visit_expr(&i.expr);
-
-            for arm in &i.arms {
-                self.visit_arm(arm);
-            }
-
-            self.current_depth -= 1;
-        }
-
-        fn visit_arm(&mut self, i: &'ast syn::Arm) {
-            for attr in &i.attrs {
-                self.visit_attribute(attr);
-            }
-            self.visit_pat(&i.pat);
-            if let Some((_, guard)) = &i.guard {
-                self.visit_expr(guard);
-            }
-            self.visit_expr(&i.body);
-        }
-
-        fn visit_block(&mut self, block: &'ast syn::Block) {
-            syn::visit::visit_block(self, block);
-        }
-    }
-
-    let mut visitor = NestingVisitor {
-        current_depth: 0,
-        max_depth: 0,
-    };
-
-    for stmt in &block.stmts {
-        visitor.visit_stmt(stmt);
-    }
-
-    visitor.max_depth
+    crate::complexity::pure::calculate_max_nesting_depth(block)
 }
 
 /// Count the number of source lines in a block.

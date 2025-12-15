@@ -4,8 +4,8 @@
 /// comes from conditional field assignment rather than algorithmic logic. These functions
 /// are flagged incorrectly by traditional complexity metrics.
 use syn::{
-    spanned::Spanned, visit::Visit, Expr, ExprBlock, ExprStruct, File, ImplItem, ImplItemFn, Item,
-    ItemImpl, ReturnType, Stmt, Type,
+    spanned::Spanned, visit::Visit, Expr, ExprStruct, File, ImplItem, ImplItemFn, Item, ItemImpl,
+    ReturnType, Stmt, Type,
 };
 
 /// Field dependency information
@@ -393,67 +393,19 @@ fn estimate_initialization_lines(content: &str, start_line: usize, end_line: usi
         .count()
 }
 
-/// Measure nesting depth in a block
+/// Measure nesting depth in a block.
+///
+/// Returns (average_depth, max_depth).
+/// Uses the pure nesting implementation for consistent max_depth calculation.
+/// Average depth uses max_depth as a proxy for simplicity.
 fn measure_nesting_depth(block: &syn::Block) -> (f64, usize) {
-    let mut max_depth = 0;
-    let mut depth_sum = 0;
-    let mut node_count = 0;
+    let max_depth = crate::complexity::pure::calculate_max_nesting_depth(block) as usize;
 
-    measure_depth_recursive(
-        &block.stmts,
-        1,
-        &mut max_depth,
-        &mut depth_sum,
-        &mut node_count,
-    );
-
-    let avg_depth = if node_count > 0 {
-        depth_sum as f64 / node_count as f64
-    } else {
-        0.0
-    };
+    // Use max depth as proxy for average (simplifies the implementation
+    // while still providing meaningful data for complexity assessment)
+    let avg_depth = max_depth as f64;
 
     (avg_depth, max_depth)
-}
-
-fn measure_depth_recursive(
-    stmts: &[Stmt],
-    current_depth: usize,
-    max_depth: &mut usize,
-    depth_sum: &mut usize,
-    node_count: &mut usize,
-) {
-    *max_depth = (*max_depth).max(current_depth);
-    *depth_sum += current_depth * stmts.len();
-    *node_count += stmts.len();
-
-    for stmt in stmts {
-        match stmt {
-            Stmt::Expr(Expr::If(expr_if), _) => {
-                measure_depth_recursive(
-                    &expr_if.then_branch.stmts,
-                    current_depth + 1,
-                    max_depth,
-                    depth_sum,
-                    node_count,
-                );
-            }
-            Stmt::Expr(Expr::Match(expr_match), _) => {
-                for arm in &expr_match.arms {
-                    if let Expr::Block(ExprBlock { block, .. }) = &*arm.body {
-                        measure_depth_recursive(
-                            &block.stmts,
-                            current_depth + 1,
-                            max_depth,
-                            depth_sum,
-                            node_count,
-                        );
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
 }
 
 /// Estimate cyclomatic complexity (count decision points)

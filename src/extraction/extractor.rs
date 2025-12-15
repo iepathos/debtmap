@@ -460,9 +460,7 @@ impl UnifiedFileExtractor {
     }
 
     fn calculate_max_nesting(&self, block: &syn::Block) -> u32 {
-        let mut visitor = NestingVisitor::new();
-        visitor.visit_block(block);
-        visitor.max_nesting
+        crate::complexity::pure::calculate_max_nesting_depth(block)
     }
 
     fn extract_struct(&self, item_struct: &syn::ItemStruct) -> ExtractedStructData {
@@ -808,68 +806,6 @@ impl<'ast> Visit<'ast> for TransformationVisitor {
         }
 
         syn::visit::visit_expr_method_call(self, expr);
-    }
-}
-
-/// Visitor to calculate maximum nesting depth.
-struct NestingVisitor {
-    current_nesting: u32,
-    max_nesting: u32,
-}
-
-impl NestingVisitor {
-    fn new() -> Self {
-        Self {
-            current_nesting: 0,
-            max_nesting: 0,
-        }
-    }
-
-    fn enter_nested(&mut self) {
-        self.current_nesting += 1;
-        if self.current_nesting > self.max_nesting {
-            self.max_nesting = self.current_nesting;
-        }
-    }
-
-    fn leave_nested(&mut self) {
-        self.current_nesting = self.current_nesting.saturating_sub(1);
-    }
-}
-
-impl<'ast> Visit<'ast> for NestingVisitor {
-    fn visit_expr(&mut self, expr: &'ast syn::Expr) {
-        match expr {
-            syn::Expr::If(if_expr) => {
-                // Increment nesting for the if itself
-                self.enter_nested();
-
-                // Visit condition (no additional nesting change)
-                syn::visit::visit_expr(self, &if_expr.cond);
-
-                // Visit then branch (already at incremented depth)
-                syn::visit::visit_block(self, &if_expr.then_branch);
-
-                // Leave nesting BEFORE visiting else (handles else-if correctly)
-                self.leave_nested();
-
-                // Visit else branch at original nesting level
-                if let Some((_, else_expr)) = &if_expr.else_branch {
-                    self.visit_expr(else_expr);
-                }
-            }
-            syn::Expr::While(_)
-            | syn::Expr::ForLoop(_)
-            | syn::Expr::Loop(_)
-            | syn::Expr::Match(_) => {
-                self.enter_nested();
-                syn::visit::visit_expr(self, expr);
-                self.leave_nested();
-            }
-            _ => {
-                syn::visit::visit_expr(self, expr);
-            }
-        }
     }
 }
 
