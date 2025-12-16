@@ -2,7 +2,9 @@
 ///
 /// Tests that type-based clustering works correctly on real codebases
 /// and produces recommendations with type ownership principles.
-use debtmap::organization::{GodObjectDetector, SplitAnalysisMethod};
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
+use debtmap::extraction::UnifiedFileExtractor;
+use debtmap::organization::SplitAnalysisMethod;
 use std::fs;
 use std::path::Path;
 
@@ -19,10 +21,9 @@ fn test_type_based_clustering_on_formatter() {
     }
 
     let source = fs::read_to_string(formatter_path).expect("Failed to read formatter.rs");
-    let file = syn::parse_file(&source).expect("Failed to parse formatter.rs");
-
-    let detector = GodObjectDetector::with_source_content(&source);
-    let analyses = detector.analyze_comprehensive(formatter_path, &file);
+    let extracted = UnifiedFileExtractor::extract(formatter_path, &source)
+        .expect("Failed to extract formatter.rs");
+    let analyses = analyze_god_objects(formatter_path, &extracted);
 
     // If formatter.rs has utilities modules from behavioral clustering,
     // type-based should be used instead
@@ -80,10 +81,9 @@ fn test_type_based_clustering_on_god_object_analysis() {
     }
 
     let source = fs::read_to_string(analysis_path).expect("Failed to read god_object_analysis.rs");
-    let file = syn::parse_file(&source).expect("Failed to parse god_object_analysis.rs");
-
-    let detector = GodObjectDetector::with_source_content(&source);
-    let analyses = detector.analyze_comprehensive(analysis_path, &file);
+    let extracted = UnifiedFileExtractor::extract(analysis_path, &source)
+        .expect("Failed to extract god_object_analysis.rs");
+    let analyses = analyze_god_objects(analysis_path, &extracted);
 
     // If the file produces splits, verify they don't have utilities modules
     if let Some(analysis) = analyses.first() {
@@ -163,9 +163,9 @@ fn test_type_based_clustering_quality() {
         }
     "#;
 
-    let file = syn::parse_file(code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(code);
-    let _analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let extracted =
+        UnifiedFileExtractor::extract(Path::new("test.rs"), code).expect("Failed to extract");
+    let _analyses = analyze_god_objects(Path::new("test.rs"), &extracted);
 
     // This code should be analyzed without errors
     // The exact behavior depends on the god object detection thresholds
@@ -215,9 +215,9 @@ fn test_utilities_trigger_type_based_fallback() {
         }
     "#;
 
-    let file = syn::parse_file(code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(code);
-    let analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let extracted =
+        UnifiedFileExtractor::extract(Path::new("test.rs"), code).expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("test.rs"), &extracted);
 
     // Verify no utilities modules in recommendations
     if let Some(analysis) = analyses.first() {

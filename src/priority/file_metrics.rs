@@ -93,6 +93,12 @@ pub struct GodObjectIndicators {
     /// Type of god object detection (GodClass, GodFile, or GodModule) (spec 155)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detection_type: Option<crate::organization::DetectionType>,
+    /// Spec 217: Trait method summary showing trait-mandated vs extractable methods
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trait_method_summary: Option<crate::organization::god_object::TraitMethodSummary>,
+    /// Spec 209/217: Weighted method count (accounting for accessors/trait methods)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weighted_method_count: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -582,6 +588,8 @@ impl Default for GodObjectIndicators {
             cross_domain_severity: None,
             domain_diversity_metrics: None,
             detection_type: None,
+            trait_method_summary: None,
+            weighted_method_count: None,
         }
     }
 }
@@ -606,6 +614,10 @@ impl From<crate::organization::GodObjectAnalysis> for GodObjectIndicators {
                 .map(convert_from_org_severity),
             domain_diversity_metrics: analysis.domain_diversity_metrics,
             detection_type: Some(analysis.detection_type),
+            // Spec 217: Propagate trait method summary for accurate god object recommendations
+            trait_method_summary: analysis.trait_method_summary,
+            // Spec 209/217: Propagate weighted method count
+            weighted_method_count: analysis.weighted_method_count,
         }
     }
 }

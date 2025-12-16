@@ -147,6 +147,7 @@ fn test_analyze_simple_code() {
     let god_object = debtmap::organization::GodObjectAnalysis {
         is_god_object: false,
         method_count: 2,
+        weighted_method_count: None,
         field_count: 1,
         responsibility_count: 1,
         lines_of_code: 50,
@@ -218,6 +219,7 @@ fn test_timeout_budget() {
     let god_object = debtmap::organization::GodObjectAnalysis {
         is_god_object: true,
         method_count: 20,
+        weighted_method_count: None,
         field_count: 4,
         responsibility_count: 3,
         lines_of_code: 200,

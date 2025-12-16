@@ -16,6 +16,7 @@ fn test_file_level_scoring_integration() {
         uncovered_lines: 412,
         god_object_analysis: Some(debtmap::organization::GodObjectAnalysis {
             method_count: 45,
+            weighted_method_count: None,
             field_count: 20,
             responsibility_count: 8,
             is_god_object: false,
@@ -102,6 +103,7 @@ fn test_file_scoring_with_god_object_detection() {
         uncovered_lines: 1500,
         god_object_analysis: Some(debtmap::organization::GodObjectAnalysis {
             method_count: 80,
+            weighted_method_count: None,
             field_count: 40,
             responsibility_count: 12,
             is_god_object: true,
@@ -198,6 +200,7 @@ fn test_file_scoring_priorities() {
                 responsibilities: Vec::new(),
                 recommended_splits: Vec::new(),
                 method_count: 60,
+                weighted_method_count: None,
                 field_count: 20,
                 responsibility_count: 5,
                 lines_of_code: 800,
@@ -222,7 +225,8 @@ fn test_file_scoring_priorities() {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             function_scores: vec![7.0; 60],
             god_object_type: None,
@@ -357,6 +361,7 @@ fn test_recommendation_generation_completeness() {
                     responsibilities: Vec::new(),
                     recommended_splits: Vec::new(),
                     method_count: 40,
+                    weighted_method_count: None,
                     field_count: 15,
                     responsibility_count: 6,
                     lines_of_code: 500,
@@ -381,7 +386,8 @@ fn test_recommendation_generation_completeness() {
                     aggregated_error_swallowing_patterns: None,
                     layering_impact: None,
                     anti_pattern_report: None,
-                    complexity_metrics: None, // Spec 211
+                    complexity_metrics: None,   // Spec 211
+                    trait_method_summary: None, // Spec 217
                 }),
                 function_count: 40,
                 ..Default::default()
@@ -451,6 +457,7 @@ fn test_file_scoring_with_real_world_scenarios() {
         uncovered_lines: 1500,
         god_object_analysis: Some(debtmap::organization::GodObjectAnalysis {
             method_count: 70,
+            weighted_method_count: None,
             field_count: 35,
             responsibility_count: 15,
             is_god_object: true,

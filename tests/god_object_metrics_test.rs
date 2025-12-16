@@ -1,4 +1,6 @@
-use debtmap::organization::{GodObjectDetector, GodObjectMetrics};
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
+use debtmap::extraction::UnifiedFileExtractor;
+use debtmap::organization::GodObjectMetrics;
 use std::path::{Path, PathBuf};
 
 /// Test that metrics tracking properly records god object detection results
@@ -28,9 +30,9 @@ fn test_metrics_tracking_integration() {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let file = syn::parse_file(&god_object_code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(&god_object_code);
-    let analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let extracted = UnifiedFileExtractor::extract(Path::new("test.rs"), &god_object_code)
+        .expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("test.rs"), &extracted);
 
     // With per-struct analysis, standalone functions don't trigger god object detection
     // Empty result means no god objects found
@@ -63,8 +65,9 @@ fn test_metrics_tracking_integration() {
         fn function10() {}
     "#;
 
-    let improved_file = syn::parse_file(improved_code).expect("Failed to parse");
-    let improved_analyses = detector.analyze_comprehensive(Path::new("test.rs"), &improved_file);
+    let improved_extracted = UnifiedFileExtractor::extract(Path::new("test.rs"), improved_code)
+        .expect("Failed to extract");
+    let improved_analyses = analyze_god_objects(Path::new("test.rs"), &improved_extracted);
 
     // With per-struct analysis, improved file likely has no god objects
     if improved_analyses.is_empty() {
@@ -111,9 +114,9 @@ fn test_multi_file_metrics_tracking() {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let file1 = syn::parse_file(&code1).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(&code1);
-    let analyses1 = detector.analyze_comprehensive(Path::new("file1.rs"), &file1);
+    let extracted1 =
+        UnifiedFileExtractor::extract(Path::new("file1.rs"), &code1).expect("Failed to extract");
+    let analyses1 = analyze_god_objects(Path::new("file1.rs"), &extracted1);
 
     // File 2: Not a god object
     let code2 = r#"
@@ -126,9 +129,9 @@ fn test_multi_file_metrics_tracking() {
             fn method2(&self) {}
         }
     "#;
-    let file2 = syn::parse_file(code2).expect("Failed to parse");
-    let detector2 = GodObjectDetector::with_source_content(code2);
-    let analyses2 = detector2.analyze_comprehensive(Path::new("file2.rs"), &file2);
+    let extracted2 =
+        UnifiedFileExtractor::extract(Path::new("file2.rs"), code2).expect("Failed to extract");
+    let analyses2 = analyze_god_objects(Path::new("file2.rs"), &extracted2);
 
     // Record snapshots if any god objects detected
     let mut files_with_god_objects = 0;
@@ -164,9 +167,9 @@ fn test_new_god_object_detection() {
         fn func2() {}
         fn func3() {}
     "#;
-    let small_file = syn::parse_file(small_code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(small_code);
-    let small_analyses = detector.analyze_comprehensive(Path::new("growing.rs"), &small_file);
+    let small_extracted = UnifiedFileExtractor::extract(Path::new("growing.rs"), small_code)
+        .expect("Failed to extract");
+    let small_analyses = analyze_god_objects(Path::new("growing.rs"), &small_extracted);
 
     // With per-struct analysis, standalone functions don't trigger detection
     for analysis in small_analyses {
@@ -191,9 +194,9 @@ fn test_new_god_object_detection() {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let large_file = syn::parse_file(&large_code).expect("Failed to parse");
-    let detector_large = GodObjectDetector::with_source_content(&large_code);
-    let large_analyses = detector_large.analyze_comprehensive(Path::new("growing.rs"), &large_file);
+    let large_extracted = UnifiedFileExtractor::extract(Path::new("growing.rs"), &large_code)
+        .expect("Failed to extract");
+    let large_analyses = analyze_god_objects(Path::new("growing.rs"), &large_extracted);
 
     for analysis in large_analyses {
         metrics.record_snapshot(PathBuf::from("growing.rs"), analysis);

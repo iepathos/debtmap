@@ -1,6 +1,8 @@
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
+use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::organization::{
     calculate_struct_ratio, count_distinct_domains, determine_cross_domain_severity,
-    GodObjectDetector, RecommendationSeverity, StructMetrics,
+    RecommendationSeverity, StructMetrics,
 };
 use std::path::Path;
 
@@ -81,9 +83,9 @@ fn test_god_object_analysis_includes_new_fields() {
         pub fn func1() {}
     "#;
 
-    let file = syn::parse_file(code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(code);
-    let analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let extracted =
+        UnifiedFileExtractor::extract(Path::new("test.rs"), code).expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("test.rs"), &extracted);
 
     // With per-struct analysis, simple code may not produce god objects
     if let Some(analysis) = analyses.first() {

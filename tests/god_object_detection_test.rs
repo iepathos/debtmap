@@ -1,6 +1,8 @@
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
+use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::organization::{
     calculate_god_object_score, determine_confidence, DetectionType, GodObjectConfidence,
-    GodObjectDetector, GodObjectThresholds,
+    GodObjectThresholds,
 };
 use std::path::Path;
 
@@ -41,9 +43,9 @@ fn test_detects_file_with_many_standalone_functions() {
         fn function30() {}
     "#;
 
-    let file = syn::parse_file(code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(code);
-    let analyses = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let extracted =
+        UnifiedFileExtractor::extract(Path::new("test.rs"), code).expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("test.rs"), &extracted);
 
     // With per-struct analysis, standalone functions don't trigger god object detection
     // Empty result means no god objects found
@@ -68,9 +70,9 @@ fn test_detects_rust_call_graph_scenario() {
         code.push_str(&format!("fn function_{}() {{ if true {{ }} }}\n", i));
     }
 
-    let file = syn::parse_file(&code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(&code);
-    let analyses = detector.analyze_comprehensive(Path::new("rust_call_graph.rs"), &file);
+    let extracted = UnifiedFileExtractor::extract(Path::new("rust_call_graph.rs"), &code)
+        .expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("rust_call_graph.rs"), &extracted);
 
     // With per-struct analysis, standalone functions don't trigger god object detection
     // Empty result means no god objects found
@@ -153,9 +155,9 @@ fn test_mixed_struct_and_functions() {
         fn standalone20() {}
     "#;
 
-    let file = syn::parse_file(code).expect("Failed to parse");
-    let detector = GodObjectDetector::with_source_content(code);
-    let analyses = detector.analyze_comprehensive(Path::new("mixed.rs"), &file);
+    let extracted =
+        UnifiedFileExtractor::extract(Path::new("mixed.rs"), code).expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("mixed.rs"), &extracted);
 
     // After spec 118: Only count impl methods for struct analysis, not standalone functions
     // This prevents false positives for functional/procedural modules
@@ -262,9 +264,9 @@ fn test_spec_130_god_class_vs_god_file_detection() {
         }
     "#;
 
-    let file = syn::parse_file(god_class_code).expect("Failed to parse god class code");
-    let detector = GodObjectDetector::with_source_content(god_class_code);
-    let analyses = detector.analyze_comprehensive(Path::new("god_class.rs"), &file);
+    let extracted = UnifiedFileExtractor::extract(Path::new("god_class.rs"), god_class_code)
+        .expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("god_class.rs"), &extracted);
 
     // Verify god class detection excludes test methods
     assert!(!analyses.is_empty(), "Should detect god class");
@@ -361,9 +363,9 @@ fn test_spec_130_god_class_vs_god_file_detection() {
         fn test_helper15() { if true { } }
     "#;
 
-    let file = syn::parse_file(god_file_code).expect("Failed to parse god file code");
-    let detector = GodObjectDetector::with_source_content(god_file_code);
-    let analyses = detector.analyze_comprehensive(Path::new("god_file.rs"), &file);
+    let extracted = UnifiedFileExtractor::extract(Path::new("god_file.rs"), god_file_code)
+        .expect("Failed to extract");
+    let analyses = analyze_god_objects(Path::new("god_file.rs"), &extracted);
 
     // With per-struct analysis, standalone functions don't trigger god object detection
     // Empty result means no god objects found
@@ -435,6 +437,7 @@ fn test_behavioral_decomposition_with_field_tracking() {
         }
     "#;
 
+    // Parse for FieldAccessTracker test (it needs syn::File)
     let file = syn::parse_file(code).expect("Failed to parse");
 
     // Test field access tracking
