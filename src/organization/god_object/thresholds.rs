@@ -111,3 +111,83 @@ impl GodObjectThresholds {
         }
     }
 }
+
+// ============================================================================
+// Spec 211: Complexity Thresholds for Method Complexity Weighting
+// ============================================================================
+
+/// Configuration thresholds for method complexity weighting in God Object scoring (Spec 211).
+///
+/// These thresholds define the "expected" complexity levels. Methods with complexity
+/// at or below these thresholds are considered normal; methods exceeding them
+/// increase the God Object score.
+///
+/// ## Usage
+///
+/// Used by `calculate_complexity_factor` to produce a multiplier for God Object scoring.
+///
+/// ## Stillwater Principle: Pure Configuration
+///
+/// This struct contains only configuration data - no behavior.
+#[derive(Debug, Clone)]
+pub struct ComplexityThresholds {
+    /// Target average cyclomatic complexity per method.
+    ///
+    /// Methods averaging above this contribute to higher scores.
+    /// Default: 5.0 (typical for clean code)
+    pub target_avg_complexity: f64,
+
+    /// Maximum acceptable cyclomatic complexity for any single method.
+    ///
+    /// Methods exceeding this are considered excessively complex.
+    /// Default: 15 (matches typical lint warnings)
+    pub max_method_complexity: u32,
+
+    /// Target total complexity budget for all methods.
+    ///
+    /// Calculated as max_methods * target_avg_complexity.
+    /// Default: 75.0 (15 methods * 5 avg)
+    pub target_total_complexity: f64,
+}
+
+impl Default for ComplexityThresholds {
+    fn default() -> Self {
+        Self {
+            target_avg_complexity: 5.0,
+            max_method_complexity: 15,
+            target_total_complexity: 75.0, // 15 methods * 5 avg
+        }
+    }
+}
+
+impl ComplexityThresholds {
+    /// Create thresholds tuned for Rust codebases.
+    ///
+    /// Rust tends to have more complex pattern matching, so thresholds
+    /// are slightly higher than other languages.
+    pub fn for_rust() -> Self {
+        Self {
+            target_avg_complexity: 5.0,
+            max_method_complexity: 15,
+            target_total_complexity: 100.0, // 20 methods * 5 avg
+        }
+    }
+
+    /// Create thresholds tuned for Python codebases.
+    pub fn for_python() -> Self {
+        Self {
+            target_avg_complexity: 4.0,
+            max_method_complexity: 12,
+            target_total_complexity: 60.0, // 15 methods * 4 avg
+        }
+    }
+
+    /// Create thresholds tuned for JavaScript/TypeScript codebases.
+    pub fn for_javascript() -> Self {
+        Self {
+            target_avg_complexity: 4.0,
+            max_method_complexity: 12,
+            target_total_complexity: 60.0,
+        }
+    }
+}

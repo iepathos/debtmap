@@ -44,6 +44,7 @@ fn test_file_level_scoring_integration() {
             aggregated_error_swallowing_patterns: None,
             layering_impact: None,
             anti_pattern_report: None,
+            complexity_metrics: None, // Spec 211
         }),
         function_scores: vec![],
         god_object_type: None,
@@ -128,6 +129,7 @@ fn test_file_scoring_with_god_object_detection() {
             aggregated_error_swallowing_patterns: None,
             layering_impact: None,
             anti_pattern_report: None,
+            complexity_metrics: None, // Spec 211
         }),
         god_object_type: None,
         function_scores: vec![8.0; 80], // High scores for all functions
@@ -218,6 +220,7 @@ fn test_file_scoring_priorities() {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
+                complexity_metrics: None, // Spec 211
             }),
             function_scores: vec![7.0; 60],
             god_object_type: None,
@@ -376,6 +379,7 @@ fn test_recommendation_generation_completeness() {
                     aggregated_error_swallowing_patterns: None,
                     layering_impact: None,
                     anti_pattern_report: None,
+                    complexity_metrics: None, // Spec 211
                 }),
                 function_count: 40,
                 ..Default::default()
@@ -473,6 +477,7 @@ fn test_file_scoring_with_real_world_scenarios() {
             aggregated_error_swallowing_patterns: None,
             layering_impact: None,
             anti_pattern_report: None,
+            complexity_metrics: None, // Spec 211
         }),
         function_scores: vec![9.0; 70],
         god_object_type: None,

@@ -109,6 +109,7 @@ pub fn fallback_god_object_heuristics(
         aggregated_error_swallowing_patterns: None,
         layering_impact: None,
         anti_pattern_report: None,
+        complexity_metrics: None, // Spec 211
     })
 }
 
@@ -230,6 +231,7 @@ pub fn fallback_with_preserved_analysis(
         aggregated_error_swallowing_patterns: None,
         layering_impact: None,
         anti_pattern_report: None,
+        complexity_metrics: None, // Spec 211
     })
 }
 

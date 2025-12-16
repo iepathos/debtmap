@@ -401,6 +401,7 @@ mod tests {
                     aggregated_error_swallowing_patterns: None,
                     layering_impact: None,
                     anti_pattern_report: None,
+                    complexity_metrics: None, // Spec 211
                 }),
                 function_scores: vec![],
                 god_object_type: None,
