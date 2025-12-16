@@ -42,12 +42,15 @@ use syn::visit::Visit;
 /// - All struct definitions
 /// - All impl blocks
 /// - All imports
+/// - Test region line counts (Spec 214)
 ///
 /// The extractor resets the proc-macro2 SourceMap after extraction
 /// to prevent overflow when processing large codebases.
 pub struct UnifiedFileExtractor {
     /// Number of lines in content
     line_count: usize,
+    /// Accumulated test lines count (Spec 214)
+    test_lines: usize,
 }
 
 impl UnifiedFileExtractor {
@@ -68,8 +71,9 @@ impl UnifiedFileExtractor {
         let ast = syn::parse_file(content)
             .map_err(|e| anyhow::anyhow!("Parse error in {}: {}", path.display(), e))?;
 
-        let extractor = Self {
+        let mut extractor = Self {
             line_count: content.lines().count(),
+            test_lines: 0,
         };
 
         let data = extractor.extract_from_ast(path, &ast);
@@ -114,7 +118,7 @@ impl UnifiedFileExtractor {
         results
     }
 
-    fn extract_from_ast(&self, path: &Path, ast: &syn::File) -> ExtractedFileData {
+    fn extract_from_ast(&mut self, path: &Path, ast: &syn::File) -> ExtractedFileData {
         let mut data = ExtractedFileData::empty(path.to_path_buf());
         data.total_lines = self.line_count;
 
@@ -148,13 +152,23 @@ impl UnifiedFileExtractor {
                                 .is_some_and(|list| list.tokens.to_string().contains("test"))
                     });
 
-                    if let Some((_, items)) = &item_mod.content {
+                    if let Some((brace, items)) = &item_mod.content {
+                        // Spec 214: Track test module line ranges
+                        if is_test_mod {
+                            let start_line = item_mod.mod_token.span.start().line;
+                            let end_line = brace.span.close().start().line;
+                            let test_mod_lines = end_line.saturating_sub(start_line) + 1;
+                            self.test_lines += test_mod_lines;
+                        }
                         self.extract_module_items(items, &mut data, is_test_mod);
                     }
                 }
                 _ => {}
             }
         }
+
+        // Set test_lines from accumulated count (Spec 214)
+        data.test_lines = self.test_lines;
 
         // Detect patterns from extracted data (spec 204: avoid re-parsing)
         data.detected_patterns = Self::detect_patterns_from_extracted(&data);
@@ -214,7 +228,7 @@ impl UnifiedFileExtractor {
     }
 
     fn extract_module_items(
-        &self,
+        &mut self,
         items: &[syn::Item],
         data: &mut ExtractedFileData,
         in_test_module: bool,
@@ -236,16 +250,25 @@ impl UnifiedFileExtractor {
                 }
                 syn::Item::Mod(item_mod) => {
                     // Nested module - check for additional #[cfg(test)]
-                    let is_test_mod =
-                        in_test_module
-                            || item_mod.attrs.iter().any(|attr| {
-                                attr.path().is_ident("cfg")
-                                    && attr.meta.require_list().ok().is_some_and(|list| {
-                                        list.tokens.to_string().contains("test")
-                                    })
-                            });
+                    let is_nested_test = item_mod.attrs.iter().any(|attr| {
+                        attr.path().is_ident("cfg")
+                            && attr
+                                .meta
+                                .require_list()
+                                .ok()
+                                .is_some_and(|list| list.tokens.to_string().contains("test"))
+                    });
+                    let is_test_mod = in_test_module || is_nested_test;
 
-                    if let Some((_, items)) = &item_mod.content {
+                    if let Some((brace, items)) = &item_mod.content {
+                        // Spec 214: Track nested test module line ranges
+                        // Only count if this is a new test module (not already in test context)
+                        if is_nested_test && !in_test_module {
+                            let start_line = item_mod.mod_token.span.start().line;
+                            let end_line = brace.span.close().start().line;
+                            let test_mod_lines = end_line.saturating_sub(start_line) + 1;
+                            self.test_lines += test_mod_lines;
+                        }
                         self.extract_module_items(items, data, is_test_mod);
                     }
                 }
@@ -1344,5 +1367,114 @@ fn short_fn(x: i32) -> i32 { x }
             data.detected_patterns.is_empty(),
             "Normal code should have no patterns"
         );
+    }
+
+    // ===== Spec 214: Test Line Detection =====
+
+    #[test]
+    fn test_extract_test_lines_cfg_test_module() {
+        let code = r#"
+fn production_fn() {}
+
+#[cfg(test)]
+mod tests {
+    fn test_helper() {}
+
+    #[test]
+    fn actual_test() {}
+}
+"#;
+        let data = extract_test_code(code);
+
+        // Test module spans lines 4-11 (8 lines)
+        assert!(data.test_lines > 0, "Should have test lines detected");
+        assert!(
+            data.test_lines >= 6,
+            "Test module should have at least 6 lines, got {}",
+            data.test_lines
+        );
+        assert!(
+            data.total_lines > data.test_lines,
+            "Total should be more than test lines"
+        );
+    }
+
+    #[test]
+    fn test_extract_no_test_lines_without_test_module() {
+        let code = r#"
+fn regular_fn() {}
+fn another_fn() {}
+"#;
+        let data = extract_test_code(code);
+        assert_eq!(data.test_lines, 0, "Should have no test lines");
+    }
+
+    #[test]
+    fn test_production_lines_calculation() {
+        let code = r#"
+fn production_fn() {}
+fn another_fn() {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_something() {}
+}
+"#;
+        let data = extract_test_code(code);
+
+        let production_lines = data.production_lines();
+        assert!(
+            production_lines < data.total_lines,
+            "Production lines should be less than total"
+        );
+        assert!(production_lines > 0, "Should have production lines");
+    }
+
+    #[test]
+    fn test_loc_metrics_from_extracted() {
+        let code = r#"
+fn foo() {}
+fn bar() {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_foo() {}
+}
+"#;
+        let data = extract_test_code(code);
+        let metrics = data.loc_metrics();
+
+        assert_eq!(metrics.total_loc, data.total_lines);
+        assert_eq!(metrics.test_loc, data.test_lines);
+        assert_eq!(
+            metrics.production_loc,
+            data.total_lines.saturating_sub(data.test_lines)
+        );
+    }
+
+    #[test]
+    fn test_nested_test_modules_not_double_counted() {
+        let code = r#"
+fn production() {}
+
+#[cfg(test)]
+mod tests {
+    fn helper() {}
+
+    mod nested {
+        #[test]
+        fn test_nested() {}
+    }
+}
+"#;
+        let data = extract_test_code(code);
+
+        // The test module should be counted, but nested non-test modules within it
+        // should not double-count
+        assert!(data.test_lines > 0);
+        // The whole #[cfg(test)] block is the test region
+        assert!(data.test_lines <= data.total_lines);
     }
 }
