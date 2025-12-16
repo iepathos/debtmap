@@ -37,7 +37,7 @@ struct StructMetrics {
     field_count: usize,
     method_count: usize,
     /// Spec 209: Weighted method count accounting for accessor/boilerplate
-    weighted_method_count: f64,
+    _weighted_method_count: f64,
     method_names: Vec<String>,
     /// Average complexity of methods (from extracted function data if available)
     avg_complexity: f64,
@@ -145,7 +145,7 @@ fn calculate_struct_metrics(
         method_count,
         trait_impls,
         trait_weighted_count,
-        weighted_method_count,
+        _weighted_method_count: weighted_method_count,
         method_names,
         avg_complexity,
         complexity_sum,

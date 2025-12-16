@@ -143,7 +143,7 @@ pub fn build_god_object_section(
 
         // Show trait method breakdown if available (Spec 217)
         // Show weighted method count adjustment if available (like entropy dampening)
-        let method_display = if let Some(ref summary) = item
+        let method_display = if let Some(summary) = item
             .god_object_indicators
             .as_ref()
             .and_then(|i| i.trait_method_summary.as_ref())
@@ -165,7 +165,7 @@ pub fn build_god_object_section(
         add_label_value(&mut lines, method_label, method_display, theme, width);
 
         // Show trait implementations if available (Spec 217)
-        if let Some(ref summary) = item
+        if let Some(summary) = item
             .god_object_indicators
             .as_ref()
             .and_then(|i| i.trait_method_summary.as_ref())
