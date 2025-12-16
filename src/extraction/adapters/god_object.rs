@@ -23,8 +23,9 @@ use crate::organization::god_object::classifier::{
 };
 use crate::organization::god_object::scoring::calculate_god_object_score_weighted;
 use crate::organization::god_object::{
-    DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis, GodObjectThresholds,
-    SplitAnalysisMethod,
+    classify_all_methods, DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis,
+    GodObjectThresholds, KnownTraitRegistry, SplitAnalysisMethod, TraitImplInfo,
+    TraitMethodSummary,
 };
 use crate::priority::score_types::Score0To100;
 use std::collections::HashMap;
@@ -36,12 +37,16 @@ struct StructMetrics {
     field_count: usize,
     method_count: usize,
     /// Spec 209: Weighted method count accounting for accessor/boilerplate
-    weighted_method_count: f64,
+    _weighted_method_count: f64,
     method_names: Vec<String>,
     /// Average complexity of methods (from extracted function data if available)
     avg_complexity: f64,
     /// Total complexity sum for all methods
     complexity_sum: u32,
+    /// Spec 217: Trait implementations for this struct
+    trait_impls: Vec<TraitImplInfo>,
+    /// Spec 217: Trait-adjusted weighted count
+    trait_weighted_count: f64,
 }
 
 /// Pure function: build mapping from type names to their impl blocks.
@@ -58,17 +63,40 @@ fn build_impl_map(impls: &[ExtractedImplData]) -> HashMap<String, Vec<&Extracted
     map
 }
 
+/// Pure function: extract trait implementation info from impl blocks.
+///
+/// Spec 217: Detects trait implementations for a struct to distinguish
+/// trait-mandated methods from self-chosen methods.
+fn extract_trait_impls(
+    impl_blocks: &[&ExtractedImplData],
+    registry: &KnownTraitRegistry,
+) -> Vec<TraitImplInfo> {
+    impl_blocks
+        .iter()
+        .filter_map(|impl_block| {
+            impl_block.trait_name.as_ref().map(|trait_name| {
+                let method_names: Vec<String> =
+                    impl_block.methods.iter().map(|m| m.name.clone()).collect();
+                let category = registry.categorize_trait(trait_name);
+                TraitImplInfo::new(trait_name.clone(), method_names, category)
+            })
+        })
+        .collect()
+}
+
 /// Pure function: calculate metrics for a single struct.
 ///
 /// Aggregates method counts, names, and complexity from all impl blocks for this struct.
 /// Looks up complexity from extracted function data using qualified names.
 ///
 /// Spec 209: Also calculates weighted method count based on accessor/boilerplate classification.
+/// Spec 217: Calculates trait-weighted count for more accurate god object detection.
 fn calculate_struct_metrics(
     struct_data: &ExtractedStructData,
     impl_blocks: &[&ExtractedImplData],
     extracted: &ExtractedFileData,
 ) -> StructMetrics {
+    let registry = KnownTraitRegistry::default();
     let method_count: usize = impl_blocks.iter().map(|i| i.methods.len()).sum();
 
     let method_names: Vec<String> = impl_blocks
@@ -80,6 +108,15 @@ fn calculate_struct_metrics(
     // Accessors and boilerplate contribute less to the god object score
     let weighted_method_count =
         calculate_weighted_count_from_names(method_names.iter().map(String::as_str));
+
+    // Spec 217: Extract trait implementations and calculate trait-weighted count
+    let trait_impls = extract_trait_impls(impl_blocks, &registry);
+    let classified_methods = classify_all_methods(&method_names, &trait_impls, &registry);
+    let trait_summary = TraitMethodSummary::from_classifications(&classified_methods);
+
+    // Use the minimum of accessor-weighted and trait-weighted counts
+    // This gives benefit of both Spec 209 and Spec 217
+    let trait_weighted_count = trait_summary.weighted_count.min(weighted_method_count);
 
     // Look up complexity from extracted functions using qualified names
     // Methods in impl blocks should match "TypeName::method_name" pattern
@@ -106,7 +143,9 @@ fn calculate_struct_metrics(
     StructMetrics {
         field_count: struct_data.fields.len(),
         method_count,
-        weighted_method_count,
+        trait_impls,
+        trait_weighted_count,
+        _weighted_method_count: weighted_method_count,
         method_names,
         avg_complexity,
         complexity_sum,
@@ -116,19 +155,21 @@ fn calculate_struct_metrics(
 /// Pure function: determine if struct qualifies as god object based on metrics.
 ///
 /// Returns true if any threshold is exceeded:
-/// - Weighted method count > max_methods (Spec 209)
+/// - Weighted method count > max_methods (Spec 209/217)
 /// - Field count > max_fields
 /// - Responsibility count > max_traits
 ///
 /// Spec 209: Uses weighted method count instead of raw count, so structs
 /// with many accessor/boilerplate methods are less likely to trigger.
+/// Spec 217: Uses trait-weighted count if available, so structs with many
+/// trait-mandated methods are less likely to trigger.
 fn is_god_object_candidate(
     metrics: &StructMetrics,
     responsibilities: &HashMap<String, Vec<String>>,
     thresholds: &GodObjectThresholds,
 ) -> bool {
-    // Spec 209: Use weighted method count for threshold check
-    metrics.weighted_method_count > thresholds.max_methods as f64
+    // Spec 209/217: Use trait-weighted count (minimum of accessor and trait weighting)
+    metrics.trait_weighted_count > thresholds.max_methods as f64
         || metrics.field_count > thresholds.max_fields
         || responsibilities.len() > thresholds.max_traits
 }
@@ -138,6 +179,7 @@ fn is_god_object_candidate(
 /// Uses the weighted scoring algorithm for consistency with detector.rs (Spec 212).
 /// Spec 209: Uses weighted method count for more accurate scoring.
 /// Spec 214: Uses production LOC (excluding test code) for scoring.
+/// Spec 217: Includes trait method summary for recommendations.
 fn build_god_object_analysis(
     struct_data: &ExtractedStructData,
     metrics: &StructMetrics,
@@ -146,10 +188,10 @@ fn build_god_object_analysis(
     thresholds: &GodObjectThresholds,
 ) -> GodObjectAnalysis {
     // Use weighted scoring algorithm from scoring.rs for consistency (Spec 212)
-    // Spec 209: Use weighted method count for scoring (accessor-heavy structs score lower)
+    // Spec 209/217: Use trait-weighted count for scoring
     // Spec 214: Use production LOC for scoring to avoid penalizing well-tested code
     let god_object_score = calculate_god_object_score_weighted(
-        metrics.weighted_method_count, // Changed from method_count
+        metrics.trait_weighted_count, // Spec 217: Use trait-weighted count
         metrics.field_count,
         responsibilities.len(),
         production_lines,
@@ -177,10 +219,17 @@ fn build_god_object_analysis(
         thresholds,
     );
 
+    // Spec 217: Build trait method summary
+    let registry = KnownTraitRegistry::default();
+    let classified_methods =
+        classify_all_methods(&metrics.method_names, &metrics.trait_impls, &registry);
+    let trait_method_summary = TraitMethodSummary::from_classifications(&classified_methods);
+    let has_trait_methods = trait_method_summary.mandated_count > 0;
+
     GodObjectAnalysis {
         is_god_object: true,
         method_count: metrics.method_count,
-        weighted_method_count: None, // Struct analysis doesn't apply pure function weighting yet
+        weighted_method_count: Some(metrics.trait_weighted_count), // Spec 217: Show trait-weighted count
         field_count: metrics.field_count,
         responsibility_count: responsibility_names.len(),
         lines_of_code: production_lines, // Spec 214: Use production LOC
@@ -209,6 +258,11 @@ fn build_god_object_analysis(
         layering_impact: None,
         anti_pattern_report: None,
         complexity_metrics: None, // Spec 211
+        trait_method_summary: if has_trait_methods {
+            Some(trait_method_summary)
+        } else {
+            None
+        }, // Spec 217
     }
 }
 
@@ -463,7 +517,8 @@ fn analyze_file_level(
         aggregated_error_swallowing_patterns: None,
         layering_impact: None,
         anti_pattern_report: None,
-        complexity_metrics: None, // Spec 211
+        complexity_metrics: None,   // Spec 211
+        trait_method_summary: None, // Spec 217 (file-level analysis doesn't detect traits yet)
     })
 }
 
