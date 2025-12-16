@@ -95,6 +95,7 @@ mod tests {
                 god_object_analysis: if is_god_object {
                     Some(crate::organization::GodObjectAnalysis {
                         method_count: 40,
+                        weighted_method_count: None,
                         field_count: 20,
                         responsibility_count: 8,
                         is_god_object: true,

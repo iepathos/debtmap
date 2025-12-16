@@ -82,6 +82,7 @@ pub fn fallback_god_object_heuristics(
     Some(GodObjectAnalysis {
         is_god_object: true,
         method_count: function_count,
+        weighted_method_count: None,
         field_count,
         responsibility_count: estimated_resp_count,
         lines_of_code: line_count,
@@ -204,6 +205,7 @@ pub fn fallback_with_preserved_analysis(
     Some(GodObjectAnalysis {
         is_god_object: true,
         method_count: function_count,
+        weighted_method_count: None,
         field_count: 0,
         responsibility_count,
         lines_of_code: line_count,

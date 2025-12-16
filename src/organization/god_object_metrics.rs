@@ -239,6 +239,7 @@ mod tests {
         GodObjectAnalysis {
             is_god_object,
             method_count,
+            weighted_method_count: None,
             field_count: 5,
             responsibility_count: 3,
             lines_of_code: 500,

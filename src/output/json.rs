@@ -373,6 +373,7 @@ mod tests {
                 uncovered_lines: 3871,
                 god_object_analysis: Some(crate::organization::GodObjectAnalysis {
                     method_count: 179,
+                    weighted_method_count: None,
                     field_count: 20,
                     responsibility_count: 15,
                     is_god_object: true,

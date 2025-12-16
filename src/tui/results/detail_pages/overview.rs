@@ -140,7 +140,15 @@ pub fn build_god_object_section(
             Some(crate::organization::DetectionType::GodClass) => "methods",
             _ => "functions",
         };
-        add_label_value(&mut lines, method_label, methods.to_string(), theme, width);
+
+        // Show weighted method count adjustment if available (like entropy dampening)
+        let method_display = item
+            .god_object_indicators
+            .as_ref()
+            .and_then(|i| i.weighted_method_count)
+            .map(|weighted| format!("{} → {:.0} (pure-weighted)", methods, weighted))
+            .unwrap_or_else(|| methods.to_string());
+        add_label_value(&mut lines, method_label, method_display, theme, width);
 
         if let Some(field_count) = fields {
             add_label_value(&mut lines, "fields", field_count.to_string(), theme, width);

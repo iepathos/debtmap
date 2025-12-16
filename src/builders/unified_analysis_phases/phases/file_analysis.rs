@@ -157,6 +157,7 @@ fn detect_god_object_from_content(
             god_analysis = Some(crate::organization::GodObjectAnalysis {
                 is_god_object: true,
                 method_count: file_metrics.function_count,
+                weighted_method_count: None,
                 field_count: 0,
                 responsibility_count: 0,
                 lines_of_code: actual_line_count,

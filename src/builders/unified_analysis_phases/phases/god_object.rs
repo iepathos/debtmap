@@ -185,6 +185,7 @@ fn create_god_object_debt_type(god_analysis: &GodObjectAnalysis) -> DebtType {
 /// - GodClass with many methods typically acts as an Orchestrator
 /// - GodFile/GodModule with many functions typically acts as an Orchestrator
 /// - Items with high impure method count act as IOWrapper
+/// - Items with mostly pure functions (low weighted/raw ratio) are PureLogic
 fn classify_god_object_role(god_analysis: &GodObjectAnalysis) -> FunctionRole {
     // If purity distribution shows mostly impure operations, classify as IOWrapper
     if let Some(ref purity) = god_analysis.purity_distribution {
@@ -195,6 +196,17 @@ fn classify_god_object_role(god_analysis: &GodObjectAnalysis) -> FunctionRole {
             if io_ratio > 0.4 {
                 return FunctionRole::IOWrapper;
             }
+        }
+    }
+
+    // Check if mostly pure functions based on weighted method count
+    // If weighted_method_count is <40% of raw count, these are mostly pure helpers
+    // This indicates a cohesive utility module, not an orchestrator
+    if let Some(weighted) = god_analysis.weighted_method_count {
+        let raw = god_analysis.method_count as f64;
+        if raw > 0.0 && weighted / raw < 0.4 {
+            // Mostly pure functions - this is a utility module, not an orchestrator
+            return FunctionRole::PureLogic;
         }
     }
 
@@ -346,6 +358,12 @@ fn create_god_object_recommendation_with_role(
         god_analysis.responsibility_count.clamp(2, 5)
     };
 
+    // Check if this is a cohesive utility module (mostly pure functions)
+    let is_pure_utility_module = god_analysis
+        .weighted_method_count
+        .map(|w| w / (god_analysis.method_count as f64) < 0.4)
+        .unwrap_or(false);
+
     // Generate role-specific primary action (spec 233)
     let primary_action = match role {
         FunctionRole::Orchestrator => format!(
@@ -356,6 +374,12 @@ fn create_god_object_recommendation_with_role(
             "Separate {} I/O handlers from business logic",
             god_analysis.responsibility_count
         ),
+        FunctionRole::PureLogic if is_pure_utility_module => {
+            format!(
+                "Review {} detected responsibilities - consider grouping related helpers into submodules",
+                god_analysis.responsibility_count
+            )
+        }
         _ => format!("Split into {} modules by responsibility", split_count),
     };
 
@@ -371,6 +395,15 @@ fn create_god_object_recommendation_with_role(
             separating I/O from pure logic enables better testing and reduces coupling",
             god_analysis.responsibility_count
         ),
+        FunctionRole::PureLogic if is_pure_utility_module => {
+            let weighted = god_analysis.weighted_method_count.unwrap_or(0.0);
+            format!(
+                "Utility module with {} pure helper functions (weighted: {:.0}). \
+                High function count but low effective complexity - \
+                verify if detected responsibilities represent distinct concerns",
+                god_analysis.method_count, weighted
+            )
+        }
         _ => format!(
             "{} responsibilities detected with {} methods/functions - \
             splitting will improve maintainability and enable focused testing",
@@ -443,6 +476,7 @@ mod tests {
         GodObjectAnalysis {
             is_god_object: true,
             method_count: 50,
+            weighted_method_count: None,
             field_count: 10,
             responsibility_count: 5,
             lines_of_code: 2000,

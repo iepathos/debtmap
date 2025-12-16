@@ -47,6 +47,7 @@ fn create_god_object_analysis(
     GodObjectAnalysis {
         is_god_object: true,
         method_count: function_count,
+        weighted_method_count: None,
         field_count: 0,
         responsibility_count: 5,
         lines_of_code: lines,

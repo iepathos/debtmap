@@ -180,6 +180,7 @@ fn build_god_object_analysis(
     GodObjectAnalysis {
         is_god_object: true,
         method_count: metrics.method_count,
+        weighted_method_count: None, // Struct analysis doesn't apply pure function weighting yet
         field_count: metrics.field_count,
         responsibility_count: responsibility_names.len(),
         lines_of_code: production_lines, // Spec 214: Use production LOC
@@ -368,6 +369,28 @@ fn analyze_file_level(
         .collect();
     let responsibility_names: Vec<String> = responsibilities.keys().cloned().collect();
 
+    // Calculate weighted method count (Spec 209)
+    // Also apply pure function weighting: standalone functions have no `self` access,
+    // so they're inherently pure helpers (0.2 weight each per Spec 213)
+    let name_weighted_count =
+        calculate_weighted_count_from_names(all_function_names.iter().map(String::as_str));
+
+    // Standalone functions are pure by definition (no self parameter)
+    // Apply pure function weight (0.2) to standalone functions
+    // Impl methods use name-based weighting
+    let standalone_pure_weighted = total_standalone as f64 * 0.2;
+    let impl_method_names: Vec<String> = extracted
+        .impls
+        .iter()
+        .flat_map(|i| i.methods.iter().map(|m| m.name.clone()))
+        .collect();
+    let impl_weighted =
+        calculate_weighted_count_from_names(impl_method_names.iter().map(String::as_str));
+
+    // Use the lower of name-based weighting or pure function weighting
+    // This gives benefit of both Spec 209 (accessor detection) and Spec 213 (pure functions)
+    let weighted_method_count = (standalone_pure_weighted + impl_weighted).min(name_weighted_count);
+
     let complexity_sum: u32 = extracted.functions.iter().map(|f| f.cyclomatic).sum();
     let visibility_breakdown = build_visibility_breakdown(extracted);
 
@@ -391,9 +414,10 @@ fn analyze_file_level(
     );
 
     // Use weighted scoring algorithm for consistency (Spec 212)
+    // Spec 209/213: Use weighted method count instead of raw count
     // Spec 214: Use production LOC to avoid penalizing well-tested code
     let god_score = calculate_god_object_score_weighted(
-        method_count as f64,
+        weighted_method_count,
         total_fields,
         responsibility_names.len(),
         production_lines,
@@ -401,9 +425,17 @@ fn analyze_file_level(
         thresholds,
     );
 
+    // Only show weighted count if there's meaningful adjustment (>10% reduction)
+    let weighted_method_count_display = if weighted_method_count < method_count as f64 * 0.9 {
+        Some(weighted_method_count)
+    } else {
+        None
+    };
+
     Some(GodObjectAnalysis {
         is_god_object: true,
         method_count,
+        weighted_method_count: weighted_method_count_display,
         field_count: total_fields,
         responsibility_count: responsibility_names.len(),
         lines_of_code: production_lines, // Spec 214: Use production LOC

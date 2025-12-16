@@ -63,6 +63,16 @@ pub struct GodObjectAnalysis {
     /// Note: `EnhancedGodObjectAnalysis.per_struct_metrics` may show different
     /// counts as they include all methods for per-struct breakdown.
     pub method_count: usize,
+    /// Weighted method count after applying pure function weighting (Spec 209/213)
+    ///
+    /// For modules with standalone functions:
+    /// - Standalone pure functions get 0.2 weight (no `self` parameter)
+    /// - Accessor/boilerplate methods get reduced weight
+    ///
+    /// When set, displays as "62 → 17 (pure-weighted)" in the TUI to show
+    /// the adjustment similar to entropy dampening.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weighted_method_count: Option<f64>,
     pub field_count: usize,
     pub responsibility_count: usize,
     pub lines_of_code: usize,
