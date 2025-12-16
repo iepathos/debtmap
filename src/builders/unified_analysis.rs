@@ -302,6 +302,11 @@ pub fn create_unified_analysis_with_exclusions(
 }
 
 /// Create debt item from metric (compatibility wrapper for parallel_unified_analysis).
+///
+/// # Performance Note
+/// The `context_detector` and `recommendation_engine` parameters should be shared across
+/// all metric processing to avoid repeated regex compilation (spec 196 optimization).
+/// Create these once at the call site and pass references.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn create_debt_item_from_metric_with_aggregator(
     metric: &crate::core::FunctionMetrics,
@@ -313,12 +318,11 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
+    context_detector: &crate::analysis::ContextDetector,
+    recommendation_engine: &crate::priority::scoring::ContextRecommendationEngine,
 ) -> Vec<UnifiedDebtItem> {
     // Create empty cache for backward compatibility (will use fallback reads)
     let empty_cache = std::collections::HashMap::new();
-    // Create detectors for backward compatibility (spec 196: ideally shared at higher level)
-    let context_detector = crate::analysis::ContextDetector::new();
-    let recommendation_engine = crate::priority::scoring::ContextRecommendationEngine::new();
     core::phases::scoring::create_debt_items_from_metric(
         metric,
         call_graph,
@@ -330,8 +334,8 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         risk_analyzer,
         project_path,
         &empty_cache,
-        &context_detector,
-        &recommendation_engine,
+        context_detector,
+        recommendation_engine,
     )
 }
 

@@ -1,4 +1,5 @@
 use crate::{
+    analysis::ContextDetector,
     analyzers::FileAnalyzer,
     core::FunctionMetrics,
     data_flow::DataFlowGraph,
@@ -7,6 +8,7 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
         file_metrics::FileDebtItem,
+        scoring::ContextRecommendationEngine,
         UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     },
     progress::ProgressManager,
@@ -191,6 +193,9 @@ struct FunctionAnalysisContext<'a> {
     function_pointer_used_functions: Option<&'a HashSet<FunctionId>>,
     risk_analyzer: Option<&'a crate::risk::RiskAnalyzer>,
     project_path: &'a Path,
+    // Shared detectors to avoid per-metric regex compilation (spec 196 optimization)
+    context_detector: &'a ContextDetector,
+    recommendation_engine: &'a ContextRecommendationEngine,
 }
 
 /// Optimized test detector with caching
@@ -728,6 +733,11 @@ impl ParallelUnifiedAnalysisBuilder {
         // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
         let progress: Option<indicatif::ProgressBar> = None;
 
+        // Pre-create shared detectors once to avoid per-metric regex compilation (spec 196)
+        // These are Sync types that can be safely shared across threads
+        let context_detector = ContextDetector::new();
+        let recommendation_engine = ContextRecommendationEngine::new();
+
         // Create analysis context for the pipeline
         let context = FunctionAnalysisContext {
             call_graph: &self.call_graph,
@@ -738,6 +748,8 @@ impl ParallelUnifiedAnalysisBuilder {
             function_pointer_used_functions,
             risk_analyzer: self.risk_analyzer.as_ref(),
             project_path: &self.project_path,
+            context_detector: &context_detector,
+            recommendation_engine: &recommendation_engine,
         };
 
         // Functional pipeline for processing metrics with progress tracking
@@ -844,6 +856,7 @@ impl ParallelUnifiedAnalysisBuilder {
         // Clone risk analyzer for thread-safe parallel execution
         let risk_analyzer_clone = context.risk_analyzer.cloned();
         // Returns Vec<UnifiedDebtItem> - one per debt type found (spec 228)
+        // Uses shared detectors from context to avoid per-metric regex compilation (spec 196)
         crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
             metric,
             context.call_graph,
@@ -854,6 +867,8 @@ impl ParallelUnifiedAnalysisBuilder {
             Some(context.data_flow_graph),
             risk_analyzer_clone.as_ref(),
             context.project_path,
+            context.context_detector,
+            context.recommendation_engine,
         )
     }
 
