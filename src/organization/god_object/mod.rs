@@ -72,3 +72,12 @@ pub use recommender::{
 pub use scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
 pub use thresholds::*;
 pub use types::*;
+
+// Spec 209: Accessor and Boilerplate Method Detection
+pub use classification_types::{
+    MethodAnalysis, MethodBodyAnalysis, MethodComplexityClass, ReturnExprType,
+};
+pub use classifier::{
+    calculate_weighted_count_from_names, calculate_weighted_method_count, classify_method_by_name,
+    classify_method_complexity,
+};
