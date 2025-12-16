@@ -96,6 +96,91 @@ impl Default for MethodComplexityClass {
     }
 }
 
+// ============================================================================
+// Spec 213: Pure Function Method Weighting
+// ============================================================================
+
+/// Classification of method self-usage for weighted god object scoring.
+///
+/// Methods are classified by whether and how they use `self` to provide more
+/// accurate god object detection. Pure associated functions that don't use
+/// instance state contribute less to the "god object" pattern than methods
+/// that actually manipulate instance state.
+///
+/// # Weights
+///
+/// - `PureAssociated`: 0.2 (no self parameter, stateless helper)
+/// - `UnusedSelf`: 0.3 (has self but doesn't use it)
+/// - `InstanceMethod`: 1.0 (actually uses self state)
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::MethodSelfUsage;
+///
+/// // Pure associated function: weight = 0.2
+/// let usage = MethodSelfUsage::PureAssociated;
+/// assert!((usage.weight() - 0.2).abs() < f64::EPSILON);
+///
+/// // Unused self: weight = 0.3
+/// let usage = MethodSelfUsage::UnusedSelf;
+/// assert!((usage.weight() - 0.3).abs() < f64::EPSILON);
+///
+/// // Instance method: weight = 1.0
+/// let usage = MethodSelfUsage::InstanceMethod;
+/// assert!((usage.weight() - 1.0).abs() < f64::EPSILON);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MethodSelfUsage {
+    /// No self parameter, stateless function
+    /// Example: `fn helper(x: &str) -> bool { x.is_empty() }`
+    PureAssociated,
+    /// Has self parameter but doesn't actually use it
+    /// Example: `fn debug(&self) { println!("debug"); }`
+    UnusedSelf,
+    /// Has self parameter and uses instance state
+    /// Example: `fn get_data(&self) -> &Data { &self.data }`
+    InstanceMethod,
+}
+
+impl MethodSelfUsage {
+    /// Returns the weight for this self-usage classification.
+    ///
+    /// Used in weighted method counting for god object scoring.
+    /// Lower weights mean the method contributes less to the god object score.
+    #[must_use]
+    pub fn weight(&self) -> f64 {
+        match self {
+            Self::PureAssociated => 0.2, // Pure helpers barely count
+            Self::UnusedSelf => 0.3,     // Slight reduction
+            Self::InstanceMethod => 1.0, // Full weight
+        }
+    }
+
+    /// Returns a human-readable description of this self-usage classification.
+    #[must_use]
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::PureAssociated => "pure associated (no self, stateless helper)",
+            Self::UnusedSelf => "unused self (has self but doesn't use it)",
+            Self::InstanceMethod => "instance method (uses self state)",
+        }
+    }
+
+    /// Returns whether this method is a pure helper (not using instance state).
+    #[must_use]
+    pub fn is_pure(&self) -> bool {
+        matches!(self, Self::PureAssociated | Self::UnusedSelf)
+    }
+}
+
+impl Default for MethodSelfUsage {
+    fn default() -> Self {
+        // Default to instance method (conservative - counts fully)
+        Self::InstanceMethod
+    }
+}
+
 /// Type of expression in a method's return statement.
 ///
 /// Used to help classify accessor methods. A method returning a direct field
@@ -148,6 +233,123 @@ pub struct MethodAnalysis {
     pub body_analysis: MethodBodyAnalysis,
     /// Determined complexity class
     pub complexity_class: MethodComplexityClass,
+    /// Self-usage classification (Spec 213)
+    pub self_usage: MethodSelfUsage,
+}
+
+// ============================================================================
+// Spec 213: Method Breakdown for Reporting
+// ============================================================================
+
+/// Breakdown of instance vs pure methods for reporting (Spec 213).
+///
+/// This provides visibility into the "instance vs pure" method breakdown
+/// for god object analysis output.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::MethodSelfUsageBreakdown;
+///
+/// let breakdown = MethodSelfUsageBreakdown {
+///     total_methods: 24,
+///     instance_methods: 3,
+///     pure_associated: 20,
+///     unused_self: 1,
+/// };
+///
+/// // Display shows breakdown
+/// assert_eq!(breakdown.to_string(), "24 (3 instance, 21 pure helpers)");
+///
+/// // Check if mostly pure (>50%)
+/// assert!(breakdown.is_mostly_pure());
+///
+/// // Calculate effective weighted count
+/// let weighted = breakdown.weighted_count();
+/// assert!((weighted - 7.3).abs() < 0.01); // 3*1.0 + 20*0.2 + 1*0.3 = 7.3
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MethodSelfUsageBreakdown {
+    /// Total number of methods
+    pub total_methods: usize,
+    /// Methods that use instance state
+    pub instance_methods: usize,
+    /// Pure associated functions (no self)
+    pub pure_associated: usize,
+    /// Methods with unused self parameter
+    pub unused_self: usize,
+}
+
+impl MethodSelfUsageBreakdown {
+    /// Create a new breakdown from method classifications.
+    pub fn from_classifications(classifications: &[MethodSelfUsage]) -> Self {
+        let (instance_methods, pure_associated, unused_self) =
+            classifications
+                .iter()
+                .fold((0, 0, 0), |(inst, pure, unused), class| match class {
+                    MethodSelfUsage::InstanceMethod => (inst + 1, pure, unused),
+                    MethodSelfUsage::PureAssociated => (inst, pure + 1, unused),
+                    MethodSelfUsage::UnusedSelf => (inst, pure, unused + 1),
+                });
+
+        Self {
+            total_methods: classifications.len(),
+            instance_methods,
+            pure_associated,
+            unused_self,
+        }
+    }
+
+    /// Calculate the weighted method count based on self-usage.
+    ///
+    /// Applies the weights from `MethodSelfUsage`:
+    /// - Instance methods: 1.0
+    /// - Pure associated: 0.2
+    /// - Unused self: 0.3
+    pub fn weighted_count(&self) -> f64 {
+        (self.instance_methods as f64 * MethodSelfUsage::InstanceMethod.weight())
+            + (self.pure_associated as f64 * MethodSelfUsage::PureAssociated.weight())
+            + (self.unused_self as f64 * MethodSelfUsage::UnusedSelf.weight())
+    }
+
+    /// Returns the count of pure helper methods (pure_associated + unused_self).
+    pub fn pure_helper_count(&self) -> usize {
+        self.pure_associated + self.unused_self
+    }
+
+    /// Returns the ratio of pure helpers to total methods (0.0 to 1.0).
+    pub fn pure_ratio(&self) -> f64 {
+        if self.total_methods == 0 {
+            return 0.0;
+        }
+        self.pure_helper_count() as f64 / self.total_methods as f64
+    }
+
+    /// Returns true if more than 50% of methods are pure helpers.
+    ///
+    /// This indicates intentional functional decomposition per Spec 213.
+    pub fn is_mostly_pure(&self) -> bool {
+        self.pure_ratio() > 0.5
+    }
+
+    /// Returns true if more than 70% of methods are pure helpers.
+    ///
+    /// This is a strong signal of cohesive functional design.
+    pub fn is_highly_pure(&self) -> bool {
+        self.pure_ratio() > 0.7
+    }
+}
+
+impl std::fmt::Display for MethodSelfUsageBreakdown {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} ({} instance, {} pure helpers)",
+            self.total_methods,
+            self.instance_methods,
+            self.pure_helper_count()
+        )
+    }
 }
 
 /// Classification of god object types

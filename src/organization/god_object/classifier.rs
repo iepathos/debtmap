@@ -316,6 +316,238 @@ pub fn calculate_weighted_count_from_names<'a>(method_names: impl Iterator<Item 
         .sum()
 }
 
+// ============================================================================
+// Spec 213: Pure Function Method Weighting
+// ============================================================================
+
+use super::classification_types::MethodSelfUsage;
+use syn::visit::Visit;
+
+/// Classify a method's self-usage from its signature and body (Spec 213).
+///
+/// This function analyzes whether a method uses `self` (instance state) or is a
+/// pure associated function. Pure functions get reduced weight in god object
+/// detection because they indicate functional decomposition rather than bloat.
+///
+/// # Arguments
+///
+/// * `method` - The method to analyze
+///
+/// # Returns
+///
+/// A `MethodSelfUsage` classification:
+/// - `PureAssociated` (0.2 weight): No self parameter
+/// - `UnusedSelf` (0.3 weight): Has self but doesn't use it
+/// - `InstanceMethod` (1.0 weight): Has self and uses it
+///
+/// # Examples
+///
+/// ```ignore
+/// // Pure associated function - no self parameter
+/// fn helper(x: &str) -> bool { x.is_empty() }
+/// // -> MethodSelfUsage::PureAssociated
+///
+/// // Instance method - uses self
+/// fn get_data(&self) -> &Data { &self.data }
+/// // -> MethodSelfUsage::InstanceMethod
+///
+/// // Unused self - has self but doesn't use it
+/// fn debug(&self) { println!("debug"); }
+/// // -> MethodSelfUsage::UnusedSelf
+/// ```
+pub fn classify_self_usage(method: &syn::ImplItemFn) -> MethodSelfUsage {
+    // Check if method has self parameter
+    let has_self_param = method
+        .sig
+        .inputs
+        .iter()
+        .any(|arg| matches!(arg, syn::FnArg::Receiver(_)));
+
+    if !has_self_param {
+        return MethodSelfUsage::PureAssociated;
+    }
+
+    // Check if self is actually used in the body
+    let self_used = SelfUsageVisitor::check_body(&method.block);
+
+    if self_used {
+        MethodSelfUsage::InstanceMethod
+    } else {
+        MethodSelfUsage::UnusedSelf
+    }
+}
+
+/// Classify self-usage from a standalone function (always PureAssociated).
+///
+/// Standalone functions (not in impl blocks) never have access to `self`,
+/// so they are always classified as pure associated functions.
+pub fn classify_self_usage_standalone(_func: &syn::ItemFn) -> MethodSelfUsage {
+    MethodSelfUsage::PureAssociated
+}
+
+/// Visitor for detecting self-usage in method bodies.
+///
+/// This visitor traverses the AST of a method body to detect references to `self`:
+/// - `self.field` (field access)
+/// - `self.method()` (method calls)
+/// - `&self` or `&mut self` (self references)
+///
+/// It does NOT count:
+/// - `Self::method()` (associated function calls on Self type)
+/// - Self in nested closures/functions (different binding context)
+struct SelfUsageVisitor {
+    uses_self: bool,
+    /// Depth of nested closures/functions (self in nested context doesn't count)
+    nested_depth: usize,
+}
+
+impl SelfUsageVisitor {
+    /// Create a new visitor
+    fn new() -> Self {
+        Self {
+            uses_self: false,
+            nested_depth: 0,
+        }
+    }
+
+    /// Check if a method body uses self
+    pub fn check_body(block: &syn::Block) -> bool {
+        let mut visitor = Self::new();
+        visitor.visit_block(block);
+        visitor.uses_self
+    }
+
+    /// Check if an expression is a reference to `self`
+    fn is_self_expr(expr: &syn::Expr) -> bool {
+        if let syn::Expr::Path(path) = expr {
+            path.path.is_ident("self")
+        } else {
+            false
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for SelfUsageVisitor {
+    fn visit_expr_field(&mut self, field: &'ast syn::ExprField) {
+        // Check for self.field access
+        if self.nested_depth == 0 && Self::is_self_expr(&field.base) {
+            self.uses_self = true;
+        }
+        syn::visit::visit_expr_field(self, field);
+    }
+
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        // Check for self.method() calls
+        if self.nested_depth == 0 && Self::is_self_expr(&call.receiver) {
+            self.uses_self = true;
+        }
+        syn::visit::visit_expr_method_call(self, call);
+    }
+
+    fn visit_expr_reference(&mut self, reference: &'ast syn::ExprReference) {
+        // Check for &self or &mut self
+        if self.nested_depth == 0 && Self::is_self_expr(&reference.expr) {
+            self.uses_self = true;
+        }
+        syn::visit::visit_expr_reference(self, reference);
+    }
+
+    fn visit_expr_path(&mut self, path: &'ast syn::ExprPath) {
+        // Check for direct self usage (e.g., passing self as argument)
+        if self.nested_depth == 0 && path.path.is_ident("self") {
+            self.uses_self = true;
+        }
+        syn::visit::visit_expr_path(self, path);
+    }
+
+    fn visit_expr_closure(&mut self, closure: &'ast syn::ExprClosure) {
+        // Don't count self usage in nested closures - they capture self
+        // from the outer scope but represent different semantic context
+        self.nested_depth += 1;
+        syn::visit::visit_expr_closure(self, closure);
+        self.nested_depth -= 1;
+    }
+
+    fn visit_item_fn(&mut self, _: &'ast syn::ItemFn) {
+        // Don't traverse into nested functions
+        // They have their own self context
+    }
+}
+
+/// Calculate combined weight for a method (Spec 213).
+///
+/// Combines weights from:
+/// - Spec 209: Accessor/boilerplate classification
+/// - Spec 213: Self-usage classification (this spec)
+///
+/// Uses the minimum of both weights (a pure accessor should have very low weight).
+///
+/// # Arguments
+///
+/// * `accessor_class` - Accessor/boilerplate classification from Spec 209
+/// * `self_usage` - Self-usage classification from Spec 213
+///
+/// # Returns
+///
+/// Combined weight in range [0.0, 1.0]
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     MethodComplexityClass, MethodSelfUsage, calculate_combined_method_weight,
+/// };
+///
+/// // Pure accessor: min(0.1, 0.2) = 0.1
+/// let weight = calculate_combined_method_weight(
+///     MethodComplexityClass::TrivialAccessor,
+///     MethodSelfUsage::PureAssociated,
+/// );
+/// assert!((weight - 0.1).abs() < f64::EPSILON);
+///
+/// // Substantive instance method: min(1.0, 1.0) = 1.0
+/// let weight = calculate_combined_method_weight(
+///     MethodComplexityClass::Substantive,
+///     MethodSelfUsage::InstanceMethod,
+/// );
+/// assert!((weight - 1.0).abs() < f64::EPSILON);
+///
+/// // Pure helper (substantive but no self): min(1.0, 0.2) = 0.2
+/// let weight = calculate_combined_method_weight(
+///     MethodComplexityClass::Substantive,
+///     MethodSelfUsage::PureAssociated,
+/// );
+/// assert!((weight - 0.2).abs() < f64::EPSILON);
+/// ```
+pub fn calculate_combined_method_weight(
+    accessor_class: MethodComplexityClass,
+    self_usage: MethodSelfUsage,
+) -> f64 {
+    // Use minimum of both weights
+    accessor_class.weight().min(self_usage.weight())
+}
+
+/// Calculate weighted method count combining Spec 209 and Spec 213.
+///
+/// For each method, the combined weight is the minimum of:
+/// - Accessor/boilerplate weight (Spec 209)
+/// - Self-usage weight (Spec 213)
+///
+/// # Arguments
+///
+/// * `classifications` - Iterator of (accessor_class, self_usage) pairs
+///
+/// # Returns
+///
+/// Sum of combined weights for all methods.
+pub fn calculate_combined_weighted_count<'a>(
+    classifications: impl Iterator<Item = (&'a MethodComplexityClass, &'a MethodSelfUsage)>,
+) -> f64 {
+    classifications
+        .map(|(accessor, self_usage)| calculate_combined_method_weight(*accessor, *self_usage))
+        .sum()
+}
+
 /// Determine confidence level from score and metrics.
 ///
 /// Maps threshold violations to confidence levels:
@@ -2480,6 +2712,346 @@ mod tests {
 
             let weighted = calculate_weighted_method_count(classes.iter());
             prop_assert!(weighted >= 0.0);
+        }
+    }
+
+    // =========================================================================
+    // Spec 213: Pure Function Method Weighting Tests
+    // =========================================================================
+
+    #[test]
+    fn test_classify_self_usage_pure_associated() {
+        // Parse a method without self parameter
+        let code = r#"
+            impl Foo {
+                fn helper(x: &str) -> bool { x.is_empty() }
+            }
+        "#;
+        let file: syn::File = syn::parse_str(code).unwrap();
+        if let syn::Item::Impl(impl_block) = &file.items[0] {
+            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                assert_eq!(
+                    classify_self_usage(method),
+                    MethodSelfUsage::PureAssociated,
+                    "Method without self should be PureAssociated"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classify_self_usage_instance_method() {
+        // Parse a method that uses self.field
+        let code = r#"
+            impl Foo {
+                fn get_data(&self) -> &Data { &self.data }
+            }
+        "#;
+        let file: syn::File = syn::parse_str(code).unwrap();
+        if let syn::Item::Impl(impl_block) = &file.items[0] {
+            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                assert_eq!(
+                    classify_self_usage(method),
+                    MethodSelfUsage::InstanceMethod,
+                    "Method using self.field should be InstanceMethod"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classify_self_usage_instance_method_call() {
+        // Parse a method that calls self.method()
+        let code = r#"
+            impl Foo {
+                fn process(&self) { self.do_work(); }
+            }
+        "#;
+        let file: syn::File = syn::parse_str(code).unwrap();
+        if let syn::Item::Impl(impl_block) = &file.items[0] {
+            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                assert_eq!(
+                    classify_self_usage(method),
+                    MethodSelfUsage::InstanceMethod,
+                    "Method calling self.method() should be InstanceMethod"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classify_self_usage_unused_self() {
+        // Parse a method with self that doesn't use it
+        let code = r#"
+            impl Foo {
+                fn debug(&self) { println!("debug"); }
+            }
+        "#;
+        let file: syn::File = syn::parse_str(code).unwrap();
+        if let syn::Item::Impl(impl_block) = &file.items[0] {
+            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                assert_eq!(
+                    classify_self_usage(method),
+                    MethodSelfUsage::UnusedSelf,
+                    "Method with unused self should be UnusedSelf"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classify_self_usage_self_type_call() {
+        // Parse a method that calls Self::method() - should NOT count as self usage
+        let code = r#"
+            impl Foo {
+                fn helper(&self) { Self::other_helper(); }
+            }
+        "#;
+        let file: syn::File = syn::parse_str(code).unwrap();
+        if let syn::Item::Impl(impl_block) = &file.items[0] {
+            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                assert_eq!(
+                    classify_self_usage(method),
+                    MethodSelfUsage::UnusedSelf,
+                    "Method calling Self::method() (not self) should be UnusedSelf"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classify_self_usage_closure_capture() {
+        // Parse a method where self is used only in a closure - should NOT count
+        // (closures capture self from outer scope, different semantic context)
+        let code = r#"
+            impl Foo {
+                fn with_closure(&self) {
+                    let f = || { println!("no self usage"); };
+                    f();
+                }
+            }
+        "#;
+        let file: syn::File = syn::parse_str(code).unwrap();
+        if let syn::Item::Impl(impl_block) = &file.items[0] {
+            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                assert_eq!(
+                    classify_self_usage(method),
+                    MethodSelfUsage::UnusedSelf,
+                    "Self in closure should not count as self usage"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classify_self_usage_mut_self() {
+        // Parse a method with &mut self that mutates self
+        let code = r#"
+            impl Foo {
+                fn add_item(&mut self, item: Item) { self.items.push(item); }
+            }
+        "#;
+        let file: syn::File = syn::parse_str(code).unwrap();
+        if let syn::Item::Impl(impl_block) = &file.items[0] {
+            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                assert_eq!(
+                    classify_self_usage(method),
+                    MethodSelfUsage::InstanceMethod,
+                    "Method with &mut self that mutates should be InstanceMethod"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_calculate_combined_method_weight_pure_accessor() {
+        // Pure accessor: min(0.1, 0.2) = 0.1
+        let weight = calculate_combined_method_weight(
+            MethodComplexityClass::TrivialAccessor,
+            MethodSelfUsage::PureAssociated,
+        );
+        assert!(
+            (weight - 0.1).abs() < f64::EPSILON,
+            "Pure accessor should have weight 0.1, got {}",
+            weight
+        );
+    }
+
+    #[test]
+    fn test_calculate_combined_method_weight_instance_substantive() {
+        // Substantive instance method: min(1.0, 1.0) = 1.0
+        let weight = calculate_combined_method_weight(
+            MethodComplexityClass::Substantive,
+            MethodSelfUsage::InstanceMethod,
+        );
+        assert!(
+            (weight - 1.0).abs() < f64::EPSILON,
+            "Instance substantive should have weight 1.0, got {}",
+            weight
+        );
+    }
+
+    #[test]
+    fn test_calculate_combined_method_weight_pure_substantive() {
+        // Pure helper (substantive but no self): min(1.0, 0.2) = 0.2
+        let weight = calculate_combined_method_weight(
+            MethodComplexityClass::Substantive,
+            MethodSelfUsage::PureAssociated,
+        );
+        assert!(
+            (weight - 0.2).abs() < f64::EPSILON,
+            "Pure substantive should have weight 0.2, got {}",
+            weight
+        );
+    }
+
+    #[test]
+    fn test_calculate_combined_method_weight_boilerplate_instance() {
+        // Boilerplate instance: min(0.0, 1.0) = 0.0
+        let weight = calculate_combined_method_weight(
+            MethodComplexityClass::Boilerplate,
+            MethodSelfUsage::InstanceMethod,
+        );
+        assert!(
+            weight.abs() < f64::EPSILON,
+            "Boilerplate should have weight 0.0, got {}",
+            weight
+        );
+    }
+
+    #[test]
+    fn test_calculate_combined_weighted_count() {
+        // Example from spec: 3 instance + 21 pure = 3*1.0 + 21*0.2 = 7.2
+        let accessor_classes = vec![
+            MethodComplexityClass::Substantive,
+            MethodComplexityClass::Substantive,
+            MethodComplexityClass::Substantive,
+        ]
+        .into_iter()
+        .chain(std::iter::repeat(MethodComplexityClass::Substantive).take(21))
+        .collect::<Vec<_>>();
+
+        let self_usages = vec![
+            MethodSelfUsage::InstanceMethod,
+            MethodSelfUsage::InstanceMethod,
+            MethodSelfUsage::InstanceMethod,
+        ]
+        .into_iter()
+        .chain(std::iter::repeat(MethodSelfUsage::PureAssociated).take(21))
+        .collect::<Vec<_>>();
+
+        let weighted =
+            calculate_combined_weighted_count(accessor_classes.iter().zip(self_usages.iter()));
+
+        // 3*1.0 + 21*0.2 = 3.0 + 4.2 = 7.2
+        assert!(
+            (weighted - 7.2).abs() < 0.01,
+            "Expected ~7.2, got {}",
+            weighted
+        );
+    }
+
+    #[test]
+    fn test_method_self_usage_weights() {
+        assert!(
+            (MethodSelfUsage::PureAssociated.weight() - 0.2).abs() < f64::EPSILON,
+            "PureAssociated weight"
+        );
+        assert!(
+            (MethodSelfUsage::UnusedSelf.weight() - 0.3).abs() < f64::EPSILON,
+            "UnusedSelf weight"
+        );
+        assert!(
+            (MethodSelfUsage::InstanceMethod.weight() - 1.0).abs() < f64::EPSILON,
+            "InstanceMethod weight"
+        );
+    }
+
+    #[test]
+    fn test_method_self_usage_default() {
+        assert_eq!(
+            MethodSelfUsage::default(),
+            MethodSelfUsage::InstanceMethod,
+            "Default should be conservative (InstanceMethod)"
+        );
+    }
+
+    #[test]
+    fn test_method_self_usage_is_pure() {
+        assert!(
+            MethodSelfUsage::PureAssociated.is_pure(),
+            "PureAssociated should be pure"
+        );
+        assert!(
+            MethodSelfUsage::UnusedSelf.is_pure(),
+            "UnusedSelf should be pure"
+        );
+        assert!(
+            !MethodSelfUsage::InstanceMethod.is_pure(),
+            "InstanceMethod should NOT be pure"
+        );
+    }
+
+    proptest! {
+        /// Verify self-usage classification is deterministic
+        #[test]
+        fn prop_classify_self_usage_deterministic(
+            has_self in proptest::bool::ANY,
+            uses_field in proptest::bool::ANY
+        ) {
+            let code = if !has_self {
+                r#"impl Foo { fn helper() {} }"#.to_string()
+            } else if uses_field {
+                r#"impl Foo { fn get(&self) { self.x } }"#.to_string()
+            } else {
+                r#"impl Foo { fn debug(&self) { println!("x"); } }"#.to_string()
+            };
+
+            if let Ok(file) = syn::parse_str::<syn::File>(&code) {
+                if let syn::Item::Impl(impl_block) = &file.items[0] {
+                    if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+                        let c1 = classify_self_usage(method);
+                        let c2 = classify_self_usage(method);
+                        prop_assert_eq!(c1, c2);
+                    }
+                }
+            }
+        }
+
+        /// Verify combined weight is always in [0.0, 1.0]
+        #[test]
+        fn prop_combined_weight_bounded(
+            accessor in prop::sample::select(vec![
+                MethodComplexityClass::TrivialAccessor,
+                MethodComplexityClass::SimpleAccessor,
+                MethodComplexityClass::Boilerplate,
+                MethodComplexityClass::Delegating,
+                MethodComplexityClass::Substantive,
+            ]),
+            self_usage in prop::sample::select(vec![
+                MethodSelfUsage::PureAssociated,
+                MethodSelfUsage::UnusedSelf,
+                MethodSelfUsage::InstanceMethod,
+            ])
+        ) {
+            let weight = calculate_combined_method_weight(accessor, self_usage);
+            prop_assert!(weight >= 0.0 && weight <= 1.0,
+                "Combined weight {} out of bounds", weight);
+        }
+
+        /// Verify pure methods always have lower weight than instance
+        #[test]
+        fn prop_pure_always_lower_weight_than_instance(
+            num_methods in 1..50usize
+        ) {
+            let pure_weight: f64 = (0..num_methods)
+                .map(|_| MethodSelfUsage::PureAssociated.weight())
+                .sum();
+            let instance_weight: f64 = (0..num_methods)
+                .map(|_| MethodSelfUsage::InstanceMethod.weight())
+                .sum();
+
+            prop_assert!(pure_weight < instance_weight);
         }
     }
 }

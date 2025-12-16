@@ -436,6 +436,148 @@ fn count_violations_with_complexity(
     violations
 }
 
+// ============================================================================
+// Spec 213: Pure Function Method Weighting Integration
+// ============================================================================
+
+use super::classification_types::MethodSelfUsageBreakdown;
+
+/// Calculate God Object score incorporating self-usage weighting (Spec 213).
+///
+/// **Pure function** - deterministic, no side effects.
+///
+/// This function integrates pure function detection into god object scoring.
+/// Structs with many pure helper methods get significantly lower scores because
+/// functional decomposition is good design, not god object sprawl.
+///
+/// # Arguments
+///
+/// * `method_breakdown` - Self-usage breakdown from `MethodSelfUsageBreakdown`
+/// * `field_count` - Number of fields in the type
+/// * `responsibility_count` - Number of distinct responsibilities
+/// * `lines_of_code` - Total lines of code
+/// * `complexity_metrics` - Aggregated complexity metrics (Spec 211)
+/// * `thresholds` - God object thresholds for the language
+/// * `complexity_thresholds` - Complexity thresholds for the language
+///
+/// # Returns
+///
+/// God object score (0-100+). Scores >70 indicate definite god objects.
+///
+/// # Scoring Adjustments
+///
+/// - `is_mostly_pure()`: Score reduced by 30% (functional design bonus)
+/// - `is_highly_pure()`: Score reduced by 50% (strong functional design bonus)
+/// - Uses `weighted_count()` instead of raw method count
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     ComplexityMetrics, ComplexityThresholds, GodObjectThresholds,
+///     MethodSelfUsageBreakdown, calculate_god_object_score_with_self_usage,
+/// };
+///
+/// // Struct with 24 methods, 21 of which are pure helpers
+/// let breakdown = MethodSelfUsageBreakdown {
+///     total_methods: 24,
+///     instance_methods: 3,
+///     pure_associated: 21,
+///     unused_self: 0,
+/// };
+///
+/// let metrics = ComplexityMetrics::default();
+///
+/// let score = calculate_god_object_score_with_self_usage(
+///     &breakdown,
+///     3, // fields
+///     1, // responsibility
+///     200, // lines
+///     &metrics,
+///     &GodObjectThresholds::default(),
+///     &ComplexityThresholds::default(),
+/// );
+///
+/// // With 21/24 pure helpers (87.5%), should have heavily reduced score
+/// assert!(score < 30.0, "Highly pure struct should score LOW, got {}", score);
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn calculate_god_object_score_with_self_usage(
+    method_breakdown: &MethodSelfUsageBreakdown,
+    field_count: usize,
+    responsibility_count: usize,
+    lines_of_code: usize,
+    complexity_metrics: &ComplexityMetrics,
+    thresholds: &GodObjectThresholds,
+    complexity_thresholds: &ComplexityThresholds,
+) -> f64 {
+    // Use weighted method count from breakdown (Spec 213)
+    let weighted_method_count = method_breakdown.weighted_count();
+
+    // Calculate base score using existing logic (Spec 211)
+    let base_score = calculate_god_object_score_with_complexity(
+        weighted_method_count,
+        field_count,
+        responsibility_count,
+        lines_of_code,
+        complexity_metrics,
+        thresholds,
+        complexity_thresholds,
+    );
+
+    // Apply functional design bonus (Spec 213)
+    // Structs with many pure helpers get score reduction
+    let functional_factor = if method_breakdown.is_highly_pure() {
+        0.5 // 50% reduction for highly pure (>70% pure methods)
+    } else if method_breakdown.is_mostly_pure() {
+        0.7 // 30% reduction for mostly pure (>50% pure methods)
+    } else {
+        1.0 // No adjustment
+    };
+
+    base_score * functional_factor
+}
+
+/// Calculate effective method count combining all weighting factors (Spec 209, 211, 213).
+///
+/// This provides the "effective methods" count shown in output, which represents
+/// how many "equivalent substantive instance methods" the struct has.
+///
+/// # Arguments
+///
+/// * `method_breakdown` - Self-usage breakdown from Spec 213
+/// * `avg_complexity` - Average cyclomatic complexity
+///
+/// # Returns
+///
+/// Effective method count considering all weighting factors.
+///
+/// # Weighting Formula
+///
+/// For each method type:
+/// - Instance methods: `1.0 * complexity_factor`
+/// - Pure associated: `0.2 * complexity_factor`
+/// - Unused self: `0.3 * complexity_factor`
+///
+/// Where complexity_factor is:
+/// - Low complexity (< 3.0): 0.8
+/// - Normal complexity: 1.0
+/// - High complexity (> 10.0): 1.5
+pub fn calculate_effective_method_count(
+    method_breakdown: &MethodSelfUsageBreakdown,
+    avg_complexity: f64,
+) -> f64 {
+    let complexity_factor = if avg_complexity < 3.0 {
+        0.8 // Simple functions get bonus
+    } else if avg_complexity > 10.0 {
+        1.5 // Complex functions get penalty
+    } else {
+        1.0
+    };
+
+    method_breakdown.weighted_count() * complexity_factor
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1193,6 +1335,484 @@ mod spec_211_tests {
             prop_assert!(high_score >= low_score,
                 "High complexity score ({}) should be >= low complexity score ({})",
                 high_score, low_score);
+        }
+    }
+}
+
+// ============================================================================
+// Spec 213: Pure Function Method Weighting Tests
+// ============================================================================
+
+#[cfg(test)]
+mod spec_213_tests {
+    use super::*;
+
+    #[test]
+    fn test_method_self_usage_breakdown_from_classifications() {
+        use super::super::classification_types::MethodSelfUsage;
+
+        let classifications = vec![
+            MethodSelfUsage::InstanceMethod,
+            MethodSelfUsage::InstanceMethod,
+            MethodSelfUsage::InstanceMethod,
+            MethodSelfUsage::PureAssociated,
+            MethodSelfUsage::PureAssociated,
+            MethodSelfUsage::PureAssociated,
+            MethodSelfUsage::PureAssociated,
+            MethodSelfUsage::PureAssociated,
+            MethodSelfUsage::UnusedSelf,
+        ];
+
+        let breakdown = MethodSelfUsageBreakdown::from_classifications(&classifications);
+
+        assert_eq!(breakdown.total_methods, 9);
+        assert_eq!(breakdown.instance_methods, 3);
+        assert_eq!(breakdown.pure_associated, 5);
+        assert_eq!(breakdown.unused_self, 1);
+    }
+
+    #[test]
+    fn test_method_self_usage_breakdown_weighted_count() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 24,
+            instance_methods: 3,
+            pure_associated: 20,
+            unused_self: 1,
+        };
+
+        // 3*1.0 + 20*0.2 + 1*0.3 = 3.0 + 4.0 + 0.3 = 7.3
+        let weighted = breakdown.weighted_count();
+        assert!(
+            (weighted - 7.3).abs() < 0.01,
+            "Expected 7.3, got {}",
+            weighted
+        );
+    }
+
+    #[test]
+    fn test_method_self_usage_breakdown_pure_helper_count() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 24,
+            instance_methods: 3,
+            pure_associated: 20,
+            unused_self: 1,
+        };
+
+        assert_eq!(breakdown.pure_helper_count(), 21);
+    }
+
+    #[test]
+    fn test_method_self_usage_breakdown_pure_ratio() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 24,
+            instance_methods: 3,
+            pure_associated: 20,
+            unused_self: 1,
+        };
+
+        // 21/24 = 0.875
+        let ratio = breakdown.pure_ratio();
+        assert!(
+            (ratio - 0.875).abs() < 0.001,
+            "Expected 0.875, got {}",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_method_self_usage_breakdown_is_mostly_pure() {
+        // >50% pure
+        let mostly_pure = MethodSelfUsageBreakdown {
+            total_methods: 10,
+            instance_methods: 4,
+            pure_associated: 6,
+            unused_self: 0,
+        };
+        assert!(mostly_pure.is_mostly_pure());
+
+        // <50% pure
+        let not_mostly_pure = MethodSelfUsageBreakdown {
+            total_methods: 10,
+            instance_methods: 6,
+            pure_associated: 4,
+            unused_self: 0,
+        };
+        assert!(!not_mostly_pure.is_mostly_pure());
+    }
+
+    #[test]
+    fn test_method_self_usage_breakdown_is_highly_pure() {
+        // >70% pure
+        let highly_pure = MethodSelfUsageBreakdown {
+            total_methods: 10,
+            instance_methods: 2,
+            pure_associated: 8,
+            unused_self: 0,
+        };
+        assert!(highly_pure.is_highly_pure());
+
+        // <70% pure (but >50%)
+        let not_highly_pure = MethodSelfUsageBreakdown {
+            total_methods: 10,
+            instance_methods: 4,
+            pure_associated: 6,
+            unused_self: 0,
+        };
+        assert!(!not_highly_pure.is_highly_pure());
+        assert!(not_highly_pure.is_mostly_pure()); // Still mostly pure
+    }
+
+    #[test]
+    fn test_method_self_usage_breakdown_display() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 24,
+            instance_methods: 3,
+            pure_associated: 20,
+            unused_self: 1,
+        };
+
+        let display = format!("{}", breakdown);
+        assert_eq!(display, "24 (3 instance, 21 pure helpers)");
+    }
+
+    #[test]
+    fn test_method_self_usage_breakdown_empty() {
+        let breakdown = MethodSelfUsageBreakdown::default();
+
+        assert_eq!(breakdown.total_methods, 0);
+        assert_eq!(breakdown.weighted_count(), 0.0);
+        assert_eq!(breakdown.pure_ratio(), 0.0);
+        assert!(!breakdown.is_mostly_pure());
+    }
+
+    #[test]
+    fn test_calculate_god_object_score_with_self_usage_highly_pure() {
+        // CallResolver example from spec: 24 methods, 21 pure
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 24,
+            instance_methods: 3,
+            pure_associated: 21,
+            unused_self: 0,
+        };
+
+        let metrics = ComplexityMetrics::default();
+
+        let score = calculate_god_object_score_with_self_usage(
+            &breakdown,
+            3,   // fields
+            1,   // responsibility
+            200, // lines
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        // With 87.5% pure (highly pure), score should be significantly reduced
+        // and well below CRITICAL threshold of 50
+        assert!(
+            score < 50.0,
+            "Highly pure struct should score < 50 (CRITICAL threshold), got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn test_calculate_god_object_score_with_self_usage_mostly_pure() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 20,
+            instance_methods: 8,
+            pure_associated: 12,
+            unused_self: 0,
+        };
+
+        let metrics = ComplexityMetrics {
+            avg_cyclomatic: 5.0,
+            max_cyclomatic: 10,
+            total_cyclomatic: 100,
+            ..Default::default()
+        };
+
+        let score = calculate_god_object_score_with_self_usage(
+            &breakdown,
+            5,   // fields
+            2,   // responsibilities
+            300, // lines
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        // With 60% pure (mostly pure), should get 30% reduction
+        assert!(
+            score.is_finite() && score >= 0.0,
+            "Score should be valid, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn test_calculate_god_object_score_with_self_usage_instance_heavy() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 20,
+            instance_methods: 18,
+            pure_associated: 2,
+            unused_self: 0,
+        };
+
+        let metrics = ComplexityMetrics {
+            avg_cyclomatic: 8.0,
+            max_cyclomatic: 15,
+            total_cyclomatic: 160,
+            ..Default::default()
+        };
+
+        let score = calculate_god_object_score_with_self_usage(
+            &breakdown,
+            10,  // fields
+            5,   // responsibilities
+            500, // lines
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        // With only 10% pure, no functional bonus should apply
+        // Score should be higher than pure equivalents
+        assert!(
+            score.is_finite() && score > 0.0,
+            "Score should be valid and positive, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn test_highly_pure_scores_lower_than_instance_heavy() {
+        let metrics = ComplexityMetrics::default();
+
+        // Same raw metrics, different pure ratios
+        let highly_pure = MethodSelfUsageBreakdown {
+            total_methods: 20,
+            instance_methods: 3,
+            pure_associated: 17,
+            unused_self: 0,
+        };
+
+        let instance_heavy = MethodSelfUsageBreakdown {
+            total_methods: 20,
+            instance_methods: 17,
+            pure_associated: 3,
+            unused_self: 0,
+        };
+
+        let pure_score = calculate_god_object_score_with_self_usage(
+            &highly_pure,
+            5,
+            3,
+            300,
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        let instance_score = calculate_god_object_score_with_self_usage(
+            &instance_heavy,
+            5,
+            3,
+            300,
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        assert!(
+            pure_score < instance_score,
+            "Highly pure struct ({}) should score LOWER than instance heavy ({})",
+            pure_score,
+            instance_score
+        );
+    }
+
+    #[test]
+    fn test_calculate_effective_method_count_low_complexity() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 10,
+            instance_methods: 5,
+            pure_associated: 5,
+            unused_self: 0,
+        };
+
+        // Weighted: 5*1.0 + 5*0.2 = 6.0
+        // With low complexity (2.0), apply 0.8 factor: 6.0 * 0.8 = 4.8
+        let effective = calculate_effective_method_count(&breakdown, 2.0);
+        assert!(
+            (effective - 4.8).abs() < 0.01,
+            "Expected 4.8, got {}",
+            effective
+        );
+    }
+
+    #[test]
+    fn test_calculate_effective_method_count_high_complexity() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 10,
+            instance_methods: 5,
+            pure_associated: 5,
+            unused_self: 0,
+        };
+
+        // Weighted: 5*1.0 + 5*0.2 = 6.0
+        // With high complexity (15.0), apply 1.5 factor: 6.0 * 1.5 = 9.0
+        let effective = calculate_effective_method_count(&breakdown, 15.0);
+        assert!(
+            (effective - 9.0).abs() < 0.01,
+            "Expected 9.0, got {}",
+            effective
+        );
+    }
+
+    #[test]
+    fn test_calculate_effective_method_count_normal_complexity() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 10,
+            instance_methods: 5,
+            pure_associated: 5,
+            unused_self: 0,
+        };
+
+        // Weighted: 5*1.0 + 5*0.2 = 6.0
+        // With normal complexity (5.0), factor is 1.0: 6.0 * 1.0 = 6.0
+        let effective = calculate_effective_method_count(&breakdown, 5.0);
+        assert!(
+            (effective - 6.0).abs() < 0.01,
+            "Expected 6.0, got {}",
+            effective
+        );
+    }
+
+    #[test]
+    fn test_score_with_self_usage_deterministic() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 15,
+            instance_methods: 5,
+            pure_associated: 10,
+            unused_self: 0,
+        };
+
+        let metrics = ComplexityMetrics {
+            avg_cyclomatic: 6.0,
+            max_cyclomatic: 12,
+            total_cyclomatic: 90,
+            ..Default::default()
+        };
+
+        let score1 = calculate_god_object_score_with_self_usage(
+            &breakdown,
+            8,
+            3,
+            400,
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        let score2 = calculate_god_object_score_with_self_usage(
+            &breakdown,
+            8,
+            3,
+            400,
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        assert_eq!(score1, score2);
+    }
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_breakdown_weighted_count_non_negative(
+            instance in 0usize..50,
+            pure in 0usize..50,
+            unused in 0usize..20
+        ) {
+            let breakdown = MethodSelfUsageBreakdown {
+                total_methods: instance + pure + unused,
+                instance_methods: instance,
+                pure_associated: pure,
+                unused_self: unused,
+            };
+
+            prop_assert!(breakdown.weighted_count() >= 0.0);
+        }
+
+        #[test]
+        fn prop_pure_ratio_bounded(
+            instance in 0usize..50,
+            pure in 0usize..50,
+            unused in 0usize..20
+        ) {
+            let breakdown = MethodSelfUsageBreakdown {
+                total_methods: instance + pure + unused,
+                instance_methods: instance,
+                pure_associated: pure,
+                unused_self: unused,
+            };
+
+            let ratio = breakdown.pure_ratio();
+            prop_assert!(ratio >= 0.0 && ratio <= 1.0,
+                "Pure ratio {} out of bounds", ratio);
+        }
+
+        #[test]
+        fn prop_effective_count_non_negative(
+            instance in 0usize..50,
+            pure in 0usize..50,
+            unused in 0usize..20,
+            complexity in 1.0f64..25.0
+        ) {
+            let breakdown = MethodSelfUsageBreakdown {
+                total_methods: instance + pure + unused,
+                instance_methods: instance,
+                pure_associated: pure,
+                unused_self: unused,
+            };
+
+            let effective = calculate_effective_method_count(&breakdown, complexity);
+            prop_assert!(effective >= 0.0 && effective.is_finite(),
+                "Effective count {} invalid", effective);
+        }
+
+        #[test]
+        fn prop_score_with_self_usage_finite(
+            instance in 1usize..30,
+            pure in 0usize..30,
+            fields in 1usize..20,
+            resp in 1usize..10,
+            loc in 50usize..1000
+        ) {
+            let breakdown = MethodSelfUsageBreakdown {
+                total_methods: instance + pure,
+                instance_methods: instance,
+                pure_associated: pure,
+                unused_self: 0,
+            };
+
+            let metrics = ComplexityMetrics::default();
+
+            let score = calculate_god_object_score_with_self_usage(
+                &breakdown,
+                fields,
+                resp,
+                loc,
+                &metrics,
+                &GodObjectThresholds::default(),
+                &ComplexityThresholds::default(),
+            );
+
+            prop_assert!(score.is_finite() && score >= 0.0,
+                "Score {} invalid", score);
         }
     }
 }
