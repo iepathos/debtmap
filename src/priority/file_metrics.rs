@@ -736,7 +736,8 @@ mod tests {
             total_complexity: 900,
             coverage_percent: 0.3,
             uncovered_lines: 700,
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: true,
                 method_count: 60,
                 field_count: 30,
@@ -766,7 +767,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             function_scores: vec![5.0; 60],
             god_object_type: None,
@@ -859,7 +861,8 @@ mod tests {
         use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
 
         let metrics = FileDebtMetrics {
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: true,
                 method_count: 50,
                 field_count: 10,
@@ -889,7 +892,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             function_count: 50,
             ..Default::default()
@@ -978,7 +982,8 @@ mod tests {
 
         let score1 = metrics.calculate_score();
 
-        metrics.god_object_analysis = Some(GodObjectAnalysis { weighted_method_count: None,
+        metrics.god_object_analysis = Some(GodObjectAnalysis {
+            weighted_method_count: None,
             is_god_object: true,
             method_count: 20,
             field_count: 10,
@@ -1008,7 +1013,8 @@ mod tests {
             aggregated_error_swallowing_patterns: None,
             layering_impact: None,
             anti_pattern_report: None,
-            complexity_metrics: None, // Spec 211
+            complexity_metrics: None,   // Spec 211
+            trait_method_summary: None, // Spec 217
         });
         let score2 = metrics.calculate_score();
 
@@ -1075,7 +1081,8 @@ mod tests {
         };
 
         let metrics = FileDebtMetrics {
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: true,
                 method_count: 888,
                 field_count: 0,
@@ -1105,7 +1112,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             god_object_type: Some(boilerplate_type),
             total_lines: 7775,
@@ -1140,7 +1148,8 @@ mod tests {
         };
 
         let metrics = FileDebtMetrics {
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: true,
                 method_count: 100,
                 field_count: 30,
@@ -1170,7 +1179,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             god_object_type: Some(god_file_type),
             total_lines: 2000,
@@ -1202,7 +1212,8 @@ mod tests {
         };
 
         let metrics = FileDebtMetrics {
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: true,
                 method_count: 200,
                 field_count: 100,
@@ -1232,7 +1243,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             god_object_type: Some(boilerplate_type),
             total_lines: 5000,
@@ -1259,7 +1271,8 @@ mod tests {
             avg_complexity: 8.0,
             total_complexity: 56,
             coverage_percent: 0.0,
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: true,
                 method_count: 60,
                 field_count: 30,
@@ -1289,7 +1302,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             function_scores: vec![1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
             god_object_type: None,
@@ -1318,7 +1332,8 @@ mod tests {
             avg_complexity: 10.0,
             total_complexity: 200,
             coverage_percent: 0.5,
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: true,
                 method_count: 40,
                 field_count: 20,
@@ -1348,7 +1363,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             function_scores: vec![5.0; 20],
             god_object_type: None,
@@ -1419,7 +1435,8 @@ mod tests {
             path: PathBuf::from("test.rs"),
             total_lines: 200,
             function_count: 10,
-            god_object_analysis: Some(GodObjectAnalysis { weighted_method_count: None,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
                 is_god_object: false,
                 method_count: 10,
                 field_count: 5,
@@ -1449,7 +1466,8 @@ mod tests {
                 aggregated_error_swallowing_patterns: None,
                 layering_impact: None,
                 anti_pattern_report: None,
-                complexity_metrics: None, // Spec 211
+                complexity_metrics: None,   // Spec 211
+                trait_method_summary: None, // Spec 217
             }),
             function_scores: vec![],
             god_object_type: None,
@@ -1460,7 +1478,8 @@ mod tests {
         let factors = metrics.get_score_factors();
         assert_eq!(factors.god_object_multiplier, 1.0); // Not flagged
 
-        metrics.god_object_analysis = Some(GodObjectAnalysis { weighted_method_count: None,
+        metrics.god_object_analysis = Some(GodObjectAnalysis {
+            weighted_method_count: None,
             is_god_object: true,
             method_count: 10,
             field_count: 5,
@@ -1490,7 +1509,8 @@ mod tests {
             aggregated_error_swallowing_patterns: None,
             layering_impact: None,
             anti_pattern_report: None,
-            complexity_metrics: None, // Spec 211
+            complexity_metrics: None,   // Spec 211
+            trait_method_summary: None, // Spec 217
         });
         let factors = metrics.get_score_factors();
         assert!((factors.god_object_multiplier - 1.17).abs() < 0.01); // 1.0 + (8.5 / 50.0)

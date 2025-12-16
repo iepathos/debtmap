@@ -271,7 +271,8 @@ mod tests {
             aggregated_error_swallowing_patterns: None,
             layering_impact: None,
             anti_pattern_report: None,
-            complexity_metrics: None, // Spec 211
+            complexity_metrics: None,   // Spec 211
+            trait_method_summary: None, // Spec 217
         }
     }
 

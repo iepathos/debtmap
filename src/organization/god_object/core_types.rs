@@ -145,6 +145,16 @@ pub struct GodObjectAnalysis {
     /// Used by `calculate_god_object_score_with_complexity` for more accurate scoring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub complexity_metrics: Option<crate::organization::god_object::ComplexityMetrics>,
+    /// Trait-mandated method analysis (Spec 217)
+    ///
+    /// Contains breakdown of methods by origin:
+    /// - Trait-mandated methods (required by trait impls, non-extractable)
+    /// - Self-chosen methods (author's design choice, extractable)
+    ///
+    /// Used to generate more accurate recommendations that focus on
+    /// extractable methods rather than trait-required methods.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trait_method_summary: Option<crate::organization::god_object::TraitMethodSummary>,
 }
 
 impl GodObjectAnalysis {

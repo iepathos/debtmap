@@ -22,6 +22,7 @@ use super::context_recommendations::{
     classify_scenario, format_recommendation, generate_context_aware_recommendation,
     LongMethodInfo, RecommendationContext,
 };
+use super::traits::TraitMethodSummary;
 use crate::organization::struct_patterns::{PatternAnalysis, StructPattern};
 use std::collections::HashMap;
 
@@ -272,6 +273,196 @@ pub fn format_functional_recommendation(rec: &FunctionalAwareRecommendation) -> 
             output.push_str(&format!("  - {}\n", suggestion));
         }
     }
+
+    output
+}
+
+// ============================================================================
+// Spec 217: Trait-Mandated Method Detection Recommendations
+// ============================================================================
+
+/// Recommendation with trait-awareness (Spec 217).
+///
+/// Contains recommendation adjusted for trait-mandated methods.
+#[derive(Debug, Clone)]
+pub struct TraitAwareRecommendation {
+    /// What action to take
+    pub action: RecommendationAction,
+    /// Human-readable explanation
+    pub rationale: String,
+    /// Number of extractable methods
+    pub extractable_count: usize,
+    /// Number of trait-mandated methods
+    pub mandated_count: usize,
+    /// Trait implementations detected
+    pub trait_breakdown: String,
+}
+
+/// Generate recommendation considering trait-mandated methods (Spec 217).
+///
+/// **Pure function** - deterministic, no side effects.
+///
+/// When many methods are trait-mandated (required by trait implementations),
+/// this function adjusts recommendations to focus on extractable methods only.
+/// It's impossible to extract trait-mandated methods, so recommending that
+/// would be misleading.
+///
+/// # Arguments
+///
+/// * `method_count` - Total method count
+/// * `responsibility_count` - Number of detected responsibilities
+/// * `trait_summary` - Trait method summary from Spec 217 detection
+///
+/// # Returns
+///
+/// `TraitAwareRecommendation` with action, rationale, and method breakdown
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     TraitMethodSummary, generate_recommendation_with_trait_awareness,
+///     RecommendationAction,
+/// };
+/// use std::collections::HashMap;
+///
+/// // CallGraphExtractor example: 32 methods, 18 trait-mandated (syn::Visit)
+/// let trait_summary = TraitMethodSummary {
+///     mandated_count: 18,
+///     by_trait: [("syn::Visit".into(), 18)].into_iter().collect(),
+///     weighted_count: 15.8,
+///     extractable_count: 14,
+///     total_methods: 32,
+/// };
+///
+/// let rec = generate_recommendation_with_trait_awareness(
+///     32, // methods
+///     8,  // responsibilities
+///     &trait_summary,
+/// );
+///
+/// // Should focus on 14 extractable methods, not all 32
+/// assert!(rec.rationale.contains("14"));
+/// assert!(rec.rationale.contains("trait-mandated"));
+/// ```
+pub fn generate_recommendation_with_trait_awareness(
+    method_count: usize,
+    responsibility_count: usize,
+    trait_summary: &TraitMethodSummary,
+) -> TraitAwareRecommendation {
+    let extractable = trait_summary.extractable_count;
+    let mandated = trait_summary.mandated_count;
+    let trait_breakdown = trait_summary.format_trait_breakdown();
+
+    // If trait methods dominate, the "god object" is likely structural
+    if trait_summary.is_trait_dominated() {
+        // Very high trait ratio (>80%): likely legitimate visitor/serializer
+        if trait_summary.mandated_ratio() > 0.8 {
+            return TraitAwareRecommendation {
+                action: RecommendationAction::NoActionNeeded,
+                rationale: format!(
+                    "Struct is primarily a trait implementation ({} of {} methods are trait-mandated). \
+                     Implements: {}. The high method count is structural requirement, not design debt. \
+                     The {} self-chosen methods are likely orchestration code.",
+                    mandated,
+                    method_count,
+                    trait_breakdown,
+                    extractable,
+                ),
+                extractable_count: extractable,
+                mandated_count: mandated,
+                trait_breakdown,
+            };
+        }
+
+        // Moderate trait ratio (50-80%): focus recommendations on extractable
+        if extractable > 10 {
+            return TraitAwareRecommendation {
+                action: RecommendationAction::ConsiderRefactoring,
+                rationale: format!(
+                    "{} of {} methods are trait-mandated (non-extractable). Implements: {}. \
+                     Focus refactoring on the {} self-chosen methods. \
+                     Consider grouping these {} extractable methods by responsibility.",
+                    mandated, method_count, trait_breakdown, extractable, extractable,
+                ),
+                extractable_count: extractable,
+                mandated_count: mandated,
+                trait_breakdown,
+            };
+        }
+
+        return TraitAwareRecommendation {
+            action: RecommendationAction::NoActionNeeded,
+            rationale: format!(
+                "{} of {} methods are trait-mandated (Implements: {}). \
+                 Only {} self-chosen methods remain - this is manageable complexity. \
+                 The struct is well-structured despite the high method count.",
+                mandated, method_count, trait_breakdown, extractable,
+            ),
+            extractable_count: extractable,
+            mandated_count: mandated,
+            trait_breakdown,
+        };
+    }
+
+    // Trait methods present but don't dominate
+    if mandated > 0 && extractable > 10 {
+        return TraitAwareRecommendation {
+            action: RecommendationAction::SplitIntoModules,
+            rationale: format!(
+                "{} of {} methods are trait-mandated ({}) - these cannot be extracted. \
+                 Focus on the {} self-chosen methods across {} responsibilities. \
+                 Consider extracting related functionality into focused modules.",
+                mandated, method_count, trait_breakdown, extractable, responsibility_count,
+            ),
+            extractable_count: extractable,
+            mandated_count: mandated,
+            trait_breakdown,
+        };
+    }
+
+    // No significant trait methods: standard recommendation
+    TraitAwareRecommendation {
+        action: RecommendationAction::SplitIntoModules,
+        rationale: format!(
+            "{} methods across {} responsibilities. \
+             No significant trait implementations detected - all methods are design choices. \
+             Consider splitting into {} focused modules.",
+            method_count, responsibility_count, responsibility_count,
+        ),
+        extractable_count: extractable,
+        mandated_count: mandated,
+        trait_breakdown,
+    }
+}
+
+/// Format a trait-aware recommendation as a human-readable string.
+pub fn format_trait_aware_recommendation(rec: &TraitAwareRecommendation) -> String {
+    let mut output = String::new();
+
+    // Action header
+    let action_str = match rec.action {
+        RecommendationAction::NoActionNeeded => "No action needed",
+        RecommendationAction::ConsiderRefactoring => "Consider refactoring",
+        RecommendationAction::SplitIntoModules => "Split into modules",
+    };
+    output.push_str(&format!("[{}]\n", action_str));
+
+    // Trait breakdown
+    if rec.mandated_count > 0 {
+        output.push_str(&format!(
+            "Methods: {} total ({} trait-mandated, {} extractable)\n",
+            rec.mandated_count + rec.extractable_count,
+            rec.mandated_count,
+            rec.extractable_count,
+        ));
+        if !rec.trait_breakdown.is_empty() {
+            output.push_str(&format!("Implements: {}\n", rec.trait_breakdown));
+        }
+    }
+
+    // Rationale
+    output.push_str(&format!("\n{}\n", rec.rationale));
 
     output
 }

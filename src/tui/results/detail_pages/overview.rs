@@ -141,14 +141,40 @@ pub fn build_god_object_section(
             _ => "functions",
         };
 
+        // Show trait method breakdown if available (Spec 217)
         // Show weighted method count adjustment if available (like entropy dampening)
-        let method_display = item
+        let method_display = if let Some(ref summary) = item
+            .god_object_indicators
+            .as_ref()
+            .and_then(|i| i.trait_method_summary.as_ref())
+        {
+            // Spec 217: Show trait breakdown if trait methods detected
+            format!(
+                "{} ({} trait-mandated, {} extractable)",
+                methods, summary.mandated_count, summary.extractable_count
+            )
+        } else if let Some(weighted) = item
             .god_object_indicators
             .as_ref()
             .and_then(|i| i.weighted_method_count)
-            .map(|weighted| format!("{} → {:.0} (pure-weighted)", methods, weighted))
-            .unwrap_or_else(|| methods.to_string());
+        {
+            format!("{} → {:.0} (pure-weighted)", methods, weighted)
+        } else {
+            methods.to_string()
+        };
         add_label_value(&mut lines, method_label, method_display, theme, width);
+
+        // Show trait implementations if available (Spec 217)
+        if let Some(ref summary) = item
+            .god_object_indicators
+            .as_ref()
+            .and_then(|i| i.trait_method_summary.as_ref())
+        {
+            let trait_breakdown = summary.format_trait_breakdown();
+            if !trait_breakdown.is_empty() {
+                add_label_value(&mut lines, "implements", trait_breakdown, theme, width);
+            }
+        }
 
         if let Some(field_count) = fields {
             add_label_value(&mut lines, "fields", field_count.to_string(), theme, width);

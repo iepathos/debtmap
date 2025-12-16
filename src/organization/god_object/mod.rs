@@ -41,6 +41,7 @@ pub mod thresholds;
 pub mod types;
 
 pub mod metrics;
+pub mod traits; // Spec 217: Trait-Mandated Method Detection
 
 // Re-exports for public API
 pub use ast_visitor::{
@@ -66,11 +67,15 @@ pub use heuristics::{
 pub use recommendation_generator::{
     // Spec 215: Functional Decomposition Recommendation
     format_functional_recommendation,
+    // Spec 217: Trait-Mandated Method Detection Recommendations
+    format_trait_aware_recommendation,
     generate_recommendation,
     generate_recommendation_with_context,
     generate_recommendation_with_functional_awareness,
+    generate_recommendation_with_trait_awareness,
     FunctionalAwareRecommendation,
     RecommendationAction,
+    TraitAwareRecommendation,
 };
 pub use recommender::{
     determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,
@@ -110,3 +115,9 @@ pub use scoring::{calculate_effective_method_count, calculate_god_object_score_w
 
 // Spec 215: Functional Decomposition Recognition - Scoring
 pub use scoring::{apply_functional_bonus, calculate_god_object_score_with_functional_bonus};
+
+// Spec 217: Trait-Mandated Method Detection
+pub use traits::{
+    classify_all_methods, classify_method_origin, ClassifiedMethod, KnownTraitRegistry,
+    MethodOrigin, MethodPattern, TraitCategory, TraitImplInfo, TraitMethodSummary,
+};
