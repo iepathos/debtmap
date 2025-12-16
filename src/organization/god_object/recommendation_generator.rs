@@ -17,13 +17,264 @@
 //! - Multi-domain structs: domain-specific split recommendations
 //! - Rationale based on cohesion scores and domain analysis
 
-use super::classification_types::GodObjectType;
+use super::classification_types::{FunctionalDecompositionMetrics, GodObjectType};
 use super::context_recommendations::{
     classify_scenario, format_recommendation, generate_context_aware_recommendation,
     LongMethodInfo, RecommendationContext,
 };
 use crate::organization::struct_patterns::{PatternAnalysis, StructPattern};
 use std::collections::HashMap;
+
+// ============================================================================
+// Spec 215: Functional Decomposition Recommendation Override
+// ============================================================================
+
+/// Action to take for a god object recommendation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RecommendationAction {
+    /// No action needed - the code is well-designed
+    NoActionNeeded,
+    /// Consider refactoring but not critical
+    ConsiderRefactoring,
+    /// Split into multiple modules (traditional god object recommendation)
+    SplitIntoModules,
+}
+
+/// Recommendation for a god object with functional awareness.
+#[derive(Debug, Clone)]
+pub struct FunctionalAwareRecommendation {
+    /// What action to take
+    pub action: RecommendationAction,
+    /// Human-readable explanation
+    pub rationale: String,
+    /// Suggested module extractions (if any)
+    pub suggested_extractions: Vec<String>,
+    /// Was functional decomposition detected?
+    pub functional_pattern_detected: bool,
+    /// Functional score (0.0 to 1.0) if detected
+    pub functional_score: Option<f64>,
+}
+
+/// Generate recommendation considering functional decomposition patterns (Spec 215).
+///
+/// **Pure function** - deterministic, no side effects.
+///
+/// When functional decomposition is detected (many pure helper functions composing
+/// into a few orchestrators), this function overrides the default "extract sub-orchestrators"
+/// recommendation with appropriate guidance.
+///
+/// # Arguments
+///
+/// * `method_count` - Total method count
+/// * `responsibility_count` - Number of detected responsibilities
+/// * `functional_metrics` - Functional decomposition metrics from Spec 215
+///
+/// # Returns
+///
+/// `FunctionalAwareRecommendation` with action, rationale, and suggestions
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     FunctionalDecompositionMetrics, RecommendationAction,
+///     generate_recommendation_with_functional_awareness,
+/// };
+///
+/// // CallResolver example: 24 methods, 21 pure helpers, 3 orchestrators
+/// let functional_metrics = FunctionalDecompositionMetrics {
+///     pure_method_ratio: 0.875,
+///     orchestrator_count: 3,
+///     pure_helper_count: 21,
+///     avg_pure_method_loc: 8.0,
+///     composition_patterns: vec![],
+///     functional_score: 0.80,
+/// };
+///
+/// let rec = generate_recommendation_with_functional_awareness(
+///     24, // methods
+///     7,  // responsibilities
+///     &functional_metrics,
+/// );
+///
+/// assert_eq!(rec.action, RecommendationAction::NoActionNeeded);
+/// assert!(rec.rationale.contains("functional design"));
+/// ```
+pub fn generate_recommendation_with_functional_awareness(
+    method_count: usize,
+    responsibility_count: usize,
+    functional_metrics: &FunctionalDecompositionMetrics,
+) -> FunctionalAwareRecommendation {
+    // Strong functional pattern: override default recommendation
+    if functional_metrics.is_strong_functional_design() {
+        return FunctionalAwareRecommendation {
+            action: RecommendationAction::NoActionNeeded,
+            rationale: format!(
+                "Well-structured functional design detected: {} pure helpers composing into {} orchestrator(s). \
+                 This pattern is intentional decomposition, not a god object. \
+                 The high method count ({}) reflects functional style where complex behavior is built from many small, composable functions.",
+                functional_metrics.pure_helper_count,
+                functional_metrics.orchestrator_count,
+                method_count,
+            ),
+            suggested_extractions: vec![],
+            functional_pattern_detected: true,
+            functional_score: Some(functional_metrics.functional_score),
+        };
+    }
+
+    // Moderate functional pattern with some issues: tailored advice
+    if functional_metrics.is_moderate_functional_style() {
+        if responsibility_count > 3 {
+            // Still has too many responsibilities - some grouping could help
+            return FunctionalAwareRecommendation {
+                action: RecommendationAction::ConsiderRefactoring,
+                rationale: format!(
+                    "Partial functional decomposition detected ({}% pure methods, {} orchestrators), \
+                     but {} distinct responsibilities suggest some grouping could improve organization. \
+                     Consider grouping related pure helpers by responsibility domain.",
+                    (functional_metrics.pure_method_ratio * 100.0) as usize,
+                    functional_metrics.orchestrator_count,
+                    responsibility_count,
+                ),
+                suggested_extractions: suggest_responsibility_groupings(responsibility_count),
+                functional_pattern_detected: true,
+                functional_score: Some(functional_metrics.functional_score),
+            };
+        }
+
+        // Moderate functional with focused responsibilities - acceptable
+        return FunctionalAwareRecommendation {
+            action: RecommendationAction::NoActionNeeded,
+            rationale: format!(
+                "Functional decomposition with focused responsibilities detected. \
+                 {} methods, {}% pure helpers, {} orchestrator(s). \
+                 The code follows functional patterns and responsibilities are well-organized.",
+                method_count,
+                (functional_metrics.pure_method_ratio * 100.0) as usize,
+                functional_metrics.orchestrator_count,
+            ),
+            suggested_extractions: vec![],
+            functional_pattern_detected: true,
+            functional_score: Some(functional_metrics.functional_score),
+        };
+    }
+
+    // Weak functional elements: provide standard advice with functional context
+    if functional_metrics.has_functional_elements() {
+        return FunctionalAwareRecommendation {
+            action: RecommendationAction::ConsiderRefactoring,
+            rationale: format!(
+                "Some functional patterns detected ({}% pure methods), but not enough \
+                 for full functional decomposition benefits. Consider: \
+                 (1) Extracting more pure helper functions from instance methods, \
+                 (2) Reducing orchestrator count (currently {}), \
+                 (3) Breaking down larger methods into smaller composable pieces.",
+                (functional_metrics.pure_method_ratio * 100.0) as usize,
+                functional_metrics.orchestrator_count,
+            ),
+            suggested_extractions: suggest_functional_improvements(functional_metrics),
+            functional_pattern_detected: false,
+            functional_score: Some(functional_metrics.functional_score),
+        };
+    }
+
+    // No functional pattern: standard god object recommendation
+    FunctionalAwareRecommendation {
+        action: RecommendationAction::SplitIntoModules,
+        rationale: format!(
+            "Traditional god object pattern detected ({} methods, {} responsibilities). \
+             The code does not follow functional decomposition patterns (only {}% pure methods). \
+             Consider splitting into {} focused modules, one per responsibility.",
+            method_count,
+            responsibility_count,
+            (functional_metrics.pure_method_ratio * 100.0) as usize,
+            responsibility_count,
+        ),
+        suggested_extractions: (1..=responsibility_count)
+            .map(|i| format!("responsibility_{}_module", i))
+            .collect(),
+        functional_pattern_detected: false,
+        functional_score: Some(functional_metrics.functional_score),
+    }
+}
+
+/// Suggest responsibility-based groupings for moderate functional code.
+fn suggest_responsibility_groupings(responsibility_count: usize) -> Vec<String> {
+    (1..=responsibility_count.min(3))
+        .map(|i| format!("Group related helpers into '{}_helpers' sub-module", i))
+        .collect()
+}
+
+/// Suggest improvements for code with weak functional elements.
+fn suggest_functional_improvements(metrics: &FunctionalDecompositionMetrics) -> Vec<String> {
+    let mut suggestions = Vec::new();
+
+    if metrics.pure_method_ratio < 0.5 {
+        suggestions
+            .push("Extract pure helper functions from instance methods where possible".to_string());
+    }
+
+    if metrics.orchestrator_count > 5 {
+        suggestions.push(format!(
+            "Reduce orchestrator count from {} to 2-3 by composing orchestrators",
+            metrics.orchestrator_count
+        ));
+    }
+
+    if metrics.avg_pure_method_loc > 15.0 {
+        suggestions.push(format!(
+            "Break down pure methods (avg {:.0} LOC) into smaller composable functions",
+            metrics.avg_pure_method_loc
+        ));
+    }
+
+    if suggestions.is_empty() {
+        suggestions.push(
+            "Continue extracting pure functions to improve functional decomposition".to_string(),
+        );
+    }
+
+    suggestions
+}
+
+/// Format a functional-aware recommendation as a human-readable string.
+pub fn format_functional_recommendation(rec: &FunctionalAwareRecommendation) -> String {
+    let mut output = String::new();
+
+    // Action header
+    let action_str = match rec.action {
+        RecommendationAction::NoActionNeeded => "No action needed",
+        RecommendationAction::ConsiderRefactoring => "Consider refactoring",
+        RecommendationAction::SplitIntoModules => "Split into modules",
+    };
+    output.push_str(&format!("[{}]\n", action_str));
+
+    // Functional pattern indicator
+    if rec.functional_pattern_detected {
+        if let Some(score) = rec.functional_score {
+            output.push_str(&format!(
+                "Functional decomposition detected (score: {:.2})\n",
+                score
+            ));
+        } else {
+            output.push_str("Functional decomposition detected\n");
+        }
+    }
+
+    // Rationale
+    output.push_str(&format!("\n{}\n", rec.rationale));
+
+    // Suggestions
+    if !rec.suggested_extractions.is_empty() {
+        output.push_str("\nSuggestions:\n");
+        for suggestion in &rec.suggested_extractions {
+            output.push_str(&format!("  - {}\n", suggestion));
+        }
+    }
+
+    output
+}
 
 /// Generate human-readable recommendation for god object (pure function).
 ///
@@ -587,6 +838,238 @@ mod tests {
             rec.contains('%') || rec.contains("domain") || rec.contains("purpose"),
             "Should include rationale, got: {}",
             rec
+        );
+    }
+
+    // =========================================================================
+    // Spec 215: Functional Decomposition Recommendation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_functional_recommendation_strong_functional() {
+        // CallResolver example: 24 methods, 21 pure helpers, 3 orchestrators
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.875,
+            orchestrator_count: 3,
+            pure_helper_count: 21,
+            avg_pure_method_loc: 8.0,
+            composition_patterns: vec![],
+            functional_score: 0.80, // Strong functional
+        };
+
+        let rec = generate_recommendation_with_functional_awareness(
+            24, // methods
+            7,  // responsibilities (would normally trigger god object)
+            &functional_metrics,
+        );
+
+        assert_eq!(
+            rec.action,
+            RecommendationAction::NoActionNeeded,
+            "Strong functional design should not need action"
+        );
+        assert!(
+            rec.rationale.contains("functional design"),
+            "Should mention functional design"
+        );
+        assert!(
+            rec.functional_pattern_detected,
+            "Should detect functional pattern"
+        );
+        assert!(
+            rec.suggested_extractions.is_empty(),
+            "Should not suggest extractions"
+        );
+    }
+
+    #[test]
+    fn test_functional_recommendation_moderate_with_responsibilities() {
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.60,
+            orchestrator_count: 4,
+            pure_helper_count: 12,
+            avg_pure_method_loc: 10.0,
+            composition_patterns: vec![],
+            functional_score: 0.55, // Moderate functional
+        };
+
+        let rec = generate_recommendation_with_functional_awareness(
+            20, // methods
+            5,  // Many responsibilities
+            &functional_metrics,
+        );
+
+        assert_eq!(
+            rec.action,
+            RecommendationAction::ConsiderRefactoring,
+            "Moderate functional with many responsibilities should consider refactoring"
+        );
+        assert!(
+            rec.rationale.contains("responsibilities"),
+            "Should mention responsibilities"
+        );
+        assert!(
+            rec.functional_pattern_detected,
+            "Should detect functional pattern"
+        );
+    }
+
+    #[test]
+    fn test_functional_recommendation_moderate_focused() {
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.60,
+            orchestrator_count: 3,
+            pure_helper_count: 12,
+            avg_pure_method_loc: 8.0,
+            composition_patterns: vec![],
+            functional_score: 0.55, // Moderate functional
+        };
+
+        let rec = generate_recommendation_with_functional_awareness(
+            20, // methods
+            2,  // Few responsibilities - focused
+            &functional_metrics,
+        );
+
+        assert_eq!(
+            rec.action,
+            RecommendationAction::NoActionNeeded,
+            "Moderate functional with focused responsibilities should not need action"
+        );
+        assert!(
+            rec.rationale.contains("focused responsibilities")
+                || rec.rationale.contains("well-organized"),
+            "Should mention focused responsibilities, got: {}",
+            rec.rationale
+        );
+    }
+
+    #[test]
+    fn test_functional_recommendation_weak_functional() {
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.35,
+            orchestrator_count: 6,
+            pure_helper_count: 7,
+            avg_pure_method_loc: 20.0,
+            composition_patterns: vec![],
+            functional_score: 0.35, // Weak functional
+        };
+
+        let rec = generate_recommendation_with_functional_awareness(
+            20, // methods
+            4,  // responsibilities
+            &functional_metrics,
+        );
+
+        assert_eq!(
+            rec.action,
+            RecommendationAction::ConsiderRefactoring,
+            "Weak functional should consider refactoring"
+        );
+        assert!(
+            !rec.functional_pattern_detected,
+            "Should not strongly detect functional pattern"
+        );
+        assert!(
+            !rec.suggested_extractions.is_empty(),
+            "Should provide improvement suggestions"
+        );
+    }
+
+    #[test]
+    fn test_functional_recommendation_no_functional_pattern() {
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.10,
+            orchestrator_count: 10,
+            pure_helper_count: 2,
+            avg_pure_method_loc: 25.0,
+            composition_patterns: vec![],
+            functional_score: 0.15, // No functional pattern
+        };
+
+        let rec = generate_recommendation_with_functional_awareness(
+            20, // methods
+            5,  // responsibilities
+            &functional_metrics,
+        );
+
+        assert_eq!(
+            rec.action,
+            RecommendationAction::SplitIntoModules,
+            "Traditional god object should recommend splitting"
+        );
+        assert!(
+            rec.rationale.contains("Traditional god object"),
+            "Should identify as traditional god object"
+        );
+        assert!(
+            !rec.functional_pattern_detected,
+            "Should not detect functional pattern"
+        );
+        assert_eq!(
+            rec.suggested_extractions.len(),
+            5,
+            "Should suggest one extraction per responsibility"
+        );
+    }
+
+    #[test]
+    fn test_format_functional_recommendation() {
+        let rec = FunctionalAwareRecommendation {
+            action: RecommendationAction::NoActionNeeded,
+            rationale: "Well-structured functional design detected.".to_string(),
+            suggested_extractions: vec![],
+            functional_pattern_detected: true,
+            functional_score: Some(0.82),
+        };
+
+        let formatted = format_functional_recommendation(&rec);
+
+        assert!(
+            formatted.contains("[No action needed]"),
+            "Should show action"
+        );
+        assert!(
+            formatted.contains("Functional decomposition detected"),
+            "Should show functional detection"
+        );
+        assert!(formatted.contains("0.82"), "Should show functional score");
+        assert!(
+            formatted.contains("Well-structured"),
+            "Should show rationale"
+        );
+    }
+
+    #[test]
+    fn test_format_functional_recommendation_with_suggestions() {
+        let rec = FunctionalAwareRecommendation {
+            action: RecommendationAction::ConsiderRefactoring,
+            rationale: "Some improvements possible.".to_string(),
+            suggested_extractions: vec![
+                "Extract pure helpers".to_string(),
+                "Reduce orchestrator count".to_string(),
+            ],
+            functional_pattern_detected: false,
+            functional_score: Some(0.35),
+        };
+
+        let formatted = format_functional_recommendation(&rec);
+
+        assert!(
+            formatted.contains("[Consider refactoring]"),
+            "Should show action"
+        );
+        assert!(
+            formatted.contains("Suggestions:"),
+            "Should show suggestions header"
+        );
+        assert!(
+            formatted.contains("Extract pure helpers"),
+            "Should list first suggestion"
+        );
+        assert!(
+            formatted.contains("Reduce orchestrator count"),
+            "Should list second suggestion"
         );
     }
 }

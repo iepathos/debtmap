@@ -578,6 +578,133 @@ pub fn calculate_effective_method_count(
     method_breakdown.weighted_count() * complexity_factor
 }
 
+// ============================================================================
+// Spec 215: Functional Decomposition Recognition
+// ============================================================================
+
+use super::classification_types::FunctionalDecompositionMetrics;
+
+/// Calculate God Object score with functional decomposition bonus (Spec 215).
+///
+/// **Pure function** - deterministic, no side effects.
+///
+/// This function applies a significant score reduction for code that follows
+/// functional decomposition patterns. A struct with many small, pure helper
+/// functions composing into a few orchestrators represents good design, not
+/// a god object.
+///
+/// # Arguments
+///
+/// * `method_breakdown` - Self-usage breakdown from Spec 213
+/// * `field_count` - Number of fields in the type
+/// * `responsibility_count` - Number of distinct responsibilities
+/// * `lines_of_code` - Total lines of code
+/// * `complexity_metrics` - Aggregated complexity metrics (Spec 211)
+/// * `functional_metrics` - Functional decomposition metrics (Spec 215)
+/// * `thresholds` - God object thresholds for the language
+/// * `complexity_thresholds` - Complexity thresholds for the language
+///
+/// # Returns
+///
+/// God object score (0-100+) with functional bonus applied.
+///
+/// # Score Adjustments
+///
+/// | Functional Score | Multiplier | Description |
+/// |------------------|------------|-------------|
+/// | >= 0.7 | 0.3x | Strong functional design |
+/// | >= 0.5 | 0.5x | Moderate functional style |
+/// | >= 0.3 | 0.75x | Some functional elements |
+/// | < 0.3 | 1.0x | Traditional OOP style |
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     ComplexityMetrics, ComplexityThresholds, GodObjectThresholds,
+///     MethodSelfUsageBreakdown, FunctionalDecompositionMetrics,
+///     calculate_god_object_score_with_functional_bonus,
+/// };
+///
+/// // CallResolver example: 24 methods, 21 pure helpers, 3 orchestrators
+/// let breakdown = MethodSelfUsageBreakdown {
+///     total_methods: 24,
+///     instance_methods: 3,
+///     pure_associated: 21,
+///     unused_self: 0,
+/// };
+///
+/// let functional_metrics = FunctionalDecompositionMetrics {
+///     pure_method_ratio: 0.875,
+///     orchestrator_count: 3,
+///     pure_helper_count: 21,
+///     avg_pure_method_loc: 8.0,
+///     composition_patterns: vec![],
+///     functional_score: 0.75,
+/// };
+///
+/// let score = calculate_god_object_score_with_functional_bonus(
+///     &breakdown,
+///     3, // fields
+///     1, // responsibility
+///     200, // lines
+///     &ComplexityMetrics::default(),
+///     &functional_metrics,
+///     &GodObjectThresholds::default(),
+///     &ComplexityThresholds::default(),
+/// );
+///
+/// // Score should be low due to functional bonus
+/// assert!(score < 30.0, "Functional decomposition should score low, got {}", score);
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn calculate_god_object_score_with_functional_bonus(
+    method_breakdown: &MethodSelfUsageBreakdown,
+    field_count: usize,
+    responsibility_count: usize,
+    lines_of_code: usize,
+    complexity_metrics: &ComplexityMetrics,
+    functional_metrics: &FunctionalDecompositionMetrics,
+    thresholds: &GodObjectThresholds,
+    complexity_thresholds: &ComplexityThresholds,
+) -> f64 {
+    // Calculate base score using Spec 213 (self-usage weighting)
+    let base_score = calculate_god_object_score_with_self_usage(
+        method_breakdown,
+        field_count,
+        responsibility_count,
+        lines_of_code,
+        complexity_metrics,
+        thresholds,
+        complexity_thresholds,
+    );
+
+    // Apply functional decomposition bonus
+    base_score * functional_metrics.score_multiplier()
+}
+
+/// Apply functional decomposition bonus to an existing score (Spec 215).
+///
+/// **Pure function** - deterministic, no side effects.
+///
+/// This is a simpler version that takes a pre-calculated base score and
+/// applies the functional bonus multiplier.
+///
+/// # Arguments
+///
+/// * `base_score` - Pre-calculated god object score
+/// * `functional_metrics` - Functional decomposition metrics
+///
+/// # Returns
+///
+/// Adjusted score with functional bonus applied.
+pub fn apply_functional_bonus(
+    base_score: f64,
+    functional_metrics: &FunctionalDecompositionMetrics,
+) -> f64 {
+    base_score * functional_metrics.score_multiplier()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1813,6 +1940,386 @@ mod spec_213_tests {
 
             prop_assert!(score.is_finite() && score >= 0.0,
                 "Score {} invalid", score);
+        }
+    }
+}
+
+// ============================================================================
+// Spec 215: Functional Decomposition Recognition Tests
+// ============================================================================
+
+#[cfg(test)]
+mod spec_215_tests {
+    use super::*;
+
+    #[test]
+    fn test_functional_bonus_strong_functional_design() {
+        // CallResolver example: 24 methods, 21 pure helpers, 3 orchestrators
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 24,
+            instance_methods: 3,
+            pure_associated: 21,
+            unused_self: 0,
+        };
+
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.875,
+            orchestrator_count: 3,
+            pure_helper_count: 21,
+            avg_pure_method_loc: 8.0,
+            composition_patterns: vec![],
+            functional_score: 0.80, // Strong functional (>= 0.7)
+        };
+
+        let metrics = ComplexityMetrics::default();
+
+        let score = calculate_god_object_score_with_functional_bonus(
+            &breakdown,
+            3,   // fields
+            1,   // responsibility
+            200, // lines
+            &metrics,
+            &functional_metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        // Strong functional design should get 0.3x multiplier
+        // Score should be low
+        assert!(
+            score < 30.0,
+            "Strong functional design should score low, got {}",
+            score
+        );
+    }
+
+    #[test]
+    fn test_functional_bonus_moderate_functional_style() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 20,
+            instance_methods: 8,
+            pure_associated: 12,
+            unused_self: 0,
+        };
+
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.60,
+            orchestrator_count: 5,
+            pure_helper_count: 12,
+            avg_pure_method_loc: 10.0,
+            composition_patterns: vec![],
+            functional_score: 0.55, // Moderate functional (0.5-0.7)
+        };
+
+        let metrics = ComplexityMetrics::default();
+
+        let score = calculate_god_object_score_with_functional_bonus(
+            &breakdown,
+            5,
+            2,
+            300,
+            &metrics,
+            &functional_metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        // Moderate functional design should get 0.5x multiplier
+        assert!(score.is_finite() && score >= 0.0);
+    }
+
+    #[test]
+    fn test_functional_bonus_no_functional_pattern() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 20,
+            instance_methods: 18,
+            pure_associated: 2,
+            unused_self: 0,
+        };
+
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.10,
+            orchestrator_count: 10,
+            pure_helper_count: 2,
+            avg_pure_method_loc: 20.0,
+            composition_patterns: vec![],
+            functional_score: 0.20, // No functional pattern (< 0.3)
+        };
+
+        let metrics = ComplexityMetrics {
+            avg_cyclomatic: 8.0,
+            max_cyclomatic: 15,
+            total_cyclomatic: 160,
+            ..Default::default()
+        };
+
+        let score_with_bonus = calculate_god_object_score_with_functional_bonus(
+            &breakdown,
+            10,
+            5,
+            500,
+            &metrics,
+            &functional_metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        let score_base = calculate_god_object_score_with_self_usage(
+            &breakdown,
+            10,
+            5,
+            500,
+            &metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        // No functional pattern = 1.0x multiplier = same score
+        assert!(
+            (score_with_bonus - score_base).abs() < 0.01,
+            "No functional pattern should not affect score. Base: {}, With bonus: {}",
+            score_base,
+            score_with_bonus
+        );
+    }
+
+    #[test]
+    fn test_functional_bonus_deterministic() {
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 15,
+            instance_methods: 5,
+            pure_associated: 10,
+            unused_self: 0,
+        };
+
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.67,
+            orchestrator_count: 3,
+            pure_helper_count: 10,
+            avg_pure_method_loc: 6.0,
+            composition_patterns: vec![],
+            functional_score: 0.72,
+        };
+
+        let metrics = ComplexityMetrics::default();
+
+        let score1 = calculate_god_object_score_with_functional_bonus(
+            &breakdown,
+            5,
+            2,
+            200,
+            &metrics,
+            &functional_metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        let score2 = calculate_god_object_score_with_functional_bonus(
+            &breakdown,
+            5,
+            2,
+            200,
+            &metrics,
+            &functional_metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        assert_eq!(score1, score2, "Scoring should be deterministic");
+    }
+
+    #[test]
+    fn test_apply_functional_bonus_simple() {
+        let high_functional = FunctionalDecompositionMetrics {
+            functional_score: 0.80,
+            ..Default::default()
+        };
+
+        let moderate_functional = FunctionalDecompositionMetrics {
+            functional_score: 0.55,
+            ..Default::default()
+        };
+
+        let weak_functional = FunctionalDecompositionMetrics {
+            functional_score: 0.35,
+            ..Default::default()
+        };
+
+        let no_functional = FunctionalDecompositionMetrics {
+            functional_score: 0.20,
+            ..Default::default()
+        };
+
+        let base_score = 100.0;
+
+        // High functional: 0.3x
+        let high_result = apply_functional_bonus(base_score, &high_functional);
+        assert!(
+            (high_result - 30.0).abs() < 0.01,
+            "High functional should be 30.0, got {}",
+            high_result
+        );
+
+        // Moderate functional: 0.5x
+        let moderate_result = apply_functional_bonus(base_score, &moderate_functional);
+        assert!(
+            (moderate_result - 50.0).abs() < 0.01,
+            "Moderate functional should be 50.0, got {}",
+            moderate_result
+        );
+
+        // Weak functional: 0.75x
+        let weak_result = apply_functional_bonus(base_score, &weak_functional);
+        assert!(
+            (weak_result - 75.0).abs() < 0.01,
+            "Weak functional should be 75.0, got {}",
+            weak_result
+        );
+
+        // No functional: 1.0x
+        let no_result = apply_functional_bonus(base_score, &no_functional);
+        assert!(
+            (no_result - 100.0).abs() < 0.01,
+            "No functional should be 100.0, got {}",
+            no_result
+        );
+    }
+
+    #[test]
+    fn test_functional_bonus_reduces_high_scores() {
+        // Scenario: A struct would normally score as CRITICAL (>50)
+        // but has strong functional decomposition
+        let breakdown = MethodSelfUsageBreakdown {
+            total_methods: 30,
+            instance_methods: 5,
+            pure_associated: 25,
+            unused_self: 0,
+        };
+
+        let functional_metrics = FunctionalDecompositionMetrics {
+            pure_method_ratio: 0.833,
+            orchestrator_count: 2,
+            pure_helper_count: 25,
+            avg_pure_method_loc: 5.0,
+            composition_patterns: vec![],
+            functional_score: 0.85, // Very strong functional
+        };
+
+        let metrics = ComplexityMetrics {
+            avg_cyclomatic: 3.0,
+            max_cyclomatic: 8,
+            total_cyclomatic: 90,
+            ..Default::default()
+        };
+
+        let score = calculate_god_object_score_with_functional_bonus(
+            &breakdown,
+            5,   // fields
+            3,   // responsibilities
+            400, // lines
+            &metrics,
+            &functional_metrics,
+            &GodObjectThresholds::default(),
+            &ComplexityThresholds::default(),
+        );
+
+        // With strong functional bonus (0.3x), should be well below CRITICAL
+        assert!(
+            score < 50.0,
+            "Strong functional code should not be CRITICAL, got {}",
+            score
+        );
+    }
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_functional_bonus_never_increases_score(
+            instance in 1usize..20,
+            pure in 0usize..30,
+            fields in 1usize..20,
+            resp in 1usize..10,
+            loc in 50usize..1000,
+            functional_score in 0.0f64..1.0
+        ) {
+            let breakdown = MethodSelfUsageBreakdown {
+                total_methods: instance + pure,
+                instance_methods: instance,
+                pure_associated: pure,
+                unused_self: 0,
+            };
+
+            let functional_metrics = FunctionalDecompositionMetrics {
+                functional_score,
+                ..Default::default()
+            };
+
+            let metrics = ComplexityMetrics::default();
+
+            let score_with_bonus = calculate_god_object_score_with_functional_bonus(
+                &breakdown,
+                fields,
+                resp,
+                loc,
+                &metrics,
+                &functional_metrics,
+                &GodObjectThresholds::default(),
+                &ComplexityThresholds::default(),
+            );
+
+            let score_base = calculate_god_object_score_with_self_usage(
+                &breakdown,
+                fields,
+                resp,
+                loc,
+                &metrics,
+                &GodObjectThresholds::default(),
+                &ComplexityThresholds::default(),
+            );
+
+            // Functional bonus should never INCREASE the score
+            prop_assert!(score_with_bonus <= score_base + 0.001,
+                "Functional bonus should not increase score. Base: {}, With bonus: {}",
+                score_base, score_with_bonus);
+        }
+
+        #[test]
+        fn prop_functional_bonus_finite(
+            instance in 1usize..20,
+            pure in 0usize..30,
+            fields in 1usize..20,
+            resp in 1usize..10,
+            loc in 50usize..1000,
+            functional_score in 0.0f64..1.0
+        ) {
+            let breakdown = MethodSelfUsageBreakdown {
+                total_methods: instance + pure,
+                instance_methods: instance,
+                pure_associated: pure,
+                unused_self: 0,
+            };
+
+            let functional_metrics = FunctionalDecompositionMetrics {
+                functional_score,
+                ..Default::default()
+            };
+
+            let metrics = ComplexityMetrics::default();
+
+            let score = calculate_god_object_score_with_functional_bonus(
+                &breakdown,
+                fields,
+                resp,
+                loc,
+                &metrics,
+                &functional_metrics,
+                &GodObjectThresholds::default(),
+                &ComplexityThresholds::default(),
+            );
+
+            prop_assert!(score.is_finite() && score >= 0.0,
+                "Score {} is invalid", score);
         }
     }
 }

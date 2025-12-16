@@ -420,6 +420,245 @@ pub struct ClassificationResult {
     pub signals_used: Vec<SignalType>,
 }
 
+// ============================================================================
+// Spec 215: Functional Decomposition Recognition
+// ============================================================================
+
+/// Detected composition patterns in functional code.
+///
+/// These patterns indicate intentional functional decomposition, where
+/// complex behavior is built from small, composable functions.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::CompositionPattern;
+///
+/// // Pipe chain pattern: `.pipe(f).pipe(g).pipe(h)`
+/// let pipe = CompositionPattern::PipeChain { length: 3 };
+///
+/// // Iterator chain pattern: `.map().filter().collect()`
+/// let iter = CompositionPattern::IteratorChain { length: 3 };
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CompositionPattern {
+    /// `.pipe()` method chains for functional composition
+    PipeChain {
+        /// Number of pipe calls in the chain
+        length: usize,
+    },
+    /// Iterator method chains (`.map().filter().collect()`)
+    IteratorChain {
+        /// Number of iterator methods in the chain
+        length: usize,
+    },
+    /// Direct function composition `f(g(h(x)))`
+    DirectComposition {
+        /// Nesting depth of composed calls
+        depth: usize,
+    },
+    /// Builder pattern with method chaining
+    BuilderPattern,
+}
+
+impl CompositionPattern {
+    /// Returns a human-readable description of this pattern.
+    #[must_use]
+    pub fn description(&self) -> String {
+        match self {
+            Self::PipeChain { length } => format!("pipe chain ({} calls)", length),
+            Self::IteratorChain { length } => format!("iterator chain ({} methods)", length),
+            Self::DirectComposition { depth } => format!("direct composition (depth {})", depth),
+            Self::BuilderPattern => "builder pattern".to_string(),
+        }
+    }
+}
+
+/// Metrics for detecting functional decomposition patterns (Spec 215).
+///
+/// This struct captures indicators of intentional functional design:
+/// - High ratio of pure methods to instance methods
+/// - Few orchestrating methods coordinating many pure helpers
+/// - Small, focused helper functions
+/// - Presence of composition patterns (pipes, iterators, etc.)
+///
+/// # Functional Score Thresholds
+///
+/// | Score | Interpretation | Multiplier |
+/// |-------|----------------|------------|
+/// | >= 0.7 | Strong functional design | 0.3x |
+/// | >= 0.5 | Moderate functional style | 0.5x |
+/// | >= 0.3 | Some functional elements | 0.75x |
+/// | < 0.3 | Traditional OOP style | 1.0x |
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::FunctionalDecompositionMetrics;
+///
+/// // CallResolver example from spec: 24 methods, 21 pure, 3 orchestrators
+/// let metrics = FunctionalDecompositionMetrics {
+///     pure_method_ratio: 0.875,  // 21/24
+///     orchestrator_count: 3,
+///     pure_helper_count: 21,
+///     avg_pure_method_loc: 8.0,
+///     composition_patterns: vec![],
+///     functional_score: 0.82,
+/// };
+///
+/// assert!(metrics.is_strong_functional_design());
+/// assert_eq!(metrics.score_multiplier(), 0.3);
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FunctionalDecompositionMetrics {
+    /// Ratio of pure methods to total methods (0.0 to 1.0)
+    pub pure_method_ratio: f64,
+    /// Number of methods that coordinate/orchestrate (instance methods with multiple calls)
+    pub orchestrator_count: usize,
+    /// Number of pure helper methods
+    pub pure_helper_count: usize,
+    /// Average lines of code per pure method
+    pub avg_pure_method_loc: f64,
+    /// Detected composition patterns
+    pub composition_patterns: Vec<CompositionPattern>,
+    /// Overall functional pattern score (0.0 to 1.0)
+    pub functional_score: f64,
+}
+
+impl FunctionalDecompositionMetrics {
+    /// Create metrics from method analysis data.
+    ///
+    /// # Arguments
+    ///
+    /// * `breakdown` - Method self-usage breakdown from Spec 213
+    /// * `orchestrator_count` - Number of orchestrating methods
+    /// * `avg_pure_loc` - Average LOC per pure method
+    /// * `patterns` - Detected composition patterns
+    pub fn from_analysis(
+        breakdown: &MethodSelfUsageBreakdown,
+        orchestrator_count: usize,
+        avg_pure_loc: f64,
+        patterns: Vec<CompositionPattern>,
+    ) -> Self {
+        let functional_score = Self::calculate_score(
+            breakdown.pure_ratio(),
+            orchestrator_count,
+            avg_pure_loc,
+            &patterns,
+        );
+
+        Self {
+            pure_method_ratio: breakdown.pure_ratio(),
+            orchestrator_count,
+            pure_helper_count: breakdown.pure_helper_count(),
+            avg_pure_method_loc: avg_pure_loc,
+            composition_patterns: patterns,
+            functional_score,
+        }
+    }
+
+    /// Calculate functional decomposition score.
+    ///
+    /// The score combines four signals:
+    /// - Pure method ratio (40%): High pure ratio = functional style
+    /// - Orchestrator count (20%): Few orchestrators = clear structure
+    /// - Average pure method size (20%): Small = composable
+    /// - Composition patterns (20%): Presence = intentional FP
+    fn calculate_score(
+        pure_ratio: f64,
+        orchestrator_count: usize,
+        avg_pure_loc: f64,
+        patterns: &[CompositionPattern],
+    ) -> f64 {
+        let mut score = 0.0;
+
+        // High pure method ratio is strong signal (0.0 - 0.4)
+        score += pure_ratio * 0.4;
+
+        // Few orchestrators is good (0.0 - 0.2)
+        let orchestrator_score = match orchestrator_count {
+            0..=2 => 0.2,
+            3..=5 => 0.1,
+            _ => 0.0,
+        };
+        score += orchestrator_score;
+
+        // Small average pure method size is good (0.0 - 0.2)
+        let size_score = if avg_pure_loc <= 5.0 {
+            0.2
+        } else if avg_pure_loc <= 10.0 {
+            0.15
+        } else if avg_pure_loc <= 15.0 {
+            0.1
+        } else {
+            0.0
+        };
+        score += size_score;
+
+        // Composition patterns detected (0.0 - 0.2)
+        let pattern_score = if !patterns.is_empty() {
+            0.2_f64.min(patterns.len() as f64 * 0.05)
+        } else {
+            0.0
+        };
+        score += pattern_score;
+
+        score.min(1.0)
+    }
+
+    /// Returns true if this represents strong functional design (score >= 0.7).
+    #[must_use]
+    pub fn is_strong_functional_design(&self) -> bool {
+        self.functional_score >= 0.7
+    }
+
+    /// Returns true if this represents moderate functional style (score >= 0.5).
+    #[must_use]
+    pub fn is_moderate_functional_style(&self) -> bool {
+        self.functional_score >= 0.5
+    }
+
+    /// Returns true if this has some functional elements (score >= 0.3).
+    #[must_use]
+    pub fn has_functional_elements(&self) -> bool {
+        self.functional_score >= 0.3
+    }
+
+    /// Returns the score multiplier for god object scoring.
+    ///
+    /// | Score | Multiplier |
+    /// |-------|------------|
+    /// | >= 0.7 | 0.3x (70% reduction) |
+    /// | >= 0.5 | 0.5x (50% reduction) |
+    /// | >= 0.3 | 0.75x (25% reduction) |
+    /// | < 0.3 | 1.0x (no reduction) |
+    #[must_use]
+    pub fn score_multiplier(&self) -> f64 {
+        if self.functional_score >= 0.7 {
+            0.3
+        } else if self.functional_score >= 0.5 {
+            0.5
+        } else if self.functional_score >= 0.3 {
+            0.75
+        } else {
+            1.0
+        }
+    }
+}
+
+impl std::fmt::Display for FunctionalDecompositionMetrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "functional score: {:.2} ({} pure helpers, {} orchestrators, {:.1} avg LOC)",
+            self.functional_score,
+            self.pure_helper_count,
+            self.orchestrator_count,
+            self.avg_pure_method_loc
+        )
+    }
+}
+
 /// Types of signals used for responsibility classification.
 ///
 /// These represent different sources of evidence used to determine

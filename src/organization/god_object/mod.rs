@@ -63,7 +63,15 @@ pub use detector::GodObjectDetector;
 pub use heuristics::{
     detect_from_content, fallback_god_object_heuristics, fallback_with_preserved_analysis,
 };
-pub use recommendation_generator::{generate_recommendation, generate_recommendation_with_context};
+pub use recommendation_generator::{
+    // Spec 215: Functional Decomposition Recommendation
+    format_functional_recommendation,
+    generate_recommendation,
+    generate_recommendation_with_context,
+    generate_recommendation_with_functional_awareness,
+    FunctionalAwareRecommendation,
+    RecommendationAction,
+};
 pub use recommender::{
     determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,
     recommend_module_splits_enhanced, recommend_module_splits_enhanced_with_evidence,
@@ -84,6 +92,9 @@ pub use classifier::{
 
 // Spec 213: Pure Function Method Weighting
 pub use classification_types::{MethodSelfUsage, MethodSelfUsageBreakdown};
+
+// Spec 215: Functional Decomposition Recognition
+pub use classification_types::{CompositionPattern, FunctionalDecompositionMetrics};
 pub use classifier::{
     calculate_combined_method_weight, calculate_combined_weighted_count, classify_self_usage,
     classify_self_usage_standalone,
@@ -96,3 +107,6 @@ pub use thresholds::ComplexityThresholds;
 
 // Spec 213: Enhanced Scoring with Self-Usage
 pub use scoring::{calculate_effective_method_count, calculate_god_object_score_with_self_usage};
+
+// Spec 215: Functional Decomposition Recognition - Scoring
+pub use scoring::{apply_functional_bonus, calculate_god_object_score_with_functional_bonus};
