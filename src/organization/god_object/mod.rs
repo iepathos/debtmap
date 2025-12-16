@@ -82,7 +82,17 @@ pub use classifier::{
     classify_method_complexity,
 };
 
+// Spec 213: Pure Function Method Weighting
+pub use classification_types::{MethodSelfUsage, MethodSelfUsageBreakdown};
+pub use classifier::{
+    calculate_combined_method_weight, calculate_combined_weighted_count, classify_self_usage,
+    classify_self_usage_standalone,
+};
+
 // Spec 211: Method Complexity Weighting
 pub use metrics_types::{calculate_complexity_metrics, ComplexityMetrics, MethodComplexity};
 pub use scoring::{calculate_complexity_factor, calculate_god_object_score_with_complexity};
 pub use thresholds::ComplexityThresholds;
+
+// Spec 213: Enhanced Scoring with Self-Usage
+pub use scoring::{calculate_effective_method_count, calculate_god_object_score_with_self_usage};
