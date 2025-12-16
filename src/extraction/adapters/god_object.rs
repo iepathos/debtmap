@@ -19,7 +19,7 @@
 
 use crate::extraction::types::{ExtractedFileData, ExtractedImplData, ExtractedStructData};
 use crate::organization::god_object::classifier::{
-    group_methods_by_responsibility, is_cohesive_struct,
+    calculate_weighted_count_from_names, group_methods_by_responsibility, is_cohesive_struct,
 };
 use crate::organization::god_object::scoring::calculate_god_object_score_weighted;
 use crate::organization::god_object::{
@@ -35,6 +35,8 @@ use std::path::Path;
 struct StructMetrics {
     field_count: usize,
     method_count: usize,
+    /// Spec 209: Weighted method count accounting for accessor/boilerplate
+    weighted_method_count: f64,
     method_names: Vec<String>,
     /// Average complexity of methods (from extracted function data if available)
     avg_complexity: f64,
@@ -60,6 +62,8 @@ fn build_impl_map(impls: &[ExtractedImplData]) -> HashMap<String, Vec<&Extracted
 ///
 /// Aggregates method counts, names, and complexity from all impl blocks for this struct.
 /// Looks up complexity from extracted function data using qualified names.
+///
+/// Spec 209: Also calculates weighted method count based on accessor/boilerplate classification.
 fn calculate_struct_metrics(
     struct_data: &ExtractedStructData,
     impl_blocks: &[&ExtractedImplData],
@@ -71,6 +75,11 @@ fn calculate_struct_metrics(
         .iter()
         .flat_map(|i| i.methods.iter().map(|m| m.name.clone()))
         .collect();
+
+    // Spec 209: Calculate weighted method count
+    // Accessors and boilerplate contribute less to the god object score
+    let weighted_method_count =
+        calculate_weighted_count_from_names(method_names.iter().map(String::as_str));
 
     // Look up complexity from extracted functions using qualified names
     // Methods in impl blocks should match "TypeName::method_name" pattern
@@ -97,6 +106,7 @@ fn calculate_struct_metrics(
     StructMetrics {
         field_count: struct_data.fields.len(),
         method_count,
+        weighted_method_count,
         method_names,
         avg_complexity,
         complexity_sum,
@@ -106,15 +116,19 @@ fn calculate_struct_metrics(
 /// Pure function: determine if struct qualifies as god object based on metrics.
 ///
 /// Returns true if any threshold is exceeded:
-/// - Method count > max_methods
+/// - Weighted method count > max_methods (Spec 209)
 /// - Field count > max_fields
 /// - Responsibility count > max_traits
+///
+/// Spec 209: Uses weighted method count instead of raw count, so structs
+/// with many accessor/boilerplate methods are less likely to trigger.
 fn is_god_object_candidate(
     metrics: &StructMetrics,
     responsibilities: &HashMap<String, Vec<String>>,
     thresholds: &GodObjectThresholds,
 ) -> bool {
-    metrics.method_count > thresholds.max_methods
+    // Spec 209: Use weighted method count for threshold check
+    metrics.weighted_method_count > thresholds.max_methods as f64
         || metrics.field_count > thresholds.max_fields
         || responsibilities.len() > thresholds.max_traits
 }
@@ -122,6 +136,7 @@ fn is_god_object_candidate(
 /// Pure function: build GodObjectAnalysis from struct metrics and responsibilities.
 ///
 /// Uses the weighted scoring algorithm for consistency with detector.rs (Spec 212).
+/// Spec 209: Uses weighted method count for more accurate scoring.
 fn build_god_object_analysis(
     struct_data: &ExtractedStructData,
     metrics: &StructMetrics,
@@ -129,9 +144,10 @@ fn build_god_object_analysis(
     total_lines: usize,
     thresholds: &GodObjectThresholds,
 ) -> GodObjectAnalysis {
-    // Use weighted scoring algorithm from scoring.rs for consistency (Spec 212)
+    // Spec 209: Use weighted method count for scoring
+    // This ensures accessor-heavy structs score lower
     let god_object_score = calculate_god_object_score_weighted(
-        metrics.method_count as f64,
+        metrics.weighted_method_count, // Changed from method_count
         metrics.field_count,
         responsibilities.len(),
         total_lines,
@@ -1012,5 +1028,398 @@ mod tests {
         file_data.impls.clear();
         let ratio_empty = calculate_struct_ratio(&file_data);
         assert_eq!(ratio_empty, 0.0);
+    }
+
+    // =========================================================================
+    // Spec 209: Accessor and Boilerplate Method Detection Tests
+    // =========================================================================
+
+    #[test]
+    fn test_accessor_heavy_struct_not_flagged() {
+        // Spec 209: A struct with many accessors but few substantive methods
+        // should NOT be flagged as a god object because the weighted count
+        // should be low (accessors have weight 0.1, setters 0.3).
+        //
+        // This tests the raw count vs weighted count scenario:
+        // - 25 raw methods would exceed the threshold (20)
+        // - But weighted count = 0.0 + 10*0.1 + 10*0.3 + 3*1.0 = 7.0 (below threshold)
+        let file_data = ExtractedFileData {
+            path: PathBuf::from("src/data_container.rs"),
+            functions: vec![],
+            structs: vec![ExtractedStructData {
+                name: "DataContainer".to_string(),
+                line: 1,
+                fields: (0..10)
+                    .map(|i| FieldInfo {
+                        name: format!("field_{}", i),
+                        type_str: "String".to_string(),
+                        is_public: false,
+                    })
+                    .collect(),
+                is_public: true,
+            }],
+            impls: vec![ExtractedImplData {
+                type_name: "DataContainer".to_string(),
+                trait_name: None,
+                methods: vec![
+                    // 1 Boilerplate (weight 0.0)
+                    MethodInfo {
+                        name: "new".to_string(),
+                        line: 10,
+                        is_public: true,
+                    },
+                    // 10 Trivial accessors (weight 0.1 each = 1.0 total)
+                    MethodInfo {
+                        name: "get_field_0".to_string(),
+                        line: 20,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_1".to_string(),
+                        line: 21,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_2".to_string(),
+                        line: 22,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_3".to_string(),
+                        line: 23,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_4".to_string(),
+                        line: 24,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_5".to_string(),
+                        line: 25,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_6".to_string(),
+                        line: 26,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_7".to_string(),
+                        line: 27,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_8".to_string(),
+                        line: 28,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_9".to_string(),
+                        line: 29,
+                        is_public: true,
+                    },
+                    // 10 Simple accessors (weight 0.3 each = 3.0 total)
+                    MethodInfo {
+                        name: "set_field_0".to_string(),
+                        line: 30,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_1".to_string(),
+                        line: 31,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_2".to_string(),
+                        line: 32,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_3".to_string(),
+                        line: 33,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_4".to_string(),
+                        line: 34,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_5".to_string(),
+                        line: 35,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_6".to_string(),
+                        line: 36,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_7".to_string(),
+                        line: 37,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_8".to_string(),
+                        line: 38,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_9".to_string(),
+                        line: 39,
+                        is_public: true,
+                    },
+                    // 3 Substantive methods (weight 1.0 each = 3.0 total)
+                    // All "build_" which goes to same "construction" responsibility
+                    MethodInfo {
+                        name: "build_output".to_string(),
+                        line: 40,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "build_summary".to_string(),
+                        line: 41,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "build_report".to_string(),
+                        line: 42,
+                        is_public: true,
+                    },
+                ],
+                line: 5,
+            }],
+            imports: vec![],
+            total_lines: 200,
+            detected_patterns: vec![],
+        };
+
+        // Total: 24 raw methods (would exceed threshold of 20)
+        // Weighted: 0.0 + 10*0.1 + 10*0.3 + 3*1.0 = 7.0 (below threshold)
+        // Responsibilities: mostly Data Access (get/set) + Construction (build)
+        // = 2-3 responsibility categories (below max_traits of 5)
+        let results = analyze_god_objects(&file_data.path, &file_data);
+        assert!(
+            results.is_empty(),
+            "Struct with 24 methods (mostly accessors) should NOT be flagged. \
+             Weighted count is ~7.0 (below 20 threshold)."
+        );
+    }
+
+    #[test]
+    fn test_substantive_heavy_struct_flagged() {
+        // A struct with mostly substantive methods SHOULD be flagged
+        let file_data = ExtractedFileData {
+            path: PathBuf::from("src/god_class.rs"),
+            functions: vec![],
+            structs: vec![ExtractedStructData {
+                name: "GodClass".to_string(),
+                line: 1,
+                fields: (0..10)
+                    .map(|i| FieldInfo {
+                        name: format!("field_{}", i),
+                        type_str: "String".to_string(),
+                        is_public: false,
+                    })
+                    .collect(),
+                is_public: true,
+            }],
+            impls: vec![ExtractedImplData {
+                type_name: "GodClass".to_string(),
+                trait_name: None,
+                // 25 substantive methods (weight 1.0 each = 25.0 total)
+                methods: (0..25)
+                    .map(|i| MethodInfo {
+                        name: format!("process_item_{}", i),
+                        line: 10 + i * 10,
+                        is_public: true,
+                    })
+                    .collect(),
+                line: 5,
+            }],
+            imports: vec![],
+            total_lines: 500,
+            detected_patterns: vec![],
+        };
+
+        // Weighted count = 25.0 (all substantive), exceeds threshold of 20
+        let results = analyze_god_objects(&file_data.path, &file_data);
+        assert!(
+            !results.is_empty(),
+            "Struct with 25 substantive methods SHOULD be flagged as god object"
+        );
+        assert_eq!(results[0].struct_name, Some("GodClass".to_string()));
+    }
+
+    #[test]
+    fn test_pure_accessor_struct_not_flagged() {
+        // A struct with ONLY accessor/boilerplate methods should never be flagged
+        let file_data = ExtractedFileData {
+            path: PathBuf::from("src/dto.rs"),
+            functions: vec![],
+            structs: vec![ExtractedStructData {
+                name: "DataTransferObject".to_string(),
+                line: 1,
+                fields: (0..10)
+                    .map(|i| FieldInfo {
+                        name: format!("field_{}", i),
+                        type_str: "String".to_string(),
+                        is_public: false,
+                    })
+                    .collect(),
+                is_public: true,
+            }],
+            impls: vec![ExtractedImplData {
+                type_name: "DataTransferObject".to_string(),
+                trait_name: None,
+                methods: vec![
+                    // 1 boilerplate
+                    MethodInfo {
+                        name: "new".to_string(),
+                        line: 10,
+                        is_public: true,
+                    },
+                    // 20 trivial accessors (weight = 20 * 0.1 = 2.0)
+                    MethodInfo {
+                        name: "get_field_0".to_string(),
+                        line: 20,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_1".to_string(),
+                        line: 21,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_2".to_string(),
+                        line: 22,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_3".to_string(),
+                        line: 23,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_4".to_string(),
+                        line: 24,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_5".to_string(),
+                        line: 25,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_6".to_string(),
+                        line: 26,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_7".to_string(),
+                        line: 27,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_8".to_string(),
+                        line: 28,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "get_field_9".to_string(),
+                        line: 29,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_0".to_string(),
+                        line: 30,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_1".to_string(),
+                        line: 31,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_2".to_string(),
+                        line: 32,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_3".to_string(),
+                        line: 33,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_4".to_string(),
+                        line: 34,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_5".to_string(),
+                        line: 35,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_6".to_string(),
+                        line: 36,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_7".to_string(),
+                        line: 37,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_8".to_string(),
+                        line: 38,
+                        is_public: true,
+                    },
+                    MethodInfo {
+                        name: "set_field_9".to_string(),
+                        line: 39,
+                        is_public: true,
+                    },
+                ],
+                line: 5,
+            }],
+            imports: vec![],
+            total_lines: 100,
+            detected_patterns: vec![],
+        };
+
+        // 21 methods raw, but weighted = 0.0 + 10*0.1 + 10*0.3 = 4.0
+        // Should NOT trigger god object
+        let results = analyze_god_objects(&file_data.path, &file_data);
+        assert!(
+            results.is_empty(),
+            "Struct with 21 pure accessor methods should NOT be flagged. \
+             Weighted count should be ~4.0, not 21."
+        );
+    }
+
+    #[test]
+    fn test_weighted_count_calculation() {
+        // Verify the weighted count math directly
+        use crate::organization::god_object::classifier::calculate_weighted_count_from_names;
+
+        let methods = [
+            "new",      // 0.0 (boilerplate)
+            "get_a",    // 0.1 (trivial)
+            "get_b",    // 0.1 (trivial)
+            "set_a",    // 0.3 (simple)
+            "set_b",    // 0.3 (simple)
+            "process",  // 1.0 (substantive)
+            "validate", // 1.0 (substantive)
+        ];
+
+        let weighted = calculate_weighted_count_from_names(methods.iter().copied());
+        // Expected: 0.0 + 0.1 + 0.1 + 0.3 + 0.3 + 1.0 + 1.0 = 2.8
+        assert!(
+            (weighted - 2.8).abs() < 0.01,
+            "Expected 2.8, got {}",
+            weighted
+        );
     }
 }

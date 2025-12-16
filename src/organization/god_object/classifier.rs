@@ -9,10 +9,312 @@
 
 use std::collections::HashMap;
 
-use super::classification_types::{ClassificationResult, SignalType};
+use super::classification_types::{
+    ClassificationResult, MethodBodyAnalysis, MethodComplexityClass, ReturnExprType, SignalType,
+};
 use super::thresholds::GodObjectThresholds;
 use super::types::GodObjectConfidence;
 use crate::organization::confidence::MINIMUM_CONFIDENCE;
+
+// ============================================================================
+// Spec 209: Accessor and Boilerplate Method Detection
+// ============================================================================
+
+/// Classify a method's complexity for weighted god object scoring.
+///
+/// This is a pure function that analyzes method characteristics to determine
+/// how much the method should contribute to god object detection.
+///
+/// # Arguments
+///
+/// * `method_name` - The name of the method
+/// * `body_analysis` - Analysis of the method body (line count, control flow, etc.)
+///
+/// # Returns
+///
+/// A `MethodComplexityClass` indicating the method's complexity level.
+///
+/// # Classification Logic
+///
+/// 1. **Boilerplate detection by name**: Methods named `new`, `default`, `clone`,
+///    `from`, `into` are classified as boilerplate (weight 0.0).
+///
+/// 2. **Accessor patterns**: Methods with accessor-style names (`get_*`, `set_*`,
+///    `*_mut`, `is_*`, `has_*`) that are short and simple are classified as:
+///    - `TrivialAccessor` (0.1): Single line, no control flow, returns field reference
+///    - `SimpleAccessor` (0.3): Short (≤3 lines), no control flow
+///
+/// 3. **Delegating methods**: Short methods (≤2 lines) with exactly one call and
+///    no control flow are classified as delegating (weight 0.5).
+///
+/// 4. **Default**: Methods that don't match any pattern are classified as
+///    `Substantive` (weight 1.0).
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     classify_method_complexity, MethodBodyAnalysis, MethodComplexityClass, ReturnExprType,
+/// };
+///
+/// // Trivial accessor: get_name returning a field reference
+/// let analysis = MethodBodyAnalysis {
+///     line_count: 1,
+///     has_control_flow: false,
+///     call_count: 0,
+///     return_expr_type: Some(ReturnExprType::FieldAccess),
+///     has_self_param: true,
+///     is_mutating: false,
+/// };
+/// assert_eq!(
+///     classify_method_complexity("get_name", &analysis),
+///     MethodComplexityClass::TrivialAccessor
+/// );
+///
+/// // Boilerplate: constructor
+/// let analysis = MethodBodyAnalysis {
+///     line_count: 5,
+///     has_control_flow: false,
+///     call_count: 1,
+///     return_expr_type: None,
+///     has_self_param: false,
+///     is_mutating: false,
+/// };
+/// assert_eq!(
+///     classify_method_complexity("new", &analysis),
+///     MethodComplexityClass::Boilerplate
+/// );
+///
+/// // Substantive: complex business logic
+/// let analysis = MethodBodyAnalysis {
+///     line_count: 25,
+///     has_control_flow: true,
+///     call_count: 5,
+///     return_expr_type: Some(ReturnExprType::Complex),
+///     has_self_param: true,
+///     is_mutating: true,
+/// };
+/// assert_eq!(
+///     classify_method_complexity("analyze_workspace", &analysis),
+///     MethodComplexityClass::Substantive
+/// );
+/// ```
+pub fn classify_method_complexity(
+    method_name: &str,
+    body_analysis: &MethodBodyAnalysis,
+) -> MethodComplexityClass {
+    let name_lower = method_name.to_lowercase();
+
+    // 1. Boilerplate detection by name
+    // These methods are structural and don't contribute to god object sprawl
+    if matches!(
+        name_lower.as_str(),
+        "new" | "default" | "clone" | "from" | "into" | "try_from" | "try_into"
+    ) {
+        return MethodComplexityClass::Boilerplate;
+    }
+
+    // Also detect trait implementation boilerplate
+    if matches!(
+        name_lower.as_str(),
+        "fmt" | "eq" | "ne" | "hash" | "cmp" | "partial_cmp" | "drop"
+    ) {
+        return MethodComplexityClass::Boilerplate;
+    }
+
+    // 2. Accessor patterns
+    let is_accessor_name = name_lower.starts_with("get_")
+        || name_lower.starts_with("set_")
+        || name_lower.ends_with("_mut")
+        || name_lower.starts_with("is_")
+        || name_lower.starts_with("has_")
+        || name_lower.starts_with("with_"); // Builder-style setters
+
+    // Trivial accessor: single line, no control flow, returns field reference
+    if is_accessor_name && body_analysis.line_count <= 1 && !body_analysis.has_control_flow {
+        if let Some(ReturnExprType::FieldAccess) = body_analysis.return_expr_type {
+            return MethodComplexityClass::TrivialAccessor;
+        }
+        // Also trivial if it returns a literal (is_enabled returning a bool)
+        if let Some(ReturnExprType::Literal) = body_analysis.return_expr_type {
+            return MethodComplexityClass::TrivialAccessor;
+        }
+    }
+
+    // Simple accessor: short accessor with minor work (e.g., .clone())
+    if is_accessor_name && body_analysis.line_count <= 3 && !body_analysis.has_control_flow {
+        return MethodComplexityClass::SimpleAccessor;
+    }
+
+    // 3. Delegating methods: short method that calls one other method
+    if body_analysis.line_count <= 2
+        && body_analysis.call_count == 1
+        && !body_analysis.has_control_flow
+    {
+        return MethodComplexityClass::Delegating;
+    }
+
+    // 4. Default to substantive
+    MethodComplexityClass::Substantive
+}
+
+/// Calculate the weighted method count for a collection of methods.
+///
+/// This applies the complexity weights from `MethodComplexityClass` to provide
+/// a more accurate method count for god object scoring.
+///
+/// # Arguments
+///
+/// * `classes` - Iterator of complexity classes for each method
+///
+/// # Returns
+///
+/// Sum of weights for all methods.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     calculate_weighted_method_count, MethodComplexityClass,
+/// };
+///
+/// let classes = vec![
+///     MethodComplexityClass::TrivialAccessor,  // 0.1
+///     MethodComplexityClass::TrivialAccessor,  // 0.1
+///     MethodComplexityClass::Boilerplate,      // 0.0
+///     MethodComplexityClass::Substantive,      // 1.0
+/// ];
+///
+/// let weighted = calculate_weighted_method_count(classes.iter());
+/// assert!((weighted - 1.2).abs() < 0.01);
+/// ```
+pub fn calculate_weighted_method_count<'a>(
+    classes: impl Iterator<Item = &'a MethodComplexityClass>,
+) -> f64 {
+    classes.map(|c| c.weight()).sum()
+}
+
+/// Classify a method's complexity using only its name.
+///
+/// This is a simplified heuristic-based classification for when AST body analysis
+/// is not available. It provides reasonable estimates based on naming conventions.
+///
+/// # Arguments
+///
+/// * `method_name` - The name of the method
+///
+/// # Returns
+///
+/// A `MethodComplexityClass` based on naming patterns.
+///
+/// # Classification Rules
+///
+/// 1. **Boilerplate** (0.0 weight): `new`, `default`, `clone`, `from`, `into`, `fmt`, `eq`, etc.
+/// 2. **TrivialAccessor** (0.1 weight): `get_*`, `is_*`, `has_*` (assumed simple)
+/// 3. **SimpleAccessor** (0.3 weight): `set_*`, `*_mut`, `with_*` (may do assignment)
+/// 4. **Substantive** (1.0 weight): All other methods
+///
+/// Note: Without body analysis, we cannot detect delegating methods.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::{
+///     classify_method_by_name, MethodComplexityClass,
+/// };
+///
+/// assert_eq!(classify_method_by_name("new"), MethodComplexityClass::Boilerplate);
+/// assert_eq!(classify_method_by_name("get_name"), MethodComplexityClass::TrivialAccessor);
+/// assert_eq!(classify_method_by_name("set_value"), MethodComplexityClass::SimpleAccessor);
+/// assert_eq!(classify_method_by_name("process_data"), MethodComplexityClass::Substantive);
+/// ```
+pub fn classify_method_by_name(method_name: &str) -> MethodComplexityClass {
+    let name_lower = method_name.to_lowercase();
+
+    // 1. Boilerplate detection by name
+    if matches!(
+        name_lower.as_str(),
+        "new"
+            | "default"
+            | "clone"
+            | "from"
+            | "into"
+            | "try_from"
+            | "try_into"
+            | "fmt"
+            | "eq"
+            | "ne"
+            | "hash"
+            | "cmp"
+            | "partial_cmp"
+            | "drop"
+            | "deref"
+            | "deref_mut"
+            | "borrow"
+            | "borrow_mut"
+            | "as_ref"
+            | "as_mut"
+            | "index"
+            | "index_mut"
+    ) {
+        return MethodComplexityClass::Boilerplate;
+    }
+
+    // 2. Trivial accessor patterns (read-only, assumed single-line)
+    if name_lower.starts_with("get_")
+        || name_lower.starts_with("is_")
+        || name_lower.starts_with("has_")
+        || name_lower == "len"
+        || name_lower == "is_empty"
+    {
+        return MethodComplexityClass::TrivialAccessor;
+    }
+
+    // 3. Simple accessor patterns (may do assignment, but still simple)
+    if name_lower.starts_with("set_")
+        || name_lower.ends_with("_mut")
+        || name_lower.starts_with("with_")
+    {
+        return MethodComplexityClass::SimpleAccessor;
+    }
+
+    // 4. Default to substantive
+    MethodComplexityClass::Substantive
+}
+
+/// Calculate weighted method count from method names only.
+///
+/// This is a convenience function that applies `classify_method_by_name` to each
+/// method name and sums their weights. Use this when AST body analysis is not available.
+///
+/// # Arguments
+///
+/// * `method_names` - Iterator of method names
+///
+/// # Returns
+///
+/// Sum of weights for all methods.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::calculate_weighted_count_from_names;
+///
+/// let methods = vec![
+///     "new",           // 0.0 (boilerplate)
+///     "get_name",      // 0.1 (trivial)
+///     "set_value",     // 0.3 (simple)
+///     "process_data",  // 1.0 (substantive)
+/// ];
+///
+/// let weighted = calculate_weighted_count_from_names(methods.iter().map(|s| *s));
+/// assert!((weighted - 1.4).abs() < 0.01);
+/// ```
+pub fn calculate_weighted_count_from_names<'a>(method_names: impl Iterator<Item = &'a str>) -> f64 {
+    method_names
+        .map(|name| classify_method_by_name(name).weight())
+        .sum()
+}
 
 /// Determine confidence level from score and metrics.
 ///
@@ -1824,6 +2126,360 @@ mod tests {
             for key in g1.keys() {
                 prop_assert!(g2.contains_key(key));
             }
+        }
+    }
+
+    // =========================================================================
+    // Spec 209: Accessor and Boilerplate Method Detection Tests
+    // =========================================================================
+
+    #[test]
+    fn test_classify_trivial_accessor_field_access() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 1,
+            has_control_flow: false,
+            call_count: 0,
+            return_expr_type: Some(ReturnExprType::FieldAccess),
+            has_self_param: true,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("get_name", &analysis),
+            MethodComplexityClass::TrivialAccessor
+        );
+    }
+
+    #[test]
+    fn test_classify_trivial_accessor_literal() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 1,
+            has_control_flow: false,
+            call_count: 0,
+            return_expr_type: Some(ReturnExprType::Literal),
+            has_self_param: true,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("is_enabled", &analysis),
+            MethodComplexityClass::TrivialAccessor
+        );
+    }
+
+    #[test]
+    fn test_classify_trivial_accessor_mut() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 1,
+            has_control_flow: false,
+            call_count: 0,
+            return_expr_type: Some(ReturnExprType::FieldAccess),
+            has_self_param: true,
+            is_mutating: true,
+        };
+        assert_eq!(
+            classify_method_complexity("data_mut", &analysis),
+            MethodComplexityClass::TrivialAccessor
+        );
+    }
+
+    #[test]
+    fn test_classify_simple_accessor() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 2,
+            has_control_flow: false,
+            call_count: 1, // .clone() call
+            return_expr_type: Some(ReturnExprType::MethodCall),
+            has_self_param: true,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("get_name", &analysis),
+            MethodComplexityClass::SimpleAccessor
+        );
+    }
+
+    #[test]
+    fn test_classify_boilerplate_new() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 5,
+            has_control_flow: false,
+            call_count: 1,
+            return_expr_type: None,
+            has_self_param: false,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("new", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+    }
+
+    #[test]
+    fn test_classify_boilerplate_default() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 10,
+            has_control_flow: false,
+            call_count: 0,
+            return_expr_type: None,
+            has_self_param: false,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("default", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+    }
+
+    #[test]
+    fn test_classify_boilerplate_clone() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 1,
+            has_control_flow: false,
+            call_count: 1,
+            return_expr_type: None,
+            has_self_param: true,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("clone", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+    }
+
+    #[test]
+    fn test_classify_boilerplate_from() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 3,
+            has_control_flow: false,
+            call_count: 2,
+            return_expr_type: None,
+            has_self_param: false,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("from", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+    }
+
+    #[test]
+    fn test_classify_boilerplate_into() {
+        let analysis = MethodBodyAnalysis::default();
+        assert_eq!(
+            classify_method_complexity("into", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+    }
+
+    #[test]
+    fn test_classify_boilerplate_trait_impls() {
+        let analysis = MethodBodyAnalysis::default();
+        assert_eq!(
+            classify_method_complexity("fmt", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+        assert_eq!(
+            classify_method_complexity("eq", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+        assert_eq!(
+            classify_method_complexity("hash", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+        assert_eq!(
+            classify_method_complexity("drop", &analysis),
+            MethodComplexityClass::Boilerplate
+        );
+    }
+
+    #[test]
+    fn test_classify_delegating() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 1,
+            has_control_flow: false,
+            call_count: 1,
+            return_expr_type: Some(ReturnExprType::MethodCall),
+            has_self_param: true,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("process", &analysis),
+            MethodComplexityClass::Delegating
+        );
+    }
+
+    #[test]
+    fn test_classify_substantive_complex_logic() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 25,
+            has_control_flow: true,
+            call_count: 5,
+            return_expr_type: Some(ReturnExprType::Complex),
+            has_self_param: true,
+            is_mutating: true,
+        };
+        assert_eq!(
+            classify_method_complexity("analyze_workspace", &analysis),
+            MethodComplexityClass::Substantive
+        );
+    }
+
+    #[test]
+    fn test_classify_substantive_with_control_flow() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 5,
+            has_control_flow: true, // Control flow makes it substantive
+            call_count: 2,
+            return_expr_type: Some(ReturnExprType::Complex),
+            has_self_param: true,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("get_name", &analysis), // Even with accessor name
+            MethodComplexityClass::Substantive
+        );
+    }
+
+    #[test]
+    fn test_classify_has_prefix() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 1,
+            has_control_flow: false,
+            call_count: 0,
+            return_expr_type: Some(ReturnExprType::FieldAccess),
+            has_self_param: true,
+            is_mutating: false,
+        };
+        assert_eq!(
+            classify_method_complexity("has_children", &analysis),
+            MethodComplexityClass::TrivialAccessor
+        );
+    }
+
+    #[test]
+    fn test_classify_with_prefix_builder() {
+        let analysis = MethodBodyAnalysis {
+            line_count: 2,
+            has_control_flow: false,
+            call_count: 0,
+            return_expr_type: Some(ReturnExprType::Complex),
+            has_self_param: true,
+            is_mutating: true,
+        };
+        assert_eq!(
+            classify_method_complexity("with_timeout", &analysis),
+            MethodComplexityClass::SimpleAccessor
+        );
+    }
+
+    #[test]
+    fn test_calculate_weighted_method_count() {
+        let classes = [
+            MethodComplexityClass::TrivialAccessor, // 0.1
+            MethodComplexityClass::TrivialAccessor, // 0.1
+            MethodComplexityClass::Boilerplate,     // 0.0
+            MethodComplexityClass::Substantive,     // 1.0
+        ];
+        let weighted = calculate_weighted_method_count(classes.iter());
+        assert!(
+            (weighted - 1.2).abs() < 0.01,
+            "Expected 1.2, got {}",
+            weighted
+        );
+    }
+
+    #[test]
+    fn test_weighted_count_all_accessors() {
+        let classes = [MethodComplexityClass::TrivialAccessor; 10];
+        let weighted = calculate_weighted_method_count(classes.iter());
+        // 10 trivial accessors = 1.0 weighted
+        assert!(
+            (weighted - 1.0).abs() < 0.01,
+            "Expected 1.0, got {}",
+            weighted
+        );
+    }
+
+    #[test]
+    fn test_weighted_count_mixed() {
+        // Example from spec: 10 accessors + 5 business methods
+        let mut classes = vec![];
+        // 10 trivial accessors (0.1 each = 1.0)
+        for _ in 0..10 {
+            classes.push(MethodComplexityClass::TrivialAccessor);
+        }
+        // 1 boilerplate (0.0)
+        classes.push(MethodComplexityClass::Boilerplate);
+        // 5 substantive methods (1.0 each = 5.0)
+        for _ in 0..5 {
+            classes.push(MethodComplexityClass::Substantive);
+        }
+
+        let weighted = calculate_weighted_method_count(classes.iter());
+        // 10 * 0.1 + 1 * 0.0 + 5 * 1.0 = 1.0 + 0.0 + 5.0 = 6.0
+        assert!(
+            (weighted - 6.0).abs() < 0.01,
+            "Expected 6.0, got {}",
+            weighted
+        );
+    }
+
+    #[test]
+    fn test_method_complexity_class_weights() {
+        assert!((MethodComplexityClass::TrivialAccessor.weight() - 0.1).abs() < f64::EPSILON);
+        assert!((MethodComplexityClass::SimpleAccessor.weight() - 0.3).abs() < f64::EPSILON);
+        assert!((MethodComplexityClass::Boilerplate.weight() - 0.0).abs() < f64::EPSILON);
+        assert!((MethodComplexityClass::Delegating.weight() - 0.5).abs() < f64::EPSILON);
+        assert!((MethodComplexityClass::Substantive.weight() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_method_complexity_class_default() {
+        assert_eq!(
+            MethodComplexityClass::default(),
+            MethodComplexityClass::Substantive
+        );
+    }
+
+    proptest! {
+        /// Verify method classification is idempotent
+        #[test]
+        fn prop_classify_method_idempotent(
+            method_name in "[a-z_]{1,20}",
+            line_count in 0usize..100,
+            has_control_flow in proptest::bool::ANY,
+            call_count in 0usize..20
+        ) {
+            let analysis = MethodBodyAnalysis {
+                line_count,
+                has_control_flow,
+                call_count,
+                return_expr_type: Some(ReturnExprType::Complex),
+                has_self_param: true,
+                is_mutating: false,
+            };
+            let c1 = classify_method_complexity(&method_name, &analysis);
+            let c2 = classify_method_complexity(&method_name, &analysis);
+            prop_assert_eq!(c1, c2);
+        }
+
+        /// Verify weighted count is always non-negative
+        #[test]
+        fn prop_weighted_count_non_negative(
+            num_trivial in 0usize..50,
+            num_simple in 0usize..50,
+            num_boilerplate in 0usize..50,
+            num_delegating in 0usize..50,
+            num_substantive in 0usize..50
+        ) {
+            let mut classes = vec![];
+            classes.extend(std::iter::repeat_n(MethodComplexityClass::TrivialAccessor, num_trivial));
+            classes.extend(std::iter::repeat_n(MethodComplexityClass::SimpleAccessor, num_simple));
+            classes.extend(std::iter::repeat_n(MethodComplexityClass::Boilerplate, num_boilerplate));
+            classes.extend(std::iter::repeat_n(MethodComplexityClass::Delegating, num_delegating));
+            classes.extend(std::iter::repeat_n(MethodComplexityClass::Substantive, num_substantive));
+
+            let weighted = calculate_weighted_method_count(classes.iter());
+            prop_assert!(weighted >= 0.0);
         }
     }
 }
