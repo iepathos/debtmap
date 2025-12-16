@@ -81,3 +81,8 @@ pub use classifier::{
     calculate_weighted_count_from_names, calculate_weighted_method_count, classify_method_by_name,
     classify_method_complexity,
 };
+
+// Spec 211: Method Complexity Weighting
+pub use metrics_types::{calculate_complexity_metrics, ComplexityMetrics, MethodComplexity};
+pub use scoring::{calculate_complexity_factor, calculate_god_object_score_with_complexity};
+pub use thresholds::ComplexityThresholds;

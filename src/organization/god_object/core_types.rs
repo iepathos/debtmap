@@ -124,6 +124,17 @@ pub struct GodObjectAnalysis {
     /// Anti-pattern detection report (Spec 197)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anti_pattern_report: Option<crate::organization::AntiPatternReport>,
+    /// Aggregated complexity metrics for god object methods (Spec 211)
+    ///
+    /// Contains detailed metrics about method complexity including:
+    /// - Total/max/average cyclomatic complexity
+    /// - Total/max/average cognitive complexity
+    /// - Complexity variance (inconsistency indicator)
+    /// - Maximum nesting depth
+    ///
+    /// Used by `calculate_god_object_score_with_complexity` for more accurate scoring.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub complexity_metrics: Option<crate::organization::god_object::ComplexityMetrics>,
 }
 
 impl GodObjectAnalysis {

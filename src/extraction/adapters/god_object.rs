@@ -207,6 +207,7 @@ fn build_god_object_analysis(
         aggregated_error_swallowing_patterns: None,
         layering_impact: None,
         anti_pattern_report: None,
+        complexity_metrics: None, // Spec 211
     }
 }
 
@@ -430,6 +431,7 @@ fn analyze_file_level(
         aggregated_error_swallowing_patterns: None,
         layering_impact: None,
         anti_pattern_report: None,
+        complexity_metrics: None, // Spec 211
     })
 }
 
