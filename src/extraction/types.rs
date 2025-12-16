@@ -44,6 +44,10 @@ pub struct ExtractedFileData {
     /// Detected code patterns (god objects, long functions, deep nesting, etc.)
     /// Spec 204: Pre-computed during extraction to avoid re-parsing
     pub detected_patterns: Vec<DetectedPattern>,
+    /// Lines of code in test regions (Spec 214)
+    /// Sum of all lines in #[cfg(test)] modules and #[test] functions
+    #[serde(default)]
+    pub test_lines: usize,
 }
 
 /// Code pattern detected during extraction.
@@ -318,6 +322,68 @@ pub enum PatternType {
 }
 
 // ============================================================================
+// LOC Metrics (Spec 214)
+// ============================================================================
+
+/// Lines of code metrics with test breakdown.
+///
+/// Spec 214: Provides accurate LOC metrics excluding test code for god object scoring.
+/// Well-tested modules should not be penalized for comprehensive test coverage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocMetrics {
+    /// Total lines of code in the file
+    pub total_loc: usize,
+    /// Lines of code in production (excluding test code)
+    pub production_loc: usize,
+    /// Lines of code in test regions
+    pub test_loc: usize,
+    /// Percentage of code that is tests (0-100)
+    pub test_percentage: u8,
+}
+
+impl LocMetrics {
+    /// Create new LOC metrics from total and test line counts.
+    pub fn new(total_loc: usize, test_loc: usize) -> Self {
+        let production_loc = total_loc.saturating_sub(test_loc);
+        let test_percentage = if total_loc > 0 {
+            ((test_loc as f64 / total_loc as f64) * 100.0).min(100.0) as u8
+        } else {
+            0
+        };
+
+        Self {
+            total_loc,
+            production_loc,
+            test_loc,
+            test_percentage,
+        }
+    }
+
+    /// Check if more than 25% of the file is test code.
+    pub fn has_significant_tests(&self) -> bool {
+        self.test_percentage >= 25
+    }
+
+    /// Format LOC for display with test breakdown.
+    ///
+    /// Returns format like "620 (867 with tests)" when tests are significant,
+    /// or just "100" when there are no/minimal tests.
+    pub fn display_loc(&self) -> String {
+        if self.test_loc > 0 && self.has_significant_tests() {
+            format!("{} ({} with tests)", self.production_loc, self.total_loc)
+        } else {
+            format!("{}", self.total_loc)
+        }
+    }
+}
+
+impl Default for LocMetrics {
+    fn default() -> Self {
+        Self::new(0, 0)
+    }
+}
+
+// ============================================================================
 // Helper Implementations
 // ============================================================================
 
@@ -334,7 +400,22 @@ impl ExtractedFileData {
             imports: Vec::new(),
             total_lines: 0,
             detected_patterns: Vec::new(),
+            test_lines: 0,
         }
+    }
+
+    /// Get production lines (total minus test lines).
+    ///
+    /// Spec 214: Returns the lines of code excluding test regions.
+    pub fn production_lines(&self) -> usize {
+        self.total_lines.saturating_sub(self.test_lines)
+    }
+
+    /// Get LOC metrics with test breakdown.
+    ///
+    /// Spec 214: Returns a breakdown of total, production, and test LOC.
+    pub fn loc_metrics(&self) -> LocMetrics {
+        LocMetrics::new(self.total_lines, self.test_lines)
     }
 
     /// Check if the file has any content worth analyzing.
@@ -466,6 +547,7 @@ const _: () = {
     let _ = _assert_send_sync::<IoOperation>;
     let _ = _assert_send_sync::<TransformationPattern>;
     let _ = _assert_send_sync::<DetectedPattern>;
+    let _ = _assert_send_sync::<LocMetrics>;
 };
 
 #[cfg(test)]
@@ -565,6 +647,7 @@ mod tests {
             }],
             total_lines: 100,
             detected_patterns: vec![],
+            test_lines: 20, // Spec 214
         };
 
         let cloned = original.clone();
@@ -614,6 +697,7 @@ mod tests {
             imports: Vec::new(),
             total_lines: 10,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         };
 
         // Serialize to JSON
@@ -754,6 +838,7 @@ mod tests {
                 .collect(),
             total_lines: 200,
             detected_patterns: vec![],
+            test_lines: 40, // Spec 214
         };
 
         // Serialize to estimate memory size
@@ -766,5 +851,97 @@ mod tests {
             "Serialized size {} bytes exceeds 16KB limit",
             json.len()
         );
+    }
+
+    // ===== Spec 214: LOC Metrics Tests =====
+
+    #[test]
+    fn test_loc_metrics_new() {
+        let metrics = LocMetrics::new(867, 247);
+
+        assert_eq!(metrics.total_loc, 867);
+        assert_eq!(metrics.production_loc, 620);
+        assert_eq!(metrics.test_loc, 247);
+        assert_eq!(metrics.test_percentage, 28); // ~28.5% rounds to 28
+    }
+
+    #[test]
+    fn test_loc_metrics_no_tests() {
+        let metrics = LocMetrics::new(500, 0);
+
+        assert_eq!(metrics.total_loc, 500);
+        assert_eq!(metrics.production_loc, 500);
+        assert_eq!(metrics.test_loc, 0);
+        assert_eq!(metrics.test_percentage, 0);
+        assert!(!metrics.has_significant_tests());
+    }
+
+    #[test]
+    fn test_loc_metrics_significant_tests() {
+        // 25% threshold for "significant"
+        let metrics = LocMetrics::new(100, 25);
+        assert!(metrics.has_significant_tests());
+
+        let metrics_below = LocMetrics::new(100, 24);
+        assert!(!metrics_below.has_significant_tests());
+    }
+
+    #[test]
+    fn test_loc_metrics_display() {
+        // Significant tests: shows breakdown
+        let metrics = LocMetrics::new(867, 247);
+        assert_eq!(metrics.display_loc(), "620 (867 with tests)");
+
+        // No significant tests: shows total only
+        let metrics_few_tests = LocMetrics::new(500, 10);
+        assert_eq!(metrics_few_tests.display_loc(), "500");
+
+        // No tests at all
+        let metrics_no_tests = LocMetrics::new(500, 0);
+        assert_eq!(metrics_no_tests.display_loc(), "500");
+    }
+
+    #[test]
+    fn test_loc_metrics_zero_lines() {
+        let metrics = LocMetrics::new(0, 0);
+
+        assert_eq!(metrics.total_loc, 0);
+        assert_eq!(metrics.production_loc, 0);
+        assert_eq!(metrics.test_loc, 0);
+        assert_eq!(metrics.test_percentage, 0);
+    }
+
+    #[test]
+    fn test_extracted_file_data_production_lines() {
+        let mut data = ExtractedFileData::empty(PathBuf::from("test.rs"));
+        data.total_lines = 867;
+        data.test_lines = 247;
+
+        assert_eq!(data.production_lines(), 620);
+    }
+
+    #[test]
+    fn test_extracted_file_data_loc_metrics() {
+        let mut data = ExtractedFileData::empty(PathBuf::from("test.rs"));
+        data.total_lines = 867;
+        data.test_lines = 247;
+
+        let metrics = data.loc_metrics();
+        assert_eq!(metrics.total_loc, 867);
+        assert_eq!(metrics.production_loc, 620);
+        assert_eq!(metrics.test_loc, 247);
+    }
+
+    #[test]
+    fn test_loc_metrics_serialization() {
+        let metrics = LocMetrics::new(867, 247);
+
+        let json = serde_json::to_string(&metrics).expect("serialization failed");
+        let restored: LocMetrics = serde_json::from_str(&json).expect("deserialization failed");
+
+        assert_eq!(restored.total_loc, metrics.total_loc);
+        assert_eq!(restored.production_loc, metrics.production_loc);
+        assert_eq!(restored.test_loc, metrics.test_loc);
+        assert_eq!(restored.test_percentage, metrics.test_percentage);
     }
 }

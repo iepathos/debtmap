@@ -122,19 +122,21 @@ fn is_god_object_candidate(
 /// Pure function: build GodObjectAnalysis from struct metrics and responsibilities.
 ///
 /// Uses the weighted scoring algorithm for consistency with detector.rs (Spec 212).
+/// Spec 214: Uses production LOC (excluding test code) for scoring.
 fn build_god_object_analysis(
     struct_data: &ExtractedStructData,
     metrics: &StructMetrics,
     responsibilities: HashMap<String, Vec<String>>,
-    total_lines: usize,
+    production_lines: usize,
     thresholds: &GodObjectThresholds,
 ) -> GodObjectAnalysis {
     // Use weighted scoring algorithm from scoring.rs for consistency (Spec 212)
+    // Spec 214: Use production LOC for scoring to avoid penalizing well-tested code
     let god_object_score = calculate_god_object_score_weighted(
         metrics.method_count as f64,
         metrics.field_count,
         responsibilities.len(),
-        total_lines,
+        production_lines,
         metrics.avg_complexity,
         thresholds,
     );
@@ -149,11 +151,12 @@ fn build_god_object_analysis(
     let responsibility_names: Vec<String> = responsibilities.keys().cloned().collect();
 
     // Determine confidence based on violation count
+    // Spec 214: Use production LOC for confidence determination
     let confidence = crate::organization::god_object::classifier::determine_confidence(
         metrics.method_count,
         metrics.field_count,
         responsibility_names.len(),
-        total_lines,
+        production_lines,
         metrics.complexity_sum,
         thresholds,
     );
@@ -163,7 +166,7 @@ fn build_god_object_analysis(
         method_count: metrics.method_count,
         field_count: metrics.field_count,
         responsibility_count: responsibility_names.len(),
-        lines_of_code: total_lines,
+        lines_of_code: production_lines, // Spec 214: Use production LOC
         complexity_sum: metrics.complexity_sum,
         god_object_score: Score0To100::new(god_object_score),
         recommended_splits: vec![],
@@ -262,11 +265,12 @@ pub fn analyze_god_objects_with_thresholds(
             }
 
             // Build analysis for this god object
+            // Spec 214: Use production LOC (excluding test code)
             Some(build_god_object_analysis(
                 struct_data,
                 &metrics,
                 responsibilities,
-                extracted.total_lines,
+                extracted.production_lines(),
                 thresholds,
             ))
         })
@@ -303,6 +307,7 @@ pub fn analyze_god_object(path: &Path, extracted: &ExtractedFileData) -> Option<
 ///
 /// Detects GodFile (no structs, many functions) and GodModule (structs exist
 /// but standalone functions dominate).
+/// Spec 214: Uses production LOC (excluding test code) for scoring.
 fn analyze_file_level(
     extracted: &ExtractedFileData,
     thresholds: &GodObjectThresholds,
@@ -356,21 +361,25 @@ fn analyze_file_level(
         0.0
     };
 
+    // Spec 214: Use production LOC for scoring and confidence
+    let production_lines = extracted.production_lines();
+
     let confidence = crate::organization::god_object::classifier::determine_confidence(
         method_count,
         total_fields,
         responsibility_names.len(),
-        extracted.total_lines,
+        production_lines,
         complexity_sum,
         thresholds,
     );
 
     // Use weighted scoring algorithm for consistency (Spec 212)
+    // Spec 214: Use production LOC to avoid penalizing well-tested code
     let god_score = calculate_god_object_score_weighted(
         method_count as f64,
         total_fields,
         responsibility_names.len(),
-        extracted.total_lines,
+        production_lines,
         avg_complexity,
         thresholds,
     );
@@ -380,7 +389,7 @@ fn analyze_file_level(
         method_count,
         field_count: total_fields,
         responsibility_count: responsibility_names.len(),
-        lines_of_code: extracted.total_lines,
+        lines_of_code: production_lines, // Spec 214: Use production LOC
         complexity_sum,
         god_object_score: Score0To100::new(god_score),
         recommended_splits: vec![],
@@ -551,6 +560,7 @@ mod tests {
             imports: vec![],
             total_lines: 2500,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         }
     }
 
@@ -564,6 +574,7 @@ mod tests {
             imports: vec![],
             total_lines: 50,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         };
 
         let result = analyze_god_object(&file_data.path, &file_data);
@@ -771,6 +782,7 @@ mod tests {
             imports: vec![],
             total_lines: 500,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);
@@ -853,6 +865,7 @@ mod tests {
             imports: vec![],
             total_lines: 800,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);
@@ -892,6 +905,7 @@ mod tests {
             imports: vec![],
             total_lines: 50,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);
@@ -958,6 +972,7 @@ mod tests {
             imports: vec![],
             total_lines: 600,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         };
 
         let results = analyze_god_objects(&file_data.path, &file_data);

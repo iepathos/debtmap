@@ -264,6 +264,7 @@ mod tests {
             imports: vec![],
             total_lines: 50,
             detected_patterns: vec![],
+            test_lines: 0, // Spec 214
         }
     }
 
