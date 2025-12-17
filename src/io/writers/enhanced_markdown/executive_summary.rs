@@ -777,6 +777,10 @@ mod tests {
                 purity_factor: None,
                 refactorability_factor: None,
                 pattern_factor: None,
+                // Spec 260: Score transparency fields
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
             },
             upstream_dependencies: 0,
             downstream_dependencies: 0,

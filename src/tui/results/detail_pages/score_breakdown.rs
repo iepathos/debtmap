@@ -319,6 +319,22 @@ pub fn build_multipliers_section(
         add_multiplier_line(&mut lines, "context", context, &context_type, theme, width);
     }
 
+    // Structural multiplier (spec 260) - if significantly different from 1.0
+    if let Some(struct_mult) = item.unified_score.structural_multiplier {
+        if (struct_mult - 1.0).abs() > 0.01 {
+            let desc = if struct_mult > 1.2 {
+                "deeply nested"
+            } else if struct_mult > 1.0 {
+                "moderate nesting"
+            } else if struct_mult < 0.85 {
+                "flat structure"
+            } else {
+                "good structure"
+            };
+            add_multiplier_line(&mut lines, "structural", struct_mult, desc, theme, width);
+        }
+    }
+
     // Entropy dampening (if present) - check both item-level and god object aggregated
     if let Some(dampening) = item.entropy_dampening_factor {
         add_multiplier_line(
@@ -888,13 +904,70 @@ pub fn build_calculation_summary_section(
         }
     }
 
-    // Show remaining gap if significant (debt aggregator adjustments, normalization)
-    if (base_score - current_value).abs() > 0.5 {
-        // Try to explain what the remaining gap is
+    // Step 4+: Show debt adjustment if applied (spec 260)
+    if let Some(debt) = &item.unified_score.debt_adjustment {
+        if debt.total.abs() > 0.01 {
+            let after_debt = current_value + debt.total;
+            // Show breakdown of debt components
+            let components: Vec<String> = [
+                (debt.testing, "test"),
+                (debt.resource, "res"),
+                (debt.duplication, "dup"),
+            ]
+            .iter()
+            .filter(|(v, _)| v.abs() > 0.01)
+            .map(|(v, name)| format!("{}:{:+.2}", name, v))
+            .collect();
+            let breakdown = if components.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", components.join(", "))
+            };
+            add_label_value(
+                &mut lines,
+                &format!("{}. + debt", step_num),
+                format!(
+                    "{:.2} + {:.2} = {:.2}{}",
+                    current_value, debt.total, after_debt, breakdown
+                ),
+                theme,
+                width,
+            );
+            current_value = after_debt;
+            step_num += 1;
+        }
+    }
+
+    // Show clamping if it occurred (spec 260)
+    if let Some(pre_norm) = item.unified_score.pre_normalization_score {
+        if pre_norm > 100.0 {
+            add_label_value(
+                &mut lines,
+                &format!("{}. clamped", step_num),
+                format!("{:.2} → 100.00 (max score)", pre_norm),
+                theme,
+                width,
+            );
+            // Values updated for potential future use in display pipeline
+            let _ = (100.0f64, step_num + 1);
+        } else if (pre_norm - current_value).abs() > 0.5 {
+            // Significant normalization applied
+            add_label_value(
+                &mut lines,
+                &format!("{}. normalized", step_num),
+                format!("{:.2} → {:.2}", pre_norm, current_value),
+                theme,
+                width,
+            );
+            // Value updated for potential future use in display pipeline
+            let _ = step_num + 1;
+        }
+    } else if (base_score - current_value).abs() > 0.5 {
+        // Fallback for older data without detailed tracking
         let explanation = if base_score > current_value {
-            "debt patterns"
+            "adjustments"
         } else if base_score < current_value && base_score <= 100.0 {
-            "clamped to 100"
+            "clamped"
         } else {
             "normalized"
         };
@@ -1114,6 +1187,10 @@ mod tests {
                 purity_factor: Some(0.7),
                 refactorability_factor: Some(1.0),
                 pattern_factor: Some(0.85),
+                // Spec 260: Score transparency fields
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.15),
             },
             debt_type,
             function_role: FunctionRole::PureLogic,
