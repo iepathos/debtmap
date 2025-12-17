@@ -45,6 +45,10 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
             purity_factor: None,
             refactorability_factor: None,
             pattern_factor: None,
+            // Spec 260: Score transparency fields
+            debt_adjustment: None,
+            pre_normalization_score: None,
+            structural_multiplier: Some(1.0),
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,
@@ -131,6 +135,10 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
             purity_factor: None,
             refactorability_factor: None,
             pattern_factor: None,
+            // Spec 260: Score transparency fields
+            debt_adjustment: None,
+            pre_normalization_score: None,
+            structural_multiplier: Some(1.0),
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,

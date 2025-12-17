@@ -21,6 +21,47 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+/// Detailed breakdown of debt aggregator adjustments (spec 260).
+/// Captures individual components that contribute to the debt adjustment score.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebtAdjustmentDetails {
+    /// Total additive adjustment from all debt components
+    pub total: f64,
+    /// Testing debt component (testing_score / 50.0)
+    pub testing: f64,
+    /// Resource debt component (resource_score / 50.0)
+    pub resource: f64,
+    /// Duplication debt component (duplication_score / 50.0)
+    pub duplication: f64,
+}
+
+impl DebtAdjustmentDetails {
+    /// Create a new DebtAdjustmentDetails with all components
+    pub fn new(testing: f64, resource: f64, duplication: f64) -> Self {
+        Self {
+            total: testing + resource + duplication,
+            testing,
+            resource,
+            duplication,
+        }
+    }
+
+    /// Create a zero-value debt adjustment (no debt detected)
+    pub fn zero() -> Self {
+        Self {
+            total: 0.0,
+            testing: 0.0,
+            resource: 0.0,
+            duplication: 0.0,
+        }
+    }
+
+    /// Returns true if total adjustment is significant (> 0.01)
+    pub fn is_significant(&self) -> bool {
+        self.total.abs() > 0.01
+    }
+}
+
 /// Purity spectrum classification for functions (spec 218).
 /// Classifies functions on a spectrum from strictly pure to impure,
 /// with score multipliers that reduce priority for purer functions.
@@ -78,6 +119,16 @@ pub struct UnifiedScore {
     pub refactorability_factor: Option<f64>, // Dead stores and escape analysis (1.0-1.5)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_factor: Option<f64>, // Data flow vs business logic (0.7-1.0)
+    // Score transparency fields (spec 260)
+    /// Debt aggregator adjustment details - breakdown of testing, resource, duplication components
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debt_adjustment: Option<DebtAdjustmentDetails>,
+    /// Score before normalization/clamping was applied (only set when clamping occurred)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pre_normalization_score: Option<f64>,
+    /// Structural quality multiplier applied (nesting/cyclomatic ratio)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub structural_multiplier: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -239,6 +290,10 @@ pub fn calculate_unified_score_with_patterns(
         purity_factor: base_score.purity_factor,
         refactorability_factor: base_score.refactorability_factor,
         pattern_factor: base_score.pattern_factor,
+        // Spec 260: Score transparency fields
+        debt_adjustment: base_score.debt_adjustment,
+        pre_normalization_score: base_score.pre_normalization_score,
+        structural_multiplier: base_score.structural_multiplier,
     }
 }
 
@@ -312,6 +367,10 @@ pub fn calculate_unified_priority_with_role(
             purity_factor: None,
             refactorability_factor: None,
             pattern_factor: None,
+            // Spec 260: Score transparency fields
+            debt_adjustment: None,
+            pre_normalization_score: None,
+            structural_multiplier: Some(1.0),
         };
     }
 
@@ -380,11 +439,13 @@ pub fn calculate_unified_priority_with_role(
         calculate_structural_quality_multiplier(func.nesting, func.cyclomatic);
     let structure_adjusted_score = role_adjusted_score * structural_multiplier;
 
-    // Add debt-based adjustments
-    let debt_adjustment = calculate_debt_adjustment(func, debt_aggregator);
+    // Add debt-based adjustments with detailed breakdown (spec 260)
+    let (debt_adjustment, debt_details) =
+        calculate_debt_adjustment_with_details(func, debt_aggregator);
     let debt_adjusted_score = structure_adjusted_score + debt_adjustment;
 
-    // Normalize to 0-10 scale
+    // Normalize to 0-10 scale, tracking pre-normalization value for clamping detection (spec 260)
+    let pre_normalization = debt_adjusted_score;
     let normalized_score = normalize_final_score(debt_adjusted_score);
 
     // Apply orchestration score adjustment (spec 110) if this is an orchestrator
@@ -396,6 +457,20 @@ pub fn calculate_unified_priority_with_role(
         call_graph,
         &role,
     );
+
+    // Only store pre_normalization if actual clamping occurred (spec 260)
+    let pre_normalization_score = if (pre_normalization - normalized_score).abs() > 0.1 {
+        Some(pre_normalization)
+    } else {
+        None
+    };
+
+    // Only store debt adjustment if it's significant (spec 260)
+    let debt_adjustment_details = if debt_details.is_significant() {
+        Some(debt_details)
+    } else {
+        None
+    };
 
     UnifiedScore {
         complexity_factor,
@@ -411,6 +486,10 @@ pub fn calculate_unified_priority_with_role(
         purity_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
         refactorability_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
         pattern_factor: None, // Set by calculate_unified_priority_with_data_flow (spec 218)
+        // Spec 260: Score transparency fields
+        debt_adjustment: debt_adjustment_details,
+        pre_normalization_score,
+        structural_multiplier: Some(structural_multiplier),
     }
 }
 
@@ -596,24 +675,28 @@ fn calculate_base_score(
     }
 }
 
-/// Calculate debt-based adjustment to the score.
+/// Calculate debt-based adjustment to the score with detailed breakdown (spec 260).
 ///
-/// Adds small additive adjustments for various debt types.
-fn calculate_debt_adjustment(
+/// Adds small additive adjustments for various debt types and returns both
+/// the total adjustment and the breakdown of individual components.
+fn calculate_debt_adjustment_with_details(
     func: &FunctionMetrics,
     debt_aggregator: Option<&DebtAggregator>,
-) -> f64 {
+) -> (f64, DebtAdjustmentDetails) {
     if let Some(aggregator) = debt_aggregator {
         let agg_func_id =
             AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line);
         let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
 
-        // Add small additive adjustments for other debt types
-        (debt_scores.testing / 50.0)
-            + (debt_scores.resource / 50.0)
-            + (debt_scores.duplication / 50.0)
+        // Calculate individual components
+        let testing = debt_scores.testing / 50.0;
+        let resource = debt_scores.resource / 50.0;
+        let duplication = debt_scores.duplication / 50.0;
+
+        let details = DebtAdjustmentDetails::new(testing, resource, duplication);
+        (details.total, details)
     } else {
-        0.0
+        (0.0, DebtAdjustmentDetails::zero())
     }
 }
 
