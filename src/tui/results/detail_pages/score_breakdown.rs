@@ -828,25 +828,88 @@ pub fn build_calculation_summary_section(
     add_label_value(
         &mut lines,
         "3. × struct",
-        format!("{:.2} × {:.2} = {:.2}", after_role, struct_mult, after_struct),
+        format!(
+            "{:.2} × {:.2} = {:.2}",
+            after_role, struct_mult, after_struct
+        ),
         theme,
         width,
     );
 
-    // Step 4: Show gap to stored base (includes debt adjustment + normalization)
+    // Step 4: Show adjustments between formula result and stored base_score
+    // The gap can include: debt aggregator, orchestration adjustment, context multiplier, clamping
     let base_score = stored_base;
-    if (base_score - after_struct).abs() > 0.5 {
+    let mut step_num = 4;
+    let mut current_value = after_struct;
+
+    // Check for orchestration adjustment (spec 110)
+    if let Some(adj) = &item.unified_score.adjustment_applied {
+        if adj.reduction_percent.abs() > 0.1 {
+            let after_orch = current_value * (1.0 - adj.reduction_percent / 100.0);
+            add_label_value(
+                &mut lines,
+                &format!("{}. orchestration", step_num),
+                format!(
+                    "{:.2} × {:.2} = {:.2} ({})",
+                    current_value,
+                    1.0 - adj.reduction_percent / 100.0,
+                    after_orch,
+                    adj.adjustment_reason
+                ),
+                theme,
+                width,
+            );
+            current_value = after_orch;
+            step_num += 1;
+        }
+    }
+
+    // Check for context multiplier (spec 191) - examples, tests, benchmarks get dampened
+    if let Some(ctx_mult) = item.context_multiplier {
+        if (ctx_mult - 1.0).abs() > 0.01 {
+            let ctx_type_name = item
+                .context_type
+                .as_ref()
+                .map(|t| format!("{:?}", t).to_lowercase())
+                .unwrap_or_else(|| "context".to_string());
+            let after_ctx = current_value * ctx_mult;
+            add_label_value(
+                &mut lines,
+                &format!("{}. × context", step_num),
+                format!(
+                    "{:.2} × {:.2} = {:.2} ({} dampening)",
+                    current_value, ctx_mult, after_ctx, ctx_type_name
+                ),
+                theme,
+                width,
+            );
+            current_value = after_ctx;
+            step_num += 1;
+        }
+    }
+
+    // Show remaining gap if significant (debt aggregator adjustments, normalization)
+    if (base_score - current_value).abs() > 0.5 {
+        // Try to explain what the remaining gap is
+        let explanation = if base_score > current_value {
+            "debt patterns"
+        } else if base_score < current_value && base_score <= 100.0 {
+            "clamped to 100"
+        } else {
+            "normalized"
+        };
         add_label_value(
             &mut lines,
-            "4. + adjustments",
-            format!("{:.2} → {:.2} (debt patterns, normalization)", after_struct, base_score),
+            &format!("{}. {}", step_num, explanation),
+            format!("{:.2} → {:.2}", current_value, base_score),
             theme,
             width,
         );
-    } else {
+    } else if (current_value - base_score).abs() <= 0.5 {
+        // No significant gap - just show the normalized value
         add_label_value(
             &mut lines,
-            "4. normalized",
+            &format!("{}. normalized", step_num),
             format!("{:.2}", base_score),
             theme,
             width,
