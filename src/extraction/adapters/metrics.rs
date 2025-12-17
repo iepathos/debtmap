@@ -47,7 +47,7 @@ pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) 
 
         // Fields populated by other phases
         purity_reason: None,
-        entropy_score: None,
+        entropy_score: extracted.entropy_score.clone(), // Pass through from extraction
         call_dependencies: None,
         upstream_callers: None,
         downstream_callees: None,
@@ -202,6 +202,7 @@ mod tests {
             cyclomatic,
             cognitive: cyclomatic / 2,
             nesting: 2,
+            entropy_score: None,
             purity_analysis: PurityAnalysisData::pure(),
             io_operations: vec![],
             parameter_names: vec![],

@@ -23,6 +23,9 @@
 use crate::analyzers::io_detector::detect_io_operations_from_block;
 use crate::analyzers::purity_detector::PurityDetector;
 use crate::complexity::{cognitive::calculate_cognitive, cyclomatic::calculate_cyclomatic};
+use crate::complexity::entropy::EntropyAnalyzer;
+use crate::complexity::entropy_core::EntropyScore;
+use crate::config::get_entropy_config;
 use crate::core::parsing::reset_span_locations;
 use crate::extraction::types::{
     CallSite, CallType, DetectedPattern, ExtractedFileData, ExtractedFunctionData,
@@ -315,6 +318,9 @@ impl UnifiedFileExtractor {
         let is_async = item_fn.sig.asyncness.is_some();
         let visibility = self.extract_visibility(&item_fn.vis);
 
+        // Calculate entropy if enabled
+        let entropy_score = calculate_entropy_if_enabled(&item_fn.block);
+
         ExtractedFunctionData {
             name,
             qualified_name,
@@ -324,6 +330,7 @@ impl UnifiedFileExtractor {
             cyclomatic,
             cognitive,
             nesting,
+            entropy_score,
             purity_analysis,
             io_operations,
             parameter_names,
@@ -374,6 +381,9 @@ impl UnifiedFileExtractor {
         let is_async = impl_fn.sig.asyncness.is_some();
         let visibility = self.extract_impl_visibility(&impl_fn.vis);
 
+        // Calculate entropy if enabled
+        let entropy_score = calculate_entropy_if_enabled(&impl_fn.block);
+
         ExtractedFunctionData {
             name,
             qualified_name,
@@ -383,6 +393,7 @@ impl UnifiedFileExtractor {
             cyclomatic,
             cognitive,
             nesting,
+            entropy_score,
             purity_analysis,
             io_operations,
             parameter_names,
@@ -883,6 +894,34 @@ impl<'ast> Visit<'ast> for TransformationVisitor {
         }
 
         syn::visit::visit_expr_method_call(self, expr);
+    }
+}
+
+/// Calculate entropy score for a function block if entropy analysis is enabled.
+///
+/// This function checks the entropy configuration and calculates entropy-based
+/// complexity dampening for functions with repetitive patterns.
+///
+/// # Returns
+///
+/// - `Some(EntropyScore)` if entropy is enabled and calculated successfully
+/// - `None` if entropy analysis is disabled
+fn calculate_entropy_if_enabled(block: &syn::Block) -> Option<EntropyScore> {
+    if get_entropy_config().enabled {
+        let mut analyzer = EntropyAnalyzer::new();
+        let score = analyzer.calculate_entropy(block);
+
+        Some(EntropyScore {
+            token_entropy: score.token_entropy,
+            pattern_repetition: score.pattern_repetition,
+            branch_similarity: score.branch_similarity,
+            effective_complexity: score.effective_complexity,
+            unique_variables: score.unique_variables,
+            max_nesting: score.max_nesting,
+            dampening_applied: score.dampening_applied,
+        })
+    } else {
+        None
     }
 }
 

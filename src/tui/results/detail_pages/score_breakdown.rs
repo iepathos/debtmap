@@ -92,13 +92,45 @@ pub fn build_raw_inputs_section(
         theme,
         width,
     );
-    add_label_value(
-        &mut lines,
-        "cognitive",
-        item.cognitive_complexity.to_string(),
-        theme,
-        width,
-    );
+    // Show cognitive complexity, with entropy-adjusted value if different
+    // Check item-level first, then god object aggregated entropy
+    let entropy_adjusted = item.entropy_adjusted_cognitive.or_else(|| {
+        item.god_object_indicators
+            .as_ref()
+            .and_then(|g| g.aggregated_entropy.as_ref())
+            .map(|e| e.adjusted_cognitive)
+    });
+
+    if let Some(adjusted) = entropy_adjusted {
+        if adjusted != item.cognitive_complexity {
+            add_label_value(
+                &mut lines,
+                "cognitive",
+                format!(
+                    "{} → {} (entropy-adjusted)",
+                    item.cognitive_complexity, adjusted
+                ),
+                theme,
+                width,
+            );
+        } else {
+            add_label_value(
+                &mut lines,
+                "cognitive",
+                item.cognitive_complexity.to_string(),
+                theme,
+                width,
+            );
+        }
+    } else {
+        add_label_value(
+            &mut lines,
+            "cognitive",
+            item.cognitive_complexity.to_string(),
+            theme,
+            width,
+        );
+    }
     add_label_value(
         &mut lines,
         "nesting",
@@ -128,6 +160,26 @@ pub fn build_raw_inputs_section(
         width,
     );
 
+    // Coverage details (affects coverage_factor)
+    if let Some(coverage) = &item.transitive_coverage {
+        add_label_value(
+            &mut lines,
+            "direct coverage",
+            format!("{:.1}%", coverage.direct * 100.0),
+            theme,
+            width,
+        );
+        if (coverage.transitive - coverage.direct).abs() > 0.01 {
+            add_label_value(
+                &mut lines,
+                "transitive coverage",
+                format!("{:.1}%", coverage.transitive * 100.0),
+                theme,
+                width,
+            );
+        }
+    }
+
     add_blank_line(&mut lines);
     lines
 }
@@ -141,12 +193,25 @@ pub fn build_score_factors_section(
     let mut lines = Vec::new();
     add_section_header(&mut lines, "score factors (0-10 scale)", theme);
 
+    // Check if god object multiplier was applied (complexity_factor would be inflated)
+    let has_god_object = matches!(&item.debt_type, DebtType::GodObject { .. })
+        || item
+            .god_object_indicators
+            .as_ref()
+            .map(|g| g.is_god_object)
+            .unwrap_or(false);
+
     // Complexity factor
+    let complexity_formula = if has_god_object {
+        "weighted(cyc,cog) * god_mult"
+    } else {
+        "weighted(cyc,cog) / 2"
+    };
     add_factor_line(
         &mut lines,
         "complexity",
         item.unified_score.complexity_factor,
-        "raw_complexity / 2.0",
+        complexity_formula,
         theme,
         width,
     );
@@ -166,7 +231,7 @@ pub fn build_score_factors_section(
         &mut lines,
         "dependencies",
         item.unified_score.dependency_factor,
-        "upstream_count / 2.0",
+        "upstream / 2.0",
         theme,
         width,
     );
@@ -197,14 +262,27 @@ pub fn build_multipliers_section(
 
     // Purity factor (if present)
     if let Some(purity) = item.unified_score.purity_factor {
-        add_multiplier_line(
-            &mut lines,
-            "purity",
-            purity,
-            "data flow analysis",
-            theme,
-            width,
-        );
+        // Show purity level classification if available
+        let purity_desc = if let Some(level) = &item.purity_level {
+            format!("{:?}", level)
+        } else if let Some(is_pure) = item.is_pure {
+            if is_pure {
+                "pure".to_string()
+            } else {
+                "impure".to_string()
+            }
+        } else {
+            "data flow analysis".to_string()
+        };
+
+        // Include confidence if available
+        let desc = if let Some(conf) = item.purity_confidence {
+            format!("{} ({:.0}% conf)", purity_desc, conf * 100.0)
+        } else {
+            purity_desc
+        };
+
+        add_multiplier_line(&mut lines, "purity", purity, &desc, theme, width);
     }
 
     // Pattern factor (if present)
@@ -214,6 +292,18 @@ pub fn build_multipliers_section(
             "pattern",
             pattern,
             "data flow vs logic",
+            theme,
+            width,
+        );
+    }
+
+    // Refactorability factor (if present)
+    if let Some(refactor) = item.unified_score.refactorability_factor {
+        add_multiplier_line(
+            &mut lines,
+            "refactorability",
+            refactor,
+            "dead stores/escape analysis",
             theme,
             width,
         );
@@ -229,18 +319,94 @@ pub fn build_multipliers_section(
         add_multiplier_line(&mut lines, "context", context, &context_type, theme, width);
     }
 
-    // Entropy dampening (if present)
+    // Entropy dampening (if present) - check both item-level and god object aggregated
     if let Some(dampening) = item.entropy_dampening_factor {
-        if dampening < 1.0 {
+        add_multiplier_line(
+            &mut lines,
+            "entropy dampening",
+            dampening,
+            "repetitive patterns",
+            theme,
+            width,
+        );
+    } else if let Some(ref god) = item.god_object_indicators {
+        // For god objects, show aggregated entropy dampening
+        if let Some(ref entropy) = god.aggregated_entropy {
             add_multiplier_line(
                 &mut lines,
                 "entropy dampening",
-                dampening,
-                "repetitive patterns",
+                entropy.dampening_factor,
+                "aggregated repetition",
                 theme,
                 width,
             );
         }
+    }
+
+    add_blank_line(&mut lines);
+    lines
+}
+
+/// Build exponential scaling pipeline section (pure) - shows score progression
+pub fn build_scaling_pipeline_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    // Only show if we have scaling data
+    let has_scaling_data = item.unified_score.base_score.is_some()
+        || item.unified_score.exponential_factor.is_some()
+        || item.unified_score.risk_boost.is_some()
+        || item.unified_score.pre_adjustment_score.is_some();
+
+    if !has_scaling_data {
+        return lines;
+    }
+
+    add_section_header(&mut lines, "score scaling pipeline", theme);
+
+    // Base score (before exponential scaling)
+    if let Some(base) = item.unified_score.base_score {
+        add_label_value(
+            &mut lines,
+            "base score",
+            format!("{:.2}", base),
+            theme,
+            width,
+        );
+    }
+
+    // Exponential factor
+    if let Some(exp) = item.unified_score.exponential_factor {
+        let exp_desc = if (exp - 1.0).abs() < 0.01 {
+            "no scaling".to_string()
+        } else {
+            format!("^{:.2} applied", exp)
+        };
+        add_label_value(&mut lines, "exponential factor", exp_desc, theme, width);
+    }
+
+    // Risk boost
+    if let Some(boost) = item.unified_score.risk_boost {
+        let boost_desc = if (boost - 1.0).abs() < 0.01 {
+            "none".to_string()
+        } else {
+            format!("{:.2}x", boost)
+        };
+        add_label_value(&mut lines, "risk boost", boost_desc, theme, width);
+    }
+
+    // Pre-adjustment score
+    if let Some(pre_adj) = item.unified_score.pre_adjustment_score {
+        add_label_value(
+            &mut lines,
+            "pre-adjustment score",
+            format!("{:.2}", pre_adj),
+            theme,
+            width,
+        );
     }
 
     add_blank_line(&mut lines);
@@ -273,6 +439,17 @@ pub fn build_god_object_impact_section(
 
     add_section_header(&mut lines, "god object impact (MAJOR)", theme);
 
+    // Detection type (GodClass/GodFile/GodModule)
+    if let Some(indicators) = &item.god_object_indicators {
+        add_label_value(
+            &mut lines,
+            "detection type",
+            format!("{:?}", indicators.detection_type),
+            theme,
+            width,
+        );
+    }
+
     // Show the god object score
     add_label_value(
         &mut lines,
@@ -302,13 +479,65 @@ pub fn build_god_object_impact_section(
         Span::styled("(3.0 + score/50)", Style::default().fg(theme.muted)),
     ]));
 
-    // Show weighted method count if available
+    // Show detailed indicators if available
     if let Some(indicators) = &item.god_object_indicators {
+        // Raw counts
+        add_label_value(
+            &mut lines,
+            "methods",
+            indicators.method_count.to_string(),
+            theme,
+            width,
+        );
+        add_label_value(
+            &mut lines,
+            "fields",
+            indicators.field_count.to_string(),
+            theme,
+            width,
+        );
+        add_label_value(
+            &mut lines,
+            "responsibilities",
+            indicators.responsibility_count.to_string(),
+            theme,
+            width,
+        );
+
+        // Weighted method count (pure-adjusted)
         if let Some(weighted) = indicators.weighted_method_count {
             add_label_value(
                 &mut lines,
                 "weighted methods",
                 format!("{:.1} (pure-adjusted)", weighted),
+                theme,
+                width,
+            );
+        }
+
+        // Trait method summary (Spec 217)
+        if let Some(trait_summary) = &indicators.trait_method_summary {
+            add_label_value(
+                &mut lines,
+                "trait methods",
+                format!(
+                    "{} mandated, {} extractable",
+                    trait_summary.mandated_count, trait_summary.extractable_count
+                ),
+                theme,
+                width,
+            );
+        }
+
+        // Domain diversity
+        if indicators.domain_count > 0 {
+            add_label_value(
+                &mut lines,
+                "domains",
+                format!(
+                    "{} (diversity: {:.2})",
+                    indicators.domain_count, indicators.domain_diversity
+                ),
                 theme,
                 width,
             );
@@ -411,36 +640,9 @@ pub fn build_orchestration_section(
 pub fn build_calculation_summary_section(
     item: &UnifiedDebtItem,
     theme: &Theme,
-    _width: u16,
+    width: u16,
 ) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    add_section_header(&mut lines, "calculation pipeline", theme);
-
-    // Show the general formula with proper alignment
-    let formula_label = format!(
-        "{:width$}",
-        format!("{}formula", " ".repeat(INDENT)),
-        width = LABEL_WIDTH
-    );
-    let gap = " ".repeat(GAP);
-
-    lines.push(Line::from(vec![
-        Span::raw(formula_label.clone()),
-        Span::raw(gap.clone()),
-        Span::styled(
-            "base = (complexity + deps) * coverage",
-            Style::default().fg(theme.muted),
-        ),
-    ]));
-
-    let cont_indent = " ".repeat(LABEL_WIDTH + GAP);
-    lines.push(Line::from(vec![
-        Span::raw(cont_indent.clone()),
-        Span::styled(
-            "     * role * structural * purity",
-            Style::default().fg(theme.muted),
-        ),
-    ]));
 
     // Check if god object multiplier was applied
     let has_god_object = matches!(&item.debt_type, DebtType::GodObject { .. })
@@ -450,41 +652,8 @@ pub fn build_calculation_summary_section(
             .map(|g| g.is_god_object)
             .unwrap_or(false);
 
-    if has_god_object {
-        lines.push(Line::from(vec![
-            Span::raw(cont_indent),
-            Span::styled(
-                "     * GOD_OBJECT_MULT (3-5x)",
-                Style::default().fg(Color::Red),
-            ),
-        ]));
-    }
-
-    add_blank_line(&mut lines);
-
-    // Show what dominates the score
-    add_section_header(&mut lines, "dominant factors", theme);
-
-    let mut factors: Vec<(&str, f64, &str)> = vec![
-        (
-            "Complexity",
-            item.unified_score.complexity_factor,
-            "complexity_factor",
-        ),
-        (
-            "Coverage Gap",
-            item.unified_score.coverage_factor / 10.0,
-            "coverage_factor/10",
-        ),
-        (
-            "Dependencies",
-            item.unified_score.dependency_factor,
-            "dependency_factor",
-        ),
-    ];
-
-    // Add god object if present
-    if has_god_object {
+    // Get god object multiplier if applicable
+    let god_mult = if has_god_object {
         let go_score = match &item.debt_type {
             DebtType::GodObject {
                 god_object_score, ..
@@ -495,35 +664,140 @@ pub fn build_calculation_summary_section(
                 .map(|g| g.god_object_score.value())
                 .unwrap_or(0.0),
         };
-        let multiplier = 3.0 + (go_score / 50.0);
-        factors.push(("God Object", multiplier * 10.0, "massive multiplier"));
-    }
+        Some(3.0 + (go_score / 50.0))
+    } else {
+        None
+    };
 
-    // Sort by impact (descending)
-    factors.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    // Collect active multipliers
+    let role = item.unified_score.role_multiplier;
+    let purity = item.unified_score.purity_factor.unwrap_or(1.0);
+    let pattern = item.unified_score.pattern_factor.unwrap_or(1.0);
+    let refactor = item.unified_score.refactorability_factor.unwrap_or(1.0);
+    let context = item.context_multiplier.unwrap_or(1.0);
+    let entropy = item.entropy_dampening_factor.unwrap_or(1.0);
 
-    for (name, value, note) in factors.iter().take(3) {
-        let bar_len = ((value / 10.0) * 10.0).round() as usize;
-        let bar = "#".repeat(bar_len.min(10));
+    // Build multiplier product (only include non-1.0 values in display)
+    let total_mult = role * purity * pattern * refactor * context * entropy;
 
-        // Use proper column alignment
-        let label = format!(
-            "{:width$}",
-            format!("{}{}", " ".repeat(INDENT), name),
-            width = LABEL_WIDTH
+    add_section_header(&mut lines, "score formula", theme);
+
+    // Show symbolic formula
+    let formula = if has_god_object {
+        "final = (C + D) × cov_mult × multipliers × god_mult"
+    } else {
+        "final = (C + D) × cov_mult × multipliers"
+    };
+    add_label_value(&mut lines, "formula", formula.to_string(), theme, width);
+
+    // Show variable legend
+    add_label_value(
+        &mut lines,
+        "where",
+        format!(
+            "C={:.1}, D={:.1}, cov_mult={:.2}",
+            item.unified_score.complexity_factor,
+            item.unified_score.dependency_factor,
+            1.0 - (item.unified_score.coverage_factor / 10.0) // coverage multiplier
+        ),
+        theme,
+        width,
+    );
+
+    // Show multipliers breakdown
+    let mult_parts: Vec<String> = [
+        (role, "role"),
+        (purity, "purity"),
+        (pattern, "pattern"),
+        (refactor, "refactor"),
+        (context, "context"),
+        (entropy, "entropy"),
+    ]
+    .iter()
+    .filter(|(v, _)| (*v - 1.0).abs() > 0.01)
+    .map(|(v, name)| format!("{}={:.2}", name, v))
+    .collect();
+
+    if mult_parts.is_empty() {
+        add_label_value(
+            &mut lines,
+            "multipliers",
+            "1.0 (no adjustments)".to_string(),
+            theme,
+            width,
         );
-
-        lines.push(Line::from(vec![
-            Span::raw(label),
-            Span::raw(gap.clone()),
-            Span::styled(format!("{:<10}", bar), Style::default().fg(theme.accent())),
-            Span::raw(" "),
-            Span::styled(
-                format!("{:.1} ({})", value, note),
-                Style::default().fg(theme.muted),
-            ),
-        ]));
+    } else {
+        add_label_value(
+            &mut lines,
+            "multipliers",
+            format!("{} = {:.2}", mult_parts.join(" × "), total_mult),
+            theme,
+            width,
+        );
     }
+
+    if let Some(gm) = god_mult {
+        add_label_value(
+            &mut lines,
+            "god_mult",
+            format!("{:.2} (3.0 + score/50)", gm),
+            theme,
+            width,
+        );
+    }
+
+    add_blank_line(&mut lines);
+
+    // Show actual calculation with values
+    add_section_header(&mut lines, "actual calculation", theme);
+
+    let c = item.unified_score.complexity_factor;
+    let d = item.unified_score.dependency_factor;
+    let cov_mult = 1.0 - (item.unified_score.coverage_factor / 10.0);
+    let base = (c + d) * cov_mult;
+
+    // Step 1: base calculation
+    add_label_value(
+        &mut lines,
+        "step 1 (base)",
+        format!("({:.1} + {:.1}) × {:.2} = {:.2}", c, d, cov_mult, base),
+        theme,
+        width,
+    );
+
+    // Step 2: apply multipliers
+    let after_mult = base * total_mult;
+    if (total_mult - 1.0).abs() > 0.01 {
+        add_label_value(
+            &mut lines,
+            "step 2 (×mult)",
+            format!("{:.2} × {:.2} = {:.2}", base, total_mult, after_mult),
+            theme,
+            width,
+        );
+    }
+
+    // Step 3: apply god object multiplier
+    if let Some(gm) = god_mult {
+        let after_god = after_mult * gm;
+        add_label_value(
+            &mut lines,
+            "step 3 (×god)",
+            format!("{:.2} × {:.2} = {:.2}", after_mult, gm, after_god),
+            theme,
+            width,
+        );
+    }
+
+    // Final score (clamped to 100)
+    let final_score = item.unified_score.final_score.value();
+    add_label_value(
+        &mut lines,
+        "final (clamped)",
+        format!("{:.1}", final_score),
+        theme,
+        width,
+    );
 
     add_blank_line(&mut lines);
     lines
@@ -613,6 +887,7 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
         build_raw_inputs_section(item, theme, width),
         build_score_factors_section(item, theme, width),
         build_multipliers_section(item, theme, width),
+        build_scaling_pipeline_section(item, theme, width),
         build_god_object_impact_section(item, theme, width),
         build_orchestration_section(item, theme, width),
         build_calculation_summary_section(item, theme, width),

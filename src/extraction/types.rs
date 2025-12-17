@@ -110,6 +110,9 @@ pub struct ExtractedFunctionData {
     pub cognitive: u32,
     /// Maximum nesting depth
     pub nesting: u32,
+    /// Entropy-based complexity score (optional, calculated during extraction if enabled)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entropy_score: Option<crate::complexity::entropy_core::EntropyScore>,
 
     // Pre-extracted analysis data
     /// Purity analysis results
@@ -456,6 +459,7 @@ impl ExtractedFunctionData {
             cyclomatic: 1,
             cognitive: 0,
             nesting: 0,
+            entropy_score: None,
             purity_analysis: PurityAnalysisData::default(),
             io_operations: Vec::new(),
             parameter_names: Vec::new(),
@@ -481,6 +485,7 @@ impl Default for ExtractedFunctionData {
             cyclomatic: 1,
             cognitive: 0,
             nesting: 0,
+            entropy_score: None,
             purity_analysis: PurityAnalysisData::default(),
             io_operations: Vec::new(),
             parameter_names: Vec::new(),
@@ -670,6 +675,7 @@ mod tests {
                 cyclomatic: 5,
                 cognitive: 3,
                 nesting: 2,
+                entropy_score: None,
                 purity_analysis: PurityAnalysisData::pure(),
                 io_operations: vec![IoOperation {
                     io_type: IoType::File,

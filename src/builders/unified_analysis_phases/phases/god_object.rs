@@ -87,9 +87,15 @@ pub fn create_god_object_debt_item(
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
         cognitive_complexity: aggregated_metrics.total_cognitive,
-        entropy_details: None,
-        entropy_adjusted_cognitive: None,
-        entropy_dampening_factor: None,
+        entropy_details: aggregated_metrics.aggregated_entropy.clone(),
+        entropy_adjusted_cognitive: aggregated_metrics
+            .aggregated_entropy
+            .as_ref()
+            .map(|e| e.adjusted_cognitive),
+        entropy_dampening_factor: aggregated_metrics
+            .aggregated_entropy
+            .as_ref()
+            .map(|e| e.dampening_factor),
         is_pure: None,
         purity_confidence: None,
         purity_level: None,

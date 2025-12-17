@@ -226,6 +226,7 @@ mod tests {
             cyclomatic: 5,
             cognitive: 3,
             nesting: 2,
+            entropy_score: None,
             purity_analysis: PurityAnalysisData::pure(),
             io_operations: vec![],
             parameter_names: vec![],
