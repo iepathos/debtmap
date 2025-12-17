@@ -165,7 +165,10 @@ impl FunctionMetrics {
     ///
     /// **DEPRECATED (Spec 218)**: Use `entropy_analysis` field directly.
     /// This method remains for backward compatibility.
-    #[deprecated(since = "0.10.0", note = "Use entropy_analysis field directly. See spec 218.")]
+    #[deprecated(
+        since = "0.10.0",
+        note = "Use entropy_analysis field directly. See spec 218."
+    )]
     pub fn get_entropy_details(&self) -> Option<EntropyDetails> {
         self.entropy_score.as_ref().map(|score| {
             let mut reasoning = Vec::new();

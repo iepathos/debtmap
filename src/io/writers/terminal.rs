@@ -217,21 +217,23 @@ fn get_refactoring_patterns(level: &ComplexityLevel) -> &'static str {
 }
 
 /// Format entropy information for display if dampening is applied
-fn format_entropy_info(entropy_details: &crate::core::EntropyDetails) -> Option<Vec<String>> {
-    if !entropy_details.dampening_applied {
+fn format_entropy_info(
+    entropy_analysis: &crate::complexity::EntropyAnalysis,
+) -> Option<Vec<String>> {
+    if !entropy_analysis.dampening_was_applied {
         return None;
     }
 
     let mut lines = Vec::new();
     lines.push(format!(
-        "     {} Entropy: {:.2}, Repetition: {:.0}%, Effective: {:.1}x",
+        "     {} Entropy: {:.2}, Repetition: {:.0}%, Dampening: {:.1}x",
         "↓".green(),
-        entropy_details.token_entropy,
-        entropy_details.pattern_repetition * 100.0,
-        entropy_details.effective_complexity
+        entropy_analysis.entropy_score,
+        entropy_analysis.pattern_repetition * 100.0,
+        entropy_analysis.dampening_factor
     ));
 
-    for reason in entropy_details.reasoning.iter().take(1) {
+    for reason in entropy_analysis.reasoning.iter().take(1) {
         lines.push(format!("       {}", reason.dimmed()));
     }
 
@@ -287,8 +289,8 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
         }
 
         // Display entropy information if available
-        if let Some(entropy_details) = func.get_entropy_details() {
-            if let Some(entropy_lines) = format_entropy_info(&entropy_details) {
+        if let Some(ref entropy_analysis) = func.entropy_analysis {
+            if let Some(entropy_lines) = format_entropy_info(entropy_analysis) {
                 for line in entropy_lines {
                     println!("{line}");
                 }
