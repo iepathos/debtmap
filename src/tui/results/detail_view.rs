@@ -38,6 +38,9 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
             DetailPage::Overview => {
                 detail_pages::overview::render(frame, app, item, content_area, &theme)
             }
+            DetailPage::ScoreBreakdown => {
+                detail_pages::score_breakdown::render(frame, app, item, content_area, &theme)
+            }
             DetailPage::Dependencies => {
                 detail_pages::dependencies::render(frame, app, item, content_area, &theme)
             }
@@ -152,7 +155,7 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
             Line::from(vec![
                 Span::styled("←→/hl", Style::default().fg(theme.accent())),
                 Span::raw(": Pages  "),
-                Span::styled("1-6", Style::default().fg(theme.accent())),
+                Span::styled("1-7", Style::default().fg(theme.accent())),
                 Span::raw(": Jump  "),
                 Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
                 Span::raw(": Items  "),
@@ -170,7 +173,7 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         vec![Line::from(vec![
             Span::styled("←→/hl", Style::default().fg(theme.accent())),
             Span::raw(": Pages  "),
-            Span::styled("1-6", Style::default().fg(theme.accent())),
+            Span::styled("1-7", Style::default().fg(theme.accent())),
             Span::raw(": Jump  "),
             Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
             Span::raw(": Items  "),

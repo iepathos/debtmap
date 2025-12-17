@@ -26,7 +26,9 @@ use ratatui::text::Line;
 use super::super::{
     app::ResultsApp,
     detail_page::DetailPage,
-    detail_pages::{data_flow, dependencies, git_context, overview, patterns, responsibilities},
+    detail_pages::{
+        data_flow, dependencies, git_context, overview, patterns, responsibilities, score_breakdown,
+    },
 };
 
 // =============================================================================
@@ -68,6 +70,7 @@ pub fn lines_to_plain_text(lines: &[Line]) -> String {
 pub fn extract_page_text(item: &UnifiedDebtItem, page: DetailPage, app: &ResultsApp) -> String {
     match page {
         DetailPage::Overview => extract_overview_text(item, app),
+        DetailPage::ScoreBreakdown => extract_score_breakdown_text(item),
         DetailPage::Dependencies => extract_dependencies_text(item, app),
         DetailPage::GitContext => extract_git_context_text(item),
         DetailPage::Patterns => extract_patterns_text(item),
@@ -119,6 +122,19 @@ fn extract_overview_text(item: &UnifiedDebtItem, app: &ResultsApp) -> String {
     .collect();
 
     lines_to_plain_text(&all_lines)
+}
+
+// =============================================================================
+// Score Breakdown page extraction
+// =============================================================================
+
+/// Extract score breakdown page content as plain text.
+///
+/// Uses the same section builders as the TUI renderer, converted to plain text.
+fn extract_score_breakdown_text(item: &UnifiedDebtItem) -> String {
+    let theme = Theme::default();
+    let lines = score_breakdown::build_page_lines(item, &theme, TEXT_EXTRACTION_WIDTH);
+    lines_to_plain_text(&lines)
 }
 
 // =============================================================================

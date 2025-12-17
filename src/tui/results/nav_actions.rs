@@ -293,12 +293,12 @@ mod tests {
         state.view_mode = ViewMode::Detail;
         state.detail_page = DetailPage::Overview;
 
-        // Forward
+        // Forward: Overview -> ScoreBreakdown
         let result = navigate_detail_page(&mut state, true);
         assert!(result.is_success());
-        assert_eq!(state.detail_page, DetailPage::Dependencies);
+        assert_eq!(state.detail_page, DetailPage::ScoreBreakdown);
 
-        // Backward
+        // Backward: ScoreBreakdown -> Overview
         let result = navigate_detail_page(&mut state, false);
         assert!(result.is_success());
         assert_eq!(state.detail_page, DetailPage::Overview);
@@ -328,10 +328,10 @@ mod tests {
         assert!(result.is_success());
         assert_eq!(state.view_mode, ViewMode::Detail);
 
-        // User navigates detail pages
+        // User navigates detail pages (Overview -> ScoreBreakdown)
         let result = navigate_detail_page(&mut state, true);
         assert!(result.is_success());
-        assert_eq!(state.detail_page, DetailPage::Dependencies);
+        assert_eq!(state.detail_page, DetailPage::ScoreBreakdown);
 
         // User opens help
         let result = navigate_to_help(&mut state);

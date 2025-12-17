@@ -161,13 +161,16 @@ The TUI adapts to terminal width with four distinct layouts:
 │ Content (flexible, varies by page)                  │
 │                                                      │
 │   Page 1: Overview - Core metrics, location         │
-│   Page 2: Dependencies - Call graph, dependencies   │
-│   Page 3: Git Context - Churn, authors, recency     │
-│   Page 4: Patterns - Framework patterns, purity     │
+│   Page 2: Score Breakdown - Detailed scoring        │
+│   Page 3: Dependencies - Call graph, dependencies   │
+│   Page 4: Git Context - Churn, authors, recency     │
+│   Page 5: Patterns - Framework patterns, purity     │
+│   Page 6: Data Flow - Mutations, I/O operations     │
+│   Page 7: Responsibilities - Role analysis          │
 │                                                      │
 ├─────────────────────────────────────────────────────┤
 │ Footer (2 lines)                                    │
-│   - Page navigation: Tab/←→, 1-4 jump               │
+│   - Page navigation: Tab/←→, 1-7 jump               │
 │   - Actions: copy, edit, help, back                 │
 └─────────────────────────────────────────────────────┘
 ```
@@ -375,20 +378,35 @@ Each list item shows in ~80 characters:
 - **Content**: Location, unified score, complexity metrics, coverage, recommendation
 - **Design**: Clean label-value pairs with clear sections
 
-#### Page 2: Dependencies
+#### Page 2: Score Breakdown
+- **Purpose**: Explain why an item scored high/low
+- **Content**: Raw inputs, score factors, multipliers applied, god object impact, calculation pipeline
+- **Design**: Shows formulas and effect indicators ([reduces]/[increases]/[neutral])
+
+#### Page 3: Dependencies
 - **Purpose**: Relationship and impact
 - **Content**: Calls this function, Called by this, transitive dependencies
 - **Design**: Hierarchical lists, dependency depth visualization
 
-#### Page 3: Git Context
+#### Page 4: Git Context
 - **Purpose**: Historical risk factors
 - **Content**: Commit frequency, authors, recency, churn risk
 - **Design**: Timeline visualization, contributor patterns
 
-#### Page 4: Patterns
+#### Page 5: Patterns
 - **Purpose**: Code quality signals
 - **Content**: Framework patterns, purity analysis, language-specific traits
 - **Design**: Tag-based presentation, boolean indicators
+
+#### Page 6: Data Flow
+- **Purpose**: Mutation and I/O analysis
+- **Content**: Purity info, mutation tracking, I/O operations
+- **Design**: Conditional - only shown when data flow data exists
+
+#### Page 7: Responsibilities
+- **Purpose**: Role and responsibility analysis
+- **Content**: Function role classification, responsibility breakdown
+- **Design**: Always available as final page
 
 ### Progressive Detail Strategy
 
@@ -523,11 +541,14 @@ src/tui/
     ├── sort.rs         # Sort criteria
     ├── filter.rs       # Filter logic
     └── detail_pages/
-        ├── overview.rs      # Page 1: Core metrics
-        ├── dependencies.rs  # Page 2: Relationships
-        ├── git_context.rs   # Page 3: History
-        ├── patterns.rs      # Page 4: Quality signals
-        └── components.rs    # Shared rendering helpers
+        ├── overview.rs         # Page 1: Core metrics
+        ├── score_breakdown.rs  # Page 2: Detailed scoring analysis
+        ├── dependencies.rs     # Page 3: Relationships
+        ├── git_context.rs      # Page 4: History
+        ├── patterns.rs         # Page 5: Quality signals
+        ├── data_flow.rs        # Page 6: Purity/mutations
+        ├── responsibilities.rs # Page 7: Role analysis
+        └── components.rs       # Shared rendering helpers
 ```
 
 ### Key Abstractions

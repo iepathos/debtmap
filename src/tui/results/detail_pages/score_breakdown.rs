@@ -1,0 +1,926 @@
+//! Score Breakdown page (Page 2) - Detailed scoring analysis.
+//!
+//! Shows every factor that contributes to the final debt score,
+//! helping users understand WHY an item scored high/low.
+//!
+//! Structured as pure section builders composed by a thin render shell,
+//! following Stillwater philosophy: "Pure Core, Imperative Shell".
+
+use super::components::{add_blank_line, add_label_value, add_section_header};
+use crate::priority::classification::Severity;
+use crate::priority::{DebtType, UnifiedDebtItem};
+use crate::tui::results::app::ResultsApp;
+use crate::tui::theme::Theme;
+use ratatui::{
+    layout::Rect,
+    style::{Color, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph, Wrap},
+    Frame,
+};
+
+// Column layout constants (from DESIGN.md)
+const INDENT: usize = 2;
+const LABEL_WIDTH: usize = 24; // Fixed column width for alignment
+const GAP: usize = 4; // Breathing room between label and value
+
+// ============================================================================
+// Pure Section Builders (the "still" core)
+// ============================================================================
+
+/// Build final score section with severity classification (pure)
+pub fn build_final_score_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    _width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    add_section_header(&mut lines, "final score", theme);
+
+    let score = item.unified_score.final_score.value();
+    let severity = Severity::from_score_100(score);
+    let severity_color = match severity {
+        Severity::Critical => Color::Red,
+        Severity::High => Color::LightRed,
+        Severity::Medium => Color::Yellow,
+        Severity::Low => Color::Green,
+    };
+
+    // Create a visual bar representation
+    let bar_width: usize = 20;
+    let filled = ((score / 100.0) * bar_width as f64).round() as usize;
+    let empty = bar_width.saturating_sub(filled);
+    let bar = format!("[{}{}]", "#".repeat(filled), "-".repeat(empty));
+
+    // Use proper column alignment
+    let label = format!(
+        "{:width$}",
+        format!("{}total", " ".repeat(INDENT)),
+        width = LABEL_WIDTH
+    );
+    let gap = " ".repeat(GAP);
+
+    lines.push(Line::from(vec![
+        Span::raw(label),
+        Span::raw(gap),
+        Span::styled(format!("{:.1}", score), Style::default().fg(severity_color)),
+        Span::raw(" "),
+        Span::styled(
+            format!("[{}]", severity.as_str().to_lowercase()),
+            Style::default().fg(severity_color),
+        ),
+        Span::raw(" "),
+        Span::styled(bar, Style::default().fg(theme.muted)),
+    ]));
+    add_blank_line(&mut lines);
+    lines
+}
+
+/// Build raw inputs section showing base metrics (pure)
+pub fn build_raw_inputs_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    add_section_header(&mut lines, "raw inputs", theme);
+
+    add_label_value(
+        &mut lines,
+        "cyclomatic",
+        item.cyclomatic_complexity.to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "cognitive",
+        item.cognitive_complexity.to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "nesting",
+        item.nesting_depth.to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "loc",
+        item.function_length.to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "upstream deps",
+        item.upstream_dependencies.to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "downstream deps",
+        item.downstream_dependencies.to_string(),
+        theme,
+        width,
+    );
+
+    add_blank_line(&mut lines);
+    lines
+}
+
+/// Build unified score factors section (pure)
+pub fn build_score_factors_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    add_section_header(&mut lines, "score factors (0-10 scale)", theme);
+
+    // Complexity factor
+    add_factor_line(
+        &mut lines,
+        "complexity",
+        item.unified_score.complexity_factor,
+        "raw_complexity / 2.0",
+        theme,
+        width,
+    );
+
+    // Coverage factor
+    add_factor_line(
+        &mut lines,
+        "coverage gap",
+        item.unified_score.coverage_factor,
+        "(1.0 - coverage%) * 10",
+        theme,
+        width,
+    );
+
+    // Dependency factor
+    add_factor_line(
+        &mut lines,
+        "dependencies",
+        item.unified_score.dependency_factor,
+        "upstream_count / 2.0",
+        theme,
+        width,
+    );
+
+    add_blank_line(&mut lines);
+    lines
+}
+
+/// Build multipliers section showing all applied multipliers (pure)
+pub fn build_multipliers_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    add_section_header(&mut lines, "multipliers applied", theme);
+
+    // Role multiplier
+    let role_desc = format!("{:?}", item.function_role);
+    add_multiplier_line(
+        &mut lines,
+        "role",
+        item.unified_score.role_multiplier,
+        &role_desc,
+        theme,
+        width,
+    );
+
+    // Purity factor (if present)
+    if let Some(purity) = item.unified_score.purity_factor {
+        add_multiplier_line(
+            &mut lines,
+            "purity",
+            purity,
+            "data flow analysis",
+            theme,
+            width,
+        );
+    }
+
+    // Pattern factor (if present)
+    if let Some(pattern) = item.unified_score.pattern_factor {
+        add_multiplier_line(
+            &mut lines,
+            "pattern",
+            pattern,
+            "data flow vs logic",
+            theme,
+            width,
+        );
+    }
+
+    // Context multiplier (if present)
+    if let Some(context) = item.context_multiplier {
+        let context_type = item
+            .context_type
+            .as_ref()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|| "unknown".to_string());
+        add_multiplier_line(&mut lines, "context", context, &context_type, theme, width);
+    }
+
+    // Entropy dampening (if present)
+    if let Some(dampening) = item.entropy_dampening_factor {
+        if dampening < 1.0 {
+            add_multiplier_line(
+                &mut lines,
+                "entropy dampening",
+                dampening,
+                "repetitive patterns",
+                theme,
+                width,
+            );
+        }
+    }
+
+    add_blank_line(&mut lines);
+    lines
+}
+
+/// Build god object impact section (pure) - only shown for god objects
+pub fn build_god_object_impact_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    // Only show for god objects
+    let god_object_score = match &item.debt_type {
+        DebtType::GodObject {
+            god_object_score, ..
+        } => Some(god_object_score.value()),
+        _ => item
+            .god_object_indicators
+            .as_ref()
+            .filter(|g| g.is_god_object)
+            .map(|g| g.god_object_score.value()),
+    };
+
+    let Some(go_score) = god_object_score else {
+        return lines;
+    };
+
+    add_section_header(&mut lines, "god object impact (MAJOR)", theme);
+
+    // Show the god object score
+    add_label_value(
+        &mut lines,
+        "god object score",
+        format!("{:.1}", go_score),
+        theme,
+        width,
+    );
+
+    // Calculate and show the multiplier with proper column alignment
+    let multiplier = 3.0 + (go_score / 50.0);
+    let label = format!(
+        "{:width$}",
+        format!("{}multiplier", " ".repeat(INDENT)),
+        width = LABEL_WIDTH
+    );
+    let gap = " ".repeat(GAP);
+
+    lines.push(Line::from(vec![
+        Span::raw(label),
+        Span::raw(gap),
+        Span::styled(
+            format!("{:.2}x", multiplier),
+            Style::default().fg(Color::Red),
+        ),
+        Span::raw(" "),
+        Span::styled("(3.0 + score/50)", Style::default().fg(theme.muted)),
+    ]));
+
+    // Show weighted method count if available
+    if let Some(indicators) = &item.god_object_indicators {
+        if let Some(weighted) = indicators.weighted_method_count {
+            add_label_value(
+                &mut lines,
+                "weighted methods",
+                format!("{:.1} (pure-adjusted)", weighted),
+                theme,
+                width,
+            );
+        }
+
+        // Show complexity metrics if available (Spec 211)
+        if let Some(metrics) = &indicators.complexity_metrics {
+            add_label_value(
+                &mut lines,
+                "avg complexity",
+                format!("{:.1}", metrics.avg_cyclomatic),
+                theme,
+                width,
+            );
+            add_label_value(
+                &mut lines,
+                "max complexity",
+                format!("{}", metrics.max_cyclomatic),
+                theme,
+                width,
+            );
+        }
+    }
+
+    // Warning about impact with proper alignment
+    let warning_label = format!(
+        "{:width$}",
+        format!("{}warning", " ".repeat(INDENT)),
+        width = LABEL_WIDTH
+    );
+    lines.push(Line::from(vec![
+        Span::raw(warning_label.clone()),
+        Span::raw(" ".repeat(GAP)),
+        Span::styled(
+            "God object multiplier applied LAST",
+            Style::default().fg(Color::Yellow),
+        ),
+    ]));
+    lines.push(Line::from(vec![
+        Span::raw(warning_label),
+        Span::raw(" ".repeat(GAP)),
+        Span::styled(
+            "causing dramatic score inflation",
+            Style::default().fg(Color::Yellow),
+        ),
+    ]));
+
+    add_blank_line(&mut lines);
+    lines
+}
+
+/// Build orchestration adjustment section (pure)
+pub fn build_orchestration_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    let Some(adjustment) = &item.unified_score.adjustment_applied else {
+        return lines;
+    };
+
+    add_section_header(&mut lines, "orchestration adjustment", theme);
+
+    add_label_value(
+        &mut lines,
+        "original score",
+        format!("{:.2}", adjustment.original_score),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "adjusted score",
+        format!("{:.2}", adjustment.adjusted_score),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "reduction",
+        format!("{:.1}%", adjustment.reduction_percent),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "reason",
+        adjustment.adjustment_reason.clone(),
+        theme,
+        width,
+    );
+
+    add_blank_line(&mut lines);
+    lines
+}
+
+/// Build score calculation summary (pure)
+pub fn build_calculation_summary_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    _width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    add_section_header(&mut lines, "calculation pipeline", theme);
+
+    // Show the general formula with proper alignment
+    let formula_label = format!(
+        "{:width$}",
+        format!("{}formula", " ".repeat(INDENT)),
+        width = LABEL_WIDTH
+    );
+    let gap = " ".repeat(GAP);
+
+    lines.push(Line::from(vec![
+        Span::raw(formula_label.clone()),
+        Span::raw(gap.clone()),
+        Span::styled(
+            "base = (complexity + deps) * coverage",
+            Style::default().fg(theme.muted),
+        ),
+    ]));
+
+    let cont_indent = " ".repeat(LABEL_WIDTH + GAP);
+    lines.push(Line::from(vec![
+        Span::raw(cont_indent.clone()),
+        Span::styled(
+            "     * role * structural * purity",
+            Style::default().fg(theme.muted),
+        ),
+    ]));
+
+    // Check if god object multiplier was applied
+    let has_god_object = matches!(&item.debt_type, DebtType::GodObject { .. })
+        || item
+            .god_object_indicators
+            .as_ref()
+            .map(|g| g.is_god_object)
+            .unwrap_or(false);
+
+    if has_god_object {
+        lines.push(Line::from(vec![
+            Span::raw(cont_indent),
+            Span::styled(
+                "     * GOD_OBJECT_MULT (3-5x)",
+                Style::default().fg(Color::Red),
+            ),
+        ]));
+    }
+
+    add_blank_line(&mut lines);
+
+    // Show what dominates the score
+    add_section_header(&mut lines, "dominant factors", theme);
+
+    let mut factors: Vec<(&str, f64, &str)> = vec![
+        (
+            "Complexity",
+            item.unified_score.complexity_factor,
+            "complexity_factor",
+        ),
+        (
+            "Coverage Gap",
+            item.unified_score.coverage_factor / 10.0,
+            "coverage_factor/10",
+        ),
+        (
+            "Dependencies",
+            item.unified_score.dependency_factor,
+            "dependency_factor",
+        ),
+    ];
+
+    // Add god object if present
+    if has_god_object {
+        let go_score = match &item.debt_type {
+            DebtType::GodObject {
+                god_object_score, ..
+            } => god_object_score.value(),
+            _ => item
+                .god_object_indicators
+                .as_ref()
+                .map(|g| g.god_object_score.value())
+                .unwrap_or(0.0),
+        };
+        let multiplier = 3.0 + (go_score / 50.0);
+        factors.push(("God Object", multiplier * 10.0, "massive multiplier"));
+    }
+
+    // Sort by impact (descending)
+    factors.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (name, value, note) in factors.iter().take(3) {
+        let bar_len = ((value / 10.0) * 10.0).round() as usize;
+        let bar = "#".repeat(bar_len.min(10));
+
+        // Use proper column alignment
+        let label = format!(
+            "{:width$}",
+            format!("{}{}", " ".repeat(INDENT), name),
+            width = LABEL_WIDTH
+        );
+
+        lines.push(Line::from(vec![
+            Span::raw(label),
+            Span::raw(gap.clone()),
+            Span::styled(format!("{:<10}", bar), Style::default().fg(theme.accent())),
+            Span::raw(" "),
+            Span::styled(
+                format!("{:.1} ({})", value, note),
+                Style::default().fg(theme.muted),
+            ),
+        ]));
+    }
+
+    add_blank_line(&mut lines);
+    lines
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Add a factor line with value and explanation (follows column layout)
+fn add_factor_line(
+    lines: &mut Vec<Line<'static>>,
+    label: &str,
+    value: f64,
+    formula: &str,
+    theme: &Theme,
+    _width: u16,
+) {
+    let label_formatted = format!(
+        "{:width$}",
+        format!("{}{}", " ".repeat(INDENT), label),
+        width = LABEL_WIDTH
+    );
+    let gap = " ".repeat(GAP);
+
+    lines.push(Line::from(vec![
+        Span::raw(label_formatted),
+        Span::raw(gap),
+        Span::styled(format!("{:.2}", value), Style::default().fg(theme.primary)),
+        Span::raw("  "),
+        Span::styled(format!("({})", formula), Style::default().fg(theme.muted)),
+    ]));
+}
+
+/// Add a multiplier line with visual indicator (follows column layout)
+fn add_multiplier_line(
+    lines: &mut Vec<Line<'static>>,
+    label: &str,
+    value: f64,
+    reason: &str,
+    theme: &Theme,
+    _width: u16,
+) {
+    let color = if value < 0.8 {
+        Color::Green // Reduces score
+    } else if value > 1.2 {
+        Color::Red // Increases score
+    } else {
+        theme.primary // Neutral
+    };
+
+    let effect = if value < 0.95 {
+        "reduces"
+    } else if value > 1.05 {
+        "increases"
+    } else {
+        "neutral"
+    };
+
+    let label_formatted = format!(
+        "{:width$}",
+        format!("{}{}", " ".repeat(INDENT), label),
+        width = LABEL_WIDTH
+    );
+    let gap = " ".repeat(GAP);
+
+    lines.push(Line::from(vec![
+        Span::raw(label_formatted),
+        Span::raw(gap),
+        Span::styled(format!("{:.2}x", value), Style::default().fg(color)),
+        Span::raw("  "),
+        Span::styled(
+            format!("[{}] {}", effect, reason),
+            Style::default().fg(theme.muted),
+        ),
+    ]));
+}
+
+// ============================================================================
+// Public API for text extraction
+// ============================================================================
+
+/// Build all page lines for text extraction (pure)
+pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
+    [
+        build_final_score_section(item, theme, width),
+        build_raw_inputs_section(item, theme, width),
+        build_score_factors_section(item, theme, width),
+        build_multipliers_section(item, theme, width),
+        build_god_object_impact_section(item, theme, width),
+        build_orchestration_section(item, theme, width),
+        build_calculation_summary_section(item, theme, width),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+// ============================================================================
+// Render Shell (the "water" boundary)
+// ============================================================================
+
+/// Render score breakdown page showing detailed scoring analysis
+pub fn render(
+    frame: &mut Frame,
+    _app: &ResultsApp,
+    item: &UnifiedDebtItem,
+    area: Rect,
+    theme: &Theme,
+) {
+    let lines = build_page_lines(item, theme, area.width);
+
+    // I/O boundary: render the widget
+    let paragraph = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::NONE))
+        .wrap(Wrap { trim: false });
+
+    frame.render_widget(paragraph, area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::score_types::Score0To100;
+    use crate::priority::unified_scorer::{Location, UnifiedScore};
+    use crate::priority::{ActionableRecommendation, FunctionRole, ImpactMetrics};
+
+    fn create_test_item(final_score: f64, debt_type: DebtType) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: std::path::PathBuf::from("test.rs"),
+                line: 10,
+                function: "test_func".to_string(),
+            },
+            unified_score: UnifiedScore {
+                final_score: Score0To100::new(final_score),
+                complexity_factor: 5.0,
+                coverage_factor: 7.0,
+                dependency_factor: 3.0,
+                role_multiplier: 1.2,
+                base_score: Some(25.0),
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: Some(0.7),
+                refactorability_factor: Some(1.0),
+                pattern_factor: Some(0.85),
+            },
+            debt_type,
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 5.0,
+                coverage_improvement: 0.1,
+                lines_reduction: 10,
+                risk_reduction: 0.2,
+            },
+            transitive_coverage: None,
+            file_context: None,
+            upstream_dependencies: 5,
+            downstream_dependencies: 10,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 3,
+            function_length: 100,
+            cyclomatic_complexity: 15,
+            cognitive_complexity: 25,
+            is_pure: Some(true),
+            purity_confidence: Some(0.9),
+            purity_level: None,
+            entropy_details: None,
+            entropy_adjusted_cognitive: None,
+            entropy_dampening_factor: Some(0.85),
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            context_multiplier: Some(0.9),
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+        }
+    }
+
+    #[test]
+    fn test_build_final_score_section() {
+        let item = create_test_item(
+            65.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+        );
+        let theme = Theme::default();
+
+        let lines = build_final_score_section(&item, &theme, 80);
+
+        assert!(!lines.is_empty());
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(content.contains("65.0"));
+        assert!(content.contains("high")); // 50.0-69.9 is High severity
+    }
+
+    #[test]
+    fn test_build_raw_inputs_section() {
+        let item = create_test_item(
+            50.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+        );
+        let theme = Theme::default();
+
+        let lines = build_raw_inputs_section(&item, &theme, 80);
+
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(content.contains("cyclomatic"));
+        assert!(content.contains("15"));
+        assert!(content.contains("cognitive"));
+        assert!(content.contains("25"));
+    }
+
+    #[test]
+    fn test_build_score_factors_section() {
+        let item = create_test_item(
+            50.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+        );
+        let theme = Theme::default();
+
+        let lines = build_score_factors_section(&item, &theme, 80);
+
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(content.contains("complexity"));
+        assert!(content.contains("5.00")); // complexity_factor
+    }
+
+    #[test]
+    fn test_build_multipliers_section() {
+        let item = create_test_item(
+            50.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+        );
+        let theme = Theme::default();
+
+        let lines = build_multipliers_section(&item, &theme, 80);
+
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(content.contains("role"));
+        assert!(content.contains("1.20")); // role_multiplier
+        assert!(content.contains("purity"));
+        assert!(content.contains("0.70")); // purity_factor
+    }
+
+    #[test]
+    fn test_god_object_section_shown_for_god_objects() {
+        let item = create_test_item(
+            90.0,
+            DebtType::GodObject {
+                methods: 50,
+                fields: Some(20),
+                responsibilities: 8,
+                lines: 1000,
+                god_object_score: Score0To100::new(75.0),
+            },
+        );
+        let theme = Theme::default();
+
+        let lines = build_god_object_impact_section(&item, &theme, 80);
+
+        assert!(!lines.is_empty());
+        let content: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(content.contains("god object"));
+        assert!(content.contains("75.0"));
+        assert!(content.contains("warning"));
+    }
+
+    #[test]
+    fn test_god_object_section_empty_for_non_god_objects() {
+        let item = create_test_item(
+            50.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+        );
+        let theme = Theme::default();
+
+        let lines = build_god_object_impact_section(&item, &theme, 80);
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn test_build_page_lines_combines_all_sections() {
+        let item = create_test_item(
+            75.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+        );
+        let theme = Theme::default();
+
+        let lines = build_page_lines(&item, &theme, 80);
+
+        // Should have lines from multiple sections
+        assert!(lines.len() > 10);
+    }
+
+    #[test]
+    fn test_column_alignment_consistent() {
+        // Verify that factor lines and multiplier lines use consistent column widths
+        let item = create_test_item(
+            50.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+        );
+        let theme = Theme::default();
+
+        let factor_lines = build_score_factors_section(&item, &theme, 80);
+        let mult_lines = build_multipliers_section(&item, &theme, 80);
+
+        // Both should have label columns of width LABEL_WIDTH (24)
+        // Check that first span of data lines has consistent width
+        for line in factor_lines.iter().skip(1) {
+            // skip header
+            if !line.spans.is_empty() && line.spans[0].content.len() > 0 {
+                // Non-empty lines should have proper indent
+                let first_span = &line.spans[0].content;
+                if first_span.trim().len() > 0 {
+                    assert!(
+                        first_span.len() >= INDENT,
+                        "Line should have at least {} indent: {:?}",
+                        INDENT,
+                        first_span
+                    );
+                }
+            }
+        }
+
+        for line in mult_lines.iter().skip(1) {
+            if !line.spans.is_empty() && line.spans[0].content.len() > 0 {
+                let first_span = &line.spans[0].content;
+                if first_span.trim().len() > 0 {
+                    assert!(
+                        first_span.len() >= INDENT,
+                        "Line should have at least {} indent: {:?}",
+                        INDENT,
+                        first_span
+                    );
+                }
+            }
+        }
+    }
+}

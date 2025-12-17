@@ -97,13 +97,18 @@ fn make_function_id(item: &UnifiedDebtItem) -> FunctionId {
 /// Get available detail pages for an item.
 ///
 /// Returns a vector of pages that have relevant data for the given item.
-/// Overview and Dependencies are always available; Responsibilities is always
-/// available at the end. Git Context, Patterns, and Data Flow are conditional.
+/// Overview, Score Breakdown, and Dependencies are always available;
+/// Responsibilities is always available at the end.
+/// Git Context, Patterns, and Data Flow are conditional.
 pub fn available_pages(
     item: Option<&UnifiedDebtItem>,
     data_flow: &DataFlowGraph,
 ) -> Vec<DetailPage> {
-    let mut pages = vec![DetailPage::Overview, DetailPage::Dependencies];
+    let mut pages = vec![
+        DetailPage::Overview,
+        DetailPage::ScoreBreakdown,
+        DetailPage::Dependencies,
+    ];
 
     if let Some(item) = item {
         if has_git_context(item) {
@@ -322,11 +327,12 @@ mod tests {
         let data_flow = create_empty_data_flow();
         let pages = available_pages(Some(&item), &data_flow);
 
-        // Minimal: Overview, Dependencies, Responsibilities
-        assert_eq!(pages.len(), 3);
+        // Minimal: Overview, ScoreBreakdown, Dependencies, Responsibilities
+        assert_eq!(pages.len(), 4);
         assert_eq!(pages[0], DetailPage::Overview);
-        assert_eq!(pages[1], DetailPage::Dependencies);
-        assert_eq!(pages[2], DetailPage::Responsibilities);
+        assert_eq!(pages[1], DetailPage::ScoreBreakdown);
+        assert_eq!(pages[2], DetailPage::Dependencies);
+        assert_eq!(pages[3], DetailPage::Responsibilities);
     }
 
     #[test]
@@ -350,8 +356,8 @@ mod tests {
         let data_flow = create_empty_data_flow();
         let pages = available_pages(None, &data_flow);
 
-        // Only Overview, Dependencies, Responsibilities
-        assert_eq!(pages.len(), 3);
+        // Only Overview, ScoreBreakdown, Dependencies, Responsibilities
+        assert_eq!(pages.len(), 4);
     }
 
     #[test]
