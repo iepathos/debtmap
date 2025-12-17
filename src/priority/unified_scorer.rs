@@ -97,20 +97,28 @@ pub struct UnifiedDebtItem {
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
-    pub entropy_details: Option<EntropyDetails>, // Store entropy information
+    /// **DEPRECATED (Spec 218)**: Use `entropy_analysis` instead.
+    /// Kept for backward compatibility with existing code.
+    pub entropy_details: Option<EntropyDetails>,
+    /// Unified entropy analysis (Spec 218) - SINGLE SOURCE OF TRUTH.
+    /// This is the canonical entropy type that flows through the entire pipeline.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub entropy_adjusted_cognitive: Option<u32>, // Entropy-adjusted cognitive complexity (spec 214)
+    pub entropy_analysis: Option<crate::complexity::EntropyAnalysis>,
+    /// **DEPRECATED (Spec 218)**: Use `entropy_analysis.adjusted_complexity` instead.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub entropy_dampening_factor: Option<f64>, // Dampening factor applied (spec 214)
-    pub is_pure: Option<bool>,                   // Whether the function is pure
-    pub purity_confidence: Option<f32>,          // Confidence in purity detection
+    pub entropy_adjusted_cognitive: Option<u32>,
+    /// **DEPRECATED (Spec 218)**: Use `entropy_analysis.dampening_factor` instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_dampening_factor: Option<f64>,
+    pub is_pure: Option<bool>,          // Whether the function is pure
+    pub purity_confidence: Option<f32>, // Confidence in purity detection
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purity_level: Option<PurityLevel>, // Refined purity classification (spec 157)
     pub god_object_indicators: Option<GodObjectAnalysis>, // God object detection results
     #[serde(skip)]
     pub tier: Option<crate::priority::RecommendationTier>, // Recommendation tier for prioritization
     pub function_context: Option<crate::analysis::FunctionContext>, // Detected context (spec 122)
-    pub context_confidence: Option<f64>,         // Confidence in context detection (spec 122)
+    pub context_confidence: Option<f64>, // Confidence in context detection (spec 122)
     pub contextual_recommendation: Option<crate::priority::scoring::ContextualRecommendation>, // Context-aware recommendation (spec 122)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)

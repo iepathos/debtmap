@@ -247,6 +247,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }];
         let smells = detect_data_clumps(&functions);
         assert_eq!(
@@ -286,6 +287,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "function_b".to_string(),
@@ -314,6 +316,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -354,6 +357,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "validate_user_data".to_string(),
@@ -382,6 +386,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -430,6 +435,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func_b".to_string(),
@@ -458,6 +464,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func_c".to_string(),
@@ -486,6 +493,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "small_func".to_string(),
@@ -514,6 +522,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -562,6 +571,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         // Test with parameter count below threshold
@@ -643,6 +653,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         // Test with length below threshold
@@ -696,6 +707,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         // Test with nesting below threshold
@@ -757,6 +769,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         // Test function with multiple smells
@@ -797,6 +810,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let smells = analyze_function_smells(&clean_func, 3);

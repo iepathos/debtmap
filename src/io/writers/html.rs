@@ -264,6 +264,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }];
 
         AnalysisResults {
@@ -611,6 +612,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "low_entropy_func".to_string(),
@@ -647,6 +649,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 

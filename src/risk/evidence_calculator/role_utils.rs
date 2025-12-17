@@ -46,6 +46,7 @@ pub fn classify_role(function: &FunctionAnalysis, call_graph: &CallGraph) -> Fun
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     classify_function_role(&func_metrics, &func_id, call_graph)

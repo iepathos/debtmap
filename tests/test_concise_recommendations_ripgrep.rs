@@ -45,6 +45,7 @@ fn create_complex_metrics(
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

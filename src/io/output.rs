@@ -181,6 +181,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }];
 
         AnalysisResults {
@@ -366,6 +367,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -399,6 +401,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -432,6 +435,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -465,6 +469,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -502,6 +507,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             });
         }
 
@@ -551,6 +557,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -579,6 +586,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 

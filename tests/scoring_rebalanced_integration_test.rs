@@ -332,5 +332,6 @@ fn create_test_function(
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }

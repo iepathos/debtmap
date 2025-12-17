@@ -231,6 +231,7 @@ fn test_complexity_metrics_from_function() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -280,6 +281,7 @@ fn test_complexity_metrics_from_function_zero_values() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -321,6 +323,7 @@ fn test_complexity_metrics_from_function_high_values() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -365,6 +368,7 @@ fn test_complexity_metrics_from_function_preserves_path() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);

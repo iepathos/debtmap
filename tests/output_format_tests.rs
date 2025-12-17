@@ -36,6 +36,7 @@ fn test_output_json_format() {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

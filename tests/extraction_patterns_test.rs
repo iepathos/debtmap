@@ -212,6 +212,7 @@ fn test_pattern_matching_for_different_languages() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     let python_func = FunctionMetrics {
@@ -241,6 +242,7 @@ fn test_pattern_matching_for_different_languages() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     let js_func = FunctionMetrics {
@@ -270,6 +272,7 @@ fn test_pattern_matching_for_different_languages() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     // Create dummy file metrics for testing

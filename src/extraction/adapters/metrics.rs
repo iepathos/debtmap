@@ -58,6 +58,8 @@ pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) 
         error_swallowing_patterns: None,
         language_specific: None,
         mapping_pattern_result: None,
+        // entropy_analysis will be populated when entropy_score is converted
+        entropy_analysis: None,
     }
 }
 
