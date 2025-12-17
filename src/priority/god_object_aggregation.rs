@@ -591,6 +591,7 @@ mod tests {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }
     }
 
@@ -732,6 +733,7 @@ mod tests {
                 error_swallowing_patterns: Some(vec![
                     "if let Ok(...) without else branch".to_string()
                 ]),
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -763,6 +765,7 @@ mod tests {
                     "if let Ok(...) without else branch".to_string(),
                     "let _ = discarding Result".to_string(),
                 ]),
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func3".to_string(),
@@ -791,6 +794,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None, // No error swallowing
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 
@@ -926,6 +930,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: Some(4),
             error_swallowing_patterns: Some(vec!["match with ignored Err variant".to_string()]),
+            entropy_analysis: None,
         }];
 
         let metrics = aggregate_from_raw_metrics(&functions);
@@ -979,6 +984,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1015,6 +1021,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 
@@ -1069,6 +1076,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }];
 
         let metrics = aggregate_from_raw_metrics(&functions);
@@ -1123,6 +1131,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "without_entropy".to_string(),
@@ -1151,6 +1160,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 
@@ -1285,6 +1295,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1313,6 +1324,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 
@@ -1362,6 +1374,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }];
 
         let metrics = aggregate_from_raw_metrics(&functions);

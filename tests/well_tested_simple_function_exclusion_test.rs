@@ -52,6 +52,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         // Add 100% coverage for these functions
@@ -100,6 +101,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         // No coverage for these functions (untested)
@@ -203,6 +205,7 @@ fn test_well_tested_simple_function_has_low_score() {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     };
 
     let mut coverage_data = LcovData::default();

@@ -96,6 +96,13 @@ pub struct FunctionMetrics {
     pub error_swallowing_count: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_swallowing_patterns: Option<Vec<String>>,
+
+    /// Unified entropy analysis (Spec 218)
+    ///
+    /// This is the SINGLE SOURCE OF TRUTH for entropy-based complexity analysis.
+    /// Populated from `entropy_score` during analysis and flows through the pipeline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entropy_analysis: Option<crate::complexity::EntropyAnalysis>,
 }
 
 /// Language-specific data to avoid memory overhead for non-applicable files
@@ -146,6 +153,7 @@ impl FunctionMetrics {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }
     }
 
@@ -154,6 +162,10 @@ impl FunctionMetrics {
     }
 
     /// Get entropy details with explanation for verbose output
+    ///
+    /// **DEPRECATED (Spec 218)**: Use `entropy_analysis` field directly.
+    /// This method remains for backward compatibility.
+    #[deprecated(since = "0.10.0", note = "Use entropy_analysis field directly. See spec 218.")]
     pub fn get_entropy_details(&self) -> Option<EntropyDetails> {
         self.entropy_score.as_ref().map(|score| {
             let mut reasoning = Vec::new();
@@ -201,6 +213,22 @@ impl FunctionMetrics {
                 reasoning,
             }
         })
+    }
+
+    /// Populate `entropy_analysis` from raw `entropy_score` (Spec 218).
+    ///
+    /// Call this after entropy calculation to convert raw EntropyScore into
+    /// the unified EntropyAnalysis format. This ensures data flows through
+    /// the analysis pipeline consistently.
+    pub fn populate_entropy_analysis(&mut self) {
+        if let Some(ref raw) = self.entropy_score {
+            let config = crate::complexity::entropy_core::EntropyConfig::default();
+            self.entropy_analysis = Some(crate::complexity::EntropyAnalysis::from_raw(
+                raw,
+                self.cognitive,
+                &config,
+            ));
+        }
     }
 }
 

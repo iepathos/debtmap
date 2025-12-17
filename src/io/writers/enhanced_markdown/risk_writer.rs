@@ -169,6 +169,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test2.rs"),
@@ -197,6 +198,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test3.rs"),
@@ -225,6 +227,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 

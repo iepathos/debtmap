@@ -22,9 +22,9 @@
 
 use crate::analyzers::io_detector::detect_io_operations_from_block;
 use crate::analyzers::purity_detector::PurityDetector;
-use crate::complexity::{cognitive::calculate_cognitive, cyclomatic::calculate_cyclomatic};
 use crate::complexity::entropy::EntropyAnalyzer;
 use crate::complexity::entropy_core::EntropyScore;
+use crate::complexity::{cognitive::calculate_cognitive, cyclomatic::calculate_cyclomatic};
 use crate::config::get_entropy_config;
 use crate::core::parsing::reset_span_locations;
 use crate::extraction::types::{

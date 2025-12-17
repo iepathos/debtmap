@@ -302,6 +302,7 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         cyclomatic_complexity: extract_cyclomatic_complexity(&context.debt_type),
         cognitive_complexity: context.function_info.cognitive,
         entropy_details: None,
+        entropy_analysis: None, // Spec 218: Unified entropy type
         entropy_adjusted_cognitive: None,
         entropy_dampening_factor: None,
         is_pure: Some(context.function_info.is_pure),
@@ -371,6 +372,7 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -629,6 +631,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let debt = classify_test_debt(&test_func);
@@ -736,6 +739,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -783,6 +787,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -834,6 +839,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -883,6 +889,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -933,6 +940,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -983,6 +991,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let transitive_cov = TransitiveCoverage {
@@ -1037,6 +1046,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         // Test at cyclomatic=10 (not complex)
@@ -1101,6 +1111,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let func_id = create_function_id(&func);
@@ -1355,6 +1366,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let debt_type = DebtType::ComplexityHotspot {
@@ -1431,6 +1443,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let info = FunctionInfo::from_metrics(&func);

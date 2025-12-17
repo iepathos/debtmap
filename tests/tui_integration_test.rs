@@ -437,6 +437,7 @@ fn create_test_unified_debt_item(
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

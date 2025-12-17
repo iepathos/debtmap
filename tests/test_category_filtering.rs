@@ -78,6 +78,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

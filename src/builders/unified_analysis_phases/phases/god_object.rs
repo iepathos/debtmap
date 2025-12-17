@@ -88,6 +88,7 @@ pub fn create_god_object_debt_item(
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
         cognitive_complexity: aggregated_metrics.total_cognitive,
         entropy_details: aggregated_metrics.aggregated_entropy.clone(),
+        entropy_analysis: None, // TODO(spec 218): Convert from aggregated_entropy
         entropy_adjusted_cognitive: aggregated_metrics
             .aggregated_entropy
             .as_ref()

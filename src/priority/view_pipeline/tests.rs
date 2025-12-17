@@ -98,6 +98,7 @@ fn create_test_function_item_at(
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

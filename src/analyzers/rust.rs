@@ -837,6 +837,7 @@ impl FunctionVisitor {
             } else {
                 Some(error_patterns)
             },
+            entropy_analysis: None, // Populated later from entropy_score
         }
     }
 
@@ -1207,6 +1208,7 @@ impl FunctionVisitor {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None, // Populated later from entropy_score
         }
     }
 
@@ -1659,6 +1661,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1687,6 +1690,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             },
         ];
 
@@ -1733,6 +1737,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }];
         let debt_items = vec![];
         let dependencies = vec![Dependency {

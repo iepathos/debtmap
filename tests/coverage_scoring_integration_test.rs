@@ -110,6 +110,7 @@ fn create_debt_item(
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -220,6 +221,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
         analysis_no_coverage.add_item(item);
     }

@@ -148,6 +148,7 @@ mod tests {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }
     }
 
@@ -223,6 +224,7 @@ mod tests {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }
     }
 

@@ -522,6 +522,7 @@ mod tests {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         assert_eq!(estimate_effort(&item), 8); // 4 * 2
@@ -616,6 +617,7 @@ mod tests {
                         purity_level: None,
                         error_swallowing_count: None,
                         error_swallowing_patterns: None,
+                        entropy_analysis: None,
                     },
                     FunctionMetrics {
                         name: "func2".to_string(),
@@ -644,6 +646,7 @@ mod tests {
                         purity_level: None,
                         error_swallowing_count: None,
                         error_swallowing_patterns: None,
+                        entropy_analysis: None,
                     },
                     FunctionMetrics {
                         name: "func3".to_string(),
@@ -672,6 +675,7 @@ mod tests {
                         purity_level: None,
                         error_swallowing_count: None,
                         error_swallowing_patterns: None,
+                        entropy_analysis: None,
                     },
                 ],
                 summary: ComplexitySummary {
@@ -782,6 +786,7 @@ mod tests {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         }];
 
         let deps = extract_module_dependencies(&items);

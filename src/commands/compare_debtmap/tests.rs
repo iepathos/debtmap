@@ -144,6 +144,7 @@ fn create_function_item(
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }))
 }
 
@@ -225,6 +226,7 @@ fn create_test_function_item(
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }))
 }
 
@@ -300,6 +302,7 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

@@ -40,6 +40,7 @@ fn create_test_metrics_simple() -> FileMetrics {
                 purity_level: None,
                 error_swallowing_count: None,
                 error_swallowing_patterns: None,
+                entropy_analysis: None,
             }],
             cyclomatic_complexity: 2,
             cognitive_complexity: 3,
@@ -86,6 +87,7 @@ fn create_test_metrics_complex() -> FileMetrics {
                     purity_level: None,
                     error_swallowing_count: None,
                     error_swallowing_patterns: None,
+                    entropy_analysis: None,
                 },
                 FunctionMetrics {
                     name: "complex_func2".to_string(),
@@ -114,6 +116,7 @@ fn create_test_metrics_complex() -> FileMetrics {
                     purity_level: None,
                     error_swallowing_count: None,
                     error_swallowing_patterns: None,
+                    entropy_analysis: None,
                 },
             ],
             cyclomatic_complexity: 8,
@@ -248,6 +251,7 @@ mod test_combine_metrics {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let func2 = FunctionMetrics {
@@ -277,6 +281,7 @@ mod test_combine_metrics {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let metrics1 = ComplexityMetrics {
@@ -339,6 +344,7 @@ mod test_combine_metrics {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let metrics1 = ComplexityMetrics {

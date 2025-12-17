@@ -93,6 +93,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -178,6 +179,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
         responsibility_category: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

@@ -149,6 +149,7 @@ fn create_getter() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -180,6 +181,7 @@ fn create_setter() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -211,6 +213,7 @@ fn create_simple_validator() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -242,6 +245,7 @@ fn create_small_util() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -273,6 +277,7 @@ fn create_test_helper() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -304,6 +309,7 @@ fn create_complex_handler() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -335,6 +341,7 @@ fn create_nested_logic() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -366,6 +373,7 @@ fn create_long_switch() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 
@@ -397,5 +405,6 @@ fn create_moderate_complexity() -> FunctionMetrics {
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }

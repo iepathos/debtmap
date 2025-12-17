@@ -329,6 +329,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         assert_eq!(determine_visibility(&pub_func), FunctionVisibility::Public);
@@ -395,6 +396,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[]);
@@ -430,6 +432,7 @@ mod tests {
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
+            entropy_analysis: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[10, 11, 12, 15, 20, 21]);

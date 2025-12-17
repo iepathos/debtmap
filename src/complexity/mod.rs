@@ -23,6 +23,10 @@ pub mod weighted;
 
 use crate::core::FunctionMetrics;
 
+// Re-export EntropyAnalysis as the unified entropy type (Spec 218)
+// This is the SINGLE SOURCE OF TRUTH for entropy analysis data.
+pub use entropy_core::{aggregate_entropy, EntropyAnalysis};
+
 // Re-export weighted complexity types (spec 121)
 pub use weighted::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
 
