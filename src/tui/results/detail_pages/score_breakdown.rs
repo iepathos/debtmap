@@ -677,36 +677,81 @@ pub fn build_calculation_summary_section(
     let context = item.context_multiplier.unwrap_or(1.0);
     let entropy = item.entropy_dampening_factor.unwrap_or(1.0);
 
-    // Build multiplier product (only include non-1.0 values in display)
-    let total_mult = role * purity * pattern * refactor * context * entropy;
+    // Build multiplier product (for potential future use)
+    let _total_mult = role * purity * pattern * refactor * context * entropy;
 
-    add_section_header(&mut lines, "score formula", theme);
+    // Check if we have coverage data - affects which formula is used
+    let has_coverage_data = item.transitive_coverage.is_some();
 
-    // Show symbolic formula
-    let formula = if has_god_object {
-        "final = (C + D) × cov_mult × multipliers × god_mult"
+    add_section_header(&mut lines, "score formula (simplified)", theme);
+
+    // Calculate structural multiplier from nesting/cyclomatic ratio
+    let struct_mult = if item.cyclomatic_complexity == 0 {
+        1.0
     } else {
-        "final = (C + D) × cov_mult × multipliers"
+        let ratio = item.nesting_depth as f64 / item.cyclomatic_complexity as f64;
+        match ratio {
+            r if r >= 0.6 => 1.5,
+            r if r >= 0.5 => 1.3,
+            r if r >= 0.4 => 1.15,
+            r if r >= 0.2 => 1.0,
+            r if r >= 0.1 => 0.85,
+            _ => 0.7,
+        }
+    };
+
+    // Show symbolic formula - different for with/without coverage data
+    // Formula: base × role × struct (× god_mult if applicable)
+    let formula = if has_coverage_data {
+        if has_god_object {
+            "(C + D) × cov × role × struct × god"
+        } else {
+            "(C + D) × cov × role × struct"
+        }
+    } else {
+        // No coverage data: uses weighted sum formula (spec 122)
+        if has_god_object {
+            "(C×5 + D×2.5) × role × struct × god"
+        } else {
+            "(C×5 + D×2.5) × role × struct"
+        }
     };
     add_label_value(&mut lines, "formula", formula.to_string(), theme, width);
 
     // Show variable legend
-    add_label_value(
-        &mut lines,
-        "where",
-        format!(
-            "C={:.1}, D={:.1}, cov_mult={:.2}",
-            item.unified_score.complexity_factor,
-            item.unified_score.dependency_factor,
-            1.0 - (item.unified_score.coverage_factor / 10.0) // coverage multiplier
-        ),
-        theme,
-        width,
-    );
+    if has_coverage_data {
+        add_label_value(
+            &mut lines,
+            "where",
+            format!(
+                "C={:.1}, D={:.1}, cov={:.2}, role={:.2}, struct={:.2}",
+                item.unified_score.complexity_factor,
+                item.unified_score.dependency_factor,
+                1.0 - (item.unified_score.coverage_factor / 10.0),
+                role,
+                struct_mult
+            ),
+            theme,
+            width,
+        );
+    } else {
+        add_label_value(
+            &mut lines,
+            "where",
+            format!(
+                "C={:.1}, D={:.1}, role={:.2}, struct={:.2}",
+                item.unified_score.complexity_factor,
+                item.unified_score.dependency_factor,
+                role,
+                struct_mult
+            ),
+            theme,
+            width,
+        );
+    }
 
-    // Show multipliers breakdown
-    let mult_parts: Vec<String> = [
-        (role, "role"),
+    // Show other multipliers (purity, pattern, refactor, context, entropy)
+    let other_mults: Vec<String> = [
         (purity, "purity"),
         (pattern, "pattern"),
         (refactor, "refactor"),
@@ -718,19 +763,11 @@ pub fn build_calculation_summary_section(
     .map(|(v, name)| format!("{}={:.2}", name, v))
     .collect();
 
-    if mult_parts.is_empty() {
+    if !other_mults.is_empty() {
         add_label_value(
             &mut lines,
-            "multipliers",
-            "1.0 (no adjustments)".to_string(),
-            theme,
-            width,
-        );
-    } else {
-        add_label_value(
-            &mut lines,
-            "multipliers",
-            format!("{} = {:.2}", mult_parts.join(" × "), total_mult),
+            "other mults",
+            other_mults.join(", "),
             theme,
             width,
         );
@@ -748,49 +785,116 @@ pub fn build_calculation_summary_section(
 
     add_blank_line(&mut lines);
 
-    // Show actual calculation with values
-    add_section_header(&mut lines, "actual calculation", theme);
+    // Show actual calculation with step-by-step breakdown
+    add_section_header(&mut lines, "calculation steps", theme);
 
+    // Use the stored base_score (score before exponential scaling)
+    let stored_base = item.unified_score.base_score.unwrap_or(0.0);
+    let exponent = item.unified_score.exponential_factor.unwrap_or(1.0);
+    let risk_boost = item.unified_score.risk_boost.unwrap_or(1.0);
+    let final_score = item.unified_score.final_score.value();
+
+    // Calculate intermediate values for display
     let c = item.unified_score.complexity_factor;
     let d = item.unified_score.dependency_factor;
-    let cov_mult = 1.0 - (item.unified_score.coverage_factor / 10.0);
-    let base = (c + d) * cov_mult;
 
-    // Step 1: base calculation
+    // Step 1: Base score from formula
+    let weighted_base = if has_coverage_data {
+        let cov_mult = 1.0 - (item.unified_score.coverage_factor / 10.0);
+        (c + d) * cov_mult
+    } else {
+        (c * 5.0) + (d * 2.5)
+    };
     add_label_value(
         &mut lines,
-        "step 1 (base)",
-        format!("({:.1} + {:.1}) × {:.2} = {:.2}", c, d, cov_mult, base),
+        "1. weighted base",
+        format!("{:.2}", weighted_base),
         theme,
         width,
     );
 
-    // Step 2: apply multipliers
-    let after_mult = base * total_mult;
-    if (total_mult - 1.0).abs() > 0.01 {
+    // Step 2: After role adjustment
+    let after_role = weighted_base * role;
+    add_label_value(
+        &mut lines,
+        "2. × role",
+        format!("{:.2} × {:.2} = {:.2}", weighted_base, role, after_role),
+        theme,
+        width,
+    );
+
+    // Step 3: After structural adjustment
+    let after_struct = after_role * struct_mult;
+    add_label_value(
+        &mut lines,
+        "3. × struct",
+        format!("{:.2} × {:.2} = {:.2}", after_role, struct_mult, after_struct),
+        theme,
+        width,
+    );
+
+    // Step 4: Show gap to stored base (includes debt adjustment + normalization)
+    let base_score = stored_base;
+    if (base_score - after_struct).abs() > 0.5 {
         add_label_value(
             &mut lines,
-            "step 2 (×mult)",
-            format!("{:.2} × {:.2} = {:.2}", base, total_mult, after_mult),
+            "4. + adjustments",
+            format!("{:.2} → {:.2} (debt patterns, normalization)", after_struct, base_score),
+            theme,
+            width,
+        );
+    } else {
+        add_label_value(
+            &mut lines,
+            "4. normalized",
+            format!("{:.2}", base_score),
             theme,
             width,
         );
     }
 
-    // Step 3: apply god object multiplier
-    if let Some(gm) = god_mult {
-        let after_god = after_mult * gm;
+    // Track running value for exponential and boost
+    let mut current = base_score;
+
+    // Show exponential scaling if applied
+    if (exponent - 1.0).abs() > 0.01 {
+        let after_exp = current.powf(exponent);
         add_label_value(
             &mut lines,
-            "step 3 (×god)",
-            format!("{:.2} × {:.2} = {:.2}", after_mult, gm, after_god),
+            "exponential",
+            format!("{:.2}^{:.2} = {:.2}", current, exponent, after_exp),
+            theme,
+            width,
+        );
+        current = after_exp;
+    }
+
+    // Show risk boost if applied
+    if (risk_boost - 1.0).abs() > 0.01 {
+        let after_boost = current * risk_boost;
+        add_label_value(
+            &mut lines,
+            "risk boost",
+            format!("{:.2} × {:.2} = {:.2}", current, risk_boost, after_boost),
+            theme,
+            width,
+        );
+        current = after_boost;
+    }
+
+    // Show god object multiplier if applied
+    if let Some(gm) = god_mult {
+        let after_god = current * gm;
+        add_label_value(
+            &mut lines,
+            "god mult",
+            format!("{:.2} × {:.2} = {:.2}", current, gm, after_god),
             theme,
             width,
         );
     }
 
     // Final score (clamped to 100)
-    let final_score = item.unified_score.final_score.value();
     add_label_value(
         &mut lines,
         "final (clamped)",

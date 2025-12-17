@@ -678,69 +678,52 @@ fn apply_orchestration_adjustment(
 /// Uses configurable weights for cyclomatic and cognitive complexity.
 /// Default: 30% cyclomatic, 70% cognitive (research shows cognitive correlates better with bugs).
 /// For orchestrators, cognitive weight may be increased further.
+/// Calculate raw complexity from cyclomatic and cognitive metrics.
 ///
-/// Applies entropy-based dampening if entropy_details is provided and enabled in config (spec 214).
+/// Uses raw cyclomatic (no dampening) and entropy-adjusted cognitive.
+/// Returns a weighted sum that feeds into calculate_complexity_factor.
+///
+/// Formula: cyclomatic * weight_cyc + cognitive_adjusted * weight_cog
+/// - Default weights: 40% cyclomatic, 60% cognitive
+/// - Orchestrators: 25% cyclomatic, 75% cognitive (cognitive matters more)
 fn normalize_complexity(
     cyclomatic: u32,
     cognitive: u32,
     entropy_details: Option<&EntropyDetails>,
     is_orchestrator: bool,
 ) -> f64 {
-    use crate::complexity::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
-    #[allow(unused_imports)]
-    use crate::priority::score_types::Score0To100;
-
-    // Get configuration
-    let config = crate::config::get_config();
     let entropy_config = crate::config::get_entropy_config();
 
-    // Apply entropy dampening if available and enabled (spec 214)
-    let (adjusted_cyclo, adjusted_cog) = if let Some(entropy) = entropy_details {
+    // Use raw cyclomatic (no entropy dampening on cyclomatic)
+    let raw_cyclomatic = cyclomatic as f64;
+
+    // Use entropy-adjusted cognitive if available and enabled
+    let adjusted_cognitive = if let Some(entropy) = entropy_details {
         if entropy_config.enabled {
-            // Use entropy-adjusted complexity values
-            (entropy.adjusted_complexity, entropy.adjusted_cognitive)
+            entropy.adjusted_cognitive as f64
         } else {
-            (cyclomatic, cognitive)
+            cognitive as f64
         }
     } else {
-        // No entropy data available, use raw complexity
-        (cyclomatic, cognitive)
+        cognitive as f64
     };
 
-    // Get weights from configuration (spec 121)
-    let weights = if let Some(weights_config) = config.complexity_weights.as_ref() {
-        ComplexityWeights {
-            cyclomatic: weights_config.cyclomatic,
-            cognitive: weights_config.cognitive,
-        }
+    // Get weights from configuration or use defaults
+    let config = crate::config::get_config();
+    let (cyc_weight, cog_weight) = if let Some(weights_config) = config.complexity_weights.as_ref()
+    {
+        (weights_config.cyclomatic, weights_config.cognitive)
+    } else if is_orchestrator {
+        // Orchestrators: cognitive complexity matters more
+        (0.25, 0.75)
     } else {
-        // For orchestrators, increase cognitive weight further
-        if is_orchestrator {
-            ComplexityWeights {
-                cyclomatic: 0.25,
-                cognitive: 0.75,
-            }
-        } else {
-            ComplexityWeights::default()
-        }
+        // Default: 40% cyclomatic, 60% cognitive
+        (0.4, 0.6)
     };
 
-    // Get normalization parameters from configuration
-    let normalization = if let Some(weights_config) = config.complexity_weights.as_ref() {
-        ComplexityNormalization {
-            max_cyclomatic: weights_config.max_cyclomatic,
-            max_cognitive: weights_config.max_cognitive,
-        }
-    } else {
-        ComplexityNormalization::default()
-    };
-
-    // Calculate weighted complexity score (0-100 scale) using entropy-adjusted values
-    let weighted =
-        WeightedComplexity::calculate(adjusted_cyclo, adjusted_cog, weights, &normalization);
-
-    // Convert from 0-100 scale to 0-10 scale for backward compatibility
-    weighted.weighted_score / 10.0
+    // Simple weighted sum - no complex normalization
+    // Result feeds into calculate_complexity_factor which divides by 2 and clamps to 0-10
+    raw_cyclomatic * cyc_weight + adjusted_cognitive * cog_weight
 }
 
 // Pure functions for scoring calculation (spec 68)

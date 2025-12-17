@@ -46,7 +46,7 @@ fn test_unified_scoring() {
     assert!(score.complexity_factor > 0.0);
     assert!(score.coverage_factor > 0.0);
     assert!(score.final_score.value() > 0.0);
-    assert!(score.final_score.value() <= 10.0);
+    assert!(score.final_score.value() <= 100.0); // Score is on 0-100 scale
 }
 
 fn create_simple_io_wrapper() -> FunctionMetrics {
@@ -208,9 +208,11 @@ fn test_test_code_not_boosted() {
     // No coverage data (worst case for non-test code)
     let score = calculate_unified_priority(&func, &call_graph, None, None);
 
-    // Test code with no coverage should still have low score
+    // Test code with no coverage should still have moderate score (not boosted)
+    // With simplified formula: (5*0.4 + 8*0.6)/2 = 3.4 complexity_factor
+    // But test code gets 100% coverage assumed, so low final score
     assert!(
-        score.final_score.value() < 10.0,
+        score.final_score.value() < 50.0,
         "Test code should not get zero coverage boost, got {}",
         score.final_score.value()
     );
@@ -237,25 +239,22 @@ fn test_complex_function_has_score() {
 
 #[test]
 fn test_complexity_factor_stores_calculated_factor_not_raw_complexity() {
-    // Test spec 121: UnifiedScore.complexity_factor should store the result of
+    // Test: UnifiedScore.complexity_factor should store the result of
     // calculate_complexity_factor with weighted complexity scoring
     let mut func = create_test_metrics();
     func.cyclomatic = 5;
     func.cognitive = 15;
-    // With spec 121 cognitive-weighted scoring (default 0.3 cyclo, 0.7 cognitive):
-    // normalized_cyclo = (5/50) * 100 = 10.0
-    // normalized_cog = (15/100) * 100 = 15.0
-    // weighted = 0.3 * 10.0 + 0.7 * 15.0 = 13.5
-    // raw_complexity (0-10 scale) = 13.5 / 10.0 = 1.35
-    // complexity_factor = calculate_complexity_factor(1.35) = 1.35 / 2.0 = 0.675
+    // With simplified formula (default 0.4 cyclo, 0.6 cognitive):
+    // raw_complexity = 5 * 0.4 + 15 * 0.6 = 2 + 9 = 11
+    // complexity_factor = calculate_complexity_factor(11) = 11 / 2.0 = 5.5
 
     let call_graph = CallGraph::new();
     let score = calculate_unified_priority(&func, &call_graph, None, None);
 
     // The complexity_factor field should store the calculated factor with cognitive weighting
     assert!(
-        (score.complexity_factor - 0.675).abs() < 0.01,
-        "complexity_factor should be ~0.675 with cognitive weighting, got {}",
+        (score.complexity_factor - 5.5).abs() < 0.1,
+        "complexity_factor should be ~5.5 with cognitive weighting, got {}",
         score.complexity_factor
     );
 }
