@@ -193,12 +193,16 @@ impl DependencyRiskProvider {
 impl DependencyRiskProvider {
     /// Classifies the contribution level based on the blast radius of a module.
     /// Higher blast radius indicates more modules would be affected by changes.
+    ///
+    /// Isolated components (blast_radius ≤ 1) contribute 0.0 since they
+    /// only affect themselves - no dependency-based risk propagation.
     fn classify_contribution_by_blast_radius(blast_radius: usize) -> f64 {
         match blast_radius {
-            r if r > 10 => 1.5,
-            r if r > 5 => 1.0,
-            r if r > 2 => 0.5,
-            _ => 0.2,
+            r if r > 10 => 1.5, // Critical: affects many modules
+            r if r > 5 => 1.0,  // High: affects several modules
+            r if r > 2 => 0.5,  // Medium: affects a few modules
+            2 => 0.2,           // Low: affects self + 1 dependent
+            _ => 0.0,           // Isolated: only affects itself, no dependency risk
         }
     }
 
@@ -761,7 +765,7 @@ mod tests {
 
         assert_eq!(context.provider, "dependency_risk");
         assert_eq!(context.weight, 1.2);
-        assert_eq!(context.contribution, 0.2); // Default minimal contribution
+        assert_eq!(context.contribution, 0.0); // Isolated: not in dependency graph
 
         match context.details {
             ContextDetails::DependencyChain {
@@ -831,16 +835,21 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_contribution_low_blast_radius() {
-        // Test with blast radius <= 2 (low)
+    fn test_classify_contribution_isolated() {
+        // Test with blast radius 0-1 (isolated, no dependency risk)
         assert_eq!(
             DependencyRiskProvider::classify_contribution_by_blast_radius(0),
-            0.2
+            0.0
         );
         assert_eq!(
             DependencyRiskProvider::classify_contribution_by_blast_radius(1),
-            0.2
+            0.0
         );
+    }
+
+    #[test]
+    fn test_classify_contribution_low_blast_radius() {
+        // Test with blast radius = 2 (low: self + 1 dependent)
         assert_eq!(
             DependencyRiskProvider::classify_contribution_by_blast_radius(2),
             0.2
@@ -922,7 +931,7 @@ mod tests {
 
         let context = provider.gather(&target).unwrap();
 
-        assert_eq!(context.contribution, 0.2); // Minimal contribution (blast_radius = 1)
+        assert_eq!(context.contribution, 0.0); // Isolated: only affects itself
 
         match context.details {
             ContextDetails::DependencyChain {
