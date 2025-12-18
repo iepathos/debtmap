@@ -179,6 +179,7 @@ mod tests {
                 structural_multiplier: Some(1.0),
                 has_coverage_data: false,
                 contextual_risk_multiplier: None,
+                pre_contextual_score: None,
             },
             upstream_dependencies: 2,
             downstream_dependencies: 5,

@@ -1,50 +1,62 @@
-//! Type-safe score scales for debt scoring system.
+//! Type-safe score types for debt scoring system.
 //!
-//! This module provides newtype wrappers for different score scales used
-//! throughout the analysis. By encoding the scale in the type system, we
-//! prevent bugs caused by mixing incompatible scales.
+//! This module provides newtype wrappers for score types used throughout
+//! the analysis. By encoding the type in the type system, we prevent bugs
+//! caused by mixing incompatible values.
 //!
-//! # Score Scales
+//! # Score Types
 //!
-//! - `Score0To100`: Standard 0-100 scale for most debt scores
+//! - `Score0To100`: Debt priority score (no upper bound, floors at 0)
 //! - `Score0To1`: Normalized 0-1 scale for certain calculations
+//!
+//! # Design Note (Spec 261)
+//!
+//! `Score0To100` has no upper clamping to preserve relative priority
+//! information. Scores can exceed 100 for severe debt items, allowing
+//! proper distinction between "bad" and "catastrophically bad" code.
+//! The type name is historical - it originally clamped to 0-100.
 //!
 //! # Examples
 //!
 //! ```rust
 //! use debtmap::priority::score_types::{Score0To100, Score0To1};
 //!
-//! // Create scores with automatic bounds enforcement
+//! // Create scores - no upper bound
 //! let score = Score0To100::new(85.0);
 //! assert_eq!(score.value(), 85.0);
 //!
-//! // Out-of-bounds values are clamped
-//! let clamped = Score0To100::new(150.0);
-//! assert_eq!(clamped.value(), 100.0);
+//! // Scores can exceed 100 for severe debt
+//! let high = Score0To100::new(250.0);
+//! assert_eq!(high.value(), 250.0);
 //!
-//! // Explicit conversion between scales
-//! let normalized = score.normalize();
+//! // Negative values floor to 0
+//! let neg = Score0To100::new(-10.0);
+//! assert_eq!(neg.value(), 0.0);
+//!
+//! // Score0To1 still clamps to 0-1 range
+//! let normalized = Score0To1::new(0.85);
 //! assert_eq!(normalized.value(), 0.85);
-//!
-//! // Roundtrip conversion is identity
-//! assert_eq!(score, normalized.denormalize());
 //! ```
 
 use serde::{Deserialize, Serialize};
 
-/// Score on 0-100 scale.
+/// Debt priority score.
 ///
-/// This is the standard scale for debt scores throughout the system.
-/// God object scores, unified scores, and threshold configurations
-/// all use this scale.
+/// This is the standard score type for debt prioritization throughout the system.
+/// Higher scores indicate higher priority (more severe debt).
 ///
-/// Values are automatically clamped to the [0.0, 100.0] range.
+/// Historical note: Named "Score0To100" when scores were clamped to 0-100.
+/// Now scores have no upper bound to preserve relative severity information
+/// (spec 261). Negative values are still clamped to 0.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Score0To100(f64);
 
 impl Score0To100 {
-    /// Create a new score, clamping to [0.0, 100.0].
+    /// Create a new score, clamping negative values to 0.
+    ///
+    /// No upper bound - scores can exceed 100 for severe debt items.
+    /// This preserves relative priority information (spec 261).
     ///
     /// # Examples
     ///
@@ -53,11 +65,16 @@ impl Score0To100 {
     /// let score = Score0To100::new(85.0);
     /// assert_eq!(score.value(), 85.0);
     ///
-    /// let clamped = Score0To100::new(150.0);
-    /// assert_eq!(clamped.value(), 100.0);
+    /// // Scores can exceed 100
+    /// let high = Score0To100::new(150.0);
+    /// assert_eq!(high.value(), 150.0);
+    ///
+    /// // Negative values clamped to 0
+    /// let negative = Score0To100::new(-10.0);
+    /// assert_eq!(negative.value(), 0.0);
     /// ```
     pub fn new(value: f64) -> Self {
-        Self(value.clamp(0.0, 100.0))
+        Self(value.max(0.0))
     }
 
     /// Get the raw score value.
@@ -134,13 +151,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn score_0_to_100_clamps_upper_bound() {
+    fn score_allows_values_above_100() {
+        // Spec 261: No upper clamping to preserve relative priority
         let score = Score0To100::new(150.0);
-        assert_eq!(score.value(), 100.0);
+        assert_eq!(score.value(), 150.0);
     }
 
     #[test]
-    fn score_0_to_100_clamps_lower_bound() {
+    fn score_clamps_negative_to_zero() {
         let score = Score0To100::new(-10.0);
         assert_eq!(score.value(), 0.0);
     }
@@ -196,9 +214,16 @@ mod property_tests {
 
     proptest! {
         #[test]
-        fn score_0_to_100_always_in_bounds(value in -1000.0..1000.0f64) {
+        fn score_0_to_100_floors_at_zero(value in -1000.0..1000.0f64) {
+            // Spec 261: No upper clamping, only floor at 0
             let score = Score0To100::new(value);
-            assert!(score.value() >= 0.0 && score.value() <= 100.0);
+            assert!(score.value() >= 0.0);
+            // Score should equal input if positive, else 0
+            if value >= 0.0 {
+                assert_eq!(score.value(), value);
+            } else {
+                assert_eq!(score.value(), 0.0);
+            }
         }
 
         #[test]

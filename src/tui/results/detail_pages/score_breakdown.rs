@@ -701,20 +701,24 @@ pub fn build_calculation_summary_section(
 
     add_section_header(&mut lines, "score formula (simplified)", theme);
 
-    // Calculate structural multiplier from nesting/cyclomatic ratio
-    let struct_mult = if item.cyclomatic_complexity == 0 {
-        1.0
-    } else {
-        let ratio = item.nesting_depth as f64 / item.cyclomatic_complexity as f64;
-        match ratio {
-            r if r >= 0.6 => 1.5,
-            r if r >= 0.5 => 1.3,
-            r if r >= 0.4 => 1.15,
-            r if r >= 0.2 => 1.0,
-            r if r >= 0.1 => 0.85,
-            _ => 0.7,
+    // Use the stored structural multiplier from the actual scorer (not recalculated)
+    // This ensures the display matches what the scorer actually used
+    let struct_mult = item.unified_score.structural_multiplier.unwrap_or_else(|| {
+        // Fallback: recalculate if not stored
+        if item.cyclomatic_complexity == 0 {
+            1.0
+        } else {
+            let ratio = item.nesting_depth as f64 / item.cyclomatic_complexity as f64;
+            match ratio {
+                r if r >= 0.6 => 1.5,
+                r if r >= 0.5 => 1.3,
+                r if r >= 0.4 => 1.15,
+                r if r >= 0.2 => 1.0,
+                r if r >= 0.1 => 0.85,
+                _ => 0.7,
+            }
         }
-    };
+    });
 
     // Show symbolic formula - different for with/without coverage data
     // Formula: base × role × struct (× god_mult if applicable)
@@ -734,14 +738,20 @@ pub fn build_calculation_summary_section(
     };
     add_label_value(&mut lines, "formula", formula.to_string(), theme, width);
 
-    // Show variable legend
+    // Show variable legend - use raw complexity for god objects
+    let c_display = if let Some(gm) = god_mult {
+        item.unified_score.complexity_factor / gm
+    } else {
+        item.unified_score.complexity_factor
+    };
+
     if has_coverage_data {
         add_label_value(
             &mut lines,
             "where",
             format!(
                 "C={:.1}, D={:.1}, cov={:.2}, role={:.2}, struct={:.2}",
-                item.unified_score.complexity_factor,
+                c_display,
                 item.unified_score.dependency_factor,
                 1.0 - (item.unified_score.coverage_factor / 10.0),
                 role,
@@ -756,7 +766,7 @@ pub fn build_calculation_summary_section(
             "where",
             format!(
                 "C={:.1}, D={:.1}, role={:.2}, struct={:.2}",
-                item.unified_score.complexity_factor,
+                c_display,
                 item.unified_score.dependency_factor,
                 role,
                 struct_mult
@@ -810,16 +820,21 @@ pub fn build_calculation_summary_section(
     let risk_boost = item.unified_score.risk_boost.unwrap_or(1.0);
     let final_score = item.unified_score.final_score.value();
 
-    // Calculate intermediate values for display
-    let c = item.unified_score.complexity_factor;
+    // For god objects, complexity_factor already has god_mult baked in.
+    // We need to use the raw value for formula display to avoid double-counting.
+    let c_raw = if let Some(gm) = god_mult {
+        item.unified_score.complexity_factor / gm
+    } else {
+        item.unified_score.complexity_factor
+    };
     let d = item.unified_score.dependency_factor;
 
-    // Step 1: Base score from formula
+    // Step 1: Base score from formula (using raw complexity, not god-inflated)
     let weighted_base = if has_coverage_data {
         let cov_mult = 1.0 - (item.unified_score.coverage_factor / 10.0);
-        (c + d) * cov_mult
+        (c_raw + d) * cov_mult
     } else {
-        (c * 5.0) + (d * 2.5)
+        (c_raw * 5.0) + (d * 2.5)
     };
     add_label_value(
         &mut lines,
@@ -938,17 +953,22 @@ pub fn build_calculation_summary_section(
         }
     }
 
-    // Step: Show contextual risk multiplier if applied (spec 255)
-    // This amplifies the score based on git history (churn, recency, bug likelihood)
+    // Step: Show contextual risk multiplier if applied (spec 255, spec 260)
+    // Use pre_contextual_score for accurate display when available
     if let Some(risk_mult) = item.unified_score.contextual_risk_multiplier {
-        if (risk_mult - 1.0).abs() > 0.01 {
-            let after_risk = current_value * risk_mult;
+        if (risk_mult - 1.0).abs() > 0.001 {
+            // Use stored pre_contextual_score if available, otherwise use calculated value
+            let pre_ctx = item
+                .unified_score
+                .pre_contextual_score
+                .unwrap_or(current_value);
+            let after_risk = pre_ctx * risk_mult;
             add_label_value(
                 &mut lines,
                 &format!("{}. × risk", step_num),
                 format!(
-                    "{:.2} × {:.2} = {:.2} (contextual risk)",
-                    current_value, risk_mult, after_risk
+                    "{:.2} × {:.2} = {:.2} (git history risk)",
+                    pre_ctx, risk_mult, after_risk
                 ),
                 theme,
                 width,
@@ -958,53 +978,53 @@ pub fn build_calculation_summary_section(
         }
     }
 
-    // Show clamping if it occurred (spec 260)
-    if let Some(pre_norm) = item.unified_score.pre_normalization_score {
-        if pre_norm > 100.0 {
-            add_label_value(
-                &mut lines,
-                &format!("{}. clamped", step_num),
-                format!("{:.2} → 100.00 (max score)", pre_norm),
-                theme,
-                width,
-            );
-            // Values updated for potential future use in display pipeline
-            let _ = (100.0f64, step_num + 1);
-        } else if (pre_norm - current_value).abs() > 0.5 {
-            // Significant normalization applied
-            add_label_value(
-                &mut lines,
-                &format!("{}. normalized", step_num),
-                format!("{:.2} → {:.2}", pre_norm, current_value),
-                theme,
-                width,
-            );
-            // Value updated for potential future use in display pipeline
-            let _ = step_num + 1;
-        }
-    } else if (base_score - current_value).abs() > 0.5 {
-        // Fallback for data without detailed tracking - show what adjustment was applied
+    // Handle any remaining gap between calculated value and stored base_score
+    // This should be rare now that contextual_risk is always stored
+    if (base_score - current_value).abs() > 0.5 {
+        let pre_norm = item.unified_score.pre_normalization_score;
+
         if base_score > current_value && current_value > 0.0 {
-            // Show the multiplier that was implicitly applied
-            let implicit_mult = base_score / current_value;
-            add_label_value(
-                &mut lines,
-                &format!("{}. × implicit", step_num),
+            let diff = base_score - current_value;
+
+            // Check if pre_normalization exists (indicates clamping occurred)
+            let explanation = if let Some(pn) = pre_norm {
                 format!(
-                    "{:.2} × {:.2} = {:.2} (untracked multiplier)",
-                    current_value, implicit_mult, base_score
-                ),
-                theme,
-                width,
-            );
-        } else if base_score < current_value && base_score <= 100.0 {
+                    "{:.2} → {:.2} → clamped to {:.2}",
+                    current_value, pn, base_score
+                )
+            } else {
+                // Residual adjustment from combined factors
+                format!(
+                    "{:.2} + {:.2} = {:.2} (combined adjustments)",
+                    current_value, diff, base_score
+                )
+            };
             add_label_value(
                 &mut lines,
-                &format!("{}. clamped", step_num),
-                format!("{:.2} → {:.2}", current_value, base_score),
+                &format!("{}. adjusted", step_num),
+                explanation,
                 theme,
                 width,
             );
+        } else if base_score < current_value {
+            // Value decreased - show as clamped (to 100) or adjusted
+            if (base_score - 100.0).abs() < 0.01 {
+                add_label_value(
+                    &mut lines,
+                    &format!("{}. clamped", step_num),
+                    format!("{:.2} → 100.00 (max score)", current_value),
+                    theme,
+                    width,
+                );
+            } else {
+                add_label_value(
+                    &mut lines,
+                    &format!("{}. adjusted", step_num),
+                    format!("{:.2} → {:.2}", current_value, base_score),
+                    theme,
+                    width,
+                );
+            }
         } else {
             add_label_value(
                 &mut lines,
@@ -1014,15 +1034,6 @@ pub fn build_calculation_summary_section(
                 width,
             );
         }
-    } else if (current_value - base_score).abs() <= 0.5 {
-        // No significant gap - just show the normalized value
-        add_label_value(
-            &mut lines,
-            &format!("{}. normalized", step_num),
-            format!("{:.2}", base_score),
-            theme,
-            width,
-        );
     }
 
     // Track running value for exponential and boost
@@ -1059,7 +1070,7 @@ pub fn build_calculation_summary_section(
         let after_god = current * gm;
         add_label_value(
             &mut lines,
-            "god mult",
+            "× god mult",
             format!("{:.2} × {:.2} = {:.2}", current, gm, after_god),
             theme,
             width,
@@ -1067,28 +1078,18 @@ pub fn build_calculation_summary_section(
         current = after_god;
     }
 
-    // Show clamping step explicitly if pre_normalization_score indicates clamping occurred (spec 260)
-    // This makes the 51.55 → 100 jump explicit rather than hidden
-    if let Some(pre_norm) = item.unified_score.pre_normalization_score {
-        if pre_norm > 100.0 {
-            add_label_value(
-                &mut lines,
-                "CLAMPED",
-                format!("{:.2} → 100.00 (exceeds max, capped)", pre_norm),
-                theme,
-                width,
-            );
-        }
-    } else if current > 100.0 {
-        // Fallback: if we calculated a value > 100 but no pre_normalization_score was stored
+    // Show clamping if any multipliers pushed the score over 100
+    // This handles exponential, risk_boost, and god_mult all potentially exceeding 100
+    if current > 100.0 {
         add_label_value(
             &mut lines,
-            "CLAMPED",
-            format!("{:.2} → 100.00 (exceeds max, capped)", current),
+            "clamped",
+            format!("{:.2} → 100.00 (max score)", current),
             theme,
             width,
         );
     }
+    let _ = current; // Suppress unused warning - value tracked for completeness
 
     // Final score
     add_label_value(
@@ -1253,6 +1254,7 @@ mod tests {
                 structural_multiplier: Some(1.15),
                 has_coverage_data: false,
                 contextual_risk_multiplier: None,
+                pre_contextual_score: None,
             },
             debt_type,
             function_role: FunctionRole::PureLogic,

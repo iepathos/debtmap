@@ -101,11 +101,16 @@ fn apply_context_multiplier_to_score(mut score: UnifiedScore, multiplier: f64) -
     score
 }
 
-/// Apply contextual risk multiplier to a UnifiedScore (spec 255)
+/// Apply contextual risk multiplier to a UnifiedScore (spec 255, spec 260)
 ///
 /// Adjusts the final score based on git context analysis (churn, recency, etc.).
 /// The multiplier is calculated as contextual_risk / base_risk.
 /// For example, if contextual_risk is 2x the base_risk, the score is doubled.
+///
+/// # Transparency (spec 260)
+///
+/// Always stores both `pre_contextual_score` and `contextual_risk_multiplier`
+/// for complete score breakdown visibility in the TUI.
 pub fn apply_contextual_risk_to_score(
     mut score: UnifiedScore,
     contextual_risk: &crate::risk::context::ContextualRisk,
@@ -118,22 +123,22 @@ pub fn apply_contextual_risk_to_score(
 
     let risk_multiplier = contextual_risk.contextual_risk / contextual_risk.base_risk;
 
-    // Store the pre-contextual score for transparency (before applying multiplier)
-    let pre_contextual_score = score.final_score.value();
+    // Store the pre-contextual score for transparency (spec 260)
+    let pre_ctx_score = score.final_score.value();
+    score.pre_contextual_score = Some(pre_ctx_score);
 
     // Apply multiplier to final_score (clamped to 0-100 by Score0To100)
-    let adjusted_final = pre_contextual_score * risk_multiplier;
+    let adjusted_final = pre_ctx_score * risk_multiplier;
     score.final_score = Score0To100::new(adjusted_final);
 
-    // Record the pre-contextual score if not already set
+    // Record the pre-contextual score in base_score if not already set
     if score.base_score.is_none() {
-        score.base_score = Some(pre_contextual_score);
+        score.base_score = Some(pre_ctx_score);
     }
 
-    // Store the contextual risk multiplier for TUI display (only if significant)
-    if (risk_multiplier - 1.0).abs() > 0.01 {
-        score.contextual_risk_multiplier = Some(risk_multiplier);
-    }
+    // Always store contextual risk multiplier for TUI transparency (spec 260)
+    // Removed threshold check - even small multipliers should be visible
+    score.contextual_risk_multiplier = Some(risk_multiplier);
 
     score
 }
@@ -957,6 +962,7 @@ mod tests {
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
+            pre_contextual_score: None,
         };
 
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
@@ -994,6 +1000,7 @@ mod tests {
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
+            pre_contextual_score: None,
         };
 
         // Test with all file types

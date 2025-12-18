@@ -206,11 +206,12 @@ pub fn normalize_final_score_with_metadata(raw_score: f64) -> NormalizedScore {
     }
 }
 
-/// Normalize final score to a simple f64 (backwards compatibility)
+/// Normalize final score to a simple f64.
+///
+/// No upper clamping - scores can exceed 100 to preserve relative
+/// priority information (spec 261). Negative values are floored to 0.
 pub fn normalize_final_score(raw_score: f64) -> f64 {
-    // Simple linear scaling to 0-100 range for clarity
-    // No complex transformations that distort relative differences
-    raw_score.clamp(0.0, 100.0)
+    raw_score.max(0.0)
 }
 
 /// Inverse normalization function for interpretation
@@ -557,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_normalization_continuity() {
-        // Linear scaling is continuous everywhere
+        // Spec 261: No upper clamping, scores are identity for positive values
         let eps = 0.001;
 
         let below_50 = normalize_final_score(50.0 - eps);
@@ -566,49 +567,46 @@ mod tests {
         assert!((at_50 - below_50).abs() < 0.01);
         assert!((above_50 - at_50).abs() < 0.01);
 
-        // At cap
+        // No cap - values above 100 are preserved
         let at_100 = normalize_final_score(100.0);
-        let above_100 = normalize_final_score(101.0);
+        let above_100 = normalize_final_score(150.0);
         assert_eq!(at_100, 100.0);
-        assert_eq!(above_100, 100.0);
+        assert_eq!(above_100, 150.0);
     }
 
     #[test]
     fn test_normalization_monotonic() {
-        // Verify ordering is preserved (up to cap)
-        let scores = [1.0, 5.0, 10.0, 50.0, 99.0];
+        // Spec 261: Ordering preserved for all positive values
+        let scores = [1.0, 5.0, 10.0, 50.0, 99.0, 150.0, 500.0];
         let normalized: Vec<_> = scores.iter().map(|&s| normalize_final_score(s)).collect();
 
         for i in 1..normalized.len() {
             assert!(normalized[i] > normalized[i - 1]);
         }
-
-        // Values above 100 are capped
-        assert_eq!(normalize_final_score(100.0), 100.0);
-        assert_eq!(normalize_final_score(500.0), 100.0);
     }
 
     #[test]
-    fn test_inverse_function() {
-        // With linear scaling, inverse should work for values up to 100
-        let test_scores = vec![5.0, 15.0, 50.0, 90.0];
+    fn test_normalization_identity() {
+        // Spec 261: normalize_final_score is identity for positive values
+        let test_scores = vec![5.0, 15.0, 50.0, 90.0, 150.0, 500.0];
 
         for score in test_scores {
             let normalized = normalize_final_score(score);
-            assert_eq!(normalized, score); // Linear = identity up to 100
+            assert_eq!(normalized, score);
         }
 
-        // Above 100 is capped
-        assert_eq!(normalize_final_score(150.0), 100.0);
+        // Negative values floor to 0
+        assert_eq!(normalize_final_score(-10.0), 0.0);
     }
 
     #[test]
-    fn test_normalization_ranges() {
-        // Linear scaling preserves values up to 100
+    fn test_normalization_no_upper_cap() {
+        // Spec 261: No upper clamping to preserve relative priority
         assert_eq!(normalize_final_score(5.0), 5.0);
         assert_eq!(normalize_final_score(50.0), 50.0);
         assert_eq!(normalize_final_score(100.0), 100.0);
-        assert_eq!(normalize_final_score(200.0), 100.0); // Capped
+        assert_eq!(normalize_final_score(200.0), 200.0);
+        assert_eq!(normalize_final_score(1000.0), 1000.0);
     }
 
     #[test]

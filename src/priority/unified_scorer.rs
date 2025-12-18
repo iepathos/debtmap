@@ -138,6 +138,10 @@ pub struct UnifiedScore {
     /// Only set when contextual risk analysis was performed and multiplier != 1.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contextual_risk_multiplier: Option<f64>,
+    /// Score before contextual risk multiplier was applied (spec 260 transparency)
+    /// This allows the TUI to show the exact score progression
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pre_contextual_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -305,6 +309,7 @@ pub fn calculate_unified_score_with_patterns(
         structural_multiplier: base_score.structural_multiplier,
         has_coverage_data: base_score.has_coverage_data,
         contextual_risk_multiplier: base_score.contextual_risk_multiplier,
+        pre_contextual_score: base_score.pre_contextual_score,
     }
 }
 
@@ -384,6 +389,7 @@ pub fn calculate_unified_priority_with_role(
             structural_multiplier: Some(1.0),
             has_coverage_data,
             contextual_risk_multiplier: None,
+            pre_contextual_score: None,
         };
     }
 
@@ -478,8 +484,9 @@ pub fn calculate_unified_priority_with_role(
         None
     };
 
-    // Only store debt adjustment if it's significant (spec 260)
-    let debt_adjustment_details = if debt_details.is_significant() {
+    // Always store debt adjustment details for transparency (spec 260)
+    // Even small adjustments help explain score differences in the TUI
+    let debt_adjustment_details = if debt_details.total.abs() > 0.001 {
         Some(debt_details)
     } else {
         None
@@ -505,6 +512,7 @@ pub fn calculate_unified_priority_with_role(
         structural_multiplier: Some(structural_multiplier),
         has_coverage_data,
         contextual_risk_multiplier: None, // Set by apply_contextual_risk_to_score
+        pre_contextual_score: None,      // Set by apply_contextual_risk_to_score
     }
 }
 

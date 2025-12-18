@@ -44,6 +44,7 @@ fn create_untested_item() -> UnifiedDebtItem {
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
+                pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

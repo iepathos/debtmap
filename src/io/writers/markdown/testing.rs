@@ -102,6 +102,7 @@ mod tests {
                 structural_multiplier: Some(1.0),
                 has_coverage_data: false,
                 contextual_risk_multiplier: None,
+                pre_contextual_score: None,
             },
             debt_type: DebtType::TestingGap {
                 coverage,
@@ -185,6 +186,7 @@ mod tests {
                 structural_multiplier: Some(1.0),
                 has_coverage_data: false,
                 contextual_risk_multiplier: None,
+                pre_contextual_score: None,
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,

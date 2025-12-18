@@ -163,6 +163,7 @@ fn calculate_god_object_score(
         structural_multiplier: Some(1.0),
         has_coverage_data,
         contextual_risk_multiplier: None,
+                pre_contextual_score: None,
     };
 
     // Apply contextual risk to score if available

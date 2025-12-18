@@ -324,8 +324,8 @@ mod tests {
 
         let trend = metrics.get_file_trend(&file_path).unwrap();
         assert_eq!(trend.method_count_change, 20);
-        // Score goes from 75.0 to 100.0 (175.0 clamped), so change is 25.0
-        assert_eq!(trend.score_change, 25.0);
+        // Spec 261: No clamping - score goes from 75.0 to 175.0
+        assert_eq!(trend.score_change, 100.0);
         assert_eq!(trend.trend_direction, TrendDirection::Worsening);
         assert!(!trend.improved);
     }

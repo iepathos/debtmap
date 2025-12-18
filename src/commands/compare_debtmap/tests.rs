@@ -103,6 +103,7 @@ fn create_function_item(
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
+                pre_contextual_score: None,
         },
         function_role: FunctionRole::Unknown,
         recommendation: ActionableRecommendation {
@@ -191,6 +192,7 @@ fn create_test_function_item(
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
+                pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {
@@ -273,6 +275,7 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
+                pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {
