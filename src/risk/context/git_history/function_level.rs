@@ -451,7 +451,7 @@ more garbage"#;
 
         let age = history.age_days();
         // Allow some tolerance for timing
-        assert!(age >= 9 && age <= 11, "Expected ~10 days, got {age}");
+        assert!((9..=11).contains(&age), "Expected ~10 days, got {age}");
     }
 
     #[test]
