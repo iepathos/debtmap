@@ -129,6 +129,15 @@ pub struct UnifiedScore {
     /// Structural quality multiplier applied (nesting/cyclomatic ratio)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub structural_multiplier: Option<f64>,
+    /// Whether coverage data was available during scoring (determines formula used)
+    /// When true: multiplier approach (coverage dampens complexity+deps)
+    /// When false: weighted sum (C×5 + D×2.5)
+    #[serde(default)]
+    pub has_coverage_data: bool,
+    /// Contextual risk multiplier applied based on git history analysis (churn, recency, bugs)
+    /// Only set when contextual risk analysis was performed and multiplier != 1.0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contextual_risk_multiplier: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -294,6 +303,8 @@ pub fn calculate_unified_score_with_patterns(
         debt_adjustment: base_score.debt_adjustment,
         pre_normalization_score: base_score.pre_normalization_score,
         structural_multiplier: base_score.structural_multiplier,
+        has_coverage_data: base_score.has_coverage_data,
+        contextual_risk_multiplier: base_score.contextual_risk_multiplier,
     }
 }
 
@@ -371,6 +382,8 @@ pub fn calculate_unified_priority_with_role(
             debt_adjustment: None,
             pre_normalization_score: None,
             structural_multiplier: Some(1.0),
+            has_coverage_data,
+            contextual_risk_multiplier: None,
         };
     }
 
@@ -490,6 +503,8 @@ pub fn calculate_unified_priority_with_role(
         debt_adjustment: debt_adjustment_details,
         pre_normalization_score,
         structural_multiplier: Some(structural_multiplier),
+        has_coverage_data,
+        contextual_risk_multiplier: None, // Set by apply_contextual_risk_to_score
     }
 }
 

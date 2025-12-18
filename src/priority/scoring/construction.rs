@@ -118,13 +118,21 @@ pub fn apply_contextual_risk_to_score(
 
     let risk_multiplier = contextual_risk.contextual_risk / contextual_risk.base_risk;
 
+    // Store the pre-contextual score for transparency (before applying multiplier)
+    let pre_contextual_score = score.final_score.value();
+
     // Apply multiplier to final_score (clamped to 0-100 by Score0To100)
-    let adjusted_final = score.final_score.value() * risk_multiplier;
+    let adjusted_final = pre_contextual_score * risk_multiplier;
     score.final_score = Score0To100::new(adjusted_final);
 
-    // Also record the pre-contextual score for transparency
+    // Record the pre-contextual score if not already set
     if score.base_score.is_none() {
-        score.base_score = Some(score.final_score.value() / risk_multiplier);
+        score.base_score = Some(pre_contextual_score);
+    }
+
+    // Store the contextual risk multiplier for TUI display (only if significant)
+    if (risk_multiplier - 1.0).abs() > 0.01 {
+        score.contextual_risk_multiplier = Some(risk_multiplier);
     }
 
     score
@@ -947,6 +955,7 @@ mod tests {
             debt_adjustment: None,
             pre_normalization_score: None,
             structural_multiplier: Some(1.0),
+            has_coverage_data: false, contextual_risk_multiplier: None,
         };
 
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
@@ -982,6 +991,7 @@ mod tests {
             debt_adjustment: None,
             pre_normalization_score: None,
             structural_multiplier: Some(1.0),
+            has_coverage_data: false, contextual_risk_multiplier: None,
         };
 
         // Test with all file types

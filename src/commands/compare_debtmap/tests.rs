@@ -100,7 +100,7 @@ fn create_function_item(
             // Spec 260: Score transparency fields
             debt_adjustment: None,
             pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
+            structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
         },
         function_role: FunctionRole::Unknown,
         recommendation: ActionableRecommendation {
@@ -186,7 +186,7 @@ fn create_test_function_item(
             // Spec 260: Score transparency fields
             debt_adjustment: None,
             pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
+            structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {
@@ -266,7 +266,7 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
             // Spec 260: Score transparency fields
             debt_adjustment: None,
             pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
+            structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {

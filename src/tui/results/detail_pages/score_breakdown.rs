@@ -696,8 +696,8 @@ pub fn build_calculation_summary_section(
     // Build multiplier product (for potential future use)
     let _total_mult = role * purity * pattern * refactor * context * entropy;
 
-    // Check if we have coverage data - affects which formula is used
-    let has_coverage_data = item.transitive_coverage.is_some();
+    // Use stored has_coverage_data flag - matches what the scorer actually used
+    let has_coverage_data = item.unified_score.has_coverage_data;
 
     add_section_header(&mut lines, "score formula (simplified)", theme);
 
@@ -934,6 +934,26 @@ pub fn build_calculation_summary_section(
                 width,
             );
             current_value = after_debt;
+            step_num += 1;
+        }
+    }
+
+    // Step: Show contextual risk multiplier if applied (spec 255)
+    // This amplifies the score based on git history (churn, recency, bug likelihood)
+    if let Some(risk_mult) = item.unified_score.contextual_risk_multiplier {
+        if (risk_mult - 1.0).abs() > 0.01 {
+            let after_risk = current_value * risk_mult;
+            add_label_value(
+                &mut lines,
+                &format!("{}. × risk", step_num),
+                format!(
+                    "{:.2} × {:.2} = {:.2} (contextual risk)",
+                    current_value, risk_mult, after_risk
+                ),
+                theme,
+                width,
+            );
+            current_value = after_risk;
             step_num += 1;
         }
     }
@@ -1231,6 +1251,7 @@ mod tests {
                 debt_adjustment: None,
                 pre_normalization_score: None,
                 structural_multiplier: Some(1.15),
+                has_coverage_data: false, contextual_risk_multiplier: None,
             },
             debt_type,
             function_role: FunctionRole::PureLogic,

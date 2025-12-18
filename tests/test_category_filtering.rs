@@ -34,7 +34,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             // Spec 260: Score transparency fields
             debt_adjustment: None,
             pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
+            structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

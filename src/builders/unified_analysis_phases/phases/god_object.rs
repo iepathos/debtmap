@@ -142,6 +142,7 @@ fn calculate_god_object_score(
     let coverage_adjusted_score = base_score * coverage_multiplier;
 
     let total_complexity = aggregated_metrics.total_cyclomatic + aggregated_metrics.total_cognitive;
+    let has_coverage_data = aggregated_metrics.weighted_coverage.is_some();
     let mut unified_score = UnifiedScore {
         final_score: Score0To100::new(coverage_adjusted_score),
         complexity_factor: total_complexity as f64 / 10.0,
@@ -160,6 +161,8 @@ fn calculate_god_object_score(
         debt_adjustment: None,
         pre_normalization_score: None,
         structural_multiplier: Some(1.0),
+        has_coverage_data,
+        contextual_risk_multiplier: None,
     };
 
     // Apply contextual risk to score if available

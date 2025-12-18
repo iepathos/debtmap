@@ -61,7 +61,7 @@ fn create_debt_item(
             // Spec 260: Score transparency fields
             debt_adjustment: None,
             pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
+            structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {
@@ -181,7 +181,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
                 // Spec 260: Score transparency fields
                 debt_adjustment: None,
                 pre_normalization_score: None,
-                structural_multiplier: Some(1.0),
+                structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: debtmap::priority::ActionableRecommendation {
