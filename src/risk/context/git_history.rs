@@ -8,6 +8,7 @@ use std::process::Command;
 use std::sync::Arc;
 
 mod batched;
+mod function_level;
 
 /// File history information from Git
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -364,28 +365,22 @@ impl ContextProvider for GitHistoryProvider {
     }
 
     fn gather(&self, target: &AnalysisTarget) -> Result<Context> {
-        // Use cached/batched history (O(1) lookup, no git subprocess calls)
-        let history = self.get_or_fetch_history(&target.file_path)?;
+        // Try function-level analysis if function name is provided
+        if !target.function_name.is_empty() {
+            match self.gather_for_function(target) {
+                Ok(context) => return Ok(context),
+                Err(e) => {
+                    log::debug!(
+                        "Function-level git analysis failed for '{}', falling back to file-level: {}",
+                        target.function_name,
+                        e
+                    );
+                }
+            }
+        }
 
-        // Calculate contribution based on instability
-        let _instability = 1.0 - history.stability_score;
-        let bug_density =
-            GitHistoryProvider::calculate_bug_density(history.bug_fix_count, history.total_commits);
-
-        let contribution =
-            GitHistoryProvider::classify_risk_contribution(history.change_frequency, bug_density);
-
-        Ok(Context {
-            provider: self.name().to_string(),
-            weight: self.weight(),
-            contribution,
-            details: ContextDetails::Historical {
-                change_frequency: history.change_frequency,
-                bug_density,
-                age_days: history.age_days,
-                author_count: history.author_count,
-            },
-        })
+        // Fall back to file-level analysis
+        self.gather_for_file(target)
     }
 
     fn weight(&self) -> f64 {
@@ -411,6 +406,56 @@ impl ContextProvider for GitHistoryProvider {
 }
 
 impl GitHistoryProvider {
+    /// Gather context using function-level git history analysis
+    ///
+    /// Uses `git log -S` to track when the function was introduced and
+    /// count only commits that modified that specific function.
+    fn gather_for_function(&self, target: &AnalysisTarget) -> Result<Context> {
+        let history = function_level::get_function_history(
+            &self.repo_root,
+            &target.file_path,
+            &target.function_name,
+        )?;
+
+        let contribution =
+            Self::classify_risk_contribution(history.change_frequency(), history.bug_density());
+
+        Ok(Context {
+            provider: self.name().to_string(),
+            weight: self.weight(),
+            contribution,
+            details: ContextDetails::Historical {
+                change_frequency: history.change_frequency(),
+                bug_density: history.bug_density(),
+                age_days: history.age_days(),
+                author_count: history.authors.len(),
+            },
+        })
+    }
+
+    /// Gather context using file-level git history analysis (fallback)
+    fn gather_for_file(&self, target: &AnalysisTarget) -> Result<Context> {
+        // Use cached/batched history (O(1) lookup, no git subprocess calls)
+        let history = self.get_or_fetch_history(&target.file_path)?;
+
+        // Calculate contribution based on instability
+        let bug_density = Self::calculate_bug_density(history.bug_fix_count, history.total_commits);
+
+        let contribution = Self::classify_risk_contribution(history.change_frequency, bug_density);
+
+        Ok(Context {
+            provider: self.name().to_string(),
+            weight: self.weight(),
+            contribution,
+            details: ContextDetails::Historical {
+                change_frequency: history.change_frequency,
+                bug_density,
+                age_days: history.age_days,
+                author_count: history.author_count,
+            },
+        })
+    }
+
     /// Calculate bug density as a ratio of bug fixes to total commits
     fn calculate_bug_density(bug_fix_count: usize, total_commits: usize) -> f64 {
         if total_commits > 0 {
@@ -1201,6 +1246,213 @@ mod tests {
             "Word boundary matching should find 2 bug fixes, got {}",
             history.bug_fix_count
         );
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Function-Level History Integration Tests
+    // =========================================================================
+
+    /// Test that function-level analysis returns 0 bug density for functions
+    /// that were introduced but never modified.
+    #[test]
+    fn test_function_level_never_modified() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create file with two functions
+        let content = r#"fn my_func() {}
+
+fn other_func() {}
+"#;
+        create_test_file(&repo_path, "test.rs", content)?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        // Modify only other_func (not my_func)
+        let content_v2 = r#"fn my_func() {}
+
+fn other_func() {
+    println!("modified");
+}
+"#;
+        modify_and_commit(&repo_path, "test.rs", content_v2, "fix: bug in other_func")?;
+
+        // Get function-level history for my_func
+        let history =
+            function_level::get_function_history(&repo_path, Path::new("test.rs"), "my_func")?;
+
+        // my_func was introduced but never modified after introduction
+        assert_eq!(
+            history.total_commits, 0,
+            "my_func should have 0 modifications, got {}",
+            history.total_commits
+        );
+        assert_eq!(
+            history.bug_density(),
+            0.0,
+            "my_func should have 0% bug density"
+        );
+        assert_eq!(
+            history.change_frequency(),
+            0.0,
+            "my_func should have 0 change frequency"
+        );
+
+        Ok(())
+    }
+
+    /// Test that function-level analysis correctly counts modifications
+    /// to a specific function.
+    #[test]
+    fn test_function_level_with_modifications() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create file with a function
+        create_test_file(&repo_path, "test.rs", "fn my_func() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        // Modify my_func twice
+        modify_and_commit(
+            &repo_path,
+            "test.rs",
+            "fn my_func() { println!(\"v2\"); }",
+            "fix: bug in my_func",
+        )?;
+        modify_and_commit(
+            &repo_path,
+            "test.rs",
+            "fn my_func() { println!(\"v3\"); }",
+            "feat: improve my_func",
+        )?;
+
+        let history =
+            function_level::get_function_history(&repo_path, Path::new("test.rs"), "my_func")?;
+
+        // my_func has 2 modifications after introduction, 1 is a bug fix
+        assert_eq!(
+            history.total_commits, 2,
+            "my_func should have 2 modifications, got {}",
+            history.total_commits
+        );
+        assert_eq!(
+            history.bug_fix_count, 1,
+            "my_func should have 1 bug fix, got {}",
+            history.bug_fix_count
+        );
+        assert!(
+            (history.bug_density() - 0.5).abs() < 0.01,
+            "my_func should have 50% bug density, got {}",
+            history.bug_density()
+        );
+
+        Ok(())
+    }
+
+    /// Test that GitHistoryProvider::gather uses function-level analysis
+    /// when function_name is provided.
+    #[test]
+    fn test_gather_uses_function_level_analysis() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create file with two functions
+        let content = r#"fn stable_func() {}
+
+fn buggy_func() {}
+"#;
+        create_test_file(&repo_path, "test.rs", content)?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        // Add bug fixes only to buggy_func
+        let content_v2 = r#"fn stable_func() {}
+
+fn buggy_func() {
+    println!("fixed");
+}
+"#;
+        modify_and_commit(&repo_path, "test.rs", content_v2, "fix: bug in buggy_func")?;
+
+        let provider = GitHistoryProvider::new(repo_path.clone())?;
+
+        // Analyze stable_func - should have 0 bug density
+        let target_stable = AnalysisTarget {
+            root_path: repo_path.clone(),
+            file_path: PathBuf::from("test.rs"),
+            function_name: "stable_func".to_string(),
+            line_range: (1, 1),
+        };
+        let context_stable = provider.gather(&target_stable)?;
+        if let ContextDetails::Historical { bug_density, .. } = context_stable.details {
+            assert_eq!(
+                bug_density, 0.0,
+                "stable_func should have 0% bug density, got {}",
+                bug_density
+            );
+        } else {
+            panic!("Expected Historical context details");
+        }
+
+        // Analyze buggy_func - should have high bug density
+        let target_buggy = AnalysisTarget {
+            root_path: repo_path,
+            file_path: PathBuf::from("test.rs"),
+            function_name: "buggy_func".to_string(),
+            line_range: (3, 5),
+        };
+        let context_buggy = provider.gather(&target_buggy)?;
+        if let ContextDetails::Historical { bug_density, .. } = context_buggy.details {
+            assert!(
+                bug_density > 0.9,
+                "buggy_func should have 100% bug density, got {}",
+                bug_density
+            );
+        } else {
+            panic!("Expected Historical context details");
+        }
+
+        Ok(())
+    }
+
+    /// Test that file-level analysis is used when function_name is empty.
+    #[test]
+    fn test_gather_falls_back_to_file_level() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        create_test_file(&repo_path, "test.rs", "fn main() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+        modify_and_commit(&repo_path, "test.rs", "fn main() { /* v2 */ }", "fix: bug")?;
+
+        let provider = GitHistoryProvider::new(repo_path.clone())?;
+
+        // Analyze without function_name - should use file-level
+        let target = AnalysisTarget {
+            root_path: repo_path,
+            file_path: PathBuf::from("test.rs"),
+            function_name: String::new(), // Empty - triggers fallback
+            line_range: (1, 1),
+        };
+        let context = provider.gather(&target)?;
+
+        // Should successfully return file-level context
+        assert_eq!(context.provider, "git_history");
+        if let ContextDetails::Historical {
+            change_frequency,
+            bug_density,
+            ..
+        } = context.details
+        {
+            // File-level should show the bug fix
+            assert!(
+                bug_density > 0.0,
+                "File-level should detect bug fix, got {}",
+                bug_density
+            );
+            assert!(
+                change_frequency >= 0.0,
+                "Change frequency should be non-negative"
+            );
+        } else {
+            panic!("Expected Historical context details");
+        }
 
         Ok(())
     }

@@ -253,7 +253,7 @@ impl BatchedGitHistory {
 
 /// Pure function: Determine if a commit message indicates a bug fix
 /// Matches the logic from the original implementation
-fn is_bug_fix(message: &str) -> bool {
+pub fn is_bug_fix(message: &str) -> bool {
     if is_excluded_commit(message) {
         return false;
     }
