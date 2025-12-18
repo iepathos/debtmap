@@ -955,7 +955,8 @@ mod tests {
             debt_adjustment: None,
             pre_normalization_score: None,
             structural_multiplier: Some(1.0),
-            has_coverage_data: false, contextual_risk_multiplier: None,
+            has_coverage_data: false,
+            contextual_risk_multiplier: None,
         };
 
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
@@ -991,7 +992,8 @@ mod tests {
             debt_adjustment: None,
             pre_normalization_score: None,
             structural_multiplier: Some(1.0),
-            has_coverage_data: false, contextual_risk_multiplier: None,
+            has_coverage_data: false,
+            contextual_risk_multiplier: None,
         };
 
         // Test with all file types

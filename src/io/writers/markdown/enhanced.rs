@@ -331,7 +331,9 @@ mod tests {
                 // Spec 260: Score transparency fields
                 debt_adjustment: None,
                 pre_normalization_score: None,
-                structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
@@ -483,7 +485,9 @@ mod tests {
             // Spec 260: Score transparency fields
             debt_adjustment: None,
             pre_normalization_score: None,
-            structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
+            structural_multiplier: Some(1.0),
+            has_coverage_data: false,
+            contextual_risk_multiplier: None,
         };
 
         let result = format_score_factors(&score);
@@ -588,7 +592,9 @@ mod tests {
             // Spec 260: Score transparency fields
             debt_adjustment: None,
             pre_normalization_score: None,
-            structural_multiplier: Some(1.0), has_coverage_data: false, contextual_risk_multiplier: None,
+            structural_multiplier: Some(1.0),
+            has_coverage_data: false,
+            contextual_risk_multiplier: None,
         };
 
         let result = format_score_factors(&score);
