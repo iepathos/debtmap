@@ -150,28 +150,6 @@ pub fn filter_bug_fix_commits(commits: &[CommitInfo]) -> Vec<&CommitInfo> {
     commits.iter().filter(|c| is_bug_fix(&c.message)).collect()
 }
 
-/// Calculate function history from parsed commits
-///
-/// Pure function - aggregates commit data into history
-pub fn calculate_function_history(
-    introduction_commit: Option<String>,
-    introduction_date: Option<DateTime<Utc>>,
-    modification_commits: &[CommitInfo],
-) -> FunctionHistory {
-    let bug_fixes = filter_bug_fix_commits(modification_commits);
-
-    FunctionHistory {
-        introduction_commit,
-        total_commits: modification_commits.len(),
-        bug_fix_count: bug_fixes.len(),
-        authors: modification_commits
-            .iter()
-            .map(|c| c.author.clone())
-            .collect(),
-        last_modified: modification_commits.iter().filter_map(|c| c.date).max(),
-        introduced: introduction_date,
-    }
-}
 
 // =============================================================================
 // I/O Wrapper Functions (Imperative Shell)
@@ -181,10 +159,17 @@ pub fn calculate_function_history(
 ///
 /// This is the imperative shell that orchestrates git commands.
 /// Falls back to default (empty) history if function is not found.
+///
+/// # Arguments
+/// * `repo_root` - Path to the git repository root
+/// * `file_path` - Path to the file containing the function
+/// * `function_name` - Name of the function to analyze
+/// * `line_range` - (start, end) line numbers of the function for git blame
 pub fn get_function_history(
     repo_root: &Path,
     file_path: &Path,
     function_name: &str,
+    line_range: (usize, usize),
 ) -> Result<FunctionHistory> {
     // I/O: Find introduction commit
     let intro_output = run_git_log_introduction(repo_root, file_path, function_name)?;
@@ -207,12 +192,38 @@ pub fn get_function_history(
     let mods_output = run_git_log_modifications(repo_root, file_path, function_name, intro)?;
     let modification_commits = parse_modification_commits(&mods_output);
 
+    // I/O: Get authors from git blame on current function lines
+    let (start, end) = line_range;
+    let blame_authors = get_blame_authors(repo_root, file_path, start, end)?;
+
     // Pure: Calculate history from parsed data
-    Ok(calculate_function_history(
+    Ok(calculate_function_history_with_authors(
         intro_commit,
         intro_date,
         &modification_commits,
+        blame_authors,
     ))
+}
+
+/// Calculate function history from parsed commits with explicit authors
+///
+/// Pure function - aggregates commit data into history
+pub fn calculate_function_history_with_authors(
+    introduction_commit: Option<String>,
+    introduction_date: Option<DateTime<Utc>>,
+    modification_commits: &[CommitInfo],
+    authors: HashSet<String>,
+) -> FunctionHistory {
+    let bug_fixes = filter_bug_fix_commits(modification_commits);
+
+    FunctionHistory {
+        introduction_commit,
+        total_commits: modification_commits.len(),
+        bug_fix_count: bug_fixes.len(),
+        authors,
+        last_modified: modification_commits.iter().filter_map(|c| c.date).max(),
+        introduced: introduction_date,
+    }
 }
 
 /// Run git log -S to find function introduction (I/O)
@@ -292,6 +303,53 @@ fn get_commit_date(repo_root: &Path, commit_hash: &str) -> Result<Option<DateTim
     }
 
     Ok(None)
+}
+
+/// Get unique authors from git blame for a line range (I/O)
+///
+/// Uses git blame to identify who wrote the current code in the function.
+/// This is more accurate than commit history for determining contributors.
+pub fn get_blame_authors(
+    repo_root: &Path,
+    file_path: &Path,
+    start_line: usize,
+    end_line: usize,
+) -> Result<HashSet<String>> {
+    if start_line == 0 || end_line == 0 || end_line < start_line {
+        return Ok(HashSet::new());
+    }
+
+    let line_range = format!("{},{}", start_line, end_line);
+    let output = Command::new("git")
+        .args([
+            "blame",
+            "-L",
+            &line_range,
+            "--porcelain",
+            &file_path.to_string_lossy(),
+        ])
+        .current_dir(repo_root)
+        .output()
+        .context("Failed to run git blame")?;
+
+    if !output.status.success() {
+        return Ok(HashSet::new());
+    }
+
+    let blame_output = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_blame_authors(&blame_output))
+}
+
+/// Parse git blame --porcelain output to extract unique authors
+///
+/// Pure function - parses blame output looking for "author " lines
+pub fn parse_blame_authors(blame_output: &str) -> HashSet<String> {
+    blame_output
+        .lines()
+        .filter(|line| line.starts_with("author "))
+        .map(|line| line.strip_prefix("author ").unwrap_or("").to_string())
+        .filter(|author| !author.is_empty() && author != "Not Committed Yet")
+        .collect()
 }
 
 #[cfg(test)]
@@ -455,7 +513,53 @@ more garbage"#;
     }
 
     #[test]
-    fn test_calculate_function_history() {
+    fn test_parse_blame_authors() {
+        // Sample git blame --porcelain output
+        let blame_output = r#"abc123def456 102 102 1
+author John Doe
+author-mail <john@example.com>
+author-time 1234567890
+author-tz +0000
+committer Jane Smith
+committer-mail <jane@example.com>
+committer-time 1234567890
+committer-tz +0000
+summary Initial commit
+filename src/test.rs
+	fn foo() {
+def456abc123 103 103 1
+author Jane Smith
+author-mail <jane@example.com>
+author-time 1234567891
+author-tz +0000
+committer Jane Smith
+committer-mail <jane@example.com>
+committer-time 1234567891
+committer-tz +0000
+summary Add feature
+filename src/test.rs
+	    bar();
+"#;
+
+        let authors = parse_blame_authors(blame_output);
+        assert_eq!(authors.len(), 2);
+        assert!(authors.contains("John Doe"));
+        assert!(authors.contains("Jane Smith"));
+    }
+
+    #[test]
+    fn test_parse_blame_authors_filters_not_committed() {
+        let blame_output = r#"0000000000000000000000000000000000000000 1 1 1
+author Not Committed Yet
+author-mail <not.committed.yet>
+"#;
+
+        let authors = parse_blame_authors(blame_output);
+        assert!(authors.is_empty());
+    }
+
+    #[test]
+    fn test_calculate_function_history_with_authors() {
         let introduced = Utc::now() - chrono::Duration::days(60);
         let commits = vec![
             CommitInfo {
@@ -478,13 +582,25 @@ more garbage"#;
             },
         ];
 
-        let history =
-            calculate_function_history(Some("intro123".to_string()), Some(introduced), &commits);
+        // Authors from git blame
+        let mut blame_authors = HashSet::new();
+        blame_authors.insert("Alice".to_string());
+        blame_authors.insert("Bob".to_string());
+
+        let history = calculate_function_history_with_authors(
+            Some("intro123".to_string()),
+            Some(introduced),
+            &commits,
+            blame_authors,
+        );
 
         assert_eq!(history.introduction_commit, Some("intro123".to_string()));
         assert_eq!(history.total_commits, 3);
         assert_eq!(history.bug_fix_count, 2);
+        // Authors come from git blame, not commits
         assert_eq!(history.authors.len(), 2);
+        assert!(history.authors.contains("Alice"));
+        assert!(history.authors.contains("Bob"));
         assert!(history.last_modified.is_some());
         assert!(history.introduced.is_some());
         assert!((history.bug_density() - 0.666).abs() < 0.01);

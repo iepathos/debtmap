@@ -410,11 +410,13 @@ impl GitHistoryProvider {
     ///
     /// Uses `git log -S` to track when the function was introduced and
     /// count only commits that modified that specific function.
+    /// Uses `git blame` on current lines to identify contributors.
     fn gather_for_function(&self, target: &AnalysisTarget) -> Result<Context> {
         let history = function_level::get_function_history(
             &self.repo_root,
             &target.file_path,
             &target.function_name,
+            target.line_range,
         )?;
 
         let contribution =
@@ -1278,8 +1280,13 @@ fn other_func() {
         modify_and_commit(&repo_path, "test.rs", content_v2, "fix: bug in other_func")?;
 
         // Get function-level history for my_func
-        let history =
-            function_level::get_function_history(&repo_path, Path::new("test.rs"), "my_func")?;
+        // Use line range (1, 10) to cover the function for git blame
+        let history = function_level::get_function_history(
+            &repo_path,
+            Path::new("test.rs"),
+            "my_func",
+            (1, 10),
+        )?;
 
         // my_func was introduced but never modified after introduction
         assert_eq!(
@@ -1325,8 +1332,12 @@ fn other_func() {
             "feat: improve my_func",
         )?;
 
-        let history =
-            function_level::get_function_history(&repo_path, Path::new("test.rs"), "my_func")?;
+        let history = function_level::get_function_history(
+            &repo_path,
+            Path::new("test.rs"),
+            "my_func",
+            (1, 5),
+        )?;
 
         // my_func has 2 modifications after introduction, 1 is a bug fix
         assert_eq!(
