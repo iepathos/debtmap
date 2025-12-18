@@ -33,6 +33,7 @@ pub struct CommitInfo {
     pub hash: String,
     pub date: Option<DateTime<Utc>>,
     pub message: String,
+    #[allow(dead_code)]
     pub author: String,
 }
 

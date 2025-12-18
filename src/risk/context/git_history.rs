@@ -468,13 +468,27 @@ impl GitHistoryProvider {
     }
 
     /// Classify the risk contribution based on change frequency and bug density
+    ///
+    /// Uses continuous scoring instead of discrete thresholds for more accurate
+    /// differentiation between risk levels.
+    ///
+    /// # Scoring model
+    /// - **Bug density** (primary signal): scales linearly from 0 to 1.5
+    ///   - 0% bugs → 0.0 contribution
+    ///   - 50% bugs → 0.75 contribution
+    ///   - 100% bugs → 1.5 contribution
+    /// - **Change frequency** (secondary signal): scales from 0 to 0.5, saturates at 10/month
+    ///   - 0/month → 0.0
+    ///   - 5/month → 0.25
+    ///   - 10+/month → 0.5
+    ///
+    /// Total is capped at 2.0 to prevent excessive score amplification.
+    /// Stable code with no bugs and no changes contributes 0.0 (no risk increase).
     fn classify_risk_contribution(change_frequency: f64, bug_density: f64) -> f64 {
-        match () {
-            _ if change_frequency > 5.0 && bug_density > 0.3 => 2.0, // Very unstable, high risk
-            _ if change_frequency > 2.0 || bug_density > 0.2 => 1.0, // Moderately unstable
-            _ if change_frequency > 1.0 || bug_density > 0.1 => 0.5, // Slightly unstable
-            _ => 0.1,                                                // Stable
-        }
+        let bug_contribution = bug_density * 1.5;
+        let freq_contribution = (change_frequency / 20.0).min(0.5);
+
+        (bug_contribution + freq_contribution).min(2.0)
     }
 
     fn explain_historical_context(
@@ -826,88 +840,103 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_risk_contribution_very_unstable() {
-        // Very unstable: high frequency AND high bug density
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(6.0, 0.4),
-            2.0
+    fn test_classify_risk_contribution_continuous_scaling() {
+        // Test that contribution scales continuously with bug density
+        // Formula: bug_density * 1.5 + min(freq/20, 0.5)
+
+        // Stable: no bugs, no changes → zero contribution (no risk increase)
+        let stable = GitHistoryProvider::classify_risk_contribution(0.0, 0.0);
+        assert!((stable - 0.0).abs() < 0.001, "Expected 0.0, got {stable}");
+
+        // Low bug density (25%)
+        let low_bugs = GitHistoryProvider::classify_risk_contribution(0.0, 0.25);
+        assert!(
+            (low_bugs - 0.375).abs() < 0.001,
+            "Expected 0.375, got {low_bugs}"
         );
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(10.0, 0.5),
-            2.0
+
+        // Medium bug density (50%)
+        let medium_bugs = GitHistoryProvider::classify_risk_contribution(0.0, 0.5);
+        assert!(
+            (medium_bugs - 0.75).abs() < 0.001,
+            "Expected 0.75, got {medium_bugs}"
+        );
+
+        // High bug density (100%)
+        let high_bugs = GitHistoryProvider::classify_risk_contribution(0.0, 1.0);
+        assert!(
+            (high_bugs - 1.5).abs() < 0.001,
+            "Expected 1.5, got {high_bugs}"
+        );
+
+        // 100% bugs should be 4x higher than 25% bugs
+        assert!(
+            (high_bugs / low_bugs - 4.0).abs() < 0.001,
+            "100% bugs ({high_bugs}) should be 4x higher than 25% bugs ({low_bugs})"
         );
     }
 
     #[test]
-    fn test_classify_risk_contribution_moderately_unstable() {
-        // Moderately unstable: high frequency OR high bug density
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(3.0, 0.1),
-            1.0
+    fn test_classify_risk_contribution_frequency_impact() {
+        // Test that change frequency adds to the contribution
+
+        // High frequency (10/month) saturates at 0.5
+        let high_freq = GitHistoryProvider::classify_risk_contribution(10.0, 0.0);
+        assert!(
+            (high_freq - 0.5).abs() < 0.001,
+            "Expected 0.5, got {high_freq}"
         );
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(1.5, 0.25),
-            1.0
+
+        // Medium frequency (5/month)
+        let medium_freq = GitHistoryProvider::classify_risk_contribution(5.0, 0.0);
+        assert!(
+            (medium_freq - 0.25).abs() < 0.001,
+            "Expected 0.25, got {medium_freq}"
         );
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(2.5, 0.0),
-            1.0
+
+        // Frequency contribution saturates at 10/month
+        let very_high_freq = GitHistoryProvider::classify_risk_contribution(20.0, 0.0);
+        assert!(
+            (very_high_freq - 0.5).abs() < 0.001,
+            "Expected 0.5 (saturated), got {very_high_freq}"
         );
     }
 
     #[test]
-    fn test_classify_risk_contribution_slightly_unstable() {
-        // Slightly unstable: moderate frequency OR moderate bug density
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(1.5, 0.05),
-            0.5
+    fn test_classify_risk_contribution_combined() {
+        // Test combined effect of bugs and frequency
+
+        // User's example: 25% bugs, 4.53 changes/month
+        let example_low = GitHistoryProvider::classify_risk_contribution(4.53, 0.25);
+        // bugs(0.375) + freq(0.2265) = 0.6015
+        assert!(
+            (example_low - 0.6015).abs() < 0.01,
+            "Expected ~0.60, got {example_low}"
         );
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(0.5, 0.15),
-            0.5
+
+        // User's example: 100% bugs, 0.59 changes/month
+        let example_high = GitHistoryProvider::classify_risk_contribution(0.59, 1.0);
+        // bugs(1.5) + freq(0.0295) = 1.5295
+        assert!(
+            (example_high - 1.5295).abs() < 0.01,
+            "Expected ~1.53, got {example_high}"
         );
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(1.2, 0.0),
-            0.5
+
+        // 100% bugs should be significantly higher than 25% bugs
+        assert!(
+            example_high > example_low * 2.0,
+            "100% bugs ({example_high}) should be >2x higher than 25% bugs ({example_low})"
         );
     }
 
     #[test]
-    fn test_classify_risk_contribution_stable() {
-        // Stable: low frequency and low bug density
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(0.5, 0.05),
-            0.1
+    fn test_classify_risk_contribution_capped_at_max() {
+        // Test that contribution is capped at 2.0
+        let extreme = GitHistoryProvider::classify_risk_contribution(100.0, 1.5);
+        assert!(
+            (extreme - 2.0).abs() < 0.001,
+            "Expected 2.0 (capped), got {extreme}"
         );
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(0.0, 0.0),
-            0.1
-        );
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(0.9, 0.09),
-            0.1
-        );
-    }
-
-    #[test]
-    fn test_classify_risk_contribution_edge_cases() {
-        // Test boundary values
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(5.0, 0.3),
-            1.0
-        ); // Not quite very unstable (needs BOTH conditions)
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(5.1, 0.31),
-            2.0
-        ); // Just over the threshold for very unstable
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(2.0, 0.2),
-            0.5
-        ); // On the boundary (falls through to slightly unstable)
-        assert_eq!(
-            GitHistoryProvider::classify_risk_contribution(1.0, 0.1),
-            0.1
-        ); // On the boundary (falls through to stable)
     }
 
     #[test]
