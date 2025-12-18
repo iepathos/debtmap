@@ -38,6 +38,7 @@ fn create_test_metrics(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionM
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

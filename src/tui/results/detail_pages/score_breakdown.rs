@@ -1455,10 +1455,10 @@ mod tests {
         // Check that first span of data lines has consistent width
         for line in factor_lines.iter().skip(1) {
             // skip header
-            if !line.spans.is_empty() && line.spans[0].content.len() > 0 {
+            if !line.spans.is_empty() && !line.spans[0].content.is_empty() {
                 // Non-empty lines should have proper indent
                 let first_span = &line.spans[0].content;
-                if first_span.trim().len() > 0 {
+                if !first_span.trim().is_empty() {
                     assert!(
                         first_span.len() >= INDENT,
                         "Line should have at least {} indent: {:?}",
@@ -1470,9 +1470,9 @@ mod tests {
         }
 
         for line in mult_lines.iter().skip(1) {
-            if !line.spans.is_empty() && line.spans[0].content.len() > 0 {
+            if !line.spans.is_empty() && !line.spans[0].content.is_empty() {
                 let first_span = &line.spans[0].content;
-                if first_span.trim().len() > 0 {
+                if !first_span.trim().is_empty() {
                     assert!(
                         first_span.len() >= INDENT,
                         "Line should have at least {} indent: {:?}",

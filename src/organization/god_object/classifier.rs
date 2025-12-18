@@ -2928,7 +2928,7 @@ mod tests {
             MethodComplexityClass::Substantive,
         ]
         .into_iter()
-        .chain(std::iter::repeat(MethodComplexityClass::Substantive).take(21))
+        .chain(std::iter::repeat_n(MethodComplexityClass::Substantive, 21))
         .collect::<Vec<_>>();
 
         let self_usages = vec![
@@ -2937,7 +2937,7 @@ mod tests {
             MethodSelfUsage::InstanceMethod,
         ]
         .into_iter()
-        .chain(std::iter::repeat(MethodSelfUsage::PureAssociated).take(21))
+        .chain(std::iter::repeat_n(MethodSelfUsage::PureAssociated, 21))
         .collect::<Vec<_>>();
 
         let weighted =
@@ -3035,7 +3035,7 @@ mod tests {
             ])
         ) {
             let weight = calculate_combined_method_weight(accessor, self_usage);
-            prop_assert!(weight >= 0.0 && weight <= 1.0,
+            prop_assert!((0.0..=1.0).contains(&weight),
                 "Combined weight {} out of bounds", weight);
         }
 

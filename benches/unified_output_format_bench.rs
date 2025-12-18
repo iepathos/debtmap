@@ -111,6 +111,8 @@ fn benchmark_unified_format_serialization(c: &mut Criterion) {
                 enable_context: false,
                 context_providers: None,
                 disable_context: None,
+                rust_files: None,
+                extracted_data: None,
             },
         )
         .unwrap();
@@ -177,6 +179,8 @@ fn benchmark_scaling_by_debt_items(c: &mut Criterion) {
                 enable_context: false,
                 context_providers: None,
                 disable_context: None,
+                rust_files: None,
+                extracted_data: None,
             },
         )
         .unwrap();

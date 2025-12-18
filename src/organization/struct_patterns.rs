@@ -78,6 +78,7 @@ pub struct PatternAnalysis {
 ///     field_count: 8,
 ///     methods: vec!["strict".into(), "balanced".into(), "lenient".into()],
 ///     fields: vec![],
+///     field_types: vec![],
 ///     responsibilities: vec![],
 ///     trait_implementations: 0,
 ///     location: SourceLocation {
@@ -87,6 +88,7 @@ pub struct PatternAnalysis {
 ///         end_column: None,
 ///         confidence: LocationConfidence::Exact,
 ///     },
+///     impl_locations: vec![],
 /// };
 ///
 /// let analysis = detect_pattern(&type_analysis, 1);

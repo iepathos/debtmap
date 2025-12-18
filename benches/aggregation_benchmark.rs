@@ -85,6 +85,8 @@ fn benchmark_analysis_without_aggregation(c: &mut Criterion) {
                     enable_context: false,
                     context_providers: None,
                     disable_context: None,
+                    rust_files: None,
+                    extracted_data: None,
                 },
             );
         });
@@ -127,6 +129,8 @@ fn benchmark_analysis_with_aggregation(c: &mut Criterion) {
                     enable_context: false,
                     context_providers: None,
                     disable_context: None,
+                    rust_files: None,
+                    extracted_data: None,
                 },
             );
         });
@@ -172,6 +176,8 @@ fn benchmark_aggregation_methods(c: &mut Criterion) {
                         enable_context: false,
                         context_providers: None,
                         disable_context: None,
+                        rust_files: None,
+                        extracted_data: None,
                     },
                 );
             });

@@ -12,7 +12,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::organization::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
     group_methods_by_responsibility, recommend_module_splits, GodObjectDetector,
-    GodObjectThresholds,
+    GodObjectThresholds, OrganizationDetector,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -135,7 +135,7 @@ fn bench_full_analysis_pipeline(c: &mut Criterion) {
     c.bench_function("full_analysis_pipeline", |b| {
         b.iter(|| {
             let detector = GodObjectDetector::with_source_content(&source_content);
-            black_box(detector.analyze_comprehensive(config_path, &file))
+            black_box(detector.detect_anti_patterns(&file))
         })
     });
 }
@@ -154,7 +154,13 @@ fn bench_enhanced_analysis(c: &mut Criterion) {
     c.bench_function("enhanced_analysis_pipeline", |b| {
         b.iter(|| {
             let detector = GodObjectDetector::with_source_content(&source_content);
-            black_box(detector.analyze_enhanced(config_path, &file))
+            // Use detect_anti_patterns as the main analysis method
+            let patterns = detector.detect_anti_patterns(&file);
+            // Also benchmark impact estimation for each pattern
+            for pattern in &patterns {
+                let _impact = detector.estimate_maintainability_impact(pattern);
+            }
+            black_box(patterns)
         })
     });
 }

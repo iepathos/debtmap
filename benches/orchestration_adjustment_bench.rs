@@ -41,6 +41,7 @@ fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) 
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        entropy_analysis: None,
     }
 }
 

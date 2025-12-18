@@ -344,8 +344,8 @@ mod tests {
     fn test_extract_thread_panic_message_from_expect() {
         // Simulate a panic from .expect()
         let handle = std::thread::spawn(|| {
-            let opt: Option<i32> = None;
-            opt.expect("expected value was missing");
+            #[allow(clippy::unnecessary_literal_unwrap)]
+            None::<i32>.expect("expected value was missing");
         });
 
         let err = handle.join().expect_err("Should have panicked");

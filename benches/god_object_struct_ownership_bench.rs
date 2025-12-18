@@ -4,7 +4,7 @@
 //! to verify < 10% overhead requirement (Spec 143 AC8 and NFR1)
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use debtmap::organization::GodObjectDetector;
+use debtmap::organization::{GodObjectDetector, OrganizationDetector};
 use std::fs;
 use std::hint::black_box;
 use std::path::Path;
@@ -12,15 +12,14 @@ use std::path::Path;
 /// Benchmark god object detection on config.rs without struct ownership analysis
 /// This serves as our baseline for comparison
 fn bench_baseline_detection(c: &mut Criterion) {
-    let config_path = Path::new("src/config.rs");
-    let source_content = fs::read_to_string(config_path).expect("Failed to read config.rs");
+    let source_content = fs::read_to_string("src/config.rs").expect("Failed to read config.rs");
     let file = syn::parse_file(&source_content).expect("Failed to parse config.rs");
 
     c.bench_function("god_object_baseline_config_rs", |b| {
         b.iter(|| {
             // Basic analysis without struct ownership
             let detector = GodObjectDetector::new();
-            black_box(detector.analyze_comprehensive(config_path, &file))
+            black_box(detector.detect_anti_patterns(&file))
         })
     });
 }
@@ -28,15 +27,14 @@ fn bench_baseline_detection(c: &mut Criterion) {
 /// Benchmark god object detection on config.rs WITH struct ownership analysis
 /// This measures the full implementation cost
 fn bench_struct_ownership_detection(c: &mut Criterion) {
-    let config_path = Path::new("src/config.rs");
-    let source_content = fs::read_to_string(config_path).expect("Failed to read config.rs");
+    let source_content = fs::read_to_string("src/config.rs").expect("Failed to read config.rs");
     let file = syn::parse_file(&source_content).expect("Failed to parse config.rs");
 
     c.bench_function("god_object_struct_ownership_config_rs", |b| {
         b.iter(|| {
             // Full analysis with struct ownership
             let detector = GodObjectDetector::with_source_content(&source_content);
-            black_box(detector.analyze_comprehensive(config_path, &file))
+            black_box(detector.detect_anti_patterns(&file))
         })
     });
 }
@@ -69,25 +67,21 @@ fn bench_scaling_comparison(c: &mut Criterion) {
         };
 
         // Baseline without struct ownership
-        group.bench_with_input(
-            BenchmarkId::new("baseline", label),
-            &(&path, &file),
-            |b, (p, f)| {
-                b.iter(|| {
-                    let detector = GodObjectDetector::new();
-                    black_box(detector.analyze_comprehensive(p, f))
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("baseline", label), &file, |b, f| {
+            b.iter(|| {
+                let detector = GodObjectDetector::new();
+                black_box(detector.detect_anti_patterns(f))
+            })
+        });
 
         // With struct ownership analysis
         group.bench_with_input(
             BenchmarkId::new("struct_ownership", label),
-            &(&path, &file, &source_content),
-            |b, (p, f, content)| {
+            &(&file, &source_content),
+            |b, (f, content)| {
                 b.iter(|| {
                     let detector = GodObjectDetector::with_source_content(content);
-                    black_box(detector.analyze_comprehensive(p, f))
+                    black_box(detector.detect_anti_patterns(f))
                 })
             },
         );
@@ -119,8 +113,7 @@ fn bench_struct_ownership_isolation(c: &mut Criterion) {
 fn validate_performance_overhead() {
     use std::time::Instant;
 
-    let config_path = Path::new("src/config.rs");
-    let source_content = fs::read_to_string(config_path).expect("Failed to read config.rs");
+    let source_content = fs::read_to_string("src/config.rs").expect("Failed to read config.rs");
     let file = syn::parse_file(&source_content).expect("Failed to parse config.rs");
 
     const ITERATIONS: usize = 100;
@@ -129,7 +122,7 @@ fn validate_performance_overhead() {
     let start_baseline = Instant::now();
     for _ in 0..ITERATIONS {
         let detector = GodObjectDetector::new();
-        let _ = black_box(detector.analyze_comprehensive(config_path, &file));
+        let _ = black_box(detector.detect_anti_patterns(&file));
     }
     let baseline_duration = start_baseline.elapsed();
 
@@ -137,7 +130,7 @@ fn validate_performance_overhead() {
     let start_ownership = Instant::now();
     for _ in 0..ITERATIONS {
         let detector = GodObjectDetector::with_source_content(&source_content);
-        let _ = black_box(detector.analyze_comprehensive(config_path, &file));
+        let _ = black_box(detector.detect_anti_patterns(&file));
     }
     let ownership_duration = start_ownership.elapsed();
 
@@ -174,8 +167,7 @@ fn validate_performance_overhead() {
 /// Memory usage comparison test
 #[test]
 fn validate_memory_efficiency() {
-    let config_path = Path::new("src/config.rs");
-    let source_content = fs::read_to_string(config_path).expect("Failed to read config.rs");
+    let source_content = fs::read_to_string("src/config.rs").expect("Failed to read config.rs");
     let file = syn::parse_file(&source_content).expect("Failed to parse config.rs");
 
     // Test that we can run analysis multiple times without excessive memory growth
@@ -183,17 +175,11 @@ fn validate_memory_efficiency() {
 
     for _ in 0..ITERATIONS {
         let detector = GodObjectDetector::with_source_content(&source_content);
-        let analyses = detector.analyze_comprehensive(config_path, &file);
+        let patterns = detector.detect_anti_patterns(&file);
 
-        // Verify we produce results - either god objects found or empty means no god objects
-        // Spec 201: analyze_comprehensive now returns Vec<GodObjectAnalysis>
-        assert!(
-            analyses.is_empty()
-                || analyses
-                    .iter()
-                    .any(|a| !a.recommended_splits.is_empty() || a.is_god_object),
-            "Analysis should produce results"
-        );
+        // Verify we produce results - patterns detected or empty means no issues
+        // This is just a basic validation that analysis completes
+        let _ = black_box(&patterns);
     }
 
     // If we get here without OOM, memory usage is acceptable

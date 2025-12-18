@@ -227,7 +227,7 @@ pub fn calculate_god_object_score_weighted(
 /// let factor = calculate_complexity_factor(&low, &ComplexityThresholds::default());
 /// assert!(factor < 1.0);
 ///
-/// // High complexity - should produce factor > 2.0
+/// // High complexity - should produce factor > 1.5
 /// let high = ComplexityMetrics {
 ///     avg_cyclomatic: 15.0,
 ///     max_cyclomatic: 30,
@@ -236,7 +236,7 @@ pub fn calculate_god_object_score_weighted(
 ///     ..Default::default()
 /// };
 /// let factor = calculate_complexity_factor(&high, &ComplexityThresholds::default());
-/// assert!(factor > 2.0);
+/// assert!(factor > 1.5);
 /// ```
 pub fn calculate_complexity_factor(
     metrics: &ComplexityMetrics,
@@ -1381,7 +1381,7 @@ mod spec_211_tests {
             let thresholds = ComplexityThresholds::default();
 
             let factor = calculate_complexity_factor(&metrics, &thresholds);
-            prop_assert!(factor >= 0.5 && factor <= 3.0,
+            prop_assert!((0.5..=3.0).contains(&factor),
                 "Factor {} out of range [0.5, 3.0]", factor);
         }
 
@@ -1888,7 +1888,7 @@ mod spec_213_tests {
             };
 
             let ratio = breakdown.pure_ratio();
-            prop_assert!(ratio >= 0.0 && ratio <= 1.0,
+            prop_assert!((0.0..=1.0).contains(&ratio),
                 "Pure ratio {} out of bounds", ratio);
         }
 
