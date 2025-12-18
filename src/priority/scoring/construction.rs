@@ -453,7 +453,7 @@ fn extract_dependency_metrics(
     }
 }
 
-// Apply exponential scaling and risk boosting to a debt item (spec 171)
+// Apply exponential scaling and risk boosting to a debt item (spec 171, spec 260)
 fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     use crate::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
 
@@ -468,6 +468,13 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     item.unified_score.base_score = Some(base_score);
     item.unified_score.exponential_factor = Some(exponent);
     item.unified_score.risk_boost = Some(boost);
+
+    // Spec 260: Track pre-normalization score if clamping will occur
+    // This ensures the calculation steps show why the score jumped to 100
+    if final_score > 100.0 {
+        item.unified_score.pre_normalization_score = Some(final_score);
+    }
+
     item.unified_score.final_score = Score0To100::new(final_score);
 
     item

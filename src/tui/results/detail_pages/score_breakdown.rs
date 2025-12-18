@@ -963,21 +963,37 @@ pub fn build_calculation_summary_section(
             let _ = step_num + 1;
         }
     } else if (base_score - current_value).abs() > 0.5 {
-        // Fallback for older data without detailed tracking
-        let explanation = if base_score > current_value {
-            "adjustments"
+        // Fallback for data without detailed tracking - show what adjustment was applied
+        if base_score > current_value && current_value > 0.0 {
+            // Show the multiplier that was implicitly applied
+            let implicit_mult = base_score / current_value;
+            add_label_value(
+                &mut lines,
+                &format!("{}. × implicit", step_num),
+                format!(
+                    "{:.2} × {:.2} = {:.2} (untracked multiplier)",
+                    current_value, implicit_mult, base_score
+                ),
+                theme,
+                width,
+            );
         } else if base_score < current_value && base_score <= 100.0 {
-            "clamped"
+            add_label_value(
+                &mut lines,
+                &format!("{}. clamped", step_num),
+                format!("{:.2} → {:.2}", current_value, base_score),
+                theme,
+                width,
+            );
         } else {
-            "normalized"
-        };
-        add_label_value(
-            &mut lines,
-            &format!("{}. {}", step_num, explanation),
-            format!("{:.2} → {:.2}", current_value, base_score),
-            theme,
-            width,
-        );
+            add_label_value(
+                &mut lines,
+                &format!("{}. normalized", step_num),
+                format!("{:.2} → {:.2}", current_value, base_score),
+                theme,
+                width,
+            );
+        }
     } else if (current_value - base_score).abs() <= 0.5 {
         // No significant gap - just show the normalized value
         add_label_value(
@@ -1028,12 +1044,36 @@ pub fn build_calculation_summary_section(
             theme,
             width,
         );
+        current = after_god;
     }
 
-    // Final score (clamped to 100)
+    // Show clamping step explicitly if pre_normalization_score indicates clamping occurred (spec 260)
+    // This makes the 51.55 → 100 jump explicit rather than hidden
+    if let Some(pre_norm) = item.unified_score.pre_normalization_score {
+        if pre_norm > 100.0 {
+            add_label_value(
+                &mut lines,
+                "CLAMPED",
+                format!("{:.2} → 100.00 (exceeds max, capped)", pre_norm),
+                theme,
+                width,
+            );
+        }
+    } else if current > 100.0 {
+        // Fallback: if we calculated a value > 100 but no pre_normalization_score was stored
+        add_label_value(
+            &mut lines,
+            "CLAMPED",
+            format!("{:.2} → 100.00 (exceeds max, capped)", current),
+            theme,
+            width,
+        );
+    }
+
+    // Final score
     add_label_value(
         &mut lines,
-        "final (clamped)",
+        "final",
         format!("{:.1}", final_score),
         theme,
         width,
