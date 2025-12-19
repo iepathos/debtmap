@@ -1026,18 +1026,7 @@ pub fn build_calculation_summary_section(
         current = after_boost;
     }
 
-    // Show god object multiplier if applied
-    if let Some(gm) = god_mult {
-        let after_god = current * gm;
-        add_label_value(
-            &mut lines,
-            "× god mult",
-            format!("{:.2} × {:.2} = {:.2}", current, gm, after_god),
-            theme,
-            width,
-        );
-        current = after_god;
-    }
+    // Note: god_mult is already included in base_score, shown in god object impact section
     let _ = current; // Suppress unused warning - value tracked for completeness
 
     // Final score
