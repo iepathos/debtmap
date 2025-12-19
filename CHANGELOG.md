@@ -7,6 +7,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-12-19
+
+### Strategic Direction
+
+- **AI Sensor Model Pivot** (Specs 262-266)
+  - Debtmap now positions itself as an "AI sensor" - providing accurate identification, quantified severity, and structural context to AI agents (Claude, Copilot, Cursor) that have semantic understanding
+  - Planned removal of template-based recommendations in favor of context window suggestions
+  - Key insight: Static analysis can accurately tell you WHERE problems are and HOW SEVERE they are; let AI determine HOW to fix them
+
+### Added
+
+- **Score Calculation Transparency** (Spec 260, 261)
+  - New Score Breakdown detail page (Page 2) in TUI showing exact calculation steps
+  - Explicit display of each scoring component: complexity, coverage, dependencies, contextual risk
+  - Shows specific adjustments and their contributions to final score
+  - Removed score clamping for more accurate representation
+  - Removed `Score0To100` and `Score0To1` wrapper types in favor of direct values
+
+- **Function-Level Git History Analysis** (Spec 195)
+  - Git blame integration for accurate contributor count per function
+  - Function-level churn and authorship metrics
+  - Continuous scoring for git history risk contribution
+
+- **God Object Detection Improvements**
+  - **Method Complexity Weighting** (Spec 211) - Methods weighted by their individual complexity contribution
+  - **Accessor and Boilerplate Detection** (Spec 209) - Identifies and discounts simple accessor methods
+  - **Pure Function Method Weighting** (Spec 213) - Pure methods contribute less to god object score
+  - **Functional Decomposition Recognition** (Spec 215) - Recognizes intentional functional decomposition patterns
+  - **Trait-Mandated Method Detection** (Spec 217) - Methods required by trait implementations weighted differently
+  - **Test Code Exclusion** (Spec 214) - Test code excluded from LOC metrics
+  - **Cohesion Gate** (Spec 206) - Low cohesion now required before flagging as god object
+  - **Per-Struct LOC Fix** (Spec 207) - Accurate LOC calculation for individual structs
+
+- **Entropy Type Consolidation** (Spec 218)
+  - Unified entropy analysis types across the codebase
+  - Improved entropy data propagation through god object analysis pipeline
+
+- **Observability Improvements**
+  - **Panic Hook with Crash Reports** (Spec 207) - Structured crash reports for debugging
+  - **Structured Tracing with Spans** (Spec 208) - Comprehensive tracing throughout analysis
+  - **Rayon Parallel Span Propagation** (Spec 209) - Tracing spans properly propagate through parallel code
+  - **SourceMap Overflow Prevention** (Spec 210) - Prevents crashes on large codebases
+
+- **Output Quality Improvements**
+  - **Output Invariant Testing** (Spec 230) - Schema validation for all output formats
+  - **Debt Item Deduplication** (Spec 231) - Eliminates duplicate items in output
+  - **Anti-Pattern Details** (Spec 197) - Exposed in JSON and TUI
+  - **Cohesion Metrics** (Spec 198) - Exposed in output for transparency
+
+### Changed
+
+- **Unified Extraction Architecture** (Specs 211-214)
+  - Single-pass parsing for Rust files via `UnifiedFileExtractor`
+  - Extraction adapters for consistent data transformation
+  - Eliminated redundant AST traversals
+  - Complete file parsing migration to unified extractor (Spec 204)
+  - Consolidated god object detection to extraction adapter (Spec 212)
+
+- **God Object Default Role**
+  - Changed default role classification from `Orchestrator` to `PureLogic`
+  - More accurate default assumption for unclassified structs
+
+- **Scoring Improvements**
+  - Isolated components now contribute zero dependency risk
+  - Continuous (non-stepped) scoring for git history risk
+  - Removed redundant god object warning from score breakdown
+  - Fixed double-counted god_mult in calculation steps
+
+### Performance
+
+- **Parallel Debt Item Scoring** (Spec 196)
+  - Rayon-based parallel scoring for debt items
+  - Significant speedup on large codebases
+
+- **File Line Count Caching** (Spec 195)
+  - Per-file line count caching eliminates redundant file reads
+
+- **Shared Context Detection**
+  - ContextDetector shared across parallel metric processing
+  - Eliminated redundant file I/O in Phase 3 analysis
+
+### Internal (Refactoring)
+
+- **God Object Remediation**
+  - Split `ResultsApp` into focused modules (navigation, rendering, state)
+  - Decomposed `unified.rs` god module into focused submodules
+  - Split `analyze.rs` command into focused modules
+  - Split `validate.rs` into focused modules
+  - Split `cfg_builder.rs` into focused modules
+  - Extracted clustering module from god object analysis
+  - Decomposed `evidence_calculator` into focused modules
+  - Split `effects.rs` into focused modules
+  - Split `trait_registry.rs` into focused modules
+  - Split `module_structure.rs` into focused modules
+  - Unified TUI copy with rendering via shared builders
+
+- **Nesting Calculation Consolidation** (Specs 201-203)
+  - Single source of truth for nesting depth calculation
+  - Comprehensive test coverage for nesting scenarios
+  - Fixed else-if chain nesting calculation (Spec 198)
+
+- **God Object Extraction Adapter Rewrite** (Spec 197)
+  - Complete rewrite of extraction adapter for cleaner architecture
+
+### Fixed
+
+- TUI progress updates throughout all analysis stages
+- Correct calculation steps displayed for god objects vs functions
+- Detailed calculation steps shown for god objects in TUI
+- Dampened cyclomatic calculation using correct input
+
 ## [0.9.2] - 2025-12-13
 
 ### Added
