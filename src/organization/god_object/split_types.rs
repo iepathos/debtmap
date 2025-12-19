@@ -146,21 +146,6 @@ impl PartialEq for ModuleSplit {
     }
 }
 
-impl ModuleSplit {
-    /// Validates that the suggested name does not include a file extension.
-    /// Extensions should be added by the formatter based on the source file type.
-    pub(crate) fn validate_name(name: &str) {
-        debug_assert!(
-            !name.ends_with(".rs")
-                && !name.ends_with(".py")
-                && !name.ends_with(".js")
-                && !name.ends_with(".ts"),
-            "ModuleSplit::suggested_name should not include file extension: {}",
-            name
-        );
-    }
-}
-
 /// Estimated interface size between proposed modules
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InterfaceEstimate {

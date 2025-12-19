@@ -22,14 +22,8 @@ pub(super) use super::computation::{calculate_entropy_details, calculate_expecte
 // Import computation functions for tests
 #[cfg(test)]
 use super::computation::{
-    calculate_coverage_improvement, calculate_functions_to_extract, calculate_lines_reduction,
-    calculate_risk_factor, is_function_complex,
-};
-
-// Import formatting functions for tests
-#[cfg(test)]
-use super::formatting::{
-    format_complexity_display, format_role_description, get_role_display_name,
+    calculate_coverage_improvement, calculate_lines_reduction, calculate_risk_factor,
+    is_function_complex,
 };
 
 // Import types for tests
@@ -247,54 +241,6 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_functions_to_extract() {
-        // Test various complexity levels
-        assert_eq!(calculate_functions_to_extract(5, 5), 2);
-        assert_eq!(calculate_functions_to_extract(10, 10), 2);
-        assert_eq!(calculate_functions_to_extract(15, 15), 3);
-        assert_eq!(calculate_functions_to_extract(20, 20), 4);
-        assert_eq!(calculate_functions_to_extract(25, 25), 5);
-        assert_eq!(calculate_functions_to_extract(30, 30), 6);
-        assert_eq!(calculate_functions_to_extract(50, 50), 10);
-
-        // Test with different cyclomatic and cognitive values
-        assert_eq!(calculate_functions_to_extract(10, 20), 4);
-        assert_eq!(calculate_functions_to_extract(30, 15), 6);
-    }
-
-    #[test]
-    fn test_format_complexity_display() {
-        assert_eq!(format_complexity_display(&5, &8), "cyclo=5, cog=8");
-        assert_eq!(format_complexity_display(&10, &15), "cyclo=10, cog=15");
-        assert_eq!(format_complexity_display(&0, &0), "cyclo=0, cog=0");
-    }
-
-    #[test]
-    fn test_format_role_description() {
-        assert_eq!(
-            format_role_description(FunctionRole::PureLogic),
-            "business logic"
-        );
-        assert_eq!(
-            format_role_description(FunctionRole::Orchestrator),
-            "orchestration"
-        );
-        assert_eq!(
-            format_role_description(FunctionRole::IOWrapper),
-            "I/O wrapper"
-        );
-        assert_eq!(
-            format_role_description(FunctionRole::EntryPoint),
-            "entry point"
-        );
-        assert_eq!(
-            format_role_description(FunctionRole::PatternMatch),
-            "pattern matching"
-        );
-        assert_eq!(format_role_description(FunctionRole::Unknown), "function");
-    }
-
-    #[test]
     fn test_is_function_complex() {
         // Test not complex
         assert!(!is_function_complex(5, 10));
@@ -392,28 +338,4 @@ mod tests {
         assert_eq!(calculate_lines_reduction(&complexity), 0);
     }
 
-    #[test]
-    fn test_get_role_display_name() {
-        assert_eq!(
-            get_role_display_name(FunctionRole::PureLogic),
-            "Business logic"
-        );
-        assert_eq!(
-            get_role_display_name(FunctionRole::Orchestrator),
-            "Orchestration"
-        );
-        assert_eq!(
-            get_role_display_name(FunctionRole::IOWrapper),
-            "I/O wrapper"
-        );
-        assert_eq!(
-            get_role_display_name(FunctionRole::EntryPoint),
-            "Entry point"
-        );
-        assert_eq!(
-            get_role_display_name(FunctionRole::PatternMatch),
-            "Pattern matching"
-        );
-        assert_eq!(get_role_display_name(FunctionRole::Unknown), "Function");
-    }
 }

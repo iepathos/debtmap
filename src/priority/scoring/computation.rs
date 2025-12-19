@@ -6,10 +6,7 @@
 
 use crate::core::FunctionMetrics;
 use crate::priority::unified_scorer::EntropyDetails;
-use crate::priority::{
-    scoring::test_calculation::{calculate_tests_needed, ComplexityTier},
-    DebtType, ImpactMetrics, UnifiedScore,
-};
+use crate::priority::{DebtType, ImpactMetrics, UnifiedScore};
 
 /// Helper function to calculate entropy details from FunctionMetrics
 /// Pure function - transforms function metrics into entropy details
@@ -49,43 +46,6 @@ pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetail
             adjusted_cognitive,
         }
     })
-}
-
-/// Pure function - calculates how many functions should be extracted
-/// Based on cyclomatic and cognitive complexity
-pub(super) fn calculate_functions_to_extract(cyclomatic: u32, cognitive: u32) -> u32 {
-    let max_complexity = cyclomatic.max(cognitive);
-    // Target complexity per function is 3-5
-    // Calculate how many functions needed to achieve this
-    match max_complexity {
-        0..=10 => 2,                      // Extract 2 functions: 10/2 = 5 complexity each
-        11..=15 => 3,                     // Extract 3 functions: 15/3 = 5 complexity each
-        16..=20 => 4,                     // Extract 4 functions: 20/4 = 5 complexity each
-        21..=25 => 5,                     // Extract 5 functions: 25/5 = 5 complexity each
-        26..=30 => 6,                     // Extract 6 functions: 30/6 = 5 complexity each
-        _ => (max_complexity / 5).max(6), // For very high complexity, aim for ~5 per function
-    }
-}
-
-/// Calculate test cases needed based on complexity and current coverage
-/// Delegates to unified test_calculation module (Moderate/High tier)
-pub(super) fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
-    // Use appropriate tier based on complexity
-    let tier = if cyclomatic > 30 {
-        ComplexityTier::High
-    } else if cyclomatic > 10 {
-        ComplexityTier::Moderate
-    } else {
-        ComplexityTier::Simple
-    };
-
-    calculate_tests_needed(cyclomatic, coverage_pct, Some(tier)).count
-}
-
-/// Calculate approximate test cases for simple functions
-/// Delegates to unified test_calculation module (Simple tier)
-pub(super) fn calculate_simple_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
-    calculate_tests_needed(cyclomatic, coverage_pct, Some(ComplexityTier::Simple)).count
 }
 
 /// Pure function - determines if a function is considered complex
@@ -227,14 +187,6 @@ pub(super) fn calculate_expected_impact(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_calculate_functions_to_extract() {
-        assert_eq!(calculate_functions_to_extract(8, 6), 2);
-        assert_eq!(calculate_functions_to_extract(15, 12), 3);
-        assert_eq!(calculate_functions_to_extract(20, 18), 4);
-        assert_eq!(calculate_functions_to_extract(50, 40), 10);
-    }
 
     #[test]
     fn test_is_function_complex() {
