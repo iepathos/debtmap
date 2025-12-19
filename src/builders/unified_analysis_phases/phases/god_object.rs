@@ -192,17 +192,22 @@ fn create_god_object_debt_type(god_analysis: &GodObjectAnalysis) -> DebtType {
     }
 }
 
-/// Classify function role for god object items (spec 233).
+/// Classify function role for god object items (spec 233, refined spec 270).
 ///
 /// God objects are architectural-level debt, not function-level. However, we assign
 /// a meaningful role based on their characteristics to improve filtering and prioritization.
 ///
-/// - GodClass with many methods typically acts as an Orchestrator
-/// - GodFile/GodModule with many functions typically acts as an Orchestrator
-/// - Items with high impure method count act as IOWrapper
-/// - Items with mostly pure functions (low weighted/raw ratio) are PureLogic
+/// Classification priority (first match wins):
+/// 1. IOWrapper: >40% impure methods (I/O operations dominate)
+/// 2. PureLogic: Trait-dominated struct (>50% trait-mandated methods like syn::Visit)
+/// 3. PureLogic: Mostly pure functions (weighted/raw ratio < 40%)
+/// 4. PureLogic: Default for large structs without clear orchestration evidence
+///
+/// Note: "Orchestrator" role is reserved for structs that actively coordinate
+/// calls to other components. A struct with many visitor methods is NOT an
+/// orchestrator - it's implementing a traversal pattern.
 fn classify_god_object_role(god_analysis: &GodObjectAnalysis) -> FunctionRole {
-    // If purity distribution shows mostly impure operations, classify as IOWrapper
+    // 1. If purity distribution shows mostly impure operations, classify as IOWrapper
     if let Some(ref purity) = god_analysis.purity_distribution {
         // Check if more than 40% of methods are impure (I/O-related)
         let total_methods = purity.pure_count + purity.probably_pure_count + purity.impure_count;
@@ -214,7 +219,17 @@ fn classify_god_object_role(god_analysis: &GodObjectAnalysis) -> FunctionRole {
         }
     }
 
-    // Check if mostly pure functions based on weighted method count
+    // 2. Check trait method summary - if trait methods dominate, this is likely
+    // a legitimate implementation (visitor, serializer, etc.), not an orchestrator
+    if let Some(ref trait_summary) = god_analysis.trait_method_summary {
+        // If >50% of methods are trait-mandated, classify as PureLogic
+        // These are structural requirements, not evidence of orchestration
+        if trait_summary.mandated_ratio() > 0.5 {
+            return FunctionRole::PureLogic;
+        }
+    }
+
+    // 3. Check if mostly pure functions based on weighted method count
     // If weighted_method_count is <40% of raw count, these are mostly pure helpers
     // This indicates a cohesive utility module, not an orchestrator
     if let Some(weighted) = god_analysis.weighted_method_count {
@@ -225,25 +240,24 @@ fn classify_god_object_role(god_analysis: &GodObjectAnalysis) -> FunctionRole {
         }
     }
 
-    // Most god objects are orchestrators - they coordinate many responsibilities
-    // They have many methods calling other parts of the system
-    if god_analysis.method_count >= 10 || god_analysis.responsibility_count >= 3 {
-        return FunctionRole::Orchestrator;
-    }
-
-    // Smaller god objects are classified as pure logic needing decomposition
+    // 4. Default to PureLogic for large structs
+    // "Orchestrator" should only be assigned when there's clear evidence of
+    // coordination (e.g., many calls to other components, delegation patterns).
+    // High method count alone is not evidence of orchestration - it could be
+    // a visitor pattern, utility module, or large API surface.
     FunctionRole::PureLogic
 }
 
-/// Calculate classification confidence for god object role (spec 233).
+/// Calculate classification confidence for god object role (spec 233, refined spec 270).
 ///
 /// Returns a confidence score between 0.0 and 1.0 based on how strongly
 /// the analysis data supports the role classification.
 ///
 /// Confidence factors:
 /// - IOWrapper: Higher impurity ratio = higher confidence
-/// - Orchestrator: More methods/responsibilities = higher confidence
-/// - PureLogic: Default classification when signals are weak (lower confidence)
+/// - PureLogic (trait-dominated): Higher mandated ratio = higher confidence
+/// - PureLogic (pure utility): Lower weighted/raw ratio = higher confidence
+/// - PureLogic (default): Base confidence for unclear cases
 #[allow(dead_code)]
 pub fn calculate_role_confidence(god_analysis: &GodObjectAnalysis) -> f64 {
     // Check IOWrapper classification confidence
@@ -259,20 +273,35 @@ pub fn calculate_role_confidence(god_analysis: &GodObjectAnalysis) -> f64 {
         }
     }
 
-    // Check Orchestrator classification confidence
-    let method_score = (god_analysis.method_count as f64 / 20.0).min(1.0);
-    let responsibility_score = (god_analysis.responsibility_count as f64 / 5.0).min(1.0);
-
-    if god_analysis.method_count >= 10 || god_analysis.responsibility_count >= 3 {
-        // Orchestrator confidence: 65% base + up to 30% based on method/responsibility counts
-        let combined_score = (method_score + responsibility_score) / 2.0;
-        return 0.65 + combined_score * 0.30;
+    // Check trait-dominated classification confidence
+    if let Some(ref trait_summary) = god_analysis.trait_method_summary {
+        let mandated_ratio = trait_summary.mandated_ratio();
+        if mandated_ratio > 0.5 {
+            // Trait-dominated confidence: 70% base + up to 25% based on how dominant
+            // mandated_ratio of 1.0 = 95% confidence, ratio of 0.5 = 70% confidence
+            return 0.70 + ((mandated_ratio - 0.5) / 0.5) * 0.25;
+        }
     }
 
-    // PureLogic is a fallback classification - lower confidence (50-65%)
-    // More methods/responsibilities suggest we're closer to being an orchestrator
-    let fallback_score = (method_score + responsibility_score) / 2.0;
-    0.50 + fallback_score * 0.15
+    // Check pure utility module confidence
+    if let Some(weighted) = god_analysis.weighted_method_count {
+        let raw = god_analysis.method_count as f64;
+        if raw > 0.0 {
+            let purity_ratio = weighted / raw;
+            if purity_ratio < 0.4 {
+                // Pure utility confidence: 75% base + up to 20% based on how pure
+                // purity_ratio of 0.0 = 95% confidence, ratio of 0.4 = 75% confidence
+                return 0.75 + ((0.4 - purity_ratio) / 0.4) * 0.20;
+            }
+        }
+    }
+
+    // Default PureLogic: moderate confidence (65-75%)
+    // More methods/responsibilities = higher confidence it's intentional design
+    let method_score = (god_analysis.method_count as f64 / 20.0).min(1.0);
+    let responsibility_score = (god_analysis.responsibility_count as f64 / 5.0).min(1.0);
+    let size_score = (method_score + responsibility_score) / 2.0;
+    0.65 + size_score * 0.10
 }
 
 /// Determine display name and line number based on detection type (pure).
@@ -556,14 +585,16 @@ mod tests {
         let analysis = create_test_god_analysis();
         let rec = create_god_object_recommendation(&analysis);
 
-        // Default test fixture (50 methods, 5 responsibilities) is classified as Orchestrator
-        // so it should recommend extracting sub-orchestrators (spec 233)
+        // Default test fixture (50 methods, 5 responsibilities) is now classified as PureLogic
+        // (spec 270: high method count alone is not evidence of orchestration)
+        // so it should recommend splitting by responsibility
         assert!(
-            rec.primary_action.contains("sub-orchestrators"),
-            "Expected orchestrator recommendation, got: {}",
+            rec.primary_action.contains("Split into")
+                || rec.primary_action.contains("modules by responsibility"),
+            "Expected pure logic recommendation (split by responsibility), got: {}",
             rec.primary_action
         );
-        assert!(rec.rationale.contains("5 responsibilities"));
+        assert!(rec.rationale.contains("responsibilities"));
     }
 
     #[test]
@@ -607,35 +638,39 @@ mod tests {
         assert_eq!(line, 42);
     }
 
-    // Spec 233: God object role classification tests
+    // Spec 233/270: God object role classification tests
+    // Spec 270: Changed default from Orchestrator to PureLogic for large structs
+    // High method count alone is not evidence of orchestration
 
     #[test]
-    fn test_classify_god_object_role_orchestrator_many_methods() {
+    fn test_classify_god_object_role_pure_logic_many_methods() {
         let mut analysis = create_test_god_analysis();
-        analysis.method_count = 20; // >= 10 methods
+        analysis.method_count = 20; // Many methods
         analysis.responsibility_count = 2;
         analysis.purity_distribution = None;
+        analysis.trait_method_summary = None;
 
         let role = classify_god_object_role(&analysis);
         assert_eq!(
             role,
-            FunctionRole::Orchestrator,
-            "God object with many methods should be Orchestrator"
+            FunctionRole::PureLogic,
+            "God object with many methods should default to PureLogic (not Orchestrator)"
         );
     }
 
     #[test]
-    fn test_classify_god_object_role_orchestrator_many_responsibilities() {
+    fn test_classify_god_object_role_pure_logic_many_responsibilities() {
         let mut analysis = create_test_god_analysis();
-        analysis.method_count = 5; // < 10 methods
-        analysis.responsibility_count = 4; // >= 3 responsibilities
+        analysis.method_count = 5;
+        analysis.responsibility_count = 10; // Many responsibilities
         analysis.purity_distribution = None;
+        analysis.trait_method_summary = None;
 
         let role = classify_god_object_role(&analysis);
         assert_eq!(
             role,
-            FunctionRole::Orchestrator,
-            "God object with many responsibilities should be Orchestrator"
+            FunctionRole::PureLogic,
+            "God object with many responsibilities should default to PureLogic (not Orchestrator)"
         );
     }
 
@@ -651,6 +686,31 @@ mod tests {
             role,
             FunctionRole::PureLogic,
             "Small god object should be PureLogic"
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_role_pure_logic_trait_dominated() {
+        use crate::organization::god_object::TraitMethodSummary;
+
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 30;
+        analysis.responsibility_count = 8;
+        analysis.purity_distribution = None;
+        // Trait-dominated: 60% of methods are trait-mandated (like syn::Visit)
+        analysis.trait_method_summary = Some(TraitMethodSummary {
+            mandated_count: 18,
+            by_trait: [("syn::Visit".into(), 18)].into_iter().collect(),
+            weighted_count: 13.8, // 18 * 0.1 + 12 * 1.0
+            extractable_count: 12,
+            total_methods: 30,
+        });
+
+        let role = classify_god_object_role(&analysis);
+        assert_eq!(
+            role,
+            FunctionRole::PureLogic,
+            "Trait-dominated struct (>50% trait-mandated) should be PureLogic"
         );
     }
 
@@ -680,12 +740,13 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_god_object_role_not_io_wrapper_low_impure() {
+    fn test_classify_god_object_role_pure_logic_low_impure() {
         use crate::organization::god_object::PurityDistribution;
 
         let mut analysis = create_test_god_analysis();
         analysis.method_count = 20;
         analysis.responsibility_count = 4;
+        analysis.trait_method_summary = None;
         // Less than 40% impure
         analysis.purity_distribution = Some(PurityDistribution {
             pure_count: 6,
@@ -699,8 +760,8 @@ mod tests {
         let role = classify_god_object_role(&analysis);
         assert_eq!(
             role,
-            FunctionRole::Orchestrator,
-            "God object with low impure ratio should be Orchestrator (not IOWrapper)"
+            FunctionRole::PureLogic,
+            "God object with low impure ratio should be PureLogic (not IOWrapper, not Orchestrator)"
         );
     }
 
@@ -809,49 +870,78 @@ mod tests {
     }
 
     #[test]
-    fn test_confidence_orchestrator_high() {
+    fn test_confidence_pure_logic_large_struct() {
         let mut analysis = create_test_god_analysis();
         analysis.method_count = 25;
         analysis.responsibility_count = 5;
         analysis.purity_distribution = None;
+        analysis.trait_method_summary = None;
 
         let confidence = calculate_role_confidence(&analysis);
-        // Should be high confidence (>= 85%)
+        // Large struct defaults to PureLogic with moderate-high confidence (65-75%)
+        // More methods/responsibilities = higher confidence in intentional design
         assert!(
-            confidence >= 0.85,
-            "High method/responsibility count should give high confidence: {:.2}%",
+            (0.65..0.80).contains(&confidence),
+            "Large struct should have moderate-high confidence: {:.2}%",
             confidence * 100.0
         );
     }
 
     #[test]
-    fn test_confidence_orchestrator_moderate() {
+    fn test_confidence_pure_logic_moderate_struct() {
         let mut analysis = create_test_god_analysis();
         analysis.method_count = 12;
         analysis.responsibility_count = 3;
         analysis.purity_distribution = None;
+        analysis.trait_method_summary = None;
 
         let confidence = calculate_role_confidence(&analysis);
-        // Should be moderate confidence (65-85%)
+        // Moderate struct defaults to PureLogic with moderate confidence (65-75%)
         assert!(
-            (0.65..0.85).contains(&confidence),
-            "Moderate method/responsibility count should give moderate confidence: {:.2}%",
+            (0.65..0.75).contains(&confidence),
+            "Moderate struct should have moderate confidence: {:.2}%",
             confidence * 100.0
         );
     }
 
     #[test]
-    fn test_confidence_pure_logic_default() {
+    fn test_confidence_pure_logic_small_struct() {
         let mut analysis = create_test_god_analysis();
         analysis.method_count = 5;
         analysis.responsibility_count = 2;
         analysis.purity_distribution = None;
+        analysis.trait_method_summary = None;
 
         let confidence = calculate_role_confidence(&analysis);
-        // Should be lower confidence (50-65%) since it's a fallback
+        // Small struct defaults to PureLogic with moderate confidence (65-70%)
         assert!(
-            (0.50..0.65).contains(&confidence),
-            "Fallback classification should have lower confidence: {:.2}%",
+            (0.65..0.70).contains(&confidence),
+            "Small struct should have moderate confidence: {:.2}%",
+            confidence * 100.0
+        );
+    }
+
+    #[test]
+    fn test_confidence_trait_dominated() {
+        use crate::organization::god_object::TraitMethodSummary;
+
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 30;
+        analysis.purity_distribution = None;
+        // 80% trait-mandated
+        analysis.trait_method_summary = Some(TraitMethodSummary {
+            mandated_count: 24,
+            by_trait: [("syn::Visit".into(), 24)].into_iter().collect(),
+            weighted_count: 8.4,
+            extractable_count: 6,
+            total_methods: 30,
+        });
+
+        let confidence = calculate_role_confidence(&analysis);
+        // Trait-dominated structs have high confidence (85-95%)
+        assert!(
+            confidence >= 0.85,
+            "Trait-dominated struct should have high confidence: {:.2}%",
             confidence * 100.0
         );
     }
