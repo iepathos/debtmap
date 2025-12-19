@@ -337,5 +337,4 @@ mod tests {
         };
         assert_eq!(calculate_lines_reduction(&complexity), 0);
     }
-
 }

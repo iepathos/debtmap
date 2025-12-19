@@ -68,19 +68,13 @@ mod tests {
             ..pub_func.clone()
         };
 
-        assert_eq!(
-            determine_visibility(&crate_func),
-            FunctionVisibility::Crate
-        );
+        assert_eq!(determine_visibility(&crate_func), FunctionVisibility::Crate);
 
         let super_func = FunctionMetrics {
             visibility: Some("pub(super)".to_string()),
             ..pub_func.clone()
         };
 
-        assert_eq!(
-            determine_visibility(&super_func),
-            FunctionVisibility::Crate
-        );
+        assert_eq!(determine_visibility(&super_func), FunctionVisibility::Crate);
     }
 }
