@@ -578,29 +578,6 @@ pub fn build_god_object_impact_section(
         }
     }
 
-    // Warning about impact with proper alignment
-    let warning_label = format!(
-        "{:width$}",
-        format!("{}warning", " ".repeat(INDENT)),
-        width = LABEL_WIDTH
-    );
-    lines.push(Line::from(vec![
-        Span::raw(warning_label.clone()),
-        Span::raw(" ".repeat(GAP)),
-        Span::styled(
-            "God object multiplier applied LAST",
-            Style::default().fg(Color::Yellow),
-        ),
-    ]));
-    lines.push(Line::from(vec![
-        Span::raw(warning_label),
-        Span::raw(" ".repeat(GAP)),
-        Span::styled(
-            "causing dramatic score inflation",
-            Style::default().fg(Color::Yellow),
-        ),
-    ]));
-
     add_blank_line(&mut lines);
     lines
 }
@@ -1396,7 +1373,6 @@ mod tests {
             .collect();
         assert!(content.contains("god object"));
         assert!(content.contains("75.0"));
-        assert!(content.contains("warning"));
     }
 
     #[test]
