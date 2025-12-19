@@ -77,7 +77,9 @@ Remove all template-based recommendation generation, heuristic impact prediction
 
 #### Code to Keep
 
-1. **Identification Logic**:
+All retained code follows the **Stillwater "Pure Core, Imperative Shell"** pattern:
+
+1. **Identification Logic** (Pure Core - no I/O, testable in isolation):
    - All complexity calculation (cyclomatic, cognitive, nesting)
    - Coverage gap detection
    - God object detection (method counts, responsibilities, cohesion)
@@ -85,17 +87,23 @@ Remove all template-based recommendation generation, heuristic impact prediction
    - Pattern detection (state machines, coordinators, pure functions)
    - Entropy analysis (false positive reduction)
 
-2. **Severity Quantification**:
+2. **Severity Quantification** (Pure Core - deterministic calculations):
    - `UnifiedScore` calculation
    - Priority tier assignment (Critical/High/Medium/Low)
    - Debt score aggregation
    - Risk scoring
 
-3. **Structural Context**:
+3. **Structural Context** (Pure Core - data transformations):
    - Call graph data
    - Dependency relationships
    - File-level coupling metrics
    - Purity propagation
+
+4. **Output Formatting** (Imperative Shell - I/O at boundaries):
+   - JSON serialization
+   - Markdown generation
+   - Terminal output
+   - TUI rendering
 
 ### Non-Functional Requirements
 
@@ -182,6 +190,15 @@ JSON output should remain structurally compatible:
 - **Architecture Updates**: Update ARCHITECTURE.md to remove recommendation flow
 
 ## Implementation Notes
+
+### Stillwater Architecture Alignment
+
+After removal, the remaining codebase should cleanly follow:
+- **Pure Core**: All scoring, complexity, and analysis functions are pure (no I/O, deterministic)
+- **Imperative Shell**: File reading, output writing, and TUI rendering at boundaries
+- **Composition Over Complexity**: Small, focused scoring functions composed together
+
+Recommendation generation violated this by mixing heuristic "interpretation" with data. Removing it clarifies the boundary.
 
 ### Incremental Approach
 

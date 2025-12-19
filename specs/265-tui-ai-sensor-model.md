@@ -23,6 +23,13 @@ The TUI serves two purposes in the new model:
 1. **Human exploration** - Developers browsing debt items to understand their codebase
 2. **AI agent debugging** - Understanding what signals debtmap is providing
 
+**Design Reference**: All TUI changes must follow `DESIGN.md` - the "Futuristic Zen Minimalist" aesthetic with:
+- 5-color palette (cyan/green/darkgray/white/bg)
+- Lowercase section headers in muted color
+- Label-value pairs with 20-char fixed columns
+- Generous whitespace, no decorative borders
+- Progressive disclosure
+
 ## Objective
 
 Update the TUI to:
@@ -56,25 +63,28 @@ Update the TUI to:
    - Show total lines and completeness confidence
    - Provide copy-to-clipboard for file ranges
 
-2. **Context Section Format**:
+2. **Context Section Format** (following DESIGN.md - no borders, lowercase headers):
    ```
-   ┌─ Context to Read ─────────────────────────────┐
-   │ Total: 168 lines | Confidence: 85%            │
-   │                                               │
-   │ PRIMARY                                       │
-   │ src/analyzers/purity_detector.rs:10-85       │
-   │ └─ PurityDetector::analyze                   │
-   │                                               │
-   │ RELATED                                       │
-   │ [Caller] src/extraction/extractor.rs:234-267 │
-   │          └─ extract_purity                   │
-   │ [Test]   src/analyzers/purity_detector.rs:   │
-   │          1500-1600                           │
-   │          └─ test_purity_detection            │
-   │ [Module] src/analyzers/purity_detector.rs:1-9│
-   │          └─ imports and constants            │
-   └───────────────────────────────────────────────┘
+   context to read                    168 lines · 85% confidence
+
+   primary
+   src/analyzers/purity_detector.rs:10-85
+       PurityDetector::analyze
+
+   related
+   Caller    src/extraction/extractor.rs:234-267
+             extract_purity
+   Test      src/analyzers/purity_detector.rs:1500-1600
+             test_purity_detection
+   Module    src/analyzers/purity_detector.rs:1-9
+             imports and constants
    ```
+
+   **Design Notes** (per DESIGN.md):
+   - Section headers ("context to read", "primary", "related") in DarkGray, lowercase
+   - Values in Cyan (primary color)
+   - 4-space indentation for hierarchy
+   - No box-drawing characters or decorative borders
 
 3. **Keyboard Shortcuts**:
    - `c` - Copy all context file ranges to clipboard
@@ -93,35 +103,40 @@ Update the TUI to:
    - Already shows detailed breakdown - ensure it's complete
    - Add any missing factors from new scoring model
 
-3. **New Signals Section** (on Overview or separate):
+3. **New Signals Section** (following DESIGN.md label-value pattern):
    ```
-   ┌─ Raw Signals ─────────────────────────────────┐
-   │ COMPLEXITY                                    │
-   │   Cyclomatic: 233 (dampened: 183, factor: 0.5)│
-   │   Cognitive: 366                              │
-   │   Nesting: 5 levels                           │
-   │   Entropy: 0.44 (low variety = repetitive)    │
-   │                                               │
-   │ COVERAGE                                      │
-   │   Direct: 78%                                 │
-   │   Transitive: 65%                             │
-   │   Uncovered Lines: 506                        │
-   │                                               │
-   │ COUPLING                                      │
-   │   Upstream: 33 callers                        │
-   │   Downstream: 20 callees                      │
-   │   Instability: 0.38                           │
-   │                                               │
-   │ PATTERNS                                      │
-   │   Type: god_object (92% confidence)           │
-   │   Responsibilities: 10 detected               │
-   │   Cohesion: 0.28 (low)                        │
-   │                                               │
-   │ PURITY                                        │
-   │   Classification: Impure (95% confidence)     │
-   │   Side Effects: mutable ref, HashMap mutation │
-   └───────────────────────────────────────────────┘
+   complexity
+   cyclomatic              233 (dampened: 183, factor: 0.5)
+   cognitive               366
+   nesting                 5 levels
+   entropy                 0.44 (low variety)
+
+   coverage
+   direct                  78%
+   transitive              65%
+   uncovered lines         506
+
+   coupling
+   upstream                33 callers
+   downstream              20 callees
+   instability             0.38
+
+   patterns
+   type                    god_object (92% confidence)
+   responsibilities        10 detected
+   cohesion                0.28 (low)
+
+   purity
+   classification          Impure (95% confidence)
+   side effects            mutable ref, HashMap mutation
    ```
+
+   **Design Notes** (per DESIGN.md):
+   - Section headers lowercase in DarkGray
+   - Labels left-aligned in 20-char column (white text)
+   - 4-char gap between label and value
+   - Values in primary color (Cyan) starting at column 24
+   - Blank line between sections for visual separation
 
 #### Update Page Navigation
 
@@ -148,13 +163,24 @@ Or alternatively, add Context as a section within Overview page.
 
 ### Non-Functional Requirements
 
-- TUI performance unchanged
-- Keyboard navigation unchanged
-- Color scheme unchanged
-- Responsive to terminal size
+- TUI performance unchanged (60 FPS target per DESIGN.md)
+- Keyboard navigation unchanged (Vi-style + arrows)
+- Color scheme: Use existing 5-color palette only (primary/success/muted/text/bg)
+- Responsive to terminal size (graceful degradation per DESIGN.md breakpoints)
+
+### DESIGN.md Compliance
+
+All new TUI elements must follow DESIGN.md "Futuristic Zen Minimalist" aesthetic:
+- **No decorative borders** - Use whitespace for separation
+- **Lowercase section headers** - In muted (DarkGray) color
+- **Fixed-column label-value pairs** - 20-char label, 4-char gap, value at column 24
+- **Restrained color use** - Primary (Cyan) for important values, muted for secondary
+- **Generous whitespace** - Blank lines between sections
+- **Pure rendering functions** - Follow Stillwater pattern (build_* returns Lines, render() displays them)
 
 ## Acceptance Criteria
 
+### Functional
 - [ ] Recommendation section removed from Overview page
 - [ ] Recommendation section removed from text extraction
 - [ ] Context suggestions displayed on new Context page (or section)
@@ -162,10 +188,21 @@ Or alternatively, add Context as a section within Overview page.
 - [ ] Scoring breakdown complete with all factors
 - [ ] Keyboard shortcuts for copying context ranges
 - [ ] Page navigation updated for new structure
+
+### DESIGN.md Compliance
+- [ ] Section headers are lowercase with muted (DarkGray) color
+- [ ] Label-value pairs use 20-char fixed column format
+- [ ] No box-drawing borders on new sections
+- [ ] Whitespace used for visual separation
+- [ ] Only 5-color palette used (primary/success/muted/text/bg)
+- [ ] Pure rendering functions (build_* pattern)
+
+### Quality
 - [ ] All existing TUI tests updated
 - [ ] New tests for context display
 - [ ] `cargo test` passes
 - [ ] `cargo clippy` passes
+- [ ] Manual visual inspection passes DESIGN.md checklist
 
 ## Technical Details
 
@@ -205,42 +242,73 @@ src/tui/results/
 
 ### Context Page Implementation
 
+Following DESIGN.md component patterns (see `components.rs` for shared helpers):
+
 ```rust
 // src/tui/results/detail_pages/context.rs
+use crate::tui::results::detail_pages::components::{
+    INDENT, LABEL_WIDTH, GAP, build_section_header, build_label_value_line
+};
 
-pub fn render(
+/// Pure function: builds context lines from data (Stillwater pattern)
+pub fn build_context_lines(
     item: &UnifiedDebtItem,
-    area: Rect,
-    buf: &mut Buffer,
     theme: &Theme,
-) {
-    // Header
-    let header = format!(
-        "Context to Read | {} lines | {}% confidence",
-        item.context.total_lines,
-        (item.context.completeness_confidence * 100.0) as u32
-    );
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
 
-    // Primary scope
+    // Section header - lowercase, muted color (per DESIGN.md)
+    lines.push(build_section_header(
+        "context to read",
+        Some(&format!(
+            "{} lines · {}% confidence",
+            item.context.total_lines,
+            (item.context.completeness_confidence * 100.0) as u32
+        )),
+        theme,
+    ));
+    lines.push(Line::default()); // Spacing
+
+    // Primary subsection
+    lines.push(build_section_header("primary", None, theme));
     let primary = &item.context.primary;
-    let primary_text = format!(
-        "{}:{}-{}",
-        primary.file.display(),
-        primary.start_line,
-        primary.end_line
-    );
-
-    // Related contexts
-    for related in &item.context.related {
-        let rel_text = format!(
-            "[{}] {}:{}-{}\n  └─ {}",
-            format_relationship(&related.relationship),
-            related.range.file.display(),
-            related.range.start_line,
-            related.range.end_line,
-            related.reason
-        );
+    lines.push(Line::from(Span::styled(
+        format!("{}:{}-{}", primary.file.display(), primary.start_line, primary.end_line),
+        Style::default().fg(theme.primary),
+    )));
+    if let Some(symbol) = &primary.symbol {
+        lines.push(Line::from(Span::styled(
+            format!("    {}", symbol),
+            Style::default().fg(theme.muted),
+        )));
     }
+    lines.push(Line::default()); // Spacing
+
+    // Related subsection
+    if !item.context.related.is_empty() {
+        lines.push(build_section_header("related", None, theme));
+        for related in &item.context.related {
+            // Label-value format per DESIGN.md (20-char label column)
+            lines.push(build_label_value_line(
+                &format_relationship(&related.relationship),
+                &format!(
+                    "{}:{}-{}",
+                    related.range.file.display(),
+                    related.range.start_line,
+                    related.range.end_line
+                ),
+                theme,
+            ));
+            // Indented reason
+            lines.push(Line::from(Span::styled(
+                format!("{:width$}{}", "", related.reason, width = LABEL_WIDTH + GAP),
+                Style::default().fg(theme.muted),
+            )));
+        }
+    }
+
+    lines
 }
 
 fn format_relationship(rel: &ContextRelationship) -> &'static str {
@@ -255,6 +323,13 @@ fn format_relationship(rel: &ContextRelationship) -> &'static str {
     }
 }
 ```
+
+**Key DESIGN.md compliance**:
+- Pure rendering function (no side effects)
+- Uses shared `components.rs` helpers for consistent label-value formatting
+- Section headers lowercase with muted color
+- Values in primary color (Cyan)
+- Proper spacing and indentation
 
 ### Keyboard Shortcuts
 

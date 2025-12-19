@@ -216,21 +216,28 @@ src/priority/context/
 └── limits.rs        # Line limiting and prioritization
 ```
 
-### Data Flow
+### Data Flow (Stillwater "Pure Core" Pattern)
+
+All context generation functions are **pure** - they take data in, return data out, with no I/O:
 
 ```
-UnifiedDebtItem
+UnifiedDebtItem + CallGraph + Config  (inputs)
     ↓
-ContextGenerator::generate(item, call_graph, config)
-    ├── extract_primary_scope(item)
-    ├── extract_caller_context(item, call_graph)
-    ├── extract_callee_context(item, call_graph)
-    ├── extract_type_context(item, call_graph)
-    ├── extract_test_context(item)
-    └── apply_limits(all_contexts, max_lines)
+ContextGenerator::generate(item, call_graph, config)  [PURE]
+    ├── extract_primary_scope(item)           [PURE]
+    ├── extract_caller_context(item, graph)   [PURE]
+    ├── extract_callee_context(item, graph)   [PURE]
+    ├── extract_type_context(item, graph)     [PURE]
+    ├── extract_test_context(item)            [PURE]
+    └── apply_limits(all_contexts, max_lines) [PURE]
     ↓
-ContextSuggestion
+ContextSuggestion  (output)
 ```
+
+**I/O happens only at boundaries**:
+- Call graph is pre-built (I/O already done)
+- File ranges reference paths but don't read files
+- Actual file reading happens when AI agent uses the suggestions
 
 ### Configuration
 
@@ -344,6 +351,13 @@ pub struct ContextConfig {
 - **Architecture Updates**: Add context generation to analysis pipeline diagram
 
 ## Implementation Notes
+
+### Stillwater Design Principles
+
+1. **Pure Functions**: All `extract_*` functions are pure - same inputs always produce same outputs
+2. **Composition**: Complex context built from simple, focused extractors
+3. **Types Guide**: `ContextSuggestion` type makes it clear what data is available
+4. **Fail Completely for Validation**: If implementing validation (e.g., "are all ranges valid?"), use `Validation<T, Vec<Error>>` to collect all issues, not fail-fast
 
 ### Handling Missing Data
 

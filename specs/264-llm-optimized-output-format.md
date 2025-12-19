@@ -359,18 +359,31 @@ The markdown format should be:
 2. Keep `--format markdown` for backward compatibility (human-readable)
 3. Update `--format json` to v3.0
 
-### Architecture Changes
+### Architecture Changes (Stillwater Pattern)
+
+Follow "Pure Core, Imperative Shell" architecture:
+
+**Pure Core** (data transformation, no I/O):
+- `LlmReadyItem` - Shared structure for both formats
+- `OutputPreparer::prepare()` - Transform `UnifiedDebtItem` to output-ready form
+- Format-agnostic data preparation
+
+**Imperative Shell** (I/O at boundaries):
+- `LlmMarkdownWriter::write()` - Markdown serialization
+- `JsonWriter::write()` - JSON serialization
+- File/stdout output
 
 New/modified files:
 ```
 src/io/writers/
-├── llm_markdown.rs     # NEW: LLM-optimized markdown writer
-├── json.rs             # MODIFIED: v3.0 format updates
+├── llm_markdown.rs     # NEW: LLM-optimized markdown writer (shell)
+├── json.rs             # MODIFIED: v3.0 format updates (shell)
 └── mod.rs              # MODIFIED: export new writer
 
 src/output/
 ├── unified/
-│   ├── llm_types.rs    # NEW: LLM-specific output types
+│   ├── llm_types.rs    # NEW: LLM-specific output types (core)
+│   ├── preparer.rs     # NEW: Pure transformation functions (core)
 │   └── mod.rs          # MODIFIED: add LLM types
 ```
 
