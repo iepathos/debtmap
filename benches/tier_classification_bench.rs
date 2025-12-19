@@ -46,6 +46,9 @@ fn create_test_item(
             debt_adjustment: None,
             pre_normalization_score: None,
             structural_multiplier: Some(1.0),
+            has_coverage_data: false,
+            contextual_risk_multiplier: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {

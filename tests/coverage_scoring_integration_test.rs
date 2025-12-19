@@ -49,7 +49,7 @@ fn create_debt_item(
             coverage_factor: coverage_multiplier * 10.0, // For display compatibility
             dependency_factor,
             role_multiplier: 1.0,
-            final_score: final_score,
+            final_score,
             base_score: None,
             exponential_factor: None,
             risk_boost: None,

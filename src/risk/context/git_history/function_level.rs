@@ -92,7 +92,7 @@ impl FunctionHistory {
 
 /// Parse git log output to find introduction commit
 ///
-/// Pure function - parses string input, returns Option<String>
+/// Pure function - parses string input, returns `Option<String>`
 ///
 /// # Arguments
 /// * `git_output` - Output from `git log -S "fn function_name" --format="%H" --reverse`
