@@ -4,11 +4,12 @@ use std::fs;
 use std::path::Path;
 
 /// Integration test that validates god object detection on a real codebase file.
+/// Spec 262: Updated to use scoring/calculation.rs after concise_recommendation.rs was removed.
 #[test]
 #[ignore = "Test file has grown and now legitimately detected as GodModule - needs different test subject"]
 fn test_god_object_detection_on_config_rs() {
     // Read a large but well-refactored file
-    let config_path = Path::new("src/priority/scoring/concise_recommendation.rs");
+    let config_path = Path::new("src/priority/scoring/calculation.rs");
     let source_content = fs::read_to_string(config_path).expect("Failed to read test file");
 
     // Run god object detection with the extraction-based API
@@ -27,9 +28,10 @@ fn test_god_object_detection_on_config_rs() {
 }
 
 /// Test that verifies the struct ownership analysis produces reasonable results
+/// Spec 262: Updated to use scoring/calculation.rs after concise_recommendation.rs was removed.
 #[test]
 fn test_struct_ownership_analysis_quality() {
-    let config_path = Path::new("src/priority/scoring/concise_recommendation.rs");
+    let config_path = Path::new("src/priority/scoring/calculation.rs");
     let source_content = fs::read_to_string(config_path).expect("Failed to read test file");
 
     let extracted =
@@ -64,9 +66,10 @@ fn test_struct_ownership_analysis_quality() {
 }
 
 /// Test that warnings are generated for borderline module sizes
+/// Spec 262: Updated to use scoring/calculation.rs after concise_recommendation.rs was removed.
 #[test]
 fn test_module_size_warnings() {
-    let config_path = Path::new("src/priority/scoring/concise_recommendation.rs");
+    let config_path = Path::new("src/priority/scoring/calculation.rs");
     let source_content = fs::read_to_string(config_path).expect("Failed to read test file");
 
     let extracted =

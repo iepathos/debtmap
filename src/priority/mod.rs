@@ -112,23 +112,28 @@ pub struct ImpactMetrics {
     pub risk_reduction: f64,
 }
 
-/// Concise recommendation with clear action steps (spec 138a)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Placeholder for recommendations (spec 262: recommendations removed)
+/// This struct is kept for backward compatibility with JSON output.
+/// All fields are now empty/default - debtmap focuses on identification and severity,
+/// not on providing refactoring recommendations.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ActionableRecommendation {
-    /// One-line primary action
+    /// Deprecated: recommendations removed in spec 262
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub primary_action: String,
-    /// Why this matters
+    /// Deprecated: recommendations removed in spec 262
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub rationale: String,
-    /// Legacy steps (for backward compatibility)
+    /// Deprecated: recommendations removed in spec 262
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub implementation_steps: Vec<String>,
-    /// Related items
+    /// Deprecated: recommendations removed in spec 262
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub related_items: Vec<String>,
-    /// New structured steps with impact and difficulty (spec 138a)
+    /// Deprecated: recommendations removed in spec 262
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steps: Option<Vec<ActionStep>>,
-    /// Estimated total effort in hours (spec 138a)
+    /// Deprecated: recommendations removed in spec 262
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub estimated_effort_hours: Option<f32>,
 }

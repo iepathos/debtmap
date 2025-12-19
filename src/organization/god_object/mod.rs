@@ -1,6 +1,7 @@
 //! God Object Detection Module
 //!
 //! Refactored following Stillwater principles (Pure Core, Imperative Shell).
+//! Spec 262: Recommendation generation has been removed.
 //!
 //! ## Architecture
 //!
@@ -10,8 +11,6 @@
 //! - `predicates` - Detection predicates
 //! - `scoring` - Scoring algorithms
 //! - `classifier` - Classification logic
-//! - `recommendation_generator` - Responsibility-aware recommendations
-//! - `recommender` - Module split recommendations
 //!
 //! Pattern detection is handled by `crate::organization::struct_patterns`
 //!
@@ -30,18 +29,20 @@ pub mod split_types;
 // Main modules
 pub mod ast_visitor;
 pub mod classifier;
-pub mod context_recommendations; // Spec 210: Context-aware recommendations
 pub mod detector;
 pub mod heuristics; // Spec 212: Shared fallback heuristics
 pub mod predicates;
-pub mod recommendation_generator; // Pure Core: Responsibility-aware recommendations
-pub mod recommender;
 pub mod scoring;
 pub mod thresholds;
 pub mod types;
 
 pub mod metrics;
 pub mod traits; // Spec 217: Trait-Mandated Method Detection
+
+// Spec 262: The following recommendation modules have been removed:
+// - context_recommendations
+// - recommendation_generator
+// - recommender
 
 // Re-exports for public API
 pub use ast_visitor::{
@@ -54,33 +55,9 @@ pub use classifier::{
     extract_domain_keywords, group_methods_by_responsibility, infer_responsibility_with_confidence,
     is_cohesive_struct,
 };
-pub use context_recommendations::{
-    build_recommendation_context, classify_scenario, format_recommendation,
-    generate_context_aware_recommendation, generate_module_name, ContextAwareRecommendation,
-    DomainSplit, GodObjectScenario, LayerSplit, LongMethodInfo, RecommendationContext,
-    HIGH_COHESION_THRESHOLD, LONG_METHOD_THRESHOLD,
-};
 pub use detector::GodObjectDetector;
 pub use heuristics::{
     detect_from_content, fallback_god_object_heuristics, fallback_with_preserved_analysis,
-};
-pub use recommendation_generator::{
-    // Spec 215: Functional Decomposition Recommendation
-    format_functional_recommendation,
-    // Spec 217: Trait-Mandated Method Detection Recommendations
-    format_trait_aware_recommendation,
-    generate_recommendation,
-    generate_recommendation_with_context,
-    generate_recommendation_with_functional_awareness,
-    generate_recommendation_with_trait_awareness,
-    FunctionalAwareRecommendation,
-    RecommendationAction,
-    TraitAwareRecommendation,
-};
-pub use recommender::{
-    determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,
-    recommend_module_splits_enhanced, recommend_module_splits_enhanced_with_evidence,
-    recommend_module_splits_with_evidence, sanitize_module_name, suggest_module_splits_by_domain,
 };
 pub use scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
 pub use thresholds::*;
