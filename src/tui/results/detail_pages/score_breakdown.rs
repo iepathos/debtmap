@@ -676,6 +676,9 @@ pub fn build_calculation_summary_section(
     // Use stored has_coverage_data flag - matches what the scorer actually used
     let has_coverage_data = item.unified_score.has_coverage_data;
 
+    // Check if this is a god object item
+    let is_god_object_item = matches!(item.debt_type, DebtType::GodObject { .. });
+
     add_section_header(&mut lines, "score formula (simplified)", theme);
 
     // Use the stored structural multiplier from the actual scorer (not recalculated)
@@ -697,90 +700,114 @@ pub fn build_calculation_summary_section(
         }
     });
 
-    // Show symbolic formula - different for with/without coverage data
-    // Formula: base × role × struct (× god_mult if applicable)
-    let formula = if has_coverage_data {
-        if has_god_object {
-            "(C + D) × cov × role × struct × god"
-        } else {
-            "(C + D) × cov × role × struct"
-        }
-    } else {
-        // No coverage data: uses weighted sum formula (spec 122)
-        if has_god_object {
-            "(C×5 + D×2.5) × role × struct × god"
-        } else {
-            "(C×5 + D×2.5) × role × struct"
-        }
-    };
-    add_label_value(&mut lines, "formula", formula.to_string(), theme, width);
-
-    // Show variable legend - use raw complexity for god objects
-    let c_display = if let Some(gm) = god_mult {
-        item.unified_score.complexity_factor / gm
-    } else {
-        item.unified_score.complexity_factor
-    };
-
-    if has_coverage_data {
+    if is_god_object_item {
+        // God object scoring formula
+        add_label_value(
+            &mut lines,
+            "formula",
+            "M × F × R × S × 20 × violations".to_string(),
+            theme,
+            width,
+        );
         add_label_value(
             &mut lines,
             "where",
-            format!(
-                "C={:.1}, D={:.1}, cov={:.2}, role={:.2}, struct={:.2}",
-                c_display,
-                item.unified_score.dependency_factor,
-                1.0 - (item.unified_score.coverage_factor / 10.0),
-                role,
-                struct_mult
-            ),
+            "M=methods/20, F=fields/15, R=resp/3, S=lines/1000".to_string(),
+            theme,
+            width,
+        );
+        add_label_value(
+            &mut lines,
+            "note",
+            "factors capped at 3.0, uses weighted methods if available".to_string(),
             theme,
             width,
         );
     } else {
-        add_label_value(
-            &mut lines,
-            "where",
-            format!(
-                "C={:.1}, D={:.1}, role={:.2}, struct={:.2}",
-                c_display, item.unified_score.dependency_factor, role, struct_mult
-            ),
-            theme,
-            width,
-        );
-    }
+        // Regular function scoring formula
+        let formula = if has_coverage_data {
+            if has_god_object {
+                "(C + D) × cov × role × struct × god"
+            } else {
+                "(C + D) × cov × role × struct"
+            }
+        } else {
+            // No coverage data: uses weighted sum formula (spec 122)
+            if has_god_object {
+                "(C×5 + D×2.5) × role × struct × god"
+            } else {
+                "(C×5 + D×2.5) × role × struct"
+            }
+        };
+        add_label_value(&mut lines, "formula", formula.to_string(), theme, width);
 
-    // Show other multipliers (purity, pattern, refactor, context, entropy)
-    let other_mults: Vec<String> = [
-        (purity, "purity"),
-        (pattern, "pattern"),
-        (refactor, "refactor"),
-        (context, "context"),
-        (entropy, "entropy"),
-    ]
-    .iter()
-    .filter(|(v, _)| (*v - 1.0).abs() > 0.01)
-    .map(|(v, name)| format!("{}={:.2}", name, v))
-    .collect();
+        // Show variable legend - use raw complexity for god objects
+        let c_display = if let Some(gm) = god_mult {
+            item.unified_score.complexity_factor / gm
+        } else {
+            item.unified_score.complexity_factor
+        };
 
-    if !other_mults.is_empty() {
-        add_label_value(
-            &mut lines,
-            "other mults",
-            other_mults.join(", "),
-            theme,
-            width,
-        );
-    }
+        if has_coverage_data {
+            add_label_value(
+                &mut lines,
+                "where",
+                format!(
+                    "C={:.1}, D={:.1}, cov={:.2}, role={:.2}, struct={:.2}",
+                    c_display,
+                    item.unified_score.dependency_factor,
+                    1.0 - (item.unified_score.coverage_factor / 10.0),
+                    role,
+                    struct_mult
+                ),
+                theme,
+                width,
+            );
+        } else {
+            add_label_value(
+                &mut lines,
+                "where",
+                format!(
+                    "C={:.1}, D={:.1}, role={:.2}, struct={:.2}",
+                    c_display, item.unified_score.dependency_factor, role, struct_mult
+                ),
+                theme,
+                width,
+            );
+        }
 
-    if let Some(gm) = god_mult {
-        add_label_value(
-            &mut lines,
-            "god_mult",
-            format!("{:.2} (3.0 + score/50)", gm),
-            theme,
-            width,
-        );
+        // Show other multipliers (purity, pattern, refactor, context, entropy)
+        let other_mults: Vec<String> = [
+            (purity, "purity"),
+            (pattern, "pattern"),
+            (refactor, "refactor"),
+            (context, "context"),
+            (entropy, "entropy"),
+        ]
+        .iter()
+        .filter(|(v, _)| (*v - 1.0).abs() > 0.01)
+        .map(|(v, name)| format!("{}={:.2}", name, v))
+        .collect();
+
+        if !other_mults.is_empty() {
+            add_label_value(
+                &mut lines,
+                "other mults",
+                other_mults.join(", "),
+                theme,
+                width,
+            );
+        }
+
+        if let Some(gm) = god_mult {
+            add_label_value(
+                &mut lines,
+                "god_mult",
+                format!("{:.2} (3.0 + score/50)", gm),
+                theme,
+                width,
+            );
+        }
     }
 
     add_blank_line(&mut lines);
@@ -800,7 +827,7 @@ pub fn build_calculation_summary_section(
     let base_score = stored_base;
 
     let (mut step_num, mut current_value) = if is_god_object_item {
-        // God object items: score comes from god_object_score directly
+        // God object items: show detailed factor breakdown
         let go_score = match &item.debt_type {
             DebtType::GodObject {
                 god_object_score, ..
@@ -808,14 +835,228 @@ pub fn build_calculation_summary_section(
             _ => stored_base,
         };
 
+        // Get raw metrics from god_object_indicators or DebtType
+        let (methods, fields, responsibilities, lines_of_code): (usize, usize, usize, usize) =
+            match &item.debt_type {
+                DebtType::GodObject {
+                    methods,
+                    fields,
+                    responsibilities,
+                    lines,
+                    ..
+                } => (
+                    *methods as usize,
+                    fields.unwrap_or(0) as usize,
+                    *responsibilities as usize,
+                    *lines as usize,
+                ),
+                _ => {
+                    if let Some(ref indicators) = item.god_object_indicators {
+                        (
+                            indicators.method_count,
+                            indicators.field_count,
+                            indicators.responsibility_count,
+                            indicators.lines_of_code,
+                        )
+                    } else {
+                        (0, 0, 0, 0)
+                    }
+                }
+            };
+
+        // Use default thresholds (Rust defaults)
+        let max_methods = 20_usize;
+        let max_fields = 15_usize;
+        let max_lines = 1000_usize;
+
+        // Get weighted method count if available - this is what the scorer actually uses
+        let weighted_methods = item
+            .god_object_indicators
+            .as_ref()
+            .and_then(|g| g.weighted_method_count);
+
+        // Calculate factors (capped at 3.0)
+        // Use weighted method count when available
+        let effective_methods = weighted_methods.unwrap_or(methods as f64);
+        let method_factor = (effective_methods / max_methods as f64).min(3.0);
+        let field_factor = (fields as f64 / max_fields as f64).min(3.0);
+        let resp_factor = (responsibilities as f64 / 3.0).min(3.0);
+        let size_factor = (lines_of_code as f64 / max_lines as f64).min(3.0);
+
+        // Count violations (based on effective/weighted counts)
+        let mut violations = Vec::new();
+        if effective_methods > max_methods as f64 {
+            violations.push(format!(
+                "methods {:.0} > {}",
+                effective_methods, max_methods
+            ));
+        }
+        if fields > max_fields {
+            violations.push(format!("fields {} > {}", fields, max_fields));
+        }
+        if responsibilities > 5 {
+            violations.push(format!("responsibilities {} > 5", responsibilities));
+        }
+        if lines_of_code > max_lines {
+            violations.push(format!("lines {} > {}", lines_of_code, max_lines));
+        }
+
+        // Step 1: Method factor - show weighted if different from raw
+        let method_display = if let Some(w) = weighted_methods {
+            if (w - methods as f64).abs() > 0.1 {
+                format!(
+                    "{:.2} = {:.1} / {} (raw {} → weighted)",
+                    method_factor, w, max_methods, methods
+                )
+            } else {
+                format!(
+                    "{:.2} = {} / {} (max 3.0)",
+                    method_factor, methods, max_methods
+                )
+            }
+        } else {
+            format!(
+                "{:.2} = {} / {} (max 3.0)",
+                method_factor, methods, max_methods
+            )
+        };
+        add_label_value(&mut lines, "1. method factor", method_display, theme, width);
+
+        // Step 2: Field factor
         add_label_value(
             &mut lines,
-            "1. god object score",
-            format!("{:.2} (from detection)", go_score),
+            "2. field factor",
+            format!(
+                "{:.2} = {} / {} (max 3.0)",
+                field_factor, fields, max_fields
+            ),
             theme,
             width,
         );
-        (2_usize, go_score)
+
+        // Step 3: Responsibility factor
+        add_label_value(
+            &mut lines,
+            "3. responsibility factor",
+            format!("{:.2} = {} / 3 (max 3.0)", resp_factor, responsibilities),
+            theme,
+            width,
+        );
+
+        // Step 4: Size factor
+        add_label_value(
+            &mut lines,
+            "4. size factor",
+            format!(
+                "{:.2} = {} / {} (max 3.0)",
+                size_factor, lines_of_code, max_lines
+            ),
+            theme,
+            width,
+        );
+
+        // Step 5: Base product
+        let base_product = method_factor * field_factor * resp_factor * size_factor;
+        add_label_value(
+            &mut lines,
+            "5. base product",
+            format!(
+                "{:.2} = {:.2} × {:.2} × {:.2} × {:.2}",
+                base_product, method_factor, field_factor, resp_factor, size_factor
+            ),
+            theme,
+            width,
+        );
+
+        // Step 6: Violations
+        let violation_count = violations.len();
+        let violation_detail = if violations.is_empty() {
+            "none".to_string()
+        } else {
+            violations.join(", ")
+        };
+        add_label_value(
+            &mut lines,
+            "6. violations",
+            format!("{} ({})", violation_count, violation_detail),
+            theme,
+            width,
+        );
+
+        // Step 7: Scaling
+        let mut step_num = 7_usize;
+        let scaled_score = if violation_count > 0 {
+            base_product * 20.0 * violation_count as f64
+        } else {
+            base_product * 10.0
+        };
+        let scaling_detail = if violation_count > 0 {
+            format!(
+                "{:.2} × 20 × {} = {:.2}",
+                base_product, violation_count, scaled_score
+            )
+        } else {
+            format!("{:.2} × 10 = {:.2}", base_product, scaled_score)
+        };
+        add_label_value(
+            &mut lines,
+            &format!("{}. scaling", step_num),
+            scaling_detail,
+            theme,
+            width,
+        );
+        step_num += 1;
+        let mut current = scaled_score;
+
+        // Show entropy dampening if applied (affects god object score)
+        if let Some(entropy_damp) = item.entropy_dampening_factor {
+            if (entropy_damp - 1.0).abs() > 0.01 {
+                let after_entropy = current * entropy_damp;
+                add_label_value(
+                    &mut lines,
+                    &format!("{}. × entropy", step_num),
+                    format!(
+                        "{:.2} × {:.2} = {:.2} (dampening)",
+                        current, entropy_damp, after_entropy
+                    ),
+                    theme,
+                    width,
+                );
+                current = after_entropy;
+                step_num += 1;
+            }
+        }
+
+        // Show complexity factor adjustment if significant difference remains
+        let diff = (current - go_score).abs();
+        if diff > 1.0 && current > 0.0 {
+            // There's an unexplained difference - likely complexity factor or functional bonus
+            let adjustment_factor = go_score / current;
+            if (adjustment_factor - 1.0).abs() > 0.01 {
+                add_label_value(
+                    &mut lines,
+                    &format!("{}. adjustments", step_num),
+                    format!(
+                        "{:.2} × {:.2} = {:.2} (complexity/functional)",
+                        current, adjustment_factor, go_score
+                    ),
+                    theme,
+                    width,
+                );
+                step_num += 1;
+            }
+        }
+
+        // Final god object score
+        add_label_value(
+            &mut lines,
+            &format!("{}. god object score", step_num),
+            format!("{:.2}", go_score),
+            theme,
+            width,
+        );
+
+        (step_num + 1, go_score)
     } else {
         // Regular function items: use complexity/dependency formula
         let c = item.unified_score.complexity_factor;
@@ -862,7 +1103,10 @@ pub fn build_calculation_summary_section(
             add_label_value(
                 &mut lines,
                 &format!("{}. × struct", next_step),
-                format!("{:.2} × {:.2} = {:.2}", after_role, struct_mult, after_struct),
+                format!(
+                    "{:.2} × {:.2} = {:.2}",
+                    after_role, struct_mult, after_struct
+                ),
                 theme,
                 width,
             );
