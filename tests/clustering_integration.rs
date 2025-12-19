@@ -7,16 +7,17 @@ use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use debtmap::extraction::UnifiedFileExtractor;
 use std::path::Path;
 
-/// Test that clustering achieves <5% unclustered rate on god_object/recommender.rs
+/// Test that clustering achieves <5% unclustered rate on god_object/detector.rs
 ///
 /// Spec 192 requires: clustering should achieve ≤5% unclustered rate for large files
 /// with 20+ methods to demonstrate effective behavioral decomposition.
+/// Spec 262: Updated to use detector.rs after recommender.rs was removed.
 #[test]
 fn test_clustering_on_god_object_detector() {
-    let source_code = std::fs::read_to_string("src/organization/god_object/recommender.rs")
-        .expect("Failed to read recommender.rs");
+    let source_code = std::fs::read_to_string("src/organization/god_object/detector.rs")
+        .expect("Failed to read detector.rs");
 
-    let path = Path::new("src/organization/god_object/recommender.rs");
+    let path = Path::new("src/organization/god_object/detector.rs");
     let extracted = UnifiedFileExtractor::extract(path, &source_code)
         .expect("Failed to extract recommender.rs");
     let analyses = analyze_god_objects(path, &extracted);
@@ -134,12 +135,13 @@ fn test_clustering_on_god_object_detector() {
 }
 
 /// Test that all clusters have acceptable quality metrics
+/// Spec 262: Updated to use detector.rs after recommender.rs was removed.
 #[test]
 fn test_cluster_quality_metrics() {
-    let source_code = std::fs::read_to_string("src/organization/god_object/recommender.rs")
-        .expect("Failed to read recommender.rs");
+    let source_code = std::fs::read_to_string("src/organization/god_object/detector.rs")
+        .expect("Failed to read detector.rs");
 
-    let path = Path::new("src/organization/god_object/recommender.rs");
+    let path = Path::new("src/organization/god_object/detector.rs");
     let extracted = UnifiedFileExtractor::extract(path, &source_code)
         .expect("Failed to extract recommender.rs");
     let analyses = analyze_god_objects(path, &extracted);
@@ -225,13 +227,14 @@ fn test_cluster_quality_metrics() {
 /// Required fixes:
 /// - Rebuild similarity matrix after each merge (performance cost), OR
 /// - Use stable cluster IDs instead of vector indices throughout the algorithm
+/// Spec 262: Updated to use detector.rs after recommender.rs was removed.
 #[test]
 #[ignore = "Flaky test due to hierarchical clustering non-determinism - see FIXME comment"]
 fn test_clustering_determinism() {
-    let source_code = std::fs::read_to_string("src/organization/god_object/recommender.rs")
-        .expect("Failed to read recommender.rs");
+    let source_code = std::fs::read_to_string("src/organization/god_object/detector.rs")
+        .expect("Failed to read detector.rs");
 
-    let path = Path::new("src/organization/god_object/recommender.rs");
+    let path = Path::new("src/organization/god_object/detector.rs");
     let extracted = UnifiedFileExtractor::extract(path, &source_code)
         .expect("Failed to extract recommender.rs");
 

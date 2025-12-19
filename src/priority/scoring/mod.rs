@@ -1,9 +1,10 @@
 // Scoring module - organizes scoring-related functionality
+// Spec 262: Recommendation generation has been removed from debtmap.
+// Debtmap now focuses on identification and severity quantification.
 
 pub mod calculation;
 pub mod classification;
 pub mod computation;
-pub mod concise_recommendation; // Spec 138a: Concise actionable recommendations
 pub mod construction;
 pub mod context_aware;
 pub mod coverage_expectations;
@@ -15,22 +16,23 @@ pub mod file_context_scoring; // Spec 166: Test file detection and context-aware
 pub mod formatting;
 pub mod orchestration_adjustment;
 pub mod rebalanced; // Spec 136: Rebalanced debt scoring algorithm
-pub mod recommendation;
-
-// Complexity recommendation modules (Stillwater refactoring)
-pub mod complexity_classification; // Pure complexity level classification
-pub mod complexity_generators; // Level-based recommendation generators
-pub mod dead_code_hints; // Dead code analysis and hints
-pub mod heuristic_generators; // Heuristic-based recommendation generators
-pub mod pattern_generators; // Pattern-based recommendation generators
-pub mod recommendation_complexity; // Facade re-exporting from submodules
-pub mod recommendation_debt_specific; // Specific debt type recommendations
-pub mod recommendation_extended; // Facade re-exporting from submodules
-pub mod recommendation_helpers;
-pub mod rust_recommendations;
 pub mod scaling; // Spec 171: Exponential scaling and risk boosting
 pub mod test_calculation;
 pub mod validation;
+
+// Spec 262: The following recommendation modules have been removed:
+// - concise_recommendation
+// - recommendation
+// - complexity_classification
+// - complexity_generators
+// - dead_code_hints
+// - heuristic_generators
+// - pattern_generators
+// - recommendation_complexity
+// - recommendation_debt_specific
+// - recommendation_extended
+// - recommendation_helpers
+// - rust_recommendations
 
 // Re-export commonly used items
 pub use calculation::{
@@ -46,16 +48,9 @@ pub use classification::{
     should_surface_untested_function,
 };
 
-pub use recommendation::{
-    generate_dead_code_recommendation, generate_error_swallowing_recommendation,
-    generate_test_debt_recommendation, generate_testing_gap_recommendation,
-};
+// Spec 262: Recommendation re-exports removed
 
-pub use concise_recommendation::generate_concise_recommendation;
-
-pub use test_calculation::{
-    calculate_tests_needed, validate_recommendation_consistency, ComplexityTier, TestRecommendation,
-};
+pub use test_calculation::{calculate_tests_needed, ComplexityTier, TestRecommendation};
 
 pub use orchestration_adjustment::{
     adjust_score, extract_composition_metrics, CompositionMetrics, OrchestrationAdjustmentConfig,

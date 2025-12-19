@@ -46,6 +46,7 @@ pub mod trait_pattern_analyzer;
 pub mod type_based_clustering;
 
 // Re-export god object functionality from new modular structure
+// Spec 262: Recommendation functions removed
 pub use god_object::{
     // Scoring
     calculate_god_object_score,
@@ -55,16 +56,9 @@ pub use god_object::{
     count_distinct_domains,
     // Classification
     determine_confidence,
-    determine_cross_domain_severity,
     extract_domain_from_name,
     group_methods_by_responsibility,
     infer_responsibility_with_confidence,
-    recommend_module_splits,
-    recommend_module_splits_enhanced,
-    recommend_module_splits_enhanced_with_evidence,
-    recommend_module_splits_with_evidence,
-    // Recommendations
-    suggest_module_splits_by_domain,
     // Types
     ClassificationResult,
     DetectionType,
