@@ -96,7 +96,7 @@ impl FilterStatistics {
 /// ```
 #[inline]
 pub fn meets_score_threshold(item: &UnifiedDebtItem, min_score: f64) -> bool {
-    item.unified_score.final_score.value() >= min_score
+    item.unified_score.final_score >= min_score
 }
 
 /// Check if item meets minimum risk threshold.
@@ -231,8 +231,7 @@ pub fn is_duplicate_of(item: &UnifiedDebtItem, existing: &UnifiedDebtItem) -> bo
 mod tests {
     use super::*;
     use crate::priority::{
-        score_types::Score0To100, ActionableRecommendation, FunctionRole, ImpactMetrics, Location,
-        UnifiedScore,
+        ActionableRecommendation, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
     use std::path::PathBuf;
 
@@ -250,7 +249,7 @@ mod tests {
             },
             debt_type,
             unified_score: UnifiedScore {
-                final_score: Score0To100::new(score),
+                final_score: score.max(0.0),
                 complexity_factor: 0.0,
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
@@ -387,7 +386,7 @@ mod tests {
                 methods: 50,
                 fields: Some(20),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 500,
             },
         );
@@ -476,7 +475,7 @@ mod tests {
                 methods: 50,
                 fields: Some(20),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 500,
             },
         );

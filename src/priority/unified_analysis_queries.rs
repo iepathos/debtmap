@@ -79,7 +79,7 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
             }
 
             // Filter out items below score threshold (spec 193)
-            if item.unified_score.final_score.value() < min_score {
+            if item.unified_score.final_score < min_score {
                 continue;
             }
 
@@ -124,7 +124,7 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
             .iter()
             .map(|item| {
                 let tier = classify_tier(item, tier_config);
-                let score = item.unified_score.final_score.value();
+                let score = item.unified_score.final_score;
                 let debt_item = DebtItem::Function(Box::new(item.clone()));
                 ClassifiedItem {
                     item: debt_item,
@@ -468,7 +468,7 @@ fn is_critical_item(item: &DebtItem) -> bool {
     match item {
         DebtItem::Function(func) => {
             matches!(func.debt_type, DebtType::GodObject { .. })
-                || func.unified_score.final_score.value() >= 95.0
+                || func.unified_score.final_score >= 95.0
         }
         DebtItem::File(file) => {
             file.metrics
@@ -588,7 +588,7 @@ mod tests {
     #[test]
     fn test_score_based_sorting() {
         // Test the sorting logic directly with DebtItems
-        use crate::priority::score_types::Score0To100;
+
         use crate::priority::semantic_classifier::FunctionRole;
 
         let item1 = DebtItem::Function(Box::new(UnifiedDebtItem {
@@ -606,7 +606,7 @@ mod tests {
                 coverage_factor: 5.0,
                 dependency_factor: 5.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(50.0),
+                final_score: 50.0,
                 base_score: Some(50.0),
                 exponential_factor: Some(1.0),
                 risk_boost: Some(1.0),
@@ -688,7 +688,7 @@ mod tests {
                 coverage_factor: 2.0,
                 dependency_factor: 2.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(10.0),
+                final_score: 10.0,
                 base_score: Some(10.0),
                 exponential_factor: Some(1.0),
                 risk_boost: Some(1.0),

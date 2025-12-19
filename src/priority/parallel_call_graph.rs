@@ -143,7 +143,7 @@ impl ParallelCallGraph {
 
         // Add all nodes
         for entry in self.nodes.iter() {
-            let node = entry.value();
+            let node = entry;
             call_graph.add_function(
                 node.id.clone(),
                 node.is_entry_point,

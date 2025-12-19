@@ -119,7 +119,7 @@ fn apply_filters(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::score_types::Score0To100;
+
     use crate::priority::{
         call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
         Location, UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
@@ -143,7 +143,7 @@ mod tests {
                 coverage_factor: 80.0,
                 dependency_factor: 50.0,
                 role_multiplier: 2.0,
-                final_score: Score0To100::new(score),
+                final_score: score.max(0.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

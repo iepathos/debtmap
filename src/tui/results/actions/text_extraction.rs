@@ -361,7 +361,6 @@ mod tests {
     #[test]
     fn test_format_debt_type_name() {
         use crate::priority::DebtType;
-        use crate::priority::Score0To100;
 
         let complexity = DebtType::ComplexityHotspot {
             cyclomatic: 10,
@@ -374,7 +373,7 @@ mod tests {
             fields: Some(20),
             responsibilities: 5,
             lines: 1000,
-            god_object_score: Score0To100::new(100.0),
+            god_object_score: 100.0,
         };
         assert_eq!(format_debt_type_name(&god_object), "God Object");
     }

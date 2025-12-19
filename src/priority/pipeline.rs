@@ -118,7 +118,7 @@ pub fn analyze_and_filter(
         .into_iter()
         .map(|item| {
             let tier = classify_tier(&item, tier_config);
-            let score = item.unified_score.final_score.value();
+            let score = item.unified_score.final_score;
             ClassifiedItem {
                 item: super::DebtItem::Function(Box::new(item)),
                 tier,
@@ -192,7 +192,7 @@ pub fn filter_sort_limit(
 mod tests {
     use super::*;
     use crate::priority::filtering::ClassifiedItem;
-    use crate::priority::score_types::Score0To100;
+
     use crate::priority::tiers::RecommendationTier;
     use crate::priority::{
         ActionableRecommendation, DebtItem, DebtType, FunctionRole, ImpactMetrics, Location,
@@ -215,7 +215,7 @@ mod tests {
                 coverage_factor: 1.0,
                 dependency_factor: 1.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(score),
+                final_score: score.max(0.0),
                 base_score: Some(score),
                 exponential_factor: Some(1.0),
                 risk_boost: Some(1.0),

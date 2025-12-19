@@ -37,7 +37,7 @@ pub fn build_final_score_section(
     let mut lines = Vec::new();
     add_section_header(&mut lines, "final score", theme);
 
-    let score = item.unified_score.final_score.value();
+    let score = item.unified_score.final_score;
     let severity = Severity::from_score_100(score);
     let severity_color = match severity {
         Severity::Critical => Color::Red,
@@ -441,12 +441,12 @@ pub fn build_god_object_impact_section(
     let god_object_score = match &item.debt_type {
         DebtType::GodObject {
             god_object_score, ..
-        } => Some(god_object_score.value()),
+        } => Some(*god_object_score),
         _ => item
             .god_object_indicators
             .as_ref()
             .filter(|g| g.is_god_object)
-            .map(|g| g.god_object_score.value()),
+            .map(|g| g.god_object_score),
     };
 
     let Some(go_score) = god_object_score else {
@@ -673,11 +673,11 @@ pub fn build_calculation_summary_section(
         let go_score = match &item.debt_type {
             DebtType::GodObject {
                 god_object_score, ..
-            } => god_object_score.value(),
+            } => *god_object_score,
             _ => item
                 .god_object_indicators
                 .as_ref()
-                .map(|g| g.god_object_score.value())
+                .map(|g| g.god_object_score)
                 .unwrap_or(0.0),
         };
         Some(3.0 + (go_score / 50.0))
@@ -766,10 +766,7 @@ pub fn build_calculation_summary_section(
             "where",
             format!(
                 "C={:.1}, D={:.1}, role={:.2}, struct={:.2}",
-                c_display,
-                item.unified_score.dependency_factor,
-                role,
-                struct_mult
+                c_display, item.unified_score.dependency_factor, role, struct_mult
             ),
             theme,
             width,
@@ -818,7 +815,7 @@ pub fn build_calculation_summary_section(
     let stored_base = item.unified_score.base_score.unwrap_or(0.0);
     let exponent = item.unified_score.exponential_factor.unwrap_or(1.0);
     let risk_boost = item.unified_score.risk_boost.unwrap_or(1.0);
-    let final_score = item.unified_score.final_score.value();
+    let final_score = item.unified_score.final_score;
 
     // For god objects, complexity_factor already has god_mult baked in.
     // We need to use the raw value for formula display to avoid double-counting.
@@ -1223,7 +1220,7 @@ pub fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::score_types::Score0To100;
+
     use crate::priority::unified_scorer::{Location, UnifiedScore};
     use crate::priority::{ActionableRecommendation, FunctionRole, ImpactMetrics};
 
@@ -1235,7 +1232,7 @@ mod tests {
                 function: "test_func".to_string(),
             },
             unified_score: UnifiedScore {
-                final_score: Score0To100::new(final_score),
+                final_score: final_score.max(0.0),
                 complexity_factor: 5.0,
                 coverage_factor: 7.0,
                 dependency_factor: 3.0,
@@ -1409,7 +1406,7 @@ mod tests {
                 fields: Some(20),
                 responsibilities: 8,
                 lines: 1000,
-                god_object_score: Score0To100::new(75.0),
+                god_object_score: 75.0,
             },
         );
         let theme = Theme::default();

@@ -381,7 +381,7 @@ fn create_test_unified_debt_item(
             coverage_factor: 5.0,
             dependency_factor: 3.0,
             role_multiplier: 1.0,
-            final_score: debtmap::priority::score_types::Score0To100::new(5.0),
+            final_score: 5.0,
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -396,7 +396,7 @@ fn create_test_unified_debt_item(
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::Unknown,
         recommendation: ActionableRecommendation {
@@ -604,7 +604,7 @@ fn test_data_flow_markdown_formatting() {
 
 #[test]
 fn test_god_object_displays_git_context() {
-    use debtmap::priority::{score_types::Score0To100, DebtType, Location};
+    use debtmap::priority::{DebtType, Location};
     use debtmap::risk;
     use debtmap::risk::context::git_history::GitHistoryProvider;
     use debtmap::risk::context::{ContextAggregator, ContextDetails};
@@ -753,7 +753,7 @@ fn test_god_object_displays_git_context() {
             methods: 3,
             fields: Some(2),
             responsibilities: 2,
-            god_object_score: Score0To100::new(60.0),
+            god_object_score: 60.0,
             lines: 150,
         },
     );

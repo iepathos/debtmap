@@ -25,7 +25,7 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
             coverage_factor: 8.0,
             dependency_factor: 4.0,
             role_multiplier: 1.2,
-            final_score: debtmap::priority::score_types::Score0To100::new(7.8),
+            final_score: 7.8,
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -40,7 +40,7 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {
@@ -190,8 +190,7 @@ fn test_enhanced_markdown_with_verbosity() {
     for i in 0..3 {
         let mut item = create_sample_unified_item();
         item.location.function = format!("function_{}", i);
-        item.unified_score.final_score =
-            debtmap::priority::score_types::Score0To100::new(10.0 - i as f64);
+        item.unified_score.final_score = 10.0 - i as f64;
         analysis.add_item(item);
     }
 

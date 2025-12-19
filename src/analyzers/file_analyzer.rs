@@ -532,7 +532,7 @@ mod tests {
         let function_god = function_god.unwrap();
         assert!(function_god.is_god_object);
         // Spec 212: Uses weighted scoring algorithm now
-        assert!(function_god.god_object_score.value() > 0.0);
+        assert!(function_god.god_object_score > 0.0);
         assert_eq!(function_god.method_count, 60);
 
         // Test god object by line count
@@ -548,7 +548,7 @@ mod tests {
         let extreme_god = extreme_god.unwrap();
         assert!(extreme_god.is_god_object);
         // Spec 212: Weighted scoring produces higher scores for severe violations
-        assert!(extreme_god.god_object_score.value() > function_god.god_object_score.value());
+        assert!(extreme_god.god_object_score > function_god.god_object_score);
     }
 
     #[test]

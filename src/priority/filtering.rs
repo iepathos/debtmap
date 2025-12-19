@@ -312,7 +312,7 @@ mod tests {
             ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedDebtItem,
             UnifiedScore,
         };
-        use crate::priority::score_types::Score0To100;
+
         use crate::priority::semantic_classifier::FunctionRole;
 
         super::super::DebtItem::Function(Box::new(UnifiedDebtItem {
@@ -330,7 +330,7 @@ mod tests {
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(5.0),
+                final_score: 5.0,
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

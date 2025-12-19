@@ -6,7 +6,6 @@
 //!
 //! This module is part of the **Pure Core** - data structures with no behavior.
 
-use crate::priority::score_types::Score0To100;
 use serde::{Deserialize, Serialize};
 
 /// Type of god object detection
@@ -77,7 +76,7 @@ pub struct GodObjectAnalysis {
     pub responsibility_count: usize,
     pub lines_of_code: usize,
     pub complexity_sum: u32,
-    pub god_object_score: Score0To100,
+    pub god_object_score: f64,
     pub recommended_splits: Vec<crate::organization::god_object::ModuleSplit>,
     pub confidence: GodObjectConfidence,
     pub responsibilities: Vec<String>,

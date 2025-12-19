@@ -4,7 +4,6 @@ use super::*;
 use crate::priority::unified_scorer::Location;
 use crate::priority::{
     file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact},
-    score_types::Score0To100,
     semantic_classifier::FunctionRole,
     tiers::RecommendationTier,
     view::{SortCriteria, ViewConfig},
@@ -42,7 +41,7 @@ fn create_test_function_item_at(
             coverage_factor: 5.0,
             dependency_factor: 2.0,
             role_multiplier: 1.0,
-            final_score: Score0To100::new(score),
+            final_score: score.max(0.0),
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -57,7 +56,7 @@ fn create_test_function_item_at(
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {

@@ -17,7 +17,7 @@ pub(crate) fn format_priority_item_markdown(
     item: &UnifiedDebtItem,
     verbosity: u8,
 ) {
-    let severity = get_severity_label(item.unified_score.final_score.value());
+    let severity = get_severity_label(item.unified_score.final_score);
 
     // Header with rank, tier, and score
     let tier_label = item
@@ -29,10 +29,7 @@ pub(crate) fn format_priority_item_markdown(
     writeln!(
         output,
         "### #{} {}Score: {:.1} [{}]",
-        rank,
-        tier_label,
-        item.unified_score.final_score.value(),
-        severity
+        rank, tier_label, item.unified_score.final_score, severity
     )
     .unwrap();
 

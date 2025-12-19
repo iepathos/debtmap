@@ -11,9 +11,6 @@ use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::{DebtType, UnifiedDebtItem};
 use serde::{Deserialize, Serialize};
 
-#[allow(unused_imports)]
-use crate::priority::score_types::Score0To100;
-
 /// Configuration for exponential scaling and risk boosting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScalingConfig {
@@ -189,7 +186,6 @@ mod tests {
         role: FunctionRole,
         cyclomatic: u32,
     ) -> UnifiedDebtItem {
-        use crate::priority::score_types::Score0To100;
         use crate::priority::unified_scorer::{Location, UnifiedScore};
         use crate::priority::ActionableRecommendation;
         use crate::priority::ImpactMetrics;
@@ -206,7 +202,7 @@ mod tests {
                 coverage_factor: 5.0,
                 dependency_factor: 5.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(base_score),
+                final_score: base_score.max(0.0),
                 base_score: Some(base_score),
                 exponential_factor: Some(1.0),
                 risk_boost: Some(1.0),
@@ -284,7 +280,7 @@ mod tests {
                 methods: 50,
                 fields: Some(20),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 400,
             },
             &config,
@@ -309,7 +305,7 @@ mod tests {
                 methods: 50,
                 fields: Some(20),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 400,
             },
             &config,
@@ -366,7 +362,7 @@ mod tests {
                 methods: 50,
                 fields: Some(1000),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 600,
             },
             20, // High deps
@@ -398,7 +394,7 @@ mod tests {
                 methods: 50,
                 fields: Some(1000),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 600,
             },
             5,
@@ -445,7 +441,7 @@ mod tests {
                 methods: 50,
                 fields: Some(1000),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 600,
             },
             &config,
@@ -530,7 +526,7 @@ mod tests {
                         methods: 50,
                         fields: Some(20),
                         responsibilities: 10,
-                        god_object_score: Score0To100::new(85.0),
+                        god_object_score: 85.0,
                         lines: 400,
                     }
                 } else if i % 3 == 1 {
@@ -609,7 +605,7 @@ mod tests {
                 methods: 50,
                 fields: Some(20),
                 responsibilities: 10,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
                 lines: 400,
             };
 
@@ -672,7 +668,7 @@ mod tests {
                     methods: 50,
                     fields: Some(20),
                     responsibilities: 10,
-                    god_object_score: Score0To100::new(85.0),
+                    god_object_score: 85.0,
                     lines: 400,
                 },
                 10,

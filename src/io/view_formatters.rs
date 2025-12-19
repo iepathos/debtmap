@@ -219,7 +219,7 @@ fn convert_item(item: &ViewItem, include_scoring_details: bool) -> JsonItem {
         ViewItem::Function(func) => {
             let loc = item.location();
             JsonItem::Function(Box::new(JsonFunctionItem {
-                score: func.unified_score.final_score.value(),
+                score: func.unified_score.final_score,
                 severity: item.severity().as_str().to_lowercase(),
                 category: item.category().to_string(),
                 location: JsonLocation {
@@ -245,7 +245,7 @@ fn convert_item(item: &ViewItem, include_scoring_details: bool) -> JsonItem {
                         coverage_factor: func.unified_score.coverage_factor,
                         dependency_factor: func.unified_score.dependency_factor,
                         role_multiplier: func.unified_score.role_multiplier,
-                        final_score: func.unified_score.final_score.value(),
+                        final_score: func.unified_score.final_score,
                     })
                 } else {
                     None

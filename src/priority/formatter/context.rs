@@ -11,8 +11,8 @@ pub(crate) fn create_format_context(
 ) -> FormatContext {
     FormatContext {
         rank,
-        score: item.unified_score.final_score.value(),
-        severity_info: SeverityInfo::from_score(item.unified_score.final_score.value()),
+        score: item.unified_score.final_score,
+        severity_info: SeverityInfo::from_score(item.unified_score.final_score),
         location_info: LocationInfo::from_item(item),
         action: item.recommendation.primary_action.clone(),
         impact: item.expected_impact.clone(),
@@ -223,7 +223,6 @@ impl ContextDampeningInfo {
     fn get_file_type_description(file_type: crate::context::FileType) -> String {
         use crate::context::FileType;
         #[allow(unused_imports)]
-        use crate::priority::score_types::Score0To100;
         match file_type {
             FileType::Example => "Example/demonstration code (pedagogical patterns accepted)",
             FileType::Test => "Test code (test helper complexity accepted)",

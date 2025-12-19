@@ -345,8 +345,8 @@ mod dampening_tests {
     use super::*;
     use crate::priority::unified_scorer::EntropyDetails;
     use crate::priority::{
-        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, Score0To100,
-        UnifiedDebtItem, UnifiedScore,
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedDebtItem,
+        UnifiedScore,
     };
     use std::path::PathBuf;
 
@@ -370,7 +370,7 @@ mod dampening_tests {
                 coverage_factor: 80.0,
                 dependency_factor: 50.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(50.0),
+                final_score: 50.0,
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

@@ -16,7 +16,7 @@ use super::types::{
     NewItems, ResolvedItems, UnchangedCritical, CRITICAL_SCORE_THRESHOLD,
 };
 use crate::priority::coverage_propagation::TransitiveCoverage;
-use crate::priority::score_types::Score0To100;
+
 use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
 use crate::priority::{ActionableRecommendation, DebtItem, DebtType, ImpactMetrics};
@@ -88,7 +88,7 @@ fn create_function_item(
             coverage_factor: 0.0,
             dependency_factor: 0.0,
             role_multiplier: 1.0,
-            final_score: Score0To100::new(score),
+            final_score: score.max(0.0),
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -103,7 +103,7 @@ fn create_function_item(
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::Unknown,
         recommendation: ActionableRecommendation {
@@ -177,7 +177,7 @@ fn create_test_function_item(
             coverage_factor: 0.0,
             dependency_factor: 0.0,
             role_multiplier: 1.0,
-            final_score: Score0To100::new(score),
+            final_score: score.max(0.0),
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -192,7 +192,7 @@ fn create_test_function_item(
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {
@@ -260,7 +260,7 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
             coverage_factor: 0.0,
             dependency_factor: 0.0,
             role_multiplier: 1.0,
-            final_score: Score0To100::new(score),
+            final_score: score.max(0.0),
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -275,7 +275,7 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: ActionableRecommendation {

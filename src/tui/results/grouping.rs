@@ -54,13 +54,13 @@ pub fn group_by_location<'a>(
         .map(|items| {
             let combined_score = items
                 .iter()
-                .map(|i| i.unified_score.final_score.value())
+                .map(|i| i.unified_score.final_score)
                 .sum::<f64>();
 
             let max_severity = items
                 .iter()
                 .map(|i| {
-                    Severity::from_score_100(i.unified_score.final_score.value())
+                    Severity::from_score_100(i.unified_score.final_score)
                         .as_str()
                         .to_lowercase()
                 })
@@ -179,7 +179,7 @@ fn severity_rank(severity: &str) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::score_types::Score0To100;
+
     use crate::priority::{
         ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedScore,
     };
@@ -201,7 +201,7 @@ mod tests {
                 coverage_factor: 5.0,
                 dependency_factor: 5.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(score),
+                final_score: score.max(0.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

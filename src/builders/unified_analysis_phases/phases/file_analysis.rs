@@ -133,8 +133,6 @@ fn detect_god_object_from_content(
     content: &str,
     file_metrics: &FileDebtMetrics,
 ) -> Option<crate::organization::GodObjectAnalysis> {
-    use crate::priority::score_types::Score0To100;
-
     let actual_line_count = content.lines().count();
 
     // Get analysis from file analyzer
@@ -148,10 +146,9 @@ fn detect_god_object_from_content(
     if actual_line_count > 2000 || file_metrics.function_count > 50 {
         if let Some(ref mut analysis) = god_analysis {
             analysis.is_god_object = true;
-            if analysis.god_object_score == Score0To100::new(0.0) {
-                analysis.god_object_score = Score0To100::new(
-                    ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0,
-                );
+            if analysis.god_object_score == 0.0 {
+                analysis.god_object_score =
+                    ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0;
             }
         } else {
             god_analysis = Some(crate::organization::GodObjectAnalysis {
@@ -162,9 +159,7 @@ fn detect_god_object_from_content(
                 responsibility_count: 0,
                 lines_of_code: actual_line_count,
                 complexity_sum: file_metrics.total_complexity,
-                god_object_score: Score0To100::new(
-                    ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0,
-                ),
+                god_object_score: ((file_metrics.function_count as f64 / 50.0).min(2.0)) * 100.0,
                 recommended_splits: Vec::new(),
                 confidence: crate::organization::GodObjectConfidence::Probable,
                 responsibilities: Vec::new(),

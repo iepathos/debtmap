@@ -192,7 +192,6 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
         &mut self,
         file_contexts: &std::collections::HashMap<std::path::PathBuf, crate::analysis::FileContext>,
     ) {
-        use crate::priority::score_types::Score0To100;
         use crate::priority::scoring::file_context_scoring::apply_context_adjustments;
 
         // Apply adjustments to all items
@@ -204,11 +203,11 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
                 if let Some(context) = file_contexts.get(&item.location.file) {
                     // Apply context adjustment to the final score
                     let adjusted_score =
-                        apply_context_adjustments(item.unified_score.final_score.value(), context);
+                        apply_context_adjustments(item.unified_score.final_score, context);
 
                     // Create a new item with the adjusted score and file context
                     let mut adjusted_item = item.clone();
-                    adjusted_item.unified_score.final_score = Score0To100::new(adjusted_score);
+                    adjusted_item.unified_score.final_score = adjusted_score.max(0.0);
                     adjusted_item.file_context = Some(context.clone());
                     adjusted_item
                 } else {

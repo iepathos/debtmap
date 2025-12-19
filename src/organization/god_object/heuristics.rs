@@ -13,7 +13,7 @@ use crate::organization::god_object::scoring::calculate_god_object_score_weighte
 use crate::organization::god_object::{
     DetectionType, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds, SplitAnalysisMethod,
 };
-use crate::priority::score_types::Score0To100;
+
 use std::collections::HashMap;
 
 /// Thresholds for simple heuristic-based detection.
@@ -87,7 +87,7 @@ pub fn fallback_god_object_heuristics(
         responsibility_count: estimated_resp_count,
         lines_of_code: line_count,
         complexity_sum,
-        god_object_score: Score0To100::new(god_object_score),
+        god_object_score: god_object_score.max(0.0),
         recommended_splits: Vec::new(),
         confidence: GodObjectConfidence::Possible,
         responsibilities,
@@ -211,7 +211,7 @@ pub fn fallback_with_preserved_analysis(
         responsibility_count,
         lines_of_code: line_count,
         complexity_sum,
-        god_object_score: Score0To100::new(god_object_score),
+        god_object_score: god_object_score.max(0.0),
         recommended_splits: Vec::new(),
         confidence: GodObjectConfidence::Probable,
         responsibilities,

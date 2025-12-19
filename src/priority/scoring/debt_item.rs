@@ -456,7 +456,7 @@ fn generate_standard_recommendation(
             responsibilities,
             god_object_score,
             ..
-        } => generate_god_object_recommendation(*responsibilities, god_object_score.value()),
+        } => generate_god_object_recommendation(*responsibilities, *god_object_score),
         DebtType::FeatureEnvy {
             external_class,
             usage_ratio,
@@ -554,7 +554,6 @@ fn generate_standard_recommendation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::score_types::Score0To100;
 
     fn assert_float_eq(left: f64, right: f64, epsilon: f64) {
         if (left - right).abs() > epsilon {
@@ -1379,7 +1378,7 @@ mod tests {
             coverage_factor: 6.0,
             dependency_factor: 2.0,
             role_multiplier: 1.2,
-            final_score: Score0To100::new(8.5),
+            final_score: 8.5,
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -1394,7 +1393,7 @@ mod tests {
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         };
 
         let coverage = TransitiveCoverage {

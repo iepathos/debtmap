@@ -151,7 +151,6 @@ pub fn filter_bug_fix_commits(commits: &[CommitInfo]) -> Vec<&CommitInfo> {
     commits.iter().filter(|c| is_bug_fix(&c.message)).collect()
 }
 
-
 // =============================================================================
 // I/O Wrapper Functions (Imperative Shell)
 // =============================================================================

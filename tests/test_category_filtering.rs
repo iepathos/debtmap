@@ -22,7 +22,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             coverage_factor: 7.0,
             dependency_factor: 3.0,
             role_multiplier: 1.0,
-            final_score: debtmap::priority::score_types::Score0To100::new(6.5),
+            final_score: 6.5,
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -37,7 +37,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {
@@ -95,7 +95,7 @@ fn create_architecture_item(function_name: &str) -> UnifiedDebtItem {
         methods: 15,
         fields: Some(8),
         responsibilities: 8,
-        god_object_score: debtmap::priority::score_types::Score0To100::new(50.0),
+        god_object_score: 50.0,
         lines: 150,
     };
     item

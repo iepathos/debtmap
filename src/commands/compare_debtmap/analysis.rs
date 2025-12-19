@@ -21,7 +21,7 @@ pub fn create_summary(analysis: &DebtmapJsonInput) -> AnalysisSummary {
     let function_items: Vec<_> = extract_functions(&analysis.items).collect();
     let scores: Vec<f64> = function_items
         .iter()
-        .map(|f| f.unified_score.final_score.value())
+        .map(|f| f.unified_score.final_score)
         .collect();
 
     AnalysisSummary {
@@ -96,7 +96,7 @@ fn find_removed_functions<'a>(
 fn count_high_priority(items: &[&UnifiedDebtItem]) -> usize {
     items
         .iter()
-        .filter(|item| is_critical(item.unified_score.final_score.value()))
+        .filter(|item| is_critical(item.unified_score.final_score))
         .count()
 }
 
@@ -141,8 +141,8 @@ fn compute_improvement_if_significant(
     before: &UnifiedDebtItem,
     after: &UnifiedDebtItem,
 ) -> Option<ImprovementMetrics> {
-    let before_score = before.unified_score.final_score.value();
-    let after_score = after.unified_score.final_score.value();
+    let before_score = before.unified_score.final_score;
+    let after_score = after.unified_score.final_score;
 
     if !is_significantly_improved(before_score, after_score) {
         return None;
@@ -215,7 +215,7 @@ fn find_new_critical_items(
 ) -> Vec<ItemInfo> {
     extract_functions(after_items)
         .filter(|f| !before_keys.contains(&(f.location.file.clone(), f.location.function.clone())))
-        .filter(|f| is_critical(f.unified_score.final_score.value()))
+        .filter(|f| is_critical(f.unified_score.final_score))
         .map(unified_to_item_info)
         .collect()
 }
@@ -226,7 +226,7 @@ fn unified_to_item_info(item: &UnifiedDebtItem) -> ItemInfo {
         file: item.location.file.clone(),
         function: item.location.function.clone(),
         line: item.location.line,
-        score: item.unified_score.final_score.value(),
+        score: item.unified_score.final_score,
     }
 }
 
@@ -254,7 +254,7 @@ fn find_unchanged_critical(
     after_map: &HashMap<(PathBuf, String), &UnifiedDebtItem>,
 ) -> Vec<ItemInfo> {
     extract_functions(before_items)
-        .filter(|before| is_critical(before.unified_score.final_score.value()))
+        .filter(|before| is_critical(before.unified_score.final_score))
         .filter_map(|before| check_if_unchanged(before, after_map))
         .collect()
 }
@@ -268,10 +268,10 @@ fn check_if_unchanged(
         before.location.file.clone(),
         before.location.function.clone(),
     );
-    let before_score = before.unified_score.final_score.value();
+    let before_score = before.unified_score.final_score;
 
     after_map.get(&key).and_then(|after| {
-        let after_score = after.unified_score.final_score.value();
+        let after_score = after.unified_score.final_score;
         if is_score_unchanged(before_score, after_score) && is_critical(after_score) {
             Some(unified_to_item_info(before))
         } else {

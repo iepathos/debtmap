@@ -7,8 +7,8 @@ use crate::organization::GodObjectAnalysis;
 use crate::priority::file_metrics::FileDebtMetrics;
 use crate::priority::god_object_aggregation::GodObjectAggregatedMetrics;
 use crate::priority::{
-    score_types::Score0To100, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
-    TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
+    ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, TransitiveCoverage,
+    UnifiedDebtItem, UnifiedScore,
 };
 use crate::risk::context::ContextualRisk;
 use crate::risk::lcov::LcovData;
@@ -56,7 +56,7 @@ pub fn create_god_object_debt_item(
     let recommendation = create_god_object_recommendation(god_analysis);
 
     // Determine tier
-    let base_score = god_analysis.god_object_score.value();
+    let base_score = god_analysis.god_object_score;
     let tier = if base_score >= 50.0 {
         crate::priority::RecommendationTier::T1CriticalArchitecture
     } else {
@@ -124,7 +124,7 @@ fn calculate_god_object_score(
     god_analysis: &GodObjectAnalysis,
     aggregated_metrics: &GodObjectAggregatedMetrics,
 ) -> UnifiedScore {
-    let base_score = god_analysis.god_object_score.value();
+    let base_score = god_analysis.god_object_score;
 
     // Use aggregated coverage in score calculation
     let coverage_factor = aggregated_metrics
@@ -144,7 +144,7 @@ fn calculate_god_object_score(
     let total_complexity = aggregated_metrics.total_cyclomatic + aggregated_metrics.total_cognitive;
     let has_coverage_data = aggregated_metrics.weighted_coverage.is_some();
     let mut unified_score = UnifiedScore {
-        final_score: Score0To100::new(coverage_adjusted_score),
+        final_score: coverage_adjusted_score.max(0.0),
         complexity_factor: total_complexity as f64 / 10.0,
         coverage_factor,
         dependency_factor: calculate_god_object_risk(god_analysis) / 10.0,
@@ -163,7 +163,7 @@ fn calculate_god_object_score(
         structural_multiplier: Some(1.0),
         has_coverage_data,
         contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+        pre_contextual_score: None,
     };
 
     // Apply contextual risk to score if available
@@ -496,7 +496,7 @@ mod tests {
             responsibility_count: 5,
             lines_of_code: 2000,
             complexity_sum: 100,
-            god_object_score: Score0To100::new(75.0),
+            god_object_score: 75.0,
             recommended_splits: vec![
                 ModuleSplit {
                     suggested_name: "module_a".to_string(),

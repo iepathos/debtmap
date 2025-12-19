@@ -132,7 +132,7 @@ mod tests {
     fn create_test_analysis() -> UnifiedAnalysis {
         use crate::data_flow::DataFlowGraph;
         use crate::priority::call_graph::CallGraph;
-        use crate::priority::score_types::Score0To100;
+
         use im::Vector;
 
         let items = Vector::from(vec![UnifiedDebtItem {
@@ -160,7 +160,7 @@ mod tests {
                 lines_reduction: 20,
             },
             unified_score: UnifiedScore {
-                final_score: Score0To100::new(8.5),
+                final_score: 8.5,
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

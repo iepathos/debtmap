@@ -507,7 +507,7 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::score_types::Score0To100;
+
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
@@ -531,7 +531,7 @@ mod tests {
                 cognitive: cog,
             },
             unified_score: UnifiedScore {
-                final_score: Score0To100::new(50.0),
+                final_score: 50.0,
                 complexity_factor: 5.0,
                 coverage_factor: 0.0,
                 dependency_factor: 0.0,

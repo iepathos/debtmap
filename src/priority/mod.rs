@@ -45,7 +45,6 @@ pub use formatter_markdown::{
 };
 pub use god_object_aggregation::{aggregate_god_object_metrics, GodObjectAggregatedMetrics};
 pub use pipeline::{analyze_and_filter, filter_sort_limit, sort_by_score, take_top};
-pub use score_types::{Score0To1, Score0To100};
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use tiers::{classify_tier, RecommendationTier, TierConfig};
 pub use unified_analysis_queries::UnifiedAnalysisQueries;
@@ -288,7 +287,7 @@ pub enum DebtType {
         /// Number of fields - Some for GodClass, None for GodFile/GodModule
         fields: Option<u32>,
         responsibilities: u32,
-        god_object_score: Score0To100,
+        god_object_score: f64,
         /// Total lines of code
         lines: u32,
     },
@@ -490,7 +489,7 @@ impl std::hash::Hash for DebtType {
                 methods.hash(state);
                 fields.hash(state);
                 responsibilities.hash(state);
-                god_object_score.value().to_bits().hash(state);
+                god_object_score.to_bits().hash(state);
                 lines.hash(state);
             }
             DebtType::FeatureEnvy {
@@ -778,7 +777,7 @@ impl DebtItem {
     pub fn score(&self) -> f64 {
         match self {
             DebtItem::File(item) => item.score,
-            DebtItem::Function(item) => item.unified_score.final_score.value(),
+            DebtItem::Function(item) => item.unified_score.final_score,
         }
     }
 
@@ -900,7 +899,7 @@ impl UnifiedAnalysis {
 
         for item in &self.items {
             // Sum up all final scores as the total debt score
-            total_debt_score += item.unified_score.final_score.value();
+            total_debt_score += item.unified_score.final_score;
 
             // Use cached file line count from item if available (spec 204)
             // This may override the analyzed_files value with more accurate counts
@@ -1043,7 +1042,7 @@ impl UnifiedAnalysis {
         // Recalculate totals for filtered set
         let total_debt_score: f64 = filtered_items
             .iter()
-            .map(|item| item.unified_score.final_score.value())
+            .map(|item| item.unified_score.final_score)
             .sum();
 
         Self {
@@ -1297,7 +1296,7 @@ mod tests {
                 coverage_factor: 10.0,
                 dependency_factor: 0.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(score),
+                final_score: score.max(0.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,

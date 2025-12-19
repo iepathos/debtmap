@@ -37,7 +37,7 @@ impl GodObjectMetrics {
             field_count: analysis.field_count,
             responsibility_count: analysis.responsibility_count,
             lines_of_code: analysis.lines_of_code,
-            god_object_score: analysis.god_object_score.value(),
+            god_object_score: analysis.god_object_score,
             confidence: analysis.confidence,
         };
 
@@ -229,7 +229,6 @@ fn determine_trend(score_change: f64) -> TrendDirection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::score_types::Score0To100;
 
     fn create_test_analysis(
         is_god_object: bool,
@@ -244,7 +243,7 @@ mod tests {
             responsibility_count: 3,
             lines_of_code: 500,
             complexity_sum: 100,
-            god_object_score: Score0To100::new(score),
+            god_object_score: score.max(0.0),
             recommended_splits: Vec::new(),
             confidence: if is_god_object {
                 GodObjectConfidence::Probable

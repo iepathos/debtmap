@@ -266,9 +266,9 @@ fn test_well_tested_simple_function_has_low_score() {
         // The key spec 109 requirement is that these don't appear in top 10
         // when competing with complex/untested functions (verified by first test)
         assert!(
-            item.unified_score.final_score.value() < 50.0,
+            item.unified_score.final_score < 50.0,
             "Well-tested simple function should score < 50.0, got {}",
-            item.unified_score.final_score.value()
+            item.unified_score.final_score
         );
     }
 }

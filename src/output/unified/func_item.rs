@@ -76,7 +76,7 @@ impl FunctionDebtItemOutput {
 
     pub fn from_function_item(item: &UnifiedDebtItem, include_scoring_details: bool) -> Self {
         // Apply rounding for clean output (spec 230)
-        let rounded_score = round_score(item.unified_score.final_score.value());
+        let rounded_score = round_score(item.unified_score.final_score);
         let complexity_pattern = extract_complexity_pattern(
             &item.recommendation.rationale,
             &item.recommendation.primary_action,

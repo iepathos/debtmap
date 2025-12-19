@@ -27,7 +27,7 @@ use crate::organization::god_object::{
     GodObjectThresholds, KnownTraitRegistry, SplitAnalysisMethod, TraitImplInfo,
     TraitMethodSummary,
 };
-use crate::priority::score_types::Score0To100;
+
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -234,7 +234,7 @@ fn build_god_object_analysis(
         responsibility_count: responsibility_names.len(),
         lines_of_code: production_lines, // Spec 214: Use production LOC
         complexity_sum: metrics.complexity_sum,
-        god_object_score: Score0To100::new(god_object_score),
+        god_object_score: god_object_score.max(0.0),
         recommended_splits: vec![],
         confidence,
         responsibilities: responsibility_names,
@@ -369,8 +369,7 @@ pub fn analyze_god_object(path: &Path, extracted: &ExtractedFileData) -> Option<
         .into_iter()
         .max_by(|a, b| {
             a.god_object_score
-                .value()
-                .partial_cmp(&b.god_object_score.value())
+                .partial_cmp(&b.god_object_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
 }
@@ -494,7 +493,7 @@ fn analyze_file_level(
         responsibility_count: responsibility_names.len(),
         lines_of_code: production_lines, // Spec 214: Use production LOC
         complexity_sum,
-        god_object_score: Score0To100::new(god_score),
+        god_object_score: god_score.max(0.0),
         recommended_splits: vec![],
         confidence,
         responsibilities: responsibility_names,

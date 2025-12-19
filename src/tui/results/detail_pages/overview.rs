@@ -75,7 +75,7 @@ pub fn build_score_section(
     if location_items.len() > 1 {
         let combined_score: f64 = location_items
             .iter()
-            .map(|i| i.unified_score.final_score.value())
+            .map(|i| i.unified_score.final_score)
             .sum();
         let severity = Severity::from_score_100(combined_score)
             .as_str()
@@ -88,17 +88,13 @@ pub fn build_score_section(
             width,
         );
     } else {
-        let severity = Severity::from_score_100(item.unified_score.final_score.value())
+        let severity = Severity::from_score_100(item.unified_score.final_score)
             .as_str()
             .to_lowercase();
         add_label_value(
             &mut lines,
             "total",
-            format!(
-                "{:.1}  [{}]",
-                item.unified_score.final_score.value(),
-                severity
-            ),
+            format!("{:.1}  [{}]", item.unified_score.final_score, severity),
             theme,
             width,
         );
@@ -460,7 +456,6 @@ pub fn get_items_at_location<'a>(
 /// Format debt type as human-readable name
 pub fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
     #[allow(unused_imports)]
-    use crate::priority::score_types::Score0To100;
     use crate::priority::DebtType;
     match debt_type {
         DebtType::ComplexityHotspot { .. } => "High Complexity".to_string(),
@@ -501,7 +496,7 @@ pub fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::score_types::Score0To100;
+
     use crate::priority::unified_scorer::{Location, UnifiedScore};
     use crate::priority::{ActionableRecommendation, FunctionRole, ImpactMetrics};
     use crate::tui::theme::Theme;
@@ -519,7 +514,7 @@ mod tests {
                 function: function_name.to_string(),
             },
             unified_score: UnifiedScore {
-                final_score: Score0To100::new(final_score),
+                final_score: final_score.max(0.0),
                 complexity_factor: 0.8,
                 coverage_factor: 0.6,
                 dependency_factor: 0.5,
@@ -700,7 +695,7 @@ mod tests {
                 fields: Some(15),
                 responsibilities: 8,
                 lines: 500,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
             },
         );
         let theme = Theme::default();
@@ -754,7 +749,7 @@ mod tests {
                 fields: Some(15),
                 responsibilities: 8,
                 lines: 500,
-                god_object_score: Score0To100::new(85.0),
+                god_object_score: 85.0,
             },
         );
         let theme = Theme::default();
@@ -902,7 +897,7 @@ mod tests {
                 fields: None,
                 responsibilities: 1,
                 lines: 1,
-                god_object_score: Score0To100::new(50.0),
+                god_object_score: 50.0,
             }),
             "God Object"
         );

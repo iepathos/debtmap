@@ -5,7 +5,6 @@
 /// 2. Coverage indicators are hidden
 /// 3. Coverage warning message is shown exactly once
 use debtmap::priority::formatter::format_priorities_with_verbosity;
-use debtmap::priority::score_types::Score0To100;
 use debtmap::priority::{
     CallGraph, DebtType, FunctionRole, ImpactMetrics, Location, OutputFormat, UnifiedAnalysis,
     UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
@@ -29,7 +28,7 @@ fn create_untested_item() -> UnifiedDebtItem {
             coverage_factor: 10.0, // High coverage factor indicates untested
             dependency_factor: 4.0,
             role_multiplier: 1.0,
-            final_score: Score0To100::new(85.0),
+            final_score: 85.0,
             base_score: None,
             exponential_factor: None,
             risk_boost: None,
@@ -44,7 +43,7 @@ fn create_untested_item() -> UnifiedDebtItem {
             structural_multiplier: Some(1.0),
             has_coverage_data: false,
             contextual_risk_multiplier: None,
-                pre_contextual_score: None,
+            pre_contextual_score: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

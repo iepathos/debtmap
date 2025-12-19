@@ -59,7 +59,7 @@ impl ViewItem {
     /// Returns the debt score for this item.
     pub fn score(&self) -> f64 {
         match self {
-            ViewItem::Function(item) => item.unified_score.final_score.value(),
+            ViewItem::Function(item) => item.unified_score.final_score,
             ViewItem::File(item) => item.score,
         }
     }
@@ -453,7 +453,6 @@ mod tests {
     use super::*;
     use crate::priority::{
         file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact},
-        score_types::Score0To100,
         semantic_classifier::FunctionRole,
         ActionableRecommendation, DebtType, ImpactMetrics, UnifiedScore,
     };
@@ -475,7 +474,7 @@ mod tests {
                 coverage_factor: 5.0,
                 dependency_factor: 2.0,
                 role_multiplier: 1.0,
-                final_score: Score0To100::new(score),
+                final_score: score.max(0.0),
                 base_score: None,
                 exponential_factor: None,
                 risk_boost: None,
