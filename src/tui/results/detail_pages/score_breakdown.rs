@@ -794,58 +794,83 @@ pub fn build_calculation_summary_section(
     let risk_boost = item.unified_score.risk_boost.unwrap_or(1.0);
     let final_score = item.unified_score.final_score;
 
-    // For god objects, complexity_factor already has god_mult baked in.
-    // We need to use the raw value for formula display to avoid double-counting.
-    let c_raw = if let Some(gm) = god_mult {
-        item.unified_score.complexity_factor / gm
-    } else {
-        item.unified_score.complexity_factor
-    };
-    let d = item.unified_score.dependency_factor;
+    // Check if this is a god object - god objects use god_object_score directly as base
+    let is_god_object_item = matches!(item.debt_type, DebtType::GodObject { .. });
 
-    // Step 1: Base score from formula (using raw complexity, not god-inflated)
-    let weighted_base = if has_coverage_data {
-        let cov_mult = 1.0 - (item.unified_score.coverage_factor / 10.0);
-        (c_raw + d) * cov_mult
-    } else {
-        (c_raw * 5.0) + (d * 2.5)
-    };
-    add_label_value(
-        &mut lines,
-        "1. weighted base",
-        format!("{:.2}", weighted_base),
-        theme,
-        width,
-    );
-
-    // Step 2: After role adjustment
-    let after_role = weighted_base * role;
-    add_label_value(
-        &mut lines,
-        "2. × role",
-        format!("{:.2} × {:.2} = {:.2}", weighted_base, role, after_role),
-        theme,
-        width,
-    );
-
-    // Step 3: After structural adjustment
-    let after_struct = after_role * struct_mult;
-    add_label_value(
-        &mut lines,
-        "3. × struct",
-        format!(
-            "{:.2} × {:.2} = {:.2}",
-            after_role, struct_mult, after_struct
-        ),
-        theme,
-        width,
-    );
-
-    // Step 4: Show adjustments between formula result and stored base_score
-    // The gap can include: debt aggregator, orchestration adjustment, context multiplier
     let base_score = stored_base;
-    let mut step_num = 4;
-    let mut current_value = after_struct;
+
+    let (mut step_num, mut current_value) = if is_god_object_item {
+        // God object items: score comes from god_object_score directly
+        let go_score = match &item.debt_type {
+            DebtType::GodObject {
+                god_object_score, ..
+            } => *god_object_score,
+            _ => stored_base,
+        };
+
+        add_label_value(
+            &mut lines,
+            "1. god object score",
+            format!("{:.2} (from detection)", go_score),
+            theme,
+            width,
+        );
+        (2_usize, go_score)
+    } else {
+        // Regular function items: use complexity/dependency formula
+        let c = item.unified_score.complexity_factor;
+        let d = item.unified_score.dependency_factor;
+
+        // Step 1: Base score from formula
+        let weighted_base = if has_coverage_data {
+            let cov_mult = 1.0 - (item.unified_score.coverage_factor / 10.0);
+            (c + d) * cov_mult
+        } else {
+            (c * 5.0) + (d * 2.5)
+        };
+
+        let formula_detail = if has_coverage_data {
+            format!(
+                "{:.2} ((C + D) × cov where C={:.1}, D={:.1})",
+                weighted_base, c, d
+            )
+        } else {
+            format!(
+                "{:.2} (C×5 + D×2.5 where C={:.1}, D={:.1})",
+                weighted_base, c, d
+            )
+        };
+        add_label_value(&mut lines, "1. weighted base", formula_detail, theme, width);
+
+        // Step 2: After role adjustment
+        let after_role = weighted_base * role;
+        let mut next_step = 2_usize;
+        if (role - 1.0).abs() > 0.01 {
+            add_label_value(
+                &mut lines,
+                "2. × role",
+                format!("{:.2} × {:.2} = {:.2}", weighted_base, role, after_role),
+                theme,
+                width,
+            );
+            next_step = 3;
+        }
+
+        // Step 3: After structural adjustment
+        let after_struct = after_role * struct_mult;
+        if (struct_mult - 1.0).abs() > 0.01 {
+            add_label_value(
+                &mut lines,
+                &format!("{}. × struct", next_step),
+                format!("{:.2} × {:.2} = {:.2}", after_role, struct_mult, after_struct),
+                theme,
+                width,
+            );
+            next_step += 1;
+        }
+
+        (next_step, after_struct)
+    };
 
     // Check for orchestration adjustment (spec 110)
     if let Some(adj) = &item.unified_score.adjustment_applied {
