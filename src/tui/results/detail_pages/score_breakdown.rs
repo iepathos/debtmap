@@ -865,7 +865,7 @@ pub fn build_calculation_summary_section(
     );
 
     // Step 4: Show adjustments between formula result and stored base_score
-    // The gap can include: debt aggregator, orchestration adjustment, context multiplier, clamping
+    // The gap can include: debt aggregator, orchestration adjustment, context multiplier
     let base_score = stored_base;
     let mut step_num = 4;
     let mut current_value = after_struct;
@@ -983,12 +983,9 @@ pub fn build_calculation_summary_section(
         if base_score > current_value && current_value > 0.0 {
             let diff = base_score - current_value;
 
-            // Check if pre_normalization exists (indicates clamping occurred)
+            // Check if pre_normalization exists (indicates adjustment occurred)
             let explanation = if let Some(pn) = pre_norm {
-                format!(
-                    "{:.2} → {:.2} → clamped to {:.2}",
-                    current_value, pn, base_score
-                )
+                format!("{:.2} → {:.2} → {:.2}", current_value, pn, base_score)
             } else {
                 // Residual adjustment from combined factors
                 format!(
@@ -1004,24 +1001,14 @@ pub fn build_calculation_summary_section(
                 width,
             );
         } else if base_score < current_value {
-            // Value decreased - show as clamped (to 100) or adjusted
-            if (base_score - 100.0).abs() < 0.01 {
-                add_label_value(
-                    &mut lines,
-                    &format!("{}. clamped", step_num),
-                    format!("{:.2} → 100.00 (max score)", current_value),
-                    theme,
-                    width,
-                );
-            } else {
-                add_label_value(
-                    &mut lines,
-                    &format!("{}. adjusted", step_num),
-                    format!("{:.2} → {:.2}", current_value, base_score),
-                    theme,
-                    width,
-                );
-            }
+            // Value decreased - show as adjusted
+            add_label_value(
+                &mut lines,
+                &format!("{}. adjusted", step_num),
+                format!("{:.2} → {:.2}", current_value, base_score),
+                theme,
+                width,
+            );
         } else {
             add_label_value(
                 &mut lines,
@@ -1073,18 +1060,6 @@ pub fn build_calculation_summary_section(
             width,
         );
         current = after_god;
-    }
-
-    // Show clamping if any multipliers pushed the score over 100
-    // This handles exponential, risk_boost, and god_mult all potentially exceeding 100
-    if current > 100.0 {
-        add_label_value(
-            &mut lines,
-            "clamped",
-            format!("{:.2} → 100.00 (max score)", current),
-            theme,
-            width,
-        );
     }
     let _ = current; // Suppress unused warning - value tracked for completeness
 
