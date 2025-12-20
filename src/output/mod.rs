@@ -2,6 +2,7 @@ pub mod dot;
 pub mod evidence_formatter;
 pub mod formatters;
 pub mod json;
+pub mod llm_markdown;
 pub mod markdown;
 pub mod pattern_analysis;
 pub mod pattern_formatter;
@@ -78,6 +79,18 @@ fn output_prepared_view(view: &PreparedDebtView, config: &OutputConfig) -> Resul
             let markdown = view_formatters::format_markdown(view, &md_config);
             write_output(&markdown, &config.output_file)
         }
+        Some(crate::cli::OutputFormat::LlmMarkdown) => {
+            // LLM-optimized markdown format (Spec 264)
+            // For prepared view, we render using view_formatters with LLM config
+            let md_config = view_formatters::MarkdownConfig {
+                verbosity: config.verbosity,
+                show_filter_stats: false, // Not needed for LLM output
+            };
+            // TODO: Create dedicated LLM markdown formatter in view_formatters
+            // For now, use standard markdown formatter
+            let markdown = view_formatters::format_markdown(view, &md_config);
+            write_output(&markdown, &config.output_file)
+        }
         _ => {
             // Terminal output (default)
             if is_markdown_file(&config.output_file) {
@@ -148,6 +161,7 @@ pub use dot::*;
 pub use evidence_formatter::*;
 pub use formatters::*;
 pub use json::*;
+pub use llm_markdown::*;
 pub use markdown::*;
 pub use pattern_analysis::*;
 pub use pattern_formatter::*;
@@ -273,6 +287,17 @@ pub fn output_unified_priorities_with_summary(
         Some(crate::cli::OutputFormat::Dot) => {
             // DOT format for Graphviz visualization (Spec 204)
             dot::output_dot_default(&analysis, output_file)
+        }
+        Some(crate::cli::OutputFormat::LlmMarkdown) => {
+            // LLM-optimized markdown format (Spec 264)
+            let include_scoring_details = verbosity >= 2;
+            llm_markdown::output_llm_markdown_with_format(
+                &analysis,
+                top,
+                tail,
+                output_file,
+                include_scoring_details,
+            )
         }
         _ => {
             if is_markdown_file(&output_file) {

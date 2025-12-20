@@ -555,6 +555,9 @@ pub enum OutputFormat {
     Html,
     /// Graphviz DOT format for dependency visualization
     Dot,
+    /// LLM-optimized markdown format (Spec 264)
+    #[value(name = "llm-markdown")]
+    LlmMarkdown,
 }
 
 /// Priority levels for debt items
@@ -585,6 +588,7 @@ impl From<OutputFormat> for crate::io::output::OutputFormat {
             OutputFormat::Terminal => crate::io::output::OutputFormat::Terminal,
             OutputFormat::Html => crate::io::output::OutputFormat::Html,
             OutputFormat::Dot => crate::io::output::OutputFormat::Dot,
+            OutputFormat::LlmMarkdown => crate::io::output::OutputFormat::LlmMarkdown,
         }
     }
 }

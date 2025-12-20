@@ -134,6 +134,9 @@ fn main_inner() -> Result<()> {
                     debtmap::cli::OutputFormat::Dot => {
                         debtmap::commands::validate_improvement::OutputFormat::Terminal
                     }
+                    debtmap::cli::OutputFormat::LlmMarkdown => {
+                        debtmap::commands::validate_improvement::OutputFormat::Markdown
+                    }
                 },
                 quiet: quiet || is_automation_mode(),
             };

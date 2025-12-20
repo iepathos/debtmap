@@ -3,6 +3,7 @@ pub mod effects;
 pub mod enhanced_markdown;
 pub mod html;
 pub mod json;
+pub mod llm_markdown;
 pub mod markdown;
 pub mod pattern_display;
 pub mod terminal;
@@ -15,5 +16,6 @@ pub use effects::{
 };
 pub use html::HtmlWriter;
 pub use json::JsonWriter;
+pub use llm_markdown::LlmMarkdownWriter;
 pub use markdown::{EnhancedMarkdownWriter, MarkdownWriter};
 pub use terminal::TerminalWriter;
