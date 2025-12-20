@@ -1,4 +1,4 @@
-//! Overview page (Page 1) - Core metrics and recommendation.
+//! Overview page (Page 1) - Core metrics display.
 //!
 //! Structured as pure section builders composed by a thin render shell,
 //! following Stillwater philosophy: "Pure Core, Imperative Shell".
@@ -339,33 +339,6 @@ pub fn build_cohesion_section(
     lines
 }
 
-/// Build recommendation section lines (pure)
-pub fn build_recommendation_section(
-    item: &UnifiedDebtItem,
-    theme: &Theme,
-    width: u16,
-) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    add_section_header(&mut lines, "recommendation", theme);
-    add_label_value(
-        &mut lines,
-        "action",
-        item.recommendation.primary_action.clone(),
-        theme,
-        width,
-    );
-    add_blank_line(&mut lines);
-    add_label_value(
-        &mut lines,
-        "rationale",
-        item.recommendation.rationale.clone(),
-        theme,
-        width,
-    );
-    add_blank_line(&mut lines);
-    lines
-}
-
 /// Build debt types section lines (pure)
 pub fn build_debt_types_section(
     location_items: &[&UnifiedDebtItem],
@@ -422,7 +395,6 @@ pub fn render(
         build_complexity_section(item, theme, area.width),
         build_coverage_section(item, theme, area.width),
         build_cohesion_section(cohesion.as_ref(), theme, area.width),
-        build_recommendation_section(item, theme, area.width),
         build_debt_types_section(&location_items, item, theme),
     ]
     .into_iter()
@@ -810,27 +782,6 @@ mod tests {
             .collect();
 
         assert!(content.contains("85.0%"));
-    }
-
-    // --- build_recommendation_section tests ---
-
-    #[test]
-    fn recommendation_section_contains_action_and_rationale() {
-        let item = complexity_item("func");
-        let theme = Theme::default();
-
-        let lines = build_recommendation_section(&item, &theme, 80);
-
-        let content: String = lines
-            .iter()
-            .flat_map(|l| l.spans.iter())
-            .map(|s| s.content.as_ref())
-            .collect();
-
-        assert!(content.contains("recommendation"));
-        assert!(content.contains("action"));
-        assert!(content.contains("rationale"));
-        assert!(content.contains("Refactor"));
     }
 
     // --- build_debt_types_section tests ---
