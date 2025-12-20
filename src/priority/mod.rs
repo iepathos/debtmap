@@ -1,6 +1,7 @@
 pub mod call_graph;
 pub mod classification;
 pub mod complexity_patterns;
+pub mod context;
 pub mod coverage_propagation;
 pub mod debt_aggregator;
 pub mod detected_pattern;
@@ -1365,6 +1366,7 @@ mod tests {
             error_swallowing_count: None,
             error_swallowing_patterns: None,
             entropy_analysis: None,
+            context_suggestion: None,
         }
     }
 

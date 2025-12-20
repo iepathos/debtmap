@@ -237,3 +237,8 @@ pub fn get_state_detection_config() -> crate::analyzers::state_field_detector::S
 pub fn get_data_flow_scoring_config() -> super::scoring::DataFlowScoringConfig {
     get_config().data_flow_scoring.clone().unwrap_or_default()
 }
+
+/// Get context suggestion configuration (spec 263)
+pub fn get_context_suggestion_config() -> crate::priority::context::ContextConfig {
+    get_config().context_suggestion.clone().unwrap_or_default()
+}

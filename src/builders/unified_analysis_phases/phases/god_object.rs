@@ -116,6 +116,7 @@ pub fn create_god_object_debt_item(
         responsibility_category: god_analysis.responsibilities.first().cloned(),
         error_swallowing_count: None,
         error_swallowing_patterns: None,
+        context_suggestion: None,
     }
 }
 

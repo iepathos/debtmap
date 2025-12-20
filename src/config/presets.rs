@@ -233,6 +233,9 @@ pub fn merge_preset_with_config(preset: PresetLevel, config: DebtmapConfig) -> D
         analysis: config.analysis.or(preset_config.analysis),
         state_detection: config.state_detection.or(preset_config.state_detection),
         data_flow_scoring: config.data_flow_scoring.or(preset_config.data_flow_scoring),
+        context_suggestion: config
+            .context_suggestion
+            .or(preset_config.context_suggestion),
     }
 }
 

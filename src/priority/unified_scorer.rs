@@ -213,6 +213,9 @@ pub struct UnifiedDebtItem {
     /// Types of error swallowing patterns detected
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_swallowing_patterns: Option<Vec<String>>,
+    /// Context window suggestions for AI agents (spec 263)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_suggestion: Option<crate::priority::context::ContextSuggestion>,
 }
 
 impl UnifiedDebtItem {

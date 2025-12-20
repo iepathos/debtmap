@@ -92,6 +92,7 @@ fn create_untested_item() -> UnifiedDebtItem {
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }
 }
 
