@@ -101,6 +101,7 @@ fn create_test_item(
         file_line_count: None,
         responsibility_category: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }
 }
 

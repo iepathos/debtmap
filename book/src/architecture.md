@@ -1,10 +1,10 @@
 # Architecture
 
-This chapter explains how debtmap's analysis pipeline works, from discovering files to producing prioritized technical debt recommendations.
+This chapter explains how debtmap's analysis pipeline works, from discovering files to producing prioritized technical debt signals.
 
 ## Analysis Pipeline Overview
 
-Debtmap's analysis follows a multi-stage pipeline that transforms source code into actionable recommendations:
+Debtmap's analysis follows a multi-stage pipeline that transforms source code into structured signals:
 
 ```
 ┌─────────────────┐
@@ -69,14 +69,22 @@ Debtmap's analysis follows a multi-stage pipeline that transforms source code in
          └─────────┬─────────┘
                    │
                    ▼
+        ┌──────────────────────┐
+        │ Context Suggestion   │
+        │    Generation        │
+        └─────────┬────────────┘
+                  │
+                  ▼
           ┌────────────────┐
           │Output Formatting│
           └────────┬───────┘
                    │
-                   ▼
-       ┌─────────────────────┐
-       │Terminal/JSON/Markdown│
-       └─────────────────────┘
+       ┌───────────┼───────────┐
+       │           │           │
+       ▼           ▼           ▼
+   ┌──────┐   ┌────────┐   ┌─────┐
+   │ JSON │   │LLM-MD  │   │Term │
+   └──────┘   └────────┘   └─────┘
 ```
 
 ## Key Components
@@ -310,20 +318,20 @@ fn calculate_risk_score():
 ```
 
 **Risk Tiers:**
-- **Critical (8.0+):** Immediate attention required
-- **High (5.0-7.9):** Priority for next sprint
-- **Moderate (2.0-4.9):** Address when refactoring nearby code
-- **Low (<2.0):** Monitor but no immediate action
+- **Critical (8.0+):** High complexity with no test coverage
+- **High (5.0-7.9):** Moderate complexity with coverage gaps
+- **Moderate (2.0-4.9):** Low-moderate risk, monitor
+- **Low (<2.0):** Acceptable state
 
 ### 9. Tiered Prioritization
 
-**Purpose:** Classify and rank technical debt items by urgency and impact.
+**Purpose:** Classify and rank technical debt items by severity.
 
 **Prioritization Algorithm:**
 
 1. **Calculate base risk score** (from Risk Scoring step)
 2. **Apply context adjustments:**
-   - Entry points: -2.0 score (lower priority for unit tests)
+   - Entry points: -2.0 score (integration test coverage expected)
    - Core business logic: +1.5 score (higher priority)
    - Frequently changed files: +1.0 score (git history analysis)
    - Critical paths: +0.5 score per untested caller
@@ -333,9 +341,9 @@ fn calculate_risk_score():
    - Moderate: score >= 2.0
    - Low: score < 2.0
 4. **Sort within tiers by:**
-   - Impact (estimated risk reduction)
-   - Effort (test count or refactoring size)
-   - ROI (impact / effort)
+   - Severity score
+   - Coupling impact
+   - File location (group related items)
 
 **Output:**
 ```rust
@@ -345,43 +353,77 @@ pub struct PrioritizedDebtItem {
     pub tier: Tier,
     pub location: Location,
     pub debt_type: DebtType,
-    pub action: String,
-    pub impact: f64,
-    pub effort: Effort,
+    pub metrics: ComplexityMetrics,
+    pub coverage: Option<CoverageMetrics>,
+    pub context: ContextSuggestion,
 }
 ```
 
 See [Tiered Prioritization](tiered-prioritization.md) for detailed explanation of the ranking algorithm.
 
-### 10. Output Formatting
+### 10. Context Suggestion Generation
 
-**Purpose:** Present analysis results in user-friendly formats.
+**Purpose:** Provide AI agents with specific file ranges to read for understanding the debt item.
+
+**Context Types:**
+
+**Primary Context:**
+- The function/struct where debt is located
+- Start and end line numbers
+- File path
+
+**Related Context:**
+- **Callers:** Functions that call this function
+- **Callees:** Functions this function calls
+- **Tests:** Existing test files that cover related code
+- **Types:** Struct/enum definitions used by this function
+
+**Selection Algorithm:**
+1. Include primary location (always)
+2. Add top 3 callers by call frequency
+3. Add callees that are untested
+4. Add test files with matching function names
+5. Limit total context to ~500 lines (configurable)
+
+**Output Format:**
+```
+CONTEXT:
+├─ Primary: src/parser.rs:38-85
+├─ Caller: src/handler.rs:100-120 (calls 12x)
+├─ Caller: src/api.rs:45-60 (calls 8x)
+├─ Callee: src/tokenizer.rs:15-40 (untested)
+└─ Test: tests/parser_test.rs:50-120
+```
+
+### 11. Output Formatting
+
+**Purpose:** Present analysis results in formats optimized for different consumers.
 
 **Output Formats:**
 
-**Terminal (default):**
-- Color-coded by tier (red=critical, yellow=high, etc.)
-- Hierarchical tree view with unicode box characters
-- Collapsible sections for detailed recommendations
-- Summary statistics at top
+**LLM Markdown (--format llm-markdown):**
+- Structured for minimal token usage
+- Context suggestions included inline
+- Metrics in consistent tabular format
+- Designed for piping to AI assistants
 
-**JSON:**
+**JSON (--format json):**
 - Machine-readable for CI/CD integration
 - Full metadata for each debt item
-- Structured for programmatic consumption
+- Stable schema for programmatic consumption
 - Schema-versioned for compatibility
 
-**Markdown:**
+**Terminal (--format terminal):**
+- Color-coded by tier (red=critical, yellow=high, etc.)
+- Hierarchical tree view with unicode box characters
+- Progress bars for analysis phases
+- Summary statistics at top
+
+**Markdown (--format markdown):**
 - Rendered in GitHub/GitLab for PR comments
 - Embedded code blocks with syntax highlighting
 - Collapsible details sections
 - Linked to source code locations
-
-**GitHub PR Comments:**
-- Automated comments on pull requests
-- Inline annotations at specific lines
-- Comparison with base branch (new vs existing debt)
-- Summary card with key metrics
 
 See [Output Formats](output-formats.md) for examples and configuration options.
 
@@ -455,13 +497,21 @@ Risk = (3.4 * 0.25) + (1 * 1 * 0.2) = 0.85 + 0.2 = 1.05
 Tier: LOW (entry point with decent coverage)
 ```
 
-**Stage 7: Recommendation**
+**Stage 7: Context Suggestion**
+```
+CONTEXT:
+├─ Primary: src/handlers.rs:2-6
+├─ Callee: src/auth.rs:15-30 (validate_auth)
+└─ Test: tests/integration/handlers_test.rs:10-25
+```
+
+**Stage 8: Output**
 ```
 #23 SCORE: 1.1 [LOW]
-├─ MINOR GAP: ./src/handlers.rs:2 process_request()
-├─ ACTION: Add 1 test for error path at line 3
-├─ IMPACT: -0.3 risk reduction
-└─ WHY: Entry point with 75% branch coverage, missing error case
+├─ src/handlers.rs:2 process_request()
+├─ COMPLEXITY: cyclomatic=4, cognitive=3, nesting=1
+├─ COVERAGE: 75% (1 branch untested)
+└─ CONTEXT: Primary + 1 callee + 1 test file
 ```
 
 ## Performance Characteristics
@@ -475,7 +525,7 @@ Tier: LOW (entry point with decent coverage)
 **Parallelization:**
 - File parsing: Parallel across all available cores
 - Metric extraction: Parallel per-file
-- Call graph construction: Sequential (requires cross-file state)
+- Call graph construction: Parallel with work stealing
 - Risk scoring: Parallel per-function
 - Output formatting: Sequential
 
@@ -527,4 +577,4 @@ pub trait OutputFormatter {
 - **Understand prioritization:** See [Tiered Prioritization](tiered-prioritization.md)
 - **Learn scoring strategies:** See [Scoring Strategies](scoring-strategies.md)
 - **Configure analysis:** See [Configuration](configuration.md)
-- **View examples:** See [Examples](examples.md)
+- **Integrate with AI:** See [LLM Integration](llm-integration.md)

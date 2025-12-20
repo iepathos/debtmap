@@ -6,6 +6,7 @@
 # User Guide
 
 - [Getting Started](getting-started.md)
+- [LLM Integration](llm-integration.md)
 - [CLI Reference](cli-reference.md)
 - [Analysis Guide](analysis-guide/index.md)
   - [Overview](analysis-guide/overview.md)

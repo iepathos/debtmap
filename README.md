@@ -5,108 +5,109 @@
 [![CI](https://github.com/iepathos/debtmap/actions/workflows/ci.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Stop guessing where bugs hide. Start fixing what matters.**
+**Code complexity sensor for AI-assisted development.**
 
-debtmap finds the Rust functions that are complex, untested, and frequently changed—the places bugs actually live.
+Debtmap identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them. It doesn't tell you what to do - it tells AI agents where to look and what signals matter.
 
-<!-- TODO: Add terminal recording GIF here showing `debtmap analyze .` running -->
-<!-- Recommended: Use `asciinema` or `vhs` to record, convert to GIF with `agg` -->
+## Why Debtmap?
 
-## The Problem
+AI coding assistants (Claude Code, Copilot, Cursor) are transforming how we write code. But they struggle with technical debt:
 
-Static analysis tools cry wolf. You get hundreds of warnings, most are noise, and you waste time on code that works fine.
+- They can't see the whole codebase at once
+- They don't know which complex code is tested vs untested
+- They can't prioritize what to fix first
+- They waste context window on irrelevant code
 
-**debtmap is different.** It combines 5 signals to find *actual* risk:
+Debtmap solves this by providing:
 
-| Signal | What it catches |
-|--------|-----------------|
-| Cognitive complexity | Code that's hard to understand |
-| Test coverage gaps | Untested critical paths |
-| Git history | Code that breaks repeatedly |
-| Pattern recognition | Ignores simple match statements |
-| Entropy analysis | Filters repetitive false positives |
+1. **Prioritized debt items** - What needs attention, ranked by severity
+2. **Quantified signals** - Complexity, coverage, coupling metrics
+3. **Context suggestions** - Exactly which files/lines the AI should read
+4. **Structured output** - JSON and markdown optimized for LLM consumption
 
-The result: a prioritized list of what to fix, with quantified impact.
-
-## Install
+## Quick Start
 
 ```bash
+# Install
 cargo install debtmap
+
+# Analyze and pipe to Claude Code
+debtmap analyze . --format llm-markdown | claude "Fix the top debt item"
+
+# Get structured data for your AI workflow
+debtmap analyze . --format json --top 10 > debt.json
+
+# Interactive exploration
+debtmap analyze . --format terminal
 ```
 
-## Usage
+## How It Works
 
-```bash
-# Analyze your project
-debtmap analyze .
+Debtmap is a **sensor**, not an oracle. It measures:
 
-# With test coverage and context (recommended)
-cargo llvm-cov --lcov --output-path coverage.lcov
-debtmap analyze . --lcov coverage.lcov --context
+| Signal | What It Measures | Why It Matters |
+|--------|------------------|----------------|
+| Complexity | Cyclomatic, cognitive, nesting | How hard code is to understand |
+| Coverage | Test coverage gaps | How risky changes are |
+| Coupling | Dependencies, call graph | How changes ripple |
+| Entropy | Pattern variety | False positive reduction |
+| Purity | Side effects | How testable code is |
 
-# Generate HTML report
-debtmap analyze . --lcov coverage.lcov --context --format html --output report.html
-```
+These signals are combined into a **severity score** that ranks debt items. The AI uses these signals + the actual code to decide how to fix it.
 
-## What You Get
+## Example Output
 
 ```
 #1 SCORE: 8.9 [CRITICAL]
 ├─ TEST GAP: ./src/parser.rs:38 parse_complex_input()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: -3.7 risk reduction
-├─ DEPENDENCIES:
-│  ├─ Called by: validate_input, process_request, handle_api_call
-│  └─ Calls: tokenize, validate_syntax
-└─ WHY: Complex logic (cyclomatic=6, cognitive=12) with 0% test coverage
-
-STEPS:
-1. Add 8 tests for 70% coverage gap [Easy]
-   Commands: cargo test parse_complex_input::
-
-2. Extract complex branches into focused functions [Medium]
-   Commands: cargo clippy -- -W clippy::cognitive_complexity
-
-3. Verify improvements [Easy]
-   Commands: cargo test --all
+├─ COMPLEXITY: cyclomatic=12, cognitive=18, nesting=4
+├─ COVERAGE: 0% (12 lines untested)
+├─ CONTEXT:
+│  ├─ Primary: src/parser.rs:38-85
+│  ├─ Caller: src/handler.rs:100-120
+│  └─ Tests: tests/parser_test.rs:50-75
+└─ WHY: High complexity function with zero test coverage
 ```
 
-Every item tells you:
-- **What** to fix (exact file and line)
-- **Why** it matters (the risk signals that triggered it)
-- **How** to fix it (concrete steps with commands)
-- **Impact** (quantified risk reduction)
+## For AI Tool Developers
 
-## Why debtmap?
+Debtmap output is designed for machine consumption:
 
-### Fewer False Positives
+- **Context suggestions** - File ranges the AI should read
+- **Deterministic output** - Same input = same output
+- **Rich metadata** - All scoring factors exposed
+- **Stable IDs** - Reference items across runs
+- **LLM-optimized format** - Markdown structured for minimal tokens
 
-A 100-line `match` statement converting enums to strings? Other tools flag it as complex. debtmap recognizes it as a simple mapping and moves on.
+See [LLM Integration Guide](https://iepathos.github.io/debtmap/llm-integration.html) for details.
 
-**Five pattern systems** eliminate noise:
-- Pure mapping detection (40% complexity reduction for simple matches)
-- Entropy analysis (repetitive validation chains aren't complex)
-- Framework patterns (Axum handlers, Tokio async, Clap CLI)
-- Recursive match detection (context-aware nesting analysis)
-- Complexity classification (state machines vs god objects)
+## Output Formats
 
-### Actually Prioritized
+```bash
+# LLM-optimized markdown (recommended for AI)
+debtmap analyze . --format llm-markdown
 
-Not alphabetical. Not by file. By **actual risk**:
+# JSON for programmatic access
+debtmap analyze . --format json
 
+# Terminal for human exploration
+debtmap analyze . --format terminal
+
+# Standard markdown for reports
+debtmap analyze . --format markdown
 ```
-Risk = Complexity × (1 - Coverage) × Change Frequency × Bug History
+
+## With Coverage Data
+
+```bash
+# Generate coverage first
+cargo llvm-cov --lcov --output-path coverage.lcov
+
+# Analyze with coverage integration
+debtmap analyze . --lcov coverage.lcov
 ```
 
-Complex + untested + frequently changed = fix first.
-
-### Fast
-
-10-100x faster than Java/Python tools. Parallel processing, lock-free caching, written in Rust.
-
-```
-190K lines analyzed in 3.2 seconds (8 cores)
-```
+Coverage data enables accurate risk assessment - complex code with good tests ranks lower than simple code with no tests.
 
 ## CI/CD Integration
 
@@ -126,30 +127,26 @@ jobs:
           fail-on-violation: 'true'
 ```
 
-Density-based thresholds work for any codebase size—no adjustment needed as your code grows.
-
 ## Documentation
 
 **[Full Documentation](https://iepathos.github.io/debtmap/)** — guides, examples, configuration reference
 
 Quick links:
 - [Getting Started](https://iepathos.github.io/debtmap/getting-started.html)
+- [LLM Integration](https://iepathos.github.io/debtmap/llm-integration.html)
 - [Configuration](https://iepathos.github.io/debtmap/configuration.html)
-- [CI/CD Integration](https://iepathos.github.io/debtmap/ci-cd-integration.html)
-- [Coverage Integration](https://iepathos.github.io/debtmap/coverage-integration.html)
+- [Metrics Reference](https://iepathos.github.io/debtmap/metrics-reference.html)
 
 ## Roadmap
 
-**Current focus:** Rust analysis excellence
+**Current focus:** Rust analysis excellence + AI workflow integration
 
 - [x] Cognitive + cyclomatic complexity
 - [x] Test coverage correlation
-- [x] Git history analysis
 - [x] Pattern-based false positive reduction
-- [x] Framework detection (Axum, Actix, Tokio, Diesel, Clap)
-- [x] Interactive TUI and HTML dashboards
-- [ ] Unsafe code analysis
-- [ ] Performance pattern detection
+- [x] LLM-optimized output format
+- [x] Context suggestions for AI
+- [ ] Streaming output for large codebases
 - [ ] Multi-language support (Go, Python, TypeScript)
 
 ## Contributing

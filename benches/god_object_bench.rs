@@ -11,10 +11,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::organization::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
-    group_methods_by_responsibility, recommend_module_splits, GodObjectDetector,
-    GodObjectThresholds, OrganizationDetector,
+    group_methods_by_responsibility, GodObjectDetector, GodObjectThresholds, OrganizationDetector,
 };
-use std::collections::HashMap;
 use std::fs;
 use std::hint::black_box;
 use std::path::Path;
@@ -92,35 +90,6 @@ fn bench_group_methods(c: &mut Criterion) {
     });
 }
 
-/// Benchmark module split recommendation generation
-fn bench_recommend_splits(c: &mut Criterion) {
-    let methods = vec![
-        "get_value".to_string(),
-        "set_value".to_string(),
-        "validate_input".to_string(),
-        "save_to_database".to_string(),
-        "load_from_database".to_string(),
-        "render_output".to_string(),
-        "format_display".to_string(),
-        "parse_config".to_string(),
-        "write_config".to_string(),
-        "handle_error".to_string(),
-    ];
-
-    let mut responsibility_groups = HashMap::new();
-    responsibility_groups.insert("data_access".to_string(), methods.clone());
-
-    c.bench_function("recommend_module_splits", |b| {
-        b.iter(|| {
-            recommend_module_splits(
-                black_box("TestStruct"),
-                black_box(&methods),
-                black_box(&responsibility_groups),
-            )
-        })
-    });
-}
-
 /// Benchmark full analysis pipeline on config.rs
 fn bench_full_analysis_pipeline(c: &mut Criterion) {
     let config_path = Path::new("src/config.rs");
@@ -171,7 +140,6 @@ criterion_group!(
     bench_calculate_score_weighted,
     bench_determine_confidence,
     bench_group_methods,
-    bench_recommend_splits,
     bench_full_analysis_pipeline,
     bench_enhanced_analysis
 );

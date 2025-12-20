@@ -37,10 +37,10 @@ pub enum FunctionalAnalysisProfile {
     Lenient,
 }
 
-/// Debtmap - Code complexity and technical debt analyzer
+/// Debtmap - Code complexity sensor for AI-assisted development
 #[derive(Parser, Debug)]
 #[command(name = "debtmap")]
-#[command(about = "Rust code complexity and technical debt analyzer", long_about = None)]
+#[command(about = "Code complexity sensor for AI-assisted development", long_about = None)]
 #[command(version)]
 pub struct Cli {
     #[command(subcommand)]
@@ -59,7 +59,7 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum Commands {
-    /// Analyze code for complexity and technical debt
+    /// Analyze code for technical debt signals
     Analyze {
         /// Path to analyze
         path: PathBuf,

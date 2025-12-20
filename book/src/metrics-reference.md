@@ -1,6 +1,8 @@
 # Metrics Reference
 
-Comprehensive guide to all metrics calculated by Debtmap and how to interpret them.
+Comprehensive guide to all signals measured by Debtmap and how to interpret them.
+
+Debtmap acts as a **sensor**, providing quantified signals about code complexity and risk. These signals are designed for consumption by AI coding tools and developers alike.
 
 ## Metric Categories (Spec 118)
 
@@ -361,9 +363,33 @@ Use `est_branches` as a starting point, not an exact requirement.
 
 **A**: Not necessarily. High `est_branches` indicates complex logic that may need thorough testing. If the logic is unavoidable (e.g., state machines, complex business rules), focus on comprehensive test coverage rather than refactoring.
 
+## Signal Categories Summary
+
+| Category | Signals | Purpose |
+|----------|---------|---------|
+| Complexity | cyclomatic, cognitive, nesting, loc | How hard code is to understand |
+| Coverage | line_percent, branch_percent | How risky changes are |
+| Coupling | fan_in, fan_out, call_depth | How changes ripple |
+| Quality | entropy, purity, dead_code | False positive reduction |
+
+## Using Signals with AI
+
+When piping debtmap output to an AI assistant, signals provide the context needed for intelligent fixes:
+
+```bash
+# Get structured signals for AI consumption
+debtmap analyze . --format llm-markdown --top 5 | claude "Fix the top item"
+```
+
+The AI uses these signals to:
+- Understand code complexity before reading it
+- Prioritize which files to examine first
+- Decide between refactoring vs testing approaches
+- Estimate the scope of changes needed
+
 ## Further Reading
 
-- [Why Debtmap? - Entropy Analysis](why-debtmap.md#entropy-based-complexity-analysis)
-- [Configuration - Complexity Thresholds](configuration.md#thresholds)
-- [Coverage Integration](coverage-integration.md)
-- [Scoring Strategies](scoring-strategies.md)
+- [Why Debtmap?](why-debtmap.md) - Sensor model explained
+- [LLM Integration](llm-integration.md) - AI workflow patterns
+- [Configuration](configuration.md#thresholds) - Threshold customization
+- [Scoring Strategies](scoring-strategies.md) - How signals combine
