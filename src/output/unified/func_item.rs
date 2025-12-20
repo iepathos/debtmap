@@ -40,6 +40,9 @@ pub struct FunctionDebtItemOutput {
     /// Pattern-specific metrics
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_details: Option<serde_json::Value>,
+    /// Context window suggestion for AI agents (spec 263)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<ContextSuggestionOutput>,
 }
 
 impl FunctionDebtItemOutput {
@@ -180,6 +183,10 @@ impl FunctionDebtItemOutput {
             pattern_type,
             pattern_confidence: rounded_pattern_confidence,
             pattern_details,
+            context: item
+                .context_suggestion
+                .as_ref()
+                .map(ContextSuggestionOutput::from_context_suggestion),
         }
     }
 }
@@ -232,6 +239,66 @@ pub struct FunctionScoringDetails {
     pub refactorability_factor: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_factor: Option<f64>,
+}
+
+/// Context suggestion output for AI agents (spec 263)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextSuggestionOutput {
+    /// Primary code range to read
+    pub primary: FileRangeOutput,
+    /// Related context ranges
+    pub related: Vec<RelatedContextOutput>,
+    /// Estimated total lines to read
+    pub total_lines: u32,
+    /// Confidence that this context is sufficient (0.0-1.0)
+    pub completeness_confidence: f64,
+}
+
+/// File range output (spec 263)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileRangeOutput {
+    pub file: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+}
+
+/// Related context output (spec 263)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelatedContextOutput {
+    pub range: FileRangeOutput,
+    pub relationship: String,
+    pub reason: String,
+}
+
+impl ContextSuggestionOutput {
+    pub fn from_context_suggestion(ctx: &crate::priority::context::ContextSuggestion) -> Self {
+        Self {
+            primary: FileRangeOutput {
+                file: ctx.primary.file.to_string_lossy().to_string(),
+                start_line: ctx.primary.start_line,
+                end_line: ctx.primary.end_line,
+                symbol: ctx.primary.symbol.clone(),
+            },
+            related: ctx
+                .related
+                .iter()
+                .map(|r| RelatedContextOutput {
+                    range: FileRangeOutput {
+                        file: r.range.file.to_string_lossy().to_string(),
+                        start_line: r.range.start_line,
+                        end_line: r.range.end_line,
+                        symbol: r.range.symbol.clone(),
+                    },
+                    relationship: r.relationship.to_string(),
+                    reason: r.reason.clone(),
+                })
+                .collect(),
+            total_lines: ctx.total_lines,
+            completeness_confidence: round_ratio(ctx.completeness_confidence as f64),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -292,6 +359,7 @@ mod tests {
             pattern_type: None,
             pattern_confidence: None,
             pattern_details: None,
+            context: None,
         };
 
         // Serialize and deserialize
@@ -354,6 +422,7 @@ mod tests {
             pattern_type: None,
             pattern_confidence: None,
             pattern_details: None,
+            context: None,
         };
 
         let json = serde_json::to_string(&item).unwrap();

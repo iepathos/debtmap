@@ -271,6 +271,7 @@ pub fn create_unified_debt_item_enhanced(
         responsibility_category, // Behavioral responsibility (spec 254)
         error_swallowing_count: func.error_swallowing_count,
         error_swallowing_patterns: func.error_swallowing_patterns.clone(),
+        context_suggestion: None,
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
@@ -590,6 +591,7 @@ fn build_unified_debt_item_from_context(
         responsibility_category,
         error_swallowing_count: func.error_swallowing_count,
         error_swallowing_patterns: func.error_swallowing_patterns.clone(),
+        context_suggestion: None,
     }
 }
 
@@ -878,6 +880,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                     crate::organization::god_object::analyze_function_responsibility(&func.name),
                 error_swallowing_count: func.error_swallowing_count,
                 error_swallowing_patterns: func.error_swallowing_patterns.clone(),
+                context_suggestion: None,
             })
         })
         .collect()

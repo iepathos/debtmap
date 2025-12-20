@@ -155,6 +155,7 @@ mod tests {
             pattern_type: None,
             pattern_confidence: None,
             pattern_details: None,
+            context: None,
         }))
     }
 

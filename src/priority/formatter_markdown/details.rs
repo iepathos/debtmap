@@ -101,6 +101,58 @@ pub(crate) fn format_priority_item_markdown(
 
     // Rationale
     writeln!(output, "\n**Why:** {}", item.recommendation.rationale).unwrap();
+
+    // Context suggestions (spec 263)
+    if verbosity >= 2 {
+        if let Some(context) = &item.context_suggestion {
+            format_context_suggestion(output, context);
+        }
+    }
+}
+
+/// Format context suggestion section for markdown output (spec 263).
+fn format_context_suggestion(
+    output: &mut String,
+    context: &crate::priority::context::ContextSuggestion,
+) {
+    writeln!(
+        output,
+        "\n#### Context to Read ({} lines, {:.0}% confidence)",
+        context.total_lines,
+        context.completeness_confidence * 100.0
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "**Primary:** {}:{}-{} {}",
+        context.primary.file.display(),
+        context.primary.start_line,
+        context.primary.end_line,
+        context
+            .primary
+            .symbol
+            .as_ref()
+            .map(|s| format!("({})", s))
+            .unwrap_or_default()
+    )
+    .unwrap();
+
+    if !context.related.is_empty() {
+        writeln!(output, "\n**Related:**").unwrap();
+        for rel in &context.related {
+            writeln!(
+                output,
+                "- {}:{}-{} ({}) - {}",
+                rel.range.file.display(),
+                rel.range.start_line,
+                rel.range.end_line,
+                rel.relationship,
+                rel.reason
+            )
+            .unwrap();
+        }
+    }
 }
 
 pub(crate) fn format_score_breakdown_with_coverage(

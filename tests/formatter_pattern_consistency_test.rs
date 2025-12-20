@@ -101,6 +101,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }
 }
 
@@ -194,6 +195,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }
 }
 

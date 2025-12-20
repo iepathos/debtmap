@@ -148,6 +148,10 @@ pub struct DebtmapConfig {
     /// Data flow scoring configuration (spec 218)
     #[serde(default)]
     pub data_flow_scoring: Option<super::scoring::DataFlowScoringConfig>,
+
+    /// Context window suggestions configuration (spec 263)
+    #[serde(default)]
+    pub context_suggestion: Option<crate::priority::context::ContextConfig>,
 }
 
 /// Advanced analysis settings for call graph and dead code detection (Spec 207).

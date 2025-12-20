@@ -132,6 +132,7 @@ fn test_function_item_required_fields_and_ranges() {
         pattern_type: None,
         pattern_confidence: None,
         pattern_details: None,
+        context: None,
     };
 
     // Serialize to JSON
@@ -306,6 +307,7 @@ fn test_priority_matches_score_thresholds() {
             pattern_type: None,
             pattern_confidence: None,
             pattern_details: None,
+            context: None,
         }));
 
         let json_str = serde_json::to_string(&item).expect("Serialization failed");
@@ -367,6 +369,7 @@ fn test_no_floating_point_noise_in_serialized_output() {
         pattern_type: None,
         pattern_confidence: None,
         pattern_details: None,
+        context: None,
     };
 
     let json_str = serde_json::to_string(&item).expect("Serialization failed");
@@ -468,6 +471,7 @@ fn test_unified_debt_item_tagged_serialization() {
         pattern_type: None,
         pattern_confidence: None,
         pattern_details: None,
+        context: None,
     }));
 
     let json_str = serde_json::to_string(&function_item).expect("Serialization failed");

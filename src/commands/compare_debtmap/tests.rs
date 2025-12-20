@@ -152,6 +152,7 @@ fn create_function_item(
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }))
 }
 
@@ -241,6 +242,7 @@ fn create_test_function_item(
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }))
 }
 
@@ -324,6 +326,7 @@ fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) ->
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }
 }
 

@@ -670,6 +670,7 @@ mod tests {
             error_swallowing_count: None,
             error_swallowing_patterns: None,
             entropy_analysis: None,
+            context_suggestion: None,
         }));
 
         let item2 = DebtItem::Function(Box::new(UnifiedDebtItem {
@@ -752,6 +753,7 @@ mod tests {
             error_swallowing_count: None,
             error_swallowing_patterns: None,
             entropy_analysis: None,
+            context_suggestion: None,
         }));
 
         let mut items = [item2.clone(), item1.clone()]; // Start with low score first

@@ -118,6 +118,7 @@ fn create_debt_item(
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+        context_suggestion: None,
     }
 }
 
@@ -236,6 +237,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             error_swallowing_count: None,
             error_swallowing_patterns: None,
             entropy_analysis: None,
+            context_suggestion: None,
         };
         analysis_no_coverage.add_item(item);
     }
