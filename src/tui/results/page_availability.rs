@@ -94,10 +94,17 @@ fn make_function_id(item: &UnifiedDebtItem) -> FunctionId {
     )
 }
 
+/// Check if item has context suggestion data.
+///
+/// Pure predicate - returns true if context suggestion is present.
+pub fn has_context_data(item: &UnifiedDebtItem) -> bool {
+    item.context_suggestion.is_some()
+}
+
 /// Get available detail pages for an item.
 ///
 /// Returns a vector of pages that have relevant data for the given item.
-/// Overview, Score Breakdown, and Dependencies are always available;
+/// Overview, Score Breakdown, Context, and Dependencies are always available;
 /// Responsibilities is always available at the end.
 /// Git Context, Patterns, and Data Flow are conditional.
 pub fn available_pages(
@@ -107,6 +114,7 @@ pub fn available_pages(
     let mut pages = vec![
         DetailPage::Overview,
         DetailPage::ScoreBreakdown,
+        DetailPage::Context, // Always available (shows placeholder if no data)
         DetailPage::Dependencies,
     ];
 
@@ -336,12 +344,13 @@ mod tests {
         let data_flow = create_empty_data_flow();
         let pages = available_pages(Some(&item), &data_flow);
 
-        // Minimal: Overview, ScoreBreakdown, Dependencies, Responsibilities
-        assert_eq!(pages.len(), 4);
+        // Minimal: Overview, ScoreBreakdown, Context, Dependencies, Responsibilities
+        assert_eq!(pages.len(), 5);
         assert_eq!(pages[0], DetailPage::Overview);
         assert_eq!(pages[1], DetailPage::ScoreBreakdown);
-        assert_eq!(pages[2], DetailPage::Dependencies);
-        assert_eq!(pages[3], DetailPage::Responsibilities);
+        assert_eq!(pages[2], DetailPage::Context);
+        assert_eq!(pages[3], DetailPage::Dependencies);
+        assert_eq!(pages[4], DetailPage::Responsibilities);
     }
 
     #[test]
@@ -365,8 +374,8 @@ mod tests {
         let data_flow = create_empty_data_flow();
         let pages = available_pages(None, &data_flow);
 
-        // Only Overview, ScoreBreakdown, Dependencies, Responsibilities
-        assert_eq!(pages.len(), 4);
+        // Only Overview, ScoreBreakdown, Context, Dependencies, Responsibilities
+        assert_eq!(pages.len(), 5);
     }
 
     #[test]

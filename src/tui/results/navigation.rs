@@ -168,6 +168,24 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         }
         KeyCode::Char('2') => {
             if page_availability::is_page_available(
+                DetailPage::ScoreBreakdown,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::ScoreBreakdown;
+            }
+        }
+        KeyCode::Char('3') => {
+            if page_availability::is_page_available(
+                DetailPage::Context,
+                app.selected_item(),
+                &app.analysis().data_flow_graph,
+            ) {
+                app.nav_mut().detail_page = DetailPage::Context;
+            }
+        }
+        KeyCode::Char('4') => {
+            if page_availability::is_page_available(
                 DetailPage::Dependencies,
                 app.selected_item(),
                 &app.analysis().data_flow_graph,
@@ -175,7 +193,7 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
                 app.nav_mut().detail_page = DetailPage::Dependencies;
             }
         }
-        KeyCode::Char('3') => {
+        KeyCode::Char('5') => {
             if page_availability::is_page_available(
                 DetailPage::GitContext,
                 app.selected_item(),
@@ -184,7 +202,7 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
                 app.nav_mut().detail_page = DetailPage::GitContext;
             }
         }
-        KeyCode::Char('4') => {
+        KeyCode::Char('6') => {
             if page_availability::is_page_available(
                 DetailPage::Patterns,
                 app.selected_item(),
@@ -193,7 +211,7 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
                 app.nav_mut().detail_page = DetailPage::Patterns;
             }
         }
-        KeyCode::Char('5') => {
+        KeyCode::Char('7') => {
             if page_availability::is_page_available(
                 DetailPage::DataFlow,
                 app.selected_item(),
@@ -202,7 +220,7 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
                 app.nav_mut().detail_page = DetailPage::DataFlow;
             }
         }
-        KeyCode::Char('6') => {
+        KeyCode::Char('8') => {
             if page_availability::is_page_available(
                 DetailPage::Responsibilities,
                 app.selected_item(),
@@ -225,9 +243,41 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
         // Actions
         KeyCode::Char('c') => {
             if let Some(item) = app.selected_item() {
-                let detail_page = app.nav().detail_page;
-                let message = super::actions::copy_page_to_clipboard(item, detail_page, app)?;
-                app.set_status_message(message);
+                // On Context page, 'c' copies all context ranges
+                if app.nav().detail_page == DetailPage::Context {
+                    if let Some(ref context) = item.context_suggestion {
+                        use super::detail_pages::context::format_context_for_clipboard;
+                        let text = format_context_for_clipboard(context);
+                        let message = super::actions::clipboard::copy_to_clipboard(
+                            &text,
+                            "all context ranges",
+                        )?;
+                        app.set_status_message(message);
+                    } else {
+                        app.set_status_message("No context data available".to_string());
+                    }
+                } else {
+                    // On other pages, copy page content
+                    let detail_page = app.nav().detail_page;
+                    let message = super::actions::copy_page_to_clipboard(item, detail_page, app)?;
+                    app.set_status_message(message);
+                }
+            }
+        }
+        KeyCode::Char('p') => {
+            // On Context page, 'p' copies primary range only
+            if app.nav().detail_page == DetailPage::Context {
+                if let Some(item) = app.selected_item() {
+                    if let Some(ref context) = item.context_suggestion {
+                        use super::detail_pages::context::format_primary_for_clipboard;
+                        let text = format_primary_for_clipboard(context);
+                        let message =
+                            super::actions::clipboard::copy_to_clipboard(&text, "primary range")?;
+                        app.set_status_message(message);
+                    } else {
+                        app.set_status_message("No context data available".to_string());
+                    }
+                }
             }
         }
         KeyCode::Char('e') | KeyCode::Char('o') => {

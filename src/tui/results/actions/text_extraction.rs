@@ -27,7 +27,8 @@ use super::super::{
     app::ResultsApp,
     detail_page::DetailPage,
     detail_pages::{
-        data_flow, dependencies, git_context, overview, patterns, responsibilities, score_breakdown,
+        context, data_flow, dependencies, git_context, overview, patterns, responsibilities,
+        score_breakdown,
     },
 };
 
@@ -71,6 +72,7 @@ pub fn extract_page_text(item: &UnifiedDebtItem, page: DetailPage, app: &Results
     match page {
         DetailPage::Overview => extract_overview_text(item, app),
         DetailPage::ScoreBreakdown => extract_score_breakdown_text(item),
+        DetailPage::Context => extract_context_text(item),
         DetailPage::Dependencies => extract_dependencies_text(item, app),
         DetailPage::GitContext => extract_git_context_text(item),
         DetailPage::Patterns => extract_patterns_text(item),
@@ -114,7 +116,6 @@ fn extract_overview_text(item: &UnifiedDebtItem, app: &ResultsApp) -> String {
         overview::build_complexity_section(item, &theme, width),
         overview::build_coverage_section(item, &theme, width),
         overview::build_cohesion_section(cohesion.as_ref(), &theme, width),
-        overview::build_recommendation_section(item, &theme, width),
         overview::build_debt_types_section(&location_items, item, &theme),
     ]
     .into_iter()
@@ -134,6 +135,19 @@ fn extract_overview_text(item: &UnifiedDebtItem, app: &ResultsApp) -> String {
 fn extract_score_breakdown_text(item: &UnifiedDebtItem) -> String {
     let theme = Theme::default();
     let lines = score_breakdown::build_page_lines(item, &theme, TEXT_EXTRACTION_WIDTH);
+    lines_to_plain_text(&lines)
+}
+
+// =============================================================================
+// Context page extraction
+// =============================================================================
+
+/// Extract context page content as plain text.
+///
+/// Uses the same section builders as the TUI renderer, converted to plain text.
+fn extract_context_text(item: &UnifiedDebtItem) -> String {
+    let theme = Theme::default();
+    let lines = context::build_page_lines(item, &theme, TEXT_EXTRACTION_WIDTH);
     lines_to_plain_text(&lines)
 }
 
