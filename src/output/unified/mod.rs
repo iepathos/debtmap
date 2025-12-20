@@ -156,7 +156,7 @@ pub fn convert_to_unified_format(
     };
 
     UnifiedOutput {
-        format_version: "2.0".to_string(),
+        format_version: "3.0".to_string(),
         metadata: OutputMetadata {
             debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             generated_at: chrono::Utc::now().to_rfc3339(),
