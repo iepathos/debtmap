@@ -7,6 +7,7 @@ use crate::analysis::ContextDetector;
 use crate::config::{get_context_multipliers, get_data_flow_scoring_config};
 use crate::context::{detect_file_type, FileType};
 use crate::core::FunctionMetrics;
+use crate::priority::context::{generate_context_suggestion, ContextConfig};
 
 use crate::priority::scoring::ContextRecommendationEngine;
 use crate::priority::unified_scorer::{
@@ -684,6 +685,10 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
                 recommendation_engine,
             );
 
+            // Generate context suggestion for AI agents (spec 263)
+            let context_config = ContextConfig::default();
+            item.context_suggestion = generate_context_suggestion(&item, call_graph, &context_config);
+
             // Analyze contextual risk if risk analyzer is provided (spec 202)
             if let Some(analyzer) = risk_analyzer {
                 let complexity_metrics = crate::core::ComplexityMetrics::from_function(func);
@@ -836,7 +841,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
             // Calculate debt-type-specific impact
             let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-            Some(UnifiedDebtItem {
+            let mut item = UnifiedDebtItem {
                 location: Location {
                     file: func.file.clone(),
                     function: func.name.clone(),
@@ -881,7 +886,13 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 error_swallowing_count: func.error_swallowing_count,
                 error_swallowing_patterns: func.error_swallowing_patterns.clone(),
                 context_suggestion: None,
-            })
+            };
+
+            // Generate context suggestion for AI agents (spec 263)
+            let context_config = ContextConfig::default();
+            item.context_suggestion = generate_context_suggestion(&item, call_graph, &context_config);
+
+            Some(item)
         })
         .collect()
 }
