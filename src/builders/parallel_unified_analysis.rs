@@ -1240,13 +1240,20 @@ impl ParallelUnifiedAnalysisBuilder {
                         };
 
                     // Create god object UnifiedDebtItem using same function as sequential path
-                    let god_item = crate::builders::unified_analysis::create_god_object_debt_item(
+                    let mut god_item = crate::builders::unified_analysis::create_god_object_debt_item(
                         &file_item.metrics.path,
                         &file_item.metrics,
                         &god_analysis,
                         aggregated_metrics,
                         coverage_data,
                     );
+
+                    // Generate context suggestion for AI agents (spec 263)
+                    use crate::priority::context::{generate_context_suggestion, ContextConfig};
+                    let context_config = ContextConfig::default();
+                    god_item.context_suggestion =
+                        generate_context_suggestion(&god_item, &self.call_graph, &context_config);
+
                     unified.add_item(god_item);
                 }
             }

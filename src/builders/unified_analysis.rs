@@ -427,6 +427,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         no_god_object,
         risk_analyzer.as_ref(),
         project_path,
+        call_graph,
     );
 
     // Finalize
@@ -533,6 +534,7 @@ fn process_file_analysis(
     no_god_object: bool,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
+    call_graph: &CallGraph,
 ) {
     use crate::metrics::loc_counter::LocCounter;
     use crate::priority::god_object_aggregation::{
@@ -605,13 +607,20 @@ fn process_file_analysis(
                     }
                 }
 
-                let god_item = core::phases::god_object::create_god_object_debt_item(
+                let mut god_item = core::phases::god_object::create_god_object_debt_item(
                     &processed.file_path,
                     &processed.file_metrics,
                     &enriched,
                     aggregated,
                     coverage_data,
                 );
+
+                // Generate context suggestion for AI agents (spec 263)
+                use crate::priority::context::{generate_context_suggestion, ContextConfig};
+                let context_config = ContextConfig::default();
+                god_item.context_suggestion =
+                    generate_context_suggestion(&god_item, call_graph, &context_config);
+
                 unified.add_item(god_item);
             }
 
