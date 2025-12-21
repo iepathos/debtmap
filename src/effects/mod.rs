@@ -146,6 +146,7 @@ pub mod io;
 pub mod progress;
 pub mod sink;
 pub mod telemetry;
+pub mod validation;
 
 // Re-export everything from core
 pub use core::*;
