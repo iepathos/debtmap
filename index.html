@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9e1f585f.js";
+            window.path_to_searchindex_js = "searchindex-08efffac.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c7b19542.js"></script>
+        <script src="toc-d4b9eccb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,113 +178,97 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<blockquote>
-<p>🚧 <strong>Early Prototype</strong> - This project is under active development and APIs may change</p>
-</blockquote>
-<p>Debtmap is a Rust code analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.</p>
+<p>Debtmap is a <strong>code complexity sensor</strong> for AI-assisted development. It identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them.</p>
 <h2 id="what-is-debtmap"><a class="header" href="#what-is-debtmap">What is Debtmap?</a></h2>
-<p>Unlike traditional static analysis tools that simply flag complex code, Debtmap answers two critical questions:</p>
+<p>Debtmap is different from traditional static analysis tools. Instead of telling you what to fix, it provides <strong>signals</strong> that AI assistants can use to make informed decisions:</p>
 <ol>
-<li><strong>“What should I refactor to reduce cognitive burden?”</strong> - Identifies overly complex code that slows down development</li>
-<li><strong>“What should I test first to reduce the most risk?”</strong> - Pinpoints untested complex code that threatens stability</li>
+<li><strong>Where to look</strong> - Prioritized list of debt items with exact file locations</li>
+<li><strong>What to read</strong> - Context suggestions (callers, callees, test files)</li>
+<li><strong>What signals matter</strong> - Complexity, coverage, coupling metrics</li>
 </ol>
-<p>Debtmap analyzes Rust codebases to identify complexity hotspots, technical debt patterns, and architectural risks with full AST parsing, macro expansion, and trait tracking.</p>
-<h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
-<p>Debtmap currently focuses exclusively on Rust codebases. Our goal is to
-perfect Rust analysis before expanding to other languages. This focused
-approach allows us to:</p>
+<p>The key insight: AI coding assistants are great at fixing code, but they need guidance on <em>where</em> to focus and <em>what</em> to read. Debtmap provides that guidance.</p>
+<h2 id="the-ai-sensor-model"><a class="header" href="#the-ai-sensor-model">The AI Sensor Model</a></h2>
+<p>Debtmap is a <strong>sensor</strong>, not a prescriber. It measures and reports; it doesn’t tell you what to do.</p>
+<p><strong>What Debtmap provides:</strong></p>
 <ul>
-<li>Build deep Rust-specific analysis (macro expansion, trait resolution, lifetime awareness)</li>
-<li>Perfect our core algorithms and metrics</li>
-<li>Establish a stable API and user experience</li>
-<li>Build a strong user community</li>
+<li>Quantified complexity signals (cyclomatic, cognitive, nesting)</li>
+<li>Test coverage gaps with risk prioritization</li>
+<li>Context suggestions for AI consumption</li>
+<li>Structured output (JSON, LLM-markdown) for machine consumption</li>
 </ul>
-<p>Multi-language support (Python, JavaScript/TypeScript, Go, etc.) is planned
-for future releases once Rust analysis reaches maturity.</p>
-<p><strong>What Makes Debtmap Different:</strong></p>
+<p><strong>What Debtmap doesn’t provide:</strong></p>
 <ul>
-<li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
-<li><strong>Multi-Factor Analysis</strong>: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization</li>
-<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, significantly reducing false positives compared to traditional complexity-only analyzers. This is achieved through an advanced token classification system that categorizes code tokens and applies weighted entropy to accurately assess complexity.</li>
-<li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” with quantified impact metrics</li>
-<li><strong>Performance</strong>: 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing providing 70-90% speedup on multi-core systems)</li>
+<li>“Fix this by doing X” recommendations</li>
+<li>“You should consider Y” advice</li>
+<li>Template-based refactoring suggestions</li>
 </ul>
-<h2 id="why-use-debtmap"><a class="header" href="#why-use-debtmap">Why Use Debtmap?</a></h2>
-<p>Debtmap helps you make data-driven decisions about where to focus your refactoring and testing efforts:</p>
-<ul>
-<li><strong>Identify Complexity</strong> - Find complex functions and modules that need refactoring, with concrete metrics showing which changes will have the most impact</li>
-<li><strong>Detect Technical Debt</strong> - Discover 30+ debt patterns including code smells, security vulnerabilities, resource management issues, and architectural problems</li>
-<li><strong>Assess Risk</strong> - Prioritize improvements based on sophisticated risk scoring that combines complexity, test coverage, and dependency impact</li>
-<li><strong>Track Quality</strong> - Monitor code quality metrics over time with the <code>compare</code> command to verify that refactoring efforts achieved their goals (can optionally extract target locations from implementation plan files for focused tracking)</li>
-<li><strong>Get Actionable Recommendations</strong> - Receive specific guidance like “refactoring this will reduce complexity by 60%” or “testing this will reduce risk by 5%”</li>
-<li><strong>Automated Debt Reduction</strong> - Integrates with <a href="./prodigy-integration.html">Prodigy workflows</a> for AI-driven automated refactoring with iterative validation and testing (via external integration)</li>
-</ul>
+<p>This design is intentional. AI assistants can consider business context, team preferences, and constraints that Debtmap can’t know. The AI decides what to do; Debtmap tells it where to look.</p>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<pre><code class="language-bash"># Install
+cargo install debtmap
+
+# Analyze and pipe to Claude Code
+debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+
+# Get structured signals for your AI workflow
+debtmap analyze . --format json --top 10 &gt; debt.json
+
+# With coverage data for accurate risk assessment
+cargo llvm-cov --lcov --output-path coverage.lcov
+debtmap analyze . --lcov coverage.lcov --format llm-markdown
+</code></pre>
 <h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
+<h3 id="signal-generation"><a class="header" href="#signal-generation">Signal Generation</a></h3>
+<ul>
+<li><strong>Complexity signals</strong> - Cyclomatic, cognitive, nesting depth, lines of code</li>
+<li><strong>Coverage signals</strong> - Line coverage, branch coverage, function coverage</li>
+<li><strong>Coupling signals</strong> - Fan-in, fan-out, call graph depth</li>
+<li><strong>Quality signals</strong> - Entropy (false positive reduction), purity (testability)</li>
+</ul>
+<h3 id="ai-optimized-output"><a class="header" href="#ai-optimized-output">AI-Optimized Output</a></h3>
+<ul>
+<li><strong>LLM markdown format</strong> - Minimal tokens, maximum information</li>
+<li><strong>Context suggestions</strong> - File ranges the AI should read</li>
+<li><strong>Structured JSON</strong> - Stable schema for programmatic access</li>
+<li><strong>Deterministic output</strong> - Same input = same output</li>
+</ul>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Rust-first analysis</strong> - Deep Rust support with AST parsing, macro expansion, trait resolution, and lifetime awareness</li>
-<li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (significantly reduces false positives compared to traditional analyzers)</li>
-<li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
-<li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types: error swallowing, poor error propagation, panic patterns, inadequate exception handling)</li>
-<li><strong>God object detection</strong> - Identifies large classes with multiple responsibilities and provides concrete module split recommendations based on responsibility inference, method clustering, and cohesion analysis</li>
-<li><strong>Boilerplate detection</strong> - Finds repetitive patterns suitable for macro-ification, including trait implementation boilerplate, builder patterns, and delegation patterns</li>
-<li><strong>Functional programming analysis</strong> - Detects function purity (functions without side effects), tracks effects (I/O, mutation, panic), and identifies higher-order functions and functional patterns</li>
-<li><strong>Security vulnerability detection</strong> - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns</li>
-<li><strong>Resource management analysis</strong> - Identifies inefficient allocations, nested loops, and blocking I/O patterns</li>
-<li><strong>Code organization analysis</strong> - Detects god objects, feature envy, primitive obsession, and magic values</li>
-<li><strong>Testing quality assessment</strong> - Analyzes test complexity, flaky patterns, and assertion quality</li>
-<li><strong>File-level aggregation</strong> - Multiple aggregation methods (sum, weighted, logarithmic) for identifying files needing organizational refactoring</li>
-<li><strong>Context-aware analysis</strong> - Reduces false positives through intelligent context detection (enabled by default)</li>
-<li><strong>Call graph debugging</strong> - Validate and debug call graph construction with detailed diagnostics</li>
+<li><strong>Rust-first analysis</strong> - Full AST parsing, macro expansion, trait resolution</li>
+<li><strong>Coverage integration</strong> - Native LCOV support for risk assessment</li>
+<li><strong>Entropy analysis</strong> - Reduces false positives from repetitive code</li>
+<li><strong>Parallel processing</strong> - Fast analysis (10-100x faster than Java/Python tools)</li>
 </ul>
-<h3 id="risk-analysis--prioritization"><a class="header" href="#risk-analysis--prioritization">Risk Analysis &amp; Prioritization</a></h3>
+<h3 id="workflow-integration"><a class="header" href="#workflow-integration">Workflow Integration</a></h3>
 <ul>
-<li><strong>Coverage-based risk analysis</strong> - Correlates complexity with test coverage to identify truly risky code</li>
-<li><strong>Risk-driven testing recommendations</strong> - Prioritizes testing efforts based on complexity-coverage correlation and dependency impact</li>
-<li><strong>Call graph analysis</strong> - Tracks upstream callers and downstream callees to understand dependency impact</li>
-<li><strong>Tiered prioritization</strong> - Multi-stage pipeline (zero coverage, complexity-risk, critical path, dependency impact, effort optimization) surfaces critical architectural issues above simple testing gaps</li>
-<li><strong>Quantified impact</strong> - Shows concrete metrics like “refactoring this will reduce complexity by 60%”</li>
+<li><strong>Direct piping</strong> - Pipe output to Claude, Cursor, or custom agents</li>
+<li><strong>CI/CD gates</strong> - Validate debt thresholds in pipelines</li>
+<li><strong>Progress tracking</strong> - Compare debt across commits</li>
 </ul>
-<h3 id="performance--output"><a class="header" href="#performance--output">Performance &amp; Output</a></h3>
+<h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
+<p>Debtmap focuses exclusively on Rust. This focused approach allows us to:</p>
 <ul>
-<li><strong>Parallel processing</strong> - Built with Rust and Rayon for blazing-fast analysis (70-90% speedup on multi-core systems, 10-100x faster than Java/Python-based tools)</li>
-<li><strong>Multiple output formats</strong> - JSON (legacy and unified structures), Markdown, and human-readable terminal formats for different tool integration needs</li>
-<li><strong>Configurable thresholds</strong> - Customize complexity and duplication thresholds to match your standards</li>
-<li><strong>Verbosity controls</strong> - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail</li>
+<li>Build deep Rust-specific analysis (macros, traits, lifetimes)</li>
+<li>Perfect core algorithms before expanding</li>
+<li>Deliver the best possible AI sensor for Rust</li>
 </ul>
-<h3 id="configuration--customization"><a class="header" href="#configuration--customization">Configuration &amp; Customization</a></h3>
-<ul>
-<li><strong>Flexible suppression</strong> - Inline comment-based suppression for specific code sections</li>
-<li><strong>Configuration file</strong> - <code>.debtmap.toml</code> or <code>debtmap.toml</code> (TOML/JSON/YAML formats supported) for project-specific settings</li>
-<li><strong>Test-friendly</strong> - Easily exclude test fixtures and example code from debt analysis</li>
-<li><strong>Macro expansion support</strong> - Handles Rust macro expansions with configurable warnings</li>
-</ul>
-<h3 id="commands"><a class="header" href="#commands">Commands</a></h3>
-<ul>
-<li><strong><code>analyze</code></strong> - Comprehensive debt analysis with unified prioritization</li>
-<li><strong><code>validate</code></strong> - Enforce quality thresholds in CI/CD pipelines</li>
-<li><strong><code>validate-improvement</code></strong> - Validate refactoring improvements against quality thresholds (automates verification that changes actually improved code quality)</li>
-<li><strong><code>compare</code></strong> - Track improvements over time and verify refactoring goals</li>
-<li><strong><code>explain-coverage</code></strong> - Debug coverage data parsing and function name matching (helps troubleshoot coverage detection issues)</li>
-<li><strong><code>init</code></strong> - Generate configuration file with sensible defaults (–force to overwrite)</li>
-</ul>
+<p>Multi-language support (Python, JavaScript/TypeScript, Go) is planned for future releases.</p>
 <h2 id="target-audience"><a class="header" href="#target-audience">Target Audience</a></h2>
 <p>Debtmap is designed for:</p>
 <ul>
-<li><strong>Development teams</strong> - Get concrete metrics for planning sprints. Know exactly which refactoring will reduce complexity by 60% or which function needs 6 unit tests for full coverage.</li>
-<li><strong>Engineering managers</strong> - Track quality trends over time with the <code>compare</code> command. Monitor whether refactoring efforts are actually improving codebase health.</li>
-<li><strong>Code reviewers</strong> - Focus reviews on high-risk areas identified by Debtmap. Prioritize reviewing untested complex code over simple utility functions.</li>
-<li><strong>CI/CD engineers</strong> - Enforce quality gates with <code>validate</code> command. Automate refactoring verification with <code>validate-improvement</code> for continuous quality monitoring in pipelines.</li>
-<li><strong>Developers refactoring legacy codebases</strong> - Receive actionable guidance like “extract nested conditions”, “split this 80-line function into 3 smaller functions”, or “add error handling for this catch block”.</li>
+<li><strong>AI-assisted developers</strong> - Get signals that help AI assistants make better decisions</li>
+<li><strong>Development teams</strong> - Prioritize debt remediation with quantified metrics</li>
+<li><strong>CI/CD engineers</strong> - Enforce quality gates with coverage-aware thresholds</li>
+<li><strong>Legacy codebase maintainers</strong> - Identify where AI can help most</li>
 </ul>
 <h2 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h2>
-<p>Ready to analyze your codebase? Check out:</p>
+<p>Ready to start? Check out:</p>
 <ul>
 <li><a href="./getting-started.html">Getting Started</a> - Installation and first analysis</li>
-<li><a href="./analysis-guide.html">Analysis Guide</a> - Understanding the metrics and output</li>
-<li><a href="./output-formats.html">Output Formats</a> - JSON, Markdown, and terminal formats</li>
+<li><a href="./llm-integration.html">LLM Integration</a> - AI workflow patterns</li>
+<li><a href="./why-debtmap.html">Why Debtmap?</a> - The AI sensor model explained</li>
 </ul>
-<p><strong>Tip:</strong> Start with <code>debtmap analyze . --summary</code> for a quick overview, or use <code>--top 10</code> to focus on highest-priority items. Use threshold presets for quick configuration: <code>--threshold-preset strict</code> for high code quality standards, <code>balanced</code> (default) for typical projects, or <code>lenient</code> for legacy or complex domains.</p>
+<p><strong>Quick tip:</strong> Start with <code>debtmap analyze . --format llm-markdown --top 5</code> to see the top priority items with context suggestions.</p>
 
                     </main>
 

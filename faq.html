@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9e1f585f.js";
+            window.path_to_searchindex_js = "searchindex-08efffac.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c7b19542.js"></script>
+        <script src="toc-d4b9eccb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,185 +178,172 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="frequently-asked-questions"><a class="header" href="#frequently-asked-questions">Frequently Asked Questions</a></h1>
-<p>Common questions about debtmap’s features, usage, and comparison with other tools.</p>
+<p>Common questions about debtmap’s features, usage, and AI integration.</p>
+<h2 id="ai-integration"><a class="header" href="#ai-integration">AI Integration</a></h2>
+<h3 id="how-does-debtmap-work-with-ai-coding-assistants"><a class="header" href="#how-does-debtmap-work-with-ai-coding-assistants">How does debtmap work with AI coding assistants?</a></h3>
+<p>Debtmap is designed as a <strong>sensor</strong> that provides structured data for AI consumption. Instead of telling you what to fix, it tells AI assistants:</p>
+<ol>
+<li><strong>Where to look</strong> - Prioritized list of debt items with file locations</li>
+<li><strong>What to read</strong> - Context suggestions (callers, callees, tests)</li>
+<li><strong>What signals matter</strong> - Complexity, coverage, coupling metrics</li>
+</ol>
+<p><strong>Example workflow:</strong></p>
+<pre><code class="language-bash"># Pipe directly to Claude Code
+debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+</code></pre>
+<h3 id="what-output-format-is-best-for-ai"><a class="header" href="#what-output-format-is-best-for-ai">What output format is best for AI?</a></h3>
+<p>Use <code>--format llm-markdown</code> for AI workflows. This format:</p>
+<ul>
+<li>Minimizes tokens while maximizing information</li>
+<li>Includes context suggestions inline</li>
+<li>Uses consistent structure for reliable parsing</li>
+<li>Avoids verbose descriptions that waste context window</li>
+</ul>
+<pre><code class="language-bash">debtmap analyze . --format llm-markdown --top 5
+</code></pre>
+<h3 id="does-debtmap-provide-fix-suggestions"><a class="header" href="#does-debtmap-provide-fix-suggestions">Does debtmap provide fix suggestions?</a></h3>
+<p>No. Debtmap is a <strong>sensor</strong>, not a prescriber. It provides signals (metrics, coverage, coupling) and lets the AI decide how to fix issues.</p>
+<p>This design is intentional:</p>
+<ul>
+<li>AI can consider business context you provide</li>
+<li>Different situations require different approaches</li>
+<li>Template recommendations are often wrong</li>
+</ul>
+<h3 id="how-do-i-use-context-suggestions"><a class="header" href="#how-do-i-use-context-suggestions">How do I use context suggestions?</a></h3>
+<p>Each debt item includes file ranges the AI should read:</p>
+<pre><code>Context:
+├─ Primary: src/parser.rs:38-85 (the debt item)
+├─ Caller: src/handler.rs:100-120 (usage context)
+└─ Test: tests/parser_test.rs:50-75 (expected behavior)
+</code></pre>
+<p>Tell your AI to read these files before making changes:</p>
+<pre><code class="language-bash">debtmap analyze . --format llm-markdown --top 1 | \
+  claude "Read the context files first, then fix the top item"
+</code></pre>
+<h3 id="can-i-integrate-debtmap-with-cursor"><a class="header" href="#can-i-integrate-debtmap-with-cursor">Can I integrate debtmap with Cursor?</a></h3>
+<p>Yes. Generate a report file and reference it in Cursor:</p>
+<pre><code class="language-bash"># Generate report
+debtmap analyze . --format llm-markdown --top 10 &gt; debt-report.md
+
+# In Cursor, use: @debt-report.md Fix the top critical item
+</code></pre>
 <h2 id="features--capabilities"><a class="header" href="#features--capabilities">Features &amp; Capabilities</a></h2>
 <h3 id="whats-the-difference-between-measured-and-estimated-metrics"><a class="header" href="#whats-the-difference-between-measured-and-estimated-metrics">What’s the difference between measured and estimated metrics?</a></h3>
-<p>Debtmap distinguishes between two types of metrics (Spec 118):</p>
 <p><strong>Measured Metrics</strong> - Precise values from AST analysis:</p>
 <ul>
 <li><code>cyclomatic_complexity</code>: Exact count of decision points</li>
 <li><code>cognitive_complexity</code>: Weighted readability measure</li>
 <li><code>nesting_depth</code>: Maximum nesting levels</li>
 <li><code>loc</code>: Lines of code</li>
-<li>These are suitable for CI/CD quality gates and thresholds</li>
 </ul>
 <p><strong>Estimated Metrics</strong> - Heuristic approximations:</p>
 <ul>
-<li><code>est_branches</code>: Estimated execution paths (formula-based)
-<ul>
-<li>Formula: <code>max(nesting, 1) × cyclomatic ÷ 3</code></li>
-<li>Use for: Estimating test cases needed</li>
-<li>Don’t use for: Hard quality gates</li>
+<li><code>est_branches</code>: Estimated execution paths (formula-based)</li>
 </ul>
-</li>
-</ul>
-<p><strong>Why it matters:</strong></p>
-<ul>
-<li>Use <strong>measured</strong> metrics for thresholds and gates (precise, repeatable)</li>
-<li>Use <strong>estimated</strong> metrics for prioritization and effort estimation (heuristic, approximate)</li>
-</ul>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># GOOD: Use measured metric for quality gate
-debtmap validate . --threshold-complexity 15
-
-# GOOD: Use estimated metric for test prioritization
-debtmap analyze . --top 10  # Considers est_branches for ranking
-</code></pre>
-<p>See <a href="metrics-reference.html">Metrics Reference</a> for complete details.</p>
+<p>Use measured metrics for thresholds and gates. Use estimated metrics for prioritization.</p>
 <h3 id="what-is-entropy-based-complexity-analysis"><a class="header" href="#what-is-entropy-based-complexity-analysis">What is entropy-based complexity analysis?</a></h3>
-<p>Entropy analysis uses information theory to distinguish between genuinely complex code and repetitive pattern-based code. Traditional cyclomatic complexity counts branches, but not all branches are equal in cognitive load.</p>
-<p>For example, a function with 20 identical if/return validation checks has the same cyclomatic complexity as a function with 20 diverse conditional branches handling different business logic. Entropy analysis gives the validation function a much lower effective complexity score because it follows a simple, repetitive pattern.</p>
+<p>Entropy analysis uses information theory to distinguish between genuinely complex code and repetitive pattern-based code.</p>
+<p>A function with 20 identical if/return validation checks has the same cyclomatic complexity as a function with 20 diverse conditional branches. Entropy analysis gives the validation function a much lower effective complexity score because it follows a simple, repetitive pattern.</p>
 <p><strong>Result:</strong> 60-75% reduction in false positives compared to traditional complexity metrics.</p>
-<p><a href="why-debtmap.html#entropy-based-complexity-analysis">Read more in Why Debtmap?</a></p>
-<h3 id="how-do-i-interpret-entropy-adjusted-complexity-output"><a class="header" href="#how-do-i-interpret-entropy-adjusted-complexity-output">How do I interpret entropy-adjusted complexity output?</a></h3>
-<p>When entropy analysis detects repetitive patterns, debtmap shows both the original and adjusted complexity values for transparency. Look for the “dampened” indicator in detailed output (<code>-vv</code>):</p>
-<p><strong>Example output:</strong></p>
-<pre><code>COMPLEXITY: cyclomatic=20 (dampened: 14, factor: 0.70), est_branches=40, cognitive=25, nesting=3, entropy=0.30
-  - Entropy Impact: 30% dampening (entropy: 0.30, repetition: 95%)
-</code></pre>
-<p><strong>Understanding the values:</strong></p>
-<ul>
-<li><code>cyclomatic=20</code>: Original complexity before adjustment</li>
-<li><code>dampened: 14</code>: Adjusted complexity after entropy analysis</li>
-<li><code>factor: 0.70</code>: Dampening factor (0.70 = 30% reduction)</li>
-<li><code>entropy: 0.30</code>: Shannon entropy score (lower = more repetitive)</li>
-<li><code>repetition: 95%</code>: Pattern repetition percentage (higher = more repetitive)</li>
-</ul>
-<p><strong>Verify the calculation:</strong></p>
-<pre><code>original × factor = adjusted
-20 × 0.70 = 14
-</code></pre>
-<p>If you don’t see dampening information, either:</p>
-<ol>
-<li>The function is too small for entropy analysis (&lt; 20 tokens)</li>
-<li>Entropy analysis didn’t detect repetitive patterns</li>
-<li>Entropy analysis is disabled (<code>--semantic-off</code>)</li>
-</ol>
-<p><a href="entropy-analysis.html#interpreting-entropy-adjusted-output">Read full guide in Entropy Analysis</a></p>
-<h3 id="how-does-coverage-integration-work"><a class="header" href="#how-does-coverage-integration-work">How does coverage integration work?</a></h3>
-<p>Debtmap reads LCOV format coverage data (generated by tools like <code>cargo-tarpaulin</code>, <code>pytest-cov</code>, or <code>jest</code>) and maps it to specific functions and branches. It then combines coverage percentages with complexity metrics to calculate risk scores.</p>
-<p><strong>Key insight:</strong> A complex function with good test coverage is lower risk than a moderately complex function with no tests.</p>
-<p><strong>Example workflow:</strong></p>
-<pre><code class="language-bash"># Generate coverage data
-cargo tarpaulin --out lcov --output-dir target/coverage
-
-# Analyze with coverage integration
-debtmap analyze . --lcov target/coverage/lcov.info
-</code></pre>
-<p><a href="analysis-guide.html#coverage-integrated-analysis">See examples in Analysis Guide</a></p>
 <h3 id="what-languages-are-supported"><a class="header" href="#what-languages-are-supported">What languages are supported?</a></h3>
 <p><strong>Currently supported:</strong></p>
 <ul>
 <li>Rust - Full support with AST parsing, macro expansion, and trait resolution</li>
 </ul>
-<p><strong>Planned (after Rust analysis is mature):</strong></p>
+<p><strong>Planned:</strong></p>
 <ul>
-<li>Python (high priority)</li>
-<li>JavaScript/TypeScript (high priority)</li>
-<li>Go, Java, C/C++, C# (medium priority)</li>
+<li>Python, JavaScript/TypeScript, Go (after Rust analysis is mature)</li>
 </ul>
 <h3 id="why-is-debtmap-rust-only-right-now"><a class="header" href="#why-is-debtmap-rust-only-right-now">Why is debtmap Rust-only right now?</a></h3>
-<p>We’re taking a focused approach to deliver the best possible Rust code
-analyzer before expanding to other languages. This strategy allows us to:</p>
+<p>We’re taking a focused approach to deliver the best possible Rust code analyzer before expanding. This allows us to:</p>
 <ol>
-<li><strong>Perfect the core</strong>: Get our algorithms, metrics, and UX right with one
-language before the complexity of multi-language support</li>
-<li><strong>Deep integration</strong>: Build Rust-specific features like macro expansion,
-trait resolution, and lifetime analysis</li>
-<li><strong>Build trust</strong>: Establish debtmap as the go-to Rust analyzer with a
-strong user base</li>
-<li><strong>Learn once, apply broadly</strong>: Use our learnings from Rust to build
-better multi-language support later</li>
+<li>Perfect core algorithms with one language</li>
+<li>Build Rust-specific features (macros, traits, lifetimes)</li>
+<li>Establish trust in the Rust community</li>
+<li>Apply learnings to future languages</li>
 </ol>
-<p>We will expand to other languages (Python, JavaScript/TypeScript, Go, etc.)
-once Rust analysis is mature and we have a stable foundation.</p>
-<h3 id="will-other-languages-be-supported-in-the-future"><a class="header" href="#will-other-languages-be-supported-in-the-future">Will other languages be supported in the future?</a></h3>
-<p>Absolutely! Multi-language support is on the roadmap. We plan to add:</p>
+<h3 id="how-does-coverage-integration-work"><a class="header" href="#how-does-coverage-integration-work">How does coverage integration work?</a></h3>
+<p>Debtmap reads LCOV format coverage data and maps it to functions:</p>
+<pre><code class="language-bash"># Generate coverage
+cargo llvm-cov --lcov --output-path coverage.lcov
+
+# Analyze with coverage
+debtmap analyze . --lcov coverage.lcov
+</code></pre>
+<p>Coverage affects prioritization:</p>
 <ul>
-<li>Python (high priority)</li>
-<li>JavaScript/TypeScript (high priority)</li>
-<li>Go, Java, C/C++, C# (medium priority)</li>
+<li>Complex function with good coverage = lower priority</li>
+<li>Simple function with no coverage = higher priority</li>
+<li>High complexity + zero coverage = critical priority</li>
 </ul>
-<p>The timeline depends on Rust analysis maturity and community demand.
-Follow our <a href="https://github.com/iepathos/debtmap/milestones">GitHub milestones</a>
-for updates.</p>
-<h3 id="why-was-branches-renamed-to-est_branches"><a class="header" href="#why-was-branches-renamed-to-est_branches">Why was “branches” renamed to “est_branches”?</a></h3>
-<p>The metric was renamed in Spec 118 to make it clear that this is an <strong>estimated</strong> value, not a precise measurement.</p>
-<p><strong>Problem with old name (“branches”):</strong></p>
-<ul>
-<li>Users thought it was a direct count from AST analysis (it’s not)</li>
-<li>Caused confusion with cyclomatic complexity (which counts actual branches)</li>
-<li>Unclear that the value was formula-based</li>
-</ul>
-<p><strong>Benefits of new name (“est_branches”):</strong></p>
-<ul>
-<li>The “est_” prefix makes the estimation explicit</li>
-<li>Clearly distinguishes it from measured metrics</li>
-<li>Sets correct user expectations</li>
-</ul>
-<p><strong>What changed:</strong></p>
-<ul>
-<li>Terminal output: <code>branches=8</code> → <code>est_branches=8</code></li>
-<li>Internal variable names updated for clarity</li>
-<li>Documentation updated to explain the distinction</li>
-</ul>
-<p><strong>What didn’t change:</strong></p>
-<ul>
-<li>The formula remains the same: <code>max(nesting, 1) × cyclomatic ÷ 3</code></li>
-<li>JSON output (this field was never serialized to JSON)</li>
-<li>Scoring and prioritization logic</li>
-</ul>
-<p>See <a href="metrics-reference.html#terminology-change-spec-118">Metrics Reference</a> for more details.</p>
+<h2 id="usage--configuration"><a class="header" href="#usage--configuration">Usage &amp; Configuration</a></h2>
+<h3 id="how-do-i-exclude-test-files-from-analysis"><a class="header" href="#how-do-i-exclude-test-files-from-analysis">How do I exclude test files from analysis?</a></h3>
+<p>By default, debtmap excludes common test directories. To customize:</p>
+<pre><code class="language-toml"># .debtmap.toml
+[analysis]
+exclude_patterns = [
+    "**/tests/**",
+    "**/*_test.rs",
+    "**/target/**",
+]
+</code></pre>
 <h3 id="can-i-customize-the-complexity-thresholds"><a class="header" href="#can-i-customize-the-complexity-thresholds">Can I customize the complexity thresholds?</a></h3>
-<p>Yes! Configure thresholds in <code>.debtmap.toml</code>:</p>
+<p>Yes. Configure in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[thresholds]
-cyclomatic_complexity = 10      # Flag functions above this
-nesting_depth = 3               # Maximum nesting levels
-loc = 200                       # Maximum lines per function
-parameter_count = 4             # Maximum parameters
+cyclomatic_complexity = 10
+nesting_depth = 3
+loc = 200
 
-[scoring]
-critical_threshold = 8.0        # Risk score for Critical tier
-high_threshold = 5.0            # Risk score for High tier
-moderate_threshold = 2.0        # Risk score for Moderate tier
+[tiers]
+critical = 8.0
+high = 5.0
+moderate = 2.0
 </code></pre>
-<p>See <a href="configuration.html#thresholds">Configuration</a> for all available options.</p>
 <h3 id="does-debtmap-integrate-with-cicd"><a class="header" href="#does-debtmap-integrate-with-cicd">Does debtmap integrate with CI/CD?</a></h3>
-<p>Yes! Use the <code>validate</code> command to enforce quality gates:</p>
-<pre><code class="language-bash"># Fail build if critical or high-tier debt detected
-debtmap validate . --max-critical 0 --max-high 5
-
-# Exit codes:
-# 0 = validation passed
-# 1 = validation failed (debt exceeds thresholds)
-# 2 = analysis error
+<p>Yes. Use the <code>validate</code> command:</p>
+<pre><code class="language-bash">debtmap validate . --max-debt-density 10.0
 </code></pre>
+<p><strong>Exit codes:</strong></p>
+<ul>
+<li><code>0</code> = validation passed</li>
+<li><code>1</code> = validation failed (debt exceeds thresholds)</li>
+<li><code>2</code> = analysis error</li>
+</ul>
 <p><strong>GitHub Actions example:</strong></p>
 <pre><code class="language-yaml">- name: Check technical debt
   run: |
-    cargo tarpaulin --out lcov --output-dir target/coverage
-    debtmap validate . --lcov target/coverage/lcov.info \
-      --max-critical 0 --max-high 10 \
-      --format json --output debt-report.json
-
-- name: Comment on PR
-  uses: actions/github-script@v6
-  with:
-    script: |
-      const report = require('./debt-report.json');
-      // Post report as PR comment
+    cargo llvm-cov --lcov --output-path coverage.lcov
+    debtmap validate . --lcov coverage.lcov --max-debt-density 10.0
 </code></pre>
-<p>See <a href="prodigy-integration.html">Prodigy Integration</a> for more CI/CD patterns.</p>
+<h3 id="what-if-debtmap-reports-false-positives"><a class="header" href="#what-if-debtmap-reports-false-positives">What if debtmap reports false positives?</a></h3>
+<ol>
+<li>
+<p><strong>Verify entropy analysis is enabled</strong> (default):</p>
+<pre><code class="language-toml">[analysis]
+enable_entropy_analysis = true
+</code></pre>
+</li>
+<li>
+<p><strong>Adjust thresholds</strong> for your project:</p>
+<pre><code class="language-toml">[thresholds]
+cyclomatic_complexity = 15
+</code></pre>
+</li>
+<li>
+<p><strong>Use ignore comments</strong> for specific functions:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// debtmap:ignore - acceptable validation pattern
+fn validate_many_fields() { ... }
+<span class="boring">}</span></code></pre>
+</li>
+<li>
+<p><strong>Report issues</strong> - If you believe analysis is incorrect, <a href="https://github.com/iepathos/debtmap/issues">open an issue</a> with a code example.</p>
+</li>
+</ol>
+<h3 id="how-accurate-is-the-risk-scoring"><a class="header" href="#how-accurate-is-the-risk-scoring">How accurate is the risk scoring?</a></h3>
+<p>Risk scores are <strong>relative prioritization metrics</strong>, not absolute measures. They help you answer “which code should I focus on first?” rather than “exactly how risky is this code?”</p>
+<p>Use risk scores for prioritization, but apply your domain knowledge when deciding what to fix.</p>
 <h2 id="comparison-with-other-tools"><a class="header" href="#comparison-with-other-tools">Comparison with Other Tools</a></h2>
 <h3 id="how-is-debtmap-different-from-sonarqube"><a class="header" href="#how-is-debtmap-different-from-sonarqube">How is debtmap different from SonarQube?</a></h3>
 <div class="table-wrapper">
@@ -365,380 +352,78 @@ debtmap validate . --max-critical 0 --max-high 5
 <tr><th>Aspect</th><th>Debtmap</th><th>SonarQube</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Speed</strong></td><td>10-100x faster (Rust)</td><td>Slower (JVM overhead)</td></tr>
-<tr><td><strong>Coverage Integration</strong></td><td>✅ Built-in LCOV</td><td>⚠️ Enterprise only</td></tr>
-<tr><td><strong>Entropy Analysis</strong></td><td>✅ Unique feature</td><td>❌ No</td></tr>
-<tr><td><strong>Language Support</strong></td><td>Rust (focused)</td><td>25+ languages</td></tr>
-<tr><td><strong>Setup</strong></td><td>Single binary</td><td>JVM + server setup</td></tr>
-<tr><td><strong>Cost</strong></td><td>Free, open-source</td><td>Free (basic) / Paid (advanced)</td></tr>
-<tr><td><strong>Use Case</strong></td><td>Rust projects</td><td>Enterprise dashboards</td></tr>
+<tr><td><strong>Output</strong></td><td>Signals for AI</td><td>Recommendations</td></tr>
+<tr><td><strong>Speed</strong></td><td>Seconds</td><td>Minutes</td></tr>
+<tr><td><strong>Coverage</strong></td><td>Built-in</td><td>Enterprise only</td></tr>
+<tr><td><strong>Entropy</strong></td><td>Yes</td><td>No</td></tr>
+<tr><td><strong>Setup</strong></td><td>Single binary</td><td>Server required</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>When to use SonarQube:</strong> Multi-language monorepos, enterprise compliance, centralized quality dashboards.</p>
-<p><strong>When to use debtmap:</strong> Rust projects, local development workflow, coverage-driven prioritization, deep Rust-specific analysis.</p>
-<h3 id="how-is-debtmap-different-from-codeclimate"><a class="header" href="#how-is-debtmap-different-from-codeclimate">How is debtmap different from CodeClimate?</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Aspect</th><th>Debtmap</th><th>CodeClimate</th></tr>
-</thead>
-<tbody>
-<tr><td><strong>Deployment</strong></td><td>Local binary</td><td>Cloud service</td></tr>
-<tr><td><strong>Coverage</strong></td><td>Built-in integration</td><td>Separate tool</td></tr>
-<tr><td><strong>Entropy</strong></td><td>✅ Yes</td><td>❌ No</td></tr>
-<tr><td><strong>Speed</strong></td><td>Seconds</td><td>Minutes (uploads code)</td></tr>
-<tr><td><strong>Privacy</strong></td><td>Code stays local</td><td>Code uploaded to cloud</td></tr>
-<tr><td><strong>Cost</strong></td><td>Free</td><td>Free (open source) / Paid</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>When to use CodeClimate:</strong> Multi-language projects, prefer SaaS solutions, want maintainability ratings.</p>
-<p><strong>When to use debtmap:</strong> Rust projects, privacy-sensitive code, fast local analysis, entropy-based scoring.</p>
+<p><strong>When to use SonarQube:</strong> Multi-language enterprise dashboards.
+<strong>When to use debtmap:</strong> AI-assisted Rust development.</p>
 <h3 id="should-i-replace-clippy-with-debtmap"><a class="header" href="#should-i-replace-clippy-with-debtmap">Should I replace clippy with debtmap?</a></h3>
-<p><strong>No—use both!</strong> They serve different purposes:</p>
+<p><strong>No—use both.</strong> They serve different purposes:</p>
 <p><strong>clippy:</strong></p>
 <ul>
-<li>Focuses on idiomatic Rust patterns</li>
-<li>Catches common mistakes (e.g., unnecessary clones, inefficient iterators)</li>
-<li>Suggests Rust-specific best practices</li>
+<li>Rust idioms and patterns</li>
+<li>Common mistakes</li>
 <li>Runs in milliseconds</li>
 </ul>
 <p><strong>debtmap:</strong></p>
 <ul>
-<li>Focuses on technical debt prioritization</li>
-<li>Identifies untested complex code</li>
-<li>Combines complexity with test coverage</li>
-<li>Provides quantified recommendations</li>
+<li>Technical debt prioritization</li>
+<li>Coverage-based risk</li>
+<li>Context for AI</li>
 </ul>
-<p><strong>Recommended workflow:</strong></p>
-<pre><code class="language-bash"># Fix clippy issues first (quick wins)
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Then prioritize debt with debtmap
-debtmap analyze . --lcov coverage/lcov.info --top 10
+<pre><code class="language-bash">cargo clippy -- -D warnings
+debtmap analyze . --lcov coverage.lcov --top 10
 </code></pre>
-<h3 id="should-i-replace-cargo-audit-with-debtmap"><a class="header" href="#should-i-replace-cargo-audit-with-debtmap">Should I replace cargo-audit with debtmap?</a></h3>
-<p><strong>No—different focus.</strong> cargo-audit scans for security vulnerabilities in dependencies. Debtmap analyzes code complexity and test coverage.</p>
-<p><strong>Use both:</strong></p>
-<ul>
-<li><code>cargo-audit</code> - Security vulnerabilities in dependencies</li>
-<li><code>cargo-geiger</code> - Unsafe code detection</li>
-<li><code>debtmap</code> - Technical debt and test gaps</li>
-</ul>
-<h3 id="how-does-debtmap-compare-to-traditional-code-coverage-tools"><a class="header" href="#how-does-debtmap-compare-to-traditional-code-coverage-tools">How does debtmap compare to traditional code coverage tools?</a></h3>
-<p>Debtmap doesn’t replace coverage tools—it <strong>augments</strong> them.</p>
-<p><strong>Coverage tools (tarpaulin, pytest-cov, jest):</strong></p>
-<ul>
-<li>Measure what % of code is executed by tests</li>
-<li>Tell you “you have 75% coverage”</li>
-</ul>
-<p><strong>Debtmap:</strong></p>
-<ul>
-<li>Reads coverage data from these tools</li>
-<li>Prioritizes gaps based on code complexity</li>
-<li>Tells you “function X has 0% coverage and complexity 12—fix this first”</li>
-</ul>
-<p><strong>Value:</strong> Debtmap answers “which 25% should I test first?” instead of just “75% is tested.”</p>
-<h2 id="usage--configuration"><a class="header" href="#usage--configuration">Usage &amp; Configuration</a></h2>
-<h3 id="why-dont-entry-points-need-100-coverage"><a class="header" href="#why-dont-entry-points-need-100-coverage">Why don’t entry points need 100% coverage?</a></h3>
-<p>Entry points (main functions, CLI handlers, framework integration code) are typically tested via <strong>integration tests</strong>, not unit tests. Unit testing them would mean mocking the entire runtime environment, which is brittle and low-value.</p>
-<p>Debtmap recognizes common entry point patterns and lowers their priority for unit test coverage:</p>
-<pre class="playground"><code class="language-rust">// Entry point - integration test coverage expected
-fn main() {
-    // Debtmap: LOW priority for unit tests
-}
-
-// HTTP handler - integration test coverage expected
-async fn handle_request(req: Request) -&gt; Response {
-    // Debtmap: LOW priority for unit tests
-}
-
-// Core business logic - unit test coverage expected
-fn calculate_discount(cart: &amp;Cart) -&gt; Discount {
-    // Debtmap: HIGH priority for unit tests if uncovered
-}</code></pre>
-<p>You can configure entry point detection in <code>.debtmap.toml</code>:</p>
-<pre><code class="language-toml">[analysis]
-entry_point_patterns = [
-    "main",
-    "handle_*",
-    "run_*",
-    "*_handler",
-]
-</code></pre>
-<h3 id="how-do-i-exclude-test-files-from-analysis"><a class="header" href="#how-do-i-exclude-test-files-from-analysis">How do I exclude test files from analysis?</a></h3>
-<p>By default, debtmap excludes common test directories. To customize:</p>
-<p><strong>.debtmap.toml:</strong></p>
-<pre><code class="language-toml">[analysis]
-exclude_patterns = [
-    "**/tests/**",
-    "**/*_test.rs",
-    "**/test_*.py",
-    "**/*.test.ts",
-    "**/target/**",
-    "**/node_modules/**",
-]
-</code></pre>
-<p><strong>Command line:</strong></p>
-<pre><code class="language-bash">debtmap analyze . --exclude '**/tests/**' --exclude '**/*_test.rs'
-</code></pre>
-<h3 id="can-i-analyze-only-specific-files-or-directories"><a class="header" href="#can-i-analyze-only-specific-files-or-directories">Can I analyze only specific files or directories?</a></h3>
-<p>Yes! Use the <code>--include</code> flag:</p>
-<pre><code class="language-bash"># Analyze only src/ directory
-debtmap analyze . --include 'src/**'
-
-# Analyze specific files
-debtmap analyze . --include 'src/main.rs' --include 'src/lib.rs'
-
-# Combine include and exclude
-debtmap analyze . --include 'src/**' --exclude 'src/generated/**'
-</code></pre>
-<h3 id="how-do-i-configure-ignore-patterns-for-generated-code"><a class="header" href="#how-do-i-configure-ignore-patterns-for-generated-code">How do I configure ignore patterns for generated code?</a></h3>
-<p>Add to <code>.debtmap.toml</code>:</p>
-<pre><code class="language-toml">[analysis]
-exclude_patterns = [
-    "**/generated/**",
-    "**/*.g.rs",           # Generated Rust
-    "**/*_pb.py",          # Protobuf generated Python
-    "**/*.generated.ts",   # Generated TypeScript
-]
-</code></pre>
-<p>Or use comments in source files:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// debtmap:ignore-file - entire file ignored
-
-fn complex_function() {
-    // debtmap:ignore-start
-    // ... complex generated code ...
-    // debtmap:ignore-end
-}
-<span class="boring">}</span></code></pre>
-<h3 id="what-if-debtmap-reports-false-positives"><a class="header" href="#what-if-debtmap-reports-false-positives">What if debtmap reports false positives?</a></h3>
-<p><strong>1. Verify entropy analysis is enabled</strong> (default in v0.2.8+):</p>
-<pre><code class="language-toml">[analysis]
-enable_entropy_analysis = true
-</code></pre>
-<p><strong>2. Adjust thresholds</strong> for your project’s needs:</p>
-<pre><code class="language-toml">[thresholds]
-cyclomatic_complexity = 15  # Increase if you have many validation functions
-</code></pre>
-<p><strong>3. Use ignore comments</strong> for specific functions:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// debtmap:ignore - explanation for why this is acceptable
-fn complex_but_acceptable() {
-    // ...
-}
-<span class="boring">}</span></code></pre>
-<p><strong>4. Report false positives:</strong> If you believe debtmap’s analysis is incorrect, please <a href="https://github.com/prodigy-tools/debtmap/issues">open an issue</a> with a code example. This helps improve the tool!</p>
-<h3 id="how-accurate-is-the-risk-scoring"><a class="header" href="#how-accurate-is-the-risk-scoring">How accurate is the risk scoring?</a></h3>
-<p>Risk scores are <strong>relative prioritization metrics</strong>, not absolute measures. They help you answer “which code should I focus on first?” rather than “exactly how risky is this code?”</p>
-<p><strong>Factors affecting accuracy:</strong></p>
-<ul>
-<li><strong>Coverage data quality:</strong> Accurate if your tests exercise realistic scenarios</li>
-<li><strong>Entropy analysis:</strong> Effective for common patterns; may miss domain-specific patterns</li>
-<li><strong>Call graph:</strong> More accurate within single files than across modules</li>
-<li><strong>Context:</strong> Cannot account for business criticality (you know your domain best)</li>
-</ul>
-<p><strong>Best practice:</strong> Use risk scores for prioritization, but apply your domain knowledge when deciding what to actually refactor or test.</p>
-<h3 id="can-i-run-debtmap-on-a-ci-server"><a class="header" href="#can-i-run-debtmap-on-a-ci-server">Can I run debtmap on a CI server?</a></h3>
-<p>Yes! Debtmap is designed for CI/CD pipelines:</p>
-<p><strong>Performance:</strong></p>
-<ul>
-<li>Statically linked binary (no runtime dependencies)</li>
-<li>Fast analysis (seconds, not minutes)</li>
-<li>Low memory footprint</li>
-</ul>
-<p><strong>Exit codes:</strong></p>
-<ul>
-<li><code>0</code> - Analysis succeeded, validation passed</li>
-<li><code>1</code> - Analysis succeeded, validation failed (debt thresholds exceeded)</li>
-<li><code>2</code> - Analysis error (parse failure, invalid config, etc.)</li>
-</ul>
-<p><strong>Example CI configuration:</strong></p>
-<pre><code class="language-yaml"># .github/workflows/debt-check.yml
-name: Technical Debt Check
-
-on: [pull_request]
-
-jobs:
-  debt-analysis:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install debtmap
-        run: cargo install debtmap
-
-      - name: Generate coverage
-        run: cargo tarpaulin --out lcov
-
-      - name: Analyze debt
-        run: debtmap validate . --lcov lcov.info --max-critical 0
-</code></pre>
+<h3 id="how-does-debtmap-compare-to-coverage-tools"><a class="header" href="#how-does-debtmap-compare-to-coverage-tools">How does debtmap compare to coverage tools?</a></h3>
+<p>Coverage tools (tarpaulin, llvm-cov) tell you what’s tested. Debtmap tells you which untested code is most risky.</p>
+<p><strong>Coverage tools:</strong> “You have 75% coverage”
+<strong>Debtmap:</strong> “Function X has 0% coverage and complexity 12—fix this first”</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-on-my-large-codebase"><a class="header" href="#analysis-is-slow-on-my-large-codebase">Analysis is slow on my large codebase</a></h3>
 <p><strong>Optimization strategies:</strong></p>
-<p><strong>1. Exclude unnecessary files:</strong></p>
+<ol>
+<li>
+<p><strong>Exclude unnecessary files:</strong></p>
 <pre><code class="language-toml">[analysis]
-exclude_patterns = [
-    "**/target/**",
-    "**/node_modules/**",
-    "**/vendor/**",
-    "**/.git/**",
-]
+exclude_patterns = ["**/target/**", "**/vendor/**"]
 </code></pre>
-<p><strong>2. Analyze specific directories:</strong></p>
-<pre><code class="language-bash"># Only analyze src/, skip examples and benches
-debtmap analyze src/
+</li>
+<li>
+<p><strong>Analyze specific directories:</strong></p>
+<pre><code class="language-bash">debtmap analyze src/
 </code></pre>
-<p><strong>3. Reduce parallelism</strong> if memory-constrained:</p>
+</li>
+<li>
+<p><strong>Reduce parallelism:</strong></p>
 <pre><code class="language-bash">debtmap analyze . --jobs 4
 </code></pre>
-<p><strong>Expected performance:</strong></p>
-<ul>
-<li>50k LOC: 5-15 seconds</li>
-<li>200k LOC: 30-90 seconds</li>
-<li>1M+ LOC: 3-8 minutes</li>
-</ul>
-<p>If analysis is significantly slower, please <a href="https://github.com/prodigy-tools/debtmap/issues">report a performance issue</a>.</p>
-<h3 id="debtmap-crashes-with-stack-overflow"><a class="header" href="#debtmap-crashes-with-stack-overflow">Debtmap crashes with “stack overflow”</a></h3>
-<p>This typically happens with extremely deep call stacks or heavily nested code.</p>
-<p><strong>Solutions:</strong></p>
-<p><strong>1. Increase stack size:</strong></p>
-<pre><code class="language-bash"># Linux/macOS
-RUST_MIN_STACK=8388608 debtmap analyze .
-
-# Windows PowerShell
-$env:RUST_MIN_STACK=8388608; debtmap analyze .
-</code></pre>
-<p><strong>2. Exclude problematic files:</strong></p>
-<pre><code class="language-bash">debtmap analyze . --exclude 'path/to/deeply/nested/file.rs'
-</code></pre>
-<p><strong>3. Report the issue:</strong> If you encounter stack overflows, please report with a minimal reproducible example.</p>
-<h3 id="coverage-data-isnt-being-applied"><a class="header" href="#coverage-data-isnt-being-applied">Coverage data isn’t being applied</a></h3>
-<p><strong>Check:</strong></p>
-<p><strong>1. LCOV file path is correct:</strong></p>
-<pre><code class="language-bash">debtmap analyze . --lcov target/coverage/lcov.info
-</code></pre>
-<p><strong>2. LCOV file contains data:</strong></p>
-<pre><code class="language-bash">grep -c "^SF:" target/coverage/lcov.info  # Should be &gt; 0
-</code></pre>
-<p><strong>3. Source paths match:</strong>
-LCOV file paths must match your source file paths. If you generate coverage in a different directory:</p>
-<pre><code class="language-toml">[coverage]
-source_root = "/path/to/project"  # Rewrite LCOV paths
-</code></pre>
-<p><strong>4. Enable debug logging:</strong></p>
-<pre><code class="language-bash">RUST_LOG=debug debtmap analyze . --lcov lcov.info 2&gt;&amp;1 | grep -i coverage
-</code></pre>
-<h3 id="debtmap-reports-no-functions-found"><a class="header" href="#debtmap-reports-no-functions-found">Debtmap reports “No functions found”</a></h3>
-<p><strong>Common causes:</strong></p>
-<p><strong>1. Wrong language detection:</strong></p>
-<pre><code class="language-bash"># Verify file extensions are recognized
-debtmap analyze . --verbose
-</code></pre>
-<p><strong>2. Syntax errors preventing parsing:</strong></p>
-<pre><code class="language-bash"># Check for parse errors
-RUST_LOG=warn debtmap analyze .
-</code></pre>
-<p><strong>3. All files excluded by ignore patterns:</strong></p>
-<pre><code class="language-bash"># List files being analyzed
-debtmap analyze . --dry-run
-</code></pre>
-<p><strong>4. Unsupported language features:</strong>
-Some cutting-edge syntax may not parse correctly. Report parsing issues with code examples.</p>
-<h3 id="how-do-i-report-a-bug-or-request-a-feature"><a class="header" href="#how-do-i-report-a-bug-or-request-a-feature">How do I report a bug or request a feature?</a></h3>
-<p><strong>Bug reports:</strong></p>
-<ol>
-<li>Check <a href="https://github.com/prodigy-tools/debtmap/issues">existing issues</a></li>
-<li>Provide minimal reproducible example</li>
-<li>Include debtmap version: <code>debtmap --version</code></li>
-<li>Include OS and Rust version: <code>rustc --version</code></li>
-</ol>
-<p><strong>Feature requests:</strong></p>
-<ol>
-<li>Describe the use case (what problem does it solve?)</li>
-<li>Provide example of desired behavior</li>
-<li>Explain why existing features don’t address the need</li>
-</ol>
-<p><strong>Contributions:</strong>
-Debtmap is open-source and welcomes contributions! See <a href="https://github.com/prodigy-tools/debtmap/blob/master/CONTRIBUTING.md">CONTRIBUTING.md</a> for guidelines.</p>
-<h2 id="advanced-topics"><a class="header" href="#advanced-topics">Advanced Topics</a></h2>
-<h3 id="can-i-extend-debtmap-with-custom-analyzers"><a class="header" href="#can-i-extend-debtmap-with-custom-analyzers">Can I extend debtmap with custom analyzers?</a></h3>
-<p>Not yet, but planned for v0.3.0. You’ll be able to implement the <code>Analyzer</code> trait for custom language support or domain-specific pattern detection.</p>
-<p><strong>Roadmap:</strong></p>
-<ul>
-<li>v0.3.0: Plugin API for custom analyzers</li>
-<li>v0.4.0: Plugin API for custom scoring strategies</li>
-<li>v0.5.0: Plugin API for custom output formatters</li>
-</ul>
-<p>Track progress in <a href="https://github.com/prodigy-tools/debtmap/issues/42">issue #42</a>.</p>
-<h3 id="how-does-debtmap-handle-monorepos"><a class="header" href="#how-does-debtmap-handle-monorepos">How does debtmap handle monorepos?</a></h3>
-<p><strong>Workspace support:</strong>
-Debtmap analyzes each workspace member independently by default:</p>
-<pre><code class="language-bash"># Analyze entire workspace
-debtmap analyze .
-
-# Analyze specific member
-debtmap analyze packages/api
-
-# Combined report for all members
-debtmap analyze . --workspace-mode combined
-</code></pre>
-<p><strong>Configuration:</strong></p>
-<pre><code class="language-toml">[workspace]
-members = ["packages/*", "services/*"]
-exclude = ["examples/*"]
-</code></pre>
-<h3 id="can-i-compare-debt-between-branches-or-commits"><a class="header" href="#can-i-compare-debt-between-branches-or-commits">Can I compare debt between branches or commits?</a></h3>
-<p>Yes! Use the <code>compare</code> command:</p>
-<pre><code class="language-bash"># Compare current branch with main
-debtmap compare main
-
-# Compare two specific commits
-debtmap compare abc123..def456
-
-# Show only new debt introduced
-debtmap compare main --show-new-only
-</code></pre>
-<p>Output shows:</p>
-<ul>
-<li>New debt items (introduced since base)</li>
-<li>Resolved debt items (fixed since base)</li>
-<li>Changed debt items (score increased/decreased)</li>
-</ul>
-<p>See <a href="examples.html#comparing-branches">Examples - Comparing Branches</a> for details.</p>
-<h3 id="how-do-i-integrate-debtmap-with-my-editor"><a class="header" href="#how-do-i-integrate-debtmap-with-my-editor">How do I integrate debtmap with my editor?</a></h3>
-<p><strong>VS Code:</strong></p>
-<ul>
-<li>Install the “Debtmap” extension (planned for Q2 2025)</li>
-<li>Inline warnings in editor for high-risk code</li>
-<li>Quick fixes to generate test stubs</li>
-</ul>
-<p><strong>Vim/Neovim:</strong></p>
-<ul>
-<li>Use ALE or vim-lsp with debtmap’s LSP mode (planned)</li>
-</ul>
-<p><strong>IntelliJ/RustRover:</strong></p>
-<ul>
-<li>Use external tools integration:
-<ul>
-<li>Settings → Tools → External Tools</li>
-<li>Add debtmap command</li>
-<li>Configure keyboard shortcut</li>
-</ul>
 </li>
-</ul>
-<p>Track editor integration progress in <a href="https://github.com/prodigy-tools/debtmap/issues/38">issue #38</a>.</p>
-<h2 id="need-more-help"><a class="header" href="#need-more-help">Need More Help?</a></h2>
+</ol>
+<h3 id="coverage-data-isnt-being-applied"><a class="header" href="#coverage-data-isnt-being-applied">Coverage data isn’t being applied</a></h3>
+<p>Check:</p>
+<ol>
+<li>LCOV file path is correct</li>
+<li>LCOV file contains data: <code>grep -c "^SF:" coverage.lcov</code></li>
+<li>Source paths match between LCOV and project</li>
+</ol>
+<h3 id="debtmap-reports-no-functions-found"><a class="header" href="#debtmap-reports-no-functions-found">Debtmap reports “No functions found”</a></h3>
+<p>Check:</p>
+<ol>
+<li>Project contains Rust files (<code>.rs</code>)</li>
+<li>Files aren’t excluded by ignore patterns</li>
+<li>No syntax errors: <code>debtmap analyze . -vv</code></li>
+</ol>
+<h2 id="getting-help"><a class="header" href="#getting-help">Getting Help</a></h2>
 <ul>
-<li><strong>Documentation:</strong> <a href="https://debtmap.dev">debtmap.dev</a></li>
-<li><strong>GitHub Issues:</strong> <a href="https://github.com/prodigy-tools/debtmap/issues">Report bugs or request features</a></li>
-<li><strong>Discussions:</strong> <a href="https://github.com/prodigy-tools/debtmap/discussions">Ask questions</a></li>
-<li><strong>Examples:</strong> See <a href="examples.html">Examples</a> for real-world use cases</li>
+<li><strong>Documentation:</strong> <a href="https://iepathos.github.io/debtmap/">debtmap.dev</a></li>
+<li><strong>GitHub Issues:</strong> <a href="https://github.com/iepathos/debtmap/issues">Report bugs</a></li>
+<li><strong>LLM Integration:</strong> See <a href="llm-integration.html">LLM Integration Guide</a></li>
+<li><strong>Examples:</strong> See <a href="examples.html">Examples</a></li>
 </ul>
 
                     </main>

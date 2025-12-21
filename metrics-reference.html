@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9e1f585f.js";
+            window.path_to_searchindex_js = "searchindex-08efffac.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c7b19542.js"></script>
+        <script src="toc-d4b9eccb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,7 +178,8 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="metrics-reference"><a class="header" href="#metrics-reference">Metrics Reference</a></h1>
-<p>Comprehensive guide to all metrics calculated by Debtmap and how to interpret them.</p>
+<p>Comprehensive guide to all signals measured by Debtmap and how to interpret them.</p>
+<p>Debtmap acts as a <strong>sensor</strong>, providing quantified signals about code complexity and risk. These signals are designed for consumption by AI coding tools and developers alike.</p>
 <h2 id="metric-categories-spec-118"><a class="header" href="#metric-categories-spec-118">Metric Categories (Spec 118)</a></h2>
 <p>Debtmap distinguishes between two fundamental categories of metrics:</p>
 <h3 id="measured-metrics"><a class="header" href="#measured-metrics">Measured Metrics</a></h3>
@@ -505,12 +506,38 @@ debtmap analyze --explain-metrics
 <p>Use <code>est_branches</code> as a starting point, not an exact requirement.</p>
 <h3 id="q-should-i-refactor-code-with-high-est_branches"><a class="header" href="#q-should-i-refactor-code-with-high-est_branches">Q: Should I refactor code with high est_branches?</a></h3>
 <p><strong>A</strong>: Not necessarily. High <code>est_branches</code> indicates complex logic that may need thorough testing. If the logic is unavoidable (e.g., state machines, complex business rules), focus on comprehensive test coverage rather than refactoring.</p>
+<h2 id="signal-categories-summary"><a class="header" href="#signal-categories-summary">Signal Categories Summary</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Category</th><th>Signals</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td>Complexity</td><td>cyclomatic, cognitive, nesting, loc</td><td>How hard code is to understand</td></tr>
+<tr><td>Coverage</td><td>line_percent, branch_percent</td><td>How risky changes are</td></tr>
+<tr><td>Coupling</td><td>fan_in, fan_out, call_depth</td><td>How changes ripple</td></tr>
+<tr><td>Quality</td><td>entropy, purity, dead_code</td><td>False positive reduction</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="using-signals-with-ai"><a class="header" href="#using-signals-with-ai">Using Signals with AI</a></h2>
+<p>When piping debtmap output to an AI assistant, signals provide the context needed for intelligent fixes:</p>
+<pre><code class="language-bash"># Get structured signals for AI consumption
+debtmap analyze . --format llm-markdown --top 5 | claude "Fix the top item"
+</code></pre>
+<p>The AI uses these signals to:</p>
+<ul>
+<li>Understand code complexity before reading it</li>
+<li>Prioritize which files to examine first</li>
+<li>Decide between refactoring vs testing approaches</li>
+<li>Estimate the scope of changes needed</li>
+</ul>
 <h2 id="further-reading"><a class="header" href="#further-reading">Further Reading</a></h2>
 <ul>
-<li><a href="why-debtmap.html#entropy-based-complexity-analysis">Why Debtmap? - Entropy Analysis</a></li>
-<li><a href="configuration.html#thresholds">Configuration - Complexity Thresholds</a></li>
-<li><a href="coverage-integration.html">Coverage Integration</a></li>
-<li><a href="scoring-strategies.html">Scoring Strategies</a></li>
+<li><a href="why-debtmap.html">Why Debtmap?</a> - Sensor model explained</li>
+<li><a href="llm-integration.html">LLM Integration</a> - AI workflow patterns</li>
+<li><a href="configuration.html#thresholds">Configuration</a> - Threshold customization</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - How signals combine</li>
 </ul>
 
                     </main>

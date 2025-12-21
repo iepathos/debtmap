@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9e1f585f.js";
+            window.path_to_searchindex_js = "searchindex-08efffac.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c7b19542.js"></script>
+        <script src="toc-d4b9eccb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -231,6 +231,223 @@ debtmap --version
 # See available commands
 debtmap --help
 </code></pre>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<p>Here are the most common commands to get you started:</p>
+<pre><code class="language-bash"># Basic analysis (simplest command)
+debtmap analyze .
+
+# LLM-optimized output for AI workflows (recommended)
+debtmap analyze . --format llm-markdown
+
+# Pipe directly to Claude Code
+debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+
+# JSON output for programmatic access
+debtmap analyze . --format json --top 10 &gt; debt.json
+
+# With coverage data for accurate risk assessment
+cargo llvm-cov --lcov --output-path coverage.lcov
+debtmap analyze . --lcov coverage.lcov
+
+# Show only critical/high priority items
+debtmap analyze . --min-priority high --top 10
+
+# Terminal output for human exploration
+debtmap analyze . --format terminal
+</code></pre>
+<h2 id="first-analysis"><a class="header" href="#first-analysis">First Analysis</a></h2>
+<p>Let’s run your first analysis! Navigate to a project directory and run:</p>
+<pre><code class="language-bash">debtmap analyze .
+</code></pre>
+<p><strong>What happens during analysis:</strong></p>
+<ol>
+<li><strong>File Discovery</strong> - Debtmap scans your project for Rust source files (<code>.rs</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
+<li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
+<li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW)</li>
+<li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
+<li><strong>Output</strong> - Results are displayed in your chosen format</li>
+</ol>
+<p><strong>Expected timing</strong>: Analyzing a 10,000 LOC project typically takes 2-5 seconds.</p>
+<h2 id="example-output"><a class="header" href="#example-output">Example Output</a></h2>
+<p>When you run <code>debtmap analyze . --format llm-markdown</code>, you’ll see output like this:</p>
+<pre><code class="language-markdown"># Technical Debt Analysis
+
+## Summary
+- Total items: 47
+- Critical: 3, High: 12, Moderate: 20, Low: 12
+
+## #1 [CRITICAL] parse_complex_input
+**Location:** src/parser.rs:38-85
+**Score:** 8.9/10
+
+**Signals:**
+| Metric | Value |
+|--------|-------|
+| Cyclomatic | 12 |
+| Cognitive | 18 |
+| Coverage | 0% |
+| Nesting | 4 |
+
+**Context:**
+- Primary: src/parser.rs:38-85
+- Caller: src/handler.rs:100-120
+- Test: tests/parser_test.rs:50-75
+</code></pre>
+<h2 id="understanding-the-output"><a class="header" href="#understanding-the-output">Understanding the Output</a></h2>
+<h3 id="priority-tiers"><a class="header" href="#priority-tiers">Priority Tiers</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Tier</th><th>Score</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td>CRITICAL</td><td>8.0-10.0</td><td>High complexity with no test coverage</td></tr>
+<tr><td>HIGH</td><td>5.0-7.9</td><td>Moderate complexity with coverage gaps</td></tr>
+<tr><td>MODERATE</td><td>2.0-4.9</td><td>Lower risk, monitor</td></tr>
+<tr><td>LOW</td><td>0.0-1.9</td><td>Acceptable state</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="key-signals"><a class="header" href="#key-signals">Key Signals</a></h3>
+<p><strong>Complexity signals:</strong></p>
+<ul>
+<li><strong>Cyclomatic</strong>: Decision points (if, match, loop)</li>
+<li><strong>Cognitive</strong>: How hard code is to understand</li>
+<li><strong>Nesting</strong>: Indentation depth</li>
+<li><strong>Lines</strong>: Function length</li>
+</ul>
+<p><strong>Coverage signals:</strong></p>
+<ul>
+<li><strong>Line coverage</strong>: % of lines executed by tests</li>
+<li><strong>Branch coverage</strong>: % of branches taken</li>
+</ul>
+<p><strong>Coupling signals:</strong></p>
+<ul>
+<li><strong>Fan-in</strong>: Functions that call this function</li>
+<li><strong>Fan-out</strong>: Functions this function calls</li>
+</ul>
+<h3 id="context-suggestions"><a class="header" href="#context-suggestions">Context Suggestions</a></h3>
+<p>Each debt item includes file ranges the AI should read:</p>
+<pre><code>Context:
+├─ Primary: src/parser.rs:38-85 (the debt item)
+├─ Caller: src/handler.rs:100-120 (usage context)
+└─ Test: tests/parser_test.rs:50-75 (expected behavior)
+</code></pre>
+<p>These suggestions help AI assistants understand the code before making changes.</p>
+<h2 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h2>
+<h3 id="llm-markdown-for-ai-workflows"><a class="header" href="#llm-markdown-for-ai-workflows">LLM Markdown (for AI workflows)</a></h3>
+<pre><code class="language-bash">debtmap analyze . --format llm-markdown
+</code></pre>
+<p>Optimized for minimal token usage while providing all necessary context.</p>
+<h3 id="json-for-programmatic-access"><a class="header" href="#json-for-programmatic-access">JSON (for programmatic access)</a></h3>
+<pre><code class="language-bash">debtmap analyze . --format json --output debt.json
+</code></pre>
+<p>Structured data for CI/CD integration and custom tooling.</p>
+<h3 id="terminal-for-human-exploration"><a class="header" href="#terminal-for-human-exploration">Terminal (for human exploration)</a></h3>
+<pre><code class="language-bash">debtmap analyze . --format terminal
+</code></pre>
+<p>Color-coded, interactive output for manual review.</p>
+<h2 id="adding-coverage-data"><a class="header" href="#adding-coverage-data">Adding Coverage Data</a></h2>
+<p>Coverage data enables accurate risk assessment:</p>
+<pre><code class="language-bash"># Generate coverage with cargo-llvm-cov
+cargo llvm-cov --lcov --output-path coverage.lcov
+
+# Or with cargo-tarpaulin
+cargo tarpaulin --out lcov --output-dir target/coverage
+
+# Analyze with coverage
+debtmap analyze . --lcov coverage.lcov
+</code></pre>
+<p>With coverage data:</p>
+<ul>
+<li>Complex code with good tests = lower priority</li>
+<li>Simple code with no tests = higher priority</li>
+<li>Untested error paths are identified</li>
+</ul>
+<h2 id="ai-workflow-examples"><a class="header" href="#ai-workflow-examples">AI Workflow Examples</a></h2>
+<h3 id="claude-code"><a class="header" href="#claude-code">Claude Code</a></h3>
+<pre><code class="language-bash"># Direct piping
+debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+
+# With coverage
+cargo llvm-cov --lcov --output-path coverage.lcov
+debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1 | \
+  claude "Add tests for this function"
+</code></pre>
+<h3 id="cursor"><a class="header" href="#cursor">Cursor</a></h3>
+<pre><code class="language-bash"># Generate report for Cursor to reference
+debtmap analyze . --format llm-markdown --top 10 &gt; debt-report.md
+
+# In Cursor: @debt-report.md Fix the top critical item
+</code></pre>
+<h3 id="custom-pipelines"><a class="header" href="#custom-pipelines">Custom Pipelines</a></h3>
+<pre><code class="language-bash"># Get JSON for programmatic processing
+debtmap analyze . --format json --top 5 | \
+  jq '.items[0].context.primary' | \
+  xargs -I {} echo "Read {}"
+</code></pre>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>Create a project-specific configuration:</p>
+<pre><code class="language-bash">debtmap init
+</code></pre>
+<p>This creates <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[thresholds]
+complexity = 10
+duplication = 40
+
+[tiers]
+critical = 9.0
+high = 7.0
+medium = 5.0
+
+[ignore]
+patterns = ["**/target/**", "**/tests/**"]
+</code></pre>
+<h2 id="cli-options-reference"><a class="header" href="#cli-options-reference">CLI Options Reference</a></h2>
+<h3 id="analysis-options"><a class="header" href="#analysis-options">Analysis Options</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--format &lt;FORMAT&gt;</code></td><td>Output format: terminal, json, markdown, llm-markdown</td></tr>
+<tr><td><code>--output &lt;FILE&gt;</code></td><td>Write to file instead of stdout</td></tr>
+<tr><td><code>--lcov &lt;FILE&gt;</code></td><td>LCOV coverage file for risk analysis</td></tr>
+<tr><td><code>--top &lt;N&gt;</code></td><td>Show only top N priority items</td></tr>
+<tr><td><code>--min-priority &lt;TIER&gt;</code></td><td>Filter by minimum priority (low, medium, high, critical)</td></tr>
+<tr><td><code>--min-score &lt;N&gt;</code></td><td>Filter items below score N</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="verbosity-options"><a class="header" href="#verbosity-options">Verbosity Options</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>-v</code></td><td>Show main score factors</td></tr>
+<tr><td><code>-vv</code></td><td>Show detailed calculations</td></tr>
+<tr><td><code>-vvv</code></td><td>Show all debug information</td></tr>
+<tr><td><code>--quiet</code></td><td>Suppress progress output</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="performance-options"><a class="header" href="#performance-options">Performance Options</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--jobs &lt;N&gt;</code></td><td>Number of threads (0 = all cores)</td></tr>
+<tr><td><code>--no-parallel</code></td><td>Disable parallel processing</td></tr>
+<tr><td><code>--max-files &lt;N&gt;</code></td><td>Limit analysis to N files</td></tr>
+</tbody>
+</table>
+</div>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="installation-issues"><a class="header" href="#installation-issues">Installation Issues</a></h3>
 <ul>
@@ -241,391 +458,25 @@ debtmap --help
 <li><strong>Permission issues</strong>: Run the install script with your current user (don’t use sudo)</li>
 <li><strong>Cargo not found</strong>: Install Rust from https://rustup.rs</li>
 </ul>
-<h3 id="first-run-issues"><a class="header" href="#first-run-issues">First Run Issues</a></h3>
+<h3 id="analysis-issues"><a class="header" href="#analysis-issues">Analysis Issues</a></h3>
 <ul>
-<li>
-<p><strong>Empty output or no items found</strong>: Check that your project contains Rust source files (<code>.rs</code>). Verify with <code>debtmap analyze . -vvv</code> for debug output.</p>
-</li>
-<li>
-<p><strong>Parser failures</strong>: If analysis fails with parsing errors:</p>
-<pre><code class="language-bash"># Run with verbose output to identify problematic files
-debtmap analyze . -vv
-# Exclude problematic files temporarily
-debtmap init  # Creates .debtmap.toml
-# Edit .debtmap.toml to add ignore patterns
-</code></pre>
-</li>
-<li>
-<p><strong>Performance issues</strong>: For large codebases (10,000+ files):</p>
-<pre><code class="language-bash"># Limit parallel jobs to reduce memory usage
-debtmap analyze . --jobs 4
-# Or analyze specific directories
-debtmap analyze ./src
-</code></pre>
-</li>
+<li><strong>Empty output</strong>: Check that your project contains Rust source files (<code>.rs</code>)</li>
+<li><strong>Parser failures</strong>: Run with <code>-vv</code> for debug output</li>
+<li><strong>Performance issues</strong>: Limit parallel jobs with <code>--jobs 4</code></li>
 </ul>
-<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
-<p>Here are the most common commands to get you started:</p>
-<pre><code class="language-bash"># Analyze current directory (simplest command)
-debtmap analyze .
-
-# Analyze with coverage data for risk scoring (recommended)
-# Note: --lcov is a shorthand alias for --coverage-file
-debtmap analyze . --lcov target/coverage/lcov.info
-
-# Generate coverage first (for Rust projects)
-cargo tarpaulin --out lcov --output-dir target/coverage
-debtmap analyze . --lcov target/coverage/lcov.info
-
-# Analyze with custom thresholds
-# Note: threshold-duplication specifies minimum lines of duplicated code to detect
-debtmap analyze ./src --threshold-complexity 15 --threshold-duplication 50
-
-# Output as JSON (for CI/CD integration)
-debtmap analyze ./src --format json --output report.json
-
-# Show only top 10 high-priority issues
-debtmap analyze . --top 10
-
-# Initialize configuration file for project-specific settings
-debtmap init
-
-# Validate against thresholds (CI/CD integration)
-debtmap validate ./src --max-debt-density 5.0
-
-# Validate using config file settings
-# Note: CLI flags override config file values when both are specified
-debtmap validate . --config .debtmap.toml --max-debt-density 5.0
-
-# Compare before/after to track improvements
-debtmap analyze . --format json --output before.json
-# ... make improvements ...
-debtmap analyze . --format json --output after.json
-debtmap compare --before before.json --after after.json
-
-# Advanced comparison: focus on specific function
-debtmap compare --before before.json --after after.json --target-location src/main.rs:main:10
-
-# Extract target from implementation plan
-debtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md
-</code></pre>
-<h3 id="advanced-options"><a class="header" href="#advanced-options">Advanced Options</a></h3>
-<p>Debtmap provides many powerful options to customize your analysis:</p>
-<p><strong>Verbosity Levels:</strong></p>
-<pre><code class="language-bash"># Show main factors contributing to scores
-debtmap analyze . -v
-
-# Show detailed calculations
-debtmap analyze . -vv
-
-# Show all debug information
-debtmap analyze . -vvv
-</code></pre>
-<p><strong>Filtering and Prioritization:</strong></p>
-<pre><code class="language-bash"># Only show high-priority items
-debtmap analyze . --min-priority high
-
-# Filter by specific categories
-debtmap analyze . --filter Architecture,Testing
-
-# Group results by debt category
-debtmap analyze . --group-by-category
-</code></pre>
-<p><strong>Performance Control:</strong></p>
-<pre><code class="language-bash"># Limit parallel jobs
-debtmap analyze . --jobs 4
-
-# Disable parallel processing
-debtmap analyze . --no-parallel
-</code></pre>
-<p><strong>Output Control:</strong></p>
-<pre><code class="language-bash"># Plain output (no colors/emoji, for CI/CD)
-debtmap analyze . --plain
-
-# Compact summary output
-debtmap analyze . --summary
-
-# Control aggregation behavior
-debtmap analyze . --aggregate-only          # Show only aggregated results
-debtmap analyze . --no-aggregation          # Skip aggregation entirely
-debtmap analyze . --aggregation-method sum  # Choose aggregation method
-
-# Adjust detail level in output
-debtmap analyze . --detail-level high       # More detailed output
-</code></pre>
-<p><strong>Expert Options:</strong></p>
-<p>These advanced options are available for power users and specialized use cases:</p>
-<pre><code class="language-bash"># Analysis behavior
---semantic-off              # Disable semantic analysis
---no-context-aware          # Disable context-aware analysis
---no-multi-pass             # Disable multi-pass analysis (for performance-critical scenarios)
---validate-loc              # Validate lines of code calculations
-
-# Rust-specific options
---verbose-macro-warnings    # Show detailed macro expansion warnings
---show-macro-stats          # Display macro usage statistics
-
-# Filtering and thresholds
---threshold-preset &lt;name&gt;   # Use predefined threshold preset
---min-problematic &lt;count&gt;   # Minimum problematic items to report
---max-files &lt;count&gt;         # Limit analysis to N files
---no-god-object             # Disable god object detection
-
-# Advanced reporting
---attribution               # Include code attribution information
-</code></pre>
-<p>For detailed documentation of these options, run <code>debtmap analyze --help</code>.</p>
-<h2 id="first-analysis"><a class="header" href="#first-analysis">First Analysis</a></h2>
-<p>Let’s run your first analysis! Navigate to a project directory and run:</p>
-<pre><code class="language-bash">debtmap analyze .
-</code></pre>
-<p><strong>What happens during analysis:</strong></p>
-<ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for Rust source files (<code>.rs</code>)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
-<li><strong>Metrics Calculation</strong> - Complexity, debt patterns, and risk scores are computed</li>
-<li><strong>Prioritization</strong> - Results are ranked by priority (CRITICAL, HIGH, MEDIUM, LOW)</li>
-<li><strong>Output</strong> - Results are displayed in your chosen format</li>
-</ol>
-<p><strong>Expected timing</strong>: Analyzing a 10,000 LOC project typically takes 2-5 seconds.</p>
-<h2 id="language-support"><a class="header" href="#language-support">Language Support</a></h2>
-<p>Debtmap is focused exclusively on Rust for comprehensive code analysis:</p>
-<h3 id="rust-full-support"><a class="header" href="#rust-full-support">Rust (Full Support)</a></h3>
-<p>All analysis features available:</p>
+<h3 id="coverage-issues"><a class="header" href="#coverage-issues">Coverage Issues</a></h3>
 <ul>
-<li>Complexity metrics (cyclomatic, cognitive, nesting, lines)</li>
-<li>Technical debt detection (code smells, anti-patterns)</li>
-<li>Test gap analysis with coverage integration</li>
-<li>Advanced features:
-<ul>
-<li>Trait detection and analysis</li>
-<li>Function purity analysis</li>
-<li>Call graph generation</li>
-<li>Macro expansion tracking</li>
+<li><strong>Coverage not applied</strong>: Verify LCOV file path is correct</li>
+<li><strong>Low coverage detected</strong>: Ensure tests actually run during coverage generation</li>
 </ul>
-</li>
-</ul>
-<p><strong>Note</strong>: Support for additional languages may be added in future releases based on community feedback and demand.</p>
-<h2 id="example-output"><a class="header" href="#example-output">Example Output</a></h2>
-<p>When you run <code>debtmap analyze .</code>, you’ll see output similar to this:</p>
-<pre><code>════════════════════════════════════════════
-    PRIORITY TECHNICAL DEBT FIXES
-════════════════════════════════════════════
-
-🎯 TOP 3 RECOMMENDATIONS (by unified priority)
-
-#1 SCORE: 8.9 [CRITICAL]
-├─ TEST GAP: ./src/analyzers/rust_call_graph.rs:38 add_function_to_graph()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.7 risk
-├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=8, nesting=2, lines=32
-├─ DEPENDENCIES: 0 upstream, 11 downstream
-└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=8)
-
-#2 SCORE: 8.9 [CRITICAL]
-├─ TEST GAP: ./src/debt/smells.rs:196 detect_data_clumps()
-├─ ACTION: Add 5 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.7 risk
-├─ COMPLEXITY: cyclomatic=5, branches=5, cognitive=11, nesting=5, lines=31
-├─ DEPENDENCIES: 0 upstream, 4 downstream
-└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=5, cog=11)
-
-#3 SCORE: 8.6 [CRITICAL]
-├─ TEST GAP: ./src/risk/context/dependency.rs:247 explain()
-├─ ACTION: Add 5 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.6 risk
-├─ COMPLEXITY: cyclomatic=5, branches=5, cognitive=9, nesting=1, lines=24
-├─ DEPENDENCIES: 0 upstream, 1 downstream
-└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=5, cog=9)
-
-
-📊 TOTAL DEBT SCORE: 4907
-📈 OVERALL COVERAGE: 67.12%
-</code></pre>
-<h2 id="understanding-the-output"><a class="header" href="#understanding-the-output">Understanding the Output</a></h2>
-<p>Let’s break down what this output means:</p>
-<h3 id="priority-levels"><a class="header" href="#priority-levels">Priority Levels</a></h3>
-<ul>
-<li><strong>CRITICAL</strong> (9.0-10.0): Immediate action required - high complexity with no test coverage</li>
-<li><strong>HIGH</strong> (7.0-8.9): Should be addressed soon - moderate-high complexity with poor coverage</li>
-<li><strong>MEDIUM</strong> (5.0-6.9): Plan for next sprint - moderate complexity or partial coverage gaps</li>
-<li><strong>LOW</strong> (3.0-4.9): Nice to have - well-tested or simple functions</li>
-</ul>
-<p><strong>Note:</strong> These are default priority thresholds. You can customize them in <code>.debtmap.toml</code> under the <code>[tiers]</code> section to match your team’s standards.</p>
-<h3 id="key-metrics"><a class="header" href="#key-metrics">Key Metrics</a></h3>
-<ul>
-<li>
-<p><strong>Unified Score</strong> (0-10 scale): Overall priority combining complexity, coverage, and dependencies</p>
-<ul>
-<li>Higher score = higher priority</li>
-<li>Takes into account multiple risk factors</li>
-</ul>
-</li>
-<li>
-<p><strong>Debt Type</strong>: Category of the issue</p>
-<ul>
-<li><code>TestGap</code>: Missing test coverage</li>
-<li><code>Complexity</code>: Exceeds complexity thresholds</li>
-<li><code>Duplication</code>: Repeated code blocks</li>
-<li><code>CodeSmell</code>: Anti-patterns and bad practices</li>
-</ul>
-</li>
-<li>
-<p><strong>Complexity Metrics</strong>:</p>
-<ul>
-<li><strong>Cyclomatic</strong>: Number of decision points (branches, loops)</li>
-<li><strong>Cognitive</strong>: How difficult the code is to understand</li>
-<li><strong>Nesting</strong>: Maximum indentation depth</li>
-<li><strong>Lines</strong>: Function length</li>
-</ul>
-</li>
-<li>
-<p><strong>Dependencies</strong>:</p>
-<ul>
-<li><strong>Upstream callers</strong>: Functions that call this function</li>
-<li><strong>Downstream callees</strong>: Functions this function calls</li>
-<li>More dependencies = higher impact when this code breaks</li>
-</ul>
-</li>
-</ul>
-<h3 id="recommendation-structure"><a class="header" href="#recommendation-structure">Recommendation Structure</a></h3>
-<p>Each recommendation shows:</p>
-<ul>
-<li><strong>ACTION</strong>: What you should do (e.g., “Add 6 unit tests”)</li>
-<li><strong>IMPACT</strong>: Expected improvement (e.g., “Full test coverage, -3.7 risk”)</li>
-<li><strong>WHY</strong>: The reasoning behind this recommendation</li>
-</ul>
-<h3 id="organizing-results"><a class="header" href="#organizing-results">Organizing Results</a></h3>
-<p>When analyzing large codebases, you can organize and filter results to focus on specific areas:</p>
-<p><strong>Group by Debt Category:</strong></p>
-<pre><code class="language-bash">debtmap analyze . --group-by-category
-</code></pre>
-<p>This organizes results by type: Architecture, Testing, Performance, CodeQuality</p>
-<p><strong>Filter by Priority:</strong></p>
-<pre><code class="language-bash"># Show only high and critical priority items
-debtmap analyze . --min-priority high
-
-# Combine with --top to limit results
-debtmap analyze . --min-priority high --top 10
-</code></pre>
-<p><strong>Filter by Category:</strong></p>
-<pre><code class="language-bash"># Focus on specific debt types
-debtmap analyze . --filter Architecture,Testing
-
-# Available categories: Architecture, Testing, Performance, CodeQuality
-</code></pre>
-<p>These filtering options help you focus on specific types of technical debt, making it easier to plan targeted improvements.</p>
-<h3 id="summary-statistics"><a class="header" href="#summary-statistics">Summary Statistics</a></h3>
-<ul>
-<li>
-<p><strong>Total Debt Score</strong>: Sum of all debt scores across your codebase</p>
-<ul>
-<li>Lower is better</li>
-<li>Track over time to measure improvement</li>
-</ul>
-</li>
-<li>
-<p><strong>Overall Coverage</strong>: Percentage of code covered by tests</p>
-<ul>
-<li>Only shown when coverage data is provided</li>
-</ul>
-</li>
-</ul>
-<h3 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h3>
-<p>Debtmap supports multiple output formats:</p>
-<ul>
-<li><strong>Terminal</strong> (default): Human-readable colored output with tables</li>
-<li><strong>JSON</strong>: Machine-readable format for CI/CD integration</li>
-<li><strong>Markdown</strong>: Documentation-friendly format for reports</li>
-</ul>
-<p>Example JSON output:</p>
-<pre><code class="language-bash"># JSON output uses unified format with consistent structure
-debtmap analyze . --format json --output report.json
-</code></pre>
-<p>The JSON format uses a unified structure with a <code>type</code> field for all items, providing consistent parsing for CI/CD integrations.</p>
-<p>Example Markdown output:</p>
-<pre><code class="language-bash">debtmap analyze . --format markdown --output report.md
-</code></pre>
 <h2 id="whats-next"><a class="header" href="#whats-next">What’s Next?</a></h2>
-<p>Now that you’ve run your first analysis, explore these topics:</p>
+<p>Now that you’ve run your first analysis:</p>
 <ul>
-<li><strong><a href="./analysis-guide.html">Analysis Guide</a></strong> - Deep dive into complexity metrics, debt patterns, and risk scoring</li>
-<li><strong><a href="./output-formats.html">Output Formats</a></strong> - Detailed guide to JSON schema and integration options</li>
-<li><strong>Configuration</strong> - Customize thresholds and filters with <code>.debtmap.toml</code></li>
-<li><strong>CI/CD Integration</strong> - Use the <code>validate</code> command to enforce quality gates</li>
+<li><strong>Integrate with AI</strong>: See <a href="llm-integration.html">LLM Integration</a> for AI workflow patterns</li>
+<li><strong>Understand metrics</strong>: See <a href="metrics-reference.html">Metrics Reference</a> for signal definitions</li>
+<li><strong>Configure thresholds</strong>: See <a href="configuration.html">Configuration</a> for customization</li>
+<li><strong>CI/CD integration</strong>: See <a href="prodigy-integration.html">Prodigy Integration</a> for automation</li>
 </ul>
-<h3 id="generate-a-configuration-file"><a class="header" href="#generate-a-configuration-file">Generate a Configuration File</a></h3>
-<p>Create a project-specific configuration:</p>
-<pre><code class="language-bash">debtmap init
-</code></pre>
-<p>This creates a <code>.debtmap.toml</code> file with sensible defaults that you can customize for your project.</p>
-<p><strong>Example Configuration File:</strong></p>
-<p>Here’s a typical <code>.debtmap.toml</code> with common settings:</p>
-<pre><code class="language-toml"># Debtmap Configuration File
-# Generated by: debtmap init
-
-# Analysis thresholds
-[thresholds]
-complexity = 10        # Flag functions with cyclomatic complexity &gt; 10
-duplication = 40       # Minimum lines for duplicate code detection
-file_size = 500        # Warn on files exceeding 500 lines
-
-# Priority tier boundaries (for unified priority scores 0-10)
-[tiers]
-critical = 9.0         # Score &gt;= 9.0 = CRITICAL priority
-high = 7.0             # Score &gt;= 7.0 = HIGH priority
-medium = 5.0           # Score &gt;= 5.0 = MEDIUM priority
-# Anything below 5.0 = LOW priority
-
-# Risk scoring weights (must sum to 1.0)
-[weights]
-coverage = 0.4         # Weight for test coverage gaps
-complexity = 0.35      # Weight for complexity metrics
-dependencies = 0.25    # Weight for call graph dependencies
-
-# Files and directories to ignore
-[ignore]
-patterns = [
-    "**/target/**",     # Rust build artifacts
-    "**/tests/**",      # Test directories (optional)
-]
-
-# God object detection thresholds
-[god_object]
-methods = 20           # Warn on classes/modules with &gt; 20 methods
-lines = 500            # Warn on classes/modules with &gt; 500 lines
-
-# Entropy-based complexity detection
-[entropy]
-enabled = true         # Enable entropy analysis
-threshold = 0.7        # Flag functions with entropy &gt; 0.7
-</code></pre>
-<p><strong>Key Configuration Options:</strong></p>
-<p>The configuration file allows you to customize:</p>
-<ul>
-<li><strong>Threshold customization</strong> - Adjust complexity, duplication, and file size thresholds</li>
-<li><strong>Scoring weights</strong> - Fine-tune how coverage, complexity, and dependencies are weighted</li>
-<li><strong>Ignore patterns</strong> - Exclude test files or generated code from analysis</li>
-<li><strong>God object thresholds</strong> - Configure what constitutes a “god object” anti-pattern</li>
-<li><strong>Entropy analysis</strong> - Control entropy-based complexity detection</li>
-<li><strong>Priority tiers</strong> - Customize CRITICAL/HIGH/MEDIUM/LOW threshold ranges</li>
-</ul>
-<p>See the Configuration chapter for complete documentation of all available options.</p>
-<h3 id="try-analysis-with-coverage"><a class="header" href="#try-analysis-with-coverage">Try Analysis with Coverage</a></h3>
-<p>For more accurate risk assessment, run analysis with coverage data. Coverage helps Debtmap identify <strong>truly risky code</strong> - functions that are both complex AND untested.</p>
-<h4 id="generating-coverage-data"><a class="header" href="#generating-coverage-data">Generating Coverage Data</a></h4>
-<p><strong>Rust Projects:</strong></p>
-<pre><code class="language-bash"># Option 1: Using cargo-tarpaulin
-cargo install cargo-tarpaulin
-cargo tarpaulin --out lcov --output-dir target/coverage
-debtmap analyze . --lcov target/coverage/lcov.info
-
-# Option 2: Using cargo-llvm-cov (recommended for faster builds)
-cargo install cargo-llvm-cov
-cargo llvm-cov --lcov --output-path target/coverage/lcov.info
-debtmap analyze . --lcov target/coverage/lcov.info
-</code></pre>
-<p><strong>Note</strong>: The <code>--lcov</code> flag is a shorthand alias for <code>--coverage-file</code>. Both accept LCOV format coverage reports.</p>
 <hr>
 <p><strong>Need help?</strong> Report issues at https://github.com/iepathos/debtmap/issues</p>
 
@@ -637,7 +488,7 @@ debtmap analyze . --lcov target/coverage/lcov.info
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="cli-reference.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="llm-integration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -651,7 +502,7 @@ debtmap analyze . --lcov target/coverage/lcov.info
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="cli-reference.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="llm-integration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

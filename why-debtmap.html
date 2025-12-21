@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9e1f585f.js";
+            window.path_to_searchindex_js = "searchindex-08efffac.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c7b19542.js"></script>
+        <script src="toc-d4b9eccb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,275 +178,195 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="why-debtmap"><a class="header" href="#why-debtmap">Why Debtmap?</a></h1>
-<p>Technical debt analysis tools are everywhere. So why another one? Debtmap takes a fundamentally different approach to code quality analysis—one that reduces false positives and gives you actionable insights instead of just flagging “complex” code.</p>
-<h2 id="the-problem-with-traditional-static-analysis"><a class="header" href="#the-problem-with-traditional-static-analysis">The Problem with Traditional Static Analysis</a></h2>
-<p>Most static analysis tools flag code as “complex” based purely on metrics like cyclomatic complexity or lines of code. The problem? Not all complexity is equal.</p>
-<p>Consider this common pattern:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn validate_config(config: &amp;Config) -&gt; Result&lt;()&gt; {
-    if config.output_dir.is_none() {
-        return Err(anyhow!("output_dir required"))
-    }
-    if config.max_workers.is_none() {
-        return Err(anyhow!("max_workers required"))
-    }
-    if config.timeout_secs.is_none() {
-        return Err(anyhow!("timeout_secs required"))
-    }
-    if config.log_level.is_none() {
-        return Err(anyhow!("log_level required"))
-    }
-    if config.cache_dir.is_none() {
-        return Err(anyhow!("cache_dir required"))
-    }
-    // ... 15 more similar checks
-    Ok(())
-}
-<span class="boring">}</span></code></pre>
-<p><strong>Traditional tools say:</strong> “Cyclomatic complexity: 20 - CRITICAL! Refactor immediately!”</p>
-<p><strong>Reality:</strong> This is a simple validation function with a repetitive pattern. Yes, it has 20 branches, but they’re all identical in structure. An experienced developer can read and understand this in seconds.</p>
-<p>Now compare with this function:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn reconcile_state(current: &amp;State, desired: &amp;State) -&gt; Vec&lt;Action&gt; {
-    let mut actions = vec![];
-
-    match (current.mode, desired.mode) {
-        (Mode::Active, Mode::Standby) =&gt; {
-            if current.has_active_connections() {
-                actions.push(Action::DrainConnections);
-                actions.push(Action::WaitForDrain);
-            }
-            actions.push(Action::TransitionToStandby);
-        }
-        (Mode::Standby, Mode::Active) =&gt; {
-            if desired.requires_warmup() {
-                actions.push(Action::Warmup);
-            }
-            actions.push(Action::TransitionToActive);
-        }
-        (Mode::Active, Mode::Maintenance) =&gt; {
-            // Complex state transitions based on multiple conditions
-            if current.has_pending_operations() {
-                if desired.force_maintenance {
-                    actions.push(Action::AbortPending);
-                } else {
-                    actions.push(Action::FinishPending);
-                }
-            }
-            actions.push(Action::TransitionToMaintenance);
-        }
-        // ... more complex state transitions
-        _ =&gt; {}
-    }
-
-    actions
-}
-<span class="boring">}</span></code></pre>
-<p><strong>Traditional tools say:</strong> “Cyclomatic complexity: 8 - moderate”</p>
-<p><strong>Reality:</strong> This function involves complex state machine logic with conditional transitions, side effects, and non-obvious control flow. It’s genuinely complex and error-prone.</p>
-<p><strong>The key insight:</strong> Traditional metrics treat both functions equally, but they’re fundamentally different in terms of cognitive load and risk.</p>
-<h2 id="debtmaps-unique-approach"><a class="header" href="#debtmaps-unique-approach">Debtmap’s Unique Approach</a></h2>
-<h3 id="1-entropy-based-complexity-analysis"><a class="header" href="#1-entropy-based-complexity-analysis">1. Entropy-Based Complexity Analysis</a></h3>
-<p>Debtmap uses information theory to distinguish between genuinely complex code and repetitive pattern-based code.</p>
-<p><strong>How it works:</strong></p>
+<p>Debtmap is a <strong>code complexity sensor</strong> designed for AI-assisted development workflows. It identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them.</p>
+<h2 id="the-ai-development-paradox"><a class="header" href="#the-ai-development-paradox">The AI Development Paradox</a></h2>
+<p>AI coding assistants like Claude Code, GitHub Copilot, and Cursor are transforming software development. They can write code faster than ever before. But this creates a paradox:</p>
+<p><strong>AI creates technical debt faster than humans can manage it.</strong></p>
+<p>When an AI generates hundreds of lines of code per hour, traditional code review and refactoring processes break down. Teams accumulate debt faster than they can pay it down.</p>
+<p>At the same time, AI assistants struggle to fix the debt they create:</p>
 <ul>
-<li>Calculate the <strong>variety</strong> of code patterns in a function</li>
-<li>High variety (many different patterns) = high entropy = genuinely complex</li>
-<li>Low variety (repetitive patterns) = low entropy = simple despite high branch count</li>
+<li><strong>Limited context window</strong> - They can’t see the entire codebase at once</li>
+<li><strong>No test awareness</strong> - They don’t know which code is tested vs untested</li>
+<li><strong>No prioritization</strong> - They can’t identify what matters most</li>
+<li><strong>Wasted tokens</strong> - They read irrelevant code while missing critical context</li>
 </ul>
-<p><strong>Applied to our examples:</strong></p>
-<pre><code>validate_config():
-- Cyclomatic complexity: 20
-- Pattern entropy: 0.3 (low - all branches identical)
-- Entropy-adjusted complexity: 5
-- Assessment: Low risk despite high branch count
-
-reconcile_state():
-- Cyclomatic complexity: 8
-- Pattern entropy: 0.85 (high - diverse conditional logic)
-- Entropy-adjusted complexity: 9
-- Assessment: High risk - genuinely complex logic
-</code></pre>
-<p>This approach <strong>significantly reduces false positives</strong> compared to traditional cyclomatic complexity metrics by recognizing that repetitive patterns are easier to understand than diverse, complex logic.</p>
-<h3 id="2-coverage-risk-correlation"><a class="header" href="#2-coverage-risk-correlation">2. Coverage-Risk Correlation</a></h3>
-<p>Debtmap is the only Rust analysis tool that natively combines code complexity with test coverage to compute risk scores.</p>
-<p><strong>Why this matters:</strong></p>
+<h2 id="what-ai-coding-tools-need"><a class="header" href="#what-ai-coding-tools-need">What AI Coding Tools Need</a></h2>
+<p>For an AI assistant to effectively fix technical debt, it needs:</p>
+<h3 id="1-prioritized-targets"><a class="header" href="#1-prioritized-targets">1. Prioritized Targets</a></h3>
+<p>Not “here are 500 complex functions,” but “here are the 10 functions that matter most, ranked by severity.”</p>
+<p>Debtmap provides a severity score (0-10) that combines:</p>
 <ul>
-<li>Complex code with good tests = managed risk</li>
-<li>Simple code without tests = unmanaged risk (but low priority)</li>
-<li>Complex code without tests = CRITICAL gap</li>
+<li>Complexity metrics (cyclomatic, cognitive, nesting)</li>
+<li>Test coverage gaps</li>
+<li>Coupling and dependency impact</li>
+<li>Pattern-based false positive reduction</li>
 </ul>
-<p><strong>Example:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Function A: Complex but well-tested
-fn parse_query(sql: &amp;str) -&gt; Result&lt;Query&gt; {
-    // Complexity: 15, Coverage: 95%
-    // Risk Score: 3.2 (moderate - complexity managed by tests)
-}
-
-// Function B: Moderate complexity, no tests
-fn apply_migrations(db: &amp;mut Database) -&gt; Result&lt;()&gt; {
-    // Complexity: 8, Coverage: 0%
-    // Risk Score: 8.9 (critical - untested with moderate complexity)
-}
-<span class="boring">}</span></code></pre>
-<p>Debtmap integrates with LCOV coverage data to automatically prioritize Function B over Function A, even though A is more complex. This is because the risk is about <strong>untested complexity</strong>, not just complexity alone.</p>
-<p><strong>What makes this unique:</strong></p>
-<p>Debtmap is the only Rust-focused tool that natively combines complexity analysis with LCOV coverage data to compute risk scores. While other tools support coverage reporting, they don’t correlate it with complexity metrics to prioritize technical debt and testing efforts.</p>
-<h3 id="3-actionable-recommendations"><a class="header" href="#3-actionable-recommendations">3. Actionable Recommendations</a></h3>
-<p>Most tools tell you <strong>what</strong> is wrong. Debtmap tells you <strong>what to do about it</strong> and <strong>what impact it will have</strong>.</p>
-<p><strong>Compare:</strong></p>
-<p><strong>SonarQube:</strong></p>
-<pre><code>Function 'process_request' has complexity 15 (threshold: 10)
-Severity: Major
+<h3 id="2-context-suggestions"><a class="header" href="#2-context-suggestions">2. Context Suggestions</a></h3>
+<p>Not “this function is complex,” but “read lines 38-85 of parser.rs, plus lines 100-120 of handler.rs where it’s called, and lines 50-75 of the test file.”</p>
+<p>Debtmap’s context suggestions tell the AI exactly which code to read:</p>
+<pre><code>CONTEXT:
+├─ Primary: src/parser.rs:38-85 (the debt item)
+├─ Caller: src/handler.rs:100-120 (usage context)
+└─ Tests: tests/parser_test.rs:50-75 (expected behavior)
 </code></pre>
-<p><strong>Debtmap:</strong></p>
-<pre><code>#1 SCORE: 8.9 [CRITICAL]
-├─ TEST GAP: ./src/handlers.rs:127 process_request()
-├─ ACTION: Add 8 unit tests for full coverage
-├─ IMPACT: -5.2 risk reduction
-├─ WHY: Complex logic (cyclo=15) with 0% coverage
-└─ SUGGEST: Extract validation to separate functions, test each independently
-</code></pre>
-<p>Debtmap tells you:</p>
+<h3 id="3-quantified-signals"><a class="header" href="#3-quantified-signals">3. Quantified Signals</a></h3>
+<p>Not “this code is bad,” but “cyclomatic complexity: 12, cognitive complexity: 18, test coverage: 0%, called by 8 functions.”</p>
+<p>These signals let the AI make informed decisions about the best approach:</p>
 <ul>
-<li><strong>Specific location</strong> (file:line)</li>
-<li><strong>Quantified gap</strong> (8 missing tests)</li>
-<li><strong>Expected impact</strong> (-5.2 risk reduction)</li>
-<li><strong>Rationale</strong> (complexity + no coverage)</li>
-<li><strong>Refactoring suggestions</strong> (extract functions)</li>
+<li>High complexity + good coverage = risky to refactor</li>
+<li>Low complexity + no coverage = easy test target</li>
+<li>High coupling + high complexity = incremental approach needed</li>
 </ul>
-<h3 id="4-context-aware-analysis"><a class="header" href="#4-context-aware-analysis">4. Context-Aware Analysis</a></h3>
-<p>Debtmap understands that not all code needs the same level of scrutiny.</p>
-<p><strong>Entry Points:</strong> Main functions, CLI handlers, and framework integration points are typically tested via integration tests, not unit tests. Debtmap’s analysis accounts for this:</p>
-<pre class="playground"><code class="language-rust">// Entry point - flagged as low priority for unit test coverage
-fn main() {
-    // Debtmap: "Integration test coverage expected - low priority"
-}
-
-// Core business logic - flagged as high priority
-fn calculate_risk_score(metrics: &amp;Metrics) -&gt; f64 {
-    // Debtmap: "High complexity + low coverage = CRITICAL"
-}</code></pre>
-<p><strong>Call Graph Analysis:</strong> Debtmap traces function dependencies to prioritize functions called by many untested paths:</p>
-<pre><code>parse_input() [untested]
-  ├─ called by: main() [integration tested]
-  └─ called by: process_batch() [untested]
-
-Priority: HIGH (called from untested code path)
-</code></pre>
-<h3 id="5-performance"><a class="header" href="#5-performance">5. Performance</a></h3>
-<p>Debtmap is written in Rust and uses parallel processing for analysis. Being a native Rust binary with no JVM overhead, it’s designed for fast local development workflow integration.</p>
-<p><strong>Typical analysis time:</strong></p>
+<h3 id="4-structured-output"><a class="header" href="#4-structured-output">4. Structured Output</a></h3>
+<p>Not free-form text, but JSON and markdown optimized for LLM consumption:</p>
 <ul>
-<li>Small project (~10k LOC): 1-2 seconds</li>
-<li>Medium project (~50k LOC): 5-8 seconds</li>
-<li>Large project (~200k LOC): 20-30 seconds</li>
+<li>Consistent structure across all debt items</li>
+<li>Minimal tokens for maximum information</li>
+<li>Deterministic output for reproducible workflows</li>
+<li>Stable IDs for referencing items across runs</li>
 </ul>
-<p>This speed means you can run debtmap in your local development workflow without breaking flow, not just in CI.</p>
-<h2 id="what-problem-does-debtmap-solve"><a class="header" href="#what-problem-does-debtmap-solve">What Problem Does Debtmap Solve?</a></h2>
-<p>Debtmap addresses a gap that existing tools don’t fill: <strong>quantified technical debt prioritization with actionable refactoring guidance</strong>.</p>
-<h3 id="the-gap-in-existing-tools"><a class="header" href="#the-gap-in-existing-tools">The Gap in Existing Tools</a></h3>
+<h2 id="what-debtmap-provides"><a class="header" href="#what-debtmap-provides">What Debtmap Provides</a></h2>
+<h3 id="complexity-signals"><a class="header" href="#complexity-signals">Complexity Signals</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Tool Type</th><th>What It Does</th><th>What It Doesn’t Do</th></tr>
+<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Linters</strong> (clippy, ESLint)</td><td>Find code style issues and common mistakes</td><td>Don’t quantify risk or prioritize by impact</td></tr>
-<tr><td><strong>Complexity Analyzers</strong> (SonarQube, CodeClimate)</td><td>Flag complex code</td><td>Don’t correlate with test coverage or provide refactoring impact estimates</td></tr>
-<tr><td><strong>Coverage Tools</strong> (tarpaulin, codecov)</td><td>Show what code is tested</td><td>Don’t identify which untested code is most risky</td></tr>
+<tr><td>Cyclomatic</td><td>Decision points (if, match, loop)</td><td>Number of execution paths</td></tr>
+<tr><td>Cognitive</td><td>Readability difficulty</td><td>How hard code is to understand</td></tr>
+<tr><td>Nesting</td><td>Indentation depth</td><td>Compound complexity</td></tr>
+<tr><td>Lines</td><td>Function length</td><td>Scope of changes needed</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Note:</strong> Debtmap is not a security scanner. Use tools like <code>cargo-audit</code> and <code>cargo-geiger</code> for security vulnerability detection. Debtmap focuses on technical debt prioritization, though complex untested code can sometimes harbor security issues.</p>
-<p><strong>What Debtmap uniquely provides:</strong></p>
-<ol>
-<li><strong>Quantified Debt Scoring</strong> - Not just “this is complex,” but “this scores 8.9/10 on risk”</li>
-<li><strong>Coverage-Risk Correlation</strong> - Identifies untested complex code, not just complex code</li>
-<li><strong>Impact Quantification</strong> - “Adding 6 tests will reduce risk by 3.7 points”</li>
-<li><strong>Actionable Recommendations</strong> - Specific refactoring suggestions with effort estimates</li>
-<li><strong>Dependency-Aware Prioritization</strong> - Prioritizes code that impacts many other functions</li>
-</ol>
-<h3 id="debtmap-vs-traditional-tools"><a class="header" href="#debtmap-vs-traditional-tools">Debtmap vs Traditional Tools</a></h3>
-<p><strong>SonarQube / CodeClimate:</strong></p>
-<ul>
-<li><strong>They say:</strong> “Function has complexity 15 (threshold exceeded)”</li>
-<li><strong>Debtmap says:</strong> “Add 8 tests (-5.2 risk). Extract validation logic to reduce complexity by 60%”</li>
-</ul>
-<p><strong>Coverage Tools (tarpaulin, codecov):</strong></p>
-<ul>
-<li><strong>They say:</strong> “67% line coverage, 54% branch coverage”</li>
-<li><strong>Debtmap says:</strong> “3 critical gaps: untested complex functions that are called from 12+ code paths”</li>
-</ul>
-<p><strong>Linters (clippy):</strong></p>
-<ul>
-<li><strong>They say:</strong> “Consider using Iterator::any() instead of a for loop”</li>
-<li><strong>Debtmap says:</strong> “This function has high cognitive complexity (12) and is called by 8 untested modules - prioritize adding tests before refactoring”</li>
-</ul>
-<h3 id="when-to-use-debtmap"><a class="header" href="#when-to-use-debtmap">When to Use Debtmap</a></h3>
-<p><strong>Use Debtmap when you need to:</strong></p>
-<ul>
-<li>Decide which technical debt to tackle first (limited time/resources)</li>
-<li>Identify critical testing gaps (high-complexity, zero-coverage code)</li>
-<li>Quantify the impact of refactoring efforts</li>
-<li>Reduce false positives from repetitive validation code</li>
-<li>Prioritize refactoring based on risk, not just complexity</li>
-<li>Get specific, actionable recommendations with effort estimates</li>
-</ul>
-<p><strong>Use other tools for different needs:</strong></p>
-<ul>
-<li><strong>clippy</strong> - Catch Rust idiom violations and common mistakes</li>
-<li><strong>tarpaulin</strong> - Generate LCOV coverage data (Debtmap analyzes it)</li>
-<li><strong>SonarQube</strong> - Multi-language analysis with centralized dashboards</li>
-</ul>
-<p><strong>Security is a separate concern:</strong></p>
-<ul>
-<li><strong>cargo-audit</strong> - Find known vulnerabilities in dependencies</li>
-<li><strong>cargo-geiger</strong> - Detect unsafe code usage</li>
-<li>Debtmap doesn’t scan for security issues, though complex code may harbor security risks</li>
-</ul>
-<h3 id="recommended-workflow"><a class="header" href="#recommended-workflow">Recommended Workflow</a></h3>
-<p>Debtmap works <strong>alongside</strong> existing tools, not instead of them:</p>
-<pre><code class="language-bash"># 1. Local development loop (before commit)
-cargo fmt                    # Format code
-cargo clippy                 # Check idioms and common issues
-cargo test                   # Run tests
-debtmap analyze .            # Identify new technical debt
+<h3 id="coverage-signals"><a class="header" href="#coverage-signals">Coverage Signals</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
+</thead>
+<tbody>
+<tr><td>Line coverage</td><td>% of lines executed by tests</td><td>Basic test coverage</td></tr>
+<tr><td>Branch coverage</td><td>% of branches taken</td><td>Edge case coverage</td></tr>
+<tr><td>Function coverage</td><td>Whether function is tested at all</td><td>Critical gap detection</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="coupling-signals"><a class="header" href="#coupling-signals">Coupling Signals</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
+</thead>
+<tbody>
+<tr><td>Fan-in</td><td>Functions that call this function</td><td>Impact of changes</td></tr>
+<tr><td>Fan-out</td><td>Functions this function calls</td><td>Dependency risk</td></tr>
+<tr><td>Call depth</td><td>Distance from entry points</td><td>Integration complexity</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="quality-signals"><a class="header" href="#quality-signals">Quality Signals</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
+</thead>
+<tbody>
+<tr><td>Entropy</td><td>Pattern variety in code</td><td>False positive filtering</td></tr>
+<tr><td>Purity</td><td>Side effect presence</td><td>Testability indicator</td></tr>
+<tr><td>Dead code</td><td>Unused functions</td><td>Cleanup candidates</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="what-debtmap-doesnt-do"><a class="header" href="#what-debtmap-doesnt-do">What Debtmap Doesn’t Do</a></h2>
+<p>Debtmap is a <strong>sensor</strong>, not a prescriber. It measures and reports; it doesn’t tell you what to do.</p>
+<h3 id="no-fix-suggestions"><a class="header" href="#no-fix-suggestions">No Fix Suggestions</a></h3>
+<p>Debtmap doesn’t say “split this function into 5 modules” or “add 8 unit tests.” Those decisions require understanding the business context, architectural constraints, and team preferences that only humans (or AI with proper context) can evaluate.</p>
+<h3 id="no-should-statements"><a class="header" href="#no-should-statements">No “Should” Statements</a></h3>
+<p>Debtmap doesn’t say “you should refactor this” or “consider extracting a helper function.” It reports facts: “complexity: 18, coverage: 0%, called by 12 functions.” The AI or developer decides what to do with that information.</p>
+<h3 id="no-impact-predictions"><a class="header" href="#no-impact-predictions">No Impact Predictions</a></h3>
+<p>Debtmap doesn’t claim “refactoring this will reduce bugs by 40%.” Such predictions are speculative. Debtmap reports what it can measure accurately and leaves interpretation to the consumer.</p>
+<h2 id="comparison-with-alternatives"><a class="header" href="#comparison-with-alternatives">Comparison with Alternatives</a></h2>
+<h3 id="vs-static-analysis-tools-sonarqube-codeclimate"><a class="header" href="#vs-static-analysis-tools-sonarqube-codeclimate">vs Static Analysis Tools (SonarQube, CodeClimate)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Aspect</th><th>Traditional Tools</th><th>Debtmap</th></tr>
+</thead>
+<tbody>
+<tr><td>Output</td><td>Recommendations</td><td>Signals</td></tr>
+<tr><td>Audience</td><td>Humans</td><td>AI + Humans</td></tr>
+<tr><td>Format</td><td>Dashboards</td><td>JSON/Markdown</td></tr>
+<tr><td>Speed</td><td>Minutes</td><td>Seconds</td></tr>
+<tr><td>Focus</td><td>“Fix this”</td><td>“Here’s what exists”</td></tr>
+</tbody>
+</table>
+</div>
+<p>Traditional tools are designed for human code review workflows. Debtmap is designed for AI-assisted development.</p>
+<h3 id="vs-linters-clippy-eslint"><a class="header" href="#vs-linters-clippy-eslint">vs Linters (Clippy, ESLint)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Aspect</th><th>Linters</th><th>Debtmap</th></tr>
+</thead>
+<tbody>
+<tr><td>Focus</td><td>Style/idioms</td><td>Complexity/debt</td></tr>
+<tr><td>Scope</td><td>Line-level</td><td>Function-level</td></tr>
+<tr><td>Output</td><td>Warnings</td><td>Prioritized signals</td></tr>
+<tr><td>Coverage</td><td>Not integrated</td><td>Core feature</td></tr>
+</tbody>
+</table>
+</div>
+<p>Linters catch code style issues. Debtmap identifies complexity hotspots. Use both.</p>
+<h3 id="vs-coverage-tools-tarpaulin-pytest-cov"><a class="header" href="#vs-coverage-tools-tarpaulin-pytest-cov">vs Coverage Tools (Tarpaulin, pytest-cov)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Aspect</th><th>Coverage Tools</th><th>Debtmap</th></tr>
+</thead>
+<tbody>
+<tr><td>Output</td><td>Coverage %</td><td>Risk-prioritized gaps</td></tr>
+<tr><td>Complexity</td><td>Not considered</td><td>Core metric</td></tr>
+<tr><td>Context</td><td>None</td><td>File ranges for AI</td></tr>
+</tbody>
+</table>
+</div>
+<p>Coverage tools tell you what’s tested. Debtmap tells you what untested code is most risky.</p>
+<h2 id="how-debtmap-fits-in-your-workflow"><a class="header" href="#how-debtmap-fits-in-your-workflow">How Debtmap Fits in Your Workflow</a></h2>
+<h3 id="ai-assisted-development"><a class="header" href="#ai-assisted-development">AI-Assisted Development</a></h3>
+<pre><code class="language-bash"># Generate debt signals
+debtmap analyze . --format llm-markdown --lcov coverage.lcov
 
-# 2. CI/CD pipeline (PR validation)
-cargo test --all-features    # Full test suite
-cargo clippy -- -D warnings  # Fail on warnings
-debtmap validate .           # Enforce debt thresholds
-
-# 3. Weekly planning (prioritize work)
-cargo tarpaulin --out lcov   # Generate coverage
-debtmap analyze . --lcov lcov.info --top 20
-# Review top 20 debt items, plan sprint work
-
-# 4. Monthly review (track trends)
-debtmap analyze . --format json --output debt-$(date +%Y%m).json
-debtmap compare --before debt-202410.json --after debt-202411.json
+# Pipe to AI
+cat debt.md | claude "Fix the top item, read the suggested context first"
 </code></pre>
-<h3 id="the-bottom-line"><a class="header" href="#the-bottom-line">The Bottom Line</a></h3>
-<p><strong>Debtmap isn’t a replacement for linters or coverage tools.</strong> It solves a different problem: turning raw complexity and coverage data into <strong>prioritized, actionable technical debt recommendations</strong>.</p>
-<p>If you’re asking “Where should I focus my refactoring efforts?” or “Which code needs tests most urgently?”, that’s what Debtmap is built for.</p>
-<h2 id="key-differentiators"><a class="header" href="#key-differentiators">Key Differentiators</a></h2>
+<h3 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h3>
+<pre><code class="language-bash"># Fail build if debt exceeds thresholds
+debtmap validate . --max-debt-density 10.0
+
+# Generate report for PR review
+debtmap analyze . --format json --output debt-report.json
+</code></pre>
+<h3 id="exploratory-analysis"><a class="header" href="#exploratory-analysis">Exploratory Analysis</a></h3>
+<pre><code class="language-bash"># Quick overview
+debtmap analyze . --top 10
+
+# Deep dive with coverage
+debtmap analyze . --lcov coverage.lcov --format terminal -vv
+</code></pre>
+<h2 id="key-insights"><a class="header" href="#key-insights">Key Insights</a></h2>
 <ol>
-<li><strong>Entropy analysis</strong> - Reduces false positives from repetitive code</li>
-<li><strong>Native coverage integration</strong> - Built-in LCOV support for risk scoring</li>
-<li><strong>Actionable recommendations</strong> - Specific steps with quantified impact</li>
-<li><strong>Context-aware</strong> - Understands entry points, call graphs, and testing patterns</li>
-<li><strong>Fast</strong> - Rust performance for local development workflow</li>
-<li><strong>Tiered prioritization</strong> - Critical/High/Moderate/Low classification with clear rationale</li>
+<li><strong>Debtmap is a sensor</strong> - It measures, it doesn’t prescribe</li>
+<li><strong>AI does the thinking</strong> - Debtmap provides data, AI decides action</li>
+<li><strong>Context is key</strong> - Knowing what to read is as valuable as what to fix</li>
+<li><strong>Signals over interpretations</strong> - Raw metrics, not template advice</li>
+<li><strong>Speed matters</strong> - Fast enough for local development loops</li>
 </ol>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <p>Ready to try it? Head to <a href="getting-started.html">Getting Started</a> to install debtmap and run your first analysis.</p>
+<p>Want to integrate with your AI workflow? See <a href="llm-integration.html">LLM Integration</a> for detailed guidance.</p>
 <p>Want to understand how it works under the hood? See <a href="architecture.html">Architecture</a> for the analysis pipeline.</p>
-<p>Have questions? Check the <a href="faq.html">FAQ</a> for common questions and answers.</p>
 
                     </main>
 

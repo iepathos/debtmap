@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9e1f585f.js";
+            window.path_to_searchindex_js = "searchindex-08efffac.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c7b19542.js"></script>
+        <script src="toc-d4b9eccb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,9 +178,9 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>This chapter explains how debtmap’s analysis pipeline works, from discovering files to producing prioritized technical debt recommendations.</p>
+<p>This chapter explains how debtmap’s analysis pipeline works, from discovering files to producing prioritized technical debt signals.</p>
 <h2 id="analysis-pipeline-overview"><a class="header" href="#analysis-pipeline-overview">Analysis Pipeline Overview</a></h2>
-<p>Debtmap’s analysis follows a multi-stage pipeline that transforms source code into actionable recommendations:</p>
+<p>Debtmap’s analysis follows a multi-stage pipeline that transforms source code into structured signals:</p>
 <pre><code>┌─────────────────┐
 │ File Discovery  │
 └────────┬────────┘
@@ -243,14 +243,22 @@
          └─────────┬─────────┘
                    │
                    ▼
+        ┌──────────────────────┐
+        │ Context Suggestion   │
+        │    Generation        │
+        └─────────┬────────────┘
+                  │
+                  ▼
           ┌────────────────┐
           │Output Formatting│
           └────────┬───────┘
                    │
-                   ▼
-       ┌─────────────────────┐
-       │Terminal/JSON/Markdown│
-       └─────────────────────┘
+       ┌───────────┼───────────┐
+       │           │           │
+       ▼           ▼           ▼
+   ┌──────┐   ┌────────┐   ┌─────┐
+   │ JSON │   │LLM-MD  │   │Term │
+   └──────┘   └────────┘   └─────┘
 </code></pre>
 <h2 id="key-components"><a class="header" href="#key-components">Key Components</a></h2>
 <h3 id="1-file-discovery-and-language-detection"><a class="header" href="#1-file-discovery-and-language-detection">1. File Discovery and Language Detection</a></h3>
@@ -475,19 +483,19 @@ where:
 <span class="boring">}</span></code></pre>
 <p><strong>Risk Tiers:</strong></p>
 <ul>
-<li><strong>Critical (8.0+):</strong> Immediate attention required</li>
-<li><strong>High (5.0-7.9):</strong> Priority for next sprint</li>
-<li><strong>Moderate (2.0-4.9):</strong> Address when refactoring nearby code</li>
-<li><strong>Low (&lt;2.0):</strong> Monitor but no immediate action</li>
+<li><strong>Critical (8.0+):</strong> High complexity with no test coverage</li>
+<li><strong>High (5.0-7.9):</strong> Moderate complexity with coverage gaps</li>
+<li><strong>Moderate (2.0-4.9):</strong> Low-moderate risk, monitor</li>
+<li><strong>Low (&lt;2.0):</strong> Acceptable state</li>
 </ul>
 <h3 id="9-tiered-prioritization"><a class="header" href="#9-tiered-prioritization">9. Tiered Prioritization</a></h3>
-<p><strong>Purpose:</strong> Classify and rank technical debt items by urgency and impact.</p>
+<p><strong>Purpose:</strong> Classify and rank technical debt items by severity.</p>
 <p><strong>Prioritization Algorithm:</strong></p>
 <ol>
 <li><strong>Calculate base risk score</strong> (from Risk Scoring step)</li>
 <li><strong>Apply context adjustments:</strong>
 <ul>
-<li>Entry points: -2.0 score (lower priority for unit tests)</li>
+<li>Entry points: -2.0 score (integration test coverage expected)</li>
 <li>Core business logic: +1.5 score (higher priority)</li>
 <li>Frequently changed files: +1.0 score (git history analysis)</li>
 <li>Critical paths: +0.5 score per untested caller</li>
@@ -503,9 +511,9 @@ where:
 </li>
 <li><strong>Sort within tiers by:</strong>
 <ul>
-<li>Impact (estimated risk reduction)</li>
-<li>Effort (test count or refactoring size)</li>
-<li>ROI (impact / effort)</li>
+<li>Severity score</li>
+<li>Coupling impact</li>
+<li>File location (group related items)</li>
 </ul>
 </li>
 </ol>
@@ -518,42 +526,74 @@ where:
     pub tier: Tier,
     pub location: Location,
     pub debt_type: DebtType,
-    pub action: String,
-    pub impact: f64,
-    pub effort: Effort,
+    pub metrics: ComplexityMetrics,
+    pub coverage: Option&lt;CoverageMetrics&gt;,
+    pub context: ContextSuggestion,
 }
 <span class="boring">}</span></code></pre>
 <p>See <a href="tiered-prioritization.html">Tiered Prioritization</a> for detailed explanation of the ranking algorithm.</p>
-<h3 id="10-output-formatting"><a class="header" href="#10-output-formatting">10. Output Formatting</a></h3>
-<p><strong>Purpose:</strong> Present analysis results in user-friendly formats.</p>
-<p><strong>Output Formats:</strong></p>
-<p><strong>Terminal (default):</strong></p>
+<h3 id="10-context-suggestion-generation"><a class="header" href="#10-context-suggestion-generation">10. Context Suggestion Generation</a></h3>
+<p><strong>Purpose:</strong> Provide AI agents with specific file ranges to read for understanding the debt item.</p>
+<p><strong>Context Types:</strong></p>
+<p><strong>Primary Context:</strong></p>
 <ul>
-<li>Color-coded by tier (red=critical, yellow=high, etc.)</li>
-<li>Hierarchical tree view with unicode box characters</li>
-<li>Collapsible sections for detailed recommendations</li>
-<li>Summary statistics at top</li>
+<li>The function/struct where debt is located</li>
+<li>Start and end line numbers</li>
+<li>File path</li>
 </ul>
-<p><strong>JSON:</strong></p>
+<p><strong>Related Context:</strong></p>
+<ul>
+<li><strong>Callers:</strong> Functions that call this function</li>
+<li><strong>Callees:</strong> Functions this function calls</li>
+<li><strong>Tests:</strong> Existing test files that cover related code</li>
+<li><strong>Types:</strong> Struct/enum definitions used by this function</li>
+</ul>
+<p><strong>Selection Algorithm:</strong></p>
+<ol>
+<li>Include primary location (always)</li>
+<li>Add top 3 callers by call frequency</li>
+<li>Add callees that are untested</li>
+<li>Add test files with matching function names</li>
+<li>Limit total context to ~500 lines (configurable)</li>
+</ol>
+<p><strong>Output Format:</strong></p>
+<pre><code>CONTEXT:
+├─ Primary: src/parser.rs:38-85
+├─ Caller: src/handler.rs:100-120 (calls 12x)
+├─ Caller: src/api.rs:45-60 (calls 8x)
+├─ Callee: src/tokenizer.rs:15-40 (untested)
+└─ Test: tests/parser_test.rs:50-120
+</code></pre>
+<h3 id="11-output-formatting"><a class="header" href="#11-output-formatting">11. Output Formatting</a></h3>
+<p><strong>Purpose:</strong> Present analysis results in formats optimized for different consumers.</p>
+<p><strong>Output Formats:</strong></p>
+<p><strong>LLM Markdown (–format llm-markdown):</strong></p>
+<ul>
+<li>Structured for minimal token usage</li>
+<li>Context suggestions included inline</li>
+<li>Metrics in consistent tabular format</li>
+<li>Designed for piping to AI assistants</li>
+</ul>
+<p><strong>JSON (–format json):</strong></p>
 <ul>
 <li>Machine-readable for CI/CD integration</li>
 <li>Full metadata for each debt item</li>
-<li>Structured for programmatic consumption</li>
+<li>Stable schema for programmatic consumption</li>
 <li>Schema-versioned for compatibility</li>
 </ul>
-<p><strong>Markdown:</strong></p>
+<p><strong>Terminal (–format terminal):</strong></p>
+<ul>
+<li>Color-coded by tier (red=critical, yellow=high, etc.)</li>
+<li>Hierarchical tree view with unicode box characters</li>
+<li>Progress bars for analysis phases</li>
+<li>Summary statistics at top</li>
+</ul>
+<p><strong>Markdown (–format markdown):</strong></p>
 <ul>
 <li>Rendered in GitHub/GitLab for PR comments</li>
 <li>Embedded code blocks with syntax highlighting</li>
 <li>Collapsible details sections</li>
 <li>Linked to source code locations</li>
-</ul>
-<p><strong>GitHub PR Comments:</strong></p>
-<ul>
-<li>Automated comments on pull requests</li>
-<li>Inline annotations at specific lines</li>
-<li>Comparison with base branch (new vs existing debt)</li>
-<li>Summary card with key metrics</li>
 </ul>
 <p>See <a href="output-formats.html">Output Formats</a> for examples and configuration options.</p>
 <h2 id="data-flow-example"><a class="header" href="#data-flow-example">Data Flow Example</a></h2>
@@ -624,12 +664,18 @@ Effective Complexity: 4 * 0.85 = 3.4
 </span>Risk = (3.4 * 0.25) + (1 * 1 * 0.2) = 0.85 + 0.2 = 1.05
 Tier: LOW (entry point with decent coverage)
 <span class="boring">}</span></code></pre>
-<p><strong>Stage 7: Recommendation</strong></p>
+<p><strong>Stage 7: Context Suggestion</strong></p>
+<pre><code>CONTEXT:
+├─ Primary: src/handlers.rs:2-6
+├─ Callee: src/auth.rs:15-30 (validate_auth)
+└─ Test: tests/integration/handlers_test.rs:10-25
+</code></pre>
+<p><strong>Stage 8: Output</strong></p>
 <pre><code>#23 SCORE: 1.1 [LOW]
-├─ MINOR GAP: ./src/handlers.rs:2 process_request()
-├─ ACTION: Add 1 test for error path at line 3
-├─ IMPACT: -0.3 risk reduction
-└─ WHY: Entry point with 75% branch coverage, missing error case
+├─ src/handlers.rs:2 process_request()
+├─ COMPLEXITY: cyclomatic=4, cognitive=3, nesting=1
+├─ COVERAGE: 75% (1 branch untested)
+└─ CONTEXT: Primary + 1 callee + 1 test file
 </code></pre>
 <h2 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h2>
 <p><strong>Analysis Speed:</strong></p>
@@ -643,7 +689,7 @@ Tier: LOW (entry point with decent coverage)
 <ul>
 <li>File parsing: Parallel across all available cores</li>
 <li>Metric extraction: Parallel per-file</li>
-<li>Call graph construction: Sequential (requires cross-file state)</li>
+<li>Call graph construction: Parallel with work stealing</li>
 <li>Risk scoring: Parallel per-function</li>
 <li>Output formatting: Sequential</li>
 </ul>
@@ -693,7 +739,7 @@ Implement the <code>OutputFormatter</code> trait for new formats:</p>
 <li><strong>Understand prioritization:</strong> See <a href="tiered-prioritization.html">Tiered Prioritization</a></li>
 <li><strong>Learn scoring strategies:</strong> See <a href="scoring-strategies.html">Scoring Strategies</a></li>
 <li><strong>Configure analysis:</strong> See <a href="configuration.html">Configuration</a></li>
-<li><strong>View examples:</strong> See <a href="examples.html">Examples</a></li>
+<li><strong>Integrate with AI:</strong> See <a href="llm-integration.html">LLM Integration</a></li>
 </ul>
 
                     </main>
