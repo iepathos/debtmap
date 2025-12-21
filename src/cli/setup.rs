@@ -36,14 +36,20 @@ pub fn get_worker_count(jobs: usize) -> usize {
     }
 }
 
+/// Pure logic: check if automation mode based on env var values
+/// This is the testable core - no global state access
+fn is_automation_mode_from_values(automation: Option<&str>, validation: Option<&str>) -> bool {
+    let is_true = |opt: Option<&str>| opt.is_some_and(|v| v.eq_ignore_ascii_case("true"));
+    is_true(automation) || is_true(validation)
+}
+
 /// Check if running in automation mode (Prodigy workflow)
+/// Thin I/O shell that reads environment and delegates to pure logic
 pub fn is_automation_mode() -> bool {
-    std::env::var("PRODIGY_AUTOMATION")
-        .unwrap_or_default()
-        .eq_ignore_ascii_case("true")
-        || std::env::var("PRODIGY_VALIDATION")
-            .unwrap_or_default()
-            .eq_ignore_ascii_case("true")
+    is_automation_mode_from_values(
+        std::env::var("PRODIGY_AUTOMATION").ok().as_deref(),
+        std::env::var("PRODIGY_VALIDATION").ok().as_deref(),
+    )
 }
 
 /// Apply environment setup for analysis (side effect function, I/O at edges)
@@ -134,49 +140,36 @@ mod tests {
         assert!(count > 0);
     }
 
-    // Note: These tests are inherently flaky due to environment variable races
-    // in parallel test execution. We test the logic by checking each env var independently.
+    // Pure function tests - no global state, fully parallelizable
     #[test]
-    fn test_automation_mode_with_automation_var() {
-        // Save current values
-        let automation_val = std::env::var("PRODIGY_AUTOMATION").ok();
-        let validation_val = std::env::var("PRODIGY_VALIDATION").ok();
-
-        // Test with PRODIGY_AUTOMATION=true
-        std::env::set_var("PRODIGY_AUTOMATION", "true");
-        std::env::remove_var("PRODIGY_VALIDATION");
-        assert!(is_automation_mode());
-
-        // Restore
-        match automation_val {
-            Some(v) => std::env::set_var("PRODIGY_AUTOMATION", v),
-            None => std::env::remove_var("PRODIGY_AUTOMATION"),
-        }
-        match validation_val {
-            Some(v) => std::env::set_var("PRODIGY_VALIDATION", v),
-            None => std::env::remove_var("PRODIGY_VALIDATION"),
-        }
+    fn test_automation_mode_with_automation_true() {
+        assert!(is_automation_mode_from_values(Some("true"), None));
+        assert!(is_automation_mode_from_values(Some("TRUE"), None));
+        assert!(is_automation_mode_from_values(Some("True"), None));
     }
 
     #[test]
-    fn test_automation_mode_with_validation_var() {
-        // Save current values
-        let automation_val = std::env::var("PRODIGY_AUTOMATION").ok();
-        let validation_val = std::env::var("PRODIGY_VALIDATION").ok();
+    fn test_automation_mode_with_validation_true() {
+        assert!(is_automation_mode_from_values(None, Some("true")));
+        assert!(is_automation_mode_from_values(None, Some("TRUE")));
+        assert!(is_automation_mode_from_values(None, Some("True")));
+    }
 
-        // Test with PRODIGY_VALIDATION=true
-        std::env::remove_var("PRODIGY_AUTOMATION");
-        std::env::set_var("PRODIGY_VALIDATION", "true");
-        assert!(is_automation_mode());
+    #[test]
+    fn test_automation_mode_both_unset() {
+        assert!(!is_automation_mode_from_values(None, None));
+    }
 
-        // Restore
-        match automation_val {
-            Some(v) => std::env::set_var("PRODIGY_AUTOMATION", v),
-            None => std::env::remove_var("PRODIGY_AUTOMATION"),
-        }
-        match validation_val {
-            Some(v) => std::env::set_var("PRODIGY_VALIDATION", v),
-            None => std::env::remove_var("PRODIGY_VALIDATION"),
-        }
+    #[test]
+    fn test_automation_mode_non_true_values() {
+        assert!(!is_automation_mode_from_values(Some("false"), None));
+        assert!(!is_automation_mode_from_values(Some("1"), None));
+        assert!(!is_automation_mode_from_values(Some(""), None));
+        assert!(!is_automation_mode_from_values(None, Some("false")));
+    }
+
+    #[test]
+    fn test_automation_mode_both_true() {
+        assert!(is_automation_mode_from_values(Some("true"), Some("true")));
     }
 }
