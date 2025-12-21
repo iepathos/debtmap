@@ -4,6 +4,7 @@
 //! - Analysis results validation with error accumulation
 //! - Predicate-based debt detection rules
 //! - File processing validation with partial success semantics
+//! - Field context for structured error reporting (Spec 003)
 //!
 //! # Predicate Combinators
 //!
@@ -33,6 +34,24 @@
 //!     .ensure(le(500_usize), AnalysisError::validation("File too long"));
 //! ```
 //!
+//! # Field Context (Spec 003)
+//!
+//! The module provides types for attaching field context to validation errors:
+//!
+//! ```rust,ignore
+//! use debtmap::effects::validation::{FieldPath, ValidationError};
+//!
+//! // Create a nested field path
+//! let path = FieldPath::root()
+//!     .push("config")
+//!     .push("thresholds")
+//!     .push("cyclomatic");
+//!
+//! // Create error with field context
+//! let error = ValidationError::at_field(&path, "must be greater than zero")
+//!     .with_context("positive integer", "-5");
+//! ```
+//!
 //! # ValidatedFileResults
 //!
 //! Represents the result of validating multiple files with partial success:
@@ -47,12 +66,547 @@
 //!     }
 //! }
 //! ```
+//!
+//! # ValidatedFileSet (Spec 003)
+//!
+//! An alternative to ValidatedFileResults that separates valid files from errors
+//! while supporting partial success with file-specific error context:
+//!
+//! ```rust,ignore
+//! use debtmap::effects::validation::ValidatedFileSet;
+//!
+//! let file_set = parse_all_files(&file_paths);
+//! if file_set.is_partial_success() {
+//!     println!("Processed {} files with {} errors",
+//!         file_set.valid.len(), file_set.errors.len());
+//! }
+//! ```
 
 use crate::core::FileMetrics;
 use crate::effects::{validation_success, AnalysisValidation};
 use crate::errors::AnalysisError;
+use serde::Serialize;
+use std::path::PathBuf;
 use stillwater::predicate::Predicate;
+use stillwater::refined::{FieldError, ValidationFieldExt};
 use stillwater::{NonEmptyVec, Validation};
+
+// =============================================================================
+// Field Context Types (Spec 003)
+// =============================================================================
+
+/// Nested field path for error context.
+///
+/// Tracks the path from root to a specific field in a configuration or data
+/// structure, enabling precise error messages like "config.thresholds.cyclomatic".
+///
+/// # Example
+///
+/// ```rust
+/// use debtmap::effects::validation::FieldPath;
+///
+/// let path = FieldPath::root()
+///     .push("config")
+///     .push("thresholds")
+///     .push("cyclomatic");
+///
+/// assert_eq!(path.as_string(), "config.thresholds.cyclomatic");
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct FieldPath(Vec<String>);
+
+impl FieldPath {
+    /// Create an empty root path.
+    pub fn root() -> Self {
+        Self(Vec::new())
+    }
+
+    /// Create a path with a single field.
+    pub fn new(field: impl Into<String>) -> Self {
+        Self(vec![field.into()])
+    }
+
+    /// Add a field to the path, returning a new path.
+    pub fn push(&self, field: impl Into<String>) -> Self {
+        let mut path = self.0.clone();
+        path.push(field.into());
+        Self(path)
+    }
+
+    /// Get the path as a dot-separated string.
+    pub fn as_string(&self) -> String {
+        self.0.join(".")
+    }
+
+    /// Check if this is the root path (no fields).
+    pub fn is_root(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Get the number of segments in the path.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Check if the path is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Get the last segment of the path, if any.
+    pub fn last(&self) -> Option<&str> {
+        self.0.last().map(|s| s.as_str())
+    }
+
+    /// Get the segments of the path.
+    pub fn segments(&self) -> &[String] {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for FieldPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_string())
+    }
+}
+
+impl From<&str> for FieldPath {
+    fn from(s: &str) -> Self {
+        Self::new(s)
+    }
+}
+
+impl From<String> for FieldPath {
+    fn from(s: String) -> Self {
+        Self::new(s)
+    }
+}
+
+/// Validation error with full field context.
+///
+/// Provides structured error information including:
+/// - The field path where the error occurred
+/// - A human-readable error message
+/// - Optional expected and actual values for debugging
+///
+/// This type is JSON-serializable for IDE integration and tooling.
+///
+/// # Example
+///
+/// ```rust
+/// use debtmap::effects::validation::{FieldPath, ValidationError};
+///
+/// let error = ValidationError::at_field(
+///     &FieldPath::new("threshold"),
+///     "must be greater than zero"
+/// ).with_context("positive integer", "-5");
+///
+/// assert_eq!(error.field.as_string(), "threshold");
+/// assert_eq!(error.expected, Some("positive integer".to_string()));
+/// assert_eq!(error.actual, Some("-5".to_string()));
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ValidationError {
+    /// The field path where the error occurred.
+    pub field: FieldPath,
+    /// Human-readable error message.
+    pub message: String,
+    /// Expected value or constraint (for debugging).
+    pub expected: Option<String>,
+    /// Actual value that failed validation (for debugging).
+    pub actual: Option<String>,
+}
+
+impl ValidationError {
+    /// Create a validation error at a specific field.
+    pub fn at_field(field: &FieldPath, message: impl Into<String>) -> Self {
+        Self {
+            field: field.clone(),
+            message: message.into(),
+            expected: None,
+            actual: None,
+        }
+    }
+
+    /// Create a validation error with a simple field name.
+    pub fn for_field(field: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            field: FieldPath::new(field),
+            message: message.into(),
+            expected: None,
+            actual: None,
+        }
+    }
+
+    /// Add expected and actual context to the error.
+    pub fn with_context(mut self, expected: impl Into<String>, actual: impl Into<String>) -> Self {
+        self.expected = Some(expected.into());
+        self.actual = Some(actual.into());
+        self
+    }
+
+    /// Add expected value context.
+    pub fn with_expected(mut self, expected: impl Into<String>) -> Self {
+        self.expected = Some(expected.into());
+        self
+    }
+
+    /// Add actual value context.
+    pub fn with_actual(mut self, actual: impl Into<String>) -> Self {
+        self.actual = Some(actual.into());
+        self
+    }
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.field.is_root() {
+            write!(f, "{}", self.message)?;
+        } else {
+            write!(f, "{}: {}", self.field, self.message)?;
+        }
+
+        if let (Some(expected), Some(actual)) = (&self.expected, &self.actual) {
+            write!(f, " (expected: {}, got: {})", expected, actual)?;
+        } else if let Some(expected) = &self.expected {
+            write!(f, " (expected: {})", expected)?;
+        } else if let Some(actual) = &self.actual {
+            write!(f, " (got: {})", actual)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl std::error::Error for ValidationError {}
+
+/// Error for a specific file with location context.
+///
+/// Tracks file path and optional line/column information for errors
+/// that occur during file processing (parsing, analysis, etc.).
+///
+/// # Example
+///
+/// ```rust
+/// use debtmap::effects::validation::FileError;
+/// use std::path::PathBuf;
+///
+/// let error = FileError::new(
+///     PathBuf::from("src/main.rs"),
+///     "unexpected token 'foo'"
+/// ).at_location(42, 15);
+///
+/// assert_eq!(error.path, PathBuf::from("src/main.rs"));
+/// assert_eq!(error.line, Some(42));
+/// assert_eq!(error.column, Some(15));
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct FileError {
+    /// Path to the file where the error occurred.
+    pub path: PathBuf,
+    /// Line number where the error occurred (1-indexed).
+    pub line: Option<u32>,
+    /// Column number where the error occurred (1-indexed).
+    pub column: Option<u32>,
+    /// Human-readable error message.
+    pub message: String,
+    /// Optional error code for programmatic handling.
+    pub error_code: Option<String>,
+}
+
+impl FileError {
+    /// Create a new file error with path and message.
+    pub fn new(path: impl Into<PathBuf>, message: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            line: None,
+            column: None,
+            message: message.into(),
+            error_code: None,
+        }
+    }
+
+    /// Add line and column location information.
+    pub fn at_location(mut self, line: u32, column: u32) -> Self {
+        self.line = Some(line);
+        self.column = Some(column);
+        self
+    }
+
+    /// Add just line location information.
+    pub fn at_line(mut self, line: u32) -> Self {
+        self.line = Some(line);
+        self
+    }
+
+    /// Add an error code for programmatic handling.
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.error_code = Some(code.into());
+        self
+    }
+
+    /// Convert from a parse error with context.
+    pub fn from_parse_error(path: impl Into<PathBuf>, error: impl std::fmt::Display) -> Self {
+        Self::new(path, error.to_string()).with_code("E010")
+    }
+
+    /// Convert from an AnalysisError with path context.
+    pub fn from_analysis_error(path: impl Into<PathBuf>, error: &AnalysisError) -> Self {
+        let path = path.into();
+        let message = error.to_string();
+
+        // Extract line number from the error if it's a parse error
+        let line = if let AnalysisError::ParseError { line, .. } = error {
+            *line
+        } else {
+            None
+        };
+
+        let mut file_error = Self::new(path, message);
+        if let Some(l) = line {
+            file_error.line = Some(l as u32);
+        }
+
+        file_error
+    }
+}
+
+impl std::fmt::Display for FileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.path.display())?;
+        if let Some(line) = self.line {
+            write!(f, ":{}", line)?;
+            if let Some(column) = self.column {
+                write!(f, ":{}", column)?;
+            }
+        }
+        write!(f, ": {}", self.message)?;
+        if let Some(code) = &self.error_code {
+            write!(f, " [{}]", code)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for FileError {}
+
+impl From<FileError> for AnalysisError {
+    fn from(err: FileError) -> Self {
+        AnalysisError::parse_with_path(&err.message, &err.path)
+    }
+}
+
+/// Result of validating multiple files with partial success semantics.
+///
+/// Unlike `ValidatedFileResults`, this type uses generic file data and
+/// provides richer error information with `FileError` instead of `AnalysisError`.
+///
+/// # Example
+///
+/// ```rust
+/// use debtmap::effects::validation::{ValidatedFileSet, FileError};
+/// use std::path::PathBuf;
+///
+/// // Create a partial success result
+/// let file_set = ValidatedFileSet {
+///     valid: vec!["file1 content".to_string(), "file2 content".to_string()],
+///     errors: vec![FileError::new(PathBuf::from("bad.rs"), "parse error")],
+/// };
+///
+/// assert!(file_set.is_partial_success());
+/// assert_eq!(file_set.valid.len(), 2);
+/// assert_eq!(file_set.errors.len(), 1);
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct ValidatedFileSet<T> {
+    /// Successfully processed files.
+    pub valid: Vec<T>,
+    /// Files that failed to process with their errors.
+    pub errors: Vec<FileError>,
+}
+
+impl<T> ValidatedFileSet<T> {
+    /// Create an empty file set.
+    pub fn empty() -> Self {
+        Self {
+            valid: Vec::new(),
+            errors: Vec::new(),
+        }
+    }
+
+    /// Create a file set with only valid files.
+    pub fn all_valid(valid: Vec<T>) -> Self {
+        Self {
+            valid,
+            errors: Vec::new(),
+        }
+    }
+
+    /// Create a file set with only errors.
+    pub fn all_errors(errors: Vec<FileError>) -> Self {
+        Self {
+            valid: Vec::new(),
+            errors,
+        }
+    }
+
+    /// Check if there are any errors.
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    /// Check if there are any valid files.
+    pub fn has_valid(&self) -> bool {
+        !self.valid.is_empty()
+    }
+
+    /// Check if this is a partial success (some valid, some errors).
+    pub fn is_partial_success(&self) -> bool {
+        self.has_valid() && self.has_errors()
+    }
+
+    /// Check if all files succeeded.
+    pub fn is_all_success(&self) -> bool {
+        self.has_valid() && !self.has_errors()
+    }
+
+    /// Check if all files failed.
+    pub fn is_all_failed(&self) -> bool {
+        !self.has_valid() && self.has_errors()
+    }
+
+    /// Get the number of successfully processed files.
+    pub fn valid_count(&self) -> usize {
+        self.valid.len()
+    }
+
+    /// Get the number of errors.
+    pub fn error_count(&self) -> usize {
+        self.errors.len()
+    }
+
+    /// Convert to a strict Result (any error = failure).
+    pub fn into_strict_result(self) -> Result<Vec<T>, Vec<FileError>> {
+        if self.errors.is_empty() {
+            Ok(self.valid)
+        } else {
+            Err(self.errors)
+        }
+    }
+
+    /// Convert to a lenient Result (only fail if all files failed).
+    pub fn into_lenient_result(self) -> Result<Vec<T>, Vec<FileError>> {
+        if self.valid.is_empty() && !self.errors.is_empty() {
+            Err(self.errors)
+        } else {
+            Ok(self.valid)
+        }
+    }
+
+    /// Add a valid file to the set.
+    pub fn add_valid(&mut self, item: T) {
+        self.valid.push(item);
+    }
+
+    /// Add an error to the set.
+    pub fn add_error(&mut self, error: FileError) {
+        self.errors.push(error);
+    }
+
+    /// Merge another file set into this one.
+    pub fn merge(&mut self, other: ValidatedFileSet<T>) {
+        self.valid.extend(other.valid);
+        self.errors.extend(other.errors);
+    }
+}
+
+impl<T: Serialize> Serialize for ValidatedFileSet<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        let mut state = serializer.serialize_struct("ValidatedFileSet", 4)?;
+        state.serialize_field("valid_count", &self.valid.len())?;
+        state.serialize_field("error_count", &self.errors.len())?;
+        state.serialize_field("valid", &self.valid)?;
+        state.serialize_field("errors", &self.errors)?;
+        state.end()
+    }
+}
+
+// =============================================================================
+// Field Context Extension Traits
+// =============================================================================
+
+/// Extension trait for adding field context to validations.
+///
+/// This trait extends stillwater's `Validation` type with methods for
+/// attaching field paths to errors.
+pub trait FieldContextExt<T, E> {
+    /// Attach a field path to validation errors.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let validated = validate_threshold(config.threshold)
+    ///     .with_field_path(&FieldPath::new("config.threshold"));
+    /// ```
+    fn with_field_path(self, path: &FieldPath) -> Validation<T, NonEmptyVec<ValidationError>>
+    where
+        E: std::fmt::Display;
+
+    /// Attach a simple field name to validation errors.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let validated = validate_threshold(value)
+    ///     .with_field_name("threshold");
+    /// ```
+    fn with_field_name(self, field: &str) -> Validation<T, NonEmptyVec<ValidationError>>
+    where
+        E: std::fmt::Display;
+}
+
+impl<T, E> FieldContextExt<T, E> for Validation<T, NonEmptyVec<E>> {
+    fn with_field_path(self, path: &FieldPath) -> Validation<T, NonEmptyVec<ValidationError>>
+    where
+        E: std::fmt::Display,
+    {
+        match self {
+            Validation::Success(value) => Validation::Success(value),
+            Validation::Failure(errors) => {
+                let field_errors: Vec<ValidationError> = errors
+                    .into_iter()
+                    .map(|e| ValidationError::at_field(path, e.to_string()))
+                    .collect();
+                Validation::Failure(
+                    NonEmptyVec::from_vec(field_errors).expect("errors came from non-empty vec"),
+                )
+            }
+        }
+    }
+
+    fn with_field_name(self, field: &str) -> Validation<T, NonEmptyVec<ValidationError>>
+    where
+        E: std::fmt::Display,
+    {
+        self.with_field_path(&FieldPath::new(field))
+    }
+}
+
+// Re-export stillwater's field types for convenience
+pub use stillwater::refined::FieldError as StillwaterFieldError;
+
+/// Create a validation that wraps errors with field context using stillwater's FieldError.
+pub fn validate_field<T, E>(
+    field: &'static str,
+    validation: Validation<T, E>,
+) -> Validation<T, FieldError<E>> {
+    validation.with_field(field)
+}
 
 // =============================================================================
 // EnsureExt Trait
@@ -775,6 +1329,343 @@ mod tests {
 
         let invalid = validate_file_length(path, 2000, &rules);
         assert!(invalid.is_failure());
+    }
+
+    // =========================================================================
+    // Field Context Tests (Spec 003)
+    // =========================================================================
+
+    #[test]
+    fn test_field_path_root() {
+        let path = FieldPath::root();
+        assert!(path.is_root());
+        assert!(path.is_empty());
+        assert_eq!(path.len(), 0);
+        assert_eq!(path.as_string(), "");
+    }
+
+    #[test]
+    fn test_field_path_single() {
+        let path = FieldPath::new("config");
+        assert!(!path.is_root());
+        assert_eq!(path.len(), 1);
+        assert_eq!(path.as_string(), "config");
+        assert_eq!(path.last(), Some("config"));
+    }
+
+    #[test]
+    fn test_field_path_nested() {
+        let path = FieldPath::root()
+            .push("config")
+            .push("thresholds")
+            .push("cyclomatic");
+        assert_eq!(path.len(), 3);
+        assert_eq!(path.as_string(), "config.thresholds.cyclomatic");
+        assert_eq!(path.last(), Some("cyclomatic"));
+        assert_eq!(path.segments(), &["config", "thresholds", "cyclomatic"]);
+    }
+
+    #[test]
+    fn test_field_path_display() {
+        let path = FieldPath::new("config").push("value");
+        assert_eq!(format!("{}", path), "config.value");
+    }
+
+    #[test]
+    fn test_field_path_from_str() {
+        let path: FieldPath = "config".into();
+        assert_eq!(path.as_string(), "config");
+    }
+
+    #[test]
+    fn test_validation_error_at_field() {
+        let path = FieldPath::new("threshold");
+        let error = ValidationError::at_field(&path, "must be positive");
+        assert_eq!(error.field.as_string(), "threshold");
+        assert_eq!(error.message, "must be positive");
+        assert!(error.expected.is_none());
+        assert!(error.actual.is_none());
+    }
+
+    #[test]
+    fn test_validation_error_for_field() {
+        let error = ValidationError::for_field("coverage", "out of range");
+        assert_eq!(error.field.as_string(), "coverage");
+        assert_eq!(error.message, "out of range");
+    }
+
+    #[test]
+    fn test_validation_error_with_context() {
+        let error = ValidationError::for_field("threshold", "invalid value")
+            .with_context("positive integer", "-5");
+        assert_eq!(error.expected, Some("positive integer".to_string()));
+        assert_eq!(error.actual, Some("-5".to_string()));
+    }
+
+    #[test]
+    fn test_validation_error_display() {
+        let error = ValidationError::for_field("config.threshold", "must be positive")
+            .with_context("positive", "negative");
+        let display = format!("{}", error);
+        assert!(display.contains("config.threshold"));
+        assert!(display.contains("must be positive"));
+        assert!(display.contains("expected: positive"));
+        assert!(display.contains("got: negative"));
+    }
+
+    #[test]
+    fn test_validation_error_display_no_context() {
+        let error = ValidationError::for_field("name", "required");
+        assert_eq!(format!("{}", error), "name: required");
+    }
+
+    #[test]
+    fn test_validation_error_display_root_path() {
+        let error = ValidationError::at_field(&FieldPath::root(), "general error");
+        assert_eq!(format!("{}", error), "general error");
+    }
+
+    #[test]
+    fn test_validation_error_serialization() {
+        let error = ValidationError::for_field("threshold", "invalid").with_context(">=0", "-1");
+        let json = serde_json::to_string(&error).unwrap();
+        assert!(json.contains("\"field\""));
+        assert!(json.contains("\"message\""));
+        assert!(json.contains("\"expected\""));
+        assert!(json.contains("\"actual\""));
+    }
+
+    #[test]
+    fn test_file_error_new() {
+        let error = FileError::new(PathBuf::from("src/main.rs"), "parse error");
+        assert_eq!(error.path, PathBuf::from("src/main.rs"));
+        assert_eq!(error.message, "parse error");
+        assert!(error.line.is_none());
+        assert!(error.column.is_none());
+        assert!(error.error_code.is_none());
+    }
+
+    #[test]
+    fn test_file_error_at_location() {
+        let error =
+            FileError::new(PathBuf::from("test.rs"), "unexpected token").at_location(42, 15);
+        assert_eq!(error.line, Some(42));
+        assert_eq!(error.column, Some(15));
+    }
+
+    #[test]
+    fn test_file_error_at_line() {
+        let error = FileError::new(PathBuf::from("test.rs"), "missing semicolon").at_line(10);
+        assert_eq!(error.line, Some(10));
+        assert!(error.column.is_none());
+    }
+
+    #[test]
+    fn test_file_error_with_code() {
+        let error = FileError::new(PathBuf::from("test.rs"), "syntax error").with_code("E010");
+        assert_eq!(error.error_code, Some("E010".to_string()));
+    }
+
+    #[test]
+    fn test_file_error_display() {
+        let error = FileError::new(PathBuf::from("src/lib.rs"), "unexpected eof")
+            .at_location(100, 25)
+            .with_code("E010");
+        let display = format!("{}", error);
+        assert!(display.contains("src/lib.rs"));
+        assert!(display.contains(":100:25"));
+        assert!(display.contains("unexpected eof"));
+        assert!(display.contains("[E010]"));
+    }
+
+    #[test]
+    fn test_file_error_display_no_location() {
+        let error = FileError::new(PathBuf::from("test.rs"), "general error");
+        let display = format!("{}", error);
+        assert_eq!(display, "test.rs: general error");
+    }
+
+    #[test]
+    fn test_file_error_serialization() {
+        let error = FileError::new(PathBuf::from("test.rs"), "error")
+            .at_location(10, 5)
+            .with_code("E001");
+        let json = serde_json::to_string(&error).unwrap();
+        assert!(json.contains("\"path\""));
+        assert!(json.contains("\"line\""));
+        assert!(json.contains("\"column\""));
+        assert!(json.contains("\"message\""));
+        assert!(json.contains("\"error_code\""));
+    }
+
+    #[test]
+    fn test_validated_file_set_empty() {
+        let set: ValidatedFileSet<String> = ValidatedFileSet::empty();
+        assert!(!set.has_valid());
+        assert!(!set.has_errors());
+        assert!(!set.is_partial_success());
+        assert!(!set.is_all_success());
+        assert!(!set.is_all_failed());
+    }
+
+    #[test]
+    fn test_validated_file_set_all_valid() {
+        let set = ValidatedFileSet::all_valid(vec!["file1".to_string(), "file2".to_string()]);
+        assert!(set.has_valid());
+        assert!(!set.has_errors());
+        assert!(set.is_all_success());
+        assert!(!set.is_partial_success());
+        assert!(!set.is_all_failed());
+        assert_eq!(set.valid_count(), 2);
+        assert_eq!(set.error_count(), 0);
+    }
+
+    #[test]
+    fn test_validated_file_set_all_errors() {
+        let set: ValidatedFileSet<String> = ValidatedFileSet::all_errors(vec![
+            FileError::new("a.rs", "error1"),
+            FileError::new("b.rs", "error2"),
+        ]);
+        assert!(!set.has_valid());
+        assert!(set.has_errors());
+        assert!(set.is_all_failed());
+        assert!(!set.is_partial_success());
+        assert!(!set.is_all_success());
+        assert_eq!(set.valid_count(), 0);
+        assert_eq!(set.error_count(), 2);
+    }
+
+    #[test]
+    fn test_validated_file_set_partial_success() {
+        let set = ValidatedFileSet {
+            valid: vec!["good.rs".to_string()],
+            errors: vec![FileError::new("bad.rs", "parse error")],
+        };
+        assert!(set.has_valid());
+        assert!(set.has_errors());
+        assert!(set.is_partial_success());
+        assert!(!set.is_all_success());
+        assert!(!set.is_all_failed());
+    }
+
+    #[test]
+    fn test_validated_file_set_into_strict_result() {
+        let success_set = ValidatedFileSet::all_valid(vec!["ok".to_string()]);
+        assert!(success_set.into_strict_result().is_ok());
+
+        let partial_set = ValidatedFileSet {
+            valid: vec!["ok".to_string()],
+            errors: vec![FileError::new("bad.rs", "error")],
+        };
+        assert!(partial_set.into_strict_result().is_err());
+    }
+
+    #[test]
+    fn test_validated_file_set_into_lenient_result() {
+        let partial_set = ValidatedFileSet {
+            valid: vec!["ok".to_string()],
+            errors: vec![FileError::new("bad.rs", "error")],
+        };
+        assert!(partial_set.into_lenient_result().is_ok());
+
+        let all_failed: ValidatedFileSet<String> =
+            ValidatedFileSet::all_errors(vec![FileError::new("bad.rs", "error")]);
+        assert!(all_failed.into_lenient_result().is_err());
+    }
+
+    #[test]
+    fn test_validated_file_set_add_operations() {
+        let mut set: ValidatedFileSet<String> = ValidatedFileSet::empty();
+        set.add_valid("file1".to_string());
+        set.add_error(FileError::new("bad.rs", "error"));
+        assert!(set.is_partial_success());
+        assert_eq!(set.valid_count(), 1);
+        assert_eq!(set.error_count(), 1);
+    }
+
+    #[test]
+    fn test_validated_file_set_merge() {
+        let mut set1: ValidatedFileSet<String> = ValidatedFileSet::all_valid(vec!["a".to_string()]);
+        let set2 = ValidatedFileSet {
+            valid: vec!["b".to_string()],
+            errors: vec![FileError::new("c.rs", "error")],
+        };
+        set1.merge(set2);
+        assert_eq!(set1.valid_count(), 2);
+        assert_eq!(set1.error_count(), 1);
+    }
+
+    #[test]
+    fn test_validated_file_set_serialization() {
+        let set = ValidatedFileSet {
+            valid: vec!["file1".to_string()],
+            errors: vec![FileError::new("bad.rs", "error")],
+        };
+        let json = serde_json::to_string(&set).unwrap();
+        assert!(json.contains("\"valid_count\":1"));
+        assert!(json.contains("\"error_count\":1"));
+        assert!(json.contains("\"valid\""));
+        assert!(json.contains("\"errors\""));
+    }
+
+    #[test]
+    fn test_field_context_ext_with_field_path() {
+        let validation: Validation<u32, NonEmptyVec<String>> =
+            Validation::Failure(NonEmptyVec::new("error message".to_string(), vec![]));
+
+        let path = FieldPath::new("config").push("threshold");
+        let result = validation.with_field_path(&path);
+
+        match result {
+            Validation::Failure(errors) => {
+                let err = errors.head();
+                assert_eq!(err.field.as_string(), "config.threshold");
+                assert!(err.message.contains("error message"));
+            }
+            _ => panic!("Expected failure"),
+        }
+    }
+
+    #[test]
+    fn test_field_context_ext_with_field_name() {
+        let validation: Validation<u32, NonEmptyVec<String>> =
+            Validation::Failure(NonEmptyVec::new("too large".to_string(), vec![]));
+
+        let result = validation.with_field_name("complexity");
+
+        match result {
+            Validation::Failure(errors) => {
+                let err = errors.head();
+                assert_eq!(err.field.as_string(), "complexity");
+            }
+            _ => panic!("Expected failure"),
+        }
+    }
+
+    #[test]
+    fn test_field_context_ext_success_passthrough() {
+        let validation: Validation<u32, NonEmptyVec<String>> = Validation::Success(42);
+        let result = validation.with_field_name("value");
+
+        match result {
+            Validation::Success(v) => assert_eq!(v, 42),
+            _ => panic!("Expected success"),
+        }
+    }
+
+    #[test]
+    fn test_validate_field_with_stillwater() {
+        // Test that we can use stillwater's with_field via our wrapper
+        let validation: Validation<u32, String> = Validation::Failure("test error".to_string());
+        let result = validate_field("my_field", validation);
+
+        match result {
+            Validation::Failure(field_error) => {
+                assert_eq!(field_error.field, "my_field");
+                assert_eq!(field_error.error, "test error");
+            }
+            _ => panic!("Expected failure"),
+        }
     }
 
     // =========================================================================
