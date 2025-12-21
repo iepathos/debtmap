@@ -21,6 +21,7 @@
 
 pub mod actions;
 pub mod app;
+pub mod detail_actions;
 pub mod detail_page;
 pub mod detail_pages;
 pub mod detail_view;
