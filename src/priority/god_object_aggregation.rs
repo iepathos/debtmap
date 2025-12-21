@@ -418,10 +418,7 @@ pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<Entro
         dampening_was_applied: dampening_factor < 1.0,
         original_complexity: total_cognitive,
         adjusted_complexity,
-        reasoning: vec![format!(
-            "Aggregated from {} functions",
-            functions.len()
-        )],
+        reasoning: vec![format!("Aggregated from {} functions", functions.len())],
     })
 }
 

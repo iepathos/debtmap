@@ -8,11 +8,12 @@
 //! - Pure action determination in `list_actions` module
 //! - Imperative shell (this module) executes the actions
 
+use super::detail_actions::{classify_detail_key, DetailAction, DetailActionContext};
 use super::filter::{CoverageFilter, Filter, SeverityFilter};
 use super::list_actions::{determine_list_action, ListAction, ListActionContext};
 use super::nav_state::can_enter_help;
 use super::sort::SortCriteria;
-use super::{app::ResultsApp, detail_page::DetailPage, page_availability, view_mode::ViewMode};
+use super::{app::ResultsApp, page_availability, view_mode::ViewMode};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -130,16 +131,36 @@ fn execute_list_action(app: &mut ResultsApp, action: ListAction) -> Result<bool>
     Ok(false)
 }
 
-/// Handle keys in detail view
+/// Handle keys in detail view.
+///
+/// Uses the Stillwater pattern: pure action determination + imperative execution.
+/// The `classify_detail_key` function is pure and testable; this function
+/// is the thin imperative shell that executes the determined action.
 fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
-    match key.code {
-        // Back - use history-based navigation
-        KeyCode::Esc | KeyCode::Char('q') => {
+    // Build context for pure action determination
+    let ctx = DetailActionContext::new(app.nav().detail_page);
+
+    // Pure function call - determine which action to take
+    let Some(action) = classify_detail_key(key, ctx) else {
+        return Ok(false);
+    };
+
+    // Imperative shell - execute the action
+    execute_detail_action(app, action)
+}
+
+/// Execute a detail action (imperative shell).
+///
+/// This function contains all the side effects for detail view actions.
+/// It's kept separate from the pure action determination to maintain
+/// clear boundaries between pure logic and effects.
+fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<bool> {
+    match action {
+        DetailAction::NavigateBack => {
             navigate_back(app);
         }
 
-        // Page navigation (only cycles through available pages)
-        KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
+        DetailAction::NextPage => {
             let new_page = page_availability::next_available_page(
                 app.nav().detail_page,
                 app.selected_item(),
@@ -147,7 +168,8 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             );
             app.nav_mut().detail_page = new_page;
         }
-        KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => {
+
+        DetailAction::PrevPage => {
             let new_page = page_availability::prev_available_page(
                 app.nav().detail_page,
                 app.selected_item(),
@@ -156,145 +178,69 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
             app.nav_mut().detail_page = new_page;
         }
 
-        // Jump to specific page (only if available)
-        KeyCode::Char('1') => {
+        DetailAction::JumpToPage(page) => {
             if page_availability::is_page_available(
-                DetailPage::Overview,
+                page,
                 app.selected_item(),
                 &app.analysis().data_flow_graph,
             ) {
-                app.nav_mut().detail_page = DetailPage::Overview;
-            }
-        }
-        KeyCode::Char('2') => {
-            if page_availability::is_page_available(
-                DetailPage::ScoreBreakdown,
-                app.selected_item(),
-                &app.analysis().data_flow_graph,
-            ) {
-                app.nav_mut().detail_page = DetailPage::ScoreBreakdown;
-            }
-        }
-        KeyCode::Char('3') => {
-            if page_availability::is_page_available(
-                DetailPage::Context,
-                app.selected_item(),
-                &app.analysis().data_flow_graph,
-            ) {
-                app.nav_mut().detail_page = DetailPage::Context;
-            }
-        }
-        KeyCode::Char('4') => {
-            if page_availability::is_page_available(
-                DetailPage::Dependencies,
-                app.selected_item(),
-                &app.analysis().data_flow_graph,
-            ) {
-                app.nav_mut().detail_page = DetailPage::Dependencies;
-            }
-        }
-        KeyCode::Char('5') => {
-            if page_availability::is_page_available(
-                DetailPage::GitContext,
-                app.selected_item(),
-                &app.analysis().data_flow_graph,
-            ) {
-                app.nav_mut().detail_page = DetailPage::GitContext;
-            }
-        }
-        KeyCode::Char('6') => {
-            if page_availability::is_page_available(
-                DetailPage::Patterns,
-                app.selected_item(),
-                &app.analysis().data_flow_graph,
-            ) {
-                app.nav_mut().detail_page = DetailPage::Patterns;
-            }
-        }
-        KeyCode::Char('7') => {
-            if page_availability::is_page_available(
-                DetailPage::DataFlow,
-                app.selected_item(),
-                &app.analysis().data_flow_graph,
-            ) {
-                app.nav_mut().detail_page = DetailPage::DataFlow;
-            }
-        }
-        KeyCode::Char('8') => {
-            if page_availability::is_page_available(
-                DetailPage::Responsibilities,
-                app.selected_item(),
-                &app.analysis().data_flow_graph,
-            ) {
-                app.nav_mut().detail_page = DetailPage::Responsibilities;
+                app.nav_mut().detail_page = page;
             }
         }
 
-        // Navigate to next/previous item (preserve page if available)
-        KeyCode::Down | KeyCode::Char('j') => {
-            move_selection(app, 1);
-            ensure_valid_page(app);
-        }
-        KeyCode::Up | KeyCode::Char('k') => {
-            move_selection(app, -1);
+        DetailAction::MoveSelection(delta) => {
+            move_selection(app, delta as isize);
             ensure_valid_page(app);
         }
 
-        // Actions
-        KeyCode::Char('c') => {
+        DetailAction::CopyContext => {
             if let Some(item) = app.selected_item() {
-                // On Context page, 'c' copies all context ranges
-                if app.nav().detail_page == DetailPage::Context {
-                    if let Some(ref context) = item.context_suggestion {
-                        use super::detail_pages::context::format_context_for_clipboard;
-                        let text = format_context_for_clipboard(context);
-                        let message = super::actions::clipboard::copy_to_clipboard(
-                            &text,
-                            "all context ranges",
-                        )?;
-                        app.set_status_message(message);
-                    } else {
-                        app.set_status_message("No context data available".to_string());
-                    }
-                } else {
-                    // On other pages, copy page content
-                    let detail_page = app.nav().detail_page;
-                    let message = super::actions::copy_page_to_clipboard(item, detail_page, app)?;
+                if let Some(ref context) = item.context_suggestion {
+                    use super::detail_pages::context::format_context_for_clipboard;
+                    let text = format_context_for_clipboard(context);
+                    let message =
+                        super::actions::clipboard::copy_to_clipboard(&text, "all context ranges")?;
                     app.set_status_message(message);
+                } else {
+                    app.set_status_message("No context data available".to_string());
                 }
             }
         }
-        KeyCode::Char('p') => {
-            // On Context page, 'p' copies primary range only
-            if app.nav().detail_page == DetailPage::Context {
-                if let Some(item) = app.selected_item() {
-                    if let Some(ref context) = item.context_suggestion {
-                        use super::detail_pages::context::format_primary_for_clipboard;
-                        let text = format_primary_for_clipboard(context);
-                        let message =
-                            super::actions::clipboard::copy_to_clipboard(&text, "primary range")?;
-                        app.set_status_message(message);
-                    } else {
-                        app.set_status_message("No context data available".to_string());
-                    }
+
+        DetailAction::CopyPrimary => {
+            if let Some(item) = app.selected_item() {
+                if let Some(ref context) = item.context_suggestion {
+                    use super::detail_pages::context::format_primary_for_clipboard;
+                    let text = format_primary_for_clipboard(context);
+                    let message =
+                        super::actions::clipboard::copy_to_clipboard(&text, "primary range")?;
+                    app.set_status_message(message);
+                } else {
+                    app.set_status_message("No context data available".to_string());
                 }
             }
         }
-        KeyCode::Char('e') | KeyCode::Char('o') => {
+
+        DetailAction::CopyPage => {
+            if let Some(item) = app.selected_item() {
+                let detail_page = app.nav().detail_page;
+                let message = super::actions::copy_page_to_clipboard(item, detail_page, app)?;
+                app.set_status_message(message);
+            }
+        }
+
+        DetailAction::OpenInEditor => {
             if let Some(item) = app.selected_item() {
                 super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;
-                app.request_redraw(); // Force redraw after editor suspends/resumes TUI
+                app.request_redraw();
             }
         }
 
-        // Help - guarded transition with history
-        KeyCode::Char('?') => {
+        DetailAction::ShowHelp => {
             if can_enter_help(app.nav().view_mode) {
                 app.nav_mut().push_and_set_view(ViewMode::Help);
             }
         }
-
-        _ => {}
     }
 
     Ok(false)
