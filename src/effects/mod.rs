@@ -59,6 +59,29 @@
 //! let summary: AnalysisSummary = metrics.into();
 //! ```
 //!
+//! # Sink Effect for Report Streaming (Spec 003)
+//!
+//! The [`sink`] submodule provides the Sink Effect pattern for streaming analysis
+//! reports with O(1) memory overhead:
+//!
+//! - [`sink::ReportLine`]: Report line types (JSON, text, header, separator)
+//! - [`sink::emit_report_line`]: Emit a single report line
+//! - [`sink::emit_json_line`]: Emit a JSON Lines formatted line
+//! - [`sink::run_with_file_sink`]: Execute with file output
+//! - [`sink::run_with_stdout_sink`]: Execute with stdout output
+//!
+//! ```rust,ignore
+//! use debtmap::effects::sink::{emit_header, emit_json_line, run_with_file_sink};
+//! use stillwater::effect::sink::prelude::*;
+//!
+//! // Stream results as they're generated
+//! let effect = emit_header::<AnalysisError, ()>("Analysis Results")
+//!     .and_then(|_| emit_json_line(&file_metrics));
+//!
+//! // Execute with file sink - constant memory
+//! run_with_file_sink(effect, output_path, &()).await?;
+//! ```
+//!
 //! ## Reader Pattern Benefits
 //!
 //! **Before (parameter threading):**
@@ -121,6 +144,7 @@ pub mod combinators;
 mod core;
 pub mod io;
 pub mod progress;
+pub mod sink;
 pub mod telemetry;
 
 // Re-export everything from core

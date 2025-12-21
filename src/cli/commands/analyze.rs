@@ -109,6 +109,8 @@ pub fn extract_analyze_params(
         show_splits,
         no_tui,
         quiet: _,
+        streaming: _,
+        stream_to: _,
         show_filter_stats,
     } = command
     {

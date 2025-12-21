@@ -149,6 +149,8 @@ mod tests {
             show_splits: false,
             no_tui: false,
             quiet: false,
+            streaming: false,
+            stream_to: None,
             show_filter_stats: false,
         };
 
