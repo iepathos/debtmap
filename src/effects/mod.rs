@@ -32,6 +32,33 @@
 //! - [`progress::par_traverse_with_progress`]: Parallel traversal with atomic progress
 //! - [`progress::report_progress`]: Direct progress reporting effect
 //!
+//! # Writer Effect for Telemetry (Spec 002)
+//!
+//! The [`telemetry`] submodule provides the Writer Effect pattern for collecting
+//! analysis telemetry without threading state through function parameters:
+//!
+//! - [`telemetry::AnalysisEvent`]: Events emitted during analysis
+//! - [`telemetry::AnalysisMetrics`]: Collection of events with Monoid accumulation
+//! - [`telemetry::AnalysisSummary`]: Aggregated summary statistics
+//! - [`telemetry::tell_event`]: Emit a single telemetry event
+//! - [`telemetry::tell_events`]: Emit multiple telemetry events
+//!
+//! ```rust,ignore
+//! use debtmap::effects::telemetry::{tell_event, AnalysisEvent, AnalysisMetrics};
+//! use stillwater::WriterEffectExt;
+//!
+//! // Emit telemetry alongside computation
+//! let effect = tell_event(AnalysisEvent::file_started(path.clone()))
+//!     .and_then(|_| do_analysis(path))
+//!     .tap_tell(|result| AnalysisMetrics::event(
+//!         AnalysisEvent::file_completed(path, result.duration_ms)
+//!     ));
+//!
+//! // Collect all events
+//! let (result, metrics) = effect.run_writer(&env).await;
+//! let summary: AnalysisSummary = metrics.into();
+//! ```
+//!
 //! ## Reader Pattern Benefits
 //!
 //! **Before (parameter threading):**
@@ -94,6 +121,7 @@ pub mod combinators;
 mod core;
 pub mod io;
 pub mod progress;
+pub mod telemetry;
 
 // Re-export everything from core
 pub use core::*;
