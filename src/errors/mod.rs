@@ -1,8 +1,24 @@
-//! Unified error types for debtmap analysis operations.
+//! Unified error types for debtmap analysis operations (DEPRECATED).
+//!
+//! **DEPRECATED**: This module's `AnalysisError` type is deprecated in favor of
+//! [`crate::debtmap_error::DebtmapError`]. The types here are maintained for backwards
+//! compatibility during migration. New code should use [`DebtmapError`](crate::debtmap_error::DebtmapError).
 //!
 //! This module provides error types that bridge between anyhow's dynamic errors
 //! and stillwater's structured effect system. The design allows gradual migration
 //! from anyhow to effect-based error handling while maintaining backwards compatibility.
+//!
+//! # Migration
+//!
+//! All types in this module implement `Into<DebtmapError>` for gradual migration:
+//!
+//! ```rust,ignore
+//! use debtmap::errors::AnalysisError;
+//! use debtmap::debtmap_error::DebtmapError;
+//!
+//! let old_error = AnalysisError::io("Failed to read file");
+//! let new_error: DebtmapError = old_error.into();
+//! ```
 //!
 //! # Design Philosophy
 //!

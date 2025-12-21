@@ -1,4 +1,20 @@
-//! Shared error types for the application
+//! Shared error types for the application (DEPRECATED).
+//!
+//! **DEPRECATED**: This module's `Error` type is deprecated in favor of
+//! [`crate::debtmap_error::DebtmapError`]. The types here are maintained for backwards
+//! compatibility during migration. New code should use [`DebtmapError`](crate::debtmap_error::DebtmapError).
+//!
+//! # Migration
+//!
+//! All types in this module implement `Into<DebtmapError>` for gradual migration:
+//!
+//! ```rust,ignore
+//! use debtmap::core::errors::Error;
+//! use debtmap::debtmap_error::DebtmapError;
+//!
+//! let old_error = Error::file_system("Not found", "/path");
+//! let new_error: DebtmapError = old_error.into();
+//! ```
 
 use std::path::PathBuf;
 use thiserror::Error;
