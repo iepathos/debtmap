@@ -1,12 +1,12 @@
 //! Patterns page (Page 4) - Detected patterns and pattern analysis.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
+use crate::complexity::EntropyAnalysis;
 use crate::core::LanguageSpecificData;
 use crate::organization::anti_pattern_detector::{AntiPattern, AntiPatternSeverity};
 use crate::organization::god_object::GodObjectAnalysis;
 use crate::organization::AntiPatternReport;
 use crate::output::PatternAnalysis;
-use crate::complexity::EntropyAnalysis;
 use crate::priority::detected_pattern::DetectedPattern;
 use crate::priority::UnifiedDebtItem;
 use crate::tui::results::app::ResultsApp;

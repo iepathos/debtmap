@@ -309,60 +309,111 @@ impl FrameworkDetector {
     }
 }
 
-/// Parse TOML configuration into framework patterns
+/// Parse TOML configuration into framework patterns (entry point)
+///
+/// Parses TOML config with nested structure like:
+/// ```toml
+/// [rust.web.axum]
+/// name = "Axum Web Framework"
+/// category = "HTTP Request Handler"
+/// patterns = [...]
+/// ```
 fn parse_config_into_patterns(
     config: &toml::Value,
 ) -> Result<HashMap<Language, Vec<FrameworkPattern>>> {
-    let mut patterns: HashMap<Language, Vec<FrameworkPattern>> = HashMap::new();
+    config
+        .as_table()
+        .ok_or_else(|| anyhow::anyhow!("Config must be a TOML table"))?
+        .iter()
+        .try_fold(
+            HashMap::<Language, Vec<FrameworkPattern>>::new(),
+            |mut acc, (lang_key, lang_value)| {
+                let (language, patterns) = parse_language_patterns(lang_key, lang_value)?;
+                acc.entry(language).or_default().extend(patterns);
+                Ok(acc)
+            },
+        )
+}
 
-    if let Some(table) = config.as_table() {
-        for (lang_key, lang_value) in table {
-            let language = Language::parse(lang_key)?;
+/// Parse patterns for a single language
+fn parse_language_patterns(
+    lang_key: &str,
+    lang_value: &toml::Value,
+) -> Result<(Language, Vec<FrameworkPattern>)> {
+    let language =
+        Language::parse(lang_key).context(format!("Invalid language key: {}", lang_key))?;
 
-            // Navigate through nested tables (e.g., rust.web.axum)
-            if let Some(category_table) = lang_value.as_table() {
-                for (_category_key, framework_table) in category_table {
-                    if let Some(framework_items) = framework_table.as_table() {
-                        for (_framework_key, pattern_value) in framework_items {
-                            // Deserialize directly from toml::Value instead of string roundtrip
-                            match pattern_value.clone().try_into::<FrameworkPattern>() {
-                                Ok(framework_pattern) => {
-                                    patterns
-                                        .entry(language)
-                                        .or_default()
-                                        .push(framework_pattern);
-                                }
-                                Err(e) => {
-                                    eprintln!(
-                                        "Warning: Failed to parse framework pattern for {}: {}",
-                                        lang_key, e
-                                    );
-                                    // Might be a direct framework definition, try parsing this level
-                                    continue;
-                                }
-                            }
-                        }
-                    } else {
-                        // Try parsing at this level (rust.testing case)
-                        match framework_table.clone().try_into::<FrameworkPattern>() {
-                            Ok(framework_pattern) => {
-                                patterns
-                                    .entry(language)
-                                    .or_default()
-                                    .push(framework_pattern);
-                            }
-                            Err(e) => {
-                                eprintln!("Warning: Failed to parse framework pattern at category level for {}: {}", lang_key, e);
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
+    let patterns = lang_value
+        .as_table()
+        .ok_or_else(|| anyhow::anyhow!("Language '{}' must be a table", lang_key))?
+        .iter()
+        .flat_map(|(category, value)| parse_category_patterns(lang_key, category, value))
+        .collect();
+
+    Ok((language, patterns))
+}
+
+/// Parse patterns from a category (e.g., "web", "testing")
+///
+/// Supports both nested configs:
+/// ```toml
+/// [rust.web.axum]
+/// name = "axum"
+/// ```
+///
+/// And flat configs:
+/// ```toml
+/// [rust.testing]
+/// name = "testing"
+/// ```
+fn parse_category_patterns(
+    lang_key: &str,
+    category_key: &str,
+    category_value: &toml::Value,
+) -> Vec<FrameworkPattern> {
+    // Try as table of frameworks first
+    if let Some(frameworks) = category_value.as_table() {
+        let nested: Vec<_> = frameworks
+            .iter()
+            .filter_map(|(name, value)| parse_single_pattern(lang_key, category_key, name, value))
+            .collect();
+
+        if !nested.is_empty() {
+            return nested;
         }
     }
 
-    Ok(patterns)
+    // Fall back to parsing the category itself as a pattern
+    parse_single_pattern(lang_key, "", category_key, category_value)
+        .into_iter()
+        .collect()
+}
+
+/// Parse a single framework pattern with error context
+fn parse_single_pattern(
+    lang: &str,
+    category: &str,
+    name: &str,
+    value: &toml::Value,
+) -> Option<FrameworkPattern> {
+    value
+        .clone()
+        .try_into::<FrameworkPattern>()
+        .map_err(|e| {
+            let path = build_toml_path(lang, category, name);
+            eprintln!("Warning: Failed to parse pattern at {}: {}", path, e);
+            e
+        })
+        .ok()
+}
+
+/// Build TOML path string for error messages
+fn build_toml_path(lang: &str, category: &str, name: &str) -> String {
+    if category.is_empty() {
+        format!("{}.{}", lang, name)
+    } else {
+        format!("{}.{}.{}", lang, category, name)
+    }
 }
 
 #[cfg(test)]
@@ -452,9 +503,6 @@ patterns = [
         let config: toml::Value = toml::from_str(toml_str).unwrap();
         let patterns = parse_config_into_patterns(&config).unwrap();
 
-        eprintln!("Parsed patterns: {:?}", patterns);
-        eprintln!("Keys: {:?}", patterns.keys().collect::<Vec<_>>());
-
         assert!(
             patterns.contains_key(&Language::Rust),
             "Should have Rust patterns"
@@ -464,5 +512,132 @@ patterns = [
         assert_eq!(rust_patterns[0].name, "Axum Web Framework");
         assert_eq!(rust_patterns[0].category, "HTTP Request Handler");
         assert_eq!(rust_patterns[0].patterns.len(), 2);
+    }
+
+    // Tests for refactored pure parsing functions
+
+    #[test]
+    fn test_parse_single_valid_pattern() {
+        let toml_str = r#"
+name = "axum"
+category = "web"
+patterns = [{ type = "import", pattern = "axum" }]
+"#;
+        let value: toml::Value = toml::from_str(toml_str).unwrap();
+        let pattern = parse_single_pattern("rust", "web", "axum", &value);
+        assert!(pattern.is_some());
+        let p = pattern.unwrap();
+        assert_eq!(p.name, "axum");
+        assert_eq!(p.category, "web");
+    }
+
+    #[test]
+    fn test_parse_single_invalid_pattern_returns_none() {
+        let value = toml::Value::String("not a pattern".into());
+        let pattern = parse_single_pattern("rust", "web", "bad", &value);
+        assert!(pattern.is_none());
+    }
+
+    #[test]
+    fn test_parse_category_patterns_nested() {
+        let toml_str = r#"
+[axum]
+name = "axum"
+category = "web framework"
+patterns = [{ type = "import", pattern = "axum" }]
+
+[actix]
+name = "actix"
+category = "web framework"
+patterns = [{ type = "import", pattern = "actix" }]
+"#;
+        let config: toml::Value = toml::from_str(toml_str).unwrap();
+        let patterns = parse_category_patterns("rust", "web", &config);
+        assert_eq!(patterns.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_category_patterns_flat() {
+        let toml_str = r#"
+name = "testing"
+category = "test framework"
+patterns = [{ type = "name", pattern = "^test_" }]
+"#;
+        let config: toml::Value = toml::from_str(toml_str).unwrap();
+        let patterns = parse_category_patterns("rust", "testing", &config);
+        assert_eq!(patterns.len(), 1);
+        assert_eq!(patterns[0].name, "testing");
+    }
+
+    #[test]
+    fn test_parse_language_patterns() {
+        let toml_str = r#"
+[web.axum]
+name = "axum"
+category = "web"
+patterns = [{ type = "import", pattern = "axum" }]
+"#;
+        let config: toml::Value = toml::from_str(toml_str).unwrap();
+        let (lang, patterns) = parse_language_patterns("rust", &config).unwrap();
+        assert_eq!(lang, Language::Rust);
+        assert!(!patterns.is_empty());
+    }
+
+    #[test]
+    fn test_parse_language_patterns_invalid_language() {
+        let toml_str = r#"
+[web.axum]
+name = "axum"
+category = "web"
+patterns = []
+"#;
+        let config: toml::Value = toml::from_str(toml_str).unwrap();
+        let result = parse_language_patterns("unknown_lang", &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_toml_path_with_category() {
+        let path = build_toml_path("rust", "web", "axum");
+        assert_eq!(path, "rust.web.axum");
+    }
+
+    #[test]
+    fn test_build_toml_path_without_category() {
+        let path = build_toml_path("rust", "", "testing");
+        assert_eq!(path, "rust.testing");
+    }
+
+    #[test]
+    fn test_parse_config_not_table_returns_error() {
+        let config = toml::Value::String("not a table".into());
+        let result = parse_config_into_patterns(&config);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must be a TOML table"));
+    }
+
+    #[test]
+    fn test_parse_multiple_languages() {
+        let toml_str = r#"
+[rust.web.axum]
+name = "axum"
+category = "web"
+patterns = [{ type = "import", pattern = "axum" }]
+
+[python.testing.pytest]
+name = "pytest"
+category = "testing"
+patterns = [{ type = "decorator", pattern = "@pytest" }]
+"#;
+        let config: toml::Value = toml::from_str(toml_str).unwrap();
+        let patterns = parse_config_into_patterns(&config).unwrap();
+
+        assert!(patterns.contains_key(&Language::Rust));
+        assert!(patterns.contains_key(&Language::Python));
+        assert_eq!(patterns[&Language::Rust].len(), 1);
+        assert_eq!(patterns[&Language::Python].len(), 1);
     }
 }
