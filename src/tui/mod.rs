@@ -35,7 +35,7 @@ pub mod results;
 pub mod theme;
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -58,83 +58,97 @@ pub struct TuiManager {
 
 impl TuiManager {
     /// Create a new TUI manager and initialize the terminal
+    ///
+    /// Following Stillwater's composition principle, initialization is split into:
+    /// 1. Terminal setup (I/O shell)
+    /// 2. Signal handler thread (extracted)
+    /// 3. Render thread (extracted)
     pub fn new() -> io::Result<Self> {
+        // Phase 1: Terminal initialization (I/O shell)
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen)?;
 
         let backend = CrosstermBackend::new(stdout);
-        let terminal = Terminal::new(backend)?;
-
+        let terminal = Arc::new(Mutex::new(Terminal::new(backend)?));
         let should_exit = Arc::new(AtomicBool::new(false));
-        let terminal = Arc::new(Mutex::new(terminal));
         let app = Arc::new(Mutex::new(App::new()));
 
-        // Setup signal handlers for Ctrl+C and Ctrl+Z
-        let exit_flag = should_exit.clone();
-        std::thread::spawn(move || {
-            loop {
-                if exit_flag.load(Ordering::Relaxed) {
-                    break;
-                }
+        // Phase 2: Start signal handler thread
+        Self::spawn_signal_handler(should_exit.clone());
 
-                // Poll for events with a timeout
-                if event::poll(std::time::Duration::from_millis(100)).unwrap_or(false) {
-                    if let Ok(Event::Key(key)) = event::read() {
-                        // Handle Ctrl+C or Ctrl+Z
-                        if key.code == KeyCode::Char('c')
-                            && key.modifiers.contains(KeyModifiers::CONTROL)
-                        {
-                            // Attempt cleanup before exiting
-                            let _ = disable_raw_mode();
-                            let _ = execute!(io::stdout(), LeaveAlternateScreen);
-                            eprintln!("\nInterrupted by user");
-                            std::process::exit(130); // Standard exit code for Ctrl+C
-                        }
-                        if key.code == KeyCode::Char('z')
-                            && key.modifiers.contains(KeyModifiers::CONTROL)
-                        {
-                            // Attempt cleanup before exiting
-                            let _ = disable_raw_mode();
-                            let _ = execute!(io::stdout(), LeaveAlternateScreen);
-                            eprintln!("\nSuspended by user");
-                            std::process::exit(148); // Standard exit code for Ctrl+Z
-                        }
-                    }
-                }
-            }
-        });
-
-        // Start background render thread for smooth 60 FPS updates
-        let render_terminal = terminal.clone();
-        let render_app = app.clone();
-        let render_exit_flag = should_exit.clone();
-
-        let render_thread = std::thread::spawn(move || {
-            let frame_duration = std::time::Duration::from_millis(16); // ~60 FPS
-
-            loop {
-                if render_exit_flag.load(Ordering::Relaxed) {
-                    break;
-                }
-
-                // Render frame - parking_lot::Mutex::lock() never fails (no poisoning)
-                {
-                    let mut terminal = render_terminal.lock();
-                    let mut app = render_app.lock();
-                    app.tick();
-                    let _ = terminal.draw(|f| render_adaptive(f, &app));
-                }
-
-                std::thread::sleep(frame_duration);
-            }
-        });
+        // Phase 3: Start render thread
+        let render_thread =
+            Self::spawn_render_thread(terminal.clone(), app.clone(), should_exit.clone());
 
         Ok(Self {
             terminal,
             app,
             should_exit,
             render_thread: Some(render_thread),
+        })
+    }
+
+    /// Spawn the signal handler thread for Ctrl+C and Ctrl+Z
+    fn spawn_signal_handler(exit_flag: Arc<AtomicBool>) {
+        std::thread::spawn(move || {
+            while !exit_flag.load(Ordering::Relaxed) {
+                if let Some(key) = Self::poll_key_event() {
+                    Self::handle_control_key(key);
+                }
+            }
+        });
+    }
+
+    /// Poll for a key event with timeout
+    fn poll_key_event() -> Option<KeyEvent> {
+        event::poll(std::time::Duration::from_millis(100))
+            .ok()
+            .filter(|&ready| ready)
+            .and_then(|_| event::read().ok())
+            .and_then(|evt| match evt {
+                Event::Key(key) => Some(key),
+                _ => None,
+            })
+    }
+
+    /// Handle Ctrl+C and Ctrl+Z key combinations
+    fn handle_control_key(key: KeyEvent) {
+        let is_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        match (key.code, is_ctrl) {
+            (KeyCode::Char('c'), true) => Self::exit_with_cleanup("Interrupted by user", 130),
+            (KeyCode::Char('z'), true) => Self::exit_with_cleanup("Suspended by user", 148),
+            _ => {}
+        }
+    }
+
+    /// Clean up terminal and exit with message
+    fn exit_with_cleanup(message: &str, code: i32) {
+        let _ = disable_raw_mode();
+        let _ = execute!(io::stdout(), LeaveAlternateScreen);
+        eprintln!("\n{}", message);
+        std::process::exit(code);
+    }
+
+    /// Spawn the background render thread (60 FPS)
+    fn spawn_render_thread(
+        terminal: Arc<Mutex<Terminal<CrosstermBackend<io::Stdout>>>>,
+        app: Arc<Mutex<App>>,
+        exit_flag: Arc<AtomicBool>,
+    ) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            const FRAME_DURATION: std::time::Duration = std::time::Duration::from_millis(16);
+
+            while !exit_flag.load(Ordering::Relaxed) {
+                // Render frame - parking_lot::Mutex::lock() never fails (no poisoning)
+                {
+                    let mut terminal = terminal.lock();
+                    let mut app = app.lock();
+                    app.tick();
+                    let _ = terminal.draw(|f| render_adaptive(f, &app));
+                }
+                std::thread::sleep(FRAME_DURATION);
+            }
         })
     }
 

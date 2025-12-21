@@ -42,8 +42,9 @@ pub use dependencies::{Dependencies, PurityAnalysis, RecommendationOutput};
 pub use file_item::{FileDebtItemOutput, FileImpactOutput, FileMetricsOutput, FileScoringDetails};
 pub use format::{round_ratio, round_score};
 pub use func_item::{
-    AdjustedComplexity, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-    FunctionScoringDetails, GitHistoryOutput,
+    AdjustedComplexity, ContextSuggestionOutput, FileRangeOutput, FunctionDebtItemOutput,
+    FunctionImpactOutput, FunctionMetricsOutput, FunctionScoringDetails, GitHistoryOutput,
+    RelatedContextOutput,
 };
 pub use location::UnifiedLocation;
 pub use priority::Priority;

@@ -5,25 +5,23 @@
 [![CI](https://github.com/iepathos/debtmap/actions/workflows/ci.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Code complexity sensor for AI-assisted development.**
+**Find the code that needs fixing.**
 
-Debtmap identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them. It doesn't tell you what to do - it tells AI agents where to look and what signals matter.
+Debtmap analyzes your codebase and ranks technical debt by severity. Know exactly where to focus your refactoring effort - whether you're fixing it yourself or handing it to an AI assistant.
 
 ## Why Debtmap?
 
-AI coding assistants (Claude Code, Copilot, Cursor) are transforming how we write code. But they struggle with technical debt:
+Large codebases accumulate complexity. You know there's debt, but where do you start?
 
-- They can't see the whole codebase at once
-- They don't know which complex code is tested vs untested
-- They can't prioritize what to fix first
-- They waste context window on irrelevant code
+Debtmap answers that question by combining multiple signals into a single priority score:
 
-Debtmap solves this by providing:
+- **Complexity** - cyclomatic, cognitive, nesting depth
+- **Coverage gaps** - untested code with high complexity
+- **Git history** - files with high churn and bug fix rates
+- **Coupling** - functions with many dependencies
+- **Purity** - side effects that make code harder to test
 
-1. **Prioritized debt items** - What needs attention, ranked by severity
-2. **Quantified signals** - Complexity, coverage, coupling metrics
-3. **Context suggestions** - Exactly which files/lines the AI should read
-4. **Structured output** - JSON and markdown optimized for LLM consumption
+The result: a ranked list of what to fix first, with the context needed to understand why.
 
 ## Quick Start
 
@@ -31,53 +29,62 @@ Debtmap solves this by providing:
 # Install
 cargo install debtmap
 
-# Analyze and pipe to Claude Code
-debtmap analyze . --format llm-markdown | claude "Fix the top debt item"
+# Explore issues interactively (default)
+debtmap analyze .
 
-# Get structured data for your AI workflow
+# Terminal output for scripts and CI
+debtmap analyze . --format terminal
+
+# JSON for programmatic access
 debtmap analyze . --format json --top 10 > debt.json
 
-# Interactive exploration
-debtmap analyze . --format terminal
+# Pipe to an LLM for automated fixes
+debtmap analyze . --format llm-markdown --top 1 | claude "Fix this"
 ```
 
 ## How It Works
 
-Debtmap is a **sensor**, not an oracle. It measures:
+Debtmap combines static analysis with git history to score technical debt:
 
 | Signal | What It Measures | Why It Matters |
 |--------|------------------|----------------|
-| Complexity | Cyclomatic, cognitive, nesting | How hard code is to understand |
-| Coverage | Test coverage gaps | How risky changes are |
-| Coupling | Dependencies, call graph | How changes ripple |
-| Entropy | Pattern variety | False positive reduction |
-| Purity | Side effects | How testable code is |
+| **Complexity** | Cyclomatic, cognitive, nesting depth | How hard code is to understand |
+| **Coverage** | Test coverage percentage per function | How risky changes are |
+| **Git History** | Change frequency, bug fix rate, author count | Which code keeps breaking |
+| **Coupling** | Dependencies, call graph depth | How changes ripple through the codebase |
+| **Purity** | Side effects, I/O operations | How testable and predictable code is |
+| **Entropy** | Pattern consistency | Reduces false positives from intentional complexity |
 
-These signals are combined into a **severity score** that ranks debt items. The AI uses these signals + the actual code to decide how to fix it.
+These signals combine into a **severity score** (0-10). High scores mean high-complexity, poorly-tested, frequently-broken code.
 
-## Example Output
+## Interactive TUI
 
+Run `debtmap analyze .` to explore results interactively:
+
+<!-- TODO: Add screenshots -->
+<!-- ![List view](assets/tui-list.png) -->
+<!-- ![Detail view with score breakdown](assets/tui-detail.png) -->
+
+Features:
+- Browse debt items sorted by severity
+- Drill into score breakdowns to understand why code ranks high
+- View git history, dependencies, and test coverage per function
+- Copy context to clipboard for AI assistants
+- Jump to code in your editor
+
+## LLM Integration
+
+The `--format llm-markdown` output is designed for AI coding assistants. It provides:
+
+- **Context suggestions** - Specific file ranges the LLM should read to understand the problem
+- **Structured metadata** - All scoring factors exposed so the LLM can reason about priorities
+- **Minimal tokens** - Compact format that fits more context into the LLM's window
+- **Deterministic output** - Same input produces same output for reproducible workflows
+
+```bash
+# Pipe directly to Claude Code
+debtmap analyze . --format llm-markdown --top 1 | claude "Fix this technical debt"
 ```
-#1 SCORE: 8.9 [CRITICAL]
-├─ TEST GAP: ./src/parser.rs:38 parse_complex_input()
-├─ COMPLEXITY: cyclomatic=12, cognitive=18, nesting=4
-├─ COVERAGE: 0% (12 lines untested)
-├─ CONTEXT:
-│  ├─ Primary: src/parser.rs:38-85
-│  ├─ Caller: src/handler.rs:100-120
-│  └─ Tests: tests/parser_test.rs:50-75
-└─ WHY: High complexity function with zero test coverage
-```
-
-## For AI Tool Developers
-
-Debtmap output is designed for machine consumption:
-
-- **Context suggestions** - File ranges the AI should read
-- **Deterministic output** - Same input = same output
-- **Rich metadata** - All scoring factors exposed
-- **Stable IDs** - Reference items across runs
-- **LLM-optimized format** - Markdown structured for minimal tokens
 
 See [LLM Integration Guide](https://iepathos.github.io/debtmap/llm-integration.html) for details.
 

@@ -40,6 +40,19 @@ use syn::spanned::Spanned;
 use syn::{visit::Visit, Item};
 use tracing::{debug, debug_span};
 
+/// Collected pattern signals from various detectors (used in build_function_metrics)
+struct PatternSignals {
+    validation: Option<crate::priority::complexity_patterns::ValidationSignals>,
+    state_machine: Option<crate::priority::complexity_patterns::StateMachineSignals>,
+    coordinator: Option<crate::priority::complexity_patterns::CoordinatorSignals>,
+}
+
+impl PatternSignals {
+    fn has_any(&self) -> bool {
+        self.validation.is_some() || self.state_machine.is_some() || self.coordinator.is_some()
+    }
+}
+
 pub struct RustAnalyzer {
     complexity_threshold: u32,
     enhanced_thresholds: ComplexityThresholds,
@@ -628,7 +641,171 @@ impl FunctionVisitor {
         (matches, if_else_chains)
     }
 
-    // Method to build metrics (needs self for enable_functional_analysis flag)
+    // =========================================================================
+    // Detection helper methods (extracted for clarity following Stillwater)
+    // =========================================================================
+
+    /// Detect mapping patterns and calculate adjusted complexity (spec 118)
+    fn detect_mapping_pattern(
+        block: &syn::Block,
+        cyclomatic: u32,
+        cognitive: u32,
+    ) -> (
+        crate::complexity::pure_mapping_patterns::MappingPatternResult,
+        Option<f64>,
+    ) {
+        let function_body = quote::quote!(#block).to_string();
+        let detector = MappingPatternDetector::new(MappingPatternConfig::default());
+        let result = detector.analyze_function(&function_body, cyclomatic);
+
+        let adjusted = result
+            .is_pure_mapping
+            .then(|| calculate_adjusted_complexity(cyclomatic, cognitive, &result));
+
+        (result, adjusted)
+    }
+
+    /// Detect parallel execution patterns and update complexity (spec 127)
+    fn detect_parallel_patterns(
+        file_ast: Option<&syn::File>,
+        source_content: &str,
+        cyclomatic: u32,
+        current_adjusted: Option<f64>,
+    ) -> (Vec<String>, Option<f64>) {
+        use crate::organization::parallel_execution_pattern::{
+            adjust_parallel_score, ParallelPatternDetector,
+        };
+
+        let Some(ast) = file_ast else {
+            return (Vec::new(), current_adjusted);
+        };
+
+        let detector = ParallelPatternDetector::default();
+        let Some(mut pattern) = detector.detect(ast, source_content) else {
+            return (Vec::new(), current_adjusted);
+        };
+
+        pattern.cyclomatic_complexity = cyclomatic as usize;
+        let confidence = detector.confidence(&pattern);
+        let parallel_adjusted = adjust_parallel_score(cyclomatic as f64, &pattern);
+
+        let best_adjusted = match current_adjusted {
+            Some(curr) if curr <= parallel_adjusted => Some(curr),
+            _ => Some(parallel_adjusted),
+        };
+
+        let pattern_desc = format!(
+            "ParallelExecution({}, {:.0}% confidence, {} closures, {} captures)",
+            pattern.library,
+            confidence * 100.0,
+            pattern.closure_count,
+            pattern.total_captures
+        );
+
+        (vec![pattern_desc], best_adjusted)
+    }
+
+    /// Perform functional composition analysis (spec 111)
+    fn analyze_functional_composition(
+        enabled: bool,
+        item_fn: &syn::ItemFn,
+    ) -> Option<crate::analysis::functional_composition::CompositionMetrics> {
+        if !enabled {
+            return None;
+        }
+
+        use crate::analysis::functional_composition::{
+            analyze_composition, FunctionalAnalysisConfig,
+        };
+
+        let config = std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS_PROFILE")
+            .ok()
+            .and_then(|p| match p.as_str() {
+                "strict" => Some(FunctionalAnalysisConfig::strict()),
+                "balanced" => Some(FunctionalAnalysisConfig::balanced()),
+                "lenient" => Some(FunctionalAnalysisConfig::lenient()),
+                _ => None,
+            })
+            .unwrap_or_else(FunctionalAnalysisConfig::balanced);
+
+        Some(analyze_composition(item_fn, &config))
+    }
+
+    /// Detect validation, state machine, and coordinator patterns (specs 179, 180)
+    fn detect_pattern_signals(block: &syn::Block, func_name: &str) -> PatternSignals {
+        use crate::analyzers::state_machine_pattern_detector::StateMachinePatternDetector;
+        use crate::analyzers::validation_pattern_detector::ValidationPatternDetector;
+        use crate::config::get_state_detection_config;
+
+        let validation = ValidationPatternDetector::new().detect(block, func_name);
+        let state_detector = StateMachinePatternDetector::with_config(get_state_detection_config());
+
+        PatternSignals {
+            validation,
+            state_machine: state_detector.detect_state_machine(block),
+            coordinator: state_detector.detect_coordinator(block),
+        }
+    }
+
+    /// Build language-specific data for Rust (spec 146)
+    fn build_language_specific(
+        &self,
+        context: &FunctionContext,
+        item_fn: &syn::ItemFn,
+        signals: &PatternSignals,
+    ) -> Option<crate::core::LanguageSpecificData> {
+        use crate::analysis::rust_patterns::{
+            ImplContext, RustFunctionContext, RustPatternDetector,
+        };
+
+        let impl_context = match (context.is_trait_method, &context.impl_type_name) {
+            (true, _) => Some(ImplContext {
+                impl_type: context.impl_type_name.clone().unwrap_or_default(),
+                is_trait_impl: true,
+                trait_name: context.trait_name.clone(),
+            }),
+            (false, Some(impl_type)) => Some(ImplContext {
+                impl_type: impl_type.clone(),
+                is_trait_impl: false,
+                trait_name: None,
+            }),
+            _ => None,
+        };
+
+        let rust_context = RustFunctionContext {
+            item_fn,
+            metrics: None,
+            impl_context,
+            file_path: &context.file,
+        };
+
+        if self.enable_rust_patterns {
+            Some(crate::core::LanguageSpecificData::Rust(
+                RustPatternDetector::new().detect_all_patterns(
+                    &rust_context,
+                    signals.validation.clone(),
+                    signals.state_machine.clone(),
+                    signals.coordinator.clone(),
+                ),
+            ))
+        } else if signals.has_any() {
+            Some(crate::core::LanguageSpecificData::Rust(
+                crate::analysis::rust_patterns::RustPatternResult {
+                    trait_impl: None,
+                    async_patterns: vec![],
+                    error_patterns: vec![],
+                    builder_patterns: vec![],
+                    validation_signals: signals.validation.clone(),
+                    state_machine_signals: signals.state_machine.clone(),
+                    coordinator_signals: signals.coordinator.clone(),
+                },
+            ))
+        } else {
+            None
+        }
+    }
+
+    // Method to build metrics (coordinator using extracted helpers)
     fn build_function_metrics(
         &self,
         context: FunctionContext,
@@ -637,163 +814,32 @@ impl FunctionVisitor {
         block: &syn::Block,
         item_fn: &syn::ItemFn,
     ) -> FunctionMetrics {
-        // Detect pure mapping patterns (spec 118)
-        let function_body = quote::quote!(#block).to_string();
-        let mapping_detector = MappingPatternDetector::new(MappingPatternConfig::default());
-        let mapping_result =
-            mapping_detector.analyze_function(&function_body, complexity.cyclomatic);
+        // Phase 1: Detect mapping patterns (spec 118)
+        let (mapping_result, mapping_adjusted) =
+            Self::detect_mapping_pattern(block, complexity.cyclomatic, complexity.cognitive);
 
-        let mut adjusted_complexity = if mapping_result.is_pure_mapping {
-            Some(calculate_adjusted_complexity(
-                complexity.cyclomatic,
-                complexity.cognitive,
-                &mapping_result,
-            ))
-        } else {
-            None
-        };
+        // Phase 2: Detect parallel patterns (spec 127)
+        let (detected_patterns, adjusted_complexity) = Self::detect_parallel_patterns(
+            self.file_ast.as_ref(),
+            &self.source_content,
+            complexity.cyclomatic,
+            mapping_adjusted,
+        );
 
-        // Detect parallel execution patterns (spec 127)
-        let mut detected_patterns = Vec::new();
-        if let Some(ref file_ast) = self.file_ast {
-            use crate::organization::parallel_execution_pattern::{
-                adjust_parallel_score, ParallelPatternDetector,
-            };
+        // Phase 3: Functional composition analysis (spec 111)
+        let composition_metrics =
+            Self::analyze_functional_composition(self.enable_functional_analysis, item_fn);
 
-            let parallel_detector = ParallelPatternDetector::default();
-            if let Some(mut pattern) = parallel_detector.detect(file_ast, &self.source_content) {
-                // Fill in cyclomatic complexity for pattern
-                pattern.cyclomatic_complexity = complexity.cyclomatic as usize;
+        // Phase 4: Pattern signal detection (specs 179, 180)
+        let signals = Self::detect_pattern_signals(block, &context.name);
 
-                let confidence = parallel_detector.confidence(&pattern);
+        // Phase 5: Build language-specific data (spec 146)
+        let language_specific = self.build_language_specific(&context, item_fn, &signals);
 
-                // Apply score adjustment if parallel pattern detected
-                let base_complexity = complexity.cyclomatic as f64;
-                let parallel_adjusted = adjust_parallel_score(base_complexity, &pattern);
-
-                // Use parallel adjustment if it's more lenient than mapping adjustment
-                if adjusted_complexity.is_none() || parallel_adjusted < adjusted_complexity.unwrap()
-                {
-                    adjusted_complexity = Some(parallel_adjusted);
-                }
-
-                detected_patterns.push(format!(
-                    "ParallelExecution({}, {:.0}% confidence, {} closures, {} captures)",
-                    pattern.library,
-                    confidence * 100.0,
-                    pattern.closure_count,
-                    pattern.total_captures
-                ));
-            }
-        }
-
-        // Perform functional composition analysis if enabled (spec 111)
-        let composition_metrics = if self.enable_functional_analysis {
-            use crate::analysis::functional_composition::{
-                analyze_composition, FunctionalAnalysisConfig,
-            };
-
-            // Load config profile from environment variable or default to balanced
-            let config = std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS_PROFILE")
-                .ok()
-                .and_then(|p| match p.as_str() {
-                    "strict" => Some(FunctionalAnalysisConfig::strict()),
-                    "balanced" => Some(FunctionalAnalysisConfig::balanced()),
-                    "lenient" => Some(FunctionalAnalysisConfig::lenient()),
-                    _ => None,
-                })
-                .unwrap_or_else(FunctionalAnalysisConfig::balanced);
-
-            Some(analyze_composition(item_fn, &config))
-        } else {
-            None
-        };
-
-        // Detect repetitive validation patterns (spec 180)
-        let validation_signals = {
-            use crate::analyzers::validation_pattern_detector::ValidationPatternDetector;
-            let detector = ValidationPatternDetector::new();
-            detector.detect(block, &context.name)
-        };
-
-        // Detect state machine and coordinator patterns (spec 179)
-        let (state_signals, coordinator_signals) = {
-            use crate::analyzers::state_machine_pattern_detector::StateMachinePatternDetector;
-            use crate::config::get_state_detection_config;
-            let detector = StateMachinePatternDetector::with_config(get_state_detection_config());
-            let state_signals = detector.detect_state_machine(block);
-            let coordinator_signals = detector.detect_coordinator(block);
-            (state_signals, coordinator_signals)
-        };
-
-        // Rust-specific pattern detection (spec 146)
-        // IMPORTANT: Always create language_specific to store validation_signals
-        // even if enable_rust_patterns is false
-        let language_specific = {
-            use crate::analysis::rust_patterns::{
-                ImplContext, RustFunctionContext, RustPatternDetector,
-            };
-
-            let impl_context = if context.is_trait_method {
-                Some(ImplContext {
-                    impl_type: context.impl_type_name.clone().unwrap_or_default(),
-                    is_trait_impl: true,
-                    trait_name: context.trait_name.clone(),
-                })
-            } else {
-                context
-                    .impl_type_name
-                    .as_ref()
-                    .map(|impl_type| ImplContext {
-                        impl_type: impl_type.clone(),
-                        is_trait_impl: false,
-                        trait_name: None,
-                    })
-            };
-
-            let rust_context = RustFunctionContext {
-                item_fn,
-                metrics: None,
-                impl_context,
-                file_path: &context.file,
-            };
-
-            let detector = RustPatternDetector::new();
-
-            // Only run full pattern detection if enabled, but always store pattern signals
-            if self.enable_rust_patterns {
-                Some(crate::core::LanguageSpecificData::Rust(
-                    detector.detect_all_patterns(
-                        &rust_context,
-                        validation_signals.clone(),
-                        state_signals.clone(),
-                        coordinator_signals.clone(),
-                    ),
-                ))
-            } else if validation_signals.is_some()
-                || state_signals.is_some()
-                || coordinator_signals.is_some()
-            {
-                // Minimal pattern result with just pattern signals
-                Some(crate::core::LanguageSpecificData::Rust(
-                    crate::analysis::rust_patterns::RustPatternResult {
-                        trait_impl: None,
-                        async_patterns: vec![],
-                        error_patterns: vec![],
-                        builder_patterns: vec![],
-                        validation_signals: validation_signals.clone(),
-                        state_machine_signals: state_signals.clone(),
-                        coordinator_signals: coordinator_signals.clone(),
-                    },
-                ))
-            } else {
-                None
-            }
-        };
-
-        // Detect error swallowing patterns per-function
+        // Phase 6: Error swallowing detection
         let (error_count, error_patterns) = detect_error_swallowing_in_function(block);
 
+        // Assemble final metrics
         FunctionMetrics {
             name: context.name,
             file: context.file,

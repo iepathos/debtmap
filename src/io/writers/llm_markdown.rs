@@ -6,14 +6,401 @@
 //! - No decorative elements (emoji, boxes, separators)
 //! - Complete with all available data
 //! - Stable item IDs for reference
+//!
+//! Architecture follows Stillwater's "Pure Core, Imperative Shell" pattern:
+//! - Pure formatting functions return Strings (the "still" core)
+//! - Writer methods handle I/O (the "flowing" shell)
 
 use crate::core::AnalysisResults;
 use crate::io::output::OutputWriter;
 use crate::output::unified::{
-    FileDebtItemOutput, FunctionDebtItemOutput, UnifiedDebtItemOutput, UnifiedOutput,
+    Dependencies, FileDebtItemOutput, FileScoringDetails, FunctionDebtItemOutput,
+    FunctionMetricsOutput, FunctionScoringDetails, GitHistoryOutput, UnifiedDebtItemOutput,
+    UnifiedOutput,
 };
+use crate::priority::GodObjectIndicators;
 use crate::risk::RiskInsight;
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
+
+// =============================================================================
+// PURE FORMATTING FUNCTIONS (the "still" core)
+// =============================================================================
+// These functions are pure: they take data, return strings, no side effects.
+// Easy to test, easy to reason about, composable.
+
+mod format {
+    use super::*;
+    use crate::output::unified::{ContextSuggestionOutput, PurityAnalysis, UnifiedLocation};
+    use crate::priority::FunctionRole;
+
+    /// Format identification section for a function item
+    pub fn identification(location: &UnifiedLocation, category: &str) -> String {
+        let mut out = String::new();
+        writeln!(out, "#### Identification").unwrap();
+        writeln!(
+            out,
+            "- ID: {}",
+            super::generate_item_id(&location.file, location.line)
+        )
+        .unwrap();
+        writeln!(out, "- Type: Function").unwrap();
+        writeln!(
+            out,
+            "- Location: {}:{}",
+            location.file,
+            location.line.unwrap_or(0)
+        )
+        .unwrap();
+        if let Some(ref func_name) = location.function {
+            writeln!(out, "- Function: {}", func_name).unwrap();
+        }
+        writeln!(out, "- Category: {}", category).unwrap();
+        out
+    }
+
+    /// Format severity section
+    pub fn severity(score: f64, priority: &crate::output::unified::Priority) -> String {
+        let mut out = String::new();
+        writeln!(out, "#### Severity").unwrap();
+        writeln!(out, "- Score: {}", score).unwrap();
+        writeln!(out, "- Priority: {:?}", priority).unwrap();
+        writeln!(out, "- Tier: {}", super::priority_tier(score)).unwrap();
+        out
+    }
+
+    /// Format metrics section
+    pub fn metrics(
+        m: &FunctionMetricsOutput,
+        adj: Option<&crate::output::unified::AdjustedComplexity>,
+    ) -> String {
+        let mut out = String::new();
+        writeln!(out, "#### Metrics").unwrap();
+        writeln!(out, "- Cyclomatic Complexity: {}", m.cyclomatic_complexity).unwrap();
+
+        // Cognitive complexity with entropy-adjusted notation
+        match (m.entropy_adjusted_cognitive, m.cognitive_complexity) {
+            (Some(adjusted), raw) if adjusted != raw => {
+                writeln!(
+                    out,
+                    "- Cognitive Complexity: {} → {} (entropy-adjusted)",
+                    raw, adjusted
+                )
+                .unwrap();
+            }
+            _ => {
+                writeln!(out, "- Cognitive Complexity: {}", m.cognitive_complexity).unwrap();
+            }
+        }
+
+        writeln!(out, "- Nesting Depth: {}", m.nesting_depth).unwrap();
+        writeln!(out, "- Lines of Code: {}", m.length).unwrap();
+
+        if let Some(entropy) = m.entropy_score {
+            writeln!(out, "- Entropy Score: {:.2}", entropy).unwrap();
+        }
+        if let Some(adjusted) = adj {
+            writeln!(out, "- Dampening Factor: {:.2}", adjusted.dampening_factor).unwrap();
+            writeln!(
+                out,
+                "- Dampened Cyclomatic: {:.1}",
+                adjusted.dampened_cyclomatic
+            )
+            .unwrap();
+        }
+        out
+    }
+
+    /// Format coverage section (returns None if no coverage data)
+    pub fn coverage(m: &FunctionMetricsOutput) -> Option<String> {
+        if m.coverage.is_none() && m.transitive_coverage.is_none() {
+            return None;
+        }
+        let mut out = String::new();
+        writeln!(out, "#### Coverage").unwrap();
+        if let Some(cov) = m.coverage {
+            writeln!(out, "- Direct Coverage: {:.0}%", cov * 100.0).unwrap();
+        }
+        if let Some(trans) = m.transitive_coverage {
+            writeln!(out, "- Transitive Coverage: {:.0}%", trans * 100.0).unwrap();
+        }
+        Some(out)
+    }
+
+    /// Format dependencies section
+    pub fn dependencies(deps: &Dependencies) -> String {
+        let mut out = String::new();
+        writeln!(out, "#### Dependencies").unwrap();
+        writeln!(out, "- Upstream Callers: {}", deps.upstream_count).unwrap();
+        writeln!(out, "- Downstream Callees: {}", deps.downstream_count).unwrap();
+
+        if deps.blast_radius > 0 {
+            let impact = match deps.blast_radius {
+                r if r >= 20 => "critical",
+                r if r >= 10 => "high",
+                _ => "moderate",
+            };
+            writeln!(out, "- Blast Radius: {} ({})", deps.blast_radius, impact).unwrap();
+        }
+        if deps.critical_path {
+            writeln!(out, "- Critical Path: Yes").unwrap();
+        }
+        if let Some(ref class) = deps.coupling_classification {
+            writeln!(out, "- Coupling Classification: {}", class).unwrap();
+        }
+        if let Some(inst) = deps.instability {
+            writeln!(out, "- Instability: {:.2} (I=Ce/(Ca+Ce))", inst).unwrap();
+        }
+
+        format_caller_list(&mut out, "Top Callers", &deps.upstream_callers);
+        format_caller_list(&mut out, "Top Callees", &deps.downstream_callees);
+        out
+    }
+
+    fn format_caller_list(out: &mut String, label: &str, items: &[String]) {
+        if items.is_empty() {
+            return;
+        }
+        writeln!(out, "- {}:", label).unwrap();
+        for item in items.iter().take(5) {
+            writeln!(out, "  - {}", item).unwrap();
+        }
+        if items.len() > 5 {
+            writeln!(out, "  - (+{} more)", items.len() - 5).unwrap();
+        }
+    }
+
+    /// Format purity analysis section (returns None if no purity data)
+    pub fn purity(purity: Option<&PurityAnalysis>) -> Option<String> {
+        let p = purity?;
+        let mut out = String::new();
+        writeln!(out, "#### Purity Analysis").unwrap();
+        writeln!(out, "- Is Pure: {}", p.is_pure).unwrap();
+        if let Some(ref level) = p.purity_level {
+            writeln!(out, "- Purity Level: {}", level).unwrap();
+        }
+        writeln!(out, "- Confidence: {:.2}", p.confidence).unwrap();
+        if let Some(ref effects) = &p.side_effects {
+            if !effects.is_empty() {
+                writeln!(out, "- Side Effects:").unwrap();
+                for effect in effects {
+                    writeln!(out, "  - {}", effect).unwrap();
+                }
+            }
+        }
+        Some(out)
+    }
+
+    /// Format pattern analysis section (returns None if no pattern data)
+    pub fn pattern_analysis(
+        pattern_type: Option<&String>,
+        confidence: Option<f64>,
+    ) -> Option<String> {
+        if pattern_type.is_none() && confidence.is_none() {
+            return None;
+        }
+        let mut out = String::new();
+        writeln!(out, "#### Pattern Analysis").unwrap();
+        if let Some(pt) = pattern_type {
+            writeln!(out, "- Pattern Type: {}", pt).unwrap();
+        }
+        if let Some(conf) = confidence {
+            writeln!(out, "- Pattern Confidence: {:.2}", conf).unwrap();
+        }
+        Some(out)
+    }
+
+    /// Format scoring breakdown section (returns None if no scoring data)
+    pub fn scoring(
+        scoring: Option<&FunctionScoringDetails>,
+        role: &FunctionRole,
+    ) -> Option<String> {
+        let s = scoring?;
+        let mut out = String::new();
+        writeln!(out, "#### Scoring Breakdown").unwrap();
+        writeln!(out, "- Base Score: {:.2}", s.base_score).unwrap();
+        writeln!(
+            out,
+            "- Complexity Factor: {:.2} (weight: 0.4)",
+            s.complexity_score
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "- Coverage Factor: {:.2} (weight: 0.3)",
+            s.coverage_score
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "- Dependency Factor: {:.2} (weight: 0.2)",
+            s.dependency_score
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "- Role Multiplier: {:.2} ({:?})",
+            s.role_multiplier, role
+        )
+        .unwrap();
+
+        // Additional multipliers only if they differ from 1.0
+        format_optional_multiplier(&mut out, "Structural Multiplier", s.structural_multiplier);
+        format_optional_multiplier(&mut out, "Context Multiplier", s.context_multiplier);
+        format_optional_multiplier(
+            &mut out,
+            "Contextual Risk Multiplier",
+            s.contextual_risk_multiplier,
+        );
+
+        if let Some(pf) = s.purity_factor {
+            writeln!(out, "- Purity Factor: {:.2}", pf).unwrap();
+        }
+        format_optional_multiplier(&mut out, "Refactorability Factor", s.refactorability_factor);
+        format_optional_multiplier(&mut out, "Pattern Factor", s.pattern_factor);
+
+        // Pre-normalization score if clamping occurred
+        if let Some(pre) = s.pre_normalization_score {
+            if (pre - s.final_score).abs() > 0.1 {
+                writeln!(
+                    out,
+                    "- Pre-normalization Score: {:.2} (clamped to {:.2})",
+                    pre, s.final_score
+                )
+                .unwrap();
+            }
+        }
+        writeln!(out, "- Final Score: {:.2}", s.final_score).unwrap();
+        Some(out)
+    }
+
+    fn format_optional_multiplier(out: &mut String, label: &str, value: Option<f64>) {
+        if let Some(v) = value {
+            if (v - 1.0).abs() > 0.01 {
+                writeln!(out, "- {}: {:.2}", label, v).unwrap();
+            }
+        }
+    }
+
+    /// Format context section (returns None if no context data)
+    pub fn context(ctx: Option<&ContextSuggestionOutput>) -> Option<String> {
+        let c = ctx?;
+        let mut out = String::new();
+        writeln!(out, "#### Context to Read").unwrap();
+        writeln!(out, "- Total Lines: {}", c.total_lines).unwrap();
+        writeln!(
+            out,
+            "- Completeness Confidence: {:.2}",
+            c.completeness_confidence
+        )
+        .unwrap();
+        writeln!(out, "- Primary:").unwrap();
+        writeln!(
+            out,
+            "  - {}:{}-{} ({})",
+            c.primary.file,
+            c.primary.start_line,
+            c.primary.end_line,
+            c.primary.symbol.as_deref().unwrap_or("Unknown")
+        )
+        .unwrap();
+        if !c.related.is_empty() {
+            writeln!(out, "- Related:").unwrap();
+            for rel in &c.related {
+                writeln!(
+                    out,
+                    "  - {}:{}-{} ({})",
+                    rel.range.file, rel.range.start_line, rel.range.end_line, rel.relationship
+                )
+                .unwrap();
+            }
+        }
+        Some(out)
+    }
+
+    /// Format git history section (returns None if no git data)
+    pub fn git_history(git: Option<&GitHistoryOutput>) -> Option<String> {
+        let g = git?;
+        let mut out = String::new();
+        writeln!(out, "#### Git History").unwrap();
+        writeln!(
+            out,
+            "- Change Frequency: {:.2} changes/month",
+            g.change_frequency
+        )
+        .unwrap();
+        writeln!(out, "- Bug Density: {:.0}%", g.bug_density * 100.0).unwrap();
+        writeln!(out, "- Age: {} days", g.age_days).unwrap();
+        writeln!(out, "- Authors: {}", g.author_count).unwrap();
+        writeln!(out, "- Stability: {}", g.stability).unwrap();
+        Some(out)
+    }
+
+    // =========================================================================
+    // FILE ITEM FORMATTERS
+    // =========================================================================
+
+    /// Format identification section for a file item
+    pub fn file_identification(file: &str, category: &str) -> String {
+        let mut out = String::new();
+        writeln!(out, "#### Identification").unwrap();
+        writeln!(out, "- ID: {}", super::generate_item_id(file, None)).unwrap();
+        writeln!(out, "- Type: File").unwrap();
+        writeln!(out, "- Location: {}", file).unwrap();
+        writeln!(out, "- Category: {}", category).unwrap();
+        out
+    }
+
+    /// Format file metrics section
+    pub fn file_metrics(m: &crate::output::unified::FileMetricsOutput) -> String {
+        let mut out = String::new();
+        writeln!(out, "#### Metrics").unwrap();
+        writeln!(out, "- Lines: {}", m.lines).unwrap();
+        writeln!(out, "- Functions: {}", m.functions).unwrap();
+        writeln!(out, "- Classes: {}", m.classes).unwrap();
+        writeln!(out, "- Average Complexity: {:.1}", m.avg_complexity).unwrap();
+        writeln!(out, "- Max Complexity: {}", m.max_complexity).unwrap();
+        writeln!(out, "- Total Complexity: {}", m.total_complexity).unwrap();
+        writeln!(out, "- Coverage: {:.0}%", m.coverage * 100.0).unwrap();
+        writeln!(out, "- Uncovered Lines: {}", m.uncovered_lines).unwrap();
+        out
+    }
+
+    /// Format god object analysis section (returns None if no god object data)
+    pub fn god_object(god: Option<&GodObjectIndicators>) -> Option<String> {
+        let g = god?;
+        let mut out = String::new();
+        writeln!(out, "#### God Object Analysis").unwrap();
+        writeln!(out, "- Is God Object: {}", g.is_god_object).unwrap();
+        writeln!(out, "- Method Count: {}", g.methods_count).unwrap();
+        writeln!(out, "- Field Count: {}", g.fields_count).unwrap();
+        writeln!(out, "- Responsibility Count: {}", g.responsibilities).unwrap();
+        writeln!(out, "- God Object Score: {:.2}", g.god_object_score).unwrap();
+        Some(out)
+    }
+
+    /// Format cohesion analysis section (returns None if no cohesion data)
+    pub fn cohesion(cohesion: Option<&crate::output::unified::CohesionOutput>) -> Option<String> {
+        let c = cohesion?;
+        let mut out = String::new();
+        writeln!(out, "#### Cohesion Analysis").unwrap();
+        writeln!(out, "- Cohesion Score: {:.2}", c.score).unwrap();
+        writeln!(out, "- Classification: {:?}", c.classification).unwrap();
+        Some(out)
+    }
+
+    /// Format file scoring breakdown section (returns None if no scoring data)
+    pub fn file_scoring(scoring: Option<&FileScoringDetails>) -> Option<String> {
+        let s = scoring?;
+        let mut out = String::new();
+        writeln!(out, "#### Scoring Breakdown").unwrap();
+        writeln!(out, "- File Size Score: {}", s.file_size_score).unwrap();
+        writeln!(out, "- Function Count Score: {}", s.function_count_score).unwrap();
+        writeln!(out, "- Complexity Score: {}", s.complexity_score).unwrap();
+        writeln!(out, "- Coverage Penalty: {}", s.coverage_penalty).unwrap();
+        Some(out)
+    }
+}
 
 /// LLM-optimized markdown writer (Spec 264)
 ///
@@ -124,326 +511,64 @@ impl<W: Write> LlmMarkdownWriter<W> {
         }
     }
 
+    /// Write a function debt item using composed pure formatters.
+    ///
+    /// This is the "imperative shell" - thin I/O that composes pure formatters.
     fn write_function_item(&mut self, item: &FunctionDebtItemOutput) -> anyhow::Result<()> {
-        // Identification section
-        writeln!(self.writer, "#### Identification")?;
-        writeln!(
+        // Compose all sections from pure formatters
+        write!(
             self.writer,
-            "- ID: {}",
-            generate_item_id(&item.location.file, item.location.line)
+            "{}",
+            format::identification(&item.location, &item.category)
         )?;
-        writeln!(self.writer, "- Type: Function")?;
-        writeln!(
-            self.writer,
-            "- Location: {}:{}",
-            item.location.file,
-            item.location.line.unwrap_or(0)
-        )?;
-        if let Some(ref func_name) = item.location.function {
-            writeln!(self.writer, "- Function: {}", func_name)?;
-        }
-        writeln!(self.writer, "- Category: {}", item.category)?;
         writeln!(self.writer)?;
 
-        // Severity section
-        writeln!(self.writer, "#### Severity")?;
-        writeln!(self.writer, "- Score: {}", item.score)?;
-        writeln!(self.writer, "- Priority: {:?}", item.priority)?;
-        writeln!(self.writer, "- Tier: {}", priority_tier(item.score))?;
+        write!(
+            self.writer,
+            "{}",
+            format::severity(item.score, &item.priority)
+        )?;
         writeln!(self.writer)?;
 
-        // Metrics section
-        writeln!(self.writer, "#### Metrics")?;
-        writeln!(
+        write!(
             self.writer,
-            "- Cyclomatic Complexity: {}",
-            item.metrics.cyclomatic_complexity
+            "{}",
+            format::metrics(&item.metrics, item.adjusted_complexity.as_ref())
         )?;
-        // Show cognitive complexity with entropy-adjusted notation if different
-        if let Some(adjusted_cog) = item.metrics.entropy_adjusted_cognitive {
-            if adjusted_cog != item.metrics.cognitive_complexity {
-                writeln!(
-                    self.writer,
-                    "- Cognitive Complexity: {} → {} (entropy-adjusted)",
-                    item.metrics.cognitive_complexity, adjusted_cog
-                )?;
-            } else {
-                writeln!(
-                    self.writer,
-                    "- Cognitive Complexity: {}",
-                    item.metrics.cognitive_complexity
-                )?;
-            }
-        } else {
-            writeln!(
-                self.writer,
-                "- Cognitive Complexity: {}",
-                item.metrics.cognitive_complexity
-            )?;
-        }
-        writeln!(
-            self.writer,
-            "- Nesting Depth: {}",
-            item.metrics.nesting_depth
-        )?;
-        writeln!(self.writer, "- Lines of Code: {}", item.metrics.length)?;
-        if let Some(entropy) = item.metrics.entropy_score {
-            writeln!(self.writer, "- Entropy Score: {:.2}", entropy)?;
-        }
-        if let Some(ref adjusted) = item.adjusted_complexity {
-            writeln!(
-                self.writer,
-                "- Dampening Factor: {:.2}",
-                adjusted.dampening_factor
-            )?;
-            writeln!(
-                self.writer,
-                "- Dampened Cyclomatic: {:.1}",
-                adjusted.dampened_cyclomatic
-            )?;
-        }
         writeln!(self.writer)?;
 
-        // Coverage section
-        if item.metrics.coverage.is_some() || item.metrics.transitive_coverage.is_some() {
-            writeln!(self.writer, "#### Coverage")?;
-            if let Some(coverage) = item.metrics.coverage {
-                writeln!(self.writer, "- Direct Coverage: {:.0}%", coverage * 100.0)?;
-            }
-            if let Some(transitive) = item.metrics.transitive_coverage {
-                writeln!(
-                    self.writer,
-                    "- Transitive Coverage: {:.0}%",
-                    transitive * 100.0
-                )?;
-            }
+        if let Some(cov) = format::coverage(&item.metrics) {
+            write!(self.writer, "{}", cov)?;
             writeln!(self.writer)?;
         }
 
-        // Dependencies section
-        writeln!(self.writer, "#### Dependencies")?;
-        writeln!(
-            self.writer,
-            "- Upstream Callers: {}",
-            item.dependencies.upstream_count
-        )?;
-        writeln!(
-            self.writer,
-            "- Downstream Callees: {}",
-            item.dependencies.downstream_count
-        )?;
-        // New fields: blast radius, critical path, coupling classification, instability
-        if item.dependencies.blast_radius > 0 {
-            let impact = if item.dependencies.blast_radius >= 20 {
-                "critical"
-            } else if item.dependencies.blast_radius >= 10 {
-                "high"
-            } else {
-                "moderate"
-            };
-            writeln!(
-                self.writer,
-                "- Blast Radius: {} ({})",
-                item.dependencies.blast_radius, impact
-            )?;
-        }
-        if item.dependencies.critical_path {
-            writeln!(self.writer, "- Critical Path: Yes")?;
-        }
-        if let Some(ref classification) = item.dependencies.coupling_classification {
-            writeln!(self.writer, "- Coupling Classification: {}", classification)?;
-        }
-        if let Some(instability) = item.dependencies.instability {
-            writeln!(
-                self.writer,
-                "- Instability: {:.2} (I=Ce/(Ca+Ce))",
-                instability
-            )?;
-        }
-        if !item.dependencies.upstream_callers.is_empty() {
-            writeln!(self.writer, "- Top Callers:")?;
-            for caller in item.dependencies.upstream_callers.iter().take(5) {
-                writeln!(self.writer, "  - {}", caller)?;
-            }
-            if item.dependencies.upstream_callers.len() > 5 {
-                writeln!(
-                    self.writer,
-                    "  - (+{} more)",
-                    item.dependencies.upstream_callers.len() - 5
-                )?;
-            }
-        }
-        if !item.dependencies.downstream_callees.is_empty() {
-            writeln!(self.writer, "- Top Callees:")?;
-            for callee in item.dependencies.downstream_callees.iter().take(5) {
-                writeln!(self.writer, "  - {}", callee)?;
-            }
-            if item.dependencies.downstream_callees.len() > 5 {
-                writeln!(
-                    self.writer,
-                    "  - (+{} more)",
-                    item.dependencies.downstream_callees.len() - 5
-                )?;
-            }
-        }
+        write!(self.writer, "{}", format::dependencies(&item.dependencies))?;
         writeln!(self.writer)?;
 
-        // Purity analysis section
-        if let Some(ref purity) = item.purity_analysis {
-            writeln!(self.writer, "#### Purity Analysis")?;
-            writeln!(self.writer, "- Is Pure: {}", purity.is_pure)?;
-            if let Some(ref level) = purity.purity_level {
-                writeln!(self.writer, "- Purity Level: {}", level)?;
-            }
-            writeln!(self.writer, "- Confidence: {:.2}", purity.confidence)?;
-            if let Some(ref side_effects) = purity.side_effects {
-                if !side_effects.is_empty() {
-                    writeln!(self.writer, "- Side Effects:")?;
-                    for effect in side_effects {
-                        writeln!(self.writer, "  - {}", effect)?;
-                    }
-                }
-            }
+        if let Some(pur) = format::purity(item.purity_analysis.as_ref()) {
+            write!(self.writer, "{}", pur)?;
             writeln!(self.writer)?;
         }
 
-        // Pattern analysis section
-        if item.pattern_type.is_some() || item.pattern_confidence.is_some() {
-            writeln!(self.writer, "#### Pattern Analysis")?;
-            if let Some(ref pattern_type) = item.pattern_type {
-                writeln!(self.writer, "- Pattern Type: {}", pattern_type)?;
-            }
-            if let Some(confidence) = item.pattern_confidence {
-                writeln!(self.writer, "- Pattern Confidence: {:.2}", confidence)?;
-            }
+        if let Some(pat) =
+            format::pattern_analysis(item.pattern_type.as_ref(), item.pattern_confidence)
+        {
+            write!(self.writer, "{}", pat)?;
             writeln!(self.writer)?;
         }
 
-        // Scoring breakdown section
-        if let Some(ref scoring) = item.scoring_details {
-            writeln!(self.writer, "#### Scoring Breakdown")?;
-            writeln!(self.writer, "- Base Score: {:.2}", scoring.base_score)?;
-            writeln!(
-                self.writer,
-                "- Complexity Factor: {:.2} (weight: 0.4)",
-                scoring.complexity_score
-            )?;
-            writeln!(
-                self.writer,
-                "- Coverage Factor: {:.2} (weight: 0.3)",
-                scoring.coverage_score
-            )?;
-            writeln!(
-                self.writer,
-                "- Dependency Factor: {:.2} (weight: 0.2)",
-                scoring.dependency_score
-            )?;
-            writeln!(
-                self.writer,
-                "- Role Multiplier: {:.2} ({:?})",
-                scoring.role_multiplier, item.function_role
-            )?;
-            // Additional multipliers (Spec 264)
-            if let Some(structural) = scoring.structural_multiplier {
-                if (structural - 1.0).abs() > 0.01 {
-                    writeln!(self.writer, "- Structural Multiplier: {:.2}", structural)?;
-                }
-            }
-            if let Some(context_mult) = scoring.context_multiplier {
-                if (context_mult - 1.0).abs() > 0.01 {
-                    writeln!(self.writer, "- Context Multiplier: {:.2}", context_mult)?;
-                }
-            }
-            if let Some(risk_mult) = scoring.contextual_risk_multiplier {
-                if (risk_mult - 1.0).abs() > 0.01 {
-                    writeln!(
-                        self.writer,
-                        "- Contextual Risk Multiplier: {:.2}",
-                        risk_mult
-                    )?;
-                }
-            }
-            if let Some(purity_factor) = scoring.purity_factor {
-                writeln!(self.writer, "- Purity Factor: {:.2}", purity_factor)?;
-            }
-            if let Some(refactor_factor) = scoring.refactorability_factor {
-                if (refactor_factor - 1.0).abs() > 0.01 {
-                    writeln!(
-                        self.writer,
-                        "- Refactorability Factor: {:.2}",
-                        refactor_factor
-                    )?;
-                }
-            }
-            if let Some(pattern_factor) = scoring.pattern_factor {
-                if (pattern_factor - 1.0).abs() > 0.01 {
-                    writeln!(self.writer, "- Pattern Factor: {:.2}", pattern_factor)?;
-                }
-            }
-            // Show pre-normalization score if clamping occurred
-            if let Some(pre_norm) = scoring.pre_normalization_score {
-                if (pre_norm - scoring.final_score).abs() > 0.1 {
-                    writeln!(
-                        self.writer,
-                        "- Pre-normalization Score: {:.2} (clamped to {:.2})",
-                        pre_norm, scoring.final_score
-                    )?;
-                }
-            }
-            writeln!(self.writer, "- Final Score: {:.2}", scoring.final_score)?;
+        if let Some(scr) = format::scoring(item.scoring_details.as_ref(), &item.function_role) {
+            write!(self.writer, "{}", scr)?;
             writeln!(self.writer)?;
         }
 
-        // Context to read section (Spec 263)
-        if let Some(ref ctx) = item.context {
-            writeln!(self.writer, "#### Context to Read")?;
-            writeln!(self.writer, "- Total Lines: {}", ctx.total_lines)?;
-            writeln!(
-                self.writer,
-                "- Completeness Confidence: {:.2}",
-                ctx.completeness_confidence
-            )?;
-            writeln!(self.writer, "- Primary:")?;
-            writeln!(
-                self.writer,
-                "  - {}:{}-{} ({})",
-                ctx.primary.file,
-                ctx.primary.start_line,
-                ctx.primary.end_line,
-                ctx.primary.symbol.as_deref().unwrap_or("Unknown")
-            )?;
-            if !ctx.related.is_empty() {
-                writeln!(self.writer, "- Related:")?;
-                for related in &ctx.related {
-                    writeln!(
-                        self.writer,
-                        "  - {}:{}-{} ({})",
-                        related.range.file,
-                        related.range.start_line,
-                        related.range.end_line,
-                        related.relationship
-                    )?;
-                }
-            }
+        if let Some(ctx) = format::context(item.context.as_ref()) {
+            write!(self.writer, "{}", ctx)?;
             writeln!(self.writer)?;
         }
 
-        // Git history section
-        if let Some(ref git) = item.git_history {
-            writeln!(self.writer, "#### Git History")?;
-            writeln!(
-                self.writer,
-                "- Change Frequency: {:.2} changes/month",
-                git.change_frequency
-            )?;
-            writeln!(
-                self.writer,
-                "- Bug Density: {:.0}%",
-                git.bug_density * 100.0
-            )?;
-            writeln!(self.writer, "- Age: {} days", git.age_days)?;
-            writeln!(self.writer, "- Authors: {}", git.author_count)?;
-            writeln!(self.writer, "- Stability: {}", git.stability)?;
+        if let Some(git) = format::git_history(item.git_history.as_ref()) {
+            write!(self.writer, "{}", git)?;
             writeln!(self.writer)?;
         }
 
@@ -452,112 +577,40 @@ impl<W: Write> LlmMarkdownWriter<W> {
         Ok(())
     }
 
+    /// Write a file debt item using composed pure formatters.
+    ///
+    /// This is the "imperative shell" - thin I/O that composes pure formatters.
     fn write_file_item(&mut self, item: &FileDebtItemOutput) -> anyhow::Result<()> {
-        // Identification section
-        writeln!(self.writer, "#### Identification")?;
-        writeln!(
+        // Compose all sections from pure formatters
+        write!(
             self.writer,
-            "- ID: {}",
-            generate_item_id(&item.location.file, None)
-        )?;
-        writeln!(self.writer, "- Type: File")?;
-        writeln!(self.writer, "- Location: {}", item.location.file)?;
-        writeln!(self.writer, "- Category: {}", item.category)?;
-        writeln!(self.writer)?;
-
-        // Severity section
-        writeln!(self.writer, "#### Severity")?;
-        writeln!(self.writer, "- Score: {}", item.score)?;
-        writeln!(self.writer, "- Priority: {:?}", item.priority)?;
-        writeln!(self.writer, "- Tier: {}", priority_tier(item.score))?;
-        writeln!(self.writer)?;
-
-        // Metrics section
-        writeln!(self.writer, "#### Metrics")?;
-        writeln!(self.writer, "- Lines: {}", item.metrics.lines)?;
-        writeln!(self.writer, "- Functions: {}", item.metrics.functions)?;
-        writeln!(self.writer, "- Classes: {}", item.metrics.classes)?;
-        writeln!(
-            self.writer,
-            "- Average Complexity: {:.1}",
-            item.metrics.avg_complexity
-        )?;
-        writeln!(
-            self.writer,
-            "- Max Complexity: {}",
-            item.metrics.max_complexity
-        )?;
-        writeln!(
-            self.writer,
-            "- Total Complexity: {}",
-            item.metrics.total_complexity
-        )?;
-        writeln!(
-            self.writer,
-            "- Coverage: {:.0}%",
-            item.metrics.coverage * 100.0
-        )?;
-        writeln!(
-            self.writer,
-            "- Uncovered Lines: {}",
-            item.metrics.uncovered_lines
+            "{}",
+            format::file_identification(&item.location.file, &item.category)
         )?;
         writeln!(self.writer)?;
 
-        // God object indicators section
-        if let Some(ref god) = item.god_object_indicators {
-            writeln!(self.writer, "#### God Object Analysis")?;
-            writeln!(self.writer, "- Is God Object: {}", god.is_god_object)?;
-            writeln!(self.writer, "- Method Count: {}", god.methods_count)?;
-            writeln!(self.writer, "- Field Count: {}", god.fields_count)?;
-            writeln!(
-                self.writer,
-                "- Responsibility Count: {}",
-                god.responsibilities
-            )?;
-            writeln!(
-                self.writer,
-                "- God Object Score: {:.2}",
-                god.god_object_score
-            )?;
+        write!(
+            self.writer,
+            "{}",
+            format::severity(item.score, &item.priority)
+        )?;
+        writeln!(self.writer)?;
+
+        write!(self.writer, "{}", format::file_metrics(&item.metrics))?;
+        writeln!(self.writer)?;
+
+        if let Some(god) = format::god_object(item.god_object_indicators.as_ref()) {
+            write!(self.writer, "{}", god)?;
             writeln!(self.writer)?;
         }
 
-        // Cohesion section
-        if let Some(ref cohesion) = item.cohesion {
-            writeln!(self.writer, "#### Cohesion Analysis")?;
-            writeln!(self.writer, "- Cohesion Score: {:.2}", cohesion.score)?;
-            writeln!(
-                self.writer,
-                "- Classification: {:?}",
-                cohesion.classification
-            )?;
+        if let Some(coh) = format::cohesion(item.cohesion.as_ref()) {
+            write!(self.writer, "{}", coh)?;
             writeln!(self.writer)?;
         }
 
-        // Scoring details section
-        if let Some(ref scoring) = item.scoring_details {
-            writeln!(self.writer, "#### Scoring Breakdown")?;
-            writeln!(
-                self.writer,
-                "- File Size Score: {}",
-                scoring.file_size_score
-            )?;
-            writeln!(
-                self.writer,
-                "- Function Count Score: {}",
-                scoring.function_count_score
-            )?;
-            writeln!(
-                self.writer,
-                "- Complexity Score: {}",
-                scoring.complexity_score
-            )?;
-            writeln!(
-                self.writer,
-                "- Coverage Penalty: {}",
-                scoring.coverage_penalty
-            )?;
+        if let Some(scr) = format::file_scoring(item.scoring_details.as_ref()) {
+            write!(self.writer, "{}", scr)?;
             writeln!(self.writer)?;
         }
 

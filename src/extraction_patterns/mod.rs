@@ -363,49 +363,54 @@ fn parse_ast_by_language(
 }
 
 fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn::File> {
-    use syn::{parse_str, Item, ItemFn};
+    use syn::{parse_str, Item};
 
-    // Parse the entire file
     let file = parse_str::<syn::File>(source).ok()?;
 
-    // Find the function by name and approximate line number
-    for item in &file.items {
-        if let Item::Fn(item_fn) = item {
-            if item_fn.sig.ident == func.name {
-                // Create a new File with just this function
-                let single_fn_file = syn::File {
-                    shebang: None,
-                    attrs: vec![],
-                    items: vec![Item::Fn(item_fn.clone())],
-                };
-                return Some(single_fn_file);
-            }
-        }
-        // Also check inside impl blocks
-        if let Item::Impl(item_impl) = item {
-            for impl_item in &item_impl.items {
-                if let syn::ImplItem::Fn(method) = impl_item {
-                    if method.sig.ident == func.name {
-                        // Convert method to standalone function for analysis
-                        let item_fn = ItemFn {
-                            attrs: method.attrs.clone(),
-                            vis: method.vis.clone(),
-                            sig: method.sig.clone(),
-                            block: Box::new(method.block.clone()),
-                        };
-                        let single_fn_file = syn::File {
-                            shebang: None,
-                            attrs: vec![],
-                            items: vec![Item::Fn(item_fn)],
-                        };
-                        return Some(single_fn_file);
-                    }
-                }
-            }
-        }
-    }
+    // Compose: try top-level functions first, then impl methods
+    file.items.iter().find_map(|item| match item {
+        Item::Fn(item_fn) => try_match_toplevel_fn(item_fn, &func.name),
+        Item::Impl(item_impl) => try_match_impl_method(item_impl, &func.name),
+        _ => None,
+    })
+}
 
-    None
+/// Try to match a top-level function by name and wrap it in a syn::File
+fn try_match_toplevel_fn(item_fn: &syn::ItemFn, target_name: &str) -> Option<syn::File> {
+    (item_fn.sig.ident == target_name).then(|| wrap_fn_in_file(item_fn.clone()))
+}
+
+/// Try to find a matching method in an impl block
+fn try_match_impl_method(item_impl: &syn::ItemImpl, target_name: &str) -> Option<syn::File> {
+    item_impl
+        .items
+        .iter()
+        .filter_map(|impl_item| match impl_item {
+            syn::ImplItem::Fn(method) if method.sig.ident == target_name => {
+                Some(wrap_fn_in_file(method_to_standalone_fn(method)))
+            }
+            _ => None,
+        })
+        .next()
+}
+
+/// Convert an impl method to a standalone ItemFn for analysis
+fn method_to_standalone_fn(method: &syn::ImplItemFn) -> syn::ItemFn {
+    syn::ItemFn {
+        attrs: method.attrs.clone(),
+        vis: method.vis.clone(),
+        sig: method.sig.clone(),
+        block: Box::new(method.block.clone()),
+    }
+}
+
+/// Wrap an ItemFn in a minimal syn::File for analysis
+fn wrap_fn_in_file(item_fn: syn::ItemFn) -> syn::File {
+    syn::File {
+        shebang: None,
+        attrs: vec![],
+        items: vec![syn::Item::Fn(item_fn)],
+    }
 }
 
 // Pure function for parameter formatting using functional style

@@ -520,10 +520,7 @@ mod tests {
             .find(|p| p.name == "test_parent_op")
             .expect("Parent should exist");
 
-        let child = parent
-            .children
-            .iter()
-            .find(|c| c.name == "test_child_op");
+        let child = parent.children.iter().find(|c| c.name == "test_child_op");
         assert!(child.is_some(), "Child should be nested under parent");
     }
 

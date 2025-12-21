@@ -2,7 +2,7 @@
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
 use crate::core::LanguageSpecificData;
-use crate::organization::anti_pattern_detector::AntiPatternSeverity;
+use crate::organization::anti_pattern_detector::{AntiPattern, AntiPatternSeverity};
 use crate::organization::god_object::GodObjectAnalysis;
 use crate::organization::AntiPatternReport;
 use crate::output::PatternAnalysis;
@@ -346,6 +346,62 @@ fn render_god_object_patterns_section(
     rendered
 }
 
+// =============================================================================
+// PURE HELPER FUNCTIONS for anti-pattern rendering (Stillwater pattern)
+// =============================================================================
+
+/// Pure: Describe quality score (no side effects)
+fn describe_quality_score(score: f64) -> &'static str {
+    match score {
+        s if s >= 90.0 => "excellent",
+        s if s >= 70.0 => "good",
+        s if s >= 50.0 => "needs improvement",
+        _ => "poor",
+    }
+}
+
+/// Pure: Count patterns by severity (functional fold)
+fn count_by_severity(patterns: &[AntiPattern]) -> SeverityCounts {
+    patterns
+        .iter()
+        .fold(SeverityCounts::default(), |mut acc, p| {
+            match p.severity {
+                AntiPatternSeverity::Critical => acc.critical += 1,
+                AntiPatternSeverity::High => acc.high += 1,
+                AntiPatternSeverity::Medium => acc.medium += 1,
+                AntiPatternSeverity::Low => acc.low += 1,
+            }
+            acc
+        })
+}
+
+#[derive(Default)]
+struct SeverityCounts {
+    critical: usize,
+    high: usize,
+    medium: usize,
+    low: usize,
+}
+
+/// Pure: Get severity indicator for display
+fn severity_indicator(severity: &AntiPatternSeverity) -> &'static str {
+    match severity {
+        AntiPatternSeverity::Critical => "!!",
+        AntiPatternSeverity::High => "! ",
+        AntiPatternSeverity::Medium => "- ",
+        AntiPatternSeverity::Low => "  ",
+    }
+}
+
+/// Pure: Truncate description to fit width
+fn truncate_description(desc: &str, max_width: usize) -> String {
+    if desc.len() > max_width {
+        format!("{}...", &desc[..max_width.saturating_sub(3)])
+    } else {
+        desc.to_string()
+    }
+}
+
 /// Render anti-pattern detection section (Spec 197). Returns true if anything was rendered.
 fn render_anti_patterns_section(
     lines: &mut Vec<Line<'static>>,
@@ -359,74 +415,46 @@ fn render_anti_patterns_section(
 
     add_section_header(lines, "anti-patterns detected", theme);
 
-    // Show quality score
-    let quality_desc = if report.quality_score >= 90.0 {
-        "excellent"
-    } else if report.quality_score >= 70.0 {
-        "good"
-    } else if report.quality_score >= 50.0 {
-        "needs improvement"
-    } else {
-        "poor"
-    };
+    // Quality score with description (using pure function)
     add_label_value(
         lines,
         "quality score",
-        format!("{:.0} ({})", report.quality_score, quality_desc),
+        format!(
+            "{:.0} ({})",
+            report.quality_score,
+            describe_quality_score(report.quality_score)
+        ),
         theme,
         width,
     );
 
-    // Count by severity
-    let mut critical_count = 0;
-    let mut high_count = 0;
-    let mut medium_count = 0;
-    let mut low_count = 0;
-
-    for pattern in &report.anti_patterns {
-        match pattern.severity {
-            AntiPatternSeverity::Critical => critical_count += 1,
-            AntiPatternSeverity::High => high_count += 1,
-            AntiPatternSeverity::Medium => medium_count += 1,
-            AntiPatternSeverity::Low => low_count += 1,
+    // Severity breakdown (using pure function)
+    let counts = count_by_severity(&report.anti_patterns);
+    for (label, count) in [
+        ("critical", counts.critical),
+        ("high", counts.high),
+        ("medium", counts.medium),
+        ("low", counts.low),
+    ] {
+        if count > 0 {
+            add_label_value(lines, label, count.to_string(), theme, width);
         }
-    }
-
-    // Show severity breakdown
-    if critical_count > 0 {
-        add_label_value(lines, "critical", critical_count.to_string(), theme, width);
-    }
-    if high_count > 0 {
-        add_label_value(lines, "high", high_count.to_string(), theme, width);
-    }
-    if medium_count > 0 {
-        add_label_value(lines, "medium", medium_count.to_string(), theme, width);
-    }
-    if low_count > 0 {
-        add_label_value(lines, "low", low_count.to_string(), theme, width);
     }
 
     // Show first few anti-patterns with descriptions
     add_blank_line(lines);
 
     for (i, pattern) in report.anti_patterns.iter().take(5).enumerate() {
-        let severity_indicator = match pattern.severity {
-            AntiPatternSeverity::Critical => "!!",
-            AntiPatternSeverity::High => "! ",
-            AntiPatternSeverity::Medium => "- ",
-            AntiPatternSeverity::Low => "  ",
-        };
-
-        let pattern_text = format!("{} {:?}", severity_indicator, pattern.pattern_type);
+        let pattern_text = format!(
+            "{} {:?}",
+            severity_indicator(&pattern.severity),
+            pattern.pattern_type
+        );
         add_label_value(lines, &format!("#{}", i + 1), pattern_text, theme, width);
 
         // Show description if it fits
         if !pattern.description.is_empty() && width > 40 {
-            let desc = if pattern.description.len() > (width - 10) as usize {
-                format!("{}...", &pattern.description[..((width - 13) as usize)])
-            } else {
-                pattern.description.clone()
-            };
+            let desc = truncate_description(&pattern.description, (width - 10) as usize);
             add_label_value(lines, "  desc", desc, theme, width);
         }
     }
