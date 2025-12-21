@@ -1142,14 +1142,12 @@ impl ParallelUnifiedAnalysisBuilder {
         unified.data_flow_graph = data_flow_graph;
 
         // Spec 201: Register all analyzed files for accurate total LOC calculation
-        // Use LocCounter to get accurate line counts for all files
-        use crate::metrics::loc_counter::LocCounter;
-        let loc_counter = LocCounter::default();
+        // Use cached total_lines from FileDebtMetrics (avoids redundant file I/O)
         for (file_item, _) in &file_data {
-            if let Ok(loc_count) = loc_counter.count_file(&file_item.metrics.path) {
+            if file_item.metrics.total_lines > 0 {
                 unified.register_analyzed_file(
                     file_item.metrics.path.clone(),
-                    loc_count.physical_lines,
+                    file_item.metrics.total_lines,
                 );
             }
         }
