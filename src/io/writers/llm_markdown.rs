@@ -99,6 +99,12 @@ mod format {
         if let Some(entropy) = m.entropy_score {
             writeln!(out, "- Entropy Score: {:.2}", entropy).unwrap();
         }
+        if let Some(repetition) = m.pattern_repetition {
+            writeln!(out, "- Pattern Repetition: {:.2}", repetition).unwrap();
+        }
+        if let Some(similarity) = m.branch_similarity {
+            writeln!(out, "- Branch Similarity: {:.2}", similarity).unwrap();
+        }
         if let Some(adjusted) = adj {
             writeln!(out, "- Dampening Factor: {:.2}", adjusted.dampening_factor).unwrap();
             writeln!(
@@ -386,6 +392,9 @@ mod format {
         writeln!(out, "#### Cohesion Analysis").unwrap();
         writeln!(out, "- Cohesion Score: {:.2}", c.score).unwrap();
         writeln!(out, "- Classification: {:?}", c.classification).unwrap();
+        writeln!(out, "- Functions Analyzed: {}", c.functions_analyzed).unwrap();
+        writeln!(out, "- Internal Calls: {}", c.internal_calls).unwrap();
+        writeln!(out, "- External Calls: {}", c.external_calls).unwrap();
         Some(out)
     }
 
@@ -844,6 +853,8 @@ mod tests {
                 coverage: Some(0.6),
                 uncovered_lines: None,
                 entropy_score: Some(0.7),
+                pattern_repetition: Some(0.6),
+                branch_similarity: Some(0.4),
                 entropy_adjusted_cognitive: Some(24),
                 transitive_coverage: Some(0.75),
             },
@@ -892,6 +903,18 @@ mod tests {
         assert!(
             markdown.contains("30 → 24 (entropy-adjusted)"),
             "Should show entropy-adjusted cognitive: {}",
+            markdown
+        );
+
+        // Check new entropy fields: pattern_repetition and branch_similarity
+        assert!(
+            markdown.contains("Pattern Repetition: 0.60"),
+            "Should show pattern repetition: {}",
+            markdown
+        );
+        assert!(
+            markdown.contains("Branch Similarity: 0.40"),
+            "Should show branch similarity: {}",
             markdown
         );
 

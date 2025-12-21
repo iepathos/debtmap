@@ -416,7 +416,11 @@ fn format_grouped_item(
 /// ```
 fn format_complexity_metric(item: &UnifiedDebtItem) -> String {
     // Check if entropy-adjusted cognitive complexity is available (spec 214)
-    if let Some(adjusted_cog) = item.entropy_adjusted_cognitive {
+    let adjusted_cog = item
+        .entropy_analysis
+        .as_ref()
+        .map(|e| e.adjusted_complexity);
+    if let Some(adjusted_cog) = adjusted_cog {
         let raw_cog = item.cognitive_complexity;
 
         // Show adjustment if there's a meaningful difference (>5%)
@@ -590,6 +594,7 @@ fn severity_to_color(severity: Severity) -> Color {
 mod tests {
     use super::*;
 
+    use crate::complexity::EntropyAnalysis;
     use crate::priority::{
         ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedScore,
     };
@@ -599,6 +604,17 @@ mod tests {
         cognitive_complexity: u32,
         entropy_adjusted: Option<u32>,
     ) -> UnifiedDebtItem {
+        // Convert entropy_adjusted to EntropyAnalysis
+        let entropy_analysis = entropy_adjusted.map(|adj| EntropyAnalysis {
+            entropy_score: 0.5,
+            pattern_repetition: 0.3,
+            branch_similarity: 0.2,
+            dampening_factor: adj as f64 / cognitive_complexity as f64,
+            dampening_was_applied: adj != cognitive_complexity,
+            original_complexity: cognitive_complexity,
+            adjusted_complexity: adj,
+            reasoning: vec![],
+        });
         UnifiedDebtItem {
             location: Location {
                 file: PathBuf::from("test.rs"),
@@ -655,9 +671,6 @@ mod tests {
             function_length: 10,
             cyclomatic_complexity: 5,
             cognitive_complexity,
-            entropy_details: None,
-            entropy_adjusted_cognitive: entropy_adjusted,
-            entropy_dampening_factor: None,
             is_pure: None,
             purity_confidence: None,
             purity_level: None,
@@ -677,7 +690,7 @@ mod tests {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
-            entropy_analysis: None,
+            entropy_analysis,
             context_suggestion: None,
         }
     }

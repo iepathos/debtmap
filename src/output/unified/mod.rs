@@ -345,7 +345,7 @@ mod proptest_tests {
 #[cfg(test)]
 mod dampening_tests {
     use super::*;
-    use crate::priority::unified_scorer::EntropyDetails;
+    use crate::complexity::EntropyAnalysis;
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedDebtItem,
         UnifiedScore,
@@ -414,16 +414,16 @@ mod dampening_tests {
             function_length: 20,
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: cognitive,
-            entropy_details: Some(EntropyDetails {
+            entropy_analysis: Some(EntropyAnalysis {
                 entropy_score: 0.5,
                 pattern_repetition: 0.3,
+                branch_similarity: 0.2,
                 original_complexity: cognitive,
                 adjusted_complexity: (cognitive as f64 * dampening_factor) as u32,
                 dampening_factor,
-                adjusted_cognitive: (cognitive as f64 * dampening_factor) as u32,
+                dampening_was_applied: dampening_factor < 1.0,
+                reasoning: vec![],
             }),
-            entropy_adjusted_cognitive: None,
-            entropy_dampening_factor: Some(dampening_factor),
             is_pure: None,
             purity_confidence: None,
             purity_level: None,
@@ -442,7 +442,6 @@ mod dampening_tests {
             responsibility_category: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,
-            entropy_analysis: None,
             context_suggestion: None,
         }
     }

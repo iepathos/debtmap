@@ -131,9 +131,20 @@ impl FunctionDebtItemOutput {
             .as_ref()
             .map(|c| round_ratio(c.transitive));
         let rounded_entropy = item
-            .entropy_details
+            .entropy_analysis
             .as_ref()
             .map(|e| round_ratio(e.entropy_score));
+
+        // Extract pattern_repetition and branch_similarity from entropy analysis
+        let (pattern_repetition, branch_similarity) =
+            if let Some(ref analysis) = item.entropy_analysis {
+                (
+                    Some(round_ratio(analysis.pattern_repetition)),
+                    Some(round_ratio(analysis.branch_similarity)),
+                )
+            } else {
+                (None, None)
+            };
 
         // Round pattern confidence if present
         let rounded_pattern_confidence = pattern_confidence.map(round_ratio);
@@ -159,7 +170,12 @@ impl FunctionDebtItemOutput {
                 coverage: rounded_coverage,
                 uncovered_lines: None, // Not currently tracked
                 entropy_score: rounded_entropy,
-                entropy_adjusted_cognitive: item.entropy_adjusted_cognitive,
+                pattern_repetition,
+                branch_similarity,
+                entropy_adjusted_cognitive: item
+                    .entropy_analysis
+                    .as_ref()
+                    .map(|e| e.adjusted_complexity),
                 transitive_coverage: item
                     .transitive_coverage
                     .as_ref()
@@ -224,7 +240,7 @@ impl FunctionDebtItemOutput {
                             + item.unified_score.dependency_factor,
                     ),
                     entropy_dampening: item
-                        .entropy_details
+                        .entropy_analysis
                         .as_ref()
                         .map(|e| round_ratio(e.dampening_factor)),
                     role_multiplier: round_ratio(item.unified_score.role_multiplier),
@@ -253,7 +269,7 @@ impl FunctionDebtItemOutput {
             } else {
                 None
             },
-            adjusted_complexity: item.entropy_details.as_ref().map(|e| AdjustedComplexity {
+            adjusted_complexity: item.entropy_analysis.as_ref().map(|e| AdjustedComplexity {
                 // Dampened cyclomatic = cyclomatic * dampening_factor (spec 232)
                 // When dampening_factor = 1.0, dampened_cyclomatic equals original cyclomatic
                 dampened_cyclomatic: round_score(
@@ -342,6 +358,12 @@ pub struct FunctionMetricsOutput {
     pub uncovered_lines: Option<Vec<usize>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_score: Option<f64>,
+    /// Pattern repetition score (0.0-1.0, higher = more repetitive)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_repetition: Option<f64>,
+    /// Branch similarity score (0.0-1.0, higher = similar branches)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch_similarity: Option<f64>,
     /// Entropy-adjusted cognitive complexity (Spec 264)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_adjusted_cognitive: Option<u32>,

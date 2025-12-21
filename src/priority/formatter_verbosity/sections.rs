@@ -1,4 +1,4 @@
-use crate::priority::unified_scorer::EntropyDetails;
+use crate::complexity::EntropyAnalysis;
 use crate::priority::UnifiedDebtItem;
 use colored::*;
 use std::fmt::Write;
@@ -75,7 +75,7 @@ pub fn format_coverage_detail(has_coverage: bool, gap: f64, pct: f64) -> String 
 }
 
 /// Pure function to format complexity detail
-pub fn format_complexity_detail(entropy: &Option<EntropyDetails>) -> String {
+pub fn format_complexity_detail(entropy: &Option<EntropyAnalysis>) -> String {
     if let Some(ref e) = entropy {
         format!(" (entropy-adjusted from {})", e.original_complexity)
     } else {
@@ -129,7 +129,7 @@ pub fn format_score_calculation_section(
     ));
 
     // Show complexity score
-    let complexity_detail = format_complexity_detail(&item.entropy_details);
+    let complexity_detail = format_complexity_detail(&item.entropy_analysis);
     lines.push(format!(
         "{}  {} Complexity Score: {:.1} × 40% = {:.2}{}",
         tree_pipe,
@@ -166,7 +166,7 @@ pub fn format_score_calculation_section(
     ));
 
     // Show entropy impact if present
-    if let Some(ref entropy) = item.entropy_details {
+    if let Some(ref entropy) = item.entropy_analysis {
         lines.push(format!(
             "{}  {} Entropy Impact: {:.0}% dampening (entropy: {:.2}, repetition: {:.0}%)",
             tree_pipe,

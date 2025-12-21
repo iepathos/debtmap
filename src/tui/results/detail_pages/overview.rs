@@ -251,18 +251,18 @@ pub fn format_cognitive_display(item: &UnifiedDebtItem, is_god_object: bool) -> 
             .map(|e| {
                 format!(
                     "{} → {} (dampened)",
-                    e.original_complexity, e.adjusted_cognitive
+                    e.original_complexity, e.adjusted_complexity
                 )
             })
             .unwrap_or_else(|| item.cognitive_complexity.to_string())
     } else {
-        item.entropy_details
+        item.entropy_analysis
             .as_ref()
             .filter(|e| e.dampening_factor < 1.0)
             .map(|e| {
                 format!(
                     "{} → {} (dampened)",
-                    e.original_complexity, e.adjusted_cognitive
+                    e.original_complexity, e.adjusted_complexity
                 )
             })
             .unwrap_or_else(|| item.cognitive_complexity.to_string())
@@ -536,9 +536,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             purity_level: None,
-            entropy_details: None,
-            entropy_adjusted_cognitive: None,
-            entropy_dampening_factor: None,
             god_object_indicators: None,
             tier: None,
             function_context: None,

@@ -139,7 +139,7 @@ pub fn format_priority_item(
             nesting: context.complexity_info.nesting,
             entropy: context
                 .complexity_info
-                .entropy_details
+                .entropy_analysis
                 .as_ref()
                 .map(|e| e.entropy_score),
         });
@@ -325,9 +325,6 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: 10,
             cognitive_complexity: 15,
-            entropy_details: None,
-            entropy_adjusted_cognitive: None,
-            entropy_dampening_factor: None,
             is_pure: None,
             purity_confidence: None,
             purity_level: None,

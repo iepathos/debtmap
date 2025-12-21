@@ -743,29 +743,22 @@ fn test_entropy_dampening_never_increases_complexity() {
     });
 
     // Calculate entropy details
-    let entropy_details = crate::priority::scoring::computation::calculate_entropy_details(&func);
+    let entropy_analysis = crate::priority::scoring::computation::calculate_entropy_analysis(&func);
 
-    assert!(entropy_details.is_some());
-    let details = entropy_details.unwrap();
+    assert!(entropy_analysis.is_some());
+    let analysis = entropy_analysis.unwrap();
 
     // Entropy-adjusted complexity should never exceed raw complexity
-    // Note: adjusted_complexity is the adjusted cognitive complexity, not cyclomatic
     assert!(
-        details.adjusted_complexity <= func.cognitive,
+        analysis.adjusted_complexity <= func.cognitive,
         "Adjusted complexity ({}) should not exceed raw cognitive ({})",
-        details.adjusted_complexity,
+        analysis.adjusted_complexity,
         func.cognitive
     );
     assert!(
-        details.adjusted_cognitive <= func.cognitive,
-        "Adjusted cognitive ({}) should not exceed raw cognitive ({})",
-        details.adjusted_cognitive,
-        func.cognitive
-    );
-    assert!(
-        details.dampening_factor <= 1.0,
+        analysis.dampening_factor <= 1.0,
         "Dampening factor ({}) should not exceed 1.0",
-        details.dampening_factor
+        analysis.dampening_factor
     );
 }
 
@@ -788,20 +781,20 @@ fn test_high_entropy_no_dampening() {
         dampening_applied: 1.0,
     });
 
-    let entropy_details = crate::priority::scoring::computation::calculate_entropy_details(&func);
+    let entropy_analysis = crate::priority::scoring::computation::calculate_entropy_analysis(&func);
 
-    assert!(entropy_details.is_some());
-    let details = entropy_details.unwrap();
+    assert!(entropy_analysis.is_some());
+    let analysis = entropy_analysis.unwrap();
 
     // High entropy = dampening factor should be 1.0 (no reduction)
     assert_eq!(
-        details.dampening_factor, 1.0,
+        analysis.dampening_factor, 1.0,
         "High entropy code should have dampening_factor=1.0, got {}",
-        details.dampening_factor
+        analysis.dampening_factor
     );
     // Cognitive should not be reduced
     assert_eq!(
-        details.adjusted_cognitive, func.cognitive,
+        analysis.adjusted_complexity, func.cognitive,
         "High entropy code cognitive should not be reduced"
     );
 }
@@ -832,14 +825,12 @@ fn test_entropy_details_populated_in_debt_item() {
     assert!(debt_item.is_some());
     let item = debt_item.unwrap();
 
-    // Verify entropy details are populated
-    assert!(item.entropy_details.is_some());
-    assert!(item.entropy_adjusted_cognitive.is_some());
-    assert!(item.entropy_dampening_factor.is_some());
+    // Verify entropy analysis is populated
+    assert!(item.entropy_analysis.is_some());
+    let entropy = item.entropy_analysis.as_ref().unwrap();
 
     // Verify adjusted cognitive value is reasonable (dampened from original)
-    let adjusted_cog = item.entropy_adjusted_cognitive.unwrap();
-    assert!(adjusted_cog <= func.cognitive);
+    assert!(entropy.adjusted_complexity <= func.cognitive);
 }
 
 #[test]

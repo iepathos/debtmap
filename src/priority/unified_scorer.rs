@@ -160,19 +160,11 @@ pub struct UnifiedDebtItem {
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
-    /// **DEPRECATED (Spec 218)**: Use `entropy_analysis` instead.
-    /// Kept for backward compatibility with existing code.
-    pub entropy_details: Option<EntropyDetails>,
     /// Unified entropy analysis (Spec 218) - SINGLE SOURCE OF TRUTH.
-    /// This is the canonical entropy type that flows through the entire pipeline.
+    /// Contains entropy_score, pattern_repetition, branch_similarity,
+    /// dampening_factor, adjusted_complexity, and reasoning.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_analysis: Option<crate::complexity::EntropyAnalysis>,
-    /// **DEPRECATED (Spec 218)**: Use `entropy_analysis.adjusted_complexity` instead.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub entropy_adjusted_cognitive: Option<u32>,
-    /// **DEPRECATED (Spec 218)**: Use `entropy_analysis.dampening_factor` instead.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub entropy_dampening_factor: Option<f64>,
     pub is_pure: Option<bool>,          // Whether the function is pure
     pub purity_confidence: Option<f32>, // Confidence in purity detection
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -227,16 +219,6 @@ impl UnifiedDebtItem {
         self.pattern_analysis = Some(pattern_analysis);
         self
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntropyDetails {
-    pub entropy_score: f64,
-    pub pattern_repetition: f64,
-    pub original_complexity: u32,
-    pub adjusted_complexity: u32,
-    pub dampening_factor: f64,
-    pub adjusted_cognitive: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -399,8 +381,8 @@ pub fn calculate_unified_priority_with_role(
     // Orchestrators typically have low cognitive complexity relative to cyclomatic
     let is_orchestrator_candidate = role == FunctionRole::Orchestrator;
 
-    // Calculate entropy details if available (spec 214)
-    let entropy_details = crate::priority::scoring::computation::calculate_entropy_details(func);
+    // Calculate entropy analysis if available (Spec 218)
+    let entropy_analysis = crate::priority::scoring::computation::calculate_entropy_analysis(func);
 
     // Calculate purity adjustment and apply to complexity metrics
     let purity_bonus = calculate_purity_adjustment(func);
@@ -410,7 +392,7 @@ pub fn calculate_unified_priority_with_role(
     let raw_complexity = normalize_complexity(
         purity_adjusted_cyclomatic,
         purity_adjusted_cognitive,
-        entropy_details.as_ref(),
+        entropy_analysis.as_ref(),
         is_orchestrator_candidate,
     );
 
@@ -796,7 +778,7 @@ fn apply_orchestration_adjustment(
 fn normalize_complexity(
     cyclomatic: u32,
     cognitive: u32,
-    entropy_details: Option<&EntropyDetails>,
+    entropy_analysis: Option<&crate::complexity::EntropyAnalysis>,
     is_orchestrator: bool,
 ) -> f64 {
     let entropy_config = crate::config::get_entropy_config();
@@ -805,9 +787,9 @@ fn normalize_complexity(
     let raw_cyclomatic = cyclomatic as f64;
 
     // Use entropy-adjusted cognitive if available and enabled
-    let adjusted_cognitive = if let Some(entropy) = entropy_details {
+    let adjusted_cognitive = if let Some(entropy) = entropy_analysis {
         if entropy_config.enabled {
-            entropy.adjusted_cognitive as f64
+            entropy.adjusted_complexity as f64
         } else {
             cognitive as f64
         }

@@ -118,9 +118,9 @@ pub struct GodObjectAnalysis {
     /// Domain diversity metrics with detailed distribution (spec 152)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_diversity_metrics: Option<crate::organization::DomainDiversityMetrics>,
-    /// Aggregated entropy analysis across all functions in the god object
+    /// Aggregated entropy analysis across all functions in the god object (Spec 218)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub aggregated_entropy: Option<crate::priority::unified_scorer::EntropyDetails>,
+    pub aggregated_entropy: Option<crate::complexity::EntropyAnalysis>,
     /// Total error swallowing count across all functions in the god object
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregated_error_swallowing_count: Option<u32>,

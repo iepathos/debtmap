@@ -17,7 +17,7 @@ pub use super::construction::{
 };
 
 // Re-export computation functions for backward compatibility
-pub(super) use super::computation::{calculate_entropy_details, calculate_expected_impact};
+pub(super) use super::computation::{calculate_entropy_analysis, calculate_expected_impact};
 
 // Import computation functions for tests
 #[cfg(test)]

@@ -45,7 +45,7 @@ fn has_direct_pattern_data(item: &UnifiedDebtItem) -> bool {
         || item.detected_pattern.is_some()
         || item.is_pure.is_some()
         || item.language_specific.is_some()
-        || item.entropy_details.is_some()
+        || item.entropy_analysis.is_some()
         || item.error_swallowing_count.is_some()
         || item.error_swallowing_patterns.is_some()
 }
@@ -262,9 +262,6 @@ mod tests {
             function_length: 10,
             cyclomatic_complexity: 5,
             cognitive_complexity: 10,
-            entropy_details: None,
-            entropy_adjusted_cognitive: None,
-            entropy_dampening_factor: None,
             is_pure: None,
             purity_confidence: None,
             purity_level: None,

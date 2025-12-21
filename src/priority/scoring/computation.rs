@@ -4,18 +4,18 @@
 //! scores, and expected impacts. All functions in this module should be pure (no side effects)
 //! and easy to test independently.
 
+use crate::complexity::EntropyAnalysis;
 use crate::core::FunctionMetrics;
-use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{DebtType, ImpactMetrics, UnifiedScore};
 
-/// Helper function to calculate entropy details from FunctionMetrics
-/// Pure function - transforms function metrics into entropy details
+/// Calculate entropy analysis from FunctionMetrics.
+/// Pure function - transforms function metrics into unified entropy analysis.
 ///
 /// Note: Entropy dampening only applies to cognitive complexity, not cyclomatic.
 /// Cyclomatic complexity is a structural metric (number of execution paths) that
 /// doesn't change based on pattern repetition. Cognitive complexity is a perceptual
 /// metric (how hard to understand) that is reduced by repetitive patterns.
-pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
+pub fn calculate_entropy_analysis(func: &FunctionMetrics) -> Option<EntropyAnalysis> {
     func.entropy_score.as_ref().map(|entropy_score| {
         // Only apply dampening for LOW entropy (repetitive patterns)
         // High entropy indicates real complexity that shouldn't be dampened
@@ -37,13 +37,45 @@ pub fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetail
         // NOT to cyclomatic complexity (structural metric - path count doesn't change)
         let adjusted_cognitive = (func.cognitive as f64 * dampening_factor) as u32;
 
-        EntropyDetails {
+        // Build reasoning for why dampening was applied
+        let mut reasoning = Vec::new();
+        if entropy_score.pattern_repetition > 0.6 {
+            reasoning.push(format!(
+                "High pattern repetition detected ({}%)",
+                (entropy_score.pattern_repetition * 100.0) as i32
+            ));
+        }
+        if entropy_score.token_entropy < 0.4 {
+            reasoning.push(format!(
+                "Low token entropy indicates simple patterns ({:.2})",
+                entropy_score.token_entropy
+            ));
+        }
+        if entropy_score.branch_similarity > 0.7 {
+            reasoning.push(format!(
+                "Similar branch structures found ({}% similarity)",
+                (entropy_score.branch_similarity * 100.0) as i32
+            ));
+        }
+        if dampening_factor < 1.0 {
+            let reduction_pct = ((1.0 - dampening_factor) * 100.0) as i32;
+            reasoning.push(format!(
+                "Complexity reduced by {}% due to pattern-based code",
+                reduction_pct
+            ));
+        } else {
+            reasoning.push("Genuine complexity detected - no reduction applied".to_string());
+        }
+
+        EntropyAnalysis {
             entropy_score: entropy_score.token_entropy,
             pattern_repetition: entropy_score.pattern_repetition,
-            original_complexity: func.cognitive, // Store original cognitive, not cyclomatic
-            adjusted_complexity: adjusted_cognitive, // Deprecated: same as adjusted_cognitive
+            branch_similarity: entropy_score.branch_similarity,
             dampening_factor,
-            adjusted_cognitive,
+            dampening_was_applied: dampening_factor < 1.0,
+            original_complexity: func.cognitive,
+            adjusted_complexity: adjusted_cognitive,
+            reasoning,
         }
     })
 }

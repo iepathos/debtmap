@@ -12,7 +12,7 @@ pub fn format_complexity_summary(
         crate::priority::formatter::extract_complexity_info(item);
 
     if cyclomatic > 0 || cognitive > 0 {
-        if let Some(ref entropy) = item.entropy_details {
+        if let Some(ref entropy) = item.entropy_analysis {
             writeln!(
                 output,
                 "├─ {} cyclomatic={} (dampened: {}, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
@@ -82,7 +82,7 @@ pub fn format_complexity_details_section(
     lines.push(format!("{} {}", "-", "COMPLEXITY DETAILS:".bright_blue()));
 
     // Format cyclomatic complexity with entropy dampening if available
-    if let Some(ref entropy) = item.entropy_details {
+    if let Some(ref entropy) = item.entropy_analysis {
         lines.push(format!(
             "{}  {} cyclomatic={} (dampened: {}, factor: {:.2})",
             tree_pipe,

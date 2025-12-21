@@ -6,8 +6,8 @@ use crate::organization::anti_pattern_detector::{AntiPattern, AntiPatternSeverit
 use crate::organization::god_object::GodObjectAnalysis;
 use crate::organization::AntiPatternReport;
 use crate::output::PatternAnalysis;
+use crate::complexity::EntropyAnalysis;
 use crate::priority::detected_pattern::DetectedPattern;
-use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::UnifiedDebtItem;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
@@ -33,7 +33,7 @@ fn entropy_description(score: f64) -> &'static str {
 /// Render entropy analysis section. Returns true if anything was rendered.
 fn render_entropy_section(
     lines: &mut Vec<Line<'static>>,
-    entropy: &EntropyDetails,
+    entropy: &EntropyAnalysis,
     theme: &Theme,
     width: u16,
 ) -> bool {
@@ -72,7 +72,7 @@ fn render_entropy_section(
             "cognitive complexity",
             format!(
                 "{} → {} (dampened)",
-                entropy.original_complexity, entropy.adjusted_cognitive
+                entropy.original_complexity, entropy.adjusted_complexity
             ),
             theme,
             width,
@@ -216,7 +216,7 @@ fn render_error_handling_section(
 /// Render god object entropy section. Returns true if anything was rendered.
 fn render_god_object_entropy_section(
     lines: &mut Vec<Line<'static>>,
-    entropy: &EntropyDetails,
+    entropy: &EntropyAnalysis,
     theme: &Theme,
     width: u16,
 ) -> bool {
@@ -247,7 +247,7 @@ fn render_god_object_entropy_section(
         "total complexity",
         format!(
             "{} (original) → {} (adjusted)",
-            entropy.original_complexity, entropy.adjusted_cognitive
+            entropy.original_complexity, entropy.adjusted_complexity
         ),
         theme,
         width,
@@ -520,7 +520,7 @@ fn build_all_sections(
     let mut has_any_data = false;
 
     // Entropy Analysis section
-    if let Some(ref entropy) = item.entropy_details {
+    if let Some(ref entropy) = item.entropy_analysis {
         has_any_data |= render_entropy_section(lines, entropy, theme, width);
     }
 

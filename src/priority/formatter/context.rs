@@ -1,6 +1,6 @@
+use crate::complexity::EntropyAnalysis;
 use crate::priority::classification::Severity;
 use crate::priority::detected_pattern::DetectedPattern;
-use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{DebtType, UnifiedDebtItem};
 
 // Pure function to create formatting context
@@ -80,7 +80,7 @@ pub(crate) struct ComplexityInfo {
     pub branch_count: u32,
     pub nesting: u32,
     pub has_complexity: bool,
-    pub entropy_details: Option<EntropyDetails>,
+    pub entropy_analysis: Option<EntropyAnalysis>,
 }
 
 impl ComplexityInfo {
@@ -93,7 +93,7 @@ impl ComplexityInfo {
             branch_count,
             nesting,
             has_complexity: cyclomatic > 0 || cognitive > 0,
-            entropy_details: item.entropy_details.clone(),
+            entropy_analysis: item.entropy_analysis.clone(),
         }
     }
 }

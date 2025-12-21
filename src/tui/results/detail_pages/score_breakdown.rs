@@ -85,13 +85,17 @@ pub fn build_raw_inputs_section(
         width,
     );
     // Show cognitive complexity, with entropy-adjusted value if different
-    // Check item-level first, then god object aggregated entropy
-    let entropy_adjusted = item.entropy_adjusted_cognitive.or_else(|| {
-        item.god_object_indicators
-            .as_ref()
-            .and_then(|g| g.aggregated_entropy.as_ref())
-            .map(|e| e.adjusted_cognitive)
-    });
+    // Check item-level entropy_analysis first, then god object aggregated entropy
+    let entropy_adjusted = item
+        .entropy_analysis
+        .as_ref()
+        .map(|e| e.adjusted_complexity)
+        .or_else(|| {
+            item.god_object_indicators
+                .as_ref()
+                .and_then(|g| g.aggregated_entropy.as_ref())
+                .map(|e| e.adjusted_complexity)
+        });
 
     if let Some(adjusted) = entropy_adjusted {
         if adjusted != item.cognitive_complexity {
@@ -198,7 +202,9 @@ pub fn build_score_factors_section(
     // Formula: (cyc×0.4 + adj_cog×0.6) / 2 where adj_cog is entropy-adjusted
     let cyc = item.cyclomatic_complexity;
     let cog_adjusted = item
-        .entropy_adjusted_cognitive
+        .entropy_analysis
+        .as_ref()
+        .map(|e| e.adjusted_complexity)
         .unwrap_or(item.cognitive_complexity);
 
     // Check if purity bonus was applied (different from data flow purity_factor)
@@ -381,26 +387,32 @@ pub fn build_multipliers_section(
 
     if is_god_object {
         // For god objects, entropy dampening IS a score multiplier
-        if let Some(dampening) = item.entropy_dampening_factor {
+        // Check item-level entropy_analysis first, then god object aggregated
+        let dampening_factor = item
+            .entropy_analysis
+            .as_ref()
+            .map(|e| e.dampening_factor)
+            .or_else(|| {
+                item.god_object_indicators
+                    .as_ref()
+                    .and_then(|g| g.aggregated_entropy.as_ref())
+                    .map(|e| e.dampening_factor)
+            });
+
+        if let Some(dampening) = dampening_factor {
+            let desc = if item.entropy_analysis.is_some() {
+                "repetitive patterns"
+            } else {
+                "aggregated repetition"
+            };
             add_multiplier_line(
                 &mut lines,
                 "entropy dampening",
                 dampening,
-                "repetitive patterns",
+                desc,
                 theme,
                 width,
             );
-        } else if let Some(ref god) = item.god_object_indicators {
-            if let Some(ref entropy) = god.aggregated_entropy {
-                add_multiplier_line(
-                    &mut lines,
-                    "entropy dampening",
-                    entropy.dampening_factor,
-                    "aggregated repetition",
-                    theme,
-                    width,
-                );
-            }
         }
     }
     // For regular functions: entropy is already reflected in cognitive complexity
@@ -715,7 +727,11 @@ pub fn build_calculation_summary_section(
     let pattern = item.unified_score.pattern_factor.unwrap_or(1.0);
     let refactor = item.unified_score.refactorability_factor.unwrap_or(1.0);
     let context = item.context_multiplier.unwrap_or(1.0);
-    let entropy = item.entropy_dampening_factor.unwrap_or(1.0);
+    let entropy = item
+        .entropy_analysis
+        .as_ref()
+        .map(|e| e.dampening_factor)
+        .unwrap_or(1.0);
 
     // Build multiplier product (for potential future use)
     let _total_mult = role * purity * pattern * refactor * context * entropy;
@@ -1068,7 +1084,11 @@ pub fn build_calculation_summary_section(
         let mut current = scaled_score;
 
         // Show entropy dampening if applied (affects god object score)
-        if let Some(entropy_damp) = item.entropy_dampening_factor {
+        let entropy_damp = item
+            .entropy_analysis
+            .as_ref()
+            .map(|e| e.dampening_factor);
+        if let Some(entropy_damp) = entropy_damp {
             if (entropy_damp - 1.0).abs() > 0.01 {
                 let after_entropy = current * entropy_damp;
                 add_label_value(
@@ -1584,9 +1604,6 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             purity_level: None,
-            entropy_details: None,
-            entropy_adjusted_cognitive: None,
-            entropy_dampening_factor: Some(0.85),
             god_object_indicators: None,
             tier: None,
             function_context: None,

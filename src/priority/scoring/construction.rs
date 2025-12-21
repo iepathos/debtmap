@@ -9,17 +9,18 @@ use crate::context::{detect_file_type, FileType};
 use crate::core::FunctionMetrics;
 use crate::priority::context::{generate_context_suggestion, ContextConfig};
 
+use crate::complexity::EntropyAnalysis;
 use crate::priority::scoring::ContextRecommendationEngine;
 use crate::priority::unified_scorer::{
     calculate_unified_priority, calculate_unified_priority_with_data_flow_and_role,
-    calculate_unified_priority_with_role, EntropyDetails,
+    calculate_unified_priority_with_role,
 };
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::calculate_transitive_coverage,
     debt_aggregator::DebtAggregator,
     scoring::debt_item::{
-        calculate_entropy_details, calculate_expected_impact, classify_all_debt_types_with_role,
+        calculate_entropy_analysis, calculate_expected_impact, classify_all_debt_types_with_role,
         classify_debt_type_enhanced, generate_recommendation,
         generate_recommendation_with_coverage_and_data_flow,
     },
@@ -221,8 +222,8 @@ pub fn create_unified_debt_item_enhanced(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
 
-    // Calculate entropy details once for efficiency (spec 214)
-    let entropy_details = calculate_entropy_details(func);
+    // Calculate entropy analysis once for efficiency (Spec 218 - unified entropy type)
+    let entropy_analysis = calculate_entropy_analysis(func);
 
     // Calculate file line count (this function doesn't use the cache since it's a standalone API)
     let file_line_count = calculate_file_line_count_from_disk(&func.file);
@@ -251,10 +252,7 @@ pub fn create_unified_debt_item_enhanced(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
-        entropy_details: entropy_details.clone(),
-        entropy_analysis: func.entropy_analysis.clone(), // Spec 218: Unified entropy type
-        entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
-        entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
+        entropy_analysis: entropy_analysis.clone(),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         purity_level: func.purity_level,
@@ -339,8 +337,8 @@ pub(crate) struct FunctionScoringContext {
     pub transitive_coverage: Option<TransitiveCoverage>,
     /// Pre-computed dependency metrics
     pub deps: DependencyMetrics,
-    /// Pre-computed entropy details for complexity adjustment
-    pub entropy_details: Option<EntropyDetails>,
+    /// Pre-computed entropy analysis for complexity adjustment (Spec 218)
+    pub entropy_analysis: Option<EntropyAnalysis>,
     /// Pre-computed context analysis
     pub context_analysis: crate::analysis::ContextAnalysis,
 }
@@ -396,8 +394,8 @@ impl FunctionScoringContext {
         // Compute dependencies ONCE
         let deps = extract_dependency_metrics(func, &func_id, call_graph);
 
-        // Compute entropy details ONCE (spec 205)
-        let entropy_details = calculate_entropy_details(func);
+        // Compute entropy analysis ONCE (Spec 218)
+        let entropy_analysis = calculate_entropy_analysis(func);
 
         // Compute context analysis ONCE
         let context_analysis = context_detector.detect_context(func, &func.file);
@@ -408,7 +406,7 @@ impl FunctionScoringContext {
             unified_score,
             transitive_coverage,
             deps,
-            entropy_details,
+            entropy_analysis,
             context_analysis,
         }
     }
@@ -570,11 +568,8 @@ fn build_unified_debt_item_from_context(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
-        // Use pre-computed entropy details (spec 205)
-        entropy_details: ctx.entropy_details.clone(),
-        entropy_analysis: func.entropy_analysis.clone(), // Spec 218: Unified entropy type
-        entropy_adjusted_cognitive: ctx.entropy_details.as_ref().map(|e| e.adjusted_cognitive),
-        entropy_dampening_factor: ctx.entropy_details.as_ref().map(|e| e.dampening_factor),
+        // Use pre-computed entropy analysis (Spec 218)
+        entropy_analysis: ctx.entropy_analysis.clone(),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         purity_level: func.purity_level,
@@ -832,7 +827,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
 
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
-    let entropy_details = calculate_entropy_details(func);
+    // Calculate entropy analysis once (Spec 218)
+    let entropy_analysis = calculate_entropy_analysis(func);
     // Look up file line count from cache (spec 195: O(1) lookup instead of file read)
     let file_line_count = get_file_line_count(&func.file, file_line_counts);
 
@@ -873,10 +869,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 function_length: func.length,
                 cyclomatic_complexity: func.cyclomatic,
                 cognitive_complexity: func.cognitive,
-                entropy_details: entropy_details.clone(),
-                entropy_analysis: func.entropy_analysis.clone(), // Spec 218: Unified entropy type
-                entropy_adjusted_cognitive: entropy_details.as_ref().map(|e| e.adjusted_cognitive),
-                entropy_dampening_factor: entropy_details.as_ref().map(|e| e.dampening_factor),
+                entropy_analysis: entropy_analysis.clone(),
                 is_pure: func.is_pure,
                 purity_confidence: func.purity_confidence,
                 purity_level: func.purity_level,

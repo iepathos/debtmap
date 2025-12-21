@@ -28,8 +28,8 @@
 //! ```
 
 use crate::complexity::entropy_core::{EntropyConfig, EntropyScore, UniversalEntropyCalculator};
+use crate::complexity::EntropyAnalysis;
 use crate::core::FunctionMetrics;
-use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
 use crate::risk::lcov::LcovData;
@@ -52,8 +52,8 @@ pub struct GodObjectAggregatedMetrics {
     pub total_error_swallowing_count: u32,
     /// Unique error swallowing pattern types found
     pub error_swallowing_patterns: Vec<String>,
-    /// Aggregated entropy analysis from member functions
-    pub aggregated_entropy: Option<EntropyDetails>,
+    /// Aggregated entropy analysis from member functions (Spec 218)
+    pub aggregated_entropy: Option<EntropyAnalysis>,
 }
 
 /// Extract member functions for a file.
@@ -243,14 +243,14 @@ pub fn aggregate_dependency_metrics_from_raw(
     )
 }
 
-/// Aggregate entropy analysis from member UnifiedDebtItems.
+/// Aggregate entropy analysis from member UnifiedDebtItems (Spec 218).
 ///
 /// Returns weighted average entropy metrics based on function length.
 /// Uses original (undampened) complexity values for the aggregate summary.
-pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<EntropyDetails> {
+pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<EntropyAnalysis> {
     let entropy_data: Vec<_> = members
         .iter()
-        .filter_map(|m| m.entropy_details.as_ref().map(|e| (e, m.function_length)))
+        .filter_map(|m| m.entropy_analysis.as_ref().map(|e| (e, m.function_length)))
         .collect();
 
     if entropy_data.is_empty() {
@@ -276,6 +276,13 @@ pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<Entropy
         .sum::<f64>()
         / total_length as f64;
 
+    // Weighted average of branch similarity
+    let weighted_branch_similarity = entropy_data
+        .iter()
+        .map(|(e, len)| e.branch_similarity * (*len as f64))
+        .sum::<f64>()
+        / total_length as f64;
+
     // Weighted average of dampening factor
     let weighted_dampening = entropy_data
         .iter()
@@ -288,15 +295,28 @@ pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<Entropy
         .iter()
         .map(|(e, _)| e.original_complexity)
         .sum();
-    let total_adjusted: u32 = entropy_data.iter().map(|(e, _)| e.adjusted_cognitive).sum();
+    let total_adjusted: u32 = entropy_data
+        .iter()
+        .map(|(e, _)| e.adjusted_complexity)
+        .sum();
 
-    Some(EntropyDetails {
+    // Aggregate reasoning from all members
+    let mut reasoning: Vec<String> = entropy_data
+        .iter()
+        .flat_map(|(e, _)| e.reasoning.iter().cloned())
+        .collect();
+    reasoning.dedup();
+    reasoning.truncate(5); // Limit to top 5 reasons
+
+    Some(EntropyAnalysis {
         entropy_score: weighted_entropy,
         pattern_repetition: weighted_repetition,
+        branch_similarity: weighted_branch_similarity,
+        dampening_factor: weighted_dampening,
+        dampening_was_applied: weighted_dampening < 1.0,
         original_complexity: total_original,
         adjusted_complexity: total_adjusted,
-        dampening_factor: weighted_dampening,
-        adjusted_cognitive: total_adjusted,
+        reasoning,
     })
 }
 
@@ -367,13 +387,13 @@ fn total_length(data: &[(&EntropyScore, usize, u32)]) -> usize {
     data.iter().map(|(_, len, _)| *len).sum()
 }
 
-/// Aggregate entropy from raw FunctionMetrics.
+/// Aggregate entropy from raw FunctionMetrics (Spec 218).
 ///
 /// Returns weighted average entropy based on function length from ALL functions,
 /// not just those that became debt items.
 ///
 /// Composed from pure helper functions following Stillwater principles.
-pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<EntropyDetails> {
+pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<EntropyAnalysis> {
     let data = extract_entropy_data(functions);
     let len = total_length(&data);
 
@@ -383,19 +403,25 @@ pub fn aggregate_entropy_from_raw(functions: &[FunctionMetrics]) -> Option<Entro
 
     let entropy = weighted_average(&data, len, |e| e.token_entropy);
     let repetition = weighted_average(&data, len, |e| e.pattern_repetition);
+    let branch_similarity = weighted_average(&data, len, |e| e.branch_similarity);
     let total_cognitive = sum_cognitive(&data);
 
     let calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
     let dampening_factor = calculator.calculate_dampening_factor(entropy, repetition);
-    let adjusted_cognitive = (total_cognitive as f64 * dampening_factor) as u32;
+    let adjusted_complexity = (total_cognitive as f64 * dampening_factor) as u32;
 
-    Some(EntropyDetails {
+    Some(EntropyAnalysis {
         entropy_score: entropy,
         pattern_repetition: repetition,
-        original_complexity: total_cognitive,
-        adjusted_complexity: adjusted_cognitive,
+        branch_similarity,
         dampening_factor,
-        adjusted_cognitive,
+        dampening_was_applied: dampening_factor < 1.0,
+        original_complexity: total_cognitive,
+        adjusted_complexity,
+        reasoning: vec![format!(
+            "Aggregated from {} functions",
+            functions.len()
+        )],
     })
 }
 
@@ -508,6 +534,7 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
 mod tests {
     use super::*;
 
+    use crate::complexity::EntropyAnalysis;
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
@@ -576,9 +603,6 @@ mod tests {
             function_length: length,
             cyclomatic_complexity: cyc,
             cognitive_complexity: cog,
-            entropy_details: None,
-            entropy_adjusted_cognitive: None,
-            entropy_dampening_factor: None,
             is_pure: None,
             purity_confidence: None,
             purity_level: None,
@@ -818,23 +842,27 @@ mod tests {
     fn test_aggregate_entropy_metrics_weighted_average() {
         // Create items with different entropy details and lengths
         let mut item1 = create_test_item("file.rs", 10, 20, 2, 100); // length 100
-        item1.entropy_details = Some(EntropyDetails {
+        item1.entropy_analysis = Some(EntropyAnalysis {
             entropy_score: 0.4,
             pattern_repetition: 0.6,
+            branch_similarity: 0.3,
             original_complexity: 20,
             adjusted_complexity: 16,
             dampening_factor: 0.8,
-            adjusted_cognitive: 16,
+            dampening_was_applied: true,
+            reasoning: vec![],
         });
 
         let mut item2 = create_test_item("file.rs", 15, 30, 3, 200); // length 200
-        item2.entropy_details = Some(EntropyDetails {
+        item2.entropy_analysis = Some(EntropyAnalysis {
             entropy_score: 0.5,
             pattern_repetition: 0.3,
+            branch_similarity: 0.2,
             original_complexity: 30,
             adjusted_complexity: 27,
             dampening_factor: 0.9,
-            adjusted_cognitive: 27,
+            dampening_was_applied: true,
+            reasoning: vec![],
         });
 
         let members = vec![&item1, &item2];
@@ -851,7 +879,7 @@ mod tests {
 
         // Sums: 20 + 30 = 50, 16 + 27 = 43
         assert_eq!(result.original_complexity, 50);
-        assert_eq!(result.adjusted_cognitive, 43);
+        assert_eq!(result.adjusted_complexity, 43);
     }
 
     #[test]
@@ -870,13 +898,15 @@ mod tests {
     fn test_aggregate_entropy_metrics_partial() {
         // Only one item has entropy
         let mut item1 = create_test_item("file.rs", 10, 20, 2, 100);
-        item1.entropy_details = Some(EntropyDetails {
+        item1.entropy_analysis = Some(EntropyAnalysis {
             entropy_score: 0.4,
             pattern_repetition: 0.6,
+            branch_similarity: 0.3,
             original_complexity: 20,
             adjusted_complexity: 16,
             dampening_factor: 0.8,
-            adjusted_cognitive: 16,
+            dampening_was_applied: true,
+            reasoning: vec![],
         });
 
         let item2 = create_test_item("file.rs", 15, 30, 3, 200); // No entropy
@@ -892,13 +922,15 @@ mod tests {
     #[test]
     fn test_aggregate_god_object_metrics_includes_entropy() {
         let mut item1 = create_test_item("file.rs", 10, 20, 2, 100);
-        item1.entropy_details = Some(EntropyDetails {
+        item1.entropy_analysis = Some(EntropyAnalysis {
             entropy_score: 0.4,
             pattern_repetition: 0.6,
+            branch_similarity: 0.3,
             original_complexity: 20,
             adjusted_complexity: 16,
             dampening_factor: 0.8,
-            adjusted_cognitive: 16,
+            dampening_was_applied: true,
+            reasoning: vec![],
         });
 
         let members = vec![&item1];

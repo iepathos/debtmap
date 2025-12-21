@@ -121,7 +121,7 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
         return None;
     }
 
-    if let Some(ref entropy) = context.complexity_info.entropy_details {
+    if let Some(ref entropy) = context.complexity_info.entropy_analysis {
         // Show raw → adjusted for clarity (spec 183)
         Some(format!(
             "{} cyclomatic={} → {} (entropy-adjusted, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
