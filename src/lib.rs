@@ -343,6 +343,7 @@ pub mod core;
 pub mod data_flow;
 pub mod database;
 pub mod debt;
+pub mod debtmap_error;
 pub mod di;
 pub mod effects;
 pub mod env;
@@ -451,3 +452,6 @@ pub use crate::observability::{
     get_current_context, get_progress, increment_processed, install_panic_hook, set_current_file,
     set_phase, set_phase_persistent, set_progress, AnalysisContext, AnalysisPhase,
 };
+
+// Unified error types (spec 005) - consolidated error handling with context chaining
+pub use crate::debtmap_error::{DebtmapError, ErrorCode};

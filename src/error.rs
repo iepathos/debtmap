@@ -1,4 +1,8 @@
-//! Domain-specific error types for debtmap
+//! Domain-specific error types for debtmap (DEPRECATED).
+//!
+//! **DEPRECATED**: This module is deprecated in favor of [`crate::debtmap_error::DebtmapError`].
+//! The types here are maintained for backwards compatibility during migration.
+//! New code should use [`DebtmapError`](crate::debtmap_error::DebtmapError) instead.
 //!
 //! This module provides a clear hierarchy of error types that correspond to different
 //! error domains in the application:
@@ -7,6 +11,18 @@
 //! - `ConfigError`: Configuration building and validation errors
 //! - `AnalysisError`: Analysis execution errors
 //! - `AppError`: Top-level application error that encompasses all domains
+//!
+//! # Migration
+//!
+//! All types in this module implement `Into<DebtmapError>` for gradual migration:
+//!
+//! ```rust,ignore
+//! use debtmap::error::ConfigError;
+//! use debtmap::debtmap_error::DebtmapError;
+//!
+//! let old_error = ConfigError::InvalidThreshold("must be > 0".to_string());
+//! let new_error: DebtmapError = old_error.into();
+//! ```
 //!
 //! # Error Boundaries
 //!
