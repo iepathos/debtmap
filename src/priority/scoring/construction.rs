@@ -687,7 +687,8 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
 
             // Generate context suggestion for AI agents (spec 263)
             let context_config = ContextConfig::default();
-            item.context_suggestion = generate_context_suggestion(&item, call_graph, &context_config);
+            item.context_suggestion =
+                generate_context_suggestion(&item, call_graph, &context_config);
 
             // Analyze contextual risk if risk analyzer is provided (spec 202)
             if let Some(analyzer) = risk_analyzer {
@@ -890,7 +891,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
 
             // Generate context suggestion for AI agents (spec 263)
             let context_config = ContextConfig::default();
-            item.context_suggestion = generate_context_suggestion(&item, call_graph, &context_config);
+            item.context_suggestion =
+                generate_context_suggestion(&item, call_graph, &context_config);
 
             Some(item)
         })

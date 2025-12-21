@@ -205,7 +205,9 @@ pub fn build_score_factors_section(
     // The scorer may apply purity bonus to metrics before weighting
     // Formula: (cyc×0.4 + adj_cog×0.6) / 2 where adj_cog is entropy-adjusted
     let cyc = item.cyclomatic_complexity;
-    let cog_adjusted = item.entropy_adjusted_cognitive.unwrap_or(item.cognitive_complexity);
+    let cog_adjusted = item
+        .entropy_adjusted_cognitive
+        .unwrap_or(item.cognitive_complexity);
 
     // Check if purity bonus was applied (different from data flow purity_factor)
     // If purity_level is pure, complexity metrics were reduced before scoring

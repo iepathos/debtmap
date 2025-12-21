@@ -206,7 +206,6 @@ pub fn normalize_final_score_with_metadata(raw_score: f64) -> NormalizedScore {
     }
 }
 
-
 /// Inverse normalization function for interpretation
 pub fn denormalize_score(normalized: f64) -> f64 {
     if normalized <= 0.0 {

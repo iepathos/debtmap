@@ -18,10 +18,21 @@
 //!
 //! # Reader Pattern (Spec 199)
 //!
-//! This module also provides **Reader pattern** helpers using stillwater 0.11.0's
+//! This module also provides **Reader pattern** helpers using stillwater 0.15's
 //! zero-cost `ask`, `asks`, and `local` primitives. The Reader pattern eliminates
 //! config parameter threading by making configuration available through the
 //! environment.
+//!
+//! # Stillwater 0.15 Features
+//!
+//! Stillwater 0.15 introduces additional effect types that can be used in debtmap:
+//!
+//! - **Writer Effect**: Accumulate logs/metrics alongside computation without
+//!   threading state. Available via `stillwater::effect::writer::{WriterEffect, tell, tell_one}`.
+//! - **Sink Effect**: Stream output with O(1) memory for large reports.
+//!   Available via `stillwater::effect::sink::{emit, emit_many}`.
+//! - **Bracket Builder**: Cleaner resource management syntax via
+//!   `stillwater::effect::bracket::Bracket`.
 //!
 //! ## Reader Pattern Benefits
 //!
