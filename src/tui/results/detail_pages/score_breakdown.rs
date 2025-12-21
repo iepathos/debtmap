@@ -46,12 +46,6 @@ pub fn build_final_score_section(
         Severity::Low => Color::Green,
     };
 
-    // Create a visual bar representation
-    let bar_width: usize = 20;
-    let filled = ((score / 100.0) * bar_width as f64).round() as usize;
-    let empty = bar_width.saturating_sub(filled);
-    let bar = format!("[{}{}]", "#".repeat(filled), "-".repeat(empty));
-
     // Use proper column alignment
     let label = format!(
         "{:width$}",
@@ -69,8 +63,6 @@ pub fn build_final_score_section(
             format!("[{}]", severity.as_str().to_lowercase()),
             Style::default().fg(severity_color),
         ),
-        Span::raw(" "),
-        Span::styled(bar, Style::default().fg(theme.muted)),
     ]));
     add_blank_line(&mut lines);
     lines
