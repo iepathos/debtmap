@@ -465,22 +465,34 @@ mod tests {
     use super::*;
     use std::thread;
 
+    /// Get current count for an operation, or 0 if not present
+    fn get_count(name: &str) -> u64 {
+        get_timing_report()
+            .phases
+            .iter()
+            .find(|p| p.name == name)
+            .map(|p| p.count)
+            .unwrap_or(0)
+    }
+
     #[test]
     fn test_timing_span_records_duration() {
-        reset_timing_data();
         enable_profiling();
+        let before = get_count("test_duration_op");
 
         {
-            let _span = TimingSpan::new("test_operation");
+            let _span = TimingSpan::new("test_duration_op");
             thread::sleep(Duration::from_millis(10));
         }
 
         let report = get_timing_report();
-        let test_phase = report.phases.iter().find(|p| p.name == "test_operation");
+        let phase = report
+            .phases
+            .iter()
+            .find(|p| p.name == "test_duration_op")
+            .expect("Should have recorded test_duration_op");
 
-        assert!(test_phase.is_some(), "Should have recorded test_operation");
-        let phase = test_phase.unwrap();
-        assert_eq!(phase.count, 1);
+        assert_eq!(phase.count, before + 1, "Count should increase by 1");
         assert!(
             phase.duration >= Duration::from_millis(10),
             "Duration should be at least 10ms"
@@ -489,13 +501,12 @@ mod tests {
 
     #[test]
     fn test_timing_with_parent() {
-        reset_timing_data();
         enable_profiling();
 
         {
-            let _parent = TimingSpan::new("parent_op");
+            let _parent = TimingSpan::new("test_parent_op");
             {
-                let _child = TimingSpan::with_parent("child_op", "parent_op");
+                let _child = TimingSpan::with_parent("test_child_op", "test_parent_op");
                 thread::sleep(Duration::from_millis(5));
             }
         }
@@ -503,62 +514,55 @@ mod tests {
         let report = get_timing_report();
 
         // Find parent - it should have the child nested
-        let parent = report.phases.iter().find(|p| p.name == "parent_op");
-        assert!(parent.is_some());
+        let parent = report
+            .phases
+            .iter()
+            .find(|p| p.name == "test_parent_op")
+            .expect("Parent should exist");
 
-        let parent = parent.unwrap();
-        let child = parent.children.iter().find(|c| c.name == "child_op");
+        let child = parent
+            .children
+            .iter()
+            .find(|c| c.name == "test_child_op");
         assert!(child.is_some(), "Child should be nested under parent");
     }
 
     #[test]
     fn test_timing_count_accumulates() {
-        reset_timing_data();
         enable_profiling();
+        let before = get_count("test_accumulate_op");
 
         for _ in 0..5 {
-            let _span = TimingSpan::new("repeated_op");
+            let _span = TimingSpan::new("test_accumulate_op");
         }
 
-        let report = get_timing_report();
-        let op = report.phases.iter().find(|p| p.name == "repeated_op");
-
-        assert!(op.is_some());
-        assert_eq!(op.unwrap().count, 5);
+        let after = get_count("test_accumulate_op");
+        assert_eq!(after, before + 5, "Count should increase by 5");
     }
 
     #[test]
     fn test_timing_conditional_creation() {
-        // Test that the pattern `if is_profiling_enabled() { TimingSpan::new(...) }` works correctly.
-        // Note: Due to global state and parallel test execution, we can't reliably test
-        // the disabled case. Instead, we verify the pattern compiles and works for both cases.
-
-        reset_timing_data();
+        // Test the conditional pattern works when profiling is enabled.
+        // We measure delta to be robust against parallel test execution.
         enable_profiling();
+        let before = get_count("test_conditional_op");
 
-        // When enabled, spans should be created
         for _ in 0..10 {
             if is_profiling_enabled() {
-                let _span = TimingSpan::new("conditional_test_enabled");
+                let _span = TimingSpan::new("test_conditional_op");
             }
         }
 
-        let report = get_timing_report();
-        let op = report
-            .phases
-            .iter()
-            .find(|p| p.name == "conditional_test_enabled");
-        assert!(op.is_some(), "Should record when profiling enabled");
-        assert_eq!(op.unwrap().count, 10);
+        let after = get_count("test_conditional_op");
+        assert_eq!(after, before + 10, "Should record 10 spans when enabled");
     }
 
     #[test]
     fn test_report_to_summary() {
-        reset_timing_data();
         enable_profiling();
 
         {
-            let _span = TimingSpan::new("summary_test");
+            let _span = TimingSpan::new("test_summary_op");
             thread::sleep(Duration::from_millis(1));
         }
 
@@ -566,52 +570,50 @@ mod tests {
         let summary = report.to_summary();
 
         assert!(summary.contains("Profiling Report"));
-        assert!(summary.contains("summary_test"));
+        assert!(summary.contains("test_summary_op"));
     }
 
     #[test]
     fn test_report_to_json() {
-        reset_timing_data();
         enable_profiling();
 
         {
-            let _span = TimingSpan::new("json_test");
+            let _span = TimingSpan::new("test_json_op");
         }
 
         let report = get_timing_report();
         let json = report.to_json();
 
-        assert!(json.contains("\"name\": \"json_test\""));
+        assert!(json.contains("\"name\": \"test_json_op\""));
         assert!(json.contains("\"total_duration\""));
     }
 
     #[test]
     fn test_time_span_macro() {
-        reset_timing_data();
         enable_profiling();
+        let before = get_count("test_macro_op");
 
         fn test_function() {
-            time_span!("macro_test");
+            time_span!("test_macro_op");
             thread::sleep(Duration::from_millis(1));
         }
 
         test_function();
 
-        let report = get_timing_report();
-        let op = report.phases.iter().find(|p| p.name == "macro_test");
-        assert!(op.is_some(), "Macro should record timing");
+        let after = get_count("test_macro_op");
+        assert_eq!(after, before + 1, "Macro should record timing");
     }
 
     #[test]
     fn test_thread_safe_collection() {
-        reset_timing_data();
         enable_profiling();
+        let before = get_count("test_parallel_op");
 
         let handles: Vec<_> = (0..4)
             .map(|_| {
                 thread::spawn(|| {
                     for _ in 0..10 {
-                        let _span = TimingSpan::new("parallel_op");
+                        let _span = TimingSpan::new("test_parallel_op");
                     }
                 })
             })
@@ -621,14 +623,11 @@ mod tests {
             handle.join().unwrap();
         }
 
-        let report = get_timing_report();
-        let op = report.phases.iter().find(|p| p.name == "parallel_op");
-
-        assert!(op.is_some());
+        let after = get_count("test_parallel_op");
         assert_eq!(
-            op.unwrap().count,
-            40,
-            "Should have 40 recordings (4 threads × 10 each)"
+            after,
+            before + 40,
+            "Should record 40 spans (4 threads × 10 each)"
         );
     }
 }
