@@ -37,6 +37,10 @@ fn is_zero(val: &usize) -> bool {
 pub struct PurityAnalysis {
     pub is_pure: bool,
     pub confidence: f32,
+    /// Purity level: "StrictlyPure", "LocallyPure", "ReadOnly", "Impure"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purity_level: Option<String>,
+    /// Reasons why the function is not strictly pure
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side_effects: Option<Vec<String>>,
 }

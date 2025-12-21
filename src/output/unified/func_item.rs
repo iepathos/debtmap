@@ -8,8 +8,43 @@ use super::format::{round_ratio, round_score};
 use super::location::UnifiedLocation;
 use super::patterns::{extract_complexity_pattern, extract_pattern_data};
 use super::priority::{assert_priority_invariants, Priority};
+use crate::core::PurityLevel;
 use crate::priority::{DebtType, FunctionRole, UnifiedDebtItem};
 use serde::{Deserialize, Serialize};
+
+/// Generate side effects description based on purity level.
+///
+/// This provides human-readable reasons for why a function is not strictly pure,
+/// derived from the `PurityLevel` classification.
+fn generate_side_effects_from_purity(
+    is_pure: bool,
+    purity_level: Option<PurityLevel>,
+) -> Option<Vec<String>> {
+    if is_pure {
+        return None;
+    }
+
+    let effects = match purity_level {
+        Some(PurityLevel::Impure) => {
+            vec!["Has side effects (I/O, mutations, or external state modification)".to_string()]
+        }
+        Some(PurityLevel::ReadOnly) => {
+            vec!["Reads external state (but does not modify it)".to_string()]
+        }
+        Some(PurityLevel::LocallyPure) => {
+            vec!["Has local mutations only (no external side effects)".to_string()]
+        }
+        Some(PurityLevel::StrictlyPure) => {
+            // Shouldn't happen if is_pure is false, but handle gracefully
+            return None;
+        }
+        None => {
+            vec!["Function may have side effects".to_string()]
+        }
+    };
+
+    Some(effects)
+}
 
 /// Function-level debt item in unified format
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +78,9 @@ pub struct FunctionDebtItemOutput {
     /// Context window suggestion for AI agents (spec 263)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<ContextSuggestionOutput>,
+    /// Git history context for understanding code stability
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub git_history: Option<GitHistoryOutput>,
 }
 
 impl FunctionDebtItemOutput {
@@ -129,10 +167,15 @@ impl FunctionDebtItemOutput {
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
-            purity_analysis: item.is_pure.map(|is_pure| PurityAnalysis {
-                is_pure,
-                confidence: item.purity_confidence.unwrap_or(0.0),
-                side_effects: None,
+            purity_analysis: item.is_pure.map(|is_pure| {
+                let purity_level = item.purity_level.as_ref().map(|level| format!("{:?}", level));
+                let side_effects = generate_side_effects_from_purity(is_pure, item.purity_level);
+                PurityAnalysis {
+                    is_pure,
+                    confidence: item.purity_confidence.unwrap_or(0.0),
+                    purity_level,
+                    side_effects,
+                }
             }),
             dependencies: {
                 let upstream = item.upstream_dependencies;
@@ -223,6 +266,10 @@ impl FunctionDebtItemOutput {
                 .context_suggestion
                 .as_ref()
                 .map(ContextSuggestionOutput::from_context_suggestion),
+            git_history: item
+                .contextual_risk
+                .as_ref()
+                .and_then(GitHistoryOutput::from_contextual_risk),
         }
     }
 }
@@ -401,6 +448,67 @@ impl ContextSuggestionOutput {
     }
 }
 
+/// Git history context output for LLM consumption
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHistoryOutput {
+    /// Change frequency (changes per month)
+    pub change_frequency: f64,
+    /// Bug density as ratio of bug fixes to total commits (0.0-1.0)
+    pub bug_density: f64,
+    /// Age of the code in days
+    pub age_days: u32,
+    /// Number of unique authors who have modified this code
+    pub author_count: usize,
+    /// Stability classification based on churn and bug patterns
+    pub stability: String,
+}
+
+impl GitHistoryOutput {
+    /// Extract git history from contextual risk if available
+    pub fn from_contextual_risk(risk: &crate::risk::context::ContextualRisk) -> Option<Self> {
+        use crate::risk::context::ContextDetails;
+
+        risk.contexts
+            .iter()
+            .find(|c| c.provider == "git_history")
+            .and_then(|git_context| {
+                if let ContextDetails::Historical {
+                    change_frequency,
+                    bug_density,
+                    age_days,
+                    author_count,
+                } = git_context.details
+                {
+                    let stability = classify_stability(change_frequency, bug_density, age_days);
+                    Some(GitHistoryOutput {
+                        change_frequency: round_ratio(change_frequency),
+                        bug_density: round_ratio(bug_density),
+                        age_days,
+                        author_count,
+                        stability,
+                    })
+                } else {
+                    None
+                }
+            })
+    }
+}
+
+/// Classify stability based on change patterns
+fn classify_stability(change_frequency: f64, bug_density: f64, age_days: u32) -> String {
+    if change_frequency > 5.0 && bug_density > 0.3 {
+        "Highly Unstable".to_string()
+    } else if change_frequency > 2.0 {
+        "Frequently Changed".to_string()
+    } else if bug_density > 0.2 {
+        "Bug Prone".to_string()
+    } else if age_days > 365 {
+        "Mature Stable".to_string()
+    } else {
+        "Relatively Stable".to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -436,6 +544,7 @@ mod tests {
             purity_analysis: Some(PurityAnalysis {
                 is_pure: true,
                 confidence: 0.9,
+                purity_level: None,
                 side_effects: None,
             }),
             dependencies: Dependencies {
@@ -462,6 +571,7 @@ mod tests {
             pattern_confidence: None,
             pattern_details: None,
             context: None,
+            git_history: None,
         };
 
         // Serialize and deserialize
@@ -527,6 +637,7 @@ mod tests {
             pattern_confidence: None,
             pattern_details: None,
             context: None,
+            git_history: None,
         };
 
         let json = serde_json::to_string(&item).unwrap();

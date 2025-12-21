@@ -292,10 +292,13 @@ impl<W: Write> LlmMarkdownWriter<W> {
         if let Some(ref purity) = item.purity_analysis {
             writeln!(self.writer, "#### Purity Analysis")?;
             writeln!(self.writer, "- Is Pure: {}", purity.is_pure)?;
+            if let Some(ref level) = purity.purity_level {
+                writeln!(self.writer, "- Purity Level: {}", level)?;
+            }
             writeln!(self.writer, "- Confidence: {:.2}", purity.confidence)?;
             if let Some(ref side_effects) = purity.side_effects {
                 if !side_effects.is_empty() {
-                    writeln!(self.writer, "- Detected Side Effects:")?;
+                    writeln!(self.writer, "- Side Effects:")?;
                     for effect in side_effects {
                         writeln!(self.writer, "  - {}", effect)?;
                     }
@@ -422,6 +425,25 @@ impl<W: Write> LlmMarkdownWriter<W> {
                     )?;
                 }
             }
+            writeln!(self.writer)?;
+        }
+
+        // Git history section
+        if let Some(ref git) = item.git_history {
+            writeln!(self.writer, "#### Git History")?;
+            writeln!(
+                self.writer,
+                "- Change Frequency: {:.2} changes/month",
+                git.change_frequency
+            )?;
+            writeln!(
+                self.writer,
+                "- Bug Density: {:.0}%",
+                git.bug_density * 100.0
+            )?;
+            writeln!(self.writer, "- Age: {} days", git.age_days)?;
+            writeln!(self.writer, "- Authors: {}", git.author_count)?;
+            writeln!(self.writer, "- Stability: {}", git.stability)?;
             writeln!(self.writer)?;
         }
 
@@ -805,6 +827,7 @@ mod tests {
             pattern_confidence: None,
             pattern_details: None,
             context: None,
+            git_history: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -912,6 +935,7 @@ mod tests {
             pattern_confidence: None,
             pattern_details: None,
             context: None,
+            git_history: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -944,6 +968,106 @@ mod tests {
         assert!(
             markdown.contains("Final Score: 100.00"),
             "Should show final score"
+        );
+    }
+
+    #[test]
+    fn test_llm_markdown_outputs_git_history() {
+        use crate::output::unified::{
+            Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
+            GitHistoryOutput, Priority, RecommendationOutput, UnifiedLocation,
+        };
+        use crate::priority::{DebtType, FunctionRole};
+
+        let mut buffer = Vec::new();
+        let mut writer = LlmMarkdownWriter::new(&mut buffer);
+
+        let item = FunctionDebtItemOutput {
+            score: 75.0,
+            category: "Complexity".to_string(),
+            priority: Priority::High,
+            location: UnifiedLocation {
+                file: "src/test.rs".to_string(),
+                line: Some(50),
+                function: Some("test_fn".to_string()),
+                file_context_label: None,
+            },
+            metrics: FunctionMetricsOutput {
+                cyclomatic_complexity: 15,
+                cognitive_complexity: 20,
+                length: 80,
+                nesting_depth: 3,
+                coverage: Some(0.4),
+                ..Default::default()
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 20,
+            },
+            function_role: FunctionRole::Unknown,
+            purity_analysis: None,
+            dependencies: Dependencies::default(),
+            recommendation: RecommendationOutput {
+                action: "Refactor".to_string(),
+                priority: None,
+                implementation_steps: vec![],
+            },
+            impact: FunctionImpactOutput {
+                coverage_improvement: 0.1,
+                complexity_reduction: 0.2,
+                risk_reduction: 0.15,
+            },
+            scoring_details: None,
+            adjusted_complexity: None,
+            complexity_pattern: None,
+            pattern_type: None,
+            pattern_confidence: None,
+            pattern_details: None,
+            context: None,
+            git_history: Some(GitHistoryOutput {
+                change_frequency: 3.5,
+                bug_density: 0.25,
+                age_days: 180,
+                author_count: 4,
+                stability: "Frequently Changed".to_string(),
+            }),
+        };
+
+        let result = writer.write_function_item(&item);
+        assert!(result.is_ok());
+
+        let markdown = String::from_utf8(buffer).unwrap();
+
+        // Check git history section is present
+        assert!(
+            markdown.contains("#### Git History"),
+            "Should have Git History header: {}",
+            markdown
+        );
+        assert!(
+            markdown.contains("Change Frequency: 3.50 changes/month"),
+            "Should show change frequency: {}",
+            markdown
+        );
+        assert!(
+            markdown.contains("Bug Density: 25%"),
+            "Should show bug density: {}",
+            markdown
+        );
+        assert!(
+            markdown.contains("Age: 180 days"),
+            "Should show age: {}",
+            markdown
+        );
+        assert!(
+            markdown.contains("Authors: 4"),
+            "Should show author count: {}",
+            markdown
+        );
+        assert!(
+            markdown.contains("Stability: Frequently Changed"),
+            "Should show stability: {}",
+            markdown
         );
     }
 }
