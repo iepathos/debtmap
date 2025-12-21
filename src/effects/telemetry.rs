@@ -648,8 +648,6 @@ mod tests {
 
     #[tokio::test]
     async fn writer_effect_collects_single_event() {
-        use stillwater::effect::writer::WriterEffectExt;
-
         // Emit a single event and collect it
         let effect = tell_event::<(), ()>(AnalysisEvent::file_started(PathBuf::from("test.rs")));
         let (_, metrics) = effect.run_writer(&()).await;
@@ -662,7 +660,6 @@ mod tests {
 
     #[tokio::test]
     async fn writer_effect_with_chained_events() {
-        use stillwater::effect::writer::WriterEffectExt;
         use stillwater::EffectExt;
 
         // Use writer-specific and_then to chain two tell operations
