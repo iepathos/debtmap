@@ -579,7 +579,7 @@ impl CoverageIndex {
             None => {
                 // Log diagnostic info about why line-based lookup failed
                 if !self.by_line.contains_key(file) {
-                    log::warn!(
+                    log::trace!(
                         "File '{}' not found in line-based index (has {} files indexed)",
                         file.display(),
                         self.by_line.len()
@@ -617,7 +617,7 @@ impl CoverageIndex {
                 Some(f.coverage_percentage / 100.0)
             }
             None => {
-                log::warn!(
+                log::trace!(
                     "✗ No coverage found for '{}' at {}:{} after all strategies",
                     function_name,
                     file.display(),
