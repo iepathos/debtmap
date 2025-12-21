@@ -548,10 +548,7 @@ mod tests {
             .phases
             .iter()
             .find(|p| p.name == "conditional_test_enabled");
-        assert!(
-            op.is_some(),
-            "Should record when profiling enabled"
-        );
+        assert!(op.is_some(), "Should record when profiling enabled");
         assert_eq!(op.unwrap().count, 10);
     }
 
@@ -628,6 +625,10 @@ mod tests {
         let op = report.phases.iter().find(|p| p.name == "parallel_op");
 
         assert!(op.is_some());
-        assert_eq!(op.unwrap().count, 40, "Should have 40 recordings (4 threads × 10 each)");
+        assert_eq!(
+            op.unwrap().count,
+            40,
+            "Should have 40 recordings (4 threads × 10 each)"
+        );
     }
 }

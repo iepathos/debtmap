@@ -237,8 +237,8 @@ pub fn process_metrics_to_debt_items(
                 risk_analyzer,
                 project_path,
                 file_line_counts,
-                &context_detector,
-                &recommendation_engine,
+                context_detector,
+                recommendation_engine,
             )
         })
         .collect()

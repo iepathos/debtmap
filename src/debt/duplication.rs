@@ -1,7 +1,7 @@
 use crate::core::{DuplicationBlock, DuplicationLocation};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use xxhash_rust::xxh64::xxh64;
 
 pub fn detect_duplication(
     files: Vec<(PathBuf, String)>,
@@ -24,7 +24,7 @@ pub fn detect_duplication(
                 })
         })
         .fold(
-            HashMap::<String, Vec<DuplicationLocation>>::new(),
+            HashMap::<u64, Vec<DuplicationLocation>>::new(),
             |mut acc, (hash, location)| {
                 acc.entry(hash).or_default().push(location);
                 acc
@@ -67,10 +67,12 @@ fn normalize_chunk(chunk: &str) -> String {
         .join("\n")
 }
 
-fn calculate_hash(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    format!("{:x}", hasher.finalize())
+/// Calculates a fast non-cryptographic hash using xxHash64.
+///
+/// Returns a u64 hash value suitable for duplication detection.
+/// xxHash64 provides excellent distribution and is 10-20x faster than SHA256.
+fn calculate_hash(content: &str) -> u64 {
+    xxh64(content.as_bytes(), 0)
 }
 
 pub fn calculate_similarity(chunk1: &str, chunk2: &str) -> f64 {

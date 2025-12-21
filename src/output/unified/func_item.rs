@@ -168,7 +168,10 @@ impl FunctionDebtItemOutput {
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
             purity_analysis: item.is_pure.map(|is_pure| {
-                let purity_level = item.purity_level.as_ref().map(|level| format!("{:?}", level));
+                let purity_level = item
+                    .purity_level
+                    .as_ref()
+                    .map(|level| format!("{:?}", level));
                 let side_effects = generate_side_effects_from_purity(is_pure, item.purity_level);
                 PurityAnalysis {
                     is_pure,
