@@ -748,11 +748,11 @@ pub fn build_calculation_summary_section(
     });
 
     if is_god_object_item {
-        // God object scoring formula
+        // God object scoring formula - show complete pipeline
         add_label_value(
             &mut lines,
             "formula",
-            "M × F × R × S × 20 × violations".to_string(),
+            "M × F × R × S × 20 × violations × adjustments".to_string(),
             theme,
             width,
         );
@@ -760,6 +760,13 @@ pub fn build_calculation_summary_section(
             &mut lines,
             "where",
             "M=methods/20, F=fields/15, R=resp/3, S=lines/1000".to_string(),
+            theme,
+            width,
+        );
+        add_label_value(
+            &mut lines,
+            "adjustments",
+            "entropy dampening, complexity weight, functional bonus".to_string(),
             theme,
             width,
         );
@@ -1079,17 +1086,23 @@ pub fn build_calculation_summary_section(
             }
         }
 
-        // Show complexity factor adjustment if significant difference remains
+        // Show combined adjustments if there's a significant gap after entropy
+        // This accounts for: complexity factor (spec 211) + functional bonus (spec 213)
         let diff = (current - go_score).abs();
         if diff > 1.0 && current > 0.0 {
-            // There's an unexplained difference - likely complexity factor or functional bonus
             let adjustment_factor = go_score / current;
             if (adjustment_factor - 1.0).abs() > 0.01 {
+                // Describe the adjustment based on whether it increases or decreases score
+                let adjustment_desc = if adjustment_factor > 1.0 {
+                    "complexity weight" // Score increased due to method complexity
+                } else {
+                    "functional bonus" // Score decreased due to pure methods
+                };
                 add_label_value(
                     &mut lines,
-                    &format!("{}. adjustments", step_num),
+                    &format!("{}. × {}", step_num, adjustment_desc),
                     format!(
-                        "{:.2} × {:.2} = {:.2} (complexity/functional)",
+                        "{:.2} × {:.2} = {:.2}",
                         current, adjustment_factor, go_score
                     ),
                     theme,
@@ -1284,8 +1297,16 @@ pub fn build_calculation_summary_section(
     }
 
     // Handle any remaining gap between calculated value and stored base_score
-    // This should be rare now that contextual_risk is always stored
-    if (base_score - current_value).abs() > 0.5 {
+    // Only show adjustment if it actually explains the final score
+    // Skip if the adjustment would be confusing (e.g., showing base_score when final_score differs)
+    let gap_to_base = (base_score - current_value).abs();
+    let gap_to_final = (final_score - current_value).abs();
+
+    // Only show adjustment if base_score is close to final_score (within 5%)
+    // Otherwise the adjustment step would be misleading
+    let base_close_to_final = (base_score - final_score).abs() < final_score * 0.05;
+
+    if gap_to_base > 0.5 && base_close_to_final {
         let pre_norm = item.unified_score.pre_normalization_score;
 
         if base_score > current_value && current_value > 0.0 {
@@ -1326,6 +1347,15 @@ pub fn build_calculation_summary_section(
                 width,
             );
         }
+    } else if gap_to_final > 0.5 && gap_to_base > 0.5 {
+        // There's a significant gap we can't explain - show it transparently
+        add_label_value(
+            &mut lines,
+            &format!("{}. final adjustments", step_num),
+            format!("{:.2} → {:.2}", current_value, final_score),
+            theme,
+            width,
+        );
     }
 
     // Track running value for exponential and boost
