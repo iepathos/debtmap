@@ -213,6 +213,20 @@ impl AnalysisError {
         Self::Other(message.into())
     }
 
+    /// Create an error from multiple file processing failures (Spec 003).
+    ///
+    /// Used when multiple files failed to process and we want to report all
+    /// errors together.
+    pub fn multi_file(errors: Vec<String>) -> Self {
+        let count = errors.len();
+        let message = if count == 1 {
+            errors.into_iter().next().unwrap_or_default()
+        } else {
+            format!("{} file errors:\n  - {}", count, errors.join("\n  - "))
+        };
+        Self::AnalysisFailure { message }
+    }
+
     /// Get the error message without context details.
     pub fn message(&self) -> &str {
         match self {

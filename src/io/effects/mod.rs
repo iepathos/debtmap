@@ -52,8 +52,10 @@ mod retry;
 
 // File operations
 pub use file::{
-    file_exists_effect, is_directory_effect, path_exists_effect, read_file_bytes_effect,
-    read_file_effect, write_file_effect,
+    file_exists_effect, is_directory_effect, path_exists_effect, process_files_with_accumulation,
+    read_file_bytes_effect, read_file_effect, read_files_parallel_with_accumulation,
+    read_files_with_accumulation, validated_file_set_to_lenient_effect,
+    validated_file_set_to_strict_effect, write_file_effect, FileContent,
 };
 
 // Directory operations
