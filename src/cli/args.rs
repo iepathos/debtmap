@@ -189,6 +189,16 @@ pub enum Commands {
         #[arg(long = "quiet", short = 'q')]
         quiet: bool,
 
+        /// Enable streaming output mode for large codebases (Spec 003).
+        /// Streams results to output as they're generated with O(1) memory overhead.
+        #[arg(long = "streaming")]
+        streaming: bool,
+
+        /// Output file for streaming mode (requires --streaming).
+        /// Use "-" for stdout.
+        #[arg(long = "stream-to", requires = "streaming")]
+        stream_to: Option<PathBuf>,
+
         /// Disable context-aware false positive reduction (enabled by default)
         #[arg(long = "no-context-aware")]
         no_context_aware: bool,
@@ -764,6 +774,68 @@ mod tests {
         match cli.command {
             Commands::Analyze { no_multi_pass, .. } => {
                 assert!(!no_multi_pass);
+            }
+            _ => panic!("Expected Analyze command"),
+        }
+    }
+
+    #[test]
+    fn test_streaming_flag() {
+        use clap::Parser;
+
+        let args = vec!["debtmap", "analyze", ".", "--streaming"];
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Analyze {
+                streaming,
+                stream_to,
+                ..
+            } => {
+                assert!(streaming);
+                assert!(stream_to.is_none());
+            }
+            _ => panic!("Expected Analyze command"),
+        }
+    }
+
+    #[test]
+    fn test_streaming_with_stream_to() {
+        use clap::Parser;
+
+        let args = vec![
+            "debtmap",
+            "analyze",
+            ".",
+            "--streaming",
+            "--stream-to",
+            "output.jsonl",
+        ];
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Analyze {
+                streaming,
+                stream_to,
+                ..
+            } => {
+                assert!(streaming);
+                assert_eq!(stream_to, Some(PathBuf::from("output.jsonl")));
+            }
+            _ => panic!("Expected Analyze command"),
+        }
+    }
+
+    #[test]
+    fn test_streaming_default_off() {
+        use clap::Parser;
+
+        let args = vec!["debtmap", "analyze", "."];
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Analyze { streaming, .. } => {
+                assert!(!streaming);
             }
             _ => panic!("Expected Analyze command"),
         }
