@@ -349,6 +349,59 @@ pub enum DebtType {
     },
 }
 
+impl DebtType {
+    /// Pure function: returns the display name for this debt type.
+    ///
+    /// For most variants, this returns a static string. The `ErrorSwallowing`
+    /// variant is the exception - it requires dynamic content and is handled
+    /// separately in the `Display` impl.
+    ///
+    /// This separation follows the Stillwater pattern: pure core logic in
+    /// a helper function, I/O (formatting) at the boundary.
+    fn display_name(&self) -> &'static str {
+        match self {
+            // Legacy variants
+            Self::Todo { .. } => "TODO",
+            Self::Fixme { .. } => "FIXME",
+            Self::CodeSmell { .. } => "Code Smell",
+            Self::Complexity { .. } => "Complexity",
+            Self::Dependency { .. } => "Dependency",
+            Self::ResourceManagement { .. } => "Resource Management",
+            Self::CodeOrganization { .. } => "Code Organization",
+            Self::TestComplexity { .. } => "Test Complexity",
+            Self::TestQuality { .. } => "Test Quality",
+            // Priority-specific variants
+            Self::TestingGap { .. } => "Testing Gap",
+            Self::ComplexityHotspot { .. } => "Complexity Hotspot",
+            Self::DeadCode { .. } => "Dead Code",
+            Self::Duplication { .. } => "Duplication",
+            Self::Risk { .. } => "Risk",
+            Self::TestComplexityHotspot { .. } => "Test Complexity Hotspot",
+            Self::TestTodo { .. } => "Test TODO",
+            Self::TestDuplication { .. } => "Test Duplication",
+            // ErrorSwallowing has dynamic content - use placeholder
+            Self::ErrorSwallowing { .. } => "Error Swallowing",
+            Self::AllocationInefficiency { .. } => "Allocation Inefficiency",
+            Self::StringConcatenation { .. } => "String Concatenation",
+            Self::NestedLoops { .. } => "Nested Loops",
+            Self::BlockingIO { .. } => "Blocking I/O",
+            Self::SuboptimalDataStructure { .. } => "Suboptimal Data Structure",
+            Self::GodObject { .. } => "God Object",
+            Self::FeatureEnvy { .. } => "Feature Envy",
+            Self::PrimitiveObsession { .. } => "Primitive Obsession",
+            Self::MagicValues { .. } => "Magic Values",
+            Self::AssertionComplexity { .. } => "Assertion Complexity",
+            Self::FlakyTestPattern { .. } => "Flaky Test Pattern",
+            Self::AsyncMisuse { .. } => "Async Misuse",
+            Self::ResourceLeak { .. } => "Resource Leak",
+            Self::CollectionInefficiency { .. } => "Collection Inefficiency",
+            Self::ScatteredType { .. } => "Scattered Type",
+            Self::OrphanedFunctions { .. } => "Orphaned Functions",
+            Self::UtilitiesSprawl { .. } => "Utilities Sprawl",
+        }
+    }
+}
+
 // Custom Eq implementation that handles f64 fields by comparing their bit representations
 impl Eq for DebtType {}
 
@@ -573,45 +626,12 @@ impl std::hash::Hash for DebtType {
 
 impl std::fmt::Display for DebtType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            // Legacy variants
-            DebtType::Todo { .. } => write!(f, "TODO"),
-            DebtType::Fixme { .. } => write!(f, "FIXME"),
-            DebtType::CodeSmell { .. } => write!(f, "Code Smell"),
-            DebtType::Complexity { .. } => write!(f, "Complexity"),
-            DebtType::Dependency { .. } => write!(f, "Dependency"),
-            DebtType::ResourceManagement { .. } => write!(f, "Resource Management"),
-            DebtType::CodeOrganization { .. } => write!(f, "Code Organization"),
-            DebtType::TestComplexity { .. } => write!(f, "Test Complexity"),
-            DebtType::TestQuality { .. } => write!(f, "Test Quality"),
-            // Priority-specific variants
-            DebtType::TestingGap { .. } => write!(f, "Testing Gap"),
-            DebtType::ComplexityHotspot { .. } => write!(f, "Complexity Hotspot"),
-            DebtType::DeadCode { .. } => write!(f, "Dead Code"),
-            DebtType::Duplication { .. } => write!(f, "Duplication"),
-            DebtType::Risk { .. } => write!(f, "Risk"),
-            DebtType::TestComplexityHotspot { .. } => write!(f, "Test Complexity Hotspot"),
-            DebtType::TestTodo { .. } => write!(f, "Test TODO"),
-            DebtType::TestDuplication { .. } => write!(f, "Test Duplication"),
-            DebtType::ErrorSwallowing { pattern, .. } => write!(f, "Error Swallowing: {}", pattern),
-            DebtType::AllocationInefficiency { .. } => write!(f, "Allocation Inefficiency"),
-            DebtType::StringConcatenation { .. } => write!(f, "String Concatenation"),
-            DebtType::NestedLoops { .. } => write!(f, "Nested Loops"),
-            DebtType::BlockingIO { .. } => write!(f, "Blocking I/O"),
-            DebtType::SuboptimalDataStructure { .. } => write!(f, "Suboptimal Data Structure"),
-            DebtType::GodObject { .. } => write!(f, "God Object"),
-            DebtType::FeatureEnvy { .. } => write!(f, "Feature Envy"),
-            DebtType::PrimitiveObsession { .. } => write!(f, "Primitive Obsession"),
-            DebtType::MagicValues { .. } => write!(f, "Magic Values"),
-            DebtType::AssertionComplexity { .. } => write!(f, "Assertion Complexity"),
-            DebtType::FlakyTestPattern { .. } => write!(f, "Flaky Test Pattern"),
-            DebtType::AsyncMisuse { .. } => write!(f, "Async Misuse"),
-            DebtType::ResourceLeak { .. } => write!(f, "Resource Leak"),
-            DebtType::CollectionInefficiency { .. } => write!(f, "Collection Inefficiency"),
-            DebtType::ScatteredType { .. } => write!(f, "Scattered Type"),
-            DebtType::OrphanedFunctions { .. } => write!(f, "Orphaned Functions"),
-            DebtType::UtilitiesSprawl { .. } => write!(f, "Utilities Sprawl"),
+        // ErrorSwallowing includes dynamic content - handle separately
+        if let Self::ErrorSwallowing { pattern, .. } = self {
+            return write!(f, "Error Swallowing: {}", pattern);
         }
+        // All other variants use the pure display_name() helper
+        write!(f, "{}", self.display_name())
     }
 }
 
@@ -1715,6 +1735,516 @@ mod tests {
         std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
         std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
         std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    }
+
+    // Tests for DebtType Display implementation (Spec 005)
+    mod debt_type_display_tests {
+        use super::*;
+
+        #[test]
+        fn display_todo() {
+            let debt = DebtType::Todo {
+                reason: Some("fix later".into()),
+            };
+            assert_eq!(debt.to_string(), "TODO");
+        }
+
+        #[test]
+        fn display_fixme() {
+            let debt = DebtType::Fixme { reason: None };
+            assert_eq!(debt.to_string(), "FIXME");
+        }
+
+        #[test]
+        fn display_code_smell() {
+            let debt = DebtType::CodeSmell {
+                smell_type: Some("complex".into()),
+            };
+            assert_eq!(debt.to_string(), "Code Smell");
+        }
+
+        #[test]
+        fn display_complexity() {
+            let debt = DebtType::Complexity {
+                cyclomatic: 20,
+                cognitive: 15,
+            };
+            assert_eq!(debt.to_string(), "Complexity");
+        }
+
+        #[test]
+        fn display_dependency() {
+            let debt = DebtType::Dependency {
+                dependency_type: Some("external".into()),
+            };
+            assert_eq!(debt.to_string(), "Dependency");
+        }
+
+        #[test]
+        fn display_resource_management() {
+            let debt = DebtType::ResourceManagement {
+                issue_type: Some("leak".into()),
+            };
+            assert_eq!(debt.to_string(), "Resource Management");
+        }
+
+        #[test]
+        fn display_code_organization() {
+            let debt = DebtType::CodeOrganization {
+                issue_type: Some("scattered".into()),
+            };
+            assert_eq!(debt.to_string(), "Code Organization");
+        }
+
+        #[test]
+        fn display_test_complexity() {
+            let debt = DebtType::TestComplexity {
+                cyclomatic: 10,
+                cognitive: 8,
+            };
+            assert_eq!(debt.to_string(), "Test Complexity");
+        }
+
+        #[test]
+        fn display_test_quality() {
+            let debt = DebtType::TestQuality {
+                issue_type: Some("poor assertions".into()),
+            };
+            assert_eq!(debt.to_string(), "Test Quality");
+        }
+
+        #[test]
+        fn display_testing_gap() {
+            let debt = DebtType::TestingGap {
+                coverage: 0.25,
+                cyclomatic: 15,
+                cognitive: 12,
+            };
+            assert_eq!(debt.to_string(), "Testing Gap");
+        }
+
+        #[test]
+        fn display_complexity_hotspot() {
+            let debt = DebtType::ComplexityHotspot {
+                cyclomatic: 30,
+                cognitive: 25,
+            };
+            assert_eq!(debt.to_string(), "Complexity Hotspot");
+        }
+
+        #[test]
+        fn display_dead_code() {
+            let debt = DebtType::DeadCode {
+                visibility: FunctionVisibility::Private,
+                cyclomatic: 5,
+                cognitive: 3,
+                usage_hints: vec![],
+            };
+            assert_eq!(debt.to_string(), "Dead Code");
+        }
+
+        #[test]
+        fn display_duplication() {
+            let debt = DebtType::Duplication {
+                instances: 3,
+                total_lines: 45,
+            };
+            assert_eq!(debt.to_string(), "Duplication");
+        }
+
+        #[test]
+        fn display_risk() {
+            let debt = DebtType::Risk {
+                risk_score: 0.8,
+                factors: vec!["untested".into()],
+            };
+            assert_eq!(debt.to_string(), "Risk");
+        }
+
+        #[test]
+        fn display_test_complexity_hotspot() {
+            let debt = DebtType::TestComplexityHotspot {
+                cyclomatic: 20,
+                cognitive: 18,
+                threshold: 15,
+            };
+            assert_eq!(debt.to_string(), "Test Complexity Hotspot");
+        }
+
+        #[test]
+        fn display_test_todo() {
+            let debt = DebtType::TestTodo {
+                priority: crate::core::Priority::Low,
+                reason: Some("add later".into()),
+            };
+            assert_eq!(debt.to_string(), "Test TODO");
+        }
+
+        #[test]
+        fn display_test_duplication() {
+            let debt = DebtType::TestDuplication {
+                instances: 2,
+                total_lines: 20,
+                similarity: 0.9,
+            };
+            assert_eq!(debt.to_string(), "Test Duplication");
+        }
+
+        #[test]
+        fn display_error_swallowing_includes_pattern() {
+            let debt = DebtType::ErrorSwallowing {
+                pattern: "unwrap()".into(),
+                context: None,
+            };
+            assert_eq!(debt.to_string(), "Error Swallowing: unwrap()");
+        }
+
+        #[test]
+        fn display_error_swallowing_with_different_patterns() {
+            let patterns = vec![
+                ("unwrap()", "Error Swallowing: unwrap()"),
+                ("expect()", "Error Swallowing: expect()"),
+                ("_ => {}", "Error Swallowing: _ => {}"),
+            ];
+            for (pattern, expected) in patterns {
+                let debt = DebtType::ErrorSwallowing {
+                    pattern: pattern.into(),
+                    context: None,
+                };
+                assert_eq!(
+                    debt.to_string(),
+                    expected,
+                    "Failed for pattern: {}",
+                    pattern
+                );
+            }
+        }
+
+        #[test]
+        fn display_allocation_inefficiency() {
+            let debt = DebtType::AllocationInefficiency {
+                pattern: "vec clone".into(),
+                impact: "high".into(),
+            };
+            assert_eq!(debt.to_string(), "Allocation Inefficiency");
+        }
+
+        #[test]
+        fn display_string_concatenation() {
+            let debt = DebtType::StringConcatenation {
+                loop_type: "for".into(),
+                iterations: Some(100),
+            };
+            assert_eq!(debt.to_string(), "String Concatenation");
+        }
+
+        #[test]
+        fn display_nested_loops() {
+            let debt = DebtType::NestedLoops {
+                depth: 3,
+                complexity_estimate: "O(n^3)".into(),
+            };
+            assert_eq!(debt.to_string(), "Nested Loops");
+        }
+
+        #[test]
+        fn display_blocking_io() {
+            let debt = DebtType::BlockingIO {
+                operation: "read_file".into(),
+                context: "async fn".into(),
+            };
+            assert_eq!(debt.to_string(), "Blocking I/O");
+        }
+
+        #[test]
+        fn display_suboptimal_data_structure() {
+            let debt = DebtType::SuboptimalDataStructure {
+                current_type: "Vec".into(),
+                recommended_type: "HashSet".into(),
+            };
+            assert_eq!(debt.to_string(), "Suboptimal Data Structure");
+        }
+
+        #[test]
+        fn display_god_object() {
+            let debt = DebtType::GodObject {
+                methods: 50,
+                fields: Some(30),
+                responsibilities: 5,
+                god_object_score: 85.0,
+                lines: 2000,
+            };
+            assert_eq!(debt.to_string(), "God Object");
+        }
+
+        #[test]
+        fn display_feature_envy() {
+            let debt = DebtType::FeatureEnvy {
+                external_class: "Config".into(),
+                usage_ratio: 0.75,
+            };
+            assert_eq!(debt.to_string(), "Feature Envy");
+        }
+
+        #[test]
+        fn display_primitive_obsession() {
+            let debt = DebtType::PrimitiveObsession {
+                primitive_type: "String".into(),
+                domain_concept: "Email".into(),
+            };
+            assert_eq!(debt.to_string(), "Primitive Obsession");
+        }
+
+        #[test]
+        fn display_magic_values() {
+            let debt = DebtType::MagicValues {
+                value: "42".into(),
+                occurrences: 5,
+            };
+            assert_eq!(debt.to_string(), "Magic Values");
+        }
+
+        #[test]
+        fn display_assertion_complexity() {
+            let debt = DebtType::AssertionComplexity {
+                assertion_count: 15,
+                complexity_score: 12.5,
+            };
+            assert_eq!(debt.to_string(), "Assertion Complexity");
+        }
+
+        #[test]
+        fn display_flaky_test_pattern() {
+            let debt = DebtType::FlakyTestPattern {
+                pattern_type: "timing".into(),
+                reliability_impact: "high".into(),
+            };
+            assert_eq!(debt.to_string(), "Flaky Test Pattern");
+        }
+
+        #[test]
+        fn display_async_misuse() {
+            let debt = DebtType::AsyncMisuse {
+                pattern: "block_on".into(),
+                performance_impact: "severe".into(),
+            };
+            assert_eq!(debt.to_string(), "Async Misuse");
+        }
+
+        #[test]
+        fn display_resource_leak() {
+            let debt = DebtType::ResourceLeak {
+                resource_type: "file handle".into(),
+                cleanup_missing: "close()".into(),
+            };
+            assert_eq!(debt.to_string(), "Resource Leak");
+        }
+
+        #[test]
+        fn display_collection_inefficiency() {
+            let debt = DebtType::CollectionInefficiency {
+                collection_type: "Vec".into(),
+                inefficiency_type: "repeated resize".into(),
+            };
+            assert_eq!(debt.to_string(), "Collection Inefficiency");
+        }
+
+        #[test]
+        fn display_scattered_type() {
+            let debt = DebtType::ScatteredType {
+                type_name: "Config".into(),
+                total_methods: 20,
+                file_count: 5,
+                severity: "high".into(),
+            };
+            assert_eq!(debt.to_string(), "Scattered Type");
+        }
+
+        #[test]
+        fn display_orphaned_functions() {
+            let debt = DebtType::OrphanedFunctions {
+                target_type: "Parser".into(),
+                function_count: 10,
+                file_count: 3,
+            };
+            assert_eq!(debt.to_string(), "Orphaned Functions");
+        }
+
+        #[test]
+        fn display_utilities_sprawl() {
+            let debt = DebtType::UtilitiesSprawl {
+                function_count: 25,
+                distinct_types: 8,
+            };
+            assert_eq!(debt.to_string(), "Utilities Sprawl");
+        }
+
+        #[test]
+        fn display_name_returns_non_empty_for_all_variants() {
+            // Test that all variants return non-empty display names
+            let variants: Vec<DebtType> = vec![
+                DebtType::Todo { reason: None },
+                DebtType::Fixme { reason: None },
+                DebtType::CodeSmell { smell_type: None },
+                DebtType::Complexity {
+                    cyclomatic: 0,
+                    cognitive: 0,
+                },
+                DebtType::Dependency {
+                    dependency_type: None,
+                },
+                DebtType::ResourceManagement { issue_type: None },
+                DebtType::CodeOrganization { issue_type: None },
+                DebtType::TestComplexity {
+                    cyclomatic: 0,
+                    cognitive: 0,
+                },
+                DebtType::TestQuality { issue_type: None },
+                DebtType::TestingGap {
+                    coverage: 0.0,
+                    cyclomatic: 0,
+                    cognitive: 0,
+                },
+                DebtType::ComplexityHotspot {
+                    cyclomatic: 0,
+                    cognitive: 0,
+                },
+                DebtType::DeadCode {
+                    visibility: FunctionVisibility::Private,
+                    cyclomatic: 0,
+                    cognitive: 0,
+                    usage_hints: vec![],
+                },
+                DebtType::Duplication {
+                    instances: 0,
+                    total_lines: 0,
+                },
+                DebtType::Risk {
+                    risk_score: 0.0,
+                    factors: vec![],
+                },
+                DebtType::TestComplexityHotspot {
+                    cyclomatic: 0,
+                    cognitive: 0,
+                    threshold: 0,
+                },
+                DebtType::TestTodo {
+                    priority: crate::core::Priority::Low,
+                    reason: None,
+                },
+                DebtType::TestDuplication {
+                    instances: 0,
+                    total_lines: 0,
+                    similarity: 0.0,
+                },
+                DebtType::ErrorSwallowing {
+                    pattern: "test".into(),
+                    context: None,
+                },
+                DebtType::AllocationInefficiency {
+                    pattern: "".into(),
+                    impact: "".into(),
+                },
+                DebtType::StringConcatenation {
+                    loop_type: "".into(),
+                    iterations: None,
+                },
+                DebtType::NestedLoops {
+                    depth: 0,
+                    complexity_estimate: "".into(),
+                },
+                DebtType::BlockingIO {
+                    operation: "".into(),
+                    context: "".into(),
+                },
+                DebtType::SuboptimalDataStructure {
+                    current_type: "".into(),
+                    recommended_type: "".into(),
+                },
+                DebtType::GodObject {
+                    methods: 0,
+                    fields: None,
+                    responsibilities: 0,
+                    god_object_score: 0.0,
+                    lines: 0,
+                },
+                DebtType::FeatureEnvy {
+                    external_class: "".into(),
+                    usage_ratio: 0.0,
+                },
+                DebtType::PrimitiveObsession {
+                    primitive_type: "".into(),
+                    domain_concept: "".into(),
+                },
+                DebtType::MagicValues {
+                    value: "".into(),
+                    occurrences: 0,
+                },
+                DebtType::AssertionComplexity {
+                    assertion_count: 0,
+                    complexity_score: 0.0,
+                },
+                DebtType::FlakyTestPattern {
+                    pattern_type: "".into(),
+                    reliability_impact: "".into(),
+                },
+                DebtType::AsyncMisuse {
+                    pattern: "".into(),
+                    performance_impact: "".into(),
+                },
+                DebtType::ResourceLeak {
+                    resource_type: "".into(),
+                    cleanup_missing: "".into(),
+                },
+                DebtType::CollectionInefficiency {
+                    collection_type: "".into(),
+                    inefficiency_type: "".into(),
+                },
+                DebtType::ScatteredType {
+                    type_name: "".into(),
+                    total_methods: 0,
+                    file_count: 0,
+                    severity: "".into(),
+                },
+                DebtType::OrphanedFunctions {
+                    target_type: "".into(),
+                    function_count: 0,
+                    file_count: 0,
+                },
+                DebtType::UtilitiesSprawl {
+                    function_count: 0,
+                    distinct_types: 0,
+                },
+            ];
+
+            for variant in variants {
+                let display = variant.to_string();
+                assert!(!display.is_empty(), "Empty display for {:?}", variant);
+                assert!(
+                    display.len() >= 3,
+                    "Display too short for {:?}: '{}'",
+                    variant,
+                    display
+                );
+            }
+        }
+
+        #[test]
+        fn display_is_deterministic() {
+            // Calling to_string() multiple times should yield identical results
+            let debt = DebtType::GodObject {
+                methods: 50,
+                fields: Some(30),
+                responsibilities: 5,
+                god_object_score: 85.0,
+                lines: 2000,
+            };
+            let s1 = debt.to_string();
+            let s2 = debt.to_string();
+            let s3 = debt.to_string();
+            assert_eq!(s1, s2);
+            assert_eq!(s2, s3);
+        }
     }
 }
 
