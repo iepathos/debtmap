@@ -54,7 +54,8 @@ impl From<&UnifiedDebtItemOutput> for DebtItemKey {
 /// Deduplicate debt items by (file, line, function) key (spec 231)
 ///
 /// Removes duplicate items that have the same location. Keeps the first occurrence
-/// of each unique item. Logs when duplicates are removed for debugging.
+/// of each unique item. Duplicates are expected during analysis (same function analyzed
+/// through multiple code paths) and are silently removed.
 pub fn deduplicate_items(items: Vec<UnifiedDebtItemOutput>) -> Vec<UnifiedDebtItemOutput> {
     let mut seen: HashSet<DebtItemKey> = HashSet::new();
     let mut result = Vec::with_capacity(items.len());
@@ -67,19 +68,18 @@ pub fn deduplicate_items(items: Vec<UnifiedDebtItemOutput>) -> Vec<UnifiedDebtIt
             result.push(item);
         } else {
             duplicate_count += 1;
-            // Log duplicate removal for debugging (only in debug builds or when RUST_LOG is set)
-            #[cfg(debug_assertions)]
-            eprintln!(
-                "Warning: Removed duplicate debt item: file={}, line={:?}, function={:?}",
+            // Log individual duplicates at trace level (only visible with RUST_LOG=trace)
+            log::trace!(
+                "Dedup: removed duplicate item: file={}, line={:?}, function={:?}",
                 key.file, key.line, key.function
             );
         }
     }
 
     if duplicate_count > 0 {
-        // Always log summary when duplicates are found
-        eprintln!(
-            "Warning: Removed {} duplicate debt items from output",
+        // Log summary at debug level (only visible with RUST_LOG=debug or lower)
+        log::debug!(
+            "Dedup: removed {} duplicate debt items from output",
             duplicate_count
         );
     }
@@ -126,6 +126,7 @@ mod tests {
                 coverage: Some(0.8),
                 uncovered_lines: None,
                 entropy_score: None,
+                ..Default::default()
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 10,
@@ -138,6 +139,7 @@ mod tests {
                 downstream_count: 0,
                 upstream_callers: vec![],
                 downstream_callees: vec![],
+                ..Default::default()
             },
             recommendation: RecommendationOutput {
                 action: "Test action".to_string(),
