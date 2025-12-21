@@ -335,29 +335,41 @@ pub fn build_multipliers_section(
         }
     }
 
-    // Entropy dampening (if present) - check both item-level and god object aggregated
-    if let Some(dampening) = item.entropy_dampening_factor {
-        add_multiplier_line(
-            &mut lines,
-            "entropy dampening",
-            dampening,
-            "repetitive patterns",
-            theme,
-            width,
-        );
-    } else if let Some(ref god) = item.god_object_indicators {
-        // For god objects, show aggregated entropy dampening
-        if let Some(ref entropy) = god.aggregated_entropy {
+    // Entropy dampening - only show as multiplier for god objects where it's applied to final score
+    // For regular functions, entropy is already applied to cognitive complexity (shown in raw inputs)
+    let is_god_object = matches!(&item.debt_type, DebtType::GodObject { .. })
+        || item
+            .god_object_indicators
+            .as_ref()
+            .map(|g| g.is_god_object)
+            .unwrap_or(false);
+
+    if is_god_object {
+        // For god objects, entropy dampening IS a score multiplier
+        if let Some(dampening) = item.entropy_dampening_factor {
             add_multiplier_line(
                 &mut lines,
                 "entropy dampening",
-                entropy.dampening_factor,
-                "aggregated repetition",
+                dampening,
+                "repetitive patterns",
                 theme,
                 width,
             );
+        } else if let Some(ref god) = item.god_object_indicators {
+            if let Some(ref entropy) = god.aggregated_entropy {
+                add_multiplier_line(
+                    &mut lines,
+                    "entropy dampening",
+                    entropy.dampening_factor,
+                    "aggregated repetition",
+                    theme,
+                    width,
+                );
+            }
         }
     }
+    // For regular functions: entropy is already reflected in cognitive complexity
+    // (shown as "cognitive: X → Y (entropy-adjusted)" in raw inputs section)
 
     add_blank_line(&mut lines);
     lines
@@ -778,13 +790,14 @@ pub fn build_calculation_summary_section(
             );
         }
 
-        // Show other multipliers (purity, pattern, refactor, context, entropy)
+        // Show other multipliers (purity, pattern, refactor, context)
+        // Note: entropy is NOT included here for regular functions because it's
+        // already applied to cognitive complexity, not as a final score multiplier
         let other_mults: Vec<String> = [
             (purity, "purity"),
             (pattern, "pattern"),
             (refactor, "refactor"),
             (context, "context"),
-            (entropy, "entropy"),
         ]
         .iter()
         .filter(|(v, _)| (*v - 1.0).abs() > 0.01)
