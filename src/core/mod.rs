@@ -353,7 +353,7 @@ pub struct CircularDependency {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DuplicationBlock {
-    pub hash: String,
+    pub hash: u64,
     pub lines: usize,
     pub locations: Vec<DuplicationLocation>,
 }

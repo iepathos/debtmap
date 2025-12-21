@@ -60,17 +60,15 @@ where
     // Parallel file reading - significant speedup for I/O bound operations
     let files_with_content: Vec<(PathBuf, String)> = files
         .par_iter()
-        .filter_map(|path| {
-            match io::read_file(path) {
-                Ok(content) => Some((path.clone(), content)),
-                Err(e) => {
-                    log::debug!(
-                        "Skipping file {} for duplication check: {}",
-                        path.display(),
-                        e
-                    );
-                    None
-                }
+        .filter_map(|path| match io::read_file(path) {
+            Ok(content) => Some((path.clone(), content)),
+            Err(e) => {
+                log::debug!(
+                    "Skipping file {} for duplication check: {}",
+                    path.display(),
+                    e
+                );
+                None
             }
         })
         .collect();
