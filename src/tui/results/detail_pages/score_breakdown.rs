@@ -749,6 +749,8 @@ pub fn build_calculation_summary_section(
         };
 
         if has_coverage_data {
+            // coverage_factor is 0-10 scale where 10 = 0% coverage (100% gap)
+            // Divide by 10 to get 0-1 multiplier (higher = less coverage = higher score)
             add_label_value(
                 &mut lines,
                 "where",
@@ -756,7 +758,7 @@ pub fn build_calculation_summary_section(
                     "C={:.1}, D={:.1}, cov={:.2}, role={:.2}, struct={:.2}",
                     c_display,
                     item.unified_score.dependency_factor,
-                    1.0 - (item.unified_score.coverage_factor / 10.0),
+                    item.unified_score.coverage_factor / 10.0,
                     role,
                     struct_mult
                 ),
@@ -1063,8 +1065,10 @@ pub fn build_calculation_summary_section(
         let d = item.unified_score.dependency_factor;
 
         // Step 1: Base score from formula
+        // coverage_factor is 0-10 scale where 10 = 0% coverage (100% gap)
+        // Divide by 10 to get 0-1 multiplier (higher = less coverage = higher score)
         let weighted_base = if has_coverage_data {
-            let cov_mult = 1.0 - (item.unified_score.coverage_factor / 10.0);
+            let cov_mult = item.unified_score.coverage_factor / 10.0;
             (c + d) * cov_mult
         } else {
             (c * 5.0) + (d * 2.5)
