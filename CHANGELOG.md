@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2025-12-20
+
+### Added
+
+- **LLM-Optimized Output Format** (Spec 264)
+  - New `--llm` output format designed for AI agent consumption
+  - Structured context suggestions with specific, actionable guidance
+  - Optimized for context window efficiency
+
+- **TUI AI Sensor Model Redesign** (Spec 265)
+  - Redesigned TUI to emphasize AI sensor positioning
+  - Clearer presentation of identification, severity, and structural context
+  - Improved context suggestion display
+
+- **Context Suggestions for God Objects** (Spec 263)
+  - God objects now generate targeted context suggestions
+  - Provides specific guidance for AI agents analyzing large structs
+
+### Changed
+
+- **Documentation Pivot to AI Sensor Model** (Spec 266)
+  - Updated documentation to reflect debtmap's role as an AI sensor
+  - Emphasis on providing accurate identification and severity data to AI agents
+
+### Fixed
+
+- **TUI Score Breakdown Transparency**
+  - Score breakdown now accurately reflects actual calculation
+  - Coverage multiplier correctly displayed in calculation steps
+  - Entropy dampening shown as multiplier only for god objects
+
+### Performance
+
+- **Eliminated Redundant File I/O**
+  - Removed unnecessary file reads after debt scoring phase completes
+  - Improved analysis speed for large codebases
+
 ## [0.10.0] - 2025-12-19
 
 ### Strategic Direction
