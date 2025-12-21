@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
+use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.8;
@@ -44,6 +45,8 @@ pub fn analyze_project(
 }
 
 /// Detect duplications with progress callback for TUI updates
+///
+/// Uses parallel file I/O for improved performance on multi-core systems.
 pub fn detect_duplications_with_progress<F>(
     files: &[PathBuf],
     threshold: usize,
@@ -53,14 +56,12 @@ where
     F: FnMut(usize, usize),
 {
     let total_files = files.len();
-    let mut last_update = std::time::Instant::now();
 
-    // Prepare files with progress tracking
+    // Parallel file reading - significant speedup for I/O bound operations
     let files_with_content: Vec<(PathBuf, String)> = files
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, path)| {
-            let result = match io::read_file(path) {
+        .par_iter()
+        .filter_map(|path| {
+            match io::read_file(path) {
                 Ok(content) => Some((path.clone(), content)),
                 Err(e) => {
                     log::debug!(
@@ -70,20 +71,11 @@ where
                     );
                     None
                 }
-            };
-
-            // Throttled progress updates (every 10 files or 100ms)
-            if (idx + 1) % 10 == 0 || last_update.elapsed() > std::time::Duration::from_millis(100)
-            {
-                progress_callback(idx + 1, total_files);
-                last_update = std::time::Instant::now();
             }
-
-            result
         })
         .collect();
 
-    // Final progress update
+    // Report completion after parallel read
     progress_callback(total_files, total_files);
 
     debt::duplication::detect_duplication(
@@ -100,7 +92,7 @@ pub fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<Duplicati
 
 pub fn prepare_files_for_duplication_check(files: &[PathBuf]) -> Vec<(PathBuf, String)> {
     files
-        .iter()
+        .par_iter()
         .filter_map(|path| match io::read_file(path) {
             Ok(content) => Some((path.clone(), content)),
             Err(e) => {
@@ -241,10 +233,10 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_duplications_with_progress_throttling() {
+    fn test_detect_duplications_with_progress_parallel() {
         use std::sync::{Arc, Mutex};
 
-        // Create many temporary test files to test throttling
+        // Create many temporary test files
         let temp_dir = tempfile::tempdir().unwrap();
         let mut files = Vec::new();
 
@@ -264,27 +256,17 @@ mod tests {
 
         let calls = progress_calls.lock().unwrap();
 
-        // With 25 files and throttling every 10 files, we expect:
-        // - Update at file 10
-        // - Update at file 20
-        // - Final update at file 25
-        // (May have more if 100ms elapsed between files)
-        assert!(
-            calls.len() >= 3,
-            "Should have at least 3 progress updates with throttling"
-        );
-        assert!(
-            calls.len() <= 10,
-            "Throttling should limit excessive updates"
+        // With parallel I/O, we report completion once at the end
+        assert_eq!(
+            calls.len(),
+            1,
+            "Parallel implementation reports once at completion"
         );
 
-        // Verify counts are monotonically increasing
-        for i in 1..calls.len() {
-            assert!(
-                calls[i].0 >= calls[i - 1].0,
-                "Progress should be monotonically increasing"
-            );
-        }
+        // Final call should report all files complete
+        let final_call = calls.last().unwrap();
+        assert_eq!(final_call.0, 25, "Should report all files complete");
+        assert_eq!(final_call.1, 25, "Total should be correct");
     }
 
     #[test]
