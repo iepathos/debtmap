@@ -853,10 +853,9 @@ impl ParallelUnifiedAnalysisBuilder {
         metric: &FunctionMetrics,
         context: &FunctionAnalysisContext,
     ) -> Vec<UnifiedDebtItem> {
-        // Clone risk analyzer for thread-safe parallel execution
-        let risk_analyzer_clone = context.risk_analyzer.cloned();
         // Returns Vec<UnifiedDebtItem> - one per debt type found (spec 228)
         // Uses shared detectors from context to avoid per-metric regex compilation (spec 196)
+        // Note: risk_analyzer is already a reference in context, no need to clone
         crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
             metric,
             context.call_graph,
@@ -865,7 +864,7 @@ impl ParallelUnifiedAnalysisBuilder {
             context.function_pointer_used_functions,
             context.debt_aggregator,
             Some(context.data_flow_graph),
-            risk_analyzer_clone.as_ref(),
+            context.risk_analyzer,
             context.project_path,
             context.context_detector,
             context.recommendation_engine,

@@ -9,6 +9,10 @@ use super::types_ctx::extract_type_contexts;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::UnifiedDebtItem;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
+
+/// Global default config to avoid repeated construction in hot paths.
+static DEFAULT_CONFIG: OnceLock<ContextConfig> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextConfig {
@@ -28,6 +32,15 @@ impl Default for ContextConfig {
             include_tests: true,
             include_types: true,
         }
+    }
+}
+
+impl ContextConfig {
+    /// Get the global default config.
+    ///
+    /// This avoids repeated struct construction in hot paths.
+    pub fn global_default() -> &'static Self {
+        DEFAULT_CONFIG.get_or_init(Self::default)
     }
 }
 

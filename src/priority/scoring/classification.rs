@@ -254,6 +254,50 @@ pub fn classify_all_debt_types(
     }
 }
 
+/// Classify debt types with precomputed role to avoid redundant role computation.
+///
+/// This is the optimized version that accepts a precomputed role for cases where
+/// the caller has already computed the function role.
+pub fn classify_all_debt_types_with_role(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+    framework_exclusions: &HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
+    coverage: Option<&TransitiveCoverage>,
+    precomputed_role: FunctionRole,
+) -> Vec<DebtType> {
+    // Test functions get exclusive test debt (early return preserved for correctness)
+    if func.is_test {
+        return vec![classify_test_debt(func)];
+    }
+
+    // Compose all independent debt checks using iterator chains (functional style)
+    let debt_types: Vec<DebtType> = vec![
+        check_testing_gap_predicate(func, coverage),
+        check_complexity_hotspot(func),
+        check_dead_code_with_exclusions_predicate(
+            func,
+            call_graph,
+            func_id,
+            framework_exclusions,
+            function_pointer_used_functions,
+        ),
+    ]
+    .into_iter()
+    .flatten() // Remove None values, keep Some(debt)
+    .collect();
+
+    // If no specific debt, classify by role (fallback) - using precomputed role
+    if debt_types.is_empty() {
+        classify_simple_function_risk(func, &precomputed_role)
+            .map(|debt| vec![debt])
+            .unwrap_or_default()
+    } else {
+        debt_types
+    }
+}
+
 /// Enhanced version of debt type classification with framework pattern exclusions
 /// Returns `Vec<DebtType>` for multi-debt accumulation (spec 228)
 ///

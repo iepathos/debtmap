@@ -164,6 +164,7 @@ mod tests {
                 coverage: Some(0.8),
                 uncovered_lines: None,
                 entropy_score: None,
+                ..Default::default()
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 10,
@@ -176,6 +177,7 @@ mod tests {
                 downstream_count: 0,
                 upstream_callers: vec![],
                 downstream_callees: vec![],
+                ..Default::default()
             },
             recommendation: RecommendationOutput {
                 action: "Test action".to_string(),

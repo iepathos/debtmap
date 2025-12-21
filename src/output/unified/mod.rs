@@ -208,6 +208,7 @@ mod proptest_tests {
                 coverage: coverage.map(round_ratio),
                 uncovered_lines: None,
                 entropy_score: entropy.map(round_ratio),
+                ..Default::default()
             }
         }
     }

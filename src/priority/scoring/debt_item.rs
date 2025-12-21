@@ -35,8 +35,9 @@ pub use super::formatting::determine_visibility;
 
 // Import and re-export classification functions for backward compatibility
 pub use super::classification::{
-    classify_debt_type_with_exclusions, classify_risk_based_debt, classify_simple_function_risk,
-    classify_test_debt, is_complexity_hotspot, is_dead_code, is_dead_code_with_exclusions,
+    classify_all_debt_types_with_role, classify_debt_type_with_exclusions,
+    classify_risk_based_debt, classify_simple_function_risk, classify_test_debt,
+    is_complexity_hotspot, is_dead_code, is_dead_code_with_exclusions,
 };
 
 /// Enhanced version of debt type classification (legacy - kept for compatibility)

@@ -102,6 +102,7 @@ fn test_function_item_required_fields_and_ranges() {
             coverage: Some(0.75),
             uncovered_lines: None,
             entropy_score: Some(0.5),
+            ..Default::default()
         },
         debt_type: test_debt_type(),
         function_role: test_function_role(),
@@ -115,6 +116,7 @@ fn test_function_item_required_fields_and_ranges() {
             downstream_count: 3,
             upstream_callers: vec![],
             downstream_callees: vec![],
+            ..Default::default()
         },
         recommendation: RecommendationOutput {
             action: "Add tests".to_string(),
@@ -281,6 +283,7 @@ fn test_priority_matches_score_thresholds() {
                 coverage: None,
                 uncovered_lines: None,
                 entropy_score: None,
+                ..Default::default()
             },
             debt_type: test_debt_type(),
             function_role: test_function_role(),
@@ -290,6 +293,7 @@ fn test_priority_matches_score_thresholds() {
                 downstream_count: 0,
                 upstream_callers: vec![],
                 downstream_callees: vec![],
+                ..Default::default()
             },
             recommendation: RecommendationOutput {
                 action: "".to_string(),
@@ -343,6 +347,7 @@ fn test_no_floating_point_noise_in_serialized_output() {
             coverage: Some(0.8),
             uncovered_lines: None,
             entropy_score: Some(0.5),
+            ..Default::default()
         },
         debt_type: test_debt_type(),
         function_role: test_function_role(),
@@ -352,6 +357,7 @@ fn test_no_floating_point_noise_in_serialized_output() {
             downstream_count: 0,
             upstream_callers: vec![],
             downstream_callees: vec![],
+            ..Default::default()
         },
         recommendation: RecommendationOutput {
             action: "Add tests".to_string(),
@@ -445,6 +451,7 @@ fn test_unified_debt_item_tagged_serialization() {
             coverage: None,
             uncovered_lines: None,
             entropy_score: None,
+            ..Default::default()
         },
         debt_type: test_debt_type(),
         function_role: test_function_role(),
@@ -454,6 +461,7 @@ fn test_unified_debt_item_tagged_serialization() {
             downstream_count: 0,
             upstream_callers: vec![],
             downstream_callees: vec![],
+            ..Default::default()
         },
         recommendation: RecommendationOutput {
             action: "".to_string(),

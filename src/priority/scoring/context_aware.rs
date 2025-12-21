@@ -2,11 +2,20 @@
 //!
 //! This module provides tailored recommendations based on the detected context
 //! of a function (formatter, parser, CLI handler, etc.).
+//!
+//! # Performance
+//!
+//! The `ContextRecommendationEngine` builds a HashMap of templates on creation.
+//! For hot paths, use the `global()` method to access a shared singleton instance.
 
 use crate::analysis::FunctionContext;
 use crate::core::FunctionMetrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+/// Global singleton for ContextRecommendationEngine to avoid repeated HashMap creation.
+static GLOBAL_RECOMMENDATION_ENGINE: OnceLock<ContextRecommendationEngine> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Severity {
@@ -265,6 +274,14 @@ impl ContextRecommendationEngine {
         );
 
         Self { templates }
+    }
+
+    /// Get the global singleton instance.
+    ///
+    /// This avoids repeated HashMap creation when called from hot paths.
+    /// The singleton is lazily initialized on first access.
+    pub fn global() -> &'static Self {
+        GLOBAL_RECOMMENDATION_ENGINE.get_or_init(Self::new)
     }
 
     pub fn generate_recommendation(

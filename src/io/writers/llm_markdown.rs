@@ -159,11 +159,28 @@ impl<W: Write> LlmMarkdownWriter<W> {
             "- Cyclomatic Complexity: {}",
             item.metrics.cyclomatic_complexity
         )?;
-        writeln!(
-            self.writer,
-            "- Cognitive Complexity: {}",
-            item.metrics.cognitive_complexity
-        )?;
+        // Show cognitive complexity with entropy-adjusted notation if different
+        if let Some(adjusted_cog) = item.metrics.entropy_adjusted_cognitive {
+            if adjusted_cog != item.metrics.cognitive_complexity {
+                writeln!(
+                    self.writer,
+                    "- Cognitive Complexity: {} → {} (entropy-adjusted)",
+                    item.metrics.cognitive_complexity, adjusted_cog
+                )?;
+            } else {
+                writeln!(
+                    self.writer,
+                    "- Cognitive Complexity: {}",
+                    item.metrics.cognitive_complexity
+                )?;
+            }
+        } else {
+            writeln!(
+                self.writer,
+                "- Cognitive Complexity: {}",
+                item.metrics.cognitive_complexity
+            )?;
+        }
         writeln!(
             self.writer,
             "- Nesting Depth: {}",
@@ -188,10 +205,17 @@ impl<W: Write> LlmMarkdownWriter<W> {
         writeln!(self.writer)?;
 
         // Coverage section
-        if item.metrics.coverage.is_some() {
+        if item.metrics.coverage.is_some() || item.metrics.transitive_coverage.is_some() {
             writeln!(self.writer, "#### Coverage")?;
             if let Some(coverage) = item.metrics.coverage {
                 writeln!(self.writer, "- Direct Coverage: {:.0}%", coverage * 100.0)?;
+            }
+            if let Some(transitive) = item.metrics.transitive_coverage {
+                writeln!(
+                    self.writer,
+                    "- Transitive Coverage: {:.0}%",
+                    transitive * 100.0
+                )?;
             }
             writeln!(self.writer)?;
         }
@@ -208,16 +232,58 @@ impl<W: Write> LlmMarkdownWriter<W> {
             "- Downstream Callees: {}",
             item.dependencies.downstream_count
         )?;
+        // New fields: blast radius, critical path, coupling classification, instability
+        if item.dependencies.blast_radius > 0 {
+            let impact = if item.dependencies.blast_radius >= 20 {
+                "critical"
+            } else if item.dependencies.blast_radius >= 10 {
+                "high"
+            } else {
+                "moderate"
+            };
+            writeln!(
+                self.writer,
+                "- Blast Radius: {} ({})",
+                item.dependencies.blast_radius, impact
+            )?;
+        }
+        if item.dependencies.critical_path {
+            writeln!(self.writer, "- Critical Path: Yes")?;
+        }
+        if let Some(ref classification) = item.dependencies.coupling_classification {
+            writeln!(self.writer, "- Coupling Classification: {}", classification)?;
+        }
+        if let Some(instability) = item.dependencies.instability {
+            writeln!(
+                self.writer,
+                "- Instability: {:.2} (I=Ce/(Ca+Ce))",
+                instability
+            )?;
+        }
         if !item.dependencies.upstream_callers.is_empty() {
             writeln!(self.writer, "- Top Callers:")?;
-            for caller in item.dependencies.upstream_callers.iter().take(3) {
+            for caller in item.dependencies.upstream_callers.iter().take(5) {
                 writeln!(self.writer, "  - {}", caller)?;
+            }
+            if item.dependencies.upstream_callers.len() > 5 {
+                writeln!(
+                    self.writer,
+                    "  - (+{} more)",
+                    item.dependencies.upstream_callers.len() - 5
+                )?;
             }
         }
         if !item.dependencies.downstream_callees.is_empty() {
             writeln!(self.writer, "- Top Callees:")?;
-            for callee in item.dependencies.downstream_callees.iter().take(3) {
+            for callee in item.dependencies.downstream_callees.iter().take(5) {
                 writeln!(self.writer, "  - {}", callee)?;
+            }
+            if item.dependencies.downstream_callees.len() > 5 {
+                writeln!(
+                    self.writer,
+                    "  - (+{} more)",
+                    item.dependencies.downstream_callees.len() - 5
+                )?;
             }
         }
         writeln!(self.writer)?;
@@ -253,30 +319,75 @@ impl<W: Write> LlmMarkdownWriter<W> {
         // Scoring breakdown section
         if let Some(ref scoring) = item.scoring_details {
             writeln!(self.writer, "#### Scoring Breakdown")?;
-            writeln!(self.writer, "- Base Score: {}", scoring.base_score)?;
+            writeln!(self.writer, "- Base Score: {:.2}", scoring.base_score)?;
             writeln!(
                 self.writer,
-                "- Complexity Factor: {} (weight: 0.4)",
+                "- Complexity Factor: {:.2} (weight: 0.4)",
                 scoring.complexity_score
             )?;
             writeln!(
                 self.writer,
-                "- Coverage Factor: {} (weight: 0.3)",
+                "- Coverage Factor: {:.2} (weight: 0.3)",
                 scoring.coverage_score
             )?;
             writeln!(
                 self.writer,
-                "- Dependency Factor: {} (weight: 0.2)",
+                "- Dependency Factor: {:.2} (weight: 0.2)",
                 scoring.dependency_score
             )?;
             writeln!(
                 self.writer,
-                "- Role Multiplier: {} ({:?})",
+                "- Role Multiplier: {:.2} ({:?})",
                 scoring.role_multiplier, item.function_role
             )?;
+            // Additional multipliers (Spec 264)
+            if let Some(structural) = scoring.structural_multiplier {
+                if (structural - 1.0).abs() > 0.01 {
+                    writeln!(self.writer, "- Structural Multiplier: {:.2}", structural)?;
+                }
+            }
+            if let Some(context_mult) = scoring.context_multiplier {
+                if (context_mult - 1.0).abs() > 0.01 {
+                    writeln!(self.writer, "- Context Multiplier: {:.2}", context_mult)?;
+                }
+            }
+            if let Some(risk_mult) = scoring.contextual_risk_multiplier {
+                if (risk_mult - 1.0).abs() > 0.01 {
+                    writeln!(
+                        self.writer,
+                        "- Contextual Risk Multiplier: {:.2}",
+                        risk_mult
+                    )?;
+                }
+            }
             if let Some(purity_factor) = scoring.purity_factor {
                 writeln!(self.writer, "- Purity Factor: {:.2}", purity_factor)?;
             }
+            if let Some(refactor_factor) = scoring.refactorability_factor {
+                if (refactor_factor - 1.0).abs() > 0.01 {
+                    writeln!(
+                        self.writer,
+                        "- Refactorability Factor: {:.2}",
+                        refactor_factor
+                    )?;
+                }
+            }
+            if let Some(pattern_factor) = scoring.pattern_factor {
+                if (pattern_factor - 1.0).abs() > 0.01 {
+                    writeln!(self.writer, "- Pattern Factor: {:.2}", pattern_factor)?;
+                }
+            }
+            // Show pre-normalization score if clamping occurred
+            if let Some(pre_norm) = scoring.pre_normalization_score {
+                if (pre_norm - scoring.final_score).abs() > 0.1 {
+                    writeln!(
+                        self.writer,
+                        "- Pre-normalization Score: {:.2} (clamped to {:.2})",
+                        pre_norm, scoring.final_score
+                    )?;
+                }
+            }
+            writeln!(self.writer, "- Final Score: {:.2}", scoring.final_score)?;
             writeln!(self.writer)?;
         }
 
@@ -625,6 +736,214 @@ mod tests {
         assert!(
             !markdown.contains("===") && !markdown.contains("---\n---"),
             "Should not contain decorative separators"
+        );
+    }
+
+    #[test]
+    fn test_llm_markdown_outputs_new_dependency_fields() {
+        use crate::output::unified::{
+            Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
+            Priority, RecommendationOutput, UnifiedLocation,
+        };
+        use crate::priority::{DebtType, FunctionRole};
+
+        let mut buffer = Vec::new();
+        let mut writer = LlmMarkdownWriter::new(&mut buffer);
+
+        // Create a function item with enhanced dependency data
+        let item = FunctionDebtItemOutput {
+            score: 85.5,
+            category: "Complexity".to_string(),
+            priority: Priority::High,
+            location: UnifiedLocation {
+                file: "src/test.rs".to_string(),
+                line: Some(100),
+                function: Some("complex_fn".to_string()),
+                file_context_label: None,
+            },
+            metrics: FunctionMetricsOutput {
+                cyclomatic_complexity: 25,
+                cognitive_complexity: 30,
+                length: 150,
+                nesting_depth: 5,
+                coverage: Some(0.6),
+                uncovered_lines: None,
+                entropy_score: Some(0.7),
+                entropy_adjusted_cognitive: Some(24),
+                transitive_coverage: Some(0.75),
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 25,
+                cognitive: 30,
+            },
+            function_role: FunctionRole::Unknown,
+            purity_analysis: None,
+            dependencies: Dependencies {
+                upstream_count: 8,
+                downstream_count: 12,
+                upstream_callers: vec!["caller1".to_string(), "caller2".to_string()],
+                downstream_callees: vec!["callee1".to_string(), "callee2".to_string()],
+                blast_radius: 20,
+                critical_path: true,
+                coupling_classification: Some("Hub".to_string()),
+                instability: Some(0.6),
+            },
+            recommendation: RecommendationOutput {
+                action: "Refactor".to_string(),
+                priority: None,
+                implementation_steps: vec![],
+            },
+            impact: FunctionImpactOutput {
+                coverage_improvement: 0.1,
+                complexity_reduction: 0.2,
+                risk_reduction: 0.15,
+            },
+            scoring_details: None,
+            adjusted_complexity: None,
+            complexity_pattern: None,
+            pattern_type: None,
+            pattern_confidence: None,
+            pattern_details: None,
+            context: None,
+        };
+
+        let result = writer.write_function_item(&item);
+        assert!(result.is_ok());
+
+        let markdown = String::from_utf8(buffer).unwrap();
+
+        // Check entropy-adjusted cognitive complexity notation
+        assert!(
+            markdown.contains("30 → 24 (entropy-adjusted)"),
+            "Should show entropy-adjusted cognitive: {}",
+            markdown
+        );
+
+        // Check transitive coverage
+        assert!(
+            markdown.contains("Transitive Coverage: 75%"),
+            "Should show transitive coverage"
+        );
+
+        // Check new dependency fields
+        assert!(
+            markdown.contains("Blast Radius: 20 (critical)"),
+            "Should show blast radius"
+        );
+        assert!(
+            markdown.contains("Critical Path: Yes"),
+            "Should show critical path"
+        );
+        assert!(
+            markdown.contains("Coupling Classification: Hub"),
+            "Should show coupling classification"
+        );
+        assert!(
+            markdown.contains("Instability: 0.60 (I=Ce/(Ca+Ce))"),
+            "Should show instability metric"
+        );
+    }
+
+    #[test]
+    fn test_llm_markdown_outputs_enhanced_scoring() {
+        use crate::output::unified::{
+            Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
+            FunctionScoringDetails, Priority, RecommendationOutput, UnifiedLocation,
+        };
+        use crate::priority::{DebtType, FunctionRole};
+
+        let mut buffer = Vec::new();
+        let mut writer = LlmMarkdownWriter::new(&mut buffer);
+
+        let item = FunctionDebtItemOutput {
+            score: 100.0,
+            category: "Complexity".to_string(),
+            priority: Priority::Critical,
+            location: UnifiedLocation {
+                file: "src/test.rs".to_string(),
+                line: Some(50),
+                function: Some("test_fn".to_string()),
+                file_context_label: None,
+            },
+            metrics: FunctionMetricsOutput {
+                cyclomatic_complexity: 20,
+                cognitive_complexity: 25,
+                length: 100,
+                nesting_depth: 4,
+                coverage: Some(0.5),
+                ..Default::default()
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+            function_role: FunctionRole::Unknown,
+            purity_analysis: None,
+            dependencies: Dependencies::default(),
+            recommendation: RecommendationOutput {
+                action: "Refactor".to_string(),
+                priority: None,
+                implementation_steps: vec![],
+            },
+            impact: FunctionImpactOutput {
+                coverage_improvement: 0.1,
+                complexity_reduction: 0.2,
+                risk_reduction: 0.15,
+            },
+            scoring_details: Some(FunctionScoringDetails {
+                coverage_score: 5.0,
+                complexity_score: 8.0,
+                dependency_score: 3.0,
+                base_score: 16.0,
+                entropy_dampening: Some(0.8),
+                role_multiplier: 1.2,
+                final_score: 100.0,
+                purity_factor: Some(0.9),
+                refactorability_factor: Some(1.1),
+                pattern_factor: Some(0.85),
+                structural_multiplier: Some(1.3),
+                context_multiplier: Some(0.9),
+                contextual_risk_multiplier: Some(1.15),
+                pre_normalization_score: Some(150.0),
+            }),
+            adjusted_complexity: None,
+            complexity_pattern: None,
+            pattern_type: None,
+            pattern_confidence: None,
+            pattern_details: None,
+            context: None,
+        };
+
+        let result = writer.write_function_item(&item);
+        assert!(result.is_ok());
+
+        let markdown = String::from_utf8(buffer).unwrap();
+
+        // Check new scoring multipliers are present
+        assert!(
+            markdown.contains("Structural Multiplier: 1.30"),
+            "Should show structural multiplier: {}",
+            markdown
+        );
+        assert!(
+            markdown.contains("Context Multiplier: 0.90"),
+            "Should show context multiplier"
+        );
+        assert!(
+            markdown.contains("Contextual Risk Multiplier: 1.15"),
+            "Should show contextual risk multiplier"
+        );
+        assert!(
+            markdown.contains("Refactorability Factor: 1.10"),
+            "Should show refactorability factor"
+        );
+        assert!(
+            markdown.contains("Pre-normalization Score: 150.00 (clamped to 100.00)"),
+            "Should show pre-normalization score when clamped"
+        );
+        assert!(
+            markdown.contains("Final Score: 100.00"),
+            "Should show final score"
         );
     }
 }

@@ -71,7 +71,9 @@ pub fn deduplicate_items(items: Vec<UnifiedDebtItemOutput>) -> Vec<UnifiedDebtIt
             // Log individual duplicates at trace level (only visible with RUST_LOG=trace)
             log::trace!(
                 "Dedup: removed duplicate item: file={}, line={:?}, function={:?}",
-                key.file, key.line, key.function
+                key.file,
+                key.line,
+                key.function
             );
         }
     }

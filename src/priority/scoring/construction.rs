@@ -19,8 +19,8 @@ use crate::priority::{
     coverage_propagation::calculate_transitive_coverage,
     debt_aggregator::DebtAggregator,
     scoring::debt_item::{
-        calculate_entropy_details, calculate_expected_impact, classify_debt_type_enhanced,
-        classify_debt_type_with_exclusions, generate_recommendation,
+        calculate_entropy_details, calculate_expected_impact, classify_all_debt_types_with_role,
+        classify_debt_type_enhanced, generate_recommendation,
         generate_recommendation_with_coverage_and_data_flow,
     },
     semantic_classifier::classify_function_role,
@@ -199,12 +199,14 @@ pub fn create_unified_debt_item_enhanced(
         };
 
     // Detect function context (spec 122)
-    let context_detector = crate::analysis::ContextDetector::new();
+    // Use global singleton to avoid repeated regex compilation
+    let context_detector = crate::analysis::ContextDetector::global();
     let context_analysis = context_detector.detect_context(func, &func.file);
 
     // Generate contextual recommendation if confidence is high enough (spec 122)
+    // Use global singleton to avoid repeated HashMap creation
     let contextual_recommendation = if context_analysis.confidence > 0.6 {
-        let engine = crate::priority::scoring::ContextRecommendationEngine::new();
+        let engine = crate::priority::scoring::ContextRecommendationEngine::global();
         Some(engine.generate_recommendation(
             func,
             context_analysis.context,
@@ -649,13 +651,15 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     );
 
     // Step 2: Get all debt types for this function (spec 228)
-    let debt_types = classify_debt_type_with_exclusions(
+    // Use precomputed role from context to avoid redundant computation
+    let debt_types = classify_all_debt_types_with_role(
         func,
         call_graph,
         &ctx.func_id,
         framework_exclusions,
         function_pointer_used_functions,
         ctx.transitive_coverage.as_ref(),
+        ctx.role,
     );
 
     // Step 3: Create one UnifiedDebtItem per debt type using pre-computed context
@@ -686,9 +690,9 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
             );
 
             // Generate context suggestion for AI agents (spec 263)
-            let context_config = ContextConfig::default();
+            // Use global default to avoid repeated construction
             item.context_suggestion =
-                generate_context_suggestion(&item, call_graph, &context_config);
+                generate_context_suggestion(&item, call_graph, ContextConfig::global_default());
 
             // Analyze contextual risk if risk analyzer is provided (spec 202)
             if let Some(analyzer) = risk_analyzer {
@@ -753,6 +757,9 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
 ) -> Vec<UnifiedDebtItem> {
     let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
+    // Compute function role ONCE upfront for reuse
+    let function_role = classify_function_role(func, &func_id, call_graph);
+
     // Calculate transitive coverage if coverage file is provided (Spec 203)
     // Use exact AST boundaries for more accurate coverage matching
     // ALWAYS return Some when coverage is provided, never None (eliminates Cov:N/A)
@@ -766,13 +773,15 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     });
 
     // Use the enhanced debt type classification with framework exclusions (spec 228)
-    let debt_types = classify_debt_type_with_exclusions(
+    // Use precomputed role to avoid redundant computation
+    let debt_types = classify_all_debt_types_with_role(
         func,
         call_graph,
         &func_id,
         framework_exclusions,
         function_pointer_used_functions,
         transitive_coverage.as_ref(),
+        function_role,
     );
 
     // Pre-calculate shared data (extracted once, reused for all debt items)
@@ -802,13 +811,15 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         };
 
     // Pre-calculate shared context data
-    let context_detector = crate::analysis::ContextDetector::new();
+    // Use global singleton to avoid repeated regex compilation
+    let context_detector = crate::analysis::ContextDetector::global();
     let context_analysis = context_detector.detect_context(func, &func.file);
 
-    let function_role = classify_function_role(func, &func_id, call_graph);
+    // function_role already computed earlier for debt classification
 
+    // Use global singleton to avoid repeated HashMap creation
     let contextual_recommendation = if context_analysis.confidence > 0.6 {
-        let engine = crate::priority::scoring::ContextRecommendationEngine::new();
+        let engine = crate::priority::scoring::ContextRecommendationEngine::global();
         Some(engine.generate_recommendation(
             func,
             context_analysis.context,
@@ -890,9 +901,9 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
             };
 
             // Generate context suggestion for AI agents (spec 263)
-            let context_config = ContextConfig::default();
+            // Use global default to avoid repeated construction
             item.context_suggestion =
-                generate_context_suggestion(&item, call_graph, &context_config);
+                generate_context_suggestion(&item, call_graph, ContextConfig::global_default());
 
             Some(item)
         })

@@ -121,6 +121,11 @@ impl FunctionDebtItemOutput {
                 coverage: rounded_coverage,
                 uncovered_lines: None, // Not currently tracked
                 entropy_score: rounded_entropy,
+                entropy_adjusted_cognitive: item.entropy_adjusted_cognitive,
+                transitive_coverage: item
+                    .transitive_coverage
+                    .as_ref()
+                    .map(|c| round_ratio(c.transitive)),
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
@@ -129,11 +134,28 @@ impl FunctionDebtItemOutput {
                 confidence: item.purity_confidence.unwrap_or(0.0),
                 side_effects: None,
             }),
-            dependencies: Dependencies {
-                upstream_count: item.upstream_dependencies,
-                downstream_count: item.downstream_dependencies,
-                upstream_callers: item.upstream_callers.clone(),
-                downstream_callees: item.downstream_callees.clone(),
+            dependencies: {
+                let upstream = item.upstream_dependencies;
+                let downstream = item.downstream_dependencies;
+                let blast_radius = upstream + downstream;
+                let critical_path = upstream > 5 || downstream > 10;
+                let instability = if blast_radius > 0 {
+                    Some(round_ratio(downstream as f64 / blast_radius as f64))
+                } else {
+                    None
+                };
+                let coupling_classification =
+                    derive_coupling_classification(upstream, downstream, instability);
+                Dependencies {
+                    upstream_count: upstream,
+                    downstream_count: downstream,
+                    upstream_callers: item.upstream_callers.clone(),
+                    downstream_callees: item.downstream_callees.clone(),
+                    blast_radius,
+                    critical_path,
+                    coupling_classification,
+                    instability,
+                }
             },
             recommendation: RecommendationOutput {
                 action: item.recommendation.primary_action.clone(),
@@ -167,6 +189,20 @@ impl FunctionDebtItemOutput {
                         .refactorability_factor
                         .map(round_ratio),
                     pattern_factor: item.unified_score.pattern_factor.map(round_ratio),
+                    // Additional multipliers for LLM output (Spec 264)
+                    structural_multiplier: item
+                        .unified_score
+                        .structural_multiplier
+                        .map(round_ratio),
+                    context_multiplier: item.context_multiplier.map(round_ratio),
+                    contextual_risk_multiplier: item
+                        .unified_score
+                        .contextual_risk_multiplier
+                        .map(round_ratio),
+                    pre_normalization_score: item
+                        .unified_score
+                        .pre_normalization_score
+                        .map(round_score),
                 })
             } else {
                 None
@@ -191,6 +227,51 @@ impl FunctionDebtItemOutput {
     }
 }
 
+/// Derive coupling classification based on upstream/downstream dependencies
+///
+/// Classifications based on dependency patterns:
+/// - "Leaf Module": No downstream dependencies (stable, pure consumer)
+/// - "Stable Core": High upstream, low instability (heavily depended upon)
+/// - "Hub": High upstream and downstream (central integration point)
+/// - "Connector": Balanced upstream/downstream (mediator)
+/// - None: Low dependency counts, no significant classification
+fn derive_coupling_classification(
+    upstream: usize,
+    downstream: usize,
+    instability: Option<f64>,
+) -> Option<String> {
+    let blast_radius = upstream + downstream;
+
+    // Low dependency counts - no meaningful classification
+    if blast_radius < 3 {
+        return None;
+    }
+
+    // Leaf module: no downstream, only consumes
+    if downstream == 0 && upstream > 0 {
+        return Some("Leaf Module".to_string());
+    }
+
+    let inst = instability.unwrap_or(0.5);
+
+    // Stable core: high upstream (many callers), low instability
+    if upstream >= 5 && inst < 0.3 {
+        return Some("Stable Core".to_string());
+    }
+
+    // Hub: high both upstream and downstream
+    if upstream >= 5 && downstream >= 5 {
+        return Some("Hub".to_string());
+    }
+
+    // Connector: moderate dependencies in both directions
+    if upstream >= 2 && downstream >= 2 {
+        return Some("Connector".to_string());
+    }
+
+    None
+}
+
 /// Adjusted complexity based on entropy analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdjustedComplexity {
@@ -199,7 +280,7 @@ pub struct AdjustedComplexity {
 }
 
 /// Function metrics in unified format
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FunctionMetricsOutput {
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
@@ -211,6 +292,12 @@ pub struct FunctionMetricsOutput {
     pub uncovered_lines: Option<Vec<usize>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_score: Option<f64>,
+    /// Entropy-adjusted cognitive complexity (Spec 264)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_adjusted_cognitive: Option<u32>,
+    /// Transitive coverage from callers (Spec 264)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transitive_coverage: Option<f64>,
 }
 
 /// Function impact metrics
@@ -239,6 +326,19 @@ pub struct FunctionScoringDetails {
     pub refactorability_factor: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_factor: Option<f64>,
+    // Additional multipliers for LLM output (Spec 264)
+    /// Structural multiplier for deep nesting
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub structural_multiplier: Option<f64>,
+    /// Context multiplier based on file context (production vs test)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_multiplier: Option<f64>,
+    /// Contextual risk multiplier from git history analysis
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contextual_risk_multiplier: Option<f64>,
+    /// Score before normalization/clamping was applied
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pre_normalization_score: Option<f64>,
 }
 
 /// Context suggestion output for AI agents (spec 263)
@@ -325,6 +425,7 @@ mod tests {
                 coverage: Some(0.8),
                 uncovered_lines: None,
                 entropy_score: Some(0.5),
+                ..Default::default()
             },
             debt_type: DebtType::TestingGap {
                 coverage: 0.8,
@@ -342,6 +443,7 @@ mod tests {
                 downstream_count: 3,
                 upstream_callers: vec!["caller1".to_string()],
                 downstream_callees: vec!["callee1".to_string()],
+                ..Default::default()
             },
             recommendation: RecommendationOutput {
                 action: "Add tests".to_string(),
@@ -392,6 +494,7 @@ mod tests {
                 coverage: Some(0.8), // Already rounded
                 uncovered_lines: None,
                 entropy_score: Some(0.5), // Already rounded
+                ..Default::default()
             },
             debt_type: crate::priority::DebtType::TestingGap {
                 coverage: 0.8,
@@ -405,6 +508,7 @@ mod tests {
                 downstream_count: 0,
                 upstream_callers: vec![],
                 downstream_callees: vec![],
+                ..Default::default()
             },
             recommendation: RecommendationOutput {
                 action: "Add tests".to_string(),

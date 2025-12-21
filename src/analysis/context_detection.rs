@@ -2,11 +2,21 @@
 //!
 //! This module detects the context of functions (formatter, parser, CLI handler, etc.)
 //! to provide specialized, context-aware recommendations.
+//!
+//! # Performance
+//!
+//! The `ContextDetector` compiles 17 regexes on creation. For hot paths, use the
+//! `global()` method to access a shared singleton instance, avoiding repeated
+//! regex compilation.
 
 use crate::core::FunctionMetrics;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::OnceLock;
+
+/// Global singleton for ContextDetector to avoid repeated regex compilation.
+static GLOBAL_CONTEXT_DETECTOR: OnceLock<ContextDetector> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FunctionContext {
@@ -84,6 +94,14 @@ impl ContextDetector {
                 Regex::new(r"^run_").unwrap(),
             ],
         }
+    }
+
+    /// Get the global singleton instance.
+    ///
+    /// This avoids repeated regex compilation when called from hot paths.
+    /// The singleton is lazily initialized on first access.
+    pub fn global() -> &'static Self {
+        GLOBAL_CONTEXT_DETECTOR.get_or_init(Self::new)
     }
 
     /// Detect the context of a function

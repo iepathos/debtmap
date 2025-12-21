@@ -66,7 +66,12 @@ pub type FileLineCountCache = HashMap<PathBuf, usize>;
 /// # Performance
 ///
 /// - Before: O(functions) file reads (e.g., 5000 reads for 5000 functions)
-/// - After: O(files) file reads (e.g., 800 reads for 800 unique files)
+/// - After: O(files) file reads in parallel (e.g., 800 reads for 800 unique files)
+///
+/// # Parallelism
+///
+/// Uses rayon's `par_iter()` for parallel file I/O. File reads are independent
+/// and benefit significantly from parallel execution on multi-core systems.
 ///
 /// # Pure Core Pattern
 ///
@@ -75,19 +80,23 @@ pub type FileLineCountCache = HashMap<PathBuf, usize>;
 pub fn build_file_line_count_cache(metrics: &[FunctionMetrics]) -> FileLineCountCache {
     use crate::metrics::LocCounter;
 
-    let loc_counter = LocCounter::default();
-
-    // Collect unique file paths
-    let unique_files: HashSet<&PathBuf> = metrics.iter().map(|m| &m.file).collect();
-
-    // Read each file once
-    unique_files
+    // Collect unique file paths into a Vec for parallel iteration
+    let unique_files: Vec<&PathBuf> = metrics
+        .iter()
+        .map(|m| &m.file)
+        .collect::<HashSet<_>>()
         .into_iter()
+        .collect();
+
+    // Read files in parallel - file I/O benefits from parallelism
+    unique_files
+        .par_iter()
         .filter_map(|path| {
+            let loc_counter = LocCounter::default();
             loc_counter
                 .count_file(path)
                 .ok()
-                .map(|count| (path.clone(), count.physical_lines))
+                .map(|count| ((*path).clone(), count.physical_lines))
         })
         .collect()
 }
@@ -208,10 +217,9 @@ pub fn process_metrics_to_debt_items(
 ) -> Vec<UnifiedDebtItem> {
     use super::call_graph::should_process_metric;
 
-    // Pre-create shared detectors once (I/O boundary) - spec 196
-    // These are Sync types that can be safely shared across threads
-    let context_detector = ContextDetector::new();
-    let recommendation_engine = ContextRecommendationEngine::new();
+    // Use global singletons to avoid repeated regex/HashMap creation
+    let context_detector = ContextDetector::global();
+    let recommendation_engine = ContextRecommendationEngine::global();
 
     // Parallel processing with shared references - spec 196
     metrics
