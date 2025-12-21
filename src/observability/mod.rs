@@ -62,6 +62,7 @@
 pub mod context;
 pub mod panic_hook;
 pub mod parallel;
+pub mod profiling;
 pub mod tracing;
 
 pub use context::{
@@ -74,6 +75,10 @@ pub use panic_hook::{
 pub use parallel::{
     process_file_with_context, with_parallel_context, ParallelContext, ParallelContextExt,
     ParallelContextGuard,
+};
+pub use profiling::{
+    enable_profiling, get_timing_report, is_profiling_enabled, reset_timing_data, PhaseTiming,
+    TimingReport, TimingSpan,
 };
 pub use tracing::{
     init_tracing, init_tracing_with_filter, is_debug_enabled, is_tui_active, set_tui_active,

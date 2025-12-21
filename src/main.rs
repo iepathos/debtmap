@@ -15,7 +15,10 @@ use debtmap::cli::{
     MAIN_STACK_SIZE,
 };
 use debtmap::di::create_app_container;
-use debtmap::observability::{extract_thread_panic_message, init_tracing, install_panic_hook};
+use debtmap::observability::{
+    enable_profiling, extract_thread_panic_message, get_timing_report, init_tracing,
+    install_panic_hook,
+};
 use std::sync::Arc;
 
 fn main() -> Result<()> {
@@ -74,9 +77,50 @@ fn main_inner() -> Result<()> {
 
     // Dispatch to command handlers
     match cli.command {
-        command @ Commands::Analyze { .. } => {
-            handle_analyze_command(command)
+        Commands::Analyze {
+            profile,
+            profile_output,
+            ..
+        } => {
+            // Extract profiling options before moving command
+            let profiling_enabled = profile;
+            let profiling_output = profile_output;
+
+            // Enable profiling if requested (spec 001)
+            if profiling_enabled {
+                enable_profiling();
+            }
+
+            // Re-parse to get full command for handler
+            let cli = if let Ok(args_str) = std::env::var("ARGUMENTS") {
+                let args: Vec<String> = args_str.split_whitespace().map(String::from).collect();
+                let mut full_args = vec![std::env::args()
+                    .next()
+                    .unwrap_or_else(|| "debtmap".to_string())];
+                full_args.extend(args);
+                Cli::parse_from(full_args)
+            } else {
+                Cli::parse()
+            };
+
+            handle_analyze_command(cli.command)
                 .map_err(|e| anyhow::anyhow!("Analyze command failed: {}", e))?;
+
+            // Output profiling report if enabled
+            if profiling_enabled {
+                let report = get_timing_report();
+
+                if let Some(output_path) = profiling_output {
+                    // Write JSON to file
+                    std::fs::write(&output_path, report.to_json())
+                        .map_err(|e| anyhow::anyhow!("Failed to write profile output: {}", e))?;
+                    eprintln!("Profiling data written to: {}", output_path.display());
+                } else {
+                    // Print summary to stderr (works with TUI mode)
+                    eprintln!("{}", report.to_summary());
+                }
+            }
+
             Ok(())
         }
         Commands::Init { force } => {

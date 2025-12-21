@@ -7,6 +7,7 @@
 
 use super::{call_graph, parallel_call_graph, parallel_unified_analysis};
 use crate::observability::{set_phase_persistent, set_progress, AnalysisPhase};
+use crate::time_span;
 use tracing::{debug, info, info_span, warn};
 
 // Re-export pure core modules
@@ -95,6 +96,8 @@ pub fn perform_unified_analysis_with_options(
         extracted_data,
     } = options;
 
+    time_span!("unified_analysis");
+
     // Create top-level span for unified analysis (spec 208)
     let span = info_span!(
         "unified_analysis",
@@ -120,6 +123,7 @@ pub fn perform_unified_analysis_with_options(
     let call_graph_start = std::time::Instant::now();
 
     let (framework_exclusions, function_pointer_used_functions) = {
+        time_span!("call_graph_building", parent: "unified_analysis");
         let _span = info_span!("call_graph_building").entered();
         info!("Building call graph");
 
@@ -163,6 +167,7 @@ pub fn perform_unified_analysis_with_options(
     let coverage_start = std::time::Instant::now();
 
     let coverage_data = {
+        time_span!("coverage_loading", parent: "unified_analysis");
         let _span = info_span!("coverage_loading").entered();
         info!("Loading coverage data");
         let data = core::phases::coverage::load_coverage_data(coverage_file.cloned())?;
@@ -192,6 +197,7 @@ pub fn perform_unified_analysis_with_options(
     // Progress: Purity stage
     report_stage_start(3);
     let enriched_metrics = {
+        time_span!("purity_analysis", parent: "unified_analysis");
         let _span = info_span!("purity_analysis").entered();
         info!("Analyzing function purity");
         let result = core::orchestration::run_purity_propagation(&enriched_metrics, &call_graph);
@@ -203,6 +209,7 @@ pub fn perform_unified_analysis_with_options(
     // Progress: Context stage
     report_stage_start(4);
     let risk_analyzer = {
+        time_span!("context_loading", parent: "unified_analysis");
         let _span = info_span!("context_loading").entered();
         info!("Loading context providers");
         let result = build_risk_analyzer(
@@ -226,6 +233,7 @@ pub fn perform_unified_analysis_with_options(
     report_stage_start(5);
 
     let result = {
+        time_span!("debt_scoring", parent: "unified_analysis");
         let _span = info_span!("debt_scoring").entered();
         info!("Scoring technical debt items");
         let result = create_unified_analysis_with_exclusions_and_timing(

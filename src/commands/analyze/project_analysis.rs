@@ -25,6 +25,8 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::time_span;
+
 use super::config::AnalyzeConfig;
 
 /// Output from project analysis including extracted data for downstream phases.
@@ -92,6 +94,8 @@ pub fn analyze_project_with_extraction(
     parallel_enabled: bool,
     formatting_config: FormattingConfig,
 ) -> Result<ProjectAnalysisOutput> {
+    time_span!("analyze_project");
+
     setup_parallel_env(parallel_enabled);
     let config = crate::config::get_config();
     init_global_progress();
@@ -155,6 +159,8 @@ fn discover_files(
     languages: &[Language],
     config: &DebtmapConfig,
 ) -> Result<Vec<PathBuf>> {
+    time_span!("file_discovery", parent: "analyze_project");
+
     let files = io::walker::find_project_files_with_config(path, languages.to_vec(), config)
         .context("Failed to find project files")?;
 
@@ -202,6 +208,8 @@ fn parse_and_extract_metrics_hybrid(
     parallel_enabled: bool,
     formatting_config: FormattingConfig,
 ) -> Result<HybridMetricsResult> {
+    time_span!("parsing", parent: "analyze_project");
+
     update_file_count(files.len());
     configure_project_size(files, parallel_enabled, formatting_config)?;
 
@@ -339,6 +347,8 @@ fn extract_analysis_data(
 
 /// Detect code duplications.
 fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<DuplicationBlock> {
+    time_span!("duplication_detection", parent: "analyze_project");
+
     let file_count = files.len();
     let duplications =
         analysis_helpers::detect_duplications_with_progress(files, threshold, |current, total| {

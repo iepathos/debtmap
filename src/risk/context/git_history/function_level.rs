@@ -20,6 +20,7 @@
 //! - Function-level metrics calculation
 
 use super::batched::is_bug_fix;
+use crate::time_span;
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use std::collections::HashSet;
@@ -171,6 +172,8 @@ pub fn get_function_history(
     function_name: &str,
     line_range: (usize, usize),
 ) -> Result<FunctionHistory> {
+    time_span!("git_function_history");
+
     // I/O: Find introduction commit
     let intro_output = run_git_log_introduction(repo_root, file_path, function_name)?;
     let intro_commit = parse_introduction_commit(&intro_output);

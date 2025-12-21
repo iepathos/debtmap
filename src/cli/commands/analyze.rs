@@ -112,6 +112,8 @@ pub fn extract_analyze_params(
         streaming: _,
         stream_to: _,
         show_filter_stats,
+        profile: _,
+        profile_output: _,
     } = command
     {
         // Build configuration groups using pure builder functions

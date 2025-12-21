@@ -352,6 +352,20 @@ pub enum Commands {
         /// Show score breakdown for debugging (deprecated: use -v instead)
         #[arg(long = "explain-score", hide = true)]
         explain_score: bool,
+
+        /// Enable profiling to identify performance bottlenecks (Spec 001).
+        /// Outputs timing breakdown for each analysis phase when complete.
+        #[arg(long = "profile", help_heading = "Profiling Options")]
+        profile: bool,
+
+        /// Write profiling data to file in JSON format (requires --profile).
+        /// Use this for post-analysis performance investigation.
+        #[arg(
+            long = "profile-output",
+            requires = "profile",
+            help_heading = "Profiling Options"
+        )]
+        profile_output: Option<PathBuf>,
     },
 
     /// Initialize configuration file
