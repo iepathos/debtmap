@@ -8,6 +8,7 @@
 //! - Role multiplier clamping
 //! - Rebalanced scoring presets
 
+use crate::core::refined::{MultiplierFactor, WeightFactor};
 use serde::{Deserialize, Serialize};
 
 /// Scoring weights configuration
@@ -122,6 +123,64 @@ impl ScoringWeights {
             self.organization = 0.0;
         }
     }
+
+    // ========================================================================
+    // Refined Type Accessors
+    // ========================================================================
+
+    /// Get coverage weight as a refined type.
+    ///
+    /// Returns `None` if the weight is outside [0.0, 1.0].
+    pub fn coverage_refined(&self) -> Option<WeightFactor> {
+        WeightFactor::new(self.coverage).ok()
+    }
+
+    /// Get complexity weight as a refined type.
+    pub fn complexity_refined(&self) -> Option<WeightFactor> {
+        WeightFactor::new(self.complexity).ok()
+    }
+
+    /// Get dependency weight as a refined type.
+    pub fn dependency_refined(&self) -> Option<WeightFactor> {
+        WeightFactor::new(self.dependency).ok()
+    }
+
+    /// Get all active weights as refined types.
+    ///
+    /// Returns `None` if any weight is invalid.
+    pub fn active_weights_refined(&self) -> Option<(WeightFactor, WeightFactor, WeightFactor)> {
+        Some((
+            self.coverage_refined()?,
+            self.complexity_refined()?,
+            self.dependency_refined()?,
+        ))
+    }
+
+    /// Validate all weights can be converted to refined types.
+    pub fn validate_refined(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        if self.coverage_refined().is_none() {
+            errors.push(format!(
+                "coverage weight {} is invalid (must be 0.0-1.0)",
+                self.coverage
+            ));
+        }
+        if self.complexity_refined().is_none() {
+            errors.push(format!(
+                "complexity weight {} is invalid (must be 0.0-1.0)",
+                self.complexity
+            ));
+        }
+        if self.dependency_refined().is_none() {
+            errors.push(format!(
+                "dependency weight {} is invalid (must be 0.0-1.0)",
+                self.dependency
+            ));
+        }
+
+        errors
+    }
 }
 
 // Default weights for weighted sum model - prioritizing coverage gaps
@@ -187,6 +246,61 @@ impl Default for RoleMultipliers {
             debug: default_debug_multiplier(),
             unknown: default_unknown_multiplier(),
         }
+    }
+}
+
+impl RoleMultipliers {
+    /// Get pure logic multiplier as a refined type.
+    ///
+    /// Returns `None` if the multiplier is not positive.
+    pub fn pure_logic_refined(&self) -> Option<MultiplierFactor> {
+        MultiplierFactor::new(self.pure_logic).ok()
+    }
+
+    /// Get orchestrator multiplier as a refined type.
+    pub fn orchestrator_refined(&self) -> Option<MultiplierFactor> {
+        MultiplierFactor::new(self.orchestrator).ok()
+    }
+
+    /// Get IO wrapper multiplier as a refined type.
+    pub fn io_wrapper_refined(&self) -> Option<MultiplierFactor> {
+        MultiplierFactor::new(self.io_wrapper).ok()
+    }
+
+    /// Get entry point multiplier as a refined type.
+    pub fn entry_point_refined(&self) -> Option<MultiplierFactor> {
+        MultiplierFactor::new(self.entry_point).ok()
+    }
+
+    /// Get debug multiplier as a refined type.
+    pub fn debug_refined(&self) -> Option<MultiplierFactor> {
+        MultiplierFactor::new(self.debug).ok()
+    }
+
+    /// Validate all multipliers can be converted to refined types.
+    pub fn validate_refined(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        let multipliers = [
+            ("pure_logic", self.pure_logic),
+            ("orchestrator", self.orchestrator),
+            ("io_wrapper", self.io_wrapper),
+            ("entry_point", self.entry_point),
+            ("pattern_match", self.pattern_match),
+            ("debug", self.debug),
+            ("unknown", self.unknown),
+        ];
+
+        for (name, value) in multipliers {
+            if MultiplierFactor::new(value).is_err() {
+                errors.push(format!(
+                    "{} multiplier {} is invalid (must be > 0.0)",
+                    name, value
+                ));
+            }
+        }
+
+        errors
     }
 }
 
