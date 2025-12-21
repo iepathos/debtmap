@@ -137,6 +137,77 @@ Quick links:
 - [Configuration](https://iepathos.github.io/debtmap/configuration.html)
 - [Metrics Reference](https://iepathos.github.io/debtmap/metrics-reference.html)
 
+## Performance Profiling
+
+Debtmap includes built-in profiling to identify performance bottlenecks.
+
+### Built-in Timing
+
+```bash
+# Show timing breakdown for each analysis phase
+debtmap analyze . --profile
+
+# Write detailed timing data to JSON
+debtmap analyze . --profile --profile-output timing.json
+```
+
+Example output:
+```
+=== Profiling Report ===
+Total analysis time: 38.55s
+
+Phase breakdown:
+Operation                                    Duration        %      Count
+------------------------------------------------------------------------
+analyze_project                                27.94s    72.5%          1
+  duplication_detection                        24.94s    64.7%          1
+  parsing                                       2.57s     6.7%          1
+unified_analysis                               10.75s    27.9%          1
+  call_graph_building                           8.05s    20.9%          1
+  debt_scoring                                  1.89s     4.9%          1
+```
+
+### External Profilers
+
+For CPU-level profiling, use sampling profilers with debug builds:
+
+**macOS (samply)**
+```bash
+# Install samply
+cargo install samply
+
+# Build with debug symbols
+cargo build --profile dev
+
+# Profile debtmap
+samply record ./target/debug/debtmap analyze /path/to/project
+
+# Opens Firefox Profiler with flame graphs
+```
+
+**macOS (Instruments)**
+```bash
+# Build with debug symbols
+cargo build --profile dev
+
+# Profile with Instruments
+xcrun xctrace record --template 'Time Profiler' --launch ./target/debug/debtmap analyze .
+```
+
+**Linux (perf)**
+```bash
+# Build with debug symbols
+RUSTFLAGS="-C debuginfo=2" cargo build --release
+
+# Record profile
+perf record -g ./target/release/debtmap analyze /path/to/project
+
+# View results
+perf report
+```
+
+**Tip:** The `--profile` flag identifies *what* is slow; sampling profilers show *why* it's slow at the code level.
+
 ## Roadmap
 
 **Current focus:** Rust analysis excellence + AI workflow integration
