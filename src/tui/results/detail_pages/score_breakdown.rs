@@ -201,17 +201,58 @@ pub fn build_score_factors_section(
             .map(|g| g.is_god_object)
             .unwrap_or(false);
 
-    // Complexity factor
-    let complexity_formula = if has_god_object {
-        "weighted(cyc,cog) * god_mult"
+    // Complexity factor - show actual calculation
+    // The scorer may apply purity bonus to metrics before weighting
+    // Formula: (cyc×0.4 + adj_cog×0.6) / 2 where adj_cog is entropy-adjusted
+    let cyc = item.cyclomatic_complexity;
+    let cog_adjusted = item.entropy_adjusted_cognitive.unwrap_or(item.cognitive_complexity);
+
+    // Check if purity bonus was applied (different from data flow purity_factor)
+    // If purity_level is pure, complexity metrics were reduced before scoring
+    let purity_bonus = item.purity_level.map(|level| {
+        let conf = item.purity_confidence.unwrap_or(0.0);
+        match level {
+            crate::core::PurityLevel::StrictlyPure if conf > 0.8 => 0.70,
+            crate::core::PurityLevel::StrictlyPure => 0.80,
+            crate::core::PurityLevel::LocallyPure if conf > 0.8 => 0.75,
+            crate::core::PurityLevel::LocallyPure => 0.85,
+            crate::core::PurityLevel::ReadOnly if conf > 0.8 => 0.90,
+            crate::core::PurityLevel::ReadOnly => 0.95,
+            crate::core::PurityLevel::Impure => 1.0,
+        }
+    });
+
+    let complexity_formula = if let Some(bonus) = purity_bonus {
+        if (bonus - 1.0_f64).abs() > 0.01 {
+            // Show purity-adjusted values
+            let adj_cyc = (cyc as f64 * bonus) as u32;
+            let adj_cog = (cog_adjusted as f64 * bonus) as u32;
+            if has_god_object {
+                format!(
+                    "({}×0.4 + {}×0.6) / 2 × god [purity ×{:.2}]",
+                    adj_cyc, adj_cog, bonus
+                )
+            } else {
+                format!(
+                    "({}×0.4 + {}×0.6) / 2 [purity ×{:.2}]",
+                    adj_cyc, adj_cog, bonus
+                )
+            }
+        } else if has_god_object {
+            format!("({}×0.4 + {}×0.6) / 2 × god", cyc, cog_adjusted)
+        } else {
+            format!("({}×0.4 + {}×0.6) / 2", cyc, cog_adjusted)
+        }
+    } else if has_god_object {
+        format!("({}×0.4 + {}×0.6) / 2 × god", cyc, cog_adjusted)
     } else {
-        "weighted(cyc,cog) / 2"
+        format!("({}×0.4 + {}×0.6) / 2", cyc, cog_adjusted)
     };
     add_factor_line(
         &mut lines,
         "complexity",
         item.unified_score.complexity_factor,
-        complexity_formula,
+        &complexity_formula,
         theme,
         width,
     );
@@ -737,14 +778,16 @@ pub fn build_calculation_summary_section(
         );
     } else {
         // Regular function scoring formula
+        // Both coverage and no-coverage paths use same weighted base: (C×5 + D×2.5)
+        // With coverage: the base is multiplied by coverage_multiplier (1.0 - coverage%)
         let formula = if has_coverage_data {
             if has_god_object {
-                "(C + D) × cov × role × struct × god"
+                "(C×5 + D×2.5) × cov × role × struct × god"
             } else {
-                "(C + D) × cov × role × struct"
+                "(C×5 + D×2.5) × cov × role × struct"
             }
         } else {
-            // No coverage data: uses weighted sum formula (spec 122)
+            // No coverage data: raw weighted sum
             if has_god_object {
                 "(C×5 + D×2.5) × role × struct × god"
             } else {
@@ -1074,40 +1117,48 @@ pub fn build_calculation_summary_section(
         (step_num + 1, go_score)
     } else {
         // Regular function items: use complexity/dependency formula
+        // The actual formula is: (C×5 + D×2.5) × coverage_multiplier
+        // where C and D are 0-10 scale factors
         let c = item.unified_score.complexity_factor;
         let d = item.unified_score.dependency_factor;
 
         // Step 1: Base score from formula
-        // coverage_factor is 0-10 scale where 10 = 0% coverage (100% gap)
-        // Divide by 10 to get 0-1 multiplier (higher = less coverage = higher score)
-        let weighted_base = if has_coverage_data {
-            let cov_mult = item.unified_score.coverage_factor / 10.0;
-            (c + d) * cov_mult
-        } else {
-            (c * 5.0) + (d * 2.5)
-        };
+        // Both paths use the same weighted base: (C×5 + D×2.5)
+        // With coverage: multiplied by coverage_multiplier (1.0 - coverage%)
+        // Without coverage: raw weighted sum
+        let weighted_base = (c * 5.0) + (d * 2.5);
 
-        let formula_detail = if has_coverage_data {
-            format!(
-                "{:.2} ((C + D) × cov where C={:.1}, D={:.1})",
-                weighted_base, c, d
+        let (displayed_base, formula_detail) = if has_coverage_data {
+            // coverage_factor is 0-10 scale where 10 = 0% coverage (100% gap)
+            // Convert to multiplier: coverage_factor/10 gives us the coverage gap (0-1)
+            let cov_mult = item.unified_score.coverage_factor / 10.0;
+            let base_with_cov = weighted_base * cov_mult;
+            (
+                base_with_cov,
+                format!(
+                    "{:.2} = (C×5 + D×2.5) × cov = ({:.1}×5 + {:.1}×2.5) × {:.2}",
+                    base_with_cov, c, d, cov_mult
+                ),
             )
         } else {
-            format!(
-                "{:.2} (C×5 + D×2.5 where C={:.1}, D={:.1})",
-                weighted_base, c, d
+            (
+                weighted_base,
+                format!(
+                    "{:.2} = C×5 + D×2.5 = {:.1}×5 + {:.1}×2.5",
+                    weighted_base, c, d
+                ),
             )
         };
         add_label_value(&mut lines, "1. weighted base", formula_detail, theme, width);
 
         // Step 2: After role adjustment
-        let after_role = weighted_base * role;
+        let after_role = displayed_base * role;
         let mut next_step = 2_usize;
         if (role - 1.0).abs() > 0.01 {
             add_label_value(
                 &mut lines,
                 "2. × role",
-                format!("{:.2} × {:.2} = {:.2}", weighted_base, role, after_role),
+                format!("{:.2} × {:.2} = {:.2}", displayed_base, role, after_role),
                 theme,
                 width,
             );

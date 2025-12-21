@@ -8,7 +8,7 @@ use crate::priority::{
     scoring::calculation::{
         calculate_base_score_no_coverage, calculate_base_score_with_coverage_multiplier,
         calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
-        calculate_dependency_factor, normalize_final_score,
+        calculate_dependency_factor,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
     semantic_classifier::{classify_function_role, FunctionRole},
@@ -465,26 +465,25 @@ pub fn calculate_unified_priority_with_role(
         calculate_debt_adjustment_with_details(func, debt_aggregator);
     let debt_adjusted_score = structure_adjusted_score + debt_adjustment;
 
-    // Normalize to 0-10 scale, tracking pre-normalization value for clamping detection (spec 260)
-    let pre_normalization = debt_adjusted_score;
-    let normalized_score = normalize_final_score(debt_adjusted_score);
+    // Floor negative scores to 0 (no upper bound - spec 261)
+    let floored_score = debt_adjusted_score.max(0.0);
+
+    // Track if negative clamping occurred for transparency (spec 260)
+    let pre_normalization_score = if debt_adjusted_score < 0.0 {
+        Some(debt_adjusted_score)
+    } else {
+        None
+    };
 
     // Apply orchestration score adjustment (spec 110) if this is an orchestrator
     let (final_normalized_score, pre_adjustment, adjustment) = apply_orchestration_adjustment(
         is_orchestrator_candidate,
-        normalized_score,
+        floored_score,
         func_id,
         func,
         call_graph,
         &role,
     );
-
-    // Only store pre_normalization if actual clamping occurred (spec 260)
-    let pre_normalization_score = if (pre_normalization - normalized_score).abs() > 0.1 {
-        Some(pre_normalization)
-    } else {
-        None
-    };
 
     // Always store debt adjustment details for transparency (spec 260)
     // Even small adjustments help explain score differences in the TUI

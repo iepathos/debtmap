@@ -39,8 +39,8 @@ pub use calculation::{
     calculate_base_score, calculate_base_score_with_coverage_multiplier,
     calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
     calculate_coverage_multiplier_with_test_flag, calculate_dependency_factor, denormalize_score,
-    generate_normalization_curve, normalize_complexity, normalize_final_score,
-    normalize_final_score_with_metadata, NormalizedScore, ScalingMethod,
+    generate_normalization_curve, normalize_complexity, normalize_final_score_with_metadata,
+    NormalizedScore, ScalingMethod,
 };
 
 pub use classification::{

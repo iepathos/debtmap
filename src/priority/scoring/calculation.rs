@@ -206,13 +206,6 @@ pub fn normalize_final_score_with_metadata(raw_score: f64) -> NormalizedScore {
     }
 }
 
-/// Normalize final score to a simple f64.
-///
-/// No upper clamping - scores can exceed 100 to preserve relative
-/// priority information (spec 261). Negative values are floored to 0.
-pub fn normalize_final_score(raw_score: f64) -> f64 {
-    raw_score.max(0.0)
-}
 
 /// Inverse normalization function for interpretation
 pub fn denormalize_score(normalized: f64) -> f64 {
@@ -249,32 +242,20 @@ pub fn normalize_complexity(cyclomatic: u32, cognitive: u32) -> f64 {
     }
 }
 
-/// Generate visualization data for normalization curve
+/// Generate visualization data for score distribution.
+/// Since normalization was removed (spec 261), scores are now identity
+/// (negative values floored to 0, no upper bound).
 pub fn generate_normalization_curve() -> Vec<(f64, f64, &'static str)> {
-    // Generate sample points across different scaling regions
+    // Generate sample points showing linear identity relationship
     let mut curve_data = Vec::new();
 
-    // Linear range (0-10)
-    for i in 0..=10 {
-        let raw = i as f64;
-        let normalized = normalize_final_score(raw);
+    // Sample points across typical score ranges
+    let sample_points = [0, 5, 10, 20, 30, 50, 75, 100, 150, 200, 500, 1000];
+    for raw in sample_points {
+        let raw = raw as f64;
+        // Identity function (floored at 0)
+        let normalized = raw.max(0.0);
         curve_data.push((raw, normalized, "Linear"));
-    }
-
-    // Square root range (11-100)
-    let sqrt_points = vec![15, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-    for raw in sqrt_points {
-        let raw = raw as f64;
-        let normalized = normalize_final_score(raw);
-        curve_data.push((raw, normalized, "SquareRoot"));
-    }
-
-    // Logarithmic range (100+)
-    let log_points = vec![150, 200, 300, 500, 750, 1000, 1500, 2000];
-    for raw in log_points {
-        let raw = raw as f64;
-        let normalized = normalize_final_score(raw);
-        curve_data.push((raw, normalized, "Logarithmic"));
     }
 
     curve_data
@@ -557,59 +538,6 @@ mod tests {
     }
 
     #[test]
-    fn test_normalization_continuity() {
-        // Spec 261: No upper clamping, scores are identity for positive values
-        let eps = 0.001;
-
-        let below_50 = normalize_final_score(50.0 - eps);
-        let at_50 = normalize_final_score(50.0);
-        let above_50 = normalize_final_score(50.0 + eps);
-        assert!((at_50 - below_50).abs() < 0.01);
-        assert!((above_50 - at_50).abs() < 0.01);
-
-        // No cap - values above 100 are preserved
-        let at_100 = normalize_final_score(100.0);
-        let above_100 = normalize_final_score(150.0);
-        assert_eq!(at_100, 100.0);
-        assert_eq!(above_100, 150.0);
-    }
-
-    #[test]
-    fn test_normalization_monotonic() {
-        // Spec 261: Ordering preserved for all positive values
-        let scores = [1.0, 5.0, 10.0, 50.0, 99.0, 150.0, 500.0];
-        let normalized: Vec<_> = scores.iter().map(|&s| normalize_final_score(s)).collect();
-
-        for i in 1..normalized.len() {
-            assert!(normalized[i] > normalized[i - 1]);
-        }
-    }
-
-    #[test]
-    fn test_normalization_identity() {
-        // Spec 261: normalize_final_score is identity for positive values
-        let test_scores = vec![5.0, 15.0, 50.0, 90.0, 150.0, 500.0];
-
-        for score in test_scores {
-            let normalized = normalize_final_score(score);
-            assert_eq!(normalized, score);
-        }
-
-        // Negative values floor to 0
-        assert_eq!(normalize_final_score(-10.0), 0.0);
-    }
-
-    #[test]
-    fn test_normalization_no_upper_cap() {
-        // Spec 261: No upper clamping to preserve relative priority
-        assert_eq!(normalize_final_score(5.0), 5.0);
-        assert_eq!(normalize_final_score(50.0), 50.0);
-        assert_eq!(normalize_final_score(100.0), 100.0);
-        assert_eq!(normalize_final_score(200.0), 200.0);
-        assert_eq!(normalize_final_score(1000.0), 1000.0);
-    }
-
-    #[test]
     fn test_scaling_method_detection() {
         let score1 = normalize_final_score_with_metadata(5.0);
         assert_eq!(score1.scaling_method, ScalingMethod::Linear);
@@ -628,25 +556,14 @@ mod tests {
         // Verify we have data points
         assert!(!curve.is_empty());
 
-        // Verify we have all three regions
+        // Verify all points are linear (identity function now)
         let linear_count = curve
             .iter()
             .filter(|&(_, _, region)| *region == "Linear")
             .count();
-        let sqrt_count = curve
-            .iter()
-            .filter(|&(_, _, region)| *region == "SquareRoot")
-            .count();
-        let log_count = curve
-            .iter()
-            .filter(|&(_, _, region)| *region == "Logarithmic")
-            .count();
+        assert_eq!(linear_count, curve.len());
 
-        assert!(linear_count > 0);
-        assert!(sqrt_count > 0);
-        assert!(log_count > 0);
-
-        // Verify monotonic increasing
+        // Verify monotonic increasing and identity relationship
         for i in 1..curve.len() {
             assert!(
                 curve[i].0 >= curve[i - 1].0,
@@ -656,6 +573,11 @@ mod tests {
                 curve[i].1 >= curve[i - 1].1,
                 "Normalized scores should be monotonic"
             );
+        }
+
+        // Verify identity: raw == normalized for all points (spec 261)
+        for (raw, normalized, _) in curve {
+            assert_eq!(raw, normalized, "Scores should be identity");
         }
     }
 
