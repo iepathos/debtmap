@@ -868,7 +868,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
- "stillwater 0.15.0",
+ "stillwater 1.0.0",
  "syn",
  "tempfile",
  "thiserror 2.0.17",
@@ -3668,11 +3668,12 @@ dependencies = [
 
 [[package]]
 name = "stillwater"
-version = "0.15.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e705a07e8c47523e6b0dddd97e51e7e42e7453d5f43ef8aacdd950cb5a16fe1e"
+checksum = "ca73e9f9f8131665bb1188cd3652d492763c1d71bd971f3b3b46d2a8b4928a28"
 dependencies = [
  "futures",
+ "serde",
  "tokio",
 ]
 

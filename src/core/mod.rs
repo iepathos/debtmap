@@ -5,6 +5,7 @@ pub mod lazy;
 pub mod metrics;
 pub mod monadic;
 pub mod parsing;
+pub mod refined;
 pub mod traits;
 pub mod types;
 

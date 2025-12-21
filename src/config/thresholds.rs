@@ -1,3 +1,4 @@
+use crate::core::refined::{DebtDensity, RiskScore, WeightFactor};
 use serde::{Deserialize, Serialize};
 
 /// God object detection thresholds
@@ -211,6 +212,64 @@ impl Default for ValidationThresholds {
             max_debt_items: None,
             max_high_risk_functions: None,
         }
+    }
+}
+
+impl ValidationThresholds {
+    /// Get the maximum debt density as a refined type.
+    ///
+    /// Returns `None` if the configured value is invalid (negative).
+    /// Default values are always valid.
+    pub fn debt_density_refined(&self) -> Option<DebtDensity> {
+        DebtDensity::new(self.max_debt_density).ok()
+    }
+
+    /// Get the maximum codebase risk score as a refined type.
+    ///
+    /// Risk scores are typically 0-10, but we use the unit interval [0, 1]
+    /// internally by normalizing. Returns `None` if out of valid range.
+    pub fn codebase_risk_refined(&self) -> Option<RiskScore> {
+        // Normalize from 0-10 scale to 0-1 scale
+        let normalized = self.max_codebase_risk_score / 10.0;
+        RiskScore::new(normalized).ok()
+    }
+
+    /// Get the minimum coverage percentage as a refined weight factor.
+    ///
+    /// Coverage is 0-100%, normalized to [0, 1] for weight calculations.
+    pub fn min_coverage_refined(&self) -> Option<WeightFactor> {
+        let normalized = self.min_coverage_percentage / 100.0;
+        WeightFactor::new(normalized).ok()
+    }
+
+    /// Validate all thresholds return refined types successfully.
+    ///
+    /// Returns a list of validation errors for any invalid values.
+    pub fn validate_refined(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        if self.debt_density_refined().is_none() {
+            errors.push(format!(
+                "max_debt_density {} is invalid (must be >= 0)",
+                self.max_debt_density
+            ));
+        }
+
+        if self.max_codebase_risk_score < 0.0 || self.max_codebase_risk_score > 10.0 {
+            errors.push(format!(
+                "max_codebase_risk_score {} is invalid (must be 0-10)",
+                self.max_codebase_risk_score
+            ));
+        }
+
+        if self.min_coverage_percentage < 0.0 || self.min_coverage_percentage > 100.0 {
+            errors.push(format!(
+                "min_coverage_percentage {} is invalid (must be 0-100)",
+                self.min_coverage_percentage
+            ));
+        }
+
+        errors
     }
 }
 
