@@ -20,6 +20,7 @@
 //! - Function-level metrics calculation
 
 use super::batched::is_bug_fix;
+use super::blame_cache::FileBlameCache;
 use crate::time_span;
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
@@ -166,11 +167,13 @@ pub fn filter_bug_fix_commits(commits: &[CommitInfo]) -> Vec<&CommitInfo> {
 /// * `file_path` - Path to the file containing the function
 /// * `function_name` - Name of the function to analyze
 /// * `line_range` - (start, end) line numbers of the function for git blame
+/// * `blame_cache` - Cache for file-level git blame data (reduces N calls to 1 per file)
 pub fn get_function_history(
     repo_root: &Path,
     file_path: &Path,
     function_name: &str,
     line_range: (usize, usize),
+    blame_cache: &FileBlameCache,
 ) -> Result<FunctionHistory> {
     time_span!("git_function_history");
 
@@ -195,9 +198,9 @@ pub fn get_function_history(
     let mods_output = run_git_log_modifications(repo_root, file_path, function_name, intro)?;
     let modification_commits = parse_modification_commits(&mods_output);
 
-    // I/O: Get authors from git blame on current function lines
+    // Use cached blame lookup (1 git call per file instead of N per function)
     let (start, end) = line_range;
-    let blame_authors = get_blame_authors(repo_root, file_path, start, end)?;
+    let blame_authors = blame_cache.get_authors(file_path, start, end)?;
 
     // Pure: Calculate history from parsed data
     Ok(calculate_function_history_with_authors(
@@ -308,52 +311,9 @@ fn get_commit_date(repo_root: &Path, commit_hash: &str) -> Result<Option<DateTim
     Ok(None)
 }
 
-/// Get unique authors from git blame for a line range (I/O)
-///
-/// Uses git blame to identify who wrote the current code in the function.
-/// This is more accurate than commit history for determining contributors.
-pub fn get_blame_authors(
-    repo_root: &Path,
-    file_path: &Path,
-    start_line: usize,
-    end_line: usize,
-) -> Result<HashSet<String>> {
-    if start_line == 0 || end_line == 0 || end_line < start_line {
-        return Ok(HashSet::new());
-    }
-
-    let line_range = format!("{},{}", start_line, end_line);
-    let output = Command::new("git")
-        .args([
-            "blame",
-            "-L",
-            &line_range,
-            "--porcelain",
-            &file_path.to_string_lossy(),
-        ])
-        .current_dir(repo_root)
-        .output()
-        .context("Failed to run git blame")?;
-
-    if !output.status.success() {
-        return Ok(HashSet::new());
-    }
-
-    let blame_output = String::from_utf8_lossy(&output.stdout);
-    Ok(parse_blame_authors(&blame_output))
-}
-
-/// Parse git blame --porcelain output to extract unique authors
-///
-/// Pure function - parses blame output looking for "author " lines
-pub fn parse_blame_authors(blame_output: &str) -> HashSet<String> {
-    blame_output
-        .lines()
-        .filter(|line| line.starts_with("author "))
-        .map(|line| line.strip_prefix("author ").unwrap_or("").to_string())
-        .filter(|author| !author.is_empty() && author != "Not Committed Yet")
-        .collect()
-}
+// Note: get_blame_authors and parse_blame_authors have been replaced by
+// FileBlameCache in blame_cache.rs, which provides batched blame lookups
+// for better performance (1 git call per file instead of N per function).
 
 #[cfg(test)]
 mod tests {
@@ -515,51 +475,8 @@ more garbage"#;
         assert!((9..=11).contains(&age), "Expected ~10 days, got {age}");
     }
 
-    #[test]
-    fn test_parse_blame_authors() {
-        // Sample git blame --porcelain output
-        let blame_output = r#"abc123def456 102 102 1
-author John Doe
-author-mail <john@example.com>
-author-time 1234567890
-author-tz +0000
-committer Jane Smith
-committer-mail <jane@example.com>
-committer-time 1234567890
-committer-tz +0000
-summary Initial commit
-filename src/test.rs
-	fn foo() {
-def456abc123 103 103 1
-author Jane Smith
-author-mail <jane@example.com>
-author-time 1234567891
-author-tz +0000
-committer Jane Smith
-committer-mail <jane@example.com>
-committer-time 1234567891
-committer-tz +0000
-summary Add feature
-filename src/test.rs
-	    bar();
-"#;
-
-        let authors = parse_blame_authors(blame_output);
-        assert_eq!(authors.len(), 2);
-        assert!(authors.contains("John Doe"));
-        assert!(authors.contains("Jane Smith"));
-    }
-
-    #[test]
-    fn test_parse_blame_authors_filters_not_committed() {
-        let blame_output = r#"0000000000000000000000000000000000000000 1 1 1
-author Not Committed Yet
-author-mail <not.committed.yet>
-"#;
-
-        let authors = parse_blame_authors(blame_output);
-        assert!(authors.is_empty());
-    }
+    // Note: parse_blame_authors tests moved to blame_cache.rs where
+    // the equivalent parse_full_blame_output function is now tested.
 
     #[test]
     fn test_calculate_function_history_with_authors() {
