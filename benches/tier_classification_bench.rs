@@ -75,9 +75,7 @@ fn create_test_item(
         function_length: 10,
         cyclomatic_complexity: cyclomatic,
         cognitive_complexity: cognitive,
-        entropy_details: None,
-        entropy_adjusted_cognitive: None,
-        entropy_dampening_factor: None,
+        entropy_analysis: None,
         is_pure: Some(false),
         purity_confidence: Some(0.0),
         purity_level: None,
@@ -96,7 +94,6 @@ fn create_test_item(
         contextual_risk: None,
         file_line_count: None,
         responsibility_category: None,
-        entropy_analysis: None,
         context_suggestion: None,
     }
 }

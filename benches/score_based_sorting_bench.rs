@@ -78,9 +78,6 @@ fn create_test_item(
         function_length: 10,
         cyclomatic_complexity: cyclomatic,
         cognitive_complexity: cyclomatic,
-        entropy_details: None,
-        entropy_adjusted_cognitive: None, // spec 214
-        entropy_dampening_factor: None,   // spec 214
         is_pure: None,
         purity_confidence: None,
         purity_level: None,

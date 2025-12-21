@@ -1084,10 +1084,7 @@ pub fn build_calculation_summary_section(
         let mut current = scaled_score;
 
         // Show entropy dampening if applied (affects god object score)
-        let entropy_damp = item
-            .entropy_analysis
-            .as_ref()
-            .map(|e| e.dampening_factor);
+        let entropy_damp = item.entropy_analysis.as_ref().map(|e| e.dampening_factor);
         if let Some(entropy_damp) = entropy_damp {
             if (entropy_damp - 1.0).abs() > 0.01 {
                 let after_entropy = current * entropy_damp;
