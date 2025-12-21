@@ -160,6 +160,7 @@ mod tests {
             pattern_confidence: None,
             pattern_details: None,
             context: None,
+            git_history: None,
         }))
     }
 

@@ -43,7 +43,7 @@ pub use file_item::{FileDebtItemOutput, FileImpactOutput, FileMetricsOutput, Fil
 pub use format::{round_ratio, round_score};
 pub use func_item::{
     AdjustedComplexity, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-    FunctionScoringDetails,
+    FunctionScoringDetails, GitHistoryOutput,
 };
 pub use location::UnifiedLocation;
 pub use priority::Priority;
