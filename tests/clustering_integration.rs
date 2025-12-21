@@ -227,6 +227,7 @@ fn test_cluster_quality_metrics() {
 /// Required fixes:
 /// - Rebuild similarity matrix after each merge (performance cost), OR
 /// - Use stable cluster IDs instead of vector indices throughout the algorithm
+///
 /// Spec 262: Updated to use detector.rs after recommender.rs was removed.
 #[test]
 #[ignore = "Flaky test due to hierarchical clustering non-determinism - see FIXME comment"]
