@@ -1,19 +1,18 @@
 use crate::core::{AnalysisResults, FunctionMetrics};
-use crate::io::writers::{
-    HtmlWriter, JsonWriter, LlmMarkdownWriter, MarkdownWriter, TerminalWriter,
-};
+use crate::io::writers::{HtmlWriter, JsonWriter, LlmMarkdownWriter, TerminalWriter};
 use crate::risk::RiskInsight;
 use std::io;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum OutputFormat {
     Json,
+    /// Markdown format with comprehensive analysis (uses LLM-optimized writer)
     Markdown,
     Terminal,
     Html,
     /// Graphviz DOT format for dependency visualization (Spec 204)
     Dot,
-    /// LLM-optimized markdown format (Spec 264)
+    /// Deprecated: Alias for Markdown. Use Markdown instead.
     LlmMarkdown,
 }
 
@@ -25,14 +24,20 @@ pub trait OutputWriter {
 pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
     match format {
         OutputFormat::Json => Box::new(JsonWriter::new(io::stdout())),
-        OutputFormat::Markdown => Box::new(MarkdownWriter::new(io::stdout())),
+        // Markdown now uses LLM-optimized writer for comprehensive output (Spec 008)
+        OutputFormat::Markdown => Box::new(LlmMarkdownWriter::new(io::stdout())),
         OutputFormat::Terminal => Box::new(TerminalWriter::default()),
         OutputFormat::Html => Box::new(HtmlWriter::new(io::stdout())),
         // DOT format is handled separately via the output module, not through OutputWriter trait
         // Fall back to terminal for legacy code paths that use create_writer
         OutputFormat::Dot => Box::new(TerminalWriter::default()),
-        // LLM markdown is handled via UnifiedOutput, fall back to terminal for legacy paths
-        OutputFormat::LlmMarkdown => Box::new(LlmMarkdownWriter::new(io::stdout())),
+        // LlmMarkdown is deprecated alias for Markdown (Spec 008)
+        OutputFormat::LlmMarkdown => {
+            eprintln!(
+                "Warning: --format llm-markdown is deprecated, use --format markdown instead"
+            );
+            Box::new(LlmMarkdownWriter::new(io::stdout()))
+        }
     }
 }
 
@@ -232,11 +237,13 @@ mod tests {
     fn test_output_markdown_format() {
         let results = create_test_results();
         let mut buffer = Vec::new();
-        let mut writer = crate::io::writers::MarkdownWriter::new(&mut buffer);
+        // Uses LlmMarkdownWriter for comprehensive output (Spec 008)
+        let mut writer = crate::io::writers::LlmMarkdownWriter::new(&mut buffer);
         writer.write_results(&results).unwrap();
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("# Debtmap Analysis Report"));
-        assert!(output.contains("Executive Summary"));
+        // LlmMarkdownWriter uses "Summary" section heading
+        assert!(output.contains("## Summary"));
     }
 
     #[test]

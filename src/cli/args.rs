@@ -574,13 +574,14 @@ pub enum Commands {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum OutputFormat {
     Json,
+    /// Markdown format with comprehensive analysis (uses LLM-optimized writer)
     Markdown,
     Terminal,
     Html,
     /// Graphviz DOT format for dependency visualization
     Dot,
-    /// LLM-optimized markdown format (Spec 264)
-    #[value(name = "llm-markdown")]
+    /// Deprecated: Use `markdown` instead. This is now an alias for `markdown`.
+    #[value(name = "llm-markdown", hide = true)]
     LlmMarkdown,
 }
 
