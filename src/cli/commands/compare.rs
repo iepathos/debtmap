@@ -45,7 +45,7 @@ pub fn handle_compare_command(
     let output_str = match format {
         OutputFormat::Json => serde_json::to_string_pretty(&comparison)?,
         OutputFormat::Markdown => format_comparison_markdown(&comparison),
-        // LLM markdown uses same format as regular markdown for comparison
+        // LlmMarkdown is deprecated alias for Markdown (Spec 008)
         OutputFormat::LlmMarkdown => format_comparison_markdown(&comparison),
         OutputFormat::Html => format_comparison_markdown(&comparison),
         OutputFormat::Dot => {
