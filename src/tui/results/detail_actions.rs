@@ -36,6 +36,14 @@ pub enum DetailAction {
     /// Positive values move down, negative values move up.
     MoveSelection(i32),
 
+    /// Cycle to next item at same location (spec 267).
+    /// Only active when multiple items exist at the current location.
+    NextLocationItem,
+
+    /// Cycle to previous item at same location (spec 267).
+    /// Only active when multiple items exist at the current location.
+    PrevLocationItem,
+
     /// Copy all context ranges (only valid on Context page).
     CopyContext,
 
@@ -117,6 +125,10 @@ pub fn classify_detail_key(key: KeyEvent, ctx: DetailActionContext) -> Option<De
         // Item navigation - up/down moves through the list
         KeyCode::Down | KeyCode::Char('j') => Some(DetailAction::MoveSelection(1)),
         KeyCode::Up | KeyCode::Char('k') => Some(DetailAction::MoveSelection(-1)),
+
+        // Location item cycling - [ and ] cycle through items at same location (spec 267)
+        KeyCode::Char(']') => Some(DetailAction::NextLocationItem),
+        KeyCode::Char('[') => Some(DetailAction::PrevLocationItem),
 
         // Copy actions - context-sensitive based on current page
         KeyCode::Char('c') => {

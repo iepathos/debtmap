@@ -330,9 +330,9 @@ fn format_grouped_item(
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
 
-    // Badge for multiple issues
+    // Badge for multiple issues (spec 267: show item count indicator)
     let badge = if group.items.len() > 1 {
-        format!(" [{}]", group.items.len())
+        format!(" ({} items)", group.items.len())
     } else {
         String::new()
     };

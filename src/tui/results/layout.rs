@@ -73,8 +73,11 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
                 .fg(theme.accent())
                 .add_modifier(Modifier::UNDERLINED),
         )]),
-        Line::from("  n           Next item"),
-        Line::from("  p           Previous item"),
+        Line::from("  ←→/hl       Page left/right"),
+        Line::from("  1-8         Jump to page"),
+        Line::from("  ↑↓/jk       Next/prev item"),
+        Line::from("  [/]         Prev/next debt type at location"),
+        Line::from("  c           Copy page content"),
         Line::from("  Esc         Back to list"),
         Line::from(""),
         Line::from(vec![Span::styled(

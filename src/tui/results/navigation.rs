@@ -190,7 +190,17 @@ fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<b
 
         DetailAction::MoveSelection(delta) => {
             move_selection(app, delta as isize);
+            // Reset location item index when changing selection
+            app.nav_mut().current_location_item_index = 0;
             ensure_valid_page(app);
+        }
+
+        DetailAction::NextLocationItem => {
+            cycle_location_item(app, 1);
+        }
+
+        DetailAction::PrevLocationItem => {
+            cycle_location_item(app, -1);
         }
 
         DetailAction::CopyContext => {
@@ -442,4 +452,43 @@ fn ensure_valid_page(app: &mut ResultsApp) {
         &app.analysis().data_flow_graph,
     );
     app.nav_mut().detail_page = new_page;
+}
+
+/// Cycle through items at the same location (spec 267).
+///
+/// When multiple debt items exist at the same location (e.g., both
+/// "Testing Gap" and "High Complexity" for the same function), this
+/// cycles through them with wraparound at boundaries.
+///
+/// # Arguments
+/// * `app` - Application state
+/// * `direction` - 1 for next, -1 for previous
+fn cycle_location_item(app: &mut ResultsApp, direction: i32) {
+    // Get items at current location
+    let Some(selected) = app.selected_item() else {
+        return;
+    };
+
+    let location_items = super::detail_pages::overview::get_items_at_location(app, selected);
+    let item_count = location_items.len();
+
+    // Only cycle if multiple items exist
+    if item_count <= 1 {
+        return;
+    }
+
+    let current = app.nav().current_location_item_index;
+    let new_index = if direction > 0 {
+        // Next item (wrap to 0 at end)
+        (current + 1) % item_count
+    } else {
+        // Previous item (wrap to last at beginning)
+        if current == 0 {
+            item_count - 1
+        } else {
+            current - 1
+        }
+    };
+
+    app.nav_mut().current_location_item_index = new_index;
 }

@@ -63,6 +63,11 @@ pub fn build_location_section(
 }
 
 /// Build score section lines (pure)
+///
+/// When multiple items exist at the same location (spec 267):
+/// - Shows "(N items at this location)" in section header
+/// - Shows combined score
+/// - Lists individual item scores below combined
 pub fn build_score_section(
     location_items: &[&UnifiedDebtItem],
     item: &UnifiedDebtItem,
@@ -70,9 +75,12 @@ pub fn build_score_section(
     width: u16,
 ) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    add_section_header(&mut lines, "score", theme);
 
     if location_items.len() > 1 {
+        // Spec 267: Add item count context to section header
+        let header = format!("score ({} items at this location)", location_items.len());
+        add_section_header(&mut lines, &header, theme);
+
         let combined_score: f64 = location_items
             .iter()
             .map(|i| i.unified_score.final_score)
@@ -87,7 +95,27 @@ pub fn build_score_section(
             theme,
             width,
         );
+
+        // Spec 267: Add individual item scores below combined
+        add_blank_line(&mut lines);
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("item scores".to_string(), Style::default().fg(theme.muted)),
+        ]));
+
+        for debt_item in location_items.iter() {
+            let debt_name = format_debt_type_name(&debt_item.debt_type);
+            let score = debt_item.unified_score.final_score;
+            add_label_value(
+                &mut lines,
+                &debt_name,
+                format!("{:.1}", score),
+                theme,
+                width,
+            );
+        }
     } else {
+        add_section_header(&mut lines, "score", theme);
         let severity = Severity::from_score_100(item.unified_score.final_score)
             .as_str()
             .to_lowercase();
@@ -639,8 +667,14 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
 
+        // Spec 267: Should show item count in header
+        assert!(content.contains("2 items at this location"));
         assert!(content.contains("combined"));
         assert!(content.contains("135.0")); // 75 + 60
+                                            // Spec 267: Should show individual item scores
+        assert!(content.contains("item scores"));
+        assert!(content.contains("High Complexity"));
+        assert!(content.contains("Testing Gap"));
     }
 
     // --- build_god_object_section tests ---
