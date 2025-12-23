@@ -1494,6 +1494,93 @@ fn add_multiplier_line(
 }
 
 // ============================================================================
+// Spec 267: Multi-item context builders
+// ============================================================================
+
+/// Build item indicator section (pure) - shown when multiple items at location
+///
+/// Displays "viewing item X of N: {DebtType}" to clarify which item's
+/// breakdown is being shown.
+pub fn build_item_indicator_section(
+    current_index: usize,
+    total_items: usize,
+    debt_type: &DebtType,
+    theme: &Theme,
+    _width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    if total_items > 1 {
+        let debt_name = super::overview::format_debt_type_name(debt_type);
+        lines.push(Line::from(vec![Span::styled(
+            format!(
+                "viewing item {} of {}: {}",
+                current_index + 1,
+                total_items,
+                debt_name
+            ),
+            Style::default().fg(theme.muted),
+        )]));
+        lines.push(Line::from("")); // Blank line after indicator
+    }
+
+    lines
+}
+
+/// Build combined reference line (pure) - shown at end of calculation when multi-item
+///
+/// Shows how this item's score contributes to the location combined score.
+pub fn build_combined_reference_line(
+    item_score: f64,
+    combined_score: f64,
+    other_item_count: usize,
+    theme: &Theme,
+    _width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    if other_item_count > 0 {
+        let other_text = if other_item_count == 1 {
+            "1 other item".to_string()
+        } else {
+            format!("{} other items", other_item_count)
+        };
+
+        // Use same column layout as other lines
+        const INDENT: usize = 2;
+        const LABEL_WIDTH: usize = 24;
+        const GAP: usize = 4;
+
+        let label = format!(
+            "{:width$}",
+            format!("{}location combined", " ".repeat(INDENT)),
+            width = LABEL_WIDTH
+        );
+        let gap = " ".repeat(GAP);
+
+        lines.push(Line::from(vec![
+            Span::raw(label),
+            Span::raw(gap),
+            Span::styled(
+                format!("{:.1}", combined_score),
+                Style::default().fg(theme.primary),
+            ),
+            Span::raw(" "),
+            Span::styled(
+                format!("(this + {})", other_text),
+                Style::default().fg(theme.muted),
+            ),
+        ]));
+        lines.push(Line::from("")); // Blank line after
+
+        // Note: Show difference from just this item
+        let _ = item_score; // Used in the combined calculation context
+    }
+
+    lines
+}
+
+// ============================================================================
 // Public API for text extraction
 // ============================================================================
 
@@ -1514,19 +1601,76 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
     .collect()
 }
 
+/// Build all page lines with multi-item context (pure) - spec 267
+pub fn build_page_lines_with_context(
+    item: &UnifiedDebtItem,
+    location_items: &[&UnifiedDebtItem],
+    current_item_index: usize,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut result = Vec::new();
+
+    // Add item indicator at top if multiple items at location
+    if location_items.len() > 1 {
+        result.extend(build_item_indicator_section(
+            current_item_index,
+            location_items.len(),
+            &item.debt_type,
+            theme,
+            width,
+        ));
+    }
+
+    // Add standard sections
+    result.extend(build_final_score_section(item, theme, width));
+    result.extend(build_raw_inputs_section(item, theme, width));
+    result.extend(build_score_factors_section(item, theme, width));
+    result.extend(build_multipliers_section(item, theme, width));
+    result.extend(build_scaling_pipeline_section(item, theme, width));
+    result.extend(build_god_object_impact_section(item, theme, width));
+    result.extend(build_orchestration_section(item, theme, width));
+    result.extend(build_calculation_summary_section(item, theme, width));
+
+    // Add combined reference at end if multiple items at location
+    if location_items.len() > 1 {
+        let combined_score: f64 = location_items
+            .iter()
+            .map(|i| i.unified_score.final_score)
+            .sum();
+        result.extend(build_combined_reference_line(
+            item.unified_score.final_score,
+            combined_score,
+            location_items.len() - 1,
+            theme,
+            width,
+        ));
+    }
+
+    result
+}
+
 // ============================================================================
 // Render Shell (the "water" boundary)
 // ============================================================================
 
 /// Render score breakdown page showing detailed scoring analysis
+///
+/// Spec 267: When multiple items exist at the same location, shows
+/// item indicator at top and combined score reference at bottom.
 pub fn render(
     frame: &mut Frame,
-    _app: &ResultsApp,
+    app: &ResultsApp,
     item: &UnifiedDebtItem,
     area: Rect,
     theme: &Theme,
 ) {
-    let lines = build_page_lines(item, theme, area.width);
+    // Get all items at this location for multi-item context (spec 267)
+    let location_items = super::overview::get_items_at_location(app, item);
+    let current_item_index = app.nav().current_location_item_index;
+
+    let lines =
+        build_page_lines_with_context(item, &location_items, current_item_index, theme, area.width);
 
     // I/O boundary: render the widget
     let paragraph = Paragraph::new(lines)
