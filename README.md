@@ -5,9 +5,7 @@
 [![CI](https://github.com/iepathos/debtmap/actions/workflows/ci.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Find the code that needs fixing.**
-
-Debtmap analyzes your codebase and ranks technical debt by severity. Know exactly where to focus your refactoring effort - whether you're fixing it yourself or handing it to an AI assistant.
+Debtmap analyzes your codebase and ranks technical debt by risk. Know exactly where to focus your refactoring effort - whether you're fixing it yourself or handing it to an AI assistant.
 
 ## Why Debtmap?
 
