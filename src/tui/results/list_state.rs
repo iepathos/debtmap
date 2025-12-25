@@ -1,31 +1,19 @@
-//! List selection, scroll position, and grouping state.
+//! List selection and scroll position state.
 //!
 //! This module manages the list-related UI state for the TUI,
 //! following the single responsibility principle. It handles:
 //! - Selection index tracking
 //! - Scroll offset for viewport
-//! - Grouping toggle state
 //!
 //! All methods are pure or have minimal side effects.
 
-/// Manages list selection, scroll position, and grouping state.
+/// Manages list selection and scroll position.
 ///
 /// Pure state container with no I/O operations.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ListState {
     selected_index: usize,
     scroll_offset: usize,
-    show_grouped: bool,
-}
-
-impl Default for ListState {
-    fn default() -> Self {
-        Self {
-            selected_index: 0,
-            scroll_offset: 0,
-            show_grouped: true, // Default: grouping enabled
-        }
-    }
 }
 
 impl ListState {
@@ -54,21 +42,6 @@ impl ListState {
     /// Set scroll offset.
     pub fn set_scroll_offset(&mut self, offset: usize) {
         self.scroll_offset = offset;
-    }
-
-    /// Check if grouping is enabled.
-    pub fn is_grouped(&self) -> bool {
-        self.show_grouped
-    }
-
-    /// Set grouping state.
-    pub fn set_grouped(&mut self, grouped: bool) {
-        self.show_grouped = grouped;
-    }
-
-    /// Toggle grouping on/off.
-    pub fn toggle_grouping(&mut self) {
-        self.show_grouped = !self.show_grouped;
     }
 
     /// Reset selection and scroll to top.
@@ -111,7 +84,6 @@ mod tests {
         let state = ListState::default();
         assert_eq!(state.selected_index(), 0);
         assert_eq!(state.scroll_offset(), 0);
-        assert!(state.is_grouped());
     }
 
     #[test]
@@ -147,25 +119,6 @@ mod tests {
         let mut state = ListState::new();
         state.set_selected_index(5, 0);
         assert_eq!(state.selected_index(), 0);
-    }
-
-    #[test]
-    fn test_toggle_grouping() {
-        let mut state = ListState::default();
-        assert!(state.is_grouped());
-        state.toggle_grouping();
-        assert!(!state.is_grouped());
-        state.toggle_grouping();
-        assert!(state.is_grouped());
-    }
-
-    #[test]
-    fn test_set_grouped() {
-        let mut state = ListState::default();
-        state.set_grouped(false);
-        assert!(!state.is_grouped());
-        state.set_grouped(true);
-        assert!(state.is_grouped());
     }
 
     #[test]
@@ -298,22 +251,6 @@ mod property_tests {
             let range = calculate_visible_range(scroll_offset, viewport_height, total_items);
             prop_assert!(range.start <= range.end, "start {} > end {} with scroll={}, total={}", range.start, range.end, scroll_offset, total_items);
             prop_assert!(range.end <= total_items);
-        }
-
-        /// Property: toggle_grouping is reversible.
-        ///
-        /// Two toggles should return to original state.
-        #[test]
-        fn toggle_grouping_reversible(initial_grouped: bool) {
-            let mut state = ListState::default();
-            state.set_grouped(initial_grouped);
-
-            let before = state.is_grouped();
-            state.toggle_grouping();
-            state.toggle_grouping();
-            let after = state.is_grouped();
-
-            prop_assert_eq!(before, after);
         }
 
         /// Property: reset always results in zero state.

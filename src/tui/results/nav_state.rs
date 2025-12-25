@@ -88,11 +88,6 @@ pub struct NavigationState {
 
     /// Navigation history for back navigation.
     pub history: Vec<ViewMode>,
-
-    /// Current item index within location (spec 267).
-    /// When multiple debt items exist at the same location,
-    /// this tracks which one is being viewed in detail.
-    pub current_location_item_index: usize,
 }
 
 impl Default for NavigationState {
@@ -108,7 +103,6 @@ impl NavigationState {
             view_mode: ViewMode::List,
             detail_page: DetailPage::Overview,
             history: vec![],
-            current_location_item_index: 0,
         }
     }
 

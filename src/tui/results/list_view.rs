@@ -3,7 +3,6 @@
 use super::app::ResultsApp;
 use super::grouping;
 use crate::priority::classification::Severity;
-use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -223,14 +222,6 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
                 format!("filters {}", app.query().filters().len()),
                 Style::default().fg(theme.muted),
             ),
-            Span::raw("  │  "),
-            Span::styled(
-                format!(
-                    "grouping {}",
-                    if app.list().is_grouped() { "on" } else { "off" }
-                ),
-                Style::default().fg(theme.muted),
-            ),
         ]),
     ];
 
@@ -244,16 +235,12 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     frame.render_widget(header, header_area);
 }
 
-/// Render list of items
+/// Render list of items (always grouped by location)
 fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     // Apply horizontal margin per DESIGN.md
     let list_area = apply_horizontal_margin(area);
 
-    let items: Vec<ListItem> = if app.list().is_grouped() {
-        render_grouped_list(app, list_area, theme)
-    } else {
-        render_ungrouped_list(app, list_area, theme)
-    };
+    let items: Vec<ListItem> = render_grouped_list(app, list_area, theme);
 
     if items.is_empty() {
         let empty_text =
@@ -272,19 +259,6 @@ fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
         let list = List::new(items).block(Block::default().borders(Borders::NONE));
         frame.render_widget(list, list_area);
     }
-}
-
-/// Render ungrouped list (original behavior)
-fn render_ungrouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListItem<'static>> {
-    app.filtered_items()
-        .enumerate()
-        .skip(app.list().scroll_offset())
-        .take(area.height as usize)
-        .map(|(idx, item)| {
-            let is_selected = idx == app.list().selected_index();
-            format_list_item(item, idx, is_selected, theme)
-        })
-        .collect()
 }
 
 /// Render grouped list by location
@@ -395,150 +369,6 @@ fn format_grouped_item(
     ListItem::new(line).style(style)
 }
 
-/// Format complexity metric for list view display.
-///
-/// Uses cognitive complexity as the primary metric since it better
-/// represents mental burden than cyclomatic complexity.
-///
-/// When entropy-adjusted complexity is available (from spec 214):
-/// - Shows adjustment if reduction > 5%: "Cog:22→14"
-/// - Otherwise shows raw value: "Cog:22"
-///
-/// # Examples
-/// ```ignore
-/// // With entropy adjustment
-/// let item = create_item_with_entropy(22, 14);
-/// assert_eq!(format_complexity_metric(&item), "Cog:22→14");
-///
-/// // Without entropy or negligible adjustment
-/// let item = create_item_without_entropy(22);
-/// assert_eq!(format_complexity_metric(&item), "Cog:22");
-/// ```
-fn format_complexity_metric(item: &UnifiedDebtItem) -> String {
-    // Check if entropy-adjusted cognitive complexity is available (spec 214)
-    let adjusted_cog = item
-        .entropy_analysis
-        .as_ref()
-        .map(|e| e.adjusted_complexity);
-    if let Some(adjusted_cog) = adjusted_cog {
-        let raw_cog = item.cognitive_complexity;
-
-        // Show adjustment if there's a meaningful difference (>5%)
-        let diff_pct = if raw_cog > 0 {
-            ((raw_cog as f64 - adjusted_cog as f64) / raw_cog as f64).abs()
-        } else {
-            0.0
-        };
-
-        if diff_pct > 0.05 {
-            format!("Cog:{}→{}", raw_cog, adjusted_cog)
-        } else {
-            // Negligible adjustment, just show raw
-            format!("Cog:{}", raw_cog)
-        }
-    } else {
-        // No entropy data, show raw cognitive complexity
-        format!("Cog:{}", item.cognitive_complexity)
-    }
-}
-
-/// Format a single list item
-fn format_list_item(
-    item: &UnifiedDebtItem,
-    index: usize,
-    is_selected: bool,
-    theme: &Theme,
-) -> ListItem<'static> {
-    let severity = Severity::from_score_100(item.unified_score.final_score);
-    let severity_color = severity_to_color(severity);
-
-    let indicator = if is_selected { "▸ " } else { "  " };
-
-    let file_name = item
-        .location
-        .file
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown");
-
-    // Check if this is a god object - format differently (spec 207, spec 253)
-    let (location_str, metrics_str) = match &item.debt_type {
-        DebtType::GodObject {
-            methods,
-            responsibilities,
-            lines,
-            ..
-        } => {
-            // Determine detection type from indicators
-            let detection_type = item
-                .god_object_indicators
-                .as_ref()
-                .map(|i| &i.detection_type);
-
-            // Customize display label based on detection type
-            let type_label = match detection_type {
-                Some(crate::organization::DetectionType::GodClass) => "God Object",
-                Some(crate::organization::DetectionType::GodFile) => "God File",
-                Some(crate::organization::DetectionType::GodModule) => "God Module",
-                None => "God Object",
-            };
-
-            (
-                format!("{} ({})", file_name, type_label),
-                format!("(LOC:{} Resp:{} Fns:{})", lines, responsibilities, methods),
-            )
-        }
-        _ => {
-            // Regular function item
-            // Format complexity with entropy adjustment if available
-            let complexity_str = format_complexity_metric(item);
-
-            let mut metric_parts = Vec::new();
-
-            // Only show coverage if available (skip N/A)
-            if let Some(cov) = &item.transitive_coverage {
-                metric_parts.push(format!("Cov:{:.0}%", cov.direct * 100.0));
-            }
-
-            metric_parts.push(complexity_str);
-
-            // Add LOC for function length (spec 207: changed from Len: to LOC:)
-            if item.function_length > 0 {
-                metric_parts.push(format!("LOC:{}", item.function_length));
-            }
-
-            (
-                format!("{}::{}", file_name, item.location.function),
-                format!("({})", metric_parts.join(" ")),
-            )
-        }
-    };
-
-    let line = Line::from(vec![
-        Span::styled(indicator, Style::default().fg(theme.accent())),
-        Span::styled(
-            format!("#{:<4}", index + 1),
-            Style::default().fg(theme.muted),
-        ),
-        Span::styled(
-            format!("{:<7.1}", item.unified_score.final_score),
-            Style::default().fg(severity_color),
-        ),
-        Span::raw("  "),
-        Span::styled(location_str, Style::default().fg(theme.secondary())),
-        Span::raw("  "),
-        Span::styled(metrics_str, Style::default().fg(theme.muted)),
-    ]);
-
-    let style = if is_selected {
-        Style::default().bg(Color::DarkGray)
-    } else {
-        Style::default()
-    };
-
-    ListItem::new(line).style(style)
-}
-
 /// Render footer with navigation hints
 fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     let position_text = if app.item_count() > 0 {
@@ -556,8 +386,6 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::raw("  |  "),
         Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
         Span::raw(":Nav  "),
-        Span::styled("G", Style::default().fg(theme.accent())),
-        Span::raw(":Group  "),
         Span::styled("/", Style::default().fg(theme.accent())),
         Span::raw(":Search  "),
         Span::styled("s", Style::default().fg(theme.accent())),
@@ -590,149 +418,3 @@ fn severity_to_color(severity: Severity) -> Color {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::complexity::EntropyAnalysis;
-    use crate::priority::{
-        ActionableRecommendation, DebtType, ImpactMetrics, Location, UnifiedScore,
-    };
-    use std::path::PathBuf;
-
-    fn create_test_item(
-        cognitive_complexity: u32,
-        entropy_adjusted: Option<u32>,
-    ) -> UnifiedDebtItem {
-        // Convert entropy_adjusted to EntropyAnalysis
-        let entropy_analysis = entropy_adjusted.map(|adj| EntropyAnalysis {
-            entropy_score: 0.5,
-            pattern_repetition: 0.3,
-            branch_similarity: 0.2,
-            dampening_factor: adj as f64 / cognitive_complexity as f64,
-            dampening_was_applied: adj != cognitive_complexity,
-            original_complexity: cognitive_complexity,
-            adjusted_complexity: adj,
-            reasoning: vec![],
-        });
-        UnifiedDebtItem {
-            location: Location {
-                file: PathBuf::from("test.rs"),
-                function: "test_function".to_string(),
-                line: 1,
-            },
-            debt_type: DebtType::ComplexityHotspot {
-                cyclomatic: 5,
-                cognitive: cognitive_complexity,
-            },
-            unified_score: UnifiedScore {
-                complexity_factor: 5.0,
-                coverage_factor: 5.0,
-                dependency_factor: 5.0,
-                role_multiplier: 1.0,
-                final_score: 50.0,
-                base_score: None,
-                exponential_factor: None,
-                risk_boost: None,
-                pre_adjustment_score: None,
-                adjustment_applied: None,
-                purity_factor: None,
-                refactorability_factor: None,
-                pattern_factor: None,
-                // Spec 260: Score transparency fields
-                debt_adjustment: None,
-                pre_normalization_score: None,
-                structural_multiplier: Some(1.0),
-                has_coverage_data: false,
-                contextual_risk_multiplier: None,
-                pre_contextual_score: None,
-            },
-            function_role: crate::priority::semantic_classifier::FunctionRole::Unknown,
-            recommendation: ActionableRecommendation {
-                primary_action: "Test action".to_string(),
-                rationale: "Test rationale".to_string(),
-                implementation_steps: vec![],
-                related_items: vec![],
-                steps: None,
-                estimated_effort_hours: None,
-            },
-            expected_impact: ImpactMetrics {
-                coverage_improvement: 0.2,
-                lines_reduction: 10,
-                complexity_reduction: 5.0,
-                risk_reduction: 0.1,
-            },
-            transitive_coverage: None,
-            upstream_dependencies: 0,
-            downstream_dependencies: 0,
-            upstream_callers: vec![],
-            downstream_callees: vec![],
-            nesting_depth: 1,
-            function_length: 10,
-            cyclomatic_complexity: 5,
-            cognitive_complexity,
-            is_pure: None,
-            purity_confidence: None,
-            purity_level: None,
-            god_object_indicators: None,
-            tier: None,
-            function_context: None,
-            context_confidence: None,
-            contextual_recommendation: None,
-            pattern_analysis: None,
-            file_context: None,
-            context_multiplier: None,
-            context_type: None,
-            language_specific: None,
-            detected_pattern: None,
-            contextual_risk: None,
-            file_line_count: None,
-            responsibility_category: None,
-            error_swallowing_count: None,
-            error_swallowing_patterns: None,
-            entropy_analysis,
-            context_suggestion: None,
-        }
-    }
-
-    #[test]
-    fn test_format_complexity_no_entropy() {
-        let item = create_test_item(15, None);
-        assert_eq!(format_complexity_metric(&item), "Cog:15");
-    }
-
-    #[test]
-    fn test_format_complexity_with_meaningful_adjustment() {
-        let item = create_test_item(22, Some(14));
-        assert_eq!(format_complexity_metric(&item), "Cog:22→14");
-    }
-
-    #[test]
-    fn test_format_complexity_negligible_adjustment() {
-        // 5% difference = 1 point at complexity 20
-        let item = create_test_item(20, Some(19));
-        // Less than 5% difference, should show raw only
-        assert_eq!(format_complexity_metric(&item), "Cog:20");
-    }
-
-    #[test]
-    fn test_format_complexity_zero_raw() {
-        // Edge case: zero cognitive complexity
-        let item = create_test_item(0, Some(0));
-        assert_eq!(format_complexity_metric(&item), "Cog:0");
-    }
-
-    #[test]
-    fn test_format_complexity_exactly_5_percent() {
-        // Exactly 5% should not show arrow (using > 0.05)
-        let item = create_test_item(100, Some(95));
-        assert_eq!(format_complexity_metric(&item), "Cog:100");
-    }
-
-    #[test]
-    fn test_format_complexity_just_over_5_percent() {
-        // Just over 5% should show arrow
-        let item = create_test_item(100, Some(94));
-        assert_eq!(format_complexity_metric(&item), "Cog:100→94");
-    }
-}

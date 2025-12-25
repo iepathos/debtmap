@@ -100,14 +100,10 @@ impl ResultsApp {
         analysis.file_items = file_items;
 
         let item_count = analysis.items.len();
-        let show_grouped = view.config.compute_groups;
-
-        let mut list = ListState::default();
-        list.set_grouped(show_grouped);
 
         Self {
             analysis,
-            list,
+            list: ListState::default(),
             query: QueryState::new(item_count),
             nav: nav_state::NavigationState::new(),
             terminal_size: (80, 24),
@@ -183,19 +179,16 @@ impl ResultsApp {
     }
 
     /// Get the currently selected item
+    ///
+    /// Items are always grouped by location. When multiple debt types exist at
+    /// the same location, returns the first item in the group. The overview page
+    /// shows all debt types at the location.
     pub fn selected_item(&self) -> Option<&UnifiedDebtItem> {
-        if self.list.is_grouped() {
-            let groups =
-                super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
-            groups
-                .get(self.list.selected_index())
-                .and_then(|group| group.items.first().copied())
-        } else {
-            self.query
-                .filtered_indices()
-                .get(self.list.selected_index())
-                .and_then(|&idx| self.analysis.items.get(idx))
-        }
+        let groups =
+            super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
+        groups
+            .get(self.list.selected_index())
+            .and_then(|group| group.items.first().copied())
     }
 
     /// Get all filtered items
@@ -206,15 +199,11 @@ impl ResultsApp {
             .filter_map(|&idx| self.analysis.items.get(idx))
     }
 
-    /// Get total item count (filtered)
+    /// Get total item count (filtered, grouped by location)
     pub fn item_count(&self) -> usize {
-        if self.list.is_grouped() {
-            let groups =
-                super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
-            groups.len()
-        } else {
-            self.query.filtered_indices().len()
-        }
+        let groups =
+            super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
+        groups.len()
     }
 
     // ========================================================================
@@ -269,14 +258,10 @@ impl ResultsApp {
 
     /// Get count display for header
     pub fn count_display(&self) -> String {
-        if self.list.is_grouped() {
-            let groups =
-                super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
-            let issue_count = self.query.filtered_indices().len();
-            format!("{} locations ({} issues)", groups.len(), issue_count)
-        } else {
-            format!("{} items", self.query.filtered_indices().len())
-        }
+        let groups =
+            super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
+        let issue_count = self.query.filtered_indices().len();
+        format!("{} locations ({} issues)", groups.len(), issue_count)
     }
 
     // ========================================================================

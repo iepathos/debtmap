@@ -1665,12 +1665,11 @@ pub fn render(
     area: Rect,
     theme: &Theme,
 ) {
-    // Get all items at this location for multi-item context (spec 267)
+    // Get all items at this location for multi-item context
     let location_items = super::overview::get_items_at_location(app, item);
-    let current_item_index = app.nav().current_location_item_index;
 
-    let lines =
-        build_page_lines_with_context(item, &location_items, current_item_index, theme, area.width);
+    // Always show first item (grouping is always on, no cycling)
+    let lines = build_page_lines_with_context(item, &location_items, 0, theme, area.width);
 
     // I/O boundary: render the widget
     let paragraph = Paragraph::new(lines)

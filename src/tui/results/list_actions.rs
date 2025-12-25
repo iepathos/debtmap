@@ -39,9 +39,6 @@ pub enum ListAction {
     /// Move selection down by a page.
     PageDown,
 
-    /// Toggle file grouping.
-    ToggleGrouping,
-
     /// Enter detail view for selected item.
     EnterDetail,
 
@@ -122,9 +119,6 @@ pub fn determine_list_action(key: KeyEvent, ctx: ListActionContext) -> Option<Li
         KeyCode::End => Some(ListAction::JumpToBottom),
         KeyCode::PageUp => Some(ListAction::PageUp),
         KeyCode::PageDown => Some(ListAction::PageDown),
-
-        // Grouping toggle
-        KeyCode::Char('G') => Some(ListAction::ToggleGrouping),
 
         // Detail view - guarded: requires items and selection
         KeyCode::Enter => {
@@ -289,19 +283,6 @@ mod tests {
         assert_eq!(
             determine_list_action(key(KeyCode::PageDown), ctx),
             Some(ListAction::PageDown)
-        );
-    }
-
-    // ============================================================================
-    // Grouping Action Tests
-    // ============================================================================
-
-    #[test]
-    fn toggle_grouping_with_shift_g() {
-        let ctx = ListActionContext::with_selection();
-        assert_eq!(
-            determine_list_action(key(KeyCode::Char('G')), ctx),
-            Some(ListAction::ToggleGrouping)
         );
     }
 
@@ -482,7 +463,6 @@ mod property_tests {
             Just(KeyCode::Char('k')),
             Just(KeyCode::Char('j')),
             Just(KeyCode::Char('g')),
-            Just(KeyCode::Char('G')),
             Just(KeyCode::Char('/')),
             Just(KeyCode::Char('s')),
             Just(KeyCode::Char('f')),
