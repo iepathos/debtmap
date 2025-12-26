@@ -322,33 +322,173 @@ fn merge_config(
     }
 
     // Merge all other optional fields using the macro
-    merge_optional_field!(target, source, thresholds, "thresholds", source_id, field_sources);
+    merge_optional_field!(
+        target,
+        source,
+        thresholds,
+        "thresholds",
+        source_id,
+        field_sources
+    );
     merge_optional_field!(target, source, display, "display", source_id, field_sources);
     merge_optional_field!(target, source, ignore, "ignore", source_id, field_sources);
     merge_optional_field!(target, source, output, "output", source_id, field_sources);
     merge_optional_field!(target, source, entropy, "entropy", source_id, field_sources);
-    merge_optional_field!(target, source, role_multipliers, "role_multipliers", source_id, field_sources);
-    merge_optional_field!(target, source, languages, "languages", source_id, field_sources);
+    merge_optional_field!(
+        target,
+        source,
+        role_multipliers,
+        "role_multipliers",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        languages,
+        "languages",
+        source_id,
+        field_sources
+    );
     merge_optional_field!(target, source, context, "context", source_id, field_sources);
-    merge_optional_field!(target, source, error_handling, "error_handling", source_id, field_sources);
-    merge_optional_field!(target, source, normalization, "normalization", source_id, field_sources);
+    merge_optional_field!(
+        target,
+        source,
+        error_handling,
+        "error_handling",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        normalization,
+        "normalization",
+        source_id,
+        field_sources
+    );
     merge_optional_field!(target, source, loc, "loc", source_id, field_sources);
     merge_optional_field!(target, source, tiers, "tiers", source_id, field_sources);
-    merge_optional_field!(target, source, god_object_detection, "god_object_detection", source_id, field_sources);
-    merge_optional_field!(target, source, external_api, "external_api", source_id, field_sources);
-    merge_optional_field!(target, source, complexity_thresholds, "complexity_thresholds", source_id, field_sources);
-    merge_optional_field!(target, source, role_coverage_weights, "role_coverage_weights", source_id, field_sources);
-    merge_optional_field!(target, source, role_multiplier_config, "role_multiplier_config", source_id, field_sources);
-    merge_optional_field!(target, source, orchestrator_detection, "orchestrator_detection", source_id, field_sources);
-    merge_optional_field!(target, source, orchestration_adjustment, "orchestration_adjustment", source_id, field_sources);
-    merge_optional_field!(target, source, classification, "classification", source_id, field_sources);
-    merge_optional_field!(target, source, mapping_patterns, "mapping_patterns", source_id, field_sources);
-    merge_optional_field!(target, source, coverage_expectations, "coverage_expectations", source_id, field_sources);
-    merge_optional_field!(target, source, complexity_weights, "complexity_weights", source_id, field_sources);
-    merge_optional_field!(target, source, functional_analysis, "functional_analysis", source_id, field_sources);
-    merge_optional_field!(target, source, boilerplate_detection, "boilerplate_detection", source_id, field_sources);
-    merge_optional_field!(target, source, scoring_rebalanced, "scoring_rebalanced", source_id, field_sources);
-    merge_optional_field!(target, source, context_multipliers, "context_multipliers", source_id, field_sources);
+    merge_optional_field!(
+        target,
+        source,
+        god_object_detection,
+        "god_object_detection",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        external_api,
+        "external_api",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        complexity_thresholds,
+        "complexity_thresholds",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        role_coverage_weights,
+        "role_coverage_weights",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        role_multiplier_config,
+        "role_multiplier_config",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        orchestrator_detection,
+        "orchestrator_detection",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        orchestration_adjustment,
+        "orchestration_adjustment",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        classification,
+        "classification",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        mapping_patterns,
+        "mapping_patterns",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        coverage_expectations,
+        "coverage_expectations",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        complexity_weights,
+        "complexity_weights",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        functional_analysis,
+        "functional_analysis",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        boilerplate_detection,
+        "boilerplate_detection",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        scoring_rebalanced,
+        "scoring_rebalanced",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        context_multipliers,
+        "context_multipliers",
+        source_id,
+        field_sources
+    );
 }
 
 /// Apply environment variable overrides to the config.

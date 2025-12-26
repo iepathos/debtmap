@@ -33,20 +33,19 @@ enum VisibilityClass {
 fn classify_visibility(vis: &syn::Visibility) -> VisibilityClass {
     match vis {
         syn::Visibility::Public(_) => VisibilityClass::Public,
-        syn::Visibility::Restricted(r) => {
-            r.path
-                .get_ident()
-                .map(|ident| {
-                    if ident == "crate" {
-                        VisibilityClass::PubCrate
-                    } else if ident == "super" {
-                        VisibilityClass::PubSuper
-                    } else {
-                        VisibilityClass::Private
-                    }
-                })
-                .unwrap_or(VisibilityClass::Private)
-        }
+        syn::Visibility::Restricted(r) => r
+            .path
+            .get_ident()
+            .map(|ident| {
+                if ident == "crate" {
+                    VisibilityClass::PubCrate
+                } else if ident == "super" {
+                    VisibilityClass::PubSuper
+                } else {
+                    VisibilityClass::Private
+                }
+            })
+            .unwrap_or(VisibilityClass::Private),
         syn::Visibility::Inherited => VisibilityClass::Private,
     }
 }
@@ -54,7 +53,10 @@ fn classify_visibility(vis: &syn::Visibility) -> VisibilityClass {
 /// Apply a visibility classification to a breakdown counter.
 ///
 /// Pure function - modifies the breakdown based on classification.
-fn apply_visibility_to_breakdown(breakdown: &mut FunctionVisibilityBreakdown, class: VisibilityClass) {
+fn apply_visibility_to_breakdown(
+    breakdown: &mut FunctionVisibilityBreakdown,
+    class: VisibilityClass,
+) {
     match class {
         VisibilityClass::Public => breakdown.public += 1,
         VisibilityClass::PubCrate => breakdown.pub_crate += 1,
