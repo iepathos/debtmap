@@ -13,12 +13,12 @@ Debtmap is designed to provide AI coding assistants with the signals they need t
 
 ## Output Formats
 
-### LLM Markdown (Recommended)
+### Markdown (Recommended)
 
-The `llm-markdown` format is specifically designed for LLM consumption:
+The `markdown` format is specifically designed for LLM consumption:
 
 ```bash
-debtmap analyze . --format llm-markdown --top 5
+debtmap analyze . --format markdown --top 5
 ```
 
 **Output structure:**
@@ -166,7 +166,7 @@ debtmap analyze . --format json | jq '.items[0].location'
 **Full context (most accurate):**
 ```bash
 # Read all suggested files
-debtmap analyze . --format llm-markdown --top 1
+debtmap analyze . --format markdown --top 1
 # Then have the AI read each file in the context section
 ```
 
@@ -176,13 +176,13 @@ debtmap analyze . --format llm-markdown --top 1
 
 **Direct piping:**
 ```bash
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item. Read the context files first."
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item. Read the context files first."
 ```
 
 **Two-step workflow:**
 ```bash
 # Step 1: Get the analysis
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 5 > debt.md
+debtmap analyze . --format markdown --lcov coverage.lcov --top 5 > debt.md
 
 # Step 2: Send to Claude with context
 cat debt.md | claude "
@@ -200,10 +200,10 @@ Then fix the debt item following these rules:
 cargo llvm-cov --lcov --output-path coverage.lcov
 
 # Analyze with coverage
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1
+debtmap analyze . --format markdown --lcov coverage.lcov --top 1
 
 # Send the top item to Claude
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1 | \
+debtmap analyze . --format markdown --lcov coverage.lcov --top 1 | \
   claude "Add tests for this function to reach 80% coverage"
 ```
 
@@ -213,7 +213,7 @@ Cursor works best with file-based context:
 
 ```bash
 # Generate debt report
-debtmap analyze . --format llm-markdown --top 10 > .cursor/debt-report.md
+debtmap analyze . --format markdown --top 10 > .cursor/debt-report.md
 
 # In Cursor, reference the report:
 # @debt-report.md Fix the top critical item
@@ -428,7 +428,7 @@ debtmap analyze . -vv  # Verbose mode shows parsing issues
 
 **Solution:** Use `--max-context-lines` to limit:
 ```bash
-debtmap analyze . --format llm-markdown --max-context-lines 300
+debtmap analyze . --format markdown --max-context-lines 300
 ```
 
 ## API Reference
@@ -437,7 +437,7 @@ debtmap analyze . --format llm-markdown --max-context-lines 300
 
 | Option | Description |
 |--------|-------------|
-| `--format llm-markdown` | LLM-optimized markdown output |
+| `--format markdown` | LLM-optimized markdown output |
 | `--format json` | Structured JSON output |
 | `--top N` | Limit to top N items |
 | `--lcov FILE` | Include coverage data |

@@ -71,8 +71,7 @@ fn output_prepared_view(view: &PreparedDebtView, config: &OutputConfig) -> Resul
             let json = view_formatters::format_json(view, include_scoring_details);
             write_output(&json, &config.output_file)
         }
-        Some(crate::cli::OutputFormat::Markdown) | Some(crate::cli::OutputFormat::LlmMarkdown) => {
-            // Both Markdown and LlmMarkdown (deprecated) use the same format (Spec 008)
+        Some(crate::cli::OutputFormat::Markdown) => {
             let md_config = view_formatters::MarkdownConfig {
                 verbosity: config.verbosity,
                 show_filter_stats: config.show_filter_stats,
@@ -248,8 +247,7 @@ pub fn output_unified_priorities_with_summary(
                 include_scoring_details,
             )
         }
-        Some(crate::cli::OutputFormat::Markdown) | Some(crate::cli::OutputFormat::LlmMarkdown) => {
-            // Both Markdown and LlmMarkdown (deprecated) use LLM-optimized output (Spec 008)
+        Some(crate::cli::OutputFormat::Markdown) => {
             let include_scoring_details = verbosity >= 2;
             llm_markdown::output_llm_markdown_with_format(
                 &analysis,

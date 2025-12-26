@@ -189,34 +189,6 @@ fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<b
             ensure_valid_page(app);
         }
 
-        DetailAction::CopyContext => {
-            if let Some(item) = app.selected_item() {
-                if let Some(ref context) = item.context_suggestion {
-                    use super::detail_pages::context::format_context_for_clipboard;
-                    let text = format_context_for_clipboard(context);
-                    let message =
-                        super::actions::clipboard::copy_to_clipboard(&text, "all context ranges")?;
-                    app.set_status_message(message);
-                } else {
-                    app.set_status_message("No context data available".to_string());
-                }
-            }
-        }
-
-        DetailAction::CopyPrimary => {
-            if let Some(item) = app.selected_item() {
-                if let Some(ref context) = item.context_suggestion {
-                    use super::detail_pages::context::format_primary_for_clipboard;
-                    let text = format_primary_for_clipboard(context);
-                    let message =
-                        super::actions::clipboard::copy_to_clipboard(&text, "primary range")?;
-                    app.set_status_message(message);
-                } else {
-                    app.set_status_message("No context data available".to_string());
-                }
-            }
-        }
-
         DetailAction::CopyPage => {
             if let Some(item) = app.selected_item() {
                 let detail_page = app.nav().detail_page;

@@ -401,7 +401,7 @@ CONTEXT:
 
 **Output Formats:**
 
-**LLM Markdown (--format llm-markdown):**
+**Markdown (--format markdown):**
 - Structured for minimal token usage
 - Context suggestions included inline
 - Metrics in consistent tabular format

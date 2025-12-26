@@ -153,7 +153,7 @@ Coverage tools tell you what's tested. Debtmap tells you what untested code is m
 
 ```bash
 # Generate debt signals
-debtmap analyze . --format llm-markdown --lcov coverage.lcov
+debtmap analyze . --format markdown --lcov coverage.lcov
 
 # Pipe to AI
 cat debt.md | claude "Fix the top item, read the suggested context first"

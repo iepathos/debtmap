@@ -36,13 +36,7 @@ pub enum DetailAction {
     /// Positive values move down, negative values move up.
     MoveSelection(i32),
 
-    /// Copy all context ranges (only valid on Context page).
-    CopyContext,
-
-    /// Copy primary range only (only valid on Context page).
-    CopyPrimary,
-
-    /// Copy current page content (valid on non-Context pages).
+    /// Copy current page content.
     CopyPage,
 
     /// Open the current item in an external editor.
@@ -102,7 +96,7 @@ pub fn page_from_digit(c: char) -> Option<DetailPage> {
 /// # Returns
 /// * `Some(action)` - The action to execute
 /// * `None` - Key has no action in detail view
-pub fn classify_detail_key(key: KeyEvent, ctx: DetailActionContext) -> Option<DetailAction> {
+pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<DetailAction> {
     match key.code {
         // Back navigation - escape or 'q' returns to previous view
         KeyCode::Esc | KeyCode::Char('q') => Some(DetailAction::NavigateBack),
@@ -118,23 +112,8 @@ pub fn classify_detail_key(key: KeyEvent, ctx: DetailActionContext) -> Option<De
         KeyCode::Down | KeyCode::Char('j') => Some(DetailAction::MoveSelection(1)),
         KeyCode::Up | KeyCode::Char('k') => Some(DetailAction::MoveSelection(-1)),
 
-        // Copy actions - context-sensitive based on current page
-        KeyCode::Char('c') => {
-            if ctx.current_page == DetailPage::Context {
-                Some(DetailAction::CopyContext)
-            } else {
-                Some(DetailAction::CopyPage)
-            }
-        }
-
-        // Primary range copy - only meaningful on Context page
-        KeyCode::Char('p') => {
-            if ctx.current_page == DetailPage::Context {
-                Some(DetailAction::CopyPrimary)
-            } else {
-                None
-            }
-        }
+        // Copy current page content
+        KeyCode::Char('c') => Some(DetailAction::CopyPage),
 
         // Open in editor
         KeyCode::Char('e') | KeyCode::Char('o') => Some(DetailAction::OpenInEditor),
@@ -311,23 +290,15 @@ mod tests {
     }
 
     // ============================================================================
-    // Context-Sensitive Copy Tests
+    // Copy Tests
     // ============================================================================
 
     #[test]
-    fn c_on_context_page_copies_context() {
-        let ctx = DetailActionContext::new(DetailPage::Context);
-        assert_eq!(
-            classify_detail_key(key(KeyCode::Char('c')), ctx),
-            Some(DetailAction::CopyContext)
-        );
-    }
-
-    #[test]
-    fn c_on_other_pages_copies_page() {
+    fn c_copies_page_on_all_pages() {
         for page in [
             DetailPage::Overview,
             DetailPage::ScoreBreakdown,
+            DetailPage::Context,
             DetailPage::Dependencies,
             DetailPage::GitContext,
             DetailPage::Patterns,
@@ -339,36 +310,6 @@ mod tests {
                 classify_detail_key(key(KeyCode::Char('c')), ctx),
                 Some(DetailAction::CopyPage),
                 "'c' on {:?} should copy page",
-                page
-            );
-        }
-    }
-
-    #[test]
-    fn p_on_context_page_copies_primary() {
-        let ctx = DetailActionContext::new(DetailPage::Context);
-        assert_eq!(
-            classify_detail_key(key(KeyCode::Char('p')), ctx),
-            Some(DetailAction::CopyPrimary)
-        );
-    }
-
-    #[test]
-    fn p_on_other_pages_does_nothing() {
-        for page in [
-            DetailPage::Overview,
-            DetailPage::ScoreBreakdown,
-            DetailPage::Dependencies,
-            DetailPage::GitContext,
-            DetailPage::Patterns,
-            DetailPage::DataFlow,
-            DetailPage::Responsibilities,
-        ] {
-            let ctx = DetailActionContext::new(page);
-            assert_eq!(
-                classify_detail_key(key(KeyCode::Char('p')), ctx),
-                None,
-                "'p' on {:?} should do nothing",
                 page
             );
         }
@@ -415,6 +356,7 @@ mod tests {
 
         assert_eq!(classify_detail_key(key(KeyCode::Char('x')), ctx), None);
         assert_eq!(classify_detail_key(key(KeyCode::Char('z')), ctx), None);
+        assert_eq!(classify_detail_key(key(KeyCode::Char('p')), ctx), None);
         assert_eq!(classify_detail_key(key(KeyCode::F(1)), ctx), None);
         assert_eq!(classify_detail_key(key(KeyCode::Char('0')), ctx), None);
         assert_eq!(classify_detail_key(key(KeyCode::Char('9')), ctx), None);
@@ -435,13 +377,14 @@ mod tests {
     }
 
     #[test]
-    fn context_affects_copy_action() {
+    fn c_key_consistent_across_pages() {
         let k = key(KeyCode::Char('c'));
 
         let context_page = DetailActionContext::new(DetailPage::Context);
         let overview_page = DetailActionContext::new(DetailPage::Overview);
 
-        assert_ne!(
+        // 'c' should always copy page on all pages
+        assert_eq!(
             classify_detail_key(k, context_page),
             classify_detail_key(k, overview_page)
         );
@@ -517,7 +460,6 @@ mod property_tests {
             Just(KeyCode::Up),
             Just(KeyCode::Down),
             Just(KeyCode::Char('c')),
-            Just(KeyCode::Char('p')),
             Just(KeyCode::Char('e')),
             Just(KeyCode::Char('o')),
             Just(KeyCode::Char('?')),
@@ -559,17 +501,14 @@ mod property_tests {
             prop_assert_eq!(classify_detail_key(down, ctx), Some(DetailAction::MoveSelection(1)));
         }
 
-        /// Property: 'c' key always produces some copy action.
+        /// Property: 'c' key always copies page.
         #[test]
-        fn c_always_copies_something(page in detail_page_strategy()) {
+        fn c_always_copies_page(page in detail_page_strategy()) {
             let ctx = DetailActionContext::new(page);
             let c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE);
 
             let action = classify_detail_key(c, ctx);
-            prop_assert!(
-                action == Some(DetailAction::CopyContext) || action == Some(DetailAction::CopyPage),
-                "c should always produce a copy action"
-            );
+            prop_assert_eq!(action, Some(DetailAction::CopyPage));
         }
 
         /// Property: Pure function - same input always produces same output.

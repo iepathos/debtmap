@@ -417,4 +417,3 @@ fn severity_to_color(severity: Severity) -> Color {
         Severity::Low => Color::Green,
     }
 }
-

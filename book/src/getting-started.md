@@ -77,11 +77,11 @@ Here are the most common commands to get you started:
 # Basic analysis (simplest command)
 debtmap analyze .
 
-# LLM-optimized output for AI workflows (recommended)
-debtmap analyze . --format llm-markdown
+# Markdown output for AI workflows (recommended)
+debtmap analyze . --format markdown
 
 # Pipe directly to Claude Code
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # JSON output for programmatic access
 debtmap analyze . --format json --top 10 > debt.json
@@ -118,7 +118,7 @@ debtmap analyze .
 
 ## Example Output
 
-When you run `debtmap analyze . --format llm-markdown`, you'll see output like this:
+When you run `debtmap analyze . --format markdown`, you'll see output like this:
 
 ```markdown
 # Technical Debt Analysis
@@ -187,10 +187,10 @@ These suggestions help AI assistants understand the code before making changes.
 
 ## Output Formats
 
-### LLM Markdown (for AI workflows)
+### Markdown (for AI workflows)
 
 ```bash
-debtmap analyze . --format llm-markdown
+debtmap analyze . --format markdown
 ```
 
 Optimized for minimal token usage while providing all necessary context.
@@ -237,11 +237,11 @@ With coverage data:
 
 ```bash
 # Direct piping
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # With coverage
 cargo llvm-cov --lcov --output-path coverage.lcov
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1 | \
+debtmap analyze . --format markdown --lcov coverage.lcov --top 1 | \
   claude "Add tests for this function"
 ```
 
@@ -249,7 +249,7 @@ debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1 | \
 
 ```bash
 # Generate report for Cursor to reference
-debtmap analyze . --format llm-markdown --top 10 > debt-report.md
+debtmap analyze . --format markdown --top 10 > debt-report.md
 
 # In Cursor: @debt-report.md Fix the top critical item
 ```
@@ -293,7 +293,7 @@ patterns = ["**/target/**", "**/tests/**"]
 
 | Option | Description |
 |--------|-------------|
-| `--format <FORMAT>` | Output format: terminal, json, markdown, llm-markdown |
+| `--format <FORMAT>` | Output format: terminal, json, markdown |
 | `--output <FILE>` | Write to file instead of stdout |
 | `--lcov <FILE>` | LCOV coverage file for risk analysis |
 | `--top <N>` | Show only top N priority items |

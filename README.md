@@ -37,7 +37,7 @@ debtmap analyze . --format terminal
 debtmap analyze . --format json --top 10 > debt.json
 
 # Pipe to an LLM for automated fixes
-debtmap analyze . --format llm-markdown --top 1 | claude "Fix this"
+debtmap analyze . --format markdown --top 1 | claude "Fix this"
 ```
 
 ## How It Works
@@ -72,7 +72,7 @@ Features:
 
 ## LLM Integration
 
-The `--format llm-markdown` output is designed for AI coding assistants. It provides:
+The `--format markdown` output is designed for AI coding assistants. It provides:
 
 - **Context suggestions** - Specific file ranges the LLM should read to understand the problem
 - **Structured metadata** - All scoring factors exposed so the LLM can reason about priorities
@@ -81,7 +81,7 @@ The `--format llm-markdown` output is designed for AI coding assistants. It prov
 
 ```bash
 # Pipe directly to Claude Code
-debtmap analyze . --format llm-markdown --top 1 | claude "Fix this technical debt"
+debtmap analyze . --format markdown --top 1 | claude "Fix this technical debt"
 ```
 
 See [LLM Integration Guide](https://iepathos.github.io/debtmap/llm-integration.html) for details.
@@ -89,17 +89,14 @@ See [LLM Integration Guide](https://iepathos.github.io/debtmap/llm-integration.h
 ## Output Formats
 
 ```bash
-# LLM-optimized markdown (recommended for AI)
-debtmap analyze . --format llm-markdown
+# Markdown (recommended for AI workflows)
+debtmap analyze . --format markdown
 
 # JSON for programmatic access
 debtmap analyze . --format json
 
 # Terminal for human exploration
 debtmap analyze . --format terminal
-
-# Standard markdown for reports
-debtmap analyze . --format markdown
 ```
 
 ## With Coverage Data

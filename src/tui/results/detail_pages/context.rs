@@ -117,21 +117,6 @@ fn build_related_section(
     add_blank_line(lines);
 }
 
-/// Build copy instructions section.
-fn build_copy_instructions(lines: &mut Vec<Line<'static>>, theme: &Theme) {
-    add_section_header(lines, "actions", theme);
-    lines.push(Line::from(vec![
-        Span::raw("  "),
-        Span::styled("c", Style::default().fg(theme.primary)),
-        Span::raw(" - copy all context ranges"),
-    ]));
-    lines.push(Line::from(vec![
-        Span::raw("  "),
-        Span::styled("p", Style::default().fg(theme.primary)),
-        Span::raw(" - copy primary range only"),
-    ]));
-}
-
 /// Build all lines for the context page (pure function).
 ///
 /// This is public so text_extraction can reuse it for clipboard copy.
@@ -142,7 +127,6 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
         build_context_header(&mut lines, context, theme);
         build_primary_section(&mut lines, context, theme, width);
         build_related_section(&mut lines, context, theme, width);
-        build_copy_instructions(&mut lines, theme);
     } else {
         // Placeholder when no context available
         lines.push(Line::from(vec![Span::styled(

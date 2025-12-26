@@ -36,14 +36,14 @@ This design is intentional. AI assistants can consider business context, team pr
 cargo install debtmap
 
 # Analyze and pipe to Claude Code
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # Get structured signals for your AI workflow
 debtmap analyze . --format json --top 10 > debt.json
 
 # With coverage data for accurate risk assessment
 cargo llvm-cov --lcov --output-path coverage.lcov
-debtmap analyze . --lcov coverage.lcov --format llm-markdown
+debtmap analyze . --lcov coverage.lcov --format markdown
 ```
 
 ## Key Features
@@ -97,4 +97,4 @@ Ready to start? Check out:
 - [LLM Integration](./llm-integration.md) - AI workflow patterns
 - [Why Debtmap?](./why-debtmap.md) - The AI sensor model explained
 
-**Quick tip:** Start with `debtmap analyze . --format llm-markdown --top 5` to see the top priority items with context suggestions.
+**Quick tip:** Start with `debtmap analyze . --format markdown --top 5` to see the top priority items with context suggestions.

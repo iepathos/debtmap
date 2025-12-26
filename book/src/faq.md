@@ -15,12 +15,12 @@ Debtmap is designed as a **sensor** that provides structured data for AI consump
 **Example workflow:**
 ```bash
 # Pipe directly to Claude Code
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 ```
 
 ### What output format is best for AI?
 
-Use `--format llm-markdown` for AI workflows. This format:
+Use `--format markdown` for AI workflows. This format:
 
 - Minimizes tokens while maximizing information
 - Includes context suggestions inline
@@ -28,7 +28,7 @@ Use `--format llm-markdown` for AI workflows. This format:
 - Avoids verbose descriptions that waste context window
 
 ```bash
-debtmap analyze . --format llm-markdown --top 5
+debtmap analyze . --format markdown --top 5
 ```
 
 ### Does debtmap provide fix suggestions?
@@ -54,7 +54,7 @@ Context:
 Tell your AI to read these files before making changes:
 
 ```bash
-debtmap analyze . --format llm-markdown --top 1 | \
+debtmap analyze . --format markdown --top 1 | \
   claude "Read the context files first, then fix the top item"
 ```
 
@@ -64,7 +64,7 @@ Yes. Generate a report file and reference it in Cursor:
 
 ```bash
 # Generate report
-debtmap analyze . --format llm-markdown --top 10 > debt-report.md
+debtmap analyze . --format markdown --top 10 > debt-report.md
 
 # In Cursor, use: @debt-report.md Fix the top critical item
 ```

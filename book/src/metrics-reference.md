@@ -378,7 +378,7 @@ When piping debtmap output to an AI assistant, signals provide the context neede
 
 ```bash
 # Get structured signals for AI consumption
-debtmap analyze . --format llm-markdown --top 5 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 5 | claude "Fix the top item"
 ```
 
 The AI uses these signals to:
