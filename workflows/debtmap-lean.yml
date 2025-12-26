@@ -1,0 +1,393 @@
+# Lean debtmap workflow - fix top 3 tech debt items following Stillwater philosophy
+
+# Phase 1: Generate coverage data
+- shell: "just coverage-lcov"
+
+# Phase 2: Analyze tech debt (markdown format, top 3)
+- shell: "debtmap analyze . --lcov target/coverage/lcov.info --top 3 --format markdown --output .prodigy/debtmap-report.md"
+
+# Phase 3: Fix the identified issues following Stillwater philosophy
+- claude: |
+    Fix the technical debt issues identified in .prodigy/debtmap-report.md
+
+    # Stillwater Philosophy
+
+    ## The Name
+
+    **Stillwater** is more than a name - it's a mental model:
+
+    ```
+           Still Waters
+          ╱            ╲
+     Pure Logic      Effects
+         ↓              ↓
+      Unchanging     Flowing
+     Predictable    Performing I/O
+      Testable      At boundaries
+    ```
+
+    Like a still pond with water flowing through it, your application should have:
+    - Pure business logic that doesn't change
+    - Effects that move data in and out
+
+    ## Core Beliefs
+
+    ### 1. Pure Core, Imperative Shell
+
+    **The Problem:**
+    Most code mixes business logic with I/O, making it hard to:
+    - Test (need to mock databases, APIs, filesystems)
+    - Reason about (what does this function *actually* do?)
+    - Reuse (tightly coupled to infrastructure)
+
+    **The Stillwater Way:**
+    ```rust
+    // ❌ Typical mixed code
+    fn process_user(id: UserId, db: &Database) -> Result<User, Error> {
+        let user = db.fetch_user(id)?;  // I/O
+        if user.age < 18 {              // Logic
+            return Err(Error::TooYoung);
+        }
+        let discount = if user.premium { // Logic
+            0.15
+        } else {
+            0.05
+        };
+        user.discount = discount;        // Logic
+        db.save_user(&user)?;           // I/O
+        Ok(user)
+    }
+
+    // ✓ Stillwater separated
+    // Pure logic (the "still" core)
+    fn calculate_discount(user: &User) -> f64 {
+        if user.premium { 0.15 } else { 0.05 }
+    }
+
+    fn validate_age(age: u8) -> Result<(), Error> {
+        if age >= 18 { Ok(()) } else { Err(Error::TooYoung) }
+    }
+
+    fn apply_discount(user: User, discount: f64) -> User {
+        User { discount, ..user }
+    }
+
+    // Effects (the "water" shell)
+    fn process_user_effect(id: UserId) -> Effect<User, Error, AppEnv> {
+        IO::query(|db| db.fetch_user(id))           // I/O
+            .and_then(|user| {
+                validate_age(user.age)?;            // Pure!
+                let discount = calculate_discount(&user); // Pure!
+                let updated = apply_discount(user, discount); // Pure!
+                Effect::pure(updated)
+            })
+            .and_then(|user| {
+                IO::execute(|db| db.save_user(&user)) // I/O
+                    .map(|_| user)
+            })
+    }
+    ```
+
+    **Benefits:**
+    - Pure functions: 100% testable, no mocks
+    - Clear data flow: see exactly what transforms what
+    - Reusable logic: discount calculation works anywhere
+    - Easy to reason about: no hidden side effects
+
+    ### 2. Fail Fast vs Fail Completely
+
+    **The Problem:**
+    Validation usually stops at the first error. User submits a form with 5 fields, gets "email invalid" error, fixes it, submits again, gets "password too weak", etc. Frustrating!
+
+    **The Stillwater Way:**
+    ```rust
+    // ❌ Standard Result: stops at first error
+    fn validate_user(input: UserInput) -> Result<User, Error> {
+        let email = validate_email(&input.email)?;     // Stops here if invalid
+        let password = validate_password(&input.pwd)?; // Never reached
+        let age = validate_age(input.age)?;           // Never reached
+        Ok(User { email, password, age })
+    }
+
+    // ✓ Stillwater: accumulates ALL errors
+    fn validate_user(input: UserInput) -> Validation<User, Vec<Error>> {
+        Validation::all((
+            validate_email(&input.email),
+            validate_password(&input.pwd),
+            validate_age(input.age),
+        ))
+        .map(|(email, password, age)| User { email, password, age })
+    }
+    // Returns: Err(vec![EmailError, PasswordError, AgeError])
+    ```
+
+    **When to use which:**
+    - **Result (fail fast)**: Sequential operations where later steps depend on earlier
+      - Example: Fetch user, then fetch their orders
+    - **Validation (fail completely)**: Independent validations that should all be checked
+      - Example: Form validation, config validation
+
+    ### 3. Errors Should Tell Stories
+
+    **The Problem:**
+    Deep call stacks lose context:
+    ```
+    Error: No such file or directory
+    ```
+    Which file? What were we trying to do? Why?
+
+    **The Stillwater Way:**
+    ```rust
+    fetch_config()
+        .context("Loading application configuration")
+        .and_then(|cfg| parse_config(cfg))
+        .context("Parsing YAML configuration")
+        .and_then(|cfg| validate_config(cfg))
+        .context("Validating configuration values")
+    ```
+
+    Error output:
+    ```
+    Error: No such file or directory
+      -> Loading application configuration
+      -> Parsing YAML configuration
+      -> Validating configuration values
+    ```
+
+    Now you know exactly what failed and why.
+
+    ### 4. Composition Over Complexity
+
+    **The Problem:**
+    Large functions that do everything are hard to test and understand.
+
+    **The Stillwater Way:**
+    Build complex behavior from simple, composable pieces:
+
+    ```rust
+    // Small, focused, pure functions
+    fn parse_line(line: &str) -> Result<Record, ParseError>;
+    fn validate_record(rec: Record) -> Validation<ValidRecord, Vec<Error>>;
+    fn enrich_record(rec: ValidRecord, ref_data: &RefData) -> EnrichedRecord;
+    fn aggregate(records: Vec<EnrichedRecord>) -> Report;
+
+    // Compose them
+    fn pipeline(input: String, ref_data: RefData) -> Effect<Report, Error, Env> {
+        input.lines()
+            .map(parse_line)
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(validate_record)
+            .collect::<Validation<Vec<_>, _>>()?
+            .into_iter()
+            .map(|r| enrich_record(r, &ref_data))
+            .collect()
+            |> aggregate
+            |> Effect::pure
+    }
+    ```
+
+    Each piece:
+    - Does one thing
+    - Is easily testable
+    - Is reusable
+    - Has clear types
+
+    ### 5. Types Guide, Don't Restrict
+
+    **The Problem:**
+    Heavy type machinery (HKTs, complex traits) makes code hard to understand and compile errors cryptic.
+
+    **The Stillwater Way:**
+    Use types to make wrong code hard to write, but keep them simple:
+
+    ```rust
+    // Effect<T, E, Env> tells you:
+    // - T: what it produces
+    // - E: how it can fail
+    // - Env: what it needs to run
+
+    // You can't:
+    // - Run an effect without environment (compiler error)
+    // - Mix effects with different environments (type mismatch)
+    // - Forget to handle errors (must call .run())
+
+    // But you can:
+    // - Understand what's happening (no magic)
+    // - Get clear error messages (simple types)
+    // - Refactor safely (types guide you)
+    ```
+
+    ### 6. Pragmatism Over Purity
+
+    **The Stillwater Way:**
+    We're not trying to be Haskell. We're trying to be **better Rust**.
+
+    **What we DON'T do:**
+    - ❌ Force monad abstraction (Rust doesn't have HKTs)
+    - ❌ Fight the borrow checker (work with ownership)
+    - ❌ Replace standard library (integrate with Result/Option)
+    - ❌ Macro-heavy DSLs (prefer clear code)
+
+    **What we DO:**
+    - ✓ Provide concrete, useful types
+    - ✓ Work with `?` operator
+    - ✓ Zero-cost via generics
+    - ✓ Integrate with async/await
+    - ✓ Help you write better Rust
+
+    ### 7. Parse, Don't Validate
+
+    **The Problem:**
+    Validation at runtime means you keep re-checking the same invariants:
+
+    ```rust
+    // ❌ Runtime validation - checked everywhere, forgotten somewhere
+    fn process_user(age: i32) -> Result<(), Error> {
+        if age < 0 { return Err(Error::InvalidAge); }  // Check here...
+        // ...later in another function
+        if age < 0 { return Err(Error::InvalidAge); }  // ...and again here
+    }
+    ```
+
+    **The Stillwater Way:**
+    Use refined types to encode invariants at the type level:
+
+    ```rust
+    use stillwater::refined::{Refined, Positive};
+
+    // ✓ Compile-time guarantee - impossible to have invalid data
+    type Age = Refined<i32, Positive>;
+
+    fn process_user(age: Age) -> Result<(), Error> {
+        // No validation needed - Age is ALWAYS positive by construction
+        let years = age.value();  // Safe access
+    }
+
+    // Validation happens once at the boundary
+    let age: Age = Refined::new(25)?;  // Fails if not positive
+    ```
+
+    **Benefits:**
+    - Invariants encoded in the type system
+    - Illegal states become unrepresentable
+    - No defensive checks scattered throughout code
+    - Self-documenting APIs
+
+    ## Quick Refactoring Decision Tree
+
+    For functions with complexity > 10:
+
+    ```
+    Is it a visitor pattern or large switch/match?
+    ├─ YES → Don't refactor, add tests if needed
+    └─ NO → Continue
+       │
+       Does it classify/categorize inputs?
+       ├─ YES → Extract as pure static function
+       └─ NO → Continue
+          │
+          Does it have repeated similar conditions?
+          ├─ YES → Consolidate with pattern matching
+          └─ NO → Continue
+             │
+             Does it have nested loops?
+             ├─ YES → Convert to iterator chains
+             └─ NO → Consider if refactoring is needed
+    ```
+
+    ## Common Pitfalls to Avoid
+
+    ### When Refactoring for Complexity:
+
+    ❌ **DON'T:**
+    - Extract helper methods that are only called once
+    - Create test-only helper functions (helpers not used in production code)
+    - Break apart a clear match/switch into multiple functions
+    - Add abstraction layers for simple logic
+    - Refactor visitor pattern implementations (they're meant to have many branches)
+    - Create 5+ helper methods for a 15-line function
+
+    ✅ **DO:**
+    - Extract reusable classification/decision logic as static pure functions
+    - Use functional patterns (map, filter, fold) where appropriate
+    - Consolidate similar patterns into single functions
+    - Keep related logic together
+    - Accept that some functions legitimately have high complexity
+    - Test the extracted pure functions thoroughly
+    - Use macros to eliminate repetitive patterns (like repeated field merging)
+
+    ## Functional Programming Preferences
+
+    **Prefer these patterns:**
+    - Pure functions over stateful methods
+    - Static methods for classification/utility functions
+    - Match expressions with guards over if-else chains
+    - Iterator chains over imperative loops
+    - Function composition over deep nesting
+    - Immutability by default
+
+    **Example of good refactoring:**
+    ```rust
+    // Extract classification logic as pure static function
+    impl MyStruct {
+        // This can be tested in isolation and reused
+        fn classify_item(name: &str) -> ItemType {
+            match () {
+                _ if name.starts_with("test_") => ItemType::Test,
+                _ if name.contains("_impl") => ItemType::Implementation,
+                _ => ItemType::Regular,
+            }
+        }
+
+        // Main function uses the pure classifier
+        fn process(&mut self, name: &str) {
+            let item_type = Self::classify_item(name);
+            // ... rest of logic
+        }
+    }
+    ```
+
+    ## Orchestration and I/O Function Guidelines
+
+    When debtmap flags orchestration or I/O functions as untested:
+
+    1. **Recognize the pattern**: Functions with cyclomatic complexity = 1 that coordinate modules or perform I/O are not the real debt
+    2. **Extract testable logic**: Instead of testing I/O directly, extract pure functions that can be unit tested
+    3. **Follow functional programming principles**:
+       - Pure core: Business logic in pure functions
+       - Imperative shell: Thin orchestration/I/O wrappers that don't need testing
+    4. **Common patterns to extract**:
+       - Formatting functions: Extract logic that builds strings from data
+       - Parsing functions: Move to dedicated parser modules
+       - Decision functions: Extract "should we do X" logic from "do X" execution
+    5. **Don't force unit tests on**:
+       - Functions that just print to stdout
+       - Simple delegation to other modules
+       - Module orchestration that just sequences calls
+       - File I/O wrappers
+
+    ## Quality Gates
+
+    - All tests must pass
+    - No clippy warnings
+    - Formatted with cargo fmt
+    - Commit with clear message explaining what was fixed and why
+
+    **IMPORTANT**: When making commits, do NOT include attribution text like "🤖 Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages.
+
+  commit_required: true
+
+# Phase 4: Run tests
+- shell: "just test"
+  on_failure:
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+
+# Phase 5: Lint and format
+- shell: "just fmt && just lint"
+  on_failure:
+    claude: "/prodigy-lint ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
