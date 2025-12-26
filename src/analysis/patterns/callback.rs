@@ -8,6 +8,33 @@
 use super::{Implementation, PatternInstance, PatternRecognizer, PatternType};
 use crate::core::{FileMetrics, FunctionMetrics};
 
+/// Keywords that indicate a callback-style decorator.
+/// Following Stillwater: extract constants for clarity and reuse.
+const CALLBACK_DECORATOR_KEYWORDS: &[&str] =
+    &["route", "handler", "callback", "listener", "event", "on_"];
+
+/// Pure predicate: check if a decorator name indicates a callback pattern.
+///
+/// This is a pure function extracted for clarity and testability.
+fn is_callback_decorator(decorator: &str) -> bool {
+    let dec_lower = decorator.to_lowercase();
+    CALLBACK_DECORATOR_KEYWORDS
+        .iter()
+        .any(|keyword| dec_lower.contains(keyword))
+}
+
+/// Pure predicate: check if a function name follows callback naming conventions.
+///
+/// This is a pure function extracted for clarity and testability.
+fn has_callback_naming_convention(name: &str) -> bool {
+    let name_lower = name.to_lowercase();
+    name_lower.starts_with("on_")
+        || name_lower.starts_with("handle_")
+        || name_lower.starts_with("callback_")
+        || name_lower.contains("handler")
+        || name_lower.contains("listener")
+}
+
 pub struct CallbackPatternRecognizer;
 
 impl CallbackPatternRecognizer {
@@ -15,44 +42,35 @@ impl CallbackPatternRecognizer {
         Self
     }
 
-    /// Check if a function has decorators that indicate it's a callback
+    /// Check if a function has decorators that indicate it's a callback.
+    ///
+    /// Refactored to use functional iterators, reducing nesting depth from 6 to 3.
+    /// Following Stillwater: composition over complexity, pure predicates.
     pub(crate) fn has_callback_decorator(
         &self,
         function: &FunctionMetrics,
         file_metrics: &FileMetrics,
     ) -> bool {
         // Check method decorators from AST classes if available
-        if let Some(classes) = &file_metrics.classes {
-            for class in classes {
-                for method in &class.methods {
-                    // Match method by name and approximate line number
-                    if method.name == function.name || function.name.ends_with(&method.name) {
-                        // Check for callback-style decorators
-                        for decorator in &method.decorators {
-                            let dec_lower = decorator.to_lowercase();
-                            if dec_lower.contains("route")
-                                || dec_lower.contains("handler")
-                                || dec_lower.contains("callback")
-                                || dec_lower.contains("listener")
-                                || dec_lower.contains("event")
-                                || dec_lower.contains("on_")
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
+        let has_decorator_match = file_metrics.classes.as_ref().is_some_and(|classes| {
+            classes.iter().any(|class| {
+                class.methods.iter().any(|method| {
+                    // Match method by name
+                    let name_matches =
+                        method.name == function.name || function.name.ends_with(&method.name);
+                    // Check for callback-style decorators
+                    name_matches && method.decorators.iter().any(|d| is_callback_decorator(d))
+                })
+            })
+        });
+
+        // Return early if found via decorator
+        if has_decorator_match {
+            return true;
         }
 
         // Fallback to naming conventions as a heuristic
-        let name_lower = function.name.to_lowercase();
-
-        name_lower.starts_with("on_")
-            || name_lower.starts_with("handle_")
-            || name_lower.starts_with("callback_")
-            || name_lower.contains("handler")
-            || name_lower.contains("listener")
+        has_callback_naming_convention(&function.name)
     }
 }
 

@@ -15,6 +15,54 @@ use crate::organization::{
 };
 use std::collections::HashMap;
 
+/// Visibility classification for functions/methods.
+///
+/// Pure function that classifies a syn::Visibility into categories.
+/// Following Stillwater: extract pure logic to reduce duplication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VisibilityClass {
+    Public,
+    PubCrate,
+    PubSuper,
+    Private,
+}
+
+/// Classify a syn::Visibility into VisibilityClass.
+///
+/// Pure function - no side effects, deterministic output.
+fn classify_visibility(vis: &syn::Visibility) -> VisibilityClass {
+    match vis {
+        syn::Visibility::Public(_) => VisibilityClass::Public,
+        syn::Visibility::Restricted(r) => {
+            r.path
+                .get_ident()
+                .map(|ident| {
+                    if ident == "crate" {
+                        VisibilityClass::PubCrate
+                    } else if ident == "super" {
+                        VisibilityClass::PubSuper
+                    } else {
+                        VisibilityClass::Private
+                    }
+                })
+                .unwrap_or(VisibilityClass::Private)
+        }
+        syn::Visibility::Inherited => VisibilityClass::Private,
+    }
+}
+
+/// Apply a visibility classification to a breakdown counter.
+///
+/// Pure function - modifies the breakdown based on classification.
+fn apply_visibility_to_breakdown(breakdown: &mut FunctionVisibilityBreakdown, class: VisibilityClass) {
+    match class {
+        VisibilityClass::Public => breakdown.public += 1,
+        VisibilityClass::PubCrate => breakdown.pub_crate += 1,
+        VisibilityClass::PubSuper => breakdown.pub_super += 1,
+        VisibilityClass::Private => breakdown.private += 1,
+    }
+}
+
 /// Build metrics for each struct in the file
 ///
 /// Spec 134 Phase 3: This returns ALL methods (including tests) per struct.
@@ -253,6 +301,9 @@ pub fn calculate_purity_weights(
 }
 
 /// Calculate visibility breakdown from TypeVisitor data (Spec 134)
+///
+/// Refactored to use pure helper functions for visibility classification,
+/// reducing code duplication and nesting depth.
 pub fn calculate_visibility_breakdown(
     visitor: &TypeVisitor,
     method_names: &[String],
@@ -262,26 +313,9 @@ pub fn calculate_visibility_breakdown(
     // Count visibility for function items (standalone functions)
     for func_item in &visitor.function_items {
         let name = func_item.sig.ident.to_string();
-        if !method_names.contains(&name) {
-            continue;
-        }
-
-        match &func_item.vis {
-            syn::Visibility::Public(_) => breakdown.public += 1,
-            syn::Visibility::Restricted(r) => {
-                if let Some(ident) = r.path.get_ident() {
-                    if ident == "crate" {
-                        breakdown.pub_crate += 1;
-                    } else if ident == "super" {
-                        breakdown.pub_super += 1;
-                    } else {
-                        breakdown.private += 1;
-                    }
-                } else {
-                    breakdown.private += 1;
-                }
-            }
-            syn::Visibility::Inherited => breakdown.private += 1,
+        if method_names.contains(&name) {
+            let class = classify_visibility(&func_item.vis);
+            apply_visibility_to_breakdown(&mut breakdown, class);
         }
     }
 
@@ -294,23 +328,8 @@ pub fn calculate_visibility_breakdown(
 
             // Look up the tracked visibility for this method
             if let Some(vis) = visitor.method_visibility.get(method_name) {
-                match vis {
-                    syn::Visibility::Public(_) => breakdown.public += 1,
-                    syn::Visibility::Restricted(r) => {
-                        if let Some(ident) = r.path.get_ident() {
-                            if ident == "crate" {
-                                breakdown.pub_crate += 1;
-                            } else if ident == "super" {
-                                breakdown.pub_super += 1;
-                            } else {
-                                breakdown.private += 1;
-                            }
-                        } else {
-                            breakdown.private += 1;
-                        }
-                    }
-                    syn::Visibility::Inherited => breakdown.private += 1,
-                }
+                let class = classify_visibility(vis);
+                apply_visibility_to_breakdown(&mut breakdown, class);
             } else {
                 // Fallback: if visibility not tracked, assume private (conservative)
                 breakdown.private += 1;

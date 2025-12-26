@@ -48,6 +48,21 @@ use super::loader::{directory_ancestors_impl, parse_and_validate_config_impl, re
 use super::scoring::ScoringWeights;
 use super::thresholds::ThresholdsConfig;
 use super::validation::validate_config;
+
+/// Macro to merge an optional config field from source to target.
+///
+/// This eliminates repetitive merge patterns by providing a consistent way
+/// to merge Option fields while tracking their source.
+///
+/// Following Stillwater philosophy: composition over complexity, DRY principle.
+macro_rules! merge_optional_field {
+    ($target:expr, $source:expr, $field:ident, $field_name:literal, $source_id:expr, $field_sources:expr) => {
+        if $source.$field.is_some() {
+            $target.$field = $source.$field.clone();
+            $field_sources.insert($field_name.to_string(), $source_id.clone());
+        }
+    };
+}
 use crate::effects::{
     validation_failure, validation_failures, validation_success, AnalysisValidation,
 };
@@ -286,185 +301,54 @@ fn load_config_from_path(path: &Path) -> Result<DebtmapConfig, AnalysisError> {
 }
 
 /// Merge source config into target config, tracking field sources.
+///
+/// Uses `merge_optional_field!` macro to eliminate repetitive merge patterns.
+/// Following Stillwater philosophy: composition over complexity, DRY principle.
 fn merge_config(
     target: &mut DebtmapConfig,
     source: &DebtmapConfig,
     source_id: &ConfigSource,
     field_sources: &mut HashMap<String, ConfigSource>,
 ) {
-    // Merge scoring weights
+    // Merge scoring weights (with sub-field tracking)
     if source.scoring.is_some() {
         target.scoring = source.scoring.clone();
         field_sources.insert("scoring".to_string(), source_id.clone());
-        if let Some(ref scoring) = source.scoring {
+        if source.scoring.is_some() {
             field_sources.insert("scoring.coverage".to_string(), source_id.clone());
             field_sources.insert("scoring.complexity".to_string(), source_id.clone());
             field_sources.insert("scoring.dependency".to_string(), source_id.clone());
-            let _ = scoring; // Suppress unused warning
         }
     }
 
-    // Merge thresholds
-    if source.thresholds.is_some() {
-        target.thresholds = source.thresholds.clone();
-        field_sources.insert("thresholds".to_string(), source_id.clone());
-    }
-
-    // Merge display config
-    if source.display.is_some() {
-        target.display = source.display.clone();
-        field_sources.insert("display".to_string(), source_id.clone());
-    }
-
-    // Merge ignore patterns
-    if source.ignore.is_some() {
-        target.ignore = source.ignore.clone();
-        field_sources.insert("ignore".to_string(), source_id.clone());
-    }
-
-    // Merge output config
-    if source.output.is_some() {
-        target.output = source.output.clone();
-        field_sources.insert("output".to_string(), source_id.clone());
-    }
-
-    // Merge entropy config
-    if source.entropy.is_some() {
-        target.entropy = source.entropy.clone();
-        field_sources.insert("entropy".to_string(), source_id.clone());
-    }
-
-    // Merge role multipliers
-    if source.role_multipliers.is_some() {
-        target.role_multipliers = source.role_multipliers.clone();
-        field_sources.insert("role_multipliers".to_string(), source_id.clone());
-    }
-
-    // Merge languages config
-    if source.languages.is_some() {
-        target.languages = source.languages.clone();
-        field_sources.insert("languages".to_string(), source_id.clone());
-    }
-
-    // Merge context config
-    if source.context.is_some() {
-        target.context = source.context.clone();
-        field_sources.insert("context".to_string(), source_id.clone());
-    }
-
-    // Merge error handling config
-    if source.error_handling.is_some() {
-        target.error_handling = source.error_handling.clone();
-        field_sources.insert("error_handling".to_string(), source_id.clone());
-    }
-
-    // Merge normalization config
-    if source.normalization.is_some() {
-        target.normalization = source.normalization.clone();
-        field_sources.insert("normalization".to_string(), source_id.clone());
-    }
-
-    // Merge LOC config
-    if source.loc.is_some() {
-        target.loc = source.loc.clone();
-        field_sources.insert("loc".to_string(), source_id.clone());
-    }
-
-    // Merge tiers config
-    if source.tiers.is_some() {
-        target.tiers = source.tiers.clone();
-        field_sources.insert("tiers".to_string(), source_id.clone());
-    }
-
-    // Merge god object detection config
-    if source.god_object_detection.is_some() {
-        target.god_object_detection = source.god_object_detection.clone();
-        field_sources.insert("god_object_detection".to_string(), source_id.clone());
-    }
-
-    // Merge external API config
-    if source.external_api.is_some() {
-        target.external_api = source.external_api.clone();
-        field_sources.insert("external_api".to_string(), source_id.clone());
-    }
-
-    // Merge complexity thresholds
-    if source.complexity_thresholds.is_some() {
-        target.complexity_thresholds = source.complexity_thresholds.clone();
-        field_sources.insert("complexity_thresholds".to_string(), source_id.clone());
-    }
-
-    // Merge role coverage weights
-    if source.role_coverage_weights.is_some() {
-        target.role_coverage_weights = source.role_coverage_weights.clone();
-        field_sources.insert("role_coverage_weights".to_string(), source_id.clone());
-    }
-
-    // Merge role multiplier config
-    if source.role_multiplier_config.is_some() {
-        target.role_multiplier_config = source.role_multiplier_config.clone();
-        field_sources.insert("role_multiplier_config".to_string(), source_id.clone());
-    }
-
-    // Merge orchestrator detection config
-    if source.orchestrator_detection.is_some() {
-        target.orchestrator_detection = source.orchestrator_detection.clone();
-        field_sources.insert("orchestrator_detection".to_string(), source_id.clone());
-    }
-
-    // Merge orchestration adjustment config
-    if source.orchestration_adjustment.is_some() {
-        target.orchestration_adjustment = source.orchestration_adjustment.clone();
-        field_sources.insert("orchestration_adjustment".to_string(), source_id.clone());
-    }
-
-    // Merge classification config
-    if source.classification.is_some() {
-        target.classification = source.classification.clone();
-        field_sources.insert("classification".to_string(), source_id.clone());
-    }
-
-    // Merge mapping patterns config
-    if source.mapping_patterns.is_some() {
-        target.mapping_patterns = source.mapping_patterns.clone();
-        field_sources.insert("mapping_patterns".to_string(), source_id.clone());
-    }
-
-    // Merge coverage expectations config
-    if source.coverage_expectations.is_some() {
-        target.coverage_expectations = source.coverage_expectations.clone();
-        field_sources.insert("coverage_expectations".to_string(), source_id.clone());
-    }
-
-    // Merge complexity weights config
-    if source.complexity_weights.is_some() {
-        target.complexity_weights = source.complexity_weights.clone();
-        field_sources.insert("complexity_weights".to_string(), source_id.clone());
-    }
-
-    // Merge functional analysis config
-    if source.functional_analysis.is_some() {
-        target.functional_analysis = source.functional_analysis.clone();
-        field_sources.insert("functional_analysis".to_string(), source_id.clone());
-    }
-
-    // Merge boilerplate detection config
-    if source.boilerplate_detection.is_some() {
-        target.boilerplate_detection = source.boilerplate_detection.clone();
-        field_sources.insert("boilerplate_detection".to_string(), source_id.clone());
-    }
-
-    // Merge rebalanced scoring config
-    if source.scoring_rebalanced.is_some() {
-        target.scoring_rebalanced = source.scoring_rebalanced.clone();
-        field_sources.insert("scoring_rebalanced".to_string(), source_id.clone());
-    }
-
-    // Merge context multipliers config
-    if source.context_multipliers.is_some() {
-        target.context_multipliers = source.context_multipliers.clone();
-        field_sources.insert("context_multipliers".to_string(), source_id.clone());
-    }
+    // Merge all other optional fields using the macro
+    merge_optional_field!(target, source, thresholds, "thresholds", source_id, field_sources);
+    merge_optional_field!(target, source, display, "display", source_id, field_sources);
+    merge_optional_field!(target, source, ignore, "ignore", source_id, field_sources);
+    merge_optional_field!(target, source, output, "output", source_id, field_sources);
+    merge_optional_field!(target, source, entropy, "entropy", source_id, field_sources);
+    merge_optional_field!(target, source, role_multipliers, "role_multipliers", source_id, field_sources);
+    merge_optional_field!(target, source, languages, "languages", source_id, field_sources);
+    merge_optional_field!(target, source, context, "context", source_id, field_sources);
+    merge_optional_field!(target, source, error_handling, "error_handling", source_id, field_sources);
+    merge_optional_field!(target, source, normalization, "normalization", source_id, field_sources);
+    merge_optional_field!(target, source, loc, "loc", source_id, field_sources);
+    merge_optional_field!(target, source, tiers, "tiers", source_id, field_sources);
+    merge_optional_field!(target, source, god_object_detection, "god_object_detection", source_id, field_sources);
+    merge_optional_field!(target, source, external_api, "external_api", source_id, field_sources);
+    merge_optional_field!(target, source, complexity_thresholds, "complexity_thresholds", source_id, field_sources);
+    merge_optional_field!(target, source, role_coverage_weights, "role_coverage_weights", source_id, field_sources);
+    merge_optional_field!(target, source, role_multiplier_config, "role_multiplier_config", source_id, field_sources);
+    merge_optional_field!(target, source, orchestrator_detection, "orchestrator_detection", source_id, field_sources);
+    merge_optional_field!(target, source, orchestration_adjustment, "orchestration_adjustment", source_id, field_sources);
+    merge_optional_field!(target, source, classification, "classification", source_id, field_sources);
+    merge_optional_field!(target, source, mapping_patterns, "mapping_patterns", source_id, field_sources);
+    merge_optional_field!(target, source, coverage_expectations, "coverage_expectations", source_id, field_sources);
+    merge_optional_field!(target, source, complexity_weights, "complexity_weights", source_id, field_sources);
+    merge_optional_field!(target, source, functional_analysis, "functional_analysis", source_id, field_sources);
+    merge_optional_field!(target, source, boilerplate_detection, "boilerplate_detection", source_id, field_sources);
+    merge_optional_field!(target, source, scoring_rebalanced, "scoring_rebalanced", source_id, field_sources);
+    merge_optional_field!(target, source, context_multipliers, "context_multipliers", source_id, field_sources);
 }
 
 /// Apply environment variable overrides to the config.
