@@ -2,6 +2,24 @@
 
 Context providers enhance debtmap's risk analysis by incorporating additional factors beyond complexity and test coverage. They analyze critical execution paths, dependency relationships, and version control history to provide a more comprehensive understanding of technical risk.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Critical Path Provider](#critical-path-provider)
+- [Dependency Provider](#dependency-provider)
+- [Git History Provider](#git-history-provider)
+- [Enabling Context Providers](#enabling-context-providers)
+- [Provider Weights](#provider-weights)
+- [How Context Affects Scoring](#how-context-affects-scoring)
+- [Context Details Structure](#context-details-structure)
+- [Practical Examples](#practical-examples)
+- [Configuration](#configuration)
+- [Performance Considerations](#performance-considerations)
+- [Troubleshooting](#troubleshooting)
+- [Advanced Usage](#advanced-usage)
+- [Best Practices](#best-practices)
+- [See Also](#see-also)
+
 ## Overview
 
 Context providers implement the `ContextProvider` trait, which gathers risk-relevant information about functions and modules. Each provider analyzes a specific dimension of risk:
@@ -226,12 +244,47 @@ The provider analyzes Git history to calculate:
 
 ### Risk Classification
 
+The table below shows approximate contribution thresholds for understanding risk levels:
+
 | Category | Conditions | Contribution | Explanation |
 |----------|------------|--------------|-------------|
 | Very unstable | freq > 5.0 AND bug_density > 0.3 | 2.0 | High churn with many bug fixes |
 | Moderately unstable | freq > 2.0 OR bug_density > 0.2 | 1.0 | Frequent changes or bug-prone |
 | Slightly unstable | freq > 1.0 OR bug_density > 0.1 | 0.5 | Some instability |
 | Stable | freq ≤ 1.0 AND bug_density ≤ 0.1 | 0.1 | Low change rate, few bugs |
+
+#### Continuous Scoring Model
+
+The actual implementation uses a **continuous scoring formula** rather than discrete thresholds. This provides more accurate differentiation between risk levels (from `src/risk/context/git_history.rs:495`):
+
+```rust
+contribution = (bug_density * 1.5) + min(change_frequency / 20.0, 0.5)
+```
+
+**Scoring breakdown:**
+
+- **Bug density** (primary signal): Scales linearly from 0.0 to 1.5
+  - 0% bugs → 0.0 contribution
+  - 50% bugs → 0.75 contribution
+  - 100% bugs → 1.5 contribution
+
+- **Change frequency** (secondary signal): Scales from 0.0 to 0.5, saturates at 10/month
+  - 0/month → 0.0
+  - 5/month → 0.25
+  - 10+/month → 0.5 (capped)
+
+- **Total** is capped at 2.0 to prevent excessive score amplification
+- Stable code with no bugs and no changes contributes 0.0 (no risk increase)
+
+**Example calculations:**
+
+| Scenario | Frequency | Bug Density | Contribution |
+|----------|-----------|-------------|--------------|
+| Stable code | 0.0/month | 0% | 0.0 |
+| Low activity, some bugs | 2.0/month | 25% | 0.475 |
+| High churn, no bugs | 10.0/month | 0% | 0.5 |
+| Bug-prone | 0.5/month | 100% | 1.525 |
+| Critical hotspot | 10.0/month | 50% | 1.25 |
 
 ### Bug Fix Detection
 
@@ -801,6 +854,21 @@ Context providers add computational overhead to analysis:
 - Git history: +30-50% (slow for large repos - multiple git commands per file)
 
 **Combined overhead:** ~60-80% increase in analysis time
+
+### Batched Git History Optimization
+
+The git history provider uses a **batched loading strategy** to minimize subprocess overhead. Instead of running separate git commands for each file (which would create N subprocess calls for N files), the provider:
+
+1. Fetches all git history data upfront in a single batch (`BatchedGitHistory`)
+2. Parses the complete log output into an in-memory index
+3. Serves subsequent file lookups via O(1) HashMap access
+
+This optimization reduces the git subprocess calls from O(N) to O(1), making git history analysis practical even for large repositories.
+
+**Implementation details** (from `src/risk/context/git_history/batched.rs`):
+- On initialization, runs a single `git log --numstat` to fetch all file changes
+- Builds per-file indexes for change frequency, bug density, authors, etc.
+- Falls back to direct git queries only if batch loading fails
 
 ### Optimization Tips
 
