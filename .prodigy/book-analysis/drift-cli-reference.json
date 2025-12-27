@@ -5,100 +5,183 @@
   "chapter_file": "book/src/cli-reference.md",
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Documentation is comprehensive and mostly accurate, but contains one broken link and one option that doesn't exist in current implementation",
+  "quality_assessment": "Good overall documentation with comprehensive command coverage, but missing one command and several options",
   "issues": [
     {
-      "type": "broken_links",
+      "type": "missing_content",
       "severity": "medium",
-      "section": "See Also",
-      "description": "Found 1 broken internal link",
-      "broken_links": [
-        {
-          "link_text": "Coverage Integration",
-          "target_path": "./coverage.md",
-          "current_file": "book/src/cli-reference.md",
-          "resolved_path": "book/src/coverage.md",
-          "exists": false,
-          "suggested_fix": "coverage-integration.md",
-          "reason": "File coverage.md does not exist, but coverage-integration.md exists"
-        }
-      ],
-      "fix_suggestion": "Update link from './coverage.md' to './coverage-integration.md'",
-      "source_reference": "book/src/cli-reference.md:918"
+      "section": "Commands",
+      "description": "The 'diagnose-coverage' command is not documented",
+      "feature_reference": "cli_interface.commands.diagnose_coverage",
+      "fix_suggestion": "Add a new section for the 'diagnose-coverage' command that explains it validates and diagnoses LCOV coverage files with text or JSON output",
+      "source_reference": "src/cli/args.rs:533-540 (DiagnoseCoverage command definition)"
     },
     {
-      "type": "incorrect_information",
-      "severity": "medium",
-      "section": "Output Control",
-      "description": "Documentation mentions '--output-format' option that doesn't exist in CLI implementation",
-      "current_content": "- `--output-format <JSON_FORMAT>` - JSON structure format: legacy or unified (default: legacy)\n  - `legacy` - Current format with `{File: {...}}` and `{Function: {...}}` wrappers\n  - `unified` - New format with consistent structure and 'type' field",
-      "should_be": "This option should be removed - it's not implemented in the current CLI (src/cli.rs)",
-      "fix_suggestion": "Remove the '--output-format' option from documentation or implement it in CLI if it's a planned feature",
-      "source_reference": "src/cli.rs:54-63 (analyze command options)"
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options",
+      "description": "The '--show-config-sources' global flag is not documented",
+      "feature_reference": "configuration.capabilities",
+      "fix_suggestion": "Add documentation for '--show-config-sources' global flag that shows where each configuration value came from (spec 201)",
+      "source_reference": "src/cli/args.rs:49-51"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--min-score' option is not documented",
+      "feature_reference": "risk_assessment.capabilities",
+      "fix_suggestion": "Add documentation for '--min-score' option which sets minimum score threshold for filtering T3/T4 recommendations (default: 3.0). Note that T1/T2 items bypass this filter.",
+      "source_reference": "src/cli/args.rs:147-152"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--show-filter-stats' option is not documented",
+      "feature_reference": "output_formats.display_options",
+      "fix_suggestion": "Add documentation for '--show-filter-stats' option that displays how many items were filtered and why",
+      "source_reference": "src/cli/args.rs:161-163"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--no-tui' option is not documented",
+      "feature_reference": "output_formats.display_options",
+      "fix_suggestion": "Add documentation for '--no-tui' flag that disables TUI progress visualization and uses simple progress bars instead",
+      "source_reference": "src/cli/args.rs:184-186"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--quiet' / '-q' option is not documented",
+      "feature_reference": "output_formats.display_options",
+      "fix_suggestion": "Add documentation for '--quiet' / '-q' flag that suppresses progress output (quiet mode)",
+      "source_reference": "src/cli/args.rs:188-190"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--streaming' and '--stream-to' options are not documented",
+      "feature_reference": "output_formats.features",
+      "fix_suggestion": "Add documentation for '--streaming' flag that enables streaming output mode for large codebases (Spec 003) and '--stream-to' option for specifying output file",
+      "source_reference": "src/cli/args.rs:192-201"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--min-split-methods' and '--min-split-lines' options are not documented",
+      "feature_reference": "god_object_detection.recommendations.split_suggestions",
+      "fix_suggestion": "Add documentation for '--min-split-methods' (default: 10) and '--min-split-lines' (default: 150) options for god object split recommendations",
+      "source_reference": "src/cli/args.rs:246-252"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--show-splits' option is not documented",
+      "feature_reference": "god_object_detection.recommendations",
+      "fix_suggestion": "Add documentation for '--show-splits' flag that shows detailed module split recommendations for god objects and large files (experimental)",
+      "source_reference": "src/cli/args.rs:254-259"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--no-public-api-detection' and '--public-api-threshold' options are not documented",
+      "feature_reference": "debt_detection.detection_categories.organization",
+      "fix_suggestion": "Add documentation for dead code analysis options: '--no-public-api-detection' disables public API detection heuristics and '--public-api-threshold' (0.0-1.0, default: 0.7) sets confidence threshold",
+      "source_reference": "src/cli/args.rs:261-267"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--no-pattern-detection', '--patterns', and '--pattern-threshold' options are not documented",
+      "feature_reference": "debt_detection.detection_categories.organization",
+      "fix_suggestion": "Add documentation for pattern detection options: '--no-pattern-detection' disables it, '--patterns' enables specific patterns (observer,singleton,factory,strategy,callback,template_method), '--pattern-threshold' (0.0-1.0, default: 0.7) sets confidence",
+      "source_reference": "src/cli/args.rs:269-279"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--show-pattern-warnings' option is not documented",
+      "feature_reference": "debt_detection.capabilities",
+      "fix_suggestion": "Add documentation for '--show-pattern-warnings' flag that shows pattern warnings for uncertain detections",
+      "source_reference": "src/cli/args.rs:324-326"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Analyze",
+      "description": "The '--profile' and '--profile-output' options are not documented",
+      "feature_reference": "parallel_processing.capabilities",
+      "fix_suggestion": "Add documentation for '--profile' flag that enables profiling to identify performance bottlenecks (Spec 001) and '--profile-output' to write profiling data to file in JSON format",
+      "source_reference": "src/cli/args.rs:356-368"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Validate",
+      "description": "The '--show-splits' option for validate command is not documented",
+      "feature_reference": "god_object_detection.recommendations",
+      "fix_suggestion": "Update the Command Compatibility Matrix to show '--show-splits' is available in validate command",
+      "source_reference": "src/cli/args.rs:466-470"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Output Formats",
+      "description": "The 'dot' output format is not documented",
+      "feature_reference": "output_formats.formats",
+      "fix_suggestion": "Add documentation for 'dot' output format (Graphviz DOT format for dependency visualization)",
+      "source_reference": "src/cli/args.rs:581-582"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Commands",
-      "description": "validate-improvement command description could be clearer about composite scoring methodology",
-      "fix_suggestion": "Add more detail about how the 50%/30%/20% weights are applied in the composite score calculation",
-      "source_reference": "book/src/cli-reference.md:171-176"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Environment Variables",
-      "description": "Missing documentation for DEBTMAP_CONFIG environment variable",
-      "feature_reference": "cli_interface.global_options.config",
-      "fix_suggestion": "Add DEBTMAP_CONFIG to environment variables section - it's supported as global option in CLI",
-      "source_reference": "src/cli.rs:45"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Environment Variables",
-      "description": "Missing documentation for PRODIGY_AUTOMATION and PRODIGY_VALIDATION environment variables",
-      "feature_reference": "validate_improvement.automation_mode",
-      "fix_suggestion": "Document PRODIGY_AUTOMATION and PRODIGY_VALIDATION environment variables used for automation mode detection",
-      "source_reference": "src/main.rs:548-555"
+      "section": "Command Compatibility Matrix",
+      "description": "The compatibility matrix is missing several options including --quiet, --streaming, --profile, --show-splits, --min-score, --show-filter-stats",
+      "feature_reference": "cli_interface",
+      "fix_suggestion": "Update the Command Compatibility Matrix to include all analyze and validate command options for comprehensive reference",
+      "source_reference": "src/cli/args.rs"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of all CLI commands and options",
-    "Well-organized with clear sections and categories",
-    "Includes practical examples for all major use cases",
-    "Good use of compatibility matrix showing which options work with which commands",
-    "Excellent troubleshooting section with common issues and solutions",
-    "Best practices section provides actionable guidance",
-    "Clear explanation of option aliases and deprecated options",
-    "Includes workflow examples for CI/CD integration and comparison tracking"
+    "Comprehensive documentation of six main commands with clear usage patterns",
+    "Well-organized sections by category (Output Control, Analysis Control, Context & Coverage, Performance, Debugging)",
+    "Excellent command compatibility matrix showing which options apply to which commands",
+    "Clear examples and common workflow patterns throughout",
+    "Good troubleshooting section with practical solutions",
+    "Detailed explanation of validate-improvement composite score calculation",
+    "All internal links are valid and point to existing documentation files",
+    "Option aliases are clearly documented",
+    "Deprecated options are properly noted with migration guidance"
   ],
   "improvement_suggestions": [
-    "Fix broken link to coverage.md (should be coverage-integration.md)",
-    "Remove --output-format option that doesn't exist or implement it in CLI",
-    "Add missing environment variables (DEBTMAP_CONFIG, PRODIGY_AUTOMATION, PRODIGY_VALIDATION)",
-    "Consider adding more detail about composite scoring in validate-improvement",
-    "Consider adding examples showing the difference between measured and estimated metrics",
-    "Consider adding a section about the --show-config-sources global flag",
-    "Add note about ARGUMENTS environment variable support for backward compatibility"
+    "Add documentation for the 'diagnose-coverage' command",
+    "Add documentation for undocumented options in the analyze command",
+    "Update the Command Compatibility Matrix to be complete",
+    "Consider adding a section on the 'dot' output format for dependency visualization",
+    "Document the global '--show-config-sources' flag"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T00:00:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Commands",
       "Arguments",
       "Options",
-      "Configuration",
-      "Environment Variables",
-      "Workflows",
-      "Troubleshooting",
-      "Best Practices"
+      "Configuration"
     ],
     "validation_focus": "Verify all CLI commands from src/cli/ are documented with current options",
-    "total_internal_links": 5,
-    "broken_links": 1,
-    "verified_commands": 6,
-    "documented_options": 80
+    "internal_links_validated": true,
+    "broken_links_count": 0,
+    "total_internal_links": 5
   }
 }
