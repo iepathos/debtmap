@@ -48,7 +48,7 @@ Measures how difficult code is to understand by considering nesting depth and co
   - Base level (no nesting): weight = 1
   - First nesting level: weight = 2
   - Second nesting level: weight = 3
-  - Formula: `complexity = 1 + nesting_level` (from src/complexity/cognitive.rs:151)
+  - Formula: `complexity = 1 + nesting_level` (from src/complexity/cognitive.rs:167)
 - Break/continue/return in middle of function adds cognitive load
 
 **Example:**
@@ -99,7 +99,7 @@ Uses information theory to distinguish genuinely complex code from pattern-based
    - High similarity (0.8+): Branches do similar things (consistent handling)
    - Low similarity: Each branch has unique logic
 
-4. **Token Classification**: Categorizes tokens by type with weighted importance (src/complexity/entropy_core.rs:44-54)
+4. **Token Classification**: Categorizes tokens by type with weighted importance (src/complexity/entropy_core.rs:267-277)
    - **Token categories and weights** (from src/complexity/entropy_traits.rs:24-44):
      - `ControlFlow` (1.2): if, match, for, while - highest weight for control structures
      - `Keyword` (1.0): language keywords like fn, let, pub
@@ -115,7 +115,7 @@ Uses information theory to distinguish genuinely complex code from pattern-based
 - High pattern repetition (> 0.6) shows similar code blocks (measured via PatternMetrics)
 - High branch similarity (> 0.7) indicates consistent branching logic
 
-**Pattern detection** (src/complexity/entropy_core.rs:56-85):
+**Pattern detection** (src/complexity/entropy_core.rs:279-308):
 - `PatternMetrics` tracks intermediate calculations:
   - `total_patterns`: Total number of code patterns detected
   - `unique_patterns`: Count of distinct patterns
@@ -127,17 +127,17 @@ When these conditions are met:
 effective_complexity = entropy × pattern_factor × similarity_factor
 ```
 
-**Note on metrics** (src/complexity/entropy_core.rs:28-32):
+**Note on metrics** (src/complexity/entropy_core.rs:228-265):
 - `token_entropy`: Measures unpredictability of code tokens (0.0-1.0), used for pattern detection
 - `effective_complexity`: Final composite score after applying dampening adjustments
 - These are distinct metrics - `effective_complexity` combines multiple factors, while `token_entropy` is a single entropy measurement
 
-**Dampening cap:** The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores. This prevents over-correction of pattern-based code and maintains a baseline complexity floor for functions that still require understanding and maintenance.
+**Dampening cap:** The dampening factor is clamped between 0.5 and 1.0 (src/complexity/entropy_core.rs:114), allowing a maximum of 50% complexity reduction. The configuration option `max_combined_reduction` (default 0.30) provides additional control over the maximum allowed reduction. This prevents over-correction of pattern-based code while still providing meaningful adjustments for repetitive structures.
 
 **Example:**
 ```rust
 // Without entropy: Cyclomatic = 15 (appears very complex)
-// With entropy: Effective = 5 (pattern-based, dampened 67%)
+// With entropy: Effective = 8 (pattern-based, dampened ~47%)
 fn validate_config(config: &Config) -> Result<(), ValidationError> {
     if config.name.is_empty() { return Err(ValidationError::EmptyName); }
     if config.port == 0 { return Err(ValidationError::InvalidPort); }
