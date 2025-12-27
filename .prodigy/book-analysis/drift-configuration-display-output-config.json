@@ -1,0 +1,161 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "configuration",
+  "subsection_id": "display-output-config",
+  "subsection_title": "Display and Output",
+  "subsection_file": "book/src/configuration/display-output.md",
+  "feature_mappings": [
+    "configuration.display",
+    "output_formats",
+    "formatting"
+  ],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Documentation file does not exist - must be created from scratch",
+  "issues": [
+    {
+      "type": "missing_file",
+      "severity": "critical",
+      "section": "Entire File",
+      "description": "The file book/src/configuration/display-output.md is referenced in SUMMARY.md line 25 but does not exist",
+      "fix_suggestion": "Create the display-output.md file with documentation for display and output configuration options",
+      "source_reference": "book/src/SUMMARY.md:25"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Display Configuration",
+      "description": "DisplayConfig struct (src/config/display.rs) is not documented. Includes tiered display, items_per_tier, and verbosity settings",
+      "feature_reference": "configuration.display",
+      "fix_suggestion": "Document DisplayConfig with TOML examples: [display] tiered = true, items_per_tier = 5, verbosity = 'detailed'",
+      "source_reference": "src/config/display.rs:56-68"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Verbosity Levels",
+      "description": "VerbosityLevel enum (Summary, Detailed, Comprehensive) needs documentation",
+      "feature_reference": "configuration.display.verbosity",
+      "fix_suggestion": "Document each verbosity level and when to use each: Summary for quick checks, Detailed for normal use, Comprehensive for debugging",
+      "source_reference": "src/config/display.rs:7-15"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Output Formats",
+      "description": "OutputFormat enum (Json, Markdown, Terminal, Html, Dot) needs documentation in configuration context",
+      "feature_reference": "output_formats",
+      "fix_suggestion": "Document how to set default output format in config file and when to use each format",
+      "source_reference": "src/cli/args.rs:574-583"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Color Mode Configuration",
+      "description": "ColorMode (Auto, Always, Never) and environment variable controls (NO_COLOR, CLICOLOR, CLICOLOR_FORCE) need documentation",
+      "feature_reference": "formatting.color_mode",
+      "fix_suggestion": "Document color mode options, environment variable overrides, and --plain flag interaction",
+      "source_reference": "src/formatting/mod.rs:6-30"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Evidence Verbosity",
+      "description": "EvidenceVerbosity (Minimal, Standard, Verbose, VeryVerbose) for multi-signal classification display needs documentation",
+      "feature_reference": "configuration.display.evidence_verbosity",
+      "fix_suggestion": "Document evidence verbosity levels and how they map to -v flags (0-3)",
+      "source_reference": "src/config/display.rs:18-30"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "OutputConfig",
+      "description": "OutputConfig struct with evidence_verbosity, min_confidence_warning, and signal_filters needs documentation",
+      "feature_reference": "configuration.output",
+      "fix_suggestion": "Document OutputConfig TOML structure and explain each field",
+      "source_reference": "src/config/display.rs:122-145"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Signal Filters",
+      "description": "SignalFilterConfig for controlling which signals to display (I/O, call graph, type signatures, purity, framework, name heuristics)",
+      "feature_reference": "configuration.output.signal_filters",
+      "fix_suggestion": "Document each signal filter option and when to enable/disable them",
+      "source_reference": "src/config/display.rs:152-190"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "FormattingConfig",
+      "description": "FormattingConfig with color, caller_callee, and show_splits options needs documentation",
+      "feature_reference": "formatting.config",
+      "fix_suggestion": "Document FormattingConfig and how it relates to CLI flags and environment variables",
+      "source_reference": "src/formatting/mod.rs:32-48"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Path Normalization",
+      "description": "Path normalization features for cross-platform compatibility are undocumented",
+      "feature_reference": "path_normalization",
+      "fix_suggestion": "Consider a subsection explaining path normalization for coverage file matching across platforms",
+      "source_reference": "src/risk/path_normalization.rs"
+    }
+  ],
+  "positive_aspects": [
+    "Related documentation exists in output-formats.md with comprehensive format coverage",
+    "CLI args are well-documented with help text that can be referenced",
+    "Code has good inline documentation that can inform the docs"
+  ],
+  "improvement_suggestions": [
+    "Create file with structure: Overview, Display Settings, Output Formats, Color Configuration, Advanced Options",
+    "Include TOML configuration examples for each setting",
+    "Cross-reference output-formats.md for detailed format descriptions",
+    "Add examples showing how CLI flags override config file settings",
+    "Include environment variable reference table"
+  ],
+  "cross_references": [
+    "scoring",
+    "thresholds",
+    "languages",
+    "advanced",
+    "best-practices"
+  ],
+  "content_structure": {
+    "recommended_sections": [
+      {
+        "title": "Overview",
+        "content": "Introduction to display and output configuration"
+      },
+      {
+        "title": "Display Settings",
+        "content": "Covers DisplayConfig: tiered, items_per_tier, verbosity"
+      },
+      {
+        "title": "Output Format Configuration",
+        "content": "Default format in config, format-specific settings"
+      },
+      {
+        "title": "Color and Terminal Options",
+        "content": "ColorMode, environment variables, --plain flag"
+      },
+      {
+        "title": "Evidence Display",
+        "content": "EvidenceVerbosity, signal filters, confidence thresholds"
+      },
+      {
+        "title": "Advanced Output Control",
+        "content": "FormattingConfig, caller_callee limits, show_splits"
+      }
+    ]
+  },
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:25:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Display configuration", "Output formats", "Normalization"],
+    "validation_focus": "Check display and output configuration",
+    "parent_chapter_exists": false,
+    "parent_chapter_status": "Configuration chapter is incomplete - only scoring.md exists"
+  }
+}
