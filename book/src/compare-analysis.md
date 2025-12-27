@@ -64,6 +64,17 @@ Examples:
 - `lib/parser.rs:parse_expression:156`
 - `api/handler.rs:process_request:89`
 
+**Location Format Variations** (src/comparison/location_matcher.rs:12-19):
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| `file:function:line` | Exact match | `src/main.rs:process:42` |
+| `file:function` | Function-level match (any line) | `src/main.rs:process` |
+| `file:*:line` | Line range match (any function at line) | `src/main.rs:*:42` |
+| `file` | File-level match (all items in file) | `src/main.rs` |
+
+The `file:*:line` format is useful when you want to target a specific line number regardless of the function name, which is helpful when function names change during refactoring.
+
 ### Specifying Target Locations
 
 #### Option 1: Via Implementation Plan
@@ -243,7 +254,7 @@ The compare command tracks improvements as a list of `ImprovementItem` objects w
 
 ### Improvement Types
 
-The `ImprovementType` enum (src/comparison/types.rs:120-126) defines four improvement categories:
+The `ImprovementType` enum (src/comparison/types.rs:121-126) defines four improvement categories:
 
 - **Resolved** - Debt item completely eliminated (no longer in after analysis) ✓ *Auto-detected*
 - **ScoreReduced** - Overall debt score reduced significantly (≥ 30% reduction) ✓ *Auto-detected*
