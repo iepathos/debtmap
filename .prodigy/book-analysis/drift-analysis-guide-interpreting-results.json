@@ -6,99 +6,121 @@
   "subsection_file": "book/src/analysis-guide/interpreting-results.md",
   "feature_mappings": [
     "output_formats",
-    "complexity_analysis",
-    "risk_assessment",
-    "coverage_integration"
+    "risk_assessment.prioritization",
+    "meta_content.best_practices.interpretation"
   ],
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Subsection is comprehensive and mostly accurate, but contains misleading information about unified JSON format availability and categorized debt serialization. Content is well-structured with good examples, but needs corrections for implementation accuracy.",
+  "quality_assessment": "Documentation is comprehensive with good structure and examples, but contains threshold inconsistencies between Tier and Priority systems that need clarification. Most source references are accurate.",
   "issues": [
     {
-      "type": "incorrect_information",
+      "type": "outdated_information",
       "severity": "high",
-      "section": "JSON Output Format Variants",
-      "description": "Documentation states unified format note but creates misleading expectation",
-      "current_content": "The unified format is currently an internal representation and is **not available** as a user-facing CLI option.",
-      "should_be": "While the note is technically correct, the preceding context about 'two JSON output format variants' implies both are available. Should clarify upfront that only legacy format is available.",
-      "fix_suggestion": "Restructure section to clearly state 'Debtmap currently supports only the legacy JSON format' before explaining the unified format exists internally. Remove the 'two variants' framing which implies user choice.",
-      "source_reference": "src/io/writers/json.rs (only legacy serialization implemented)"
-    },
-    {
-      "type": "misleading_content",
-      "severity": "medium",
-      "section": "Categorized Debt Analysis",
-      "description": "Documentation shows complete CategorizedDebt structure and usage examples, but this data is NOT serialized to JSON output",
-      "current_content": "Detailed examples showing how to query categorized_debt from JSON output using jq commands",
-      "should_be": "Clarify that CategorizedDebt structures are defined internally but not included in JSON output. Update examples to reflect actual JSON structure.",
-      "fix_suggestion": "Add prominent note that CategorizedDebt is an internal structure not yet exposed in JSON output. Remove or update jq examples that query '.categorized_debt' as this path doesn't exist in actual JSON.",
-      "source_reference": "src/priority/mod.rs:409 (CategorySummary defined but not in UnifiedAnalysis serialization)"
+      "section": "Tiered Prioritization - Tier Levels",
+      "description": "Documentation correctly shows Tier thresholds (Critical ≥90, High 70-89.9, Moderate 50-69.9, Low <50) but fails to distinguish this from the Priority enum used in JSON output (Critical ≥100, High ≥50, Medium ≥20, Low <20). The score_distribution in JSON uses Priority thresholds, not Tier thresholds.",
+      "current_content": "The Tier enum shows Score ≥ 90 as Critical, but score_distribution in summary uses Priority thresholds",
+      "should_be": "Documentation should explicitly note that Tier (for terminal display/grouping) and Priority (for JSON output priority field and score_distribution) use different threshold systems",
+      "fix_suggestion": "Add a clarifying note explaining that Tier system (90/70/50 thresholds) is for display grouping while JSON priority field uses Priority system (100/50/20 thresholds). Add comments to JSON example showing score_distribution thresholds.",
+      "source_reference": "src/priority/mod.rs:372-386 (Tier), src/output/unified/priority.rs:15-33 (Priority), src/output/unified/types.rs:57-62 (ScoreDistribution)"
     },
     {
       "type": "incomplete_explanation",
       "severity": "medium",
-      "section": "JSON Structure",
-      "description": "Example JSON structure shows nested 'complexity' and 'technical_debt' objects, but actual UnifiedAnalysis structure is flatter",
-      "current_content": "Shows structure with 'complexity.metrics' and 'technical_debt.items' nesting",
-      "should_be": "Actual JSON has 'items' and 'file_items' at top level with UnifiedAnalysis structure",
-      "fix_suggestion": "Update example JSON to match actual UnifiedAnalysis serialization: use 'items' (not 'technical_debt.items'), include 'debt_density', 'total_debt_score', 'overall_coverage', etc. at top level",
-      "source_reference": "src/priority/mod.rs:46 (UnifiedAnalysis struct definition)"
+      "section": "JSON Structure - score_distribution",
+      "description": "The score_distribution thresholds in the JSON example are not explicitly stated. The code shows: critical >= 100, high >= 50, medium >= 20, low < 20. This differs from the Tier thresholds documented later.",
+      "current_content": "JSON shows score_distribution with critical/high/medium/low counts without threshold explanation",
+      "should_be": "Add explicit threshold notes: critical (score ≥100), high (score ≥50), medium (score ≥20), low (score <20)",
+      "fix_suggestion": "Update the JSON example with comments or add inline explanation of score_distribution thresholds",
+      "source_reference": "src/output/unified/types.rs:57-62"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Output Formats",
+      "description": "Documentation mentions only three output formats (Terminal, JSON, Markdown) but does not mention HTML output which is available via --format html",
+      "current_content": "Debtmap provides three output formats:",
+      "should_be": "Debtmap provides four output formats: Terminal, JSON, Markdown, and HTML",
+      "fix_suggestion": "Add HTML format example: debtmap analyze . --format html --output report.html",
+      "source_reference": "features.json:output_formats.formats.html, src/io/writers/html.rs"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "JSON Structure - metadata",
+      "description": "Example shows debtmap_version as '0.2.0' but current version is 0.10.0-dev",
+      "current_content": "\"debtmap_version\": \"0.2.0\"",
+      "should_be": "Use current version or placeholder like '<version>'",
+      "fix_suggestion": "Update version in example to match current version",
+      "source_reference": "features.json:version_info.analyzed_version"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "JSON Structure - summary",
+      "description": "The cohesion field in DebtSummary (spec 198) is not documented in the JSON structure example",
+      "current_content": "Summary shows total_items, total_debt_score, debt_density, etc.",
+      "should_be": "Include optional cohesion field for codebase-wide cohesion statistics",
+      "fix_suggestion": "Add cohesion field to the JSON example with note that it's optional",
+      "source_reference": "src/output/unified/types.rs:41-43"
     },
     {
       "type": "missing_content",
       "severity": "low",
       "section": "Reading Function Metrics",
-      "description": "Missing explanation of 'detected_patterns' field values and meanings",
-      "fix_suggestion": "Add section explaining what patterns can appear in 'detected_patterns' array (e.g., 'validation_pattern', 'error_handling_pattern', 'state_machine_pattern') and their implications for complexity adjustment",
-      "source_reference": "src/complexity/entropy_analysis.rs (pattern detection implementation)"
+      "description": "New metrics from Spec 264 (pattern_repetition, branch_similarity, entropy_adjusted_cognitive, transitive_coverage) are not documented",
+      "current_content": "Metrics section covers basic fields but not all entropy-related details",
+      "should_be": "Document pattern_repetition, branch_similarity, entropy_adjusted_cognitive, and transitive_coverage fields",
+      "fix_suggestion": "Add documentation for new entropy-related metrics in the metrics object section",
+      "source_reference": "src/output/unified/func_item.rs:361-372"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Tiered Prioritization",
-      "description": "Documentation mentions TieredDisplay and batch recommendations, but unclear if this is actually used in output",
-      "fix_suggestion": "Clarify whether TieredDisplay.batch_recommendations actually appears in JSON output or is only used internally for terminal display. If not in JSON, update documentation accordingly.",
-      "source_reference": "src/priority/mod.rs:515 (TieredDisplay defined but usage unclear)"
+      "section": "Function-level debt item structure",
+      "description": "The context (spec 263) and git_history (spec 264) fields are not documented in the individual debt item structure example",
+      "current_content": "JSON example shows most fields but omits context and git_history",
+      "should_be": "Include context (AI agent context window suggestion) and git_history (code stability) fields",
+      "fix_suggestion": "Add examples for context and git_history optional fields",
+      "source_reference": "src/output/unified/func_item.rs:78-83, 476-520"
     },
     {
-      "type": "outdated_information",
+      "type": "unclear_content",
       "severity": "low",
-      "section": "Prioritizing Work - By Risk Category",
-      "description": "Section describes '--min-priority high' as 'legacy compatibility' but doesn't explain relationship to unified scoring clearly",
-      "fix_suggestion": "Better explain how legacy risk categories (CRITICAL, HIGH, MEDIUM, LOW) map to unified score ranges (0-10 scale), or if they use completely different calculation paths",
-      "source_reference": "src/priority/unified_scorer.rs (unified scoring), src/risk/ (legacy risk calculation)"
+      "section": "Tiered Prioritization",
+      "description": "TieredDisplay is noted as internal but the relationship between terminal display tiers and JSON priority is not clearly explained",
+      "current_content": "Note mentions TieredDisplay is internal and not serialized to JSON",
+      "should_be": "Clarify that terminal output uses Tier (90/70/50) while JSON uses Priority (100/50/20) thresholds",
+      "fix_suggestion": "Add explicit comparison table showing Tier vs Priority threshold differences",
+      "source_reference": "src/priority/mod.rs:416-422 (TieredDisplay), src/output/unified/priority.rs"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of all output formats with clear examples",
-    "Excellent explanation of unified scoring system (0-10 scale) with practical guidance",
-    "Well-structured sections progressing from basic output to advanced prioritization",
-    "Good use of tables for tier thresholds and debt density interpretation",
-    "Detailed entropy score interpretation guidance matching implementation",
-    "Clear 'Common Patterns to Recognize' section with actionable insights",
-    "Accurate documentation of EntropyScore fields (token_entropy, pattern_repetition, branch_similarity, effective_complexity)",
-    "Correct formula for debt_density: (total_debt_score / total_lines_of_code) × 1000",
-    "Accurate Tier enum threshold documentation (Critical ≥ 90, High 70-89.9, etc.)",
-    "Good examples of strategic planning workflows"
+    "Comprehensive documentation of JSON structure with accurate source file references",
+    "Excellent explanation of pattern detection and complexity adjustment with entropy dampening",
+    "Clear guidance on prioritization strategies with practical command examples",
+    "Well-structured tiered prioritization with effort estimates matching code",
+    "Thorough explanation of categorized debt analysis with internal-only notes",
+    "Detailed debt density metric explanation with accurate formula and interpretation guidelines",
+    "Actionable insights section provides clear workflow guidance",
+    "Common patterns section helps users recognize and interpret results",
+    "Good CI/CD integration examples for debt density tracking",
+    "Accurate documentation of entropy score interpretation thresholds"
   ],
   "improvement_suggestions": [
-    "Restructure 'JSON Output Format Variants' to eliminate confusion about unified format availability",
-    "Update example JSON structure to match actual UnifiedAnalysis serialization",
-    "Add clear note about CategorizedDebt internal-only status before showing examples",
-    "Include actual JSON output example from running 'debtmap analyze --format json' to ground documentation in reality",
-    "Add cross-reference to CLI reference for all command-line flags mentioned (--top, --min-priority, --filter, etc.)",
-    "Consider adding troubleshooting section for common JSON parsing issues",
-    "Clarify whether 'by_type' grouping shown in example JSON is actually in output",
-    "Add version compatibility notes if JSON structure changes between releases",
-    "Include schema or TypeScript type definitions for JSON structure to help integrations"
+    "Add explicit clarification about the dual threshold systems (Tier for display vs Priority for JSON)",
+    "Include HTML output format documentation alongside Terminal, JSON, Markdown",
+    "Document newer fields from specs 263, 264, 198 (context, git_history, cohesion)",
+    "Add comparison table showing Tier vs Priority threshold mappings",
+    "Consider adding cross-references to related subsections like complexity-metrics.md and risk-scoring.md"
   ],
   "cross_references": [
-    "cli-reference.md (for detailed flag documentation)",
-    "workflow-examples.md (for complete CI/CD integration examples)",
-    "configuration.md (for threshold configuration details)"
+    "complexity-metrics",
+    "risk-scoring",
+    "overview",
+    "cli-reference"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T08:30:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Output formats",
