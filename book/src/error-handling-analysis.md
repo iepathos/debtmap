@@ -305,7 +305,7 @@ fn load_settings() -> Settings {
 
 All these patterns are detected at **Medium to High priority** depending on context, as they represent lost error information that makes debugging difficult.
 
-**Source:** Error swallowing patterns are defined in `src/debt/error_swallowing.rs:229-238` and comprehensively tested in `tests/error_swallowing_test.rs`.
+**Source:** Error swallowing patterns are defined in `src/debt/error_swallowing.rs:234-243` and comprehensively tested in `tests/error_swallowing_test.rs`.
 
 ## Python Error Handling Analysis (Planned)
 
@@ -660,7 +660,7 @@ async fn process_with_timeout(data: Data) -> Result<()> {
 
 All async error patterns emphasize the importance of properly handling errors in concurrent Rust code, where failures can easily go unnoticed.
 
-**Source:** Async error patterns are defined in `src/debt/async_errors.rs:205-212` and tested with tokio-specific patterns.
+**Source:** Async error patterns are defined in `src/debt/async_errors.rs:210-217` and tested with tokio-specific patterns.
 
 ## Severity Levels and Prioritization
 

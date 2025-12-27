@@ -1,0 +1,115 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "scoring-strategies",
+  "subsection_id": "exponential-scaling-scoring",
+  "subsection_title": "Exponential Scaling",
+  "subsection_file": "book/src/scoring-strategies/exponential-scaling.md",
+  "feature_mappings": [
+    "risk_assessment.prioritization",
+    "configuration.scoring"
+  ],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Subsection file does not exist despite being referenced in SUMMARY.md. Content exists in parent chapter file but needs extraction to standalone subsection. Also contains incorrect configuration examples that don't match implementation.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "The subsection file book/src/scoring-strategies/exponential-scaling.md does not exist, but is referenced in book/src/SUMMARY.md line 57. The content exists in the parent file book/src/scoring-strategies.md (lines 1281-1575) and needs to be extracted to its own file.",
+      "feature_reference": "risk_assessment.prioritization",
+      "fix_suggestion": "Extract the 'Score-Based Prioritization with Exponential Scaling' section (lines 1281-1575) from book/src/scoring-strategies.md to a new file book/src/scoring-strategies/exponential-scaling.md. Update cross-references and ensure mdbook build works.",
+      "source_reference": "book/src/SUMMARY.md:57"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Configuration",
+      "description": "Documentation shows per-pattern configuration with [priority.scaling.god_object] sections containing exponent, min_threshold, and max_threshold parameters. The actual implementation uses a flat ScalingConfig struct without TOML configuration support and without per-pattern thresholds.",
+      "current_content": "[priority.scaling.god_object]\nexponent = 1.5\nmin_threshold = 30.0\nmax_threshold = 500.0",
+      "should_be": "The ScalingConfig struct (src/priority/scoring/scaling.rs:16-28) has fixed fields: god_object_exponent, god_module_exponent, high_complexity_exponent, moderate_complexity_exponent, and boost multipliers. No TOML configuration is exposed for these values.",
+      "fix_suggestion": "Either remove the configuration section from documentation OR implement the TOML configuration support in the codebase. If removing, update docs to explain that exponential scaling uses hardcoded defaults (god_object=1.4, high_complexity=1.2, moderate=1.1).",
+      "source_reference": "src/priority/scoring/scaling.rs:16-43"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Pattern-Specific Exponents Table",
+      "description": "Documentation shows 'Long Functions' with exponent 1.3 and 'Primitive Obsession' with exponent 1.1, but the actual ScalingConfig doesn't have these categories. It only has: god_object (1.4), god_module (1.4), high_complexity (1.2 for cyclomatic>30), moderate_complexity (1.1 for cyclomatic>15).",
+      "current_content": "Long Functions | 1.3 | High amplification\nPrimitive Obsession | 1.1 | Light amplification",
+      "should_be": "God Objects | 1.4\nGod Modules | 1.4\nHigh Complexity (cyclomatic>30) | 1.2\nModerate Complexity (cyclomatic>15) | 1.1\nComplex TestingGap (cyclomatic>20) | 1.1",
+      "fix_suggestion": "Update the pattern-specific exponents table to match the actual DebtType enum matching in apply_exponential_scaling() function.",
+      "source_reference": "src/priority/scoring/scaling.rs:53-75"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Risk Multipliers Table",
+      "description": "Documentation shows 'High dependency count (10+ callers)' threshold, but actual code checks for 'total_deps > 15'. Documentation shows 'Low test coverage (<30%)' boost, but actual code doesn't have a general low-coverage boost - only complex_untested_boost which requires cyclomatic>20 AND coverage<10%.",
+      "current_content": "High dependency count (10+ callers) | 1.2x\nLow test coverage (<30%) | 1.1x",
+      "should_be": "High dependency count (>15 total deps) | 1.2x\nEntry point | 1.15x\nComplex untested (cyclomatic>20 + coverage<10%) | 1.25x\nError swallowing patterns | 1.15x",
+      "fix_suggestion": "Update the risk multipliers table to match the apply_risk_boosts() function implementation, including the error swallowing boost that is not documented.",
+      "source_reference": "src/priority/scoring/scaling.rs:84-109"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Error Swallowing Boost",
+      "description": "The error_swallowing_boost (1.15x) is implemented in the code but not documented. Functions with error swallowing patterns get a 15% score boost.",
+      "feature_reference": "risk_assessment.prioritization",
+      "fix_suggestion": "Add documentation for the error swallowing boost: 'Functions that swallow errors (e.g., if_let_ok_without_else patterns) receive a 1.15x boost to encourage proper error handling.'",
+      "source_reference": "src/priority/scoring/scaling.rs:27,40,103-107"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "God Module Exponent",
+      "description": "The god_module_exponent (1.4) is defined in ScalingConfig but not documented. God modules are distinct from god objects but receive the same exponential scaling.",
+      "feature_reference": "risk_assessment.prioritization",
+      "fix_suggestion": "Add documentation for god module detection and its 1.4 exponent.",
+      "source_reference": "src/priority/scoring/scaling.rs:19,34"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "medium",
+      "section": "Scoring Pipeline",
+      "description": "The documented scoring pipeline shows weights of 'Coverage factor (40% weight), Complexity factor (40% weight), Dependency factor (20% weight)' but the actual default weights from src/config/scoring.rs are: coverage=0.50 (50%), complexity=0.35 (35%), dependency=0.15 (15%).",
+      "current_content": "Coverage factor (40% weight)\nComplexity factor (40% weight)\nDependency factor (20% weight)",
+      "should_be": "Coverage factor (50% weight)\nComplexity factor (35% weight)\nDependency factor (15% weight)",
+      "fix_suggestion": "Update the scoring pipeline diagram to use the actual default weights from src/config/scoring.rs:187-198.",
+      "source_reference": "src/config/scoring.rs:187-198"
+    }
+  ],
+  "positive_aspects": [
+    "The parent file has comprehensive content explaining exponential scaling concepts",
+    "Good examples showing exponential scaling impact (10^1.4, 50^1.4, 100^1.4)",
+    "Clear explanation of why exponential scaling is preferable to linear multipliers",
+    "Practical CLI examples for viewing scaling effects",
+    "Performance impact section is accurate (powf is negligible)"
+  ],
+  "improvement_suggestions": [
+    "Extract content from parent file to create the missing subsection file",
+    "Add the missing error_swallowing_boost to the risk multipliers documentation",
+    "Correct the configuration section to match actual implementation or mark as 'not yet configurable via TOML'",
+    "Update risk boost thresholds to match code (>15 deps, not 10+ callers)",
+    "Add property test examples from the source code to demonstrate monotonicity guarantees"
+  ],
+  "cross_references": [
+    "function-level",
+    "file-level",
+    "rebalanced"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Exponential scaling",
+      "Risk boosting",
+      "Pattern-specific exponents",
+      "Score amplification"
+    ],
+    "validation_focus": "Check exponential scaling configuration and examples",
+    "content_source": "book/src/scoring-strategies.md:1281-1575",
+    "referenced_in_summary": "book/src/SUMMARY.md:57"
+  }
+}

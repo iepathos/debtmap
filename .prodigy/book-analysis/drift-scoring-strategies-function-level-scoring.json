@@ -1,0 +1,118 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "scoring-strategies",
+  "subsection_id": "function-level-scoring",
+  "subsection_title": "Function-Level Scoring",
+  "subsection_file": "book/src/scoring-strategies/function-level.md",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Subsection file does not exist - entire chapter structure needs to be created",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "Documentation file book/src/scoring-strategies/function-level.md does not exist. The entire scoring-strategies chapter directory is also missing.",
+      "feature_reference": "complexity_analysis, risk_assessment, semantic_classification",
+      "fix_suggestion": "Create the scoring-strategies chapter directory and function-level.md subsection with documentation covering: function scoring formula, constructor detection, role multipliers, and metrics",
+      "source_references": [
+        "src/priority/scoring/calculation.rs - Core scoring formulas",
+        "src/analyzers/rust_constructor_detector.rs - Constructor detection logic",
+        "src/priority/semantic_classifier/mod.rs - Role classification and multipliers",
+        "src/config/scoring.rs - Role multiplier configuration"
+      ]
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Function Scoring Formula",
+      "description": "No documentation for the function-level scoring formula which combines complexity, coverage, and dependency factors",
+      "feature_reference": "complexity_analysis.metrics",
+      "fix_suggestion": "Document the scoring formula: base_score = (complexity_score * 0.5) + (dependency_score * 0.25) where factors are normalized to 0-10 scale. Coverage acts as a dampening multiplier (1.0 - coverage_pct).",
+      "source_reference": "src/priority/scoring/calculation.rs:68-82"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Constructor Detection",
+      "description": "No documentation for AST-based constructor detection which affects role classification",
+      "feature_reference": "semantic_classification.roles",
+      "fix_suggestion": "Document constructor detection: name patterns (new, from_*, with_*, create_*, make_*, build_*), AST analysis for return type (Self, Result<Self>, Option<Self>), body pattern analysis (struct init, no loops), complexity thresholds (cyclomatic <= 2, cognitive <= 3, length <= 14)",
+      "source_reference": "src/analyzers/rust_constructor_detector.rs:1-50"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Role Multipliers",
+      "description": "No documentation for role-based score multipliers used in function prioritization",
+      "feature_reference": "semantic_classification.capabilities",
+      "fix_suggestion": "Document role multipliers: PureLogic (1.2), Orchestrator (0.8), IOWrapper (0.7), EntryPoint (0.9), PatternMatch (0.6), Debug (0.3), Unknown (1.0). Explain how each role affects final score.",
+      "source_reference": "src/config/scoring.rs:307-333"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Complexity Weights",
+      "description": "No documentation for complexity weight configuration (cyclomatic vs cognitive)",
+      "feature_reference": "complexity_analysis.metrics",
+      "fix_suggestion": "Document complexity weights: cyclomatic (0.3/30%) and cognitive (0.7/70%), with cognitive having higher weight as it correlates better with bugs",
+      "source_reference": "src/config/scoring.rs:335-381"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Coverage Dampening",
+      "description": "No documentation for how coverage affects scoring as a dampening multiplier",
+      "feature_reference": "coverage_integration",
+      "fix_suggestion": "Document coverage dampening: multiplier = 1.0 - coverage_pct, so 100% coverage results in near-zero score, 0% coverage preserves full base score. Test code gets automatic 0.0 multiplier.",
+      "source_reference": "src/priority/scoring/calculation.rs:6-21"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Function Role Classification",
+      "description": "No documentation for semantic role classification (PureLogic, Orchestrator, IOWrapper, etc.)",
+      "feature_reference": "semantic_classification.roles",
+      "fix_suggestion": "Document role classification order: EntryPoint > Debug > Constructor > EnumConverter > Accessor > DataFlow > PatternMatch > IOWrapper > Orchestrator > PureLogic (default)",
+      "source_reference": "src/priority/semantic_classifier/mod.rs:35-114"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Score Normalization",
+      "description": "No documentation for score normalization curve (linear, sqrt, logarithmic)",
+      "feature_reference": "output_formats.display_options",
+      "fix_suggestion": "Document normalization: scores <= 10 use linear, 10-100 use sqrt scaling, 100+ use logarithmic scaling for display",
+      "source_reference": "src/priority/scoring/calculation.rs:174-206"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Accessor Detection",
+      "description": "No documentation for accessor method detection (getters, is_*, has_*)",
+      "feature_reference": "semantic_classification.capabilities",
+      "fix_suggestion": "Document accessor patterns: single-word names (id, name, value, kind, type, status, code, key, index), prefixes (get_, is_, has_, can_, should_, as_, to_, into_), with complexity thresholds (cyclomatic <= 2, cognitive <= 1, length < 10)",
+      "source_reference": "src/priority/semantic_classifier/mod.rs:121-177"
+    }
+  ],
+  "positive_aspects": [],
+  "improvement_suggestions": [
+    "Create the scoring-strategies chapter directory structure first",
+    "Include concrete examples showing how different function types get different scores",
+    "Add a section explaining how to tune scoring weights via configuration",
+    "Include a comparison table of role multipliers with explanations of their rationale"
+  ],
+  "cross_references": [
+    "file-level-scoring",
+    "codebase-level-scoring"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [],
+    "validation_focus": "Check function-level scoring formula and constructor detection",
+    "documentation_exists": false,
+    "chapter_directory_exists": false
+  }
+}

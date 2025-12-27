@@ -43,7 +43,8 @@ The boilerplate detector extracts detection signals (src/organization/boilerplat
 - **HighMethodUniformity(f64)** - Methods are highly uniform across implementations
 - **LowAvgComplexity(f64)** - Average complexity is below threshold
 - **LowComplexityVariance(f64)** - Complexity variance is low (consistent complexity)
-- **HighStructDensity(usize)** - Many structs with similar implementations
+
+**Note**: The `HighStructDensity` signal is defined as an enum variant but is not currently extracted by the detection algorithm. It is reserved for future enhancement to detect struct-level boilerplate patterns.
 
 ## Boilerplate Scoring Algorithm
 
@@ -142,6 +143,16 @@ fn test_case_b() {
 
 **Recommendation**: Use parameterized tests with `rstest` or table-driven tests.
 
+### Planned Pattern Types
+
+The following pattern types are defined in the feature specification but not yet fully implemented:
+
+- **State machine patterns** - Repetitive state transition implementations
+- **Registry patterns** - Similar registration logic across modules
+- **Delegation patterns** - Wrapper types with passthrough implementations
+
+These are tracked for future enhancement. Currently, the implementation focuses on trait implementation boilerplate detection with partial support for builder and test patterns.
+
 ## Configuration
 
 Boilerplate detection is controlled via configuration file (src/organization/boilerplate_detector.rs:256-322):
@@ -172,6 +183,8 @@ detect_builders = true
 # Enable test boilerplate detection (default: true)
 detect_test_boilerplate = true
 ```
+
+**Implementation Status**: The `detect_trait_impls` option is fully implemented. The `detect_builders` and `detect_test_boilerplate` options are configuration placeholders with partial implementation - the current `detect()` method primarily focuses on trait implementation detection (src/organization/boilerplate_detector.rs:75-121).
 
 **Field reference** (src/organization/boilerplate_detector.rs:48-57, 310-322):
 - All fields have serde defaults
@@ -213,14 +226,17 @@ Recommendation:
 
 ### For Builder Patterns
 
-```
-Detected boilerplate: 15 setter methods in ConfigBuilder
-Estimated line reduction: 75 lines → 10 lines (87% reduction)
+The MacroRecommendationEngine suggests multiple builder crates (src/organization/macro_recommendations.rs:119-131):
 
-Recommendation:
-- Add derive_builder to Cargo.toml
-- Use #[derive(Builder)] on struct
-- Configure with #[builder(setter(into))] for ergonomics
+```
+BUILDER PATTERN BOILERPLATE DETECTED: 5 builder structs
+
+Consider using existing builder libraries:
+- `bon` crate for declarative builders
+- `typed-builder` for compile-time checked builders
+- `derive_builder` for macro-based generation
+
+This reduces boilerplate while maintaining type safety.
 ```
 
 ### For Test Boilerplate

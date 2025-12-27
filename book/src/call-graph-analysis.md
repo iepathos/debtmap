@@ -78,7 +78,7 @@ enable_cross_module_analysis = true
 max_analysis_depth = 10
 ```
 
-**Source**: Configuration fields from src/config/core.rs:149-167 (AnalysisSettings)
+**Source**: Configuration fields from src/config/core.rs:159-175 (AnalysisSettings)
 
 ### Caller/Callee Display Settings
 
@@ -128,8 +128,9 @@ show_std_lib = false
 | `--validate-call-graph` | false | Validate call graph structure and report issues |
 | `--call-graph-stats` | false | Show call graph statistics with resolution percentiles (p50, p95, p99) |
 | `--trace-function <NAMES>` | none | Trace specific functions during call resolution (comma-separated) |
+| `--debug-format <FORMAT>` | text | Debug output format (text or json) |
 
-**Source**: CLI flags from src/cli.rs:163-289
+**Source**: CLI flags from src/cli/args.rs:341-350
 
 ## Usage
 
@@ -253,7 +254,7 @@ Validation reports include:
 - **Structural issues** - Orphaned functions, disconnected components
 - **Warnings** - Potential resolution problems
 
-**Source**: Validation implementation from tests/call_graph_debug_output_test.rs:134-151
+**Source**: Validation implementation from src/analyzers/call_graph/validation.rs:185 (CallGraphValidator)
 
 ## Performance Tuning
 

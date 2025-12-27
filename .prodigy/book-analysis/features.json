@@ -627,11 +627,41 @@
       "Dependency injection for testability"
     ]
   },
+  "test_quality_analysis": {
+    "type": "major_feature",
+    "description": "Analyze quality and patterns in test code",
+    "detection": {
+      "assertion_patterns": "Identify assertion types and quality",
+      "test_complexity": "Analyze test complexity to identify overly complex tests",
+      "flaky_test_detection": "Identify potentially flaky tests through pattern analysis",
+      "framework_detection": "Detect testing frameworks in use"
+    },
+    "classification": {
+      "test_type_classification": "Unit, integration, property tests",
+      "timing_classification": "Fast vs slow test detection"
+    }
+  },
+  "semantic_classification": {
+    "type": "major_feature",
+    "description": "Semantic role classification for functions",
+    "roles": {
+      "pure_logic": "Functions that compute without side effects",
+      "orchestrator": "Functions that coordinate other functions",
+      "io_wrapper": "Functions that wrap I/O operations",
+      "entry_point": "Main functions and public API endpoints",
+      "pattern_match": "Functions dominated by pattern matching"
+    },
+    "capabilities": [
+      "AST-based role detection",
+      "Role-specific coverage expectations",
+      "Scoring adjustments by role"
+    ]
+  },
   "version_info": {
-    "analyzed_version": "0.9.0",
-    "analysis_date": "2025-12-04",
-    "feature_count": 12,
+    "analyzed_version": "0.10.0-dev",
+    "analysis_date": "2025-12-26",
+    "feature_count": 15,
     "command_count": 6,
-    "detection_pattern_count": 30
+    "detection_pattern_count": 35
   }
 }

@@ -1,0 +1,108 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "configuration",
+  "subsection_id": "best-practices-config",
+  "subsection_title": "Best Practices",
+  "subsection_file": "book/src/configuration/best-practices.md",
+  "feature_mappings": [
+    "configuration",
+    "meta_content.best_practices"
+  ],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "File does not exist but is referenced in SUMMARY.md. Content exists in parent chapter configuration.md and needs to be migrated.",
+  "issues": [
+    {
+      "type": "missing_file",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "The file book/src/configuration/best-practices.md does not exist. This will cause mdbook build failures since it's referenced in SUMMARY.md at line 27.",
+      "fix_suggestion": "Create the best-practices.md file by extracting content from the parent chapter configuration.md (lines 1372-1407) which contains a 'Configuration Best Practices' section.",
+      "source_reference": "book/src/configuration.md:1372-1407"
+    },
+    {
+      "type": "content_fragmentation",
+      "severity": "medium",
+      "section": "Best Practices Content",
+      "description": "Best practices content is currently scattered across multiple locations: 1) configuration.md has 'Configuration Best Practices' section, 2) thresholds.md has 'Best Practices' section (lines 335-379), 3) features.json has meta_content.best_practices with workflow, configuration, interpretation, and performance guidance.",
+      "fix_suggestion": "Consolidate all best practices content into the new best-practices.md file. Reference existing subsections rather than duplicating their content.",
+      "source_reference": "Multiple sources"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Strict Quality Standards",
+      "description": "The topics array specifies 'Strict quality standards' but no dedicated documentation exists for this use case. Parent chapter has partial coverage at lines 1376-1390.",
+      "feature_reference": "meta_content.best_practices.configuration",
+      "fix_suggestion": "Create a section covering strict quality standards configuration with complete TOML examples for new/greenfield projects.",
+      "source_reference": "book/src/configuration.md:1376-1390"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Legacy Codebases",
+      "description": "The topics array specifies 'Legacy codebases' but documentation is incomplete. Parent chapter has partial coverage at lines 1394-1407.",
+      "feature_reference": "meta_content.best_practices.configuration",
+      "fix_suggestion": "Create comprehensive guidance for legacy codebase configuration including gradual threshold tightening strategies.",
+      "source_reference": "book/src/configuration.md:1394-1407"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Open Source Libraries",
+      "description": "The topics array specifies 'Open source libraries' but documentation is incomplete. Parent chapter has only brief coverage at lines 1409-1423.",
+      "feature_reference": "meta_content.best_practices.configuration",
+      "fix_suggestion": "Expand open source library configuration guidance to include public API detection, documentation requirements, and coverage expectations.",
+      "source_reference": "book/src/configuration.md:1409-1423"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "CI/CD Integration",
+      "description": "The topics array specifies 'CI/CD' but detailed CI/CD integration best practices are not covered. The validate command is documented but pipeline configuration examples are missing.",
+      "feature_reference": "cli_interface.commands.validate",
+      "fix_suggestion": "Add comprehensive CI/CD integration section covering GitHub Actions, GitLab CI, and generic pipeline configurations with debtmap validate.",
+      "source_reference": "src/cli/mod.rs (validate command)"
+    },
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "File does not exist so cannot validate internal links. However, once created, should include links to: configuration/scoring.md, configuration/thresholds.md, validation-gates.md",
+      "fix_suggestion": "When creating the file, ensure proper cross-references to related configuration subsections."
+    }
+  ],
+  "positive_aspects": [
+    "Best practices content exists in the parent chapter and can be migrated",
+    "Existing subsections (thresholds.md) have relevant best practices sections that can be referenced",
+    "Features.json has comprehensive meta_content.best_practices data that documents workflow, configuration, interpretation, and performance patterns",
+    "The topics specified align well with features.json meta_content structure"
+  ],
+  "improvement_suggestions": [
+    "Organize by use case (strict, legacy, OSS, CI/CD) rather than by configuration section",
+    "Include complete, copy-paste-ready TOML configuration examples for each use case",
+    "Add a troubleshooting section for common configuration mistakes",
+    "Include links to CLI Reference for related command options",
+    "Consider adding a configuration anti-patterns section"
+  ],
+  "cross_references": [
+    "scoring-config",
+    "thresholds-config",
+    "languages-config",
+    "validation-gates"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:22:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Strict quality standards", "Legacy codebases", "Open source libraries", "CI/CD"],
+    "validation_focus": "Check configuration best practices",
+    "file_exists": false,
+    "parent_chapter_file": "book/src/configuration.md",
+    "parent_chapter_lines": 1490,
+    "related_content_locations": {
+      "configuration_best_practices": "book/src/configuration.md:1372-1407",
+      "thresholds_best_practices": "book/src/configuration/thresholds.md:335-379",
+      "features_best_practices": ".prodigy/book-analysis/features.json:meta_content.best_practices"
+    }
+  }
+}

@@ -6,73 +6,85 @@
   "subsection_file": "book/src/analysis-guide/analyzer-types.md",
   "feature_mappings": [],
   "drift_detected": true,
-  "severity": "high",
-  "quality_assessment": "Documentation contains significant outdated information about language support and incorrect trait signatures. Claims support for Python, JavaScript, TypeScript when only Rust is actually supported (per spec 191).",
+  "severity": "medium",
+  "quality_assessment": "Documentation is well-structured and accurate in describing Rust-only support (per spec 191), but contains outdated source line references that no longer match the current codebase",
   "issues": [
     {
       "type": "outdated_information",
-      "severity": "high",
-      "section": "Supported Languages",
-      "description": "Documentation incorrectly states Python, JavaScript, TypeScript are supported with varying capabilities",
-      "current_content": "Documentation describes full support for Rust and mentions Python/JavaScript/TypeScript as having limited or planned support",
-      "should_be": "Only Rust is supported. All other languages were removed in spec 191.",
-      "fix_suggestion": "Remove all references to Python, JavaScript, TypeScript support. Update 'Unsupported Languages' section to clarify that debtmap is a Rust-only analyzer.",
-      "source_reference": "src/core/mod.rs:376-377 (comment states 'After spec 191, only Rust is supported'), src/core/mod.rs:368-372 (Language enum has Rust, Python, Unknown but Python is not actually supported)"
-    },
-    {
-      "type": "incorrect_examples",
       "severity": "medium",
-      "section": "Extensibility",
-      "description": "Analyzer trait signature in documentation does not match actual implementation",
-      "current_content": "pub trait Analyzer: Send + Sync {\n    fn parse(&self, content: &str, path: PathBuf) -> Result<Ast>;\n    fn analyze(&self, ast: &Ast) -> FileMetrics;\n    fn language(&self) -> Language;\n}",
-      "should_be": "The actual trait in src/analyzers/mod.rs:39-43 matches this signature, but there's also a more complex generic Analyzer trait in src/core/traits.rs:11-16 with associated types",
-      "fix_suggestion": "Clarify which Analyzer trait is the public extension point. The documentation shows the simpler trait from src/analyzers/mod.rs which appears to be the correct one for language analyzers.",
-      "source_reference": "src/analyzers/mod.rs:39-43 (simpler trait), src/core/traits.rs:11-16 (generic trait with associated types)"
+      "section": "Overview",
+      "description": "Source reference 'src/core/mod.rs:376-377' is incorrect. The Language enum and Rust-only support documentation is at different lines.",
+      "current_content": "**Source**: As documented in src/core/mod.rs:376-377 and src/core/injection.rs:198-200",
+      "should_be": "**Source**: Language enum at src/core/mod.rs:416-421, AnalyzerFactory at src/core/injection.rs:190-203",
+      "fix_suggestion": "Update source reference to use correct line numbers",
+      "source_reference": "src/core/mod.rs:416-421"
     },
     {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Language Detection",
-      "description": "Language detection logic description is incomplete",
-      "current_content": "Shows code snippet for Language::from_path but doesn't explain Unknown language handling or filtering",
-      "should_be": "Explain that unknown languages (non-.rs files) are filtered during file discovery and never reach analysis stage",
-      "fix_suggestion": "Add explanation of the Unknown language variant and how it's used for filtering during discovery phase (see src/core/mod.rs:386-391)",
-      "source_reference": "src/core/mod.rs:368-372 (Language enum with Unknown variant), src/core/mod.rs:386-391 (from_path implementation)"
-    },
-    {
-      "type": "confusing_content",
+      "type": "outdated_information",
       "severity": "medium",
-      "section": "Unsupported Languages",
-      "description": "The 'Unsupported Languages' section contradicts earlier content",
-      "current_content": "States 'Debtmap currently supports only Rust' but earlier sections describe Python/JS/TS support",
-      "should_be": "Consistent messaging throughout that only Rust is supported",
-      "fix_suggestion": "Remove contradictory content. Start subsection by clearly stating Rust-only support, then explain architecture allows future language support via Analyzer trait.",
-      "source_reference": "src/core/mod.rs:376-377"
+      "section": "Language Support > Supported: Rust Only",
+      "description": "Source reference 'src/core/mod.rs:386-391' for Language detection from_path function is incorrect. The actual from_path function is at lines 435-440.",
+      "current_content": "**Language Detection** (src/core/mod.rs:386-391)",
+      "should_be": "**Language Detection** (src/core/mod.rs:435-440)",
+      "fix_suggestion": "Update line reference from 386-391 to 435-440",
+      "source_reference": "src/core/mod.rs:435-440"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Language Support > Supported: Rust Only",
+      "description": "Source reference 'src/core/mod.rs:368-372' for Language enum is incorrect. The actual Language enum is at lines 416-421.",
+      "current_content": "The `Language` enum (src/core/mod.rs:368-372)",
+      "should_be": "The `Language` enum (src/core/mod.rs:416-421)",
+      "fix_suggestion": "Update line reference from 368-372 to 416-421",
+      "source_reference": "src/core/mod.rs:416-421"
     },
     {
       "type": "outdated_information",
       "severity": "low",
-      "section": "Semantic Classification",
-      "description": "Semantic classification description is accurate but could clarify it's Rust-specific",
-      "current_content": "Describes semantic classification features without explicitly stating it's Rust-only",
-      "should_be": "Clarify this is part of Rust analyzer capabilities",
-      "fix_suggestion": "Add prefix: 'The Rust analyzer includes semantic classification...'",
-      "source_reference": "Features inventory confirms semantic classification is Rust-specific"
+      "section": "File Filtering Behavior",
+      "description": "Source reference 'src/core/mod.rs:375-391' is outdated. The actual implementation spans lines 423-440.",
+      "current_content": "**Source**: Language detection implemented in src/core/mod.rs:375-391",
+      "should_be": "**Source**: Language detection implemented in src/core/mod.rs:423-440",
+      "fix_suggestion": "Update line reference from 375-391 to 423-440",
+      "source_reference": "src/core/mod.rs:423-440"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Extensibility > Analyzer Trait",
+      "description": "Source reference 'src/analyzers/mod.rs:39-43' is slightly off. The actual Analyzer trait is at lines 40-44.",
+      "current_content": "(src/analyzers/mod.rs:39-43)",
+      "should_be": "(src/analyzers/mod.rs:40-44)",
+      "fix_suggestion": "Update line reference from 39-43 to 40-44",
+      "source_reference": "src/analyzers/mod.rs:40-44"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Extensibility > Adding Language Support (Future)",
+      "description": "Multiple line references in the 'Adding Language Support' steps are outdated",
+      "current_content": "References to lines 368-372, 375-384, 196-201",
+      "should_be": "Language enum at 416-421, from_extension at 423-433, AnalyzerFactory at 190-203",
+      "fix_suggestion": "Update all line references in this section to match current source code locations",
+      "source_reference": "src/core/mod.rs, src/core/injection.rs"
     }
   ],
   "positive_aspects": [
-    "Accurate description of Rust analyzer capabilities (macro expansion, purity detection, call graph)",
-    "Clear explanation of semantic classification categories and their purpose",
-    "Good extensibility section showing how to add new language support",
-    "Visibility tracking and test module detection are accurately documented"
+    "Accurate and clear description of Rust-only analysis focus per specification 191",
+    "Correctly explains Python as an 'Architectural placeholder, not supported'",
+    "Clear explanation of the Analyzer trait interface and its purpose",
+    "Good code examples showing Language enum and from_path implementation that match actual code",
+    "Comprehensive coverage of semantic function classification categories",
+    "Well-organized extensibility section for future language additions",
+    "Valid internal links to related documentation (overview.md, complexity-metrics.md, risk-scoring.md)",
+    "Clear usage examples demonstrating debtmap CLI commands",
+    "Helpful note distinguishing between two Analyzer traits in the codebase"
   ],
   "improvement_suggestions": [
-    "Restructure to lead with 'Rust-only support' messaging upfront",
-    "Remove all Python/JavaScript/TypeScript references or move to a 'Future Extensibility' section",
-    "Add clarification that Language enum's Python/Unknown variants exist for architecture but aren't actively used",
-    "Include note about spec 191 decision to focus on Rust-only support",
-    "Add reference to src/analyzers/rust.rs as the canonical example implementation",
-    "Clarify the file discovery filtering mechanism that prevents non-Rust files from reaching analysis"
+    "Update all source line references to match current codebase (approximately 48-line offset shift)",
+    "Consider removing line number references in favor of function/type names only, as line numbers drift frequently",
+    "Add note about the core/types.rs Language enum which also exists alongside core/mod.rs version"
   ],
   "cross_references": [
     "overview",
@@ -80,15 +92,22 @@
     "risk-scoring"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T08:40:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Supported languages",
       "Language detection",
       "Analyzer capabilities",
-      "Rust-specific features",
+      "Semantic classification",
       "Extensibility"
     ],
-    "validation_focus": "Check analyzer type documentation is current"
+    "validation_focus": "Check analyzer type documentation is current",
+    "internal_links_validated": true,
+    "all_internal_links_valid": true,
+    "previous_report_obsolete": true,
+    "previous_issues_resolved": [
+      "Python/JavaScript/TypeScript references - documentation now correctly states Rust-only",
+      "Contradictory 'Unsupported Languages' section - documentation now consistent"
+    ]
   }
 }

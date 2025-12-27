@@ -114,7 +114,8 @@
     {
       "id": "configuration",
       "title": "Configuration",
-      "file": "book/src/configuration.md",
+      "type": "multi-subsection",
+      "index_file": "book/src/configuration/index.md",
       "topics": [
         "Config files",
         "Options reference",
@@ -122,7 +123,51 @@
         "Customization"
       ],
       "validation": "Check config options match implementation in src/config/",
-      "auto_generated": false
+      "auto_generated": false,
+      "subsections": [
+        {
+          "id": "scoring",
+          "title": "Scoring Configuration",
+          "file": "book/src/configuration/scoring.md",
+          "topics": ["Scoring weights", "Role multipliers", "Coverage weights", "Role-based adjustments"],
+          "validation": "Check scoring configuration options"
+        },
+        {
+          "id": "thresholds",
+          "title": "Thresholds Configuration",
+          "file": "book/src/configuration/thresholds.md",
+          "topics": ["Basic thresholds", "Minimum thresholds", "Validation thresholds", "Coverage expectations"],
+          "validation": "Check threshold configuration options"
+        },
+        {
+          "id": "languages",
+          "title": "Language Configuration",
+          "file": "book/src/configuration/languages.md",
+          "topics": ["Enabled languages", "Language-specific features", "Exclusion patterns", "Classification"],
+          "validation": "Check language configuration options"
+        },
+        {
+          "id": "display-output",
+          "title": "Display and Output",
+          "file": "book/src/configuration/display-output.md",
+          "topics": ["Display configuration", "Output formats", "Normalization"],
+          "validation": "Check display and output configuration"
+        },
+        {
+          "id": "advanced",
+          "title": "Advanced Options",
+          "file": "book/src/configuration/advanced.md",
+          "topics": ["Entropy analysis", "God object detection", "Context-aware detection", "Parallel processing"],
+          "validation": "Check advanced configuration options"
+        },
+        {
+          "id": "best-practices",
+          "title": "Best Practices",
+          "file": "book/src/configuration/best-practices.md",
+          "topics": ["Strict quality standards", "Legacy codebases", "Open source libraries", "CI/CD"],
+          "validation": "Check configuration best practices"
+        }
+      ]
     },
     {
       "id": "output-formats",
@@ -153,7 +198,8 @@
     {
       "id": "troubleshooting",
       "title": "Troubleshooting",
-      "file": "book/src/troubleshooting.md",
+      "type": "multi-subsection",
+      "index_file": "book/src/troubleshooting/index.md",
       "topics": [
         "Common issues",
         "Debug mode",
@@ -161,7 +207,58 @@
         "FAQ"
       ],
       "validation": "Check troubleshooting covers common user issues",
-      "auto_generated": false
+      "auto_generated": false,
+      "subsections": [
+        {
+          "id": "quick-fixes",
+          "title": "Quick Fixes",
+          "file": "book/src/troubleshooting/quick-fixes.md",
+          "topics": ["Quick fixes", "Common issues", "Parse errors", "Coverage issues"],
+          "validation": "Check quick fixes are current and comprehensive"
+        },
+        {
+          "id": "debug-mode",
+          "title": "Debug Mode",
+          "file": "book/src/troubleshooting/debug-mode.md",
+          "topics": ["Verbosity levels", "Diagnostic options", "Performance tips", "Environment variables"],
+          "validation": "Check debug options and performance tips are documented"
+        },
+        {
+          "id": "context-providers",
+          "title": "Context Provider Issues",
+          "file": "book/src/troubleshooting/context-providers.md",
+          "topics": ["Context provider errors", "Git history issues", "Dependency issues", "Critical path issues"],
+          "validation": "Check context provider troubleshooting is complete"
+        },
+        {
+          "id": "advanced-analysis",
+          "title": "Advanced Analysis Issues",
+          "file": "book/src/troubleshooting/advanced-analysis.md",
+          "topics": ["Multi-pass analysis", "Attribution", "God object detection", "Functional analysis"],
+          "validation": "Check advanced analysis troubleshooting is comprehensive"
+        },
+        {
+          "id": "error-messages",
+          "title": "Error Messages Reference",
+          "file": "book/src/troubleshooting/error-messages.md",
+          "topics": ["Error types", "Language-specific issues", "Boilerplate detection", "False positives"],
+          "validation": "Check error messages and language issues are documented"
+        },
+        {
+          "id": "output-issues",
+          "title": "Output and Command Issues",
+          "file": "book/src/troubleshooting/output-issues.md",
+          "topics": ["Output formatting", "Compare command", "Validate command", "Validate-improvement command"],
+          "validation": "Check output and command troubleshooting is complete"
+        },
+        {
+          "id": "faq",
+          "title": "FAQ",
+          "file": "book/src/troubleshooting/faq.md",
+          "topics": ["General questions", "Coverage questions", "Scoring questions", "Bug reports"],
+          "validation": "Check FAQ covers common user questions"
+        }
+      ]
     },
     {
       "id": "tiered-prioritization",
@@ -182,7 +279,8 @@
     {
       "id": "scoring-strategies",
       "title": "Scoring Strategies",
-      "file": "book/src/scoring-strategies.md",
+      "type": "multi-subsection",
+      "index_file": "book/src/scoring-strategies/index.md",
       "topics": [
         "File-level scoring",
         "Function-level scoring",
@@ -193,7 +291,51 @@
       ],
       "validation": "Check that file-level and function-level scoring differences are explained with use cases",
       "auto_generated": true,
-      "source_feature": "scoring_comparison"
+      "source_feature": "scoring_comparison",
+      "subsections": [
+        {
+          "id": "file-level",
+          "title": "File-Level Scoring",
+          "file": "book/src/scoring-strategies/file-level.md",
+          "topics": ["File aggregation", "Aggregation methods", "God object detection", "Architectural scoring"],
+          "validation": "Check file-level scoring formula and aggregation methods"
+        },
+        {
+          "id": "function-level",
+          "title": "Function-Level Scoring",
+          "file": "book/src/scoring-strategies/function-level.md",
+          "topics": ["Function scoring formula", "Constructor detection", "Role multipliers", "Metrics"],
+          "validation": "Check function-level scoring formula and constructor detection"
+        },
+        {
+          "id": "role-based",
+          "title": "Role-Based Adjustments",
+          "file": "book/src/scoring-strategies/role-based.md",
+          "topics": ["Coverage weighting", "Role multipliers", "Two-stage adjustments", "False positive reduction"],
+          "validation": "Check role-based adjustments and coverage weighting"
+        },
+        {
+          "id": "rebalanced",
+          "title": "Rebalanced Scoring",
+          "file": "book/src/scoring-strategies/rebalanced.md",
+          "topics": ["Multi-dimensional scoring", "Severity levels", "Generated code detection", "Presets"],
+          "validation": "Check rebalanced scoring presets and configuration"
+        },
+        {
+          "id": "exponential-scaling",
+          "title": "Exponential Scaling",
+          "file": "book/src/scoring-strategies/exponential-scaling.md",
+          "topics": ["Exponential scaling", "Risk boosting", "Pattern-specific exponents", "Score amplification"],
+          "validation": "Check exponential scaling configuration and examples"
+        },
+        {
+          "id": "data-flow",
+          "title": "Data Flow Scoring",
+          "file": "book/src/scoring-strategies/data-flow.md",
+          "topics": ["Purity spectrum", "Refactorability factor", "Pattern factor", "Data flow analysis"],
+          "validation": "Check data flow scoring configuration and examples"
+        }
+      ]
     },
     {
       "id": "prodigy-integration",
@@ -499,6 +641,42 @@
       "validation": "Check that boilerplate detection criteria, pattern types, and macro recommendations are documented",
       "auto_generated": true,
       "source_feature": "boilerplate_detection"
+    },
+    {
+      "id": "test-quality-analysis",
+      "title": "Test Quality Analysis",
+      "file": "book/src/test-quality-analysis.md",
+      "topics": [
+        "Assertion pattern detection",
+        "Test complexity analysis",
+        "Flaky test detection",
+        "Framework detection",
+        "Test type classification (unit, integration, property)",
+        "Fast vs slow test detection",
+        "Test quality recommendations"
+      ],
+      "validation": "Check that test quality detection patterns and classification are documented",
+      "auto_generated": true,
+      "source_feature": "test_quality_analysis"
+    },
+    {
+      "id": "semantic-classification",
+      "title": "Semantic Classification",
+      "file": "book/src/semantic-classification.md",
+      "topics": [
+        "Function role detection",
+        "Pure logic functions",
+        "Orchestrator functions",
+        "I/O wrapper functions",
+        "Entry point detection",
+        "Pattern match functions",
+        "AST-based role detection",
+        "Role-specific coverage expectations",
+        "Scoring adjustments by role"
+      ],
+      "validation": "Check that semantic role classification and detection criteria are documented",
+      "auto_generated": true,
+      "source_feature": "semantic_classification"
     }
   ]
 }

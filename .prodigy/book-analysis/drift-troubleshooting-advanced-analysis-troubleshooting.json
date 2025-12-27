@@ -1,0 +1,85 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "troubleshooting",
+  "subsection_id": "advanced-analysis-troubleshooting",
+  "subsection_title": "Advanced Analysis Issues",
+  "subsection_file": "book/src/troubleshooting/advanced-analysis.md",
+  "feature_mappings": [
+    "complexity_analysis.multi_pass",
+    "call_graph_analysis",
+    "god_object_detection",
+    "functional_analysis",
+    "debt_detection.patterns"
+  ],
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive and covers most advanced analysis features well. Minor issues with default threshold values that don't match codebase.",
+  "issues": [
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Pattern Detection Issues",
+      "description": "The --pattern-threshold example shows 0.8 as the value, but the default in the codebase is 0.7",
+      "current_content": "--pattern-threshold 0.8",
+      "should_be": "--pattern-threshold (default: 0.7)",
+      "fix_suggestion": "Either remove the specific value from the example or note that the default is 0.7",
+      "source_reference": "src/cli/args.rs:277"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Public API Detection Issues",
+      "description": "The --public-api-threshold example shows 0.5 as the value, but the default in the codebase is 0.7",
+      "current_content": "--public-api-threshold 0.5",
+      "should_be": "--public-api-threshold (default: 0.7)",
+      "fix_suggestion": "Either remove the specific value from the example or note that the default is 0.7",
+      "source_reference": "src/cli/args.rs:265"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Attribution",
+      "description": "The subsection topics mention 'Attribution' but there is no section in the documentation covering attribution troubleshooting",
+      "fix_suggestion": "Add a section on attribution analysis troubleshooting, or remove 'Attribution' from the topics list if not needed",
+      "source_reference": "src/analysis/attribution/mod.rs"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Pattern Detection Issues",
+      "description": "The documented patterns list (god_object, long_function, complex_conditional, deep_nesting) does not cover all detected patterns in the codebase (observer, singleton, factory, strategy, callback, template_method)",
+      "fix_suggestion": "Add note that --patterns flag accepts additional pattern types: observer, singleton, factory, strategy, callback, template_method",
+      "source_reference": "src/cli/args.rs:273"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of multi-pass analysis with clear when-to-disable guidance",
+    "Well-structured call graph debugging section with all available flags documented",
+    "Clear god object type explanations (god_class, god_file, god_module)",
+    "Functional analysis section covers all profile options (strict, balanced, lenient)",
+    "Good cross-references to related troubleshooting pages"
+  ],
+  "improvement_suggestions": [
+    "Add attribution troubleshooting section to match the topics list",
+    "Include a troubleshooting section for when analysis produces unexpected results",
+    "Document the interaction between multi-pass and context analysis flags"
+  ],
+  "cross_references": [
+    "quick-fixes",
+    "context-providers",
+    "debug-mode"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:22:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Multi-pass analysis",
+      "Call graph debugging",
+      "God object detection",
+      "Pattern detection",
+      "Functional analysis",
+      "Public API detection"
+    ],
+    "validation_focus": "Check advanced analysis troubleshooting is comprehensive"
+  }
+}

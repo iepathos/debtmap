@@ -1,0 +1,113 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "scoring-strategies",
+  "subsection_id": "rebalanced-scoring",
+  "subsection_title": "Rebalanced Scoring",
+  "subsection_file": "book/src/scoring-strategies/rebalanced.md",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Subsection file does not exist - must be created from scratch",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "The rebalanced.md file does not exist. The rebalanced scoring algorithm (Spec 136) is fully implemented in the codebase but has no documentation.",
+      "source_reference": "src/priority/scoring/rebalanced.rs",
+      "fix_suggestion": "Create book/src/scoring-strategies/rebalanced.md documenting the multi-dimensional scoring algorithm, severity levels, presets, and configuration"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Severity Levels",
+      "description": "Need to document the 4 severity levels (Critical, High, Medium, Low) and their determination logic based on normalized total scores (0-200 range)",
+      "source_reference": "src/priority/scoring/rebalanced.rs:12-30 (Severity enum), :416-448 (determine_severity)",
+      "fix_suggestion": "Add section explaining severity level thresholds: Critical (>120 or high complexity+coverage), High (>80), Medium (>40), Low (everything else)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Score Components",
+      "description": "Need to document the 5 score components: complexity_score (0-100), coverage_score (0-80), structural_score (0-60), size_score (0-30), smell_score (0-40)",
+      "source_reference": "src/priority/scoring/rebalanced.rs:32-55 (ScoreComponents struct)",
+      "fix_suggestion": "Add table documenting each component, its weight range, and what it measures"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Presets",
+      "description": "Need to document the 4 weight presets: balanced (default), quality-focused, size-focused (legacy), test-coverage-focused",
+      "source_reference": "src/priority/scoring/rebalanced.rs:73-127 (ScoreWeights presets)",
+      "fix_suggestion": "Add table comparing preset weights and when to use each preset"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Generated Code Detection",
+      "description": "Need to document the 90% size score reduction for generated files (.generated.rs, .pb.rs, .g.rs, etc.)",
+      "source_reference": "src/priority/scoring/rebalanced.rs:450-467 (is_generated_file), :246-249 (reduction logic)",
+      "fix_suggestion": "Add section explaining how generated code is detected and why its size score is reduced"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration",
+      "description": "Need to document RebalancedScoringConfig options for preset selection and custom weight overrides",
+      "source_reference": "src/config/scoring.rs:495-554 (RebalancedScoringConfig)",
+      "fix_suggestion": "Add TOML configuration example showing preset selection and custom weight overrides via scoring_rebalanced section"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Scoring Rationale",
+      "description": "Need to document the ScoringRationale struct that explains why a score was assigned (primary factors, bonuses, context adjustments)",
+      "source_reference": "src/priority/scoring/rebalanced.rs:130-223 (ScoringRationale)",
+      "fix_suggestion": "Add section explaining how to interpret scoring rationale output in reports"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Score Normalization",
+      "description": "Need to document how weighted totals are normalized to 0-200 range",
+      "source_reference": "src/priority/scoring/rebalanced.rs:44-54 (weighted_total normalization)",
+      "fix_suggestion": "Explain the normalization formula: (raw_total / 237.0) * 200.0"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Complexity Scoring Details",
+      "description": "Need to document how cyclomatic and cognitive complexity map to complexity_score",
+      "source_reference": "src/priority/scoring/rebalanced.rs:265-317 (score_complexity)",
+      "fix_suggestion": "Add breakdown table showing cyclomatic thresholds (5, 10, 15, 20, 30) mapping to scores (20, 40, 60, 80, 100) plus cognitive bonuses"
+    }
+  ],
+  "positive_aspects": [
+    "File-level.md provides a good template for subsection structure",
+    "The rebalanced scoring implementation is comprehensive and well-tested",
+    "Clear preset system makes configuration user-friendly",
+    "ScoringRationale provides excellent transparency for users"
+  ],
+  "improvement_suggestions": [
+    "Follow the structure of file-level.md for consistency",
+    "Include TOML configuration examples for each preset",
+    "Add comparison section explaining how rebalanced scoring differs from legacy scoring",
+    "Include CLI usage examples showing how to select presets",
+    "Add cross-references to file-level.md and function-level.md"
+  ],
+  "cross_references": [
+    "file-level-scoring",
+    "function-level-scoring",
+    "role-based-adjustments"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Multi-dimensional scoring", "Severity levels", "Generated code detection", "Presets"],
+    "validation_focus": "Check rebalanced scoring presets and configuration",
+    "primary_source_files": [
+      "src/priority/scoring/rebalanced.rs",
+      "src/config/scoring.rs"
+    ]
+  }
+}

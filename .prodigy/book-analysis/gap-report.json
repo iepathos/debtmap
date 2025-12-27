@@ -1,12 +1,129 @@
 {
-  "analysis_date": "2025-12-04T13:59:08.808354",
-  "features_analyzed": 13,
+  "analysis_date": "2025-12-27T00:00:00.000000",
+  "features_analyzed": 17,
   "meta_features_excluded": [
     "meta_content",
     "architecture"
   ],
-  "documented_topics": 28,
-  "gaps_found": 0,
-  "gaps": [],
-  "actions_taken": []
+  "documented_topics": 35,
+  "gaps_found": 2,
+  "gaps": [
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "test_quality_analysis",
+      "feature_description": "Analyze quality and patterns in test code including assertion patterns, test complexity, flaky test detection, and framework detection",
+      "recommended_chapter_id": "test-quality-analysis",
+      "recommended_title": "Test Quality Analysis",
+      "recommended_location": "book/src/test-quality-analysis.md",
+      "rationale": "Major feature in features.json deserves dedicated chapter rather than being scattered across debt-patterns and coverage-integration"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "semantic_classification",
+      "feature_description": "Semantic role classification for functions including pure_logic, orchestrator, io_wrapper, entry_point, and pattern_match roles",
+      "recommended_chapter_id": "semantic-classification",
+      "recommended_title": "Semantic Classification",
+      "recommended_location": "book/src/semantic-classification.md",
+      "rationale": "Major feature in features.json with distinct detection criteria and role-specific coverage expectations deserves dedicated documentation"
+    }
+  ],
+  "actions_taken": [
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "test-quality-analysis",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "semantic-classification",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/test-quality-analysis.md",
+      "type": "chapter"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/semantic-classification.md",
+      "type": "chapter"
+    },
+    {
+      "action": "updated_summary",
+      "file_path": "book/src/SUMMARY.md",
+      "items_added": [
+        {"type": "chapter", "id": "test-quality-analysis"},
+        {"type": "chapter", "id": "semantic-classification"}
+      ]
+    },
+    {
+      "action": "regenerated_flattened_items",
+      "file_path": ".prodigy/book-analysis/flattened-items.json",
+      "items_count": 55
+    }
+  ],
+  "feature_coverage": {
+    "cli_interface": {
+      "status": "covered",
+      "chapters": ["cli-reference", "getting-started"]
+    },
+    "complexity_analysis": {
+      "status": "covered",
+      "chapters": ["analysis-guide/complexity-metrics", "analysis-guide/overview"]
+    },
+    "debt_detection": {
+      "status": "covered",
+      "chapters": ["analysis-guide/debt-patterns"]
+    },
+    "risk_assessment": {
+      "status": "covered",
+      "chapters": ["analysis-guide/risk-scoring", "tiered-prioritization"]
+    },
+    "coverage_integration": {
+      "status": "covered",
+      "chapters": ["coverage-integration"]
+    },
+    "call_graph_analysis": {
+      "status": "covered",
+      "chapters": ["call-graph-analysis"]
+    },
+    "god_object_detection": {
+      "status": "covered",
+      "chapters": ["god-object-detection"]
+    },
+    "boilerplate_detection": {
+      "status": "covered",
+      "chapters": ["boilerplate-detection"]
+    },
+    "functional_analysis": {
+      "status": "covered",
+      "chapters": ["functional-analysis"]
+    },
+    "output_formats": {
+      "status": "covered",
+      "chapters": ["output-formats", "analysis-guide/example-outputs"]
+    },
+    "configuration": {
+      "status": "covered",
+      "chapters": ["configuration", "threshold-configuration"]
+    },
+    "parallel_processing": {
+      "status": "covered",
+      "chapters": ["parallel-processing"]
+    },
+    "comparison_workflow": {
+      "status": "covered",
+      "chapters": ["compare-analysis", "validation-gates"]
+    },
+    "test_quality_analysis": {
+      "status": "gap_filled",
+      "chapters": ["test-quality-analysis"]
+    },
+    "semantic_classification": {
+      "status": "gap_filled",
+      "chapters": ["semantic-classification"]
+    }
+  }
 }

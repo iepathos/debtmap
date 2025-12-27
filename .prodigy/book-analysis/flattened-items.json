@@ -3,571 +3,499 @@
     "id": "introduction",
     "title": "Introduction",
     "file": "book/src/introduction.md",
-    "topics": [
-      "What is Debtmap",
-      "Why use it",
-      "Key features",
-      "Target audience"
-    ],
+    "topics": ["What is Debtmap", "Why use it", "Key features", "Target audience"],
     "validation": "Ensure introduction covers project purpose and main features",
-    "type": "single-file",
-    "auto_generated": false
+    "type": "single-file"
   },
   {
     "id": "getting-started",
     "title": "Getting Started",
     "file": "book/src/getting-started.md",
-    "topics": [
-      "Installation",
-      "Quick start",
-      "First analysis",
-      "Basic usage"
-    ],
+    "topics": ["Installation", "Quick start", "First analysis", "Basic usage"],
     "validation": "Check installation instructions and quick start examples are current",
-    "type": "single-file",
-    "auto_generated": false
+    "type": "single-file"
   },
   {
     "id": "cli-reference",
     "title": "CLI Reference",
     "file": "book/src/cli-reference.md",
-    "topics": [
-      "Commands",
-      "Arguments",
-      "Options",
-      "Configuration"
-    ],
+    "topics": ["Commands", "Arguments", "Options", "Configuration"],
     "validation": "Verify all CLI commands from src/cli/ are documented with current options",
-    "type": "single-file",
-    "auto_generated": false
+    "type": "single-file"
   },
   {
     "id": "overview",
     "title": "Overview",
     "file": "book/src/analysis-guide/overview.md",
-    "topics": [
-      "Analysis capabilities",
-      "Overall approach"
-    ],
-    "validation": "Check introduction covers analysis fundamentals",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Analysis capabilities", "Overall approach"],
+    "validation": "Check introduction covers analysis fundamentals"
   },
   {
     "id": "complexity-metrics",
     "title": "Complexity Metrics",
     "file": "book/src/analysis-guide/complexity-metrics.md",
-    "topics": [
-      "Cyclomatic complexity",
-      "Cognitive complexity",
-      "Entropy analysis",
-      "Constructor detection"
-    ],
-    "validation": "Verify all complexity metric types are documented with examples",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Cyclomatic complexity", "Cognitive complexity", "Entropy analysis", "Constructor detection"],
+    "validation": "Verify all complexity metric types are documented with examples"
   },
   {
     "id": "debt-patterns",
     "title": "Debt Patterns",
     "file": "book/src/analysis-guide/debt-patterns.md",
-    "topics": [
-      "Debt types",
-      "Debt categories",
-      "Detection criteria",
-      "Examples by category"
-    ],
-    "validation": "Ensure all 25 debt types are documented with detection criteria",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Debt types", "Debt categories", "Detection criteria", "Examples by category"],
+    "validation": "Ensure all 25 debt types are documented with detection criteria"
   },
   {
     "id": "risk-scoring",
     "title": "Risk Scoring",
     "file": "book/src/analysis-guide/risk-scoring.md",
-    "topics": [
-      "Unified scoring system",
-      "Risk categories",
-      "Coverage propagation",
-      "ROI calculation"
-    ],
-    "validation": "Check risk scoring formulas and prioritization strategies",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Unified scoring system", "Risk categories", "Coverage propagation", "ROI calculation"],
+    "validation": "Check risk scoring formulas and prioritization strategies"
   },
   {
     "id": "interpreting-results",
     "title": "Interpreting Results",
     "file": "book/src/analysis-guide/interpreting-results.md",
-    "topics": [
-      "Output formats",
-      "JSON structure",
-      "Prioritization strategies",
-      "Actionable insights"
-    ],
-    "validation": "Verify result interpretation guidance is comprehensive",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Output formats", "JSON structure", "Prioritization strategies", "Actionable insights"],
+    "validation": "Verify result interpretation guidance is comprehensive"
   },
   {
     "id": "analyzer-types",
     "title": "Analyzer Types",
     "file": "book/src/analysis-guide/analyzer-types.md",
-    "topics": [
-      "Supported languages",
-      "Language detection",
-      "Analyzer capabilities"
-    ],
-    "validation": "Check analyzer type documentation is current",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Supported languages", "Language detection", "Analyzer capabilities"],
+    "validation": "Check analyzer type documentation is current"
   },
   {
     "id": "advanced-features",
     "title": "Advanced Features",
     "file": "book/src/analysis-guide/advanced-features.md",
-    "topics": [
-      "Purity detection",
-      "Data flow analysis",
-      "Entropy caching",
-      "Context-aware analysis"
-    ],
-    "validation": "Ensure advanced features are fully documented",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Purity detection", "Data flow analysis", "Entropy caching", "Context-aware analysis"],
+    "validation": "Ensure advanced features are fully documented"
   },
   {
     "id": "example-outputs",
     "title": "Example Outputs",
     "file": "book/src/analysis-guide/example-outputs.md",
-    "topics": [
-      "Terminal output examples",
-      "JSON output examples",
-      "Before/after comparisons"
-    ],
-    "validation": "Verify examples are realistic and helpful",
-    "type": "subsection",
     "parent_chapter_id": "analysis-guide",
-    "parent_chapter_title": "Analysis Guide"
+    "parent_chapter_title": "Analysis Guide",
+    "type": "subsection",
+    "topics": ["Terminal output examples", "JSON output examples", "Before/after comparisons"],
+    "validation": "Verify examples are realistic and helpful"
   },
   {
-    "id": "configuration",
-    "title": "Configuration",
-    "file": "book/src/configuration.md",
-    "topics": [
-      "Config files",
-      "Options reference",
-      "Exclusion patterns",
-      "Customization"
-    ],
-    "validation": "Check config options match implementation in src/config/",
-    "type": "single-file",
-    "auto_generated": false
+    "id": "scoring-config",
+    "title": "Scoring Configuration",
+    "file": "book/src/configuration/scoring.md",
+    "parent_chapter_id": "configuration",
+    "parent_chapter_title": "Configuration",
+    "type": "subsection",
+    "topics": ["Scoring weights", "Role multipliers", "Coverage weights", "Role-based adjustments"],
+    "validation": "Check scoring configuration options"
+  },
+  {
+    "id": "thresholds-config",
+    "title": "Thresholds Configuration",
+    "file": "book/src/configuration/thresholds.md",
+    "parent_chapter_id": "configuration",
+    "parent_chapter_title": "Configuration",
+    "type": "subsection",
+    "topics": ["Basic thresholds", "Minimum thresholds", "Validation thresholds", "Coverage expectations"],
+    "validation": "Check threshold configuration options"
+  },
+  {
+    "id": "languages-config",
+    "title": "Language Configuration",
+    "file": "book/src/configuration/languages.md",
+    "parent_chapter_id": "configuration",
+    "parent_chapter_title": "Configuration",
+    "type": "subsection",
+    "topics": ["Enabled languages", "Language-specific features", "Exclusion patterns", "Classification"],
+    "validation": "Check language configuration options"
+  },
+  {
+    "id": "display-output-config",
+    "title": "Display and Output",
+    "file": "book/src/configuration/display-output.md",
+    "parent_chapter_id": "configuration",
+    "parent_chapter_title": "Configuration",
+    "type": "subsection",
+    "topics": ["Display configuration", "Output formats", "Normalization"],
+    "validation": "Check display and output configuration"
+  },
+  {
+    "id": "advanced-config",
+    "title": "Advanced Options",
+    "file": "book/src/configuration/advanced.md",
+    "parent_chapter_id": "configuration",
+    "parent_chapter_title": "Configuration",
+    "type": "subsection",
+    "topics": ["Entropy analysis", "God object detection", "Context-aware detection", "Parallel processing"],
+    "validation": "Check advanced configuration options"
+  },
+  {
+    "id": "best-practices-config",
+    "title": "Best Practices",
+    "file": "book/src/configuration/best-practices.md",
+    "parent_chapter_id": "configuration",
+    "parent_chapter_title": "Configuration",
+    "type": "subsection",
+    "topics": ["Strict quality standards", "Legacy codebases", "Open source libraries", "CI/CD"],
+    "validation": "Check configuration best practices"
   },
   {
     "id": "output-formats",
     "title": "Output Formats",
     "file": "book/src/output-formats.md",
-    "topics": [
-      "JSON output",
-      "Text reports",
-      "Integration with tools",
-      "Custom formatting"
-    ],
+    "topics": ["JSON output", "Text reports", "Integration with tools", "Custom formatting"],
     "validation": "Verify output format documentation matches src/io/ implementation",
-    "type": "single-file",
-    "auto_generated": false
+    "type": "single-file"
   },
   {
     "id": "examples",
     "title": "Examples",
     "file": "book/src/examples.md",
-    "topics": [
-      "Analyzing Rust projects",
-      "Python analysis",
-      "JavaScript/TypeScript",
-      "CI integration"
-    ],
+    "topics": ["Analyzing Rust projects", "Python analysis", "JavaScript/TypeScript", "CI integration"],
     "validation": "Ensure examples use current CLI syntax and options",
-    "type": "single-file",
-    "auto_generated": false
+    "type": "single-file"
   },
   {
-    "id": "troubleshooting",
-    "title": "Troubleshooting",
-    "file": "book/src/troubleshooting.md",
-    "topics": [
-      "Common issues",
-      "Debug mode",
-      "Performance tips",
-      "FAQ"
-    ],
-    "validation": "Check troubleshooting covers common user issues",
-    "type": "single-file",
-    "auto_generated": false
+    "id": "quick-fixes",
+    "title": "Quick Fixes",
+    "file": "book/src/troubleshooting/quick-fixes.md",
+    "parent_chapter_id": "troubleshooting",
+    "parent_chapter_title": "Troubleshooting",
+    "type": "subsection",
+    "topics": ["Quick fixes", "Common issues", "Parse errors", "Coverage issues"],
+    "validation": "Check quick fixes are current and comprehensive"
+  },
+  {
+    "id": "debug-mode",
+    "title": "Debug Mode",
+    "file": "book/src/troubleshooting/debug-mode.md",
+    "parent_chapter_id": "troubleshooting",
+    "parent_chapter_title": "Troubleshooting",
+    "type": "subsection",
+    "topics": ["Verbosity levels", "Diagnostic options", "Performance tips", "Environment variables"],
+    "validation": "Check debug options and performance tips are documented"
+  },
+  {
+    "id": "context-providers-troubleshooting",
+    "title": "Context Provider Issues",
+    "file": "book/src/troubleshooting/context-providers.md",
+    "parent_chapter_id": "troubleshooting",
+    "parent_chapter_title": "Troubleshooting",
+    "type": "subsection",
+    "topics": ["Context provider errors", "Git history issues", "Dependency issues", "Critical path issues"],
+    "validation": "Check context provider troubleshooting is complete"
+  },
+  {
+    "id": "advanced-analysis-troubleshooting",
+    "title": "Advanced Analysis Issues",
+    "file": "book/src/troubleshooting/advanced-analysis.md",
+    "parent_chapter_id": "troubleshooting",
+    "parent_chapter_title": "Troubleshooting",
+    "type": "subsection",
+    "topics": ["Multi-pass analysis", "Attribution", "God object detection", "Functional analysis"],
+    "validation": "Check advanced analysis troubleshooting is comprehensive"
+  },
+  {
+    "id": "error-messages-troubleshooting",
+    "title": "Error Messages Reference",
+    "file": "book/src/troubleshooting/error-messages.md",
+    "parent_chapter_id": "troubleshooting",
+    "parent_chapter_title": "Troubleshooting",
+    "type": "subsection",
+    "topics": ["Error types", "Language-specific issues", "Boilerplate detection", "False positives"],
+    "validation": "Check error messages and language issues are documented"
+  },
+  {
+    "id": "output-issues-troubleshooting",
+    "title": "Output and Command Issues",
+    "file": "book/src/troubleshooting/output-issues.md",
+    "parent_chapter_id": "troubleshooting",
+    "parent_chapter_title": "Troubleshooting",
+    "type": "subsection",
+    "topics": ["Output formatting", "Compare command", "Validate command", "Validate-improvement command"],
+    "validation": "Check output and command troubleshooting is complete"
+  },
+  {
+    "id": "faq-troubleshooting",
+    "title": "FAQ",
+    "file": "book/src/troubleshooting/faq.md",
+    "parent_chapter_id": "troubleshooting",
+    "parent_chapter_title": "Troubleshooting",
+    "type": "subsection",
+    "topics": ["General questions", "Coverage questions", "Scoring questions", "Bug reports"],
+    "validation": "Check FAQ covers common user questions"
   },
   {
     "id": "tiered-prioritization",
     "title": "Tiered Prioritization",
     "file": "book/src/tiered-prioritization.md",
-    "topics": [
-      "Tier 1: Critical Architecture",
-      "Tier 2: Complex Untested",
-      "Tier 3: Testing Gaps",
-      "Tier 4: Maintenance",
-      "Tier weights and configuration",
-      "Customizing tier thresholds"
-    ],
+    "topics": ["Tier 1: Critical Architecture", "Tier 2: Complex Untested", "Tier 3: Testing Gaps", "Tier 4: Maintenance", "Tier weights and configuration", "Customizing tier thresholds"],
     "validation": "Check that tier strategy, weights, and configuration options are documented with examples",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "tiered_prioritization"
   },
   {
-    "id": "scoring-strategies",
-    "title": "Scoring Strategies",
-    "file": "book/src/scoring-strategies.md",
-    "topics": [
-      "File-level scoring",
-      "Function-level scoring",
-      "When to use each approach",
-      "Aggregation methods",
-      "Score normalization",
-      "Use case comparison"
-    ],
-    "validation": "Check that file-level and function-level scoring differences are explained with use cases",
-    "type": "single-file",
-    "auto_generated": true,
-    "source_feature": "scoring_comparison"
+    "id": "file-level-scoring",
+    "title": "File-Level Scoring",
+    "file": "book/src/scoring-strategies/file-level.md",
+    "parent_chapter_id": "scoring-strategies",
+    "parent_chapter_title": "Scoring Strategies",
+    "type": "subsection",
+    "topics": ["File aggregation", "Aggregation methods", "God object detection", "Architectural scoring"],
+    "validation": "Check file-level scoring formula and aggregation methods"
+  },
+  {
+    "id": "function-level-scoring",
+    "title": "Function-Level Scoring",
+    "file": "book/src/scoring-strategies/function-level.md",
+    "parent_chapter_id": "scoring-strategies",
+    "parent_chapter_title": "Scoring Strategies",
+    "type": "subsection",
+    "topics": ["Function scoring formula", "Constructor detection", "Role multipliers", "Metrics"],
+    "validation": "Check function-level scoring formula and constructor detection"
+  },
+  {
+    "id": "role-based-scoring",
+    "title": "Role-Based Adjustments",
+    "file": "book/src/scoring-strategies/role-based.md",
+    "parent_chapter_id": "scoring-strategies",
+    "parent_chapter_title": "Scoring Strategies",
+    "type": "subsection",
+    "topics": ["Coverage weighting", "Role multipliers", "Two-stage adjustments", "False positive reduction"],
+    "validation": "Check role-based adjustments and coverage weighting"
+  },
+  {
+    "id": "rebalanced-scoring",
+    "title": "Rebalanced Scoring",
+    "file": "book/src/scoring-strategies/rebalanced.md",
+    "parent_chapter_id": "scoring-strategies",
+    "parent_chapter_title": "Scoring Strategies",
+    "type": "subsection",
+    "topics": ["Multi-dimensional scoring", "Severity levels", "Generated code detection", "Presets"],
+    "validation": "Check rebalanced scoring presets and configuration"
+  },
+  {
+    "id": "exponential-scaling-scoring",
+    "title": "Exponential Scaling",
+    "file": "book/src/scoring-strategies/exponential-scaling.md",
+    "parent_chapter_id": "scoring-strategies",
+    "parent_chapter_title": "Scoring Strategies",
+    "type": "subsection",
+    "topics": ["Exponential scaling", "Risk boosting", "Pattern-specific exponents", "Score amplification"],
+    "validation": "Check exponential scaling configuration and examples"
+  },
+  {
+    "id": "data-flow-scoring",
+    "title": "Data Flow Scoring",
+    "file": "book/src/scoring-strategies/data-flow.md",
+    "parent_chapter_id": "scoring-strategies",
+    "parent_chapter_title": "Scoring Strategies",
+    "type": "subsection",
+    "topics": ["Purity spectrum", "Refactorability factor", "Pattern factor", "Data flow analysis"],
+    "validation": "Check data flow scoring configuration and examples"
   },
   {
     "id": "prodigy-integration",
     "title": "Prodigy Integration",
     "file": "book/src/prodigy-integration.md",
-    "topics": [
-      "What is Prodigy",
-      "Automated debt reduction",
-      "Map-reduce workflows",
-      "Setting up Prodigy",
-      "Running debtmap workflows",
-      "Iterative improvement",
-      "Validation and testing"
-    ],
+    "topics": ["What is Prodigy", "Automated debt reduction", "Map-reduce workflows", "Setting up Prodigy", "Running debtmap workflows", "Iterative improvement", "Validation and testing"],
     "validation": "Check that Prodigy workflow integration is documented with workflow file examples",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "prodigy_workflows"
   },
   {
     "id": "parallel-processing",
     "title": "Parallel Processing",
     "file": "book/src/parallel-processing.md",
-    "topics": [
-      "Rayon parallel iterators",
-      "Thread pool configuration",
-      "Worker thread tuning",
-      "Lock-free concurrent access with DashMap",
-      "Performance benchmarks",
-      "Scaling strategies"
-    ],
+    "topics": ["Rayon parallel iterators", "Thread pool configuration", "Worker thread tuning", "Lock-free concurrent access with DashMap", "Performance benchmarks", "Scaling strategies"],
     "validation": "Check that parallel processing features, thread configuration, and performance characteristics are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "parallel_processing"
   },
   {
     "id": "entropy-analysis",
     "title": "Entropy Analysis",
     "file": "book/src/entropy-analysis.md",
-    "topics": [
-      "Shannon entropy calculation",
-      "Pattern repetition detection",
-      "Branch similarity analysis",
-      "Token classification",
-      "Effective complexity adjustment",
-      "Configuration options",
-      "False positive reduction"
-    ],
+    "topics": ["Shannon entropy calculation", "Pattern repetition detection", "Branch similarity analysis", "Token classification", "Effective complexity adjustment", "Configuration options", "False positive reduction"],
     "validation": "Check that entropy analysis algorithm, components, and configuration are documented with examples",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "entropy_based_analysis"
   },
   {
     "id": "coverage-integration",
     "title": "Coverage Integration",
     "file": "book/src/coverage-integration.md",
-    "topics": [
-      "LCOV format support",
-      "Generating coverage with cargo-tarpaulin",
-      "Coverage for other languages (pytest, jest, go test)",
-      "Coverage index performance",
-      "Transitive coverage propagation",
-      "Troubleshooting coverage correlation",
-      "Best practices"
-    ],
+    "topics": ["LCOV format support", "Generating coverage with cargo-tarpaulin", "Coverage for other languages (pytest, jest, go test)", "Coverage index performance", "Transitive coverage propagation", "Troubleshooting coverage correlation", "Best practices"],
     "validation": "Check that coverage setup, tool integration, and troubleshooting are documented for all supported languages",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "coverage_integration"
   },
   {
     "id": "god-object-detection",
     "title": "God Object Detection",
     "file": "book/src/god-object-detection.md",
-    "topics": [
-      "Detection criteria (method count, field count, responsibilities)",
-      "God object scoring algorithm",
-      "Thresholds and configuration",
-      "File-level aggregation",
-      "Refactoring recommendations",
-      "Examples and case studies"
-    ],
+    "topics": ["Detection criteria (method count, field count, responsibilities)", "God object scoring algorithm", "Thresholds and configuration", "File-level aggregation", "Refactoring recommendations", "Examples and case studies"],
     "validation": "Check that god object detection algorithm, scoring, and configuration options are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "god_object_detection"
   },
   {
     "id": "suppression-patterns",
     "title": "Suppression Patterns",
     "file": "book/src/suppression-patterns.md",
-    "topics": [
-      "Inline comment suppression",
-      "Suppression formats (ignore, ignore-next-line, ignore blocks)",
-      "Type-specific suppression",
-      "Config file exclusion patterns",
-      "Glob pattern syntax",
-      "Best practices for suppression"
-    ],
+    "topics": ["Inline comment suppression", "Suppression formats (ignore, ignore-next-line, ignore blocks)", "Type-specific suppression", "Config file exclusion patterns", "Glob pattern syntax", "Best practices for suppression"],
     "validation": "Check that all suppression formats and config patterns are documented with examples",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "suppression"
   },
   {
     "id": "context-providers",
     "title": "Context Providers",
     "file": "book/src/context-providers.md",
-    "topics": [
-      "Critical path detection",
-      "Dependency analysis",
-      "Git history integration",
-      "Change frequency analysis",
-      "Context-aware risk adjustment",
-      "Enabling and disabling providers"
-    ],
+    "topics": ["Critical path detection", "Dependency analysis", "Git history integration", "Change frequency analysis", "Context-aware risk adjustment", "Enabling and disabling providers"],
     "validation": "Check that all context providers are documented with configuration and use cases",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "context_providers"
   },
   {
     "id": "design-patterns",
     "title": "Design Pattern Detection",
     "file": "book/src/design-patterns.md",
-    "topics": [
-      "Observer pattern detection",
-      "Singleton pattern detection",
-      "Factory pattern detection",
-      "Strategy pattern detection",
-      "Callback pattern detection",
-      "Template method pattern detection",
-      "Dependency injection detection",
-      "Builder pattern detection",
-      "Pattern confidence thresholds",
-      "Configuration options"
-    ],
+    "topics": ["Observer pattern detection", "Singleton pattern detection", "Factory pattern detection", "Strategy pattern detection", "Callback pattern detection", "Template method pattern detection", "Dependency injection detection", "Builder pattern detection", "Pattern confidence thresholds", "Configuration options"],
     "validation": "Check that all 8 design patterns are documented with detection criteria and examples",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "design_patterns_detected"
   },
   {
     "id": "compare-analysis",
     "title": "Compare Analysis",
     "file": "book/src/compare-analysis.md",
-    "topics": [
-      "Compare command usage",
-      "Target location tracking",
-      "Project health trends",
-      "Regression detection",
-      "Before/after metrics comparison",
-      "Improvement percentage calculations",
-      "Integration with CI/CD"
-    ],
+    "topics": ["Compare command usage", "Target location tracking", "Project health trends", "Regression detection", "Before/after metrics comparison", "Improvement percentage calculations", "Integration with CI/CD"],
     "validation": "Check that compare command features and workflow integration are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "compare_command"
   },
   {
     "id": "validation-gates",
     "title": "Validation and Quality Gates",
     "file": "book/src/validation-gates.md",
-    "topics": [
-      "Validate command usage",
-      "Debt density thresholds",
-      "Quality gate configuration",
-      "CI/CD integration",
-      "Exit codes and automation",
-      "Custom validation rules"
-    ],
+    "topics": ["Validate command usage", "Debt density thresholds", "Quality gate configuration", "CI/CD integration", "Exit codes and automation", "Custom validation rules"],
     "validation": "Check that validate command and quality gate configuration are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "validate_command"
   },
   {
     "id": "error-handling-analysis",
     "title": "Error Handling Analysis",
     "file": "book/src/error-handling-analysis.md",
-    "topics": [
-      "Error swallowing detection",
-      "Error propagation patterns",
-      "Panic pattern detection",
-      "Python error handling patterns",
-      "Best practices",
-      "Severity levels",
-      "Recommendations"
-    ],
+    "topics": ["Error swallowing detection", "Error propagation patterns", "Panic pattern detection", "Python error handling patterns", "Best practices", "Severity levels", "Recommendations"],
     "validation": "Check that all error handling patterns are documented with detection criteria",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "error_handling_patterns"
   },
   {
     "id": "architectural-analysis",
     "title": "Architectural Analysis",
     "file": "book/src/architectural-analysis.md",
-    "topics": [
-      "Circular dependency detection",
-      "Coupling metrics (afferent, efferent)",
-      "Bidirectional dependencies",
-      "Stable dependencies principle",
-      "Zone of pain detection",
-      "Zone of uselessness detection",
-      "Code duplication detection",
-      "Refactoring recommendations"
-    ],
+    "topics": ["Circular dependency detection", "Coupling metrics (afferent, efferent)", "Bidirectional dependencies", "Stable dependencies principle", "Zone of pain detection", "Zone of uselessness detection", "Code duplication detection", "Refactoring recommendations"],
     "validation": "Check that architectural pattern detection and coupling analysis are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "architectural_patterns"
   },
   {
     "id": "multi-pass-analysis",
     "title": "Multi-Pass Analysis",
     "file": "book/src/multi-pass-analysis.md",
-    "topics": [
-      "Multi-pass analysis overview",
-      "Complexity attribution",
-      "Attribution display options",
-      "Configuration and usage",
-      "Performance considerations"
-    ],
+    "topics": ["Multi-pass analysis overview", "Complexity attribution", "Attribution display options", "Configuration and usage", "Performance considerations"],
     "validation": "Check that multi-pass analysis and attribution features are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "multi_pass_analysis"
   },
   {
     "id": "functional-analysis",
     "title": "Functional Composition Analysis",
     "file": "book/src/functional-analysis.md",
-    "topics": [
-      "AST-based functional analysis",
-      "Pure function detection",
-      "Side effect detection",
-      "Composition pattern recognition",
-      "Purity profiles (strict, balanced, lenient)",
-      "Scoring and distribution analysis"
-    ],
+    "topics": ["AST-based functional analysis", "Pure function detection", "Side effect detection", "Composition pattern recognition", "Purity profiles (strict, balanced, lenient)", "Scoring and distribution analysis"],
     "validation": "Check that functional composition analysis features are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "functional_composition"
   },
   {
     "id": "threshold-configuration",
     "title": "Threshold Configuration",
     "file": "book/src/threshold-configuration.md",
-    "topics": [
-      "Threshold presets (strict, balanced, lenient)",
-      "Custom threshold configuration",
-      "Language-specific thresholds",
-      "Cyclomatic complexity thresholds",
-      "God object thresholds",
-      "Tuning guidelines"
-    ],
+    "topics": ["Threshold presets (strict, balanced, lenient)", "Custom threshold configuration", "Language-specific thresholds", "Cyclomatic complexity thresholds", "God object thresholds", "Tuning guidelines"],
     "validation": "Check that all threshold presets and configuration options are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "threshold_presets"
   },
   {
     "id": "dead-code-analysis",
     "title": "Dead Code Analysis",
     "file": "book/src/dead-code-analysis.md",
-    "topics": [
-      "Public API detection heuristics",
-      "Confidence thresholds",
-      "Dead code identification",
-      "Configuration options",
-      "Best practices"
-    ],
+    "topics": ["Public API detection heuristics", "Confidence thresholds", "Dead code identification", "Configuration options", "Best practices"],
     "validation": "Check that dead code analysis and public API detection are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "dead_code_analysis"
   },
   {
     "id": "call-graph-analysis",
     "title": "Call Graph Analysis",
     "file": "book/src/call-graph-analysis.md",
-    "topics": [
-      "AST-based call graph construction",
-      "Trait method resolution",
-      "Macro expansion tracking",
-      "Import and module path resolution",
-      "Caller/callee relationship tracking",
-      "Critical path identification",
-      "Circular dependency detection",
-      "Call graph validation and debugging",
-      "Parallel call graph construction",
-      "External crate call filtering",
-      "Dependency display in output",
-      "Configurable caller/callee limits"
-    ],
+    "topics": ["AST-based call graph construction", "Trait method resolution", "Macro expansion tracking", "Import and module path resolution", "Caller/callee relationship tracking", "Critical path identification", "Circular dependency detection", "Call graph validation and debugging", "Parallel call graph construction", "External crate call filtering", "Dependency display in output", "Configurable caller/callee limits"],
     "validation": "Check that call graph construction, resolution mechanisms, and visualization options are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "call_graph_analysis"
   },
   {
     "id": "boilerplate-detection",
     "title": "Boilerplate Detection",
     "file": "book/src/boilerplate-detection.md",
-    "topics": [
-      "Detection criteria for repetitive patterns",
-      "Trait implementation analysis",
-      "Method uniformity calculation",
-      "Pattern types (trait implementations, builders, state machines)",
-      "Boilerplate scoring algorithm",
-      "Macro-ification recommendations",
-      "Configuration and thresholds",
-      "Alternative approaches (code generation, generics)"
-    ],
+    "topics": ["Detection criteria for repetitive patterns", "Trait implementation analysis", "Method uniformity calculation", "Pattern types (trait implementations, builders, state machines)", "Boilerplate scoring algorithm", "Macro-ification recommendations", "Configuration and thresholds", "Alternative approaches (code generation, generics)"],
     "validation": "Check that boilerplate detection criteria, pattern types, and macro recommendations are documented",
     "type": "single-file",
-    "auto_generated": true,
     "source_feature": "boilerplate_detection"
+  },
+  {
+    "id": "test-quality-analysis",
+    "title": "Test Quality Analysis",
+    "file": "book/src/test-quality-analysis.md",
+    "topics": ["Assertion pattern detection", "Test complexity analysis", "Flaky test detection", "Framework detection", "Test type classification (unit, integration, property)", "Fast vs slow test detection", "Test quality recommendations"],
+    "validation": "Check that test quality detection patterns and classification are documented",
+    "type": "single-file",
+    "source_feature": "test_quality_analysis"
+  },
+  {
+    "id": "semantic-classification",
+    "title": "Semantic Classification",
+    "file": "book/src/semantic-classification.md",
+    "topics": ["Function role detection", "Pure logic functions", "Orchestrator functions", "I/O wrapper functions", "Entry point detection", "Pattern match functions", "AST-based role detection", "Role-specific coverage expectations", "Scoring adjustments by role"],
+    "validation": "Check that semantic role classification and detection criteria are documented",
+    "type": "single-file",
+    "source_feature": "semantic_classification"
   }
 ]

@@ -239,8 +239,8 @@ debtmap analyze . \
   --context \
   --context-providers critical_path,dependency,git_history
 
-# Multi-pass analysis with attribution
-debtmap analyze . --multi-pass --attribution
+# Multi-pass analysis with attribution (multi-pass is default)
+debtmap analyze . --attribution
 ```
 
 ### Complete CI Example

@@ -229,7 +229,7 @@ impl ComplexityThresholds {
                 entry_point_multiplier: 1.2,
                 core_logic_multiplier: 1.0,
                 utility_multiplier: 0.6,
-                test_function_multiplier: 1.5,
+                test_function_multiplier: 3.0,
             }),
             "balanced" => Some(Self::default()),
             "lenient" => Some(Self {

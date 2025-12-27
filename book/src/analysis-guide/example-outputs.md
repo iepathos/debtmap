@@ -92,7 +92,7 @@ This page demonstrates realistic examples of debtmap's terminal and JSON output 
 }
 ```
 
-**Source**: Structure from `src/output/unified.rs:FunctionDebtItemOutput` (lines 158-183)
+**Source**: Structure from `src/output/unified/func_item.rs:FunctionDebtItemOutput` (lines 50-84)
 
 **Key Fields Explained:**
 - `type`: Always `"Function"` for function-level debt items
@@ -189,7 +189,7 @@ The `function_role` field helps prioritize testing and refactoring efforts based
 }
 ```
 
-**Source**: Structure from `src/output/unified.rs:FileDebtItemOutput` (lines 110-123) and `src/priority/file_metrics.rs:GodObjectIndicators`
+**Source**: Structure from `src/output/unified/file_item.rs:FileDebtItemOutput` and `src/priority/file_metrics.rs:GodObjectIndicators`
 
 ## Test Gap (Needs Testing)
 
@@ -274,7 +274,7 @@ The `function_role` field helps prioritize testing and refactoring efforts based
 }
 ```
 
-**Source**: Structure from `src/output/unified.rs:FunctionDebtItemOutput` with `debt_type` from `src/priority/mod.rs:158-171`
+**Source**: Structure from `src/output/unified/func_item.rs:FunctionDebtItemOutput` with `debt_type` from `src/priority/debt_types.rs:DebtType`
 
 ## Entropy-Dampened Validation Function
 
@@ -349,7 +349,7 @@ Function: validate_config
 }
 ```
 
-**Source**: `adjusted_complexity` from `src/output/unified.rs:186-190`, entropy dampening spec 182
+**Source**: `adjusted_complexity` from `src/output/unified/func_item.rs:AdjustedComplexity`, entropy dampening spec 182
 
 **Key Points:**
 - `adjusted_cyclomatic`: Entropy-dampened complexity value (7 vs original 20)
@@ -385,7 +385,7 @@ When debtmap detects a specific complexity pattern, it includes pattern metadata
 }
 ```
 
-**Source**: `pattern_type` and `pattern_confidence` from `src/output/unified.rs:178-182`
+**Source**: `pattern_type` and `pattern_confidence` from `src/output/unified/func_item.rs:FunctionDebtItemOutput`
 
 **Available Pattern Types:**
 - `state_machine` - State transition logic
@@ -413,7 +413,7 @@ Debtmap automatically labels test files using the `file_context_label` field (sp
 - `"TEST FILE"` - File is definitively a test file
 - `"PROBABLE TEST"` - File likely contains tests but not confirmed
 
-**Source**: `file_context_label` from `src/output/unified.rs:106`
+**Source**: `file_context_label` from `src/output/unified/location.rs:UnifiedLocation`
 
 ## Summary Statistics
 
@@ -455,7 +455,7 @@ The unified format includes summary statistics at the top level.
 }
 ```
 
-**Source**: `UnifiedOutput` structure from `src/output/unified.rs:18-24` and `DebtSummary` from lines 36-45
+**Source**: `UnifiedOutput` structure from `src/output/unified/types.rs:14-20` and `DebtSummary` from lines 32-44
 
 **Key Summary Fields:**
 - `debt_density`: Total debt score per 1000 lines of code
@@ -520,6 +520,6 @@ Function: calculate_tax (WELL TESTED - Good Example!)
 
 - **[Output Formats](../output-formats.md)** - Complete JSON schema and format documentation
 - **[Configuration](../configuration.md)** - Customize thresholds and analysis behavior
-- **[Advanced Features](../analysis-guide/advanced-features.md)** - Purity analysis, entropy dampening, pattern detection
+- **[Advanced Features](./advanced-features.md)** - Purity analysis, entropy dampening, pattern detection
 
 For questions or issues, visit [GitHub Issues](https://github.com/iepathos/debtmap/issues).

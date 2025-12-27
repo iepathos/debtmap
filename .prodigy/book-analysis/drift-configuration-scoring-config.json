@@ -1,0 +1,94 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "configuration",
+  "subsection_id": "scoring-config",
+  "subsection_title": "Scoring Configuration",
+  "subsection_file": "book/src/configuration/scoring.md",
+  "actual_location": "book/src/configuration.md#scoring-configuration",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "low",
+  "quality_assessment": "Scoring configuration content is comprehensive and accurate, but the file structure mismatch indicates chapter reorganization is needed",
+  "structural_issue": {
+    "description": "The specified subsection file does not exist. Scoring configuration is documented within the monolithic configuration.md file rather than as a separate subsection file.",
+    "expected_path": "book/src/configuration/scoring.md",
+    "actual_path": "book/src/configuration.md",
+    "recommendation": "If migrating to multi-subsection chapter structure, extract scoring configuration sections (lines 44-288) to book/src/configuration/scoring.md"
+  },
+  "issues": [
+    {
+      "type": "structural_mismatch",
+      "severity": "low",
+      "section": "File Structure",
+      "description": "Subsection file path references non-existent file - scoring content exists within configuration.md monolith",
+      "expected": "book/src/configuration/scoring.md",
+      "actual": "Content in book/src/configuration.md lines 44-288",
+      "fix_suggestion": "Either update subsection metadata to point to configuration.md or extract scoring sections to dedicated file"
+    }
+  ],
+  "content_analysis": {
+    "documentation_accurate": true,
+    "topics_covered": {
+      "scoring_weights": {
+        "documented": true,
+        "accurate": true,
+        "lines": "44-78",
+        "source_match": "src/config/scoring.rs:ScoringWeights"
+      },
+      "role_multipliers": {
+        "documented": true,
+        "accurate": true,
+        "lines": "80-96",
+        "source_match": "src/config/scoring.rs:RoleMultipliers",
+        "note": "Default values documented match source (pure_logic=1.2, orchestrator=0.8, io_wrapper=0.7, entry_point=0.9, pattern_match=0.6, debug=0.3, unknown=1.0)"
+      },
+      "role_coverage_weights": {
+        "documented": true,
+        "accurate": true,
+        "lines": "97-152",
+        "source_match": "src/config/scoring.rs:RoleCoverageWeights",
+        "note": "Two-stage role adjustment mechanism well documented with examples"
+      },
+      "role_multiplier_clamping": {
+        "documented": true,
+        "accurate": true,
+        "lines": "154-226",
+        "source_match": "src/config/scoring.rs:RoleMultiplierConfig",
+        "note": "Clamp range [0.3, 1.8] matches source defaults"
+      }
+    }
+  },
+  "positive_aspects": [
+    "Comprehensive documentation of all scoring configuration options",
+    "Clear explanation of two-stage role adjustment mechanism",
+    "Accurate default values matching source code",
+    "Good use of tables for rationale and configuration options",
+    "Practical examples showing different configuration strategies",
+    "Source file references included for advanced users",
+    "Validation rules clearly documented",
+    "Weight normalization behavior explained"
+  ],
+  "improvement_suggestions": [
+    "Consider extracting scoring configuration to dedicated subsection file if adopting multi-file chapter structure",
+    "Add cross-reference to complexity_weights configuration which affects scoring",
+    "Include a quick reference table of all scoring defaults at section start"
+  ],
+  "cross_references": [
+    {
+      "target": "./scoring-strategies.md#role-based-adjustments",
+      "valid": true
+    },
+    {
+      "target": "./parallel-processing.md",
+      "valid": true
+    }
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:25:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Scoring weights", "Role multipliers", "Coverage weights", "Role-based adjustments"],
+    "validation_focus": "Check scoring configuration options",
+    "documentation_lines_analyzed": 244,
+    "source_files_verified": ["src/config/scoring.rs"]
+  }
+}
