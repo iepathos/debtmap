@@ -1,116 +1,18 @@
 {
-  "analysis_date": "2025-12-04T00:00:00Z",
+  "analysis_date": "2025-12-26T23:35:00Z",
   "project": "Debtmap",
-  "chapters_analyzed": 28,
+  "chapters_analyzed": 32,
   "thresholds": {
     "size_threshold": 500,
     "section_threshold": 100
   },
   "summary": {
-    "oversized_chapters": 10,
-    "large_chapters": 5,
-    "well_sized_chapters": 11,
-    "multi_subsection_chapters": 0,
-    "tiny_chapters": 2
+    "oversized_chapters": 13,
+    "large_chapters": 6,
+    "well_sized_chapters": 12,
+    "multi_subsection_chapters": 1
   },
   "recommendations": [
-    {
-      "chapter_id": "analysis-guide",
-      "chapter_title": "Analysis Guide",
-      "current_file": "book/src/analysis-guide.md",
-      "priority": "high",
-      "issue": "oversized",
-      "metrics": {
-        "total_lines": 2587,
-        "content_lines": 2091,
-        "h2_sections": 9,
-        "h3_sections": 40,
-        "h4_sections": 40,
-        "code_block_ratio": 0.38,
-        "substantial_sections": 9
-      },
-      "recommended_action": "split_into_subsections",
-      "reason": "Largest chapter by far (2587 lines, 5x threshold). Contains 9 major H2 sections covering distinct analysis topics. Each section is substantial (200-400+ lines) and self-contained. This is a comprehensive reference that would benefit greatly from subsection organization.",
-      "proposed_structure": {
-        "type": "multi-subsection",
-        "index_file": "book/src/analysis-guide/index.md",
-        "subsections": [
-          {
-            "id": "overview",
-            "title": "Overview",
-            "file": "book/src/analysis-guide/overview.md",
-            "estimated_lines": 150,
-            "line_range": "1-150",
-            "source_sections": ["Overview"],
-            "reason": "Introduction to analysis capabilities and overall approach"
-          },
-          {
-            "id": "complexity-metrics",
-            "title": "Complexity Metrics",
-            "file": "book/src/analysis-guide/complexity-metrics.md",
-            "estimated_lines": 280,
-            "line_range": "16-296",
-            "source_sections": ["Complexity Metrics"],
-            "reason": "Comprehensive coverage of cyclomatic, cognitive, and entropy-based complexity with extensive examples"
-          },
-          {
-            "id": "debt-patterns",
-            "title": "Debt Patterns",
-            "file": "book/src/analysis-guide/debt-patterns.md",
-            "estimated_lines": 373,
-            "line_range": "296-669",
-            "source_sections": ["Debt Patterns"],
-            "reason": "Detailed documentation of all 13 debt pattern types with detection criteria"
-          },
-          {
-            "id": "risk-scoring",
-            "title": "Risk Scoring",
-            "file": "book/src/analysis-guide/risk-scoring.md",
-            "estimated_lines": 352,
-            "line_range": "669-1021",
-            "source_sections": ["Risk Scoring"],
-            "reason": "Risk calculation methodology, scoring formulas, and prioritization strategies"
-          },
-          {
-            "id": "interpreting-results",
-            "title": "Interpreting Results",
-            "file": "book/src/analysis-guide/interpreting-results.md",
-            "estimated_lines": 743,
-            "line_range": "1021-1764",
-            "source_sections": ["Interpreting Results"],
-            "reason": "Large section covering result interpretation, action strategies, and detailed examples"
-          },
-          {
-            "id": "analyzer-types",
-            "title": "Analyzer Types",
-            "file": "book/src/analysis-guide/analyzer-types.md",
-            "estimated_lines": 89,
-            "line_range": "1764-1853",
-            "source_sections": ["Analyzer Types"],
-            "reason": "Documentation of different analyzer modes and their use cases"
-          },
-          {
-            "id": "advanced-features",
-            "title": "Advanced Features",
-            "file": "book/src/analysis-guide/advanced-features.md",
-            "estimated_lines": 567,
-            "line_range": "1853-2420",
-            "source_sections": ["Advanced Features"],
-            "reason": "Substantial section covering advanced analysis capabilities and techniques"
-          },
-          {
-            "id": "example-outputs",
-            "title": "Example Outputs",
-            "file": "book/src/analysis-guide/example-outputs.md",
-            "estimated_lines": 162,
-            "line_range": "2420-2582",
-            "source_sections": ["Example Outputs"],
-            "reason": "Real-world output examples and interpretation guidance"
-          }
-        ],
-        "estimated_improvement": "Breaking 2587-line monolith into 8 focused subsections (avg 323 lines each) dramatically improves navigability and findability"
-      }
-    },
     {
       "chapter_id": "troubleshooting",
       "chapter_title": "Troubleshooting",
@@ -118,111 +20,24 @@
       "priority": "high",
       "issue": "oversized",
       "metrics": {
-        "total_lines": 2411,
-        "content_lines": 1728,
+        "total_lines": 2553,
         "h2_sections": 17,
-        "h3_sections": 94,
-        "code_block_ratio": 0.42,
-        "substantial_sections": 17
+        "code_block_markers": 246,
+        "code_block_ratio": 0.48
       },
       "recommended_action": "split_into_subsections",
-      "reason": "Second largest chapter (2411 lines, 4.8x threshold). Contains 17 H2 sections covering different troubleshooting categories. Heavy on code examples (42% code blocks). Would benefit from topical organization.",
       "proposed_structure": {
         "type": "multi-subsection",
         "index_file": "book/src/troubleshooting/index.md",
         "subsections": [
-          {
-            "id": "quick-fixes",
-            "title": "Quick Fixes for Common Issues",
-            "file": "book/src/troubleshooting/quick-fixes.md",
-            "estimated_lines": 100,
-            "line_range": "1-100",
-            "source_sections": ["Quick Fixes for Common Issues", "Common Issues"],
-            "reason": "First-response troubleshooting guide with immediate solutions"
-          },
-          {
-            "id": "debug-mode",
-            "title": "Debug Mode",
-            "file": "book/src/troubleshooting/debug-mode.md",
-            "estimated_lines": 150,
-            "line_range": "208-358",
-            "source_sections": ["Debug Mode"],
-            "reason": "Detailed debugging techniques and verbose output options"
-          },
-          {
-            "id": "performance",
-            "title": "Performance Tips",
-            "file": "book/src/troubleshooting/performance.md",
-            "estimated_lines": 200,
-            "line_range": "277-477",
-            "source_sections": ["Performance Tips"],
-            "reason": "Performance optimization strategies and tuning guidance"
-          },
-          {
-            "id": "environment-variables",
-            "title": "Environment Variables",
-            "file": "book/src/troubleshooting/environment-variables.md",
-            "estimated_lines": 150,
-            "line_range": "342-492",
-            "source_sections": ["Environment Variables"],
-            "reason": "Reference for environment variable configuration"
-          },
-          {
-            "id": "context-providers",
-            "title": "Context Provider Troubleshooting",
-            "file": "book/src/troubleshooting/context-providers.md",
-            "estimated_lines": 300,
-            "line_range": "413-713",
-            "source_sections": ["Context Provider Troubleshooting"],
-            "reason": "Specialized troubleshooting for context provider issues"
-          },
-          {
-            "id": "advanced-analysis",
-            "title": "Advanced Analysis Troubleshooting",
-            "file": "book/src/troubleshooting/advanced-analysis.md",
-            "estimated_lines": 400,
-            "line_range": "545-945",
-            "source_sections": ["Advanced Analysis Troubleshooting"],
-            "reason": "Complex analysis issues and resolution strategies"
-          },
-          {
-            "id": "error-messages",
-            "title": "Error Messages Reference",
-            "file": "book/src/troubleshooting/error-messages.md",
-            "estimated_lines": 250,
-            "line_range": "1168-1418",
-            "source_sections": ["Error Messages Reference"],
-            "reason": "Comprehensive error message catalog with solutions"
-          },
-          {
-            "id": "language-specific",
-            "title": "Language-Specific Issues",
-            "file": "book/src/troubleshooting/language-specific.md",
-            "estimated_lines": 300,
-            "line_range": "1315-1615",
-            "source_sections": ["Language-Specific Issues"],
-            "reason": "Troubleshooting by programming language (Rust, Python, JS/TS)"
-          },
-          {
-            "id": "command-issues",
-            "title": "Command-Specific Issues",
-            "file": "book/src/troubleshooting/command-issues.md",
-            "estimated_lines": 350,
-            "line_range": "1665-2015",
-            "source_sections": ["Output Formatting Issues", "Compare Command Issues", "Validate Command Issues", "Validate-Improvement Command Issues"],
-            "reason": "Troubleshooting for specific debtmap commands"
-          },
-          {
-            "id": "faq",
-            "title": "FAQ and Bug Reports",
-            "file": "book/src/troubleshooting/faq.md",
-            "estimated_lines": 200,
-            "line_range": "2022-2222",
-            "source_sections": ["FAQ", "When to File Bug Reports", "Related Documentation", "Troubleshooting Checklist"],
-            "reason": "Frequently asked questions and bug reporting guidelines"
-          }
-        ],
-        "estimated_improvement": "Breaking 2411-line reference into 10 topical subsections (avg 241 lines each) allows users to quickly find relevant troubleshooting content"
+          {"id": "quick-fixes", "title": "Quick Fixes", "estimated_lines": 340, "source_sections": ["Quick Fixes for Common Issues", "Common Issues"]},
+          {"id": "debug-mode", "title": "Debug Mode", "estimated_lines": 140, "source_sections": ["Debug Mode", "Performance Tips"]},
+          {"id": "context-providers", "title": "Context Provider Issues", "estimated_lines": 280, "source_sections": ["Context Provider Troubleshooting"]},
+          {"id": "advanced-analysis", "title": "Advanced Analysis Issues", "estimated_lines": 620, "source_sections": ["Advanced Analysis Troubleshooting"]},
+          {"id": "error-messages", "title": "Error Messages Reference", "estimated_lines": 370, "source_sections": ["Error Messages Reference", "Language-Specific Issues"]},
+          {"id": "output-issues", "title": "Output and Command Issues", "estimated_lines": 380, "source_sections": ["Output Formatting Issues", "Compare Command Issues", "Validate Command Issues", "Validate-Improvement Command Issues"]},
+          {"id": "faq", "title": "FAQ", "estimated_lines": 420, "source_sections": ["FAQ", "When to File Bug Reports", "Troubleshooting Checklist"]}
+        ]
       }
     },
     {
@@ -232,76 +47,49 @@
       "priority": "high",
       "issue": "oversized",
       "metrics": {
-        "total_lines": 1574,
-        "content_lines": 1186,
-        "h2_sections": 10,
-        "h3_sections": 49,
-        "h4_sections": 17,
-        "code_block_ratio": 0.29,
-        "substantial_sections": 8
+        "total_lines": 1868,
+        "h2_sections": 11,
+        "code_block_markers": 198,
+        "code_block_ratio": 0.53
       },
       "recommended_action": "split_into_subsections",
-      "reason": "Large chapter (1574 lines, 3.1x threshold) covering multiple distinct scoring approaches. Contains detailed comparisons and methodology explanations that would benefit from separate subsections.",
       "proposed_structure": {
         "type": "multi-subsection",
         "index_file": "book/src/scoring-strategies/index.md",
         "subsections": [
-          {
-            "id": "overview",
-            "title": "Overview",
-            "file": "book/src/scoring-strategies/overview.md",
-            "estimated_lines": 100,
-            "line_range": "1-100",
-            "source_sections": ["Overview"],
-            "reason": "Introduction to scoring strategy concepts"
-          },
-          {
-            "id": "file-level-scoring",
-            "title": "File-Level Scoring",
-            "file": "book/src/scoring-strategies/file-level-scoring.md",
-            "estimated_lines": 300,
-            "line_range": "13-313",
-            "source_sections": ["File-Level Scoring"],
-            "reason": "Detailed explanation of file-level aggregation methodology"
-          },
-          {
-            "id": "function-level-scoring",
-            "title": "Function-Level Scoring",
-            "file": "book/src/scoring-strategies/function-level-scoring.md",
-            "estimated_lines": 400,
-            "line_range": "213-613",
-            "source_sections": ["Function-Level Scoring"],
-            "reason": "Comprehensive function-level scoring approach and use cases"
-          },
-          {
-            "id": "comparison-guide",
-            "title": "Strategy Comparison Guide",
-            "file": "book/src/scoring-strategies/comparison-guide.md",
-            "estimated_lines": 250,
-            "line_range": "726-976",
-            "source_sections": ["When to Use Each Approach", "Comparison Examples", "Score Normalization", "Best Practices"],
-            "reason": "Practical guidance for choosing and comparing strategies"
-          },
-          {
-            "id": "rebalanced-scoring",
-            "title": "Rebalanced Debt Scoring",
-            "file": "book/src/scoring-strategies/rebalanced-scoring.md",
-            "estimated_lines": 300,
-            "line_range": "980-1280",
-            "source_sections": ["Rebalanced Debt Scoring (Spec 136)"],
-            "reason": "Advanced rebalanced scoring methodology from Spec 136"
-          },
-          {
-            "id": "exponential-scaling",
-            "title": "Score-Based Prioritization with Exponential Scaling",
-            "file": "book/src/scoring-strategies/exponential-scaling.md",
-            "estimated_lines": 224,
-            "line_range": "1278-1502",
-            "source_sections": ["Score-Based Prioritization with Exponential Scaling (Spec 171)"],
-            "reason": "Exponential scaling methodology from Spec 171"
-          }
-        ],
-        "estimated_improvement": "Breaking 1574-line reference into 6 focused subsections (avg 262 lines each) improves comprehension and navigation"
+          {"id": "file-level-scoring", "title": "File-Level Scoring", "estimated_lines": 200, "source_sections": ["Overview", "File-Level Scoring"]},
+          {"id": "function-level-scoring", "title": "Function-Level Scoring", "estimated_lines": 510, "source_sections": ["Function-Level Scoring"]},
+          {"id": "comparison-guide", "title": "Comparison Guide", "estimated_lines": 190, "source_sections": ["When to Use Each Approach", "Comparison Examples", "Score Normalization", "Best Practices", "Troubleshooting"]},
+          {"id": "rebalanced-scoring", "title": "Rebalanced Debt Scoring", "estimated_lines": 300, "source_sections": ["Rebalanced Debt Scoring (Spec 136)"]},
+          {"id": "exponential-scaling", "title": "Exponential Scaling", "estimated_lines": 295, "source_sections": ["Score-Based Prioritization with Exponential Scaling (Spec 171)"]},
+          {"id": "data-flow-scoring", "title": "Data Flow Scoring", "estimated_lines": 290, "source_sections": ["Data Flow Scoring (Spec 218)"]}
+        ]
+      }
+    },
+    {
+      "chapter_id": "configuration",
+      "chapter_title": "Configuration",
+      "current_file": "book/src/configuration.md",
+      "priority": "high",
+      "issue": "oversized",
+      "metrics": {
+        "total_lines": 1489,
+        "h2_sections": 15,
+        "code_block_markers": 128,
+        "code_block_ratio": 0.43
+      },
+      "recommended_action": "split_into_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/configuration/index.md",
+        "subsections": [
+          {"id": "basics", "title": "Configuration Basics", "estimated_lines": 200, "source_sections": ["Config Files", "Scoring Configuration"]},
+          {"id": "thresholds", "title": "Threshold Configuration", "estimated_lines": 150, "source_sections": ["Thresholds Configuration", "Language Configuration"]},
+          {"id": "exclusions", "title": "Exclusion Patterns", "estimated_lines": 100, "source_sections": ["Exclusion Patterns", "Display Configuration", "Output Configuration", "Normalization Configuration"]},
+          {"id": "advanced", "title": "Advanced Configuration", "estimated_lines": 750, "source_sections": ["Advanced Configuration"]},
+          {"id": "cli-integration", "title": "CLI Integration", "estimated_lines": 130, "source_sections": ["CLI Integration", "Configuration Validation"]},
+          {"id": "examples", "title": "Configuration Examples", "estimated_lines": 160, "source_sections": ["Complete Configuration Example", "Configuration Best Practices", "Troubleshooting"]}
+        ]
       }
     },
     {
@@ -311,94 +99,50 @@
       "priority": "high",
       "issue": "oversized",
       "metrics": {
-        "total_lines": 1453,
-        "content_lines": 1094,
-        "h2_sections": 18,
-        "h3_sections": 58,
-        "h4_sections": 20,
-        "code_block_ratio": 0.46,
-        "substantial_sections": 12
+        "total_lines": 1460,
+        "h2_sections": 17,
+        "code_block_markers": 114,
+        "code_block_ratio": 0.39
       },
       "recommended_action": "split_into_subsections",
-      "reason": "Large integration guide (1453 lines, 2.9x threshold) with 18 H2 sections. High code block density (46%). Covers setup, workflows, and best practices that would benefit from separation.",
       "proposed_structure": {
         "type": "multi-subsection",
         "index_file": "book/src/prodigy-integration/index.md",
         "subsections": [
-          {
-            "id": "getting-started",
-            "title": "Getting Started with Prodigy",
-            "file": "book/src/prodigy-integration/getting-started.md",
-            "estimated_lines": 250,
-            "line_range": "1-251",
-            "source_sections": ["Prerequisites Checklist", "What is Prodigy?", "Benefits", "Prerequisites", "Quick Start"],
-            "reason": "Introduction and initial setup guide"
-          },
-          {
-            "id": "commands",
-            "title": "Prodigy Commands",
-            "file": "book/src/prodigy-integration/commands.md",
-            "estimated_lines": 200,
-            "line_range": "198-398",
-            "source_sections": ["Useful Prodigy Commands"],
-            "reason": "Command reference for Prodigy CLI operations"
-          },
-          {
-            "id": "workflow-configuration",
-            "title": "Workflow Configuration",
-            "file": "book/src/prodigy-integration/workflow-configuration.md",
-            "estimated_lines": 250,
-            "line_range": "288-538",
-            "source_sections": ["Workflow Configuration"],
-            "reason": "Detailed workflow file structure and configuration options"
-          },
-          {
-            "id": "slash-commands",
-            "title": "Claude Slash Commands",
-            "file": "book/src/prodigy-integration/slash-commands.md",
-            "estimated_lines": 200,
-            "line_range": "414-614",
-            "source_sections": ["Claude Slash Commands"],
-            "reason": "Custom slash command reference for debtmap workflows"
-          },
-          {
-            "id": "mapreduce-workflows",
-            "title": "MapReduce Workflows",
-            "file": "book/src/prodigy-integration/mapreduce-workflows.md",
-            "estimated_lines": 350,
-            "line_range": "563-913",
-            "source_sections": ["Target Selection", "MapReduce Workflows", "Iteration Strategy", "Validation"],
-            "reason": "Comprehensive guide to map-reduce workflow patterns"
-          },
-          {
-            "id": "metrics-and-ci",
-            "title": "Output, Metrics, and CI/CD",
-            "file": "book/src/prodigy-integration/metrics-and-ci.md",
-            "estimated_lines": 150,
-            "line_range": "953-1103",
-            "source_sections": ["Output and Metrics", "Integration with CI/CD"],
-            "reason": "Monitoring workflow progress and CI/CD integration"
-          },
-          {
-            "id": "best-practices",
-            "title": "Best Practices",
-            "file": "book/src/prodigy-integration/best-practices.md",
-            "estimated_lines": 150,
-            "line_range": "1074-1224",
-            "source_sections": ["Best Practices"],
-            "reason": "Guidelines for effective Prodigy workflow usage"
-          },
-          {
-            "id": "troubleshooting",
-            "title": "Troubleshooting",
-            "file": "book/src/prodigy-integration/troubleshooting.md",
-            "estimated_lines": 153,
-            "line_range": "1146-1299",
-            "source_sections": ["Troubleshooting", "Example Workflows"],
-            "reason": "Common issues and example workflow patterns"
-          }
-        ],
-        "estimated_improvement": "Breaking 1453-line integration guide into 8 topical subsections (avg 181 lines each) improves learning progression"
+          {"id": "overview", "title": "Overview", "estimated_lines": 180, "source_sections": ["Prerequisites Checklist", "What is Prodigy?", "Benefits", "Prerequisites"]},
+          {"id": "quick-start", "title": "Quick Start", "estimated_lines": 190, "source_sections": ["Quick Start", "Useful Prodigy Commands"]},
+          {"id": "workflow-configuration", "title": "Workflow Configuration", "estimated_lines": 250, "source_sections": ["Workflow Configuration", "Claude Slash Commands", "Target Selection"]},
+          {"id": "mapreduce-workflows", "title": "MapReduce Workflows", "estimated_lines": 340, "source_sections": ["MapReduce Workflows", "Iteration Strategy"]},
+          {"id": "validation", "title": "Validation and Metrics", "estimated_lines": 180, "source_sections": ["Validation", "Output and Metrics"]},
+          {"id": "cicd-integration", "title": "CI/CD Integration", "estimated_lines": 140, "source_sections": ["Integration with CI/CD", "Best Practices"]},
+          {"id": "troubleshooting", "title": "Troubleshooting", "estimated_lines": 300, "source_sections": ["Troubleshooting", "Example Workflows"]}
+        ]
+      }
+    },
+    {
+      "chapter_id": "output-formats",
+      "chapter_title": "Output Formats",
+      "current_file": "book/src/output-formats.md",
+      "priority": "high",
+      "issue": "oversized",
+      "metrics": {
+        "total_lines": 1375,
+        "h2_sections": 16,
+        "code_block_markers": 102,
+        "code_block_ratio": 0.37
+      },
+      "recommended_action": "split_into_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/output-formats/index.md",
+        "subsections": [
+          {"id": "terminal-output", "title": "Terminal Output", "estimated_lines": 300, "source_sections": ["Format Selection", "Terminal Output"]},
+          {"id": "json-output", "title": "JSON Output", "estimated_lines": 260, "source_sections": ["JSON Output"]},
+          {"id": "markdown-output", "title": "Markdown and Executive Summary", "estimated_lines": 240, "source_sections": ["Markdown Output", "Executive Summary", "Complexity Analysis", "Technical Debt", "Dependencies", "Recommendations"]},
+          {"id": "data-flow-output", "title": "Data Flow Analysis", "estimated_lines": 250, "source_sections": ["Data Flow Analysis", "HTML Output"]},
+          {"id": "tool-integration", "title": "Tool Integration", "estimated_lines": 350, "source_sections": ["Tool Integration", "Output Filtering"]},
+          {"id": "best-practices", "title": "Best Practices", "estimated_lines": 110, "source_sections": ["Best Practices", "Troubleshooting"]}
+        ]
       }
     },
     {
@@ -408,600 +152,426 @@
       "priority": "high",
       "issue": "oversized",
       "metrics": {
-        "total_lines": 1353,
-        "content_lines": 1028,
+        "total_lines": 1342,
         "h2_sections": 12,
-        "h3_sections": 49,
-        "code_block_ratio": 0.52,
-        "substantial_sections": 10
+        "code_block_markers": 108,
+        "code_block_ratio": 0.40
       },
       "recommended_action": "split_into_subsections",
-      "reason": "Large examples chapter (1353 lines, 2.7x threshold) with extremely high code density (52%). Natural division by language and use case. Heavy on copy-paste examples that benefit from focused organization.",
       "proposed_structure": {
         "type": "multi-subsection",
         "index_file": "book/src/examples/index.md",
         "subsections": [
-          {
-            "id": "overview",
-            "title": "Overview",
-            "file": "book/src/examples/overview.md",
-            "estimated_lines": 100,
-            "line_range": "1-100",
-            "source_sections": ["Overview", "Table of Contents"],
-            "reason": "Introduction to example categories and navigation"
-          },
-          {
-            "id": "rust-projects",
-            "title": "Analyzing Rust Projects",
-            "file": "book/src/examples/rust-projects.md",
-            "estimated_lines": 250,
-            "line_range": "32-282",
-            "source_sections": ["Analyzing Rust Projects"],
-            "reason": "Comprehensive Rust-specific examples and patterns"
-          },
-          {
-            "id": "python-analysis",
-            "title": "Python Analysis",
-            "file": "book/src/examples/python-analysis.md",
-            "estimated_lines": 150,
-            "line_range": "252-402",
-            "source_sections": ["Python Analysis"],
-            "reason": "Python-specific analysis examples"
-          },
-          {
-            "id": "javascript-typescript",
-            "title": "JavaScript/TypeScript",
-            "file": "book/src/examples/javascript-typescript.md",
-            "estimated_lines": 200,
-            "line_range": "318-518",
-            "source_sections": ["JavaScript/TypeScript"],
-            "reason": "JS/TS analysis examples and best practices"
-          },
-          {
-            "id": "ci-integration",
-            "title": "CI Integration",
-            "file": "book/src/examples/ci-integration.md",
-            "estimated_lines": 250,
-            "line_range": "389-639",
-            "source_sections": ["CI Integration"],
-            "reason": "CI/CD pipeline integration examples"
-          },
-          {
-            "id": "output-formats",
-            "title": "Output Formats",
-            "file": "book/src/examples/output-formats.md",
-            "estimated_lines": 200,
-            "line_range": "570-770",
-            "source_sections": ["Output Formats"],
-            "reason": "Examples of different output format options"
-          },
-          {
-            "id": "advanced-usage",
-            "title": "Advanced Usage",
-            "file": "book/src/examples/advanced-usage.md",
-            "estimated_lines": 203,
-            "line_range": "741-944",
-            "source_sections": ["Advanced Usage", "Configuration Examples", "Compare Command", "Tips and Best Practices"],
-            "reason": "Advanced techniques and configuration patterns"
-          }
-        ],
-        "estimated_improvement": "Breaking 1353-line example collection into 7 language/topic subsections (avg 193 lines each) improves findability"
-      }
-    },
-    {
-      "chapter_id": "output-formats",
-      "chapter_title": "Output Formats",
-      "current_file": "book/src/output-formats.md",
-      "priority": "medium",
-      "issue": "large",
-      "metrics": {
-        "total_lines": 1257,
-        "content_lines": 989,
-        "h2_sections": 14,
-        "h3_sections": 41,
-        "h4_sections": 9,
-        "code_block_ratio": 0.55,
-        "substantial_sections": 10
-      },
-      "recommended_action": "split_into_subsections",
-      "reason": "Large chapter (1257 lines, 2.5x threshold) with very high code density (55%). Covers multiple output formats that could be separate subsections for easier reference.",
-      "proposed_structure": {
-        "type": "multi-subsection",
-        "index_file": "book/src/output-formats/index.md",
-        "subsections": [
-          {
-            "id": "format-selection",
-            "title": "Format Selection",
-            "file": "book/src/output-formats/format-selection.md",
-            "estimated_lines": 150,
-            "line_range": "1-150",
-            "source_sections": ["Format Selection"],
-            "reason": "Overview of available formats and selection criteria"
-          },
-          {
-            "id": "terminal-output",
-            "title": "Terminal Output",
-            "file": "book/src/output-formats/terminal-output.md",
-            "estimated_lines": 350,
-            "line_range": "42-392",
-            "source_sections": ["Terminal Output"],
-            "reason": "Detailed terminal output formatting and options"
-          },
-          {
-            "id": "json-output",
-            "title": "JSON Output",
-            "file": "book/src/output-formats/json-output.md",
-            "estimated_lines": 400,
-            "line_range": "293-693",
-            "source_sections": ["JSON Output"],
-            "reason": "Comprehensive JSON schema and field documentation"
-          },
-          {
-            "id": "markdown-output",
-            "title": "Markdown and Executive Summary",
-            "file": "book/src/output-formats/markdown-output.md",
-            "estimated_lines": 150,
-            "line_range": "650-800",
-            "source_sections": ["Markdown Output", "Executive Summary", "Complexity Analysis", "Technical Debt", "Dependencies", "Recommendations"],
-            "reason": "Markdown format and executive summary generation"
-          },
-          {
-            "id": "tool-integration",
-            "title": "Tool Integration",
-            "file": "book/src/output-formats/tool-integration.md",
-            "estimated_lines": 207,
-            "line_range": "801-1008",
-            "source_sections": ["Tool Integration", "Output Filtering", "Best Practices", "Troubleshooting"],
-            "reason": "Integration with external tools and filtering options"
-          }
-        ],
-        "estimated_improvement": "Breaking 1257-line reference into 5 format-specific subsections (avg 251 lines each) improves format discoverability"
+          {"id": "rust-projects", "title": "Rust Projects", "estimated_lines": 280, "source_sections": ["Overview", "Table of Contents", "Analyzing Rust Projects"]},
+          {"id": "python-projects", "title": "Python Analysis", "estimated_lines": 135, "source_sections": ["Python Analysis", "JavaScript/TypeScript"]},
+          {"id": "ci-integration", "title": "CI Integration", "estimated_lines": 300, "source_sections": ["CI Integration", "Output Formats"]},
+          {"id": "advanced-usage", "title": "Advanced Usage", "estimated_lines": 420, "source_sections": ["Advanced Usage", "Configuration Examples"]},
+          {"id": "compare-examples", "title": "Compare Examples", "estimated_lines": 200, "source_sections": ["Compare Command", "Tips and Best Practices"]}
+        ]
       }
     },
     {
       "chapter_id": "parallel-processing",
       "chapter_title": "Parallel Processing",
       "current_file": "book/src/parallel-processing.md",
-      "priority": "medium",
-      "issue": "large",
+      "priority": "high",
+      "issue": "oversized",
       "metrics": {
-        "total_lines": 1252,
-        "content_lines": 932,
+        "total_lines": 1262,
         "h2_sections": 17,
-        "h3_sections": 51,
-        "code_block_ratio": 0.31,
-        "substantial_sections": 12
+        "code_block_markers": 96,
+        "code_block_ratio": 0.38
       },
       "recommended_action": "split_into_subsections",
-      "reason": "Large technical chapter (1252 lines, 2.5x threshold) covering multiple parallel processing aspects. Contains 17 H2 sections that could be organized into subsections.",
       "proposed_structure": {
         "type": "multi-subsection",
         "index_file": "book/src/parallel-processing/index.md",
         "subsections": [
-          {
-            "id": "overview",
-            "title": "Overview and Performance Characteristics",
-            "file": "book/src/parallel-processing/overview.md",
-            "estimated_lines": 150,
-            "line_range": "1-150",
-            "source_sections": ["Overview", "Performance Characteristics", "CLI Flags for Parallelization"],
-            "reason": "Introduction to parallel processing capabilities and CLI configuration"
-          },
-          {
-            "id": "rayon-iterators",
-            "title": "Rayon Parallel Iterators",
-            "file": "book/src/parallel-processing/rayon-iterators.md",
-            "estimated_lines": 200,
-            "line_range": "100-300",
-            "source_sections": ["Rayon Parallel Iterators"],
-            "reason": "Deep dive into Rayon-based parallelization"
-          },
-          {
-            "id": "concurrent-data-structures",
-            "title": "Concurrent Data Structures",
-            "file": "book/src/parallel-processing/concurrent-data-structures.md",
-            "estimated_lines": 250,
-            "line_range": "269-519",
-            "source_sections": ["DashMap for Lock-Free Concurrency"],
-            "reason": "DashMap and concurrent data structure patterns"
-          },
-          {
-            "id": "call-graph-parallelization",
-            "title": "Call Graph Parallelization",
-            "file": "book/src/parallel-processing/call-graph-parallelization.md",
-            "estimated_lines": 300,
-            "line_range": "409-709",
-            "source_sections": ["Parallel Call Graph Statistics", "Cross-File Call Resolution", "Concurrent Merging"],
-            "reason": "Advanced call graph parallel processing techniques"
-          },
-          {
-            "id": "coverage-optimization",
-            "title": "Coverage Index Optimization",
-            "file": "book/src/parallel-processing/coverage-optimization.md",
-            "estimated_lines": 200,
-            "line_range": "716-916",
-            "source_sections": ["Coverage Index Optimization"],
-            "reason": "Coverage index performance optimization strategies"
-          },
-          {
-            "id": "tuning-guide",
-            "title": "Performance Tuning Guide",
-            "file": "book/src/parallel-processing/tuning-guide.md",
-            "estimated_lines": 152,
-            "line_range": "874-1026",
-            "source_sections": ["Performance Tuning", "Scaling Strategies", "Tuning Guidelines", "Profiling and Debugging", "Best Practices", "Troubleshooting"],
-            "reason": "Comprehensive tuning, scaling, and troubleshooting guidance"
-          }
-        ],
-        "estimated_improvement": "Breaking 1252-line technical guide into 6 focused subsections (avg 208 lines each) improves comprehension"
-      }
-    },
-    {
-      "chapter_id": "configuration",
-      "chapter_title": "Configuration",
-      "current_file": "book/src/configuration.md",
-      "priority": "medium",
-      "issue": "large",
-      "metrics": {
-        "total_lines": 1136,
-        "content_lines": 853,
-        "h2_sections": 15,
-        "h3_sections": 30,
-        "h4_sections": 11,
-        "code_block_ratio": 0.45,
-        "substantial_sections": 12
-      },
-      "recommended_action": "split_into_subsections",
-      "reason": "Large configuration reference (1136 lines, 2.3x threshold) with 15 H2 sections covering different config categories. High code density (45%) with many configuration examples.",
-      "proposed_structure": {
-        "type": "multi-subsection",
-        "index_file": "book/src/configuration/index.md",
-        "subsections": [
-          {
-            "id": "overview",
-            "title": "Configuration Overview",
-            "file": "book/src/configuration/overview.md",
-            "estimated_lines": 150,
-            "line_range": "1-150",
-            "source_sections": ["Config Files"],
-            "reason": "Introduction to configuration file structure and locations"
-          },
-          {
-            "id": "scoring-config",
-            "title": "Scoring Configuration",
-            "file": "book/src/configuration/scoring-config.md",
-            "estimated_lines": 250,
-            "line_range": "44-294",
-            "source_sections": ["Scoring Configuration"],
-            "reason": "Detailed scoring weights and strategy configuration"
-          },
-          {
-            "id": "thresholds",
-            "title": "Thresholds Configuration",
-            "file": "book/src/configuration/thresholds.md",
-            "estimated_lines": 150,
-            "line_range": "290-440",
-            "source_sections": ["Thresholds Configuration"],
-            "reason": "Complexity and debt pattern threshold settings"
-          },
-          {
-            "id": "language-config",
-            "title": "Language Configuration",
-            "file": "book/src/configuration/language-config.md",
-            "estimated_lines": 100,
-            "line_range": "353-453",
-            "source_sections": ["Language Configuration"],
-            "reason": "Language-specific configuration options"
-          },
-          {
-            "id": "exclusions-and-display",
-            "title": "Exclusion Patterns and Display",
-            "file": "book/src/configuration/exclusions-and-display.md",
-            "estimated_lines": 150,
-            "line_range": "392-542",
-            "source_sections": ["Exclusion Patterns", "Display Configuration", "Output Configuration", "Normalization Configuration"],
-            "reason": "File exclusions, display options, and output configuration"
-          },
-          {
-            "id": "advanced-config",
-            "title": "Advanced Configuration",
-            "file": "book/src/configuration/advanced-config.md",
-            "estimated_lines": 336,
-            "line_range": "473-809",
-            "source_sections": ["Advanced Configuration", "CLI Integration", "Configuration Validation", "Complete Configuration Example", "Configuration Best Practices", "Troubleshooting"],
-            "reason": "Advanced features, validation, examples, and troubleshooting"
-          }
-        ],
-        "estimated_improvement": "Breaking 1136-line config reference into 6 topical subsections (avg 189 lines each) improves reference usability"
+          {"id": "overview", "title": "Overview", "estimated_lines": 200, "source_sections": ["Overview", "Performance Characteristics", "CLI Flags for Parallelization"]},
+          {"id": "rayon-iterators", "title": "Rayon Parallel Iterators", "estimated_lines": 280, "source_sections": ["Rayon Parallel Iterators", "DashMap for Lock-Free Concurrency"]},
+          {"id": "call-graph", "title": "Parallel Call Graph", "estimated_lines": 260, "source_sections": ["Parallel Call Graph Statistics", "Cross-File Call Resolution", "Concurrent Merging"]},
+          {"id": "coverage-optimization", "title": "Coverage Optimization", "estimated_lines": 230, "source_sections": ["Coverage Index Optimization", "Performance Tuning"]},
+          {"id": "scaling-tuning", "title": "Scaling and Tuning", "estimated_lines": 180, "source_sections": ["Scaling Strategies", "Tuning Guidelines", "Profiling and Debugging"]},
+          {"id": "troubleshooting", "title": "Troubleshooting", "estimated_lines": 140, "source_sections": ["Best Practices", "Troubleshooting", "Summary"]}
+        ]
       }
     },
     {
       "chapter_id": "error-handling-analysis",
       "chapter_title": "Error Handling Analysis",
       "current_file": "book/src/error-handling-analysis.md",
-      "priority": "medium",
-      "issue": "large",
+      "priority": "high",
+      "issue": "oversized",
       "metrics": {
-        "total_lines": 1065,
-        "content_lines": 857,
-        "h2_sections": 12,
-        "h3_sections": 23,
-        "h4_sections": 12,
-        "code_block_ratio": 0.52,
-        "substantial_sections": 10
+        "total_lines": 1093,
+        "h2_sections": 13,
+        "code_block_markers": 82,
+        "code_block_ratio": 0.38
       },
       "recommended_action": "split_into_subsections",
-      "reason": "Large analysis chapter (1065 lines, 2.1x threshold) with high code density (52%). Covers multiple error handling patterns that could be separate subsections.",
       "proposed_structure": {
         "type": "multi-subsection",
         "index_file": "book/src/error-handling-analysis/index.md",
         "subsections": [
-          {
-            "id": "overview",
-            "title": "Overview",
-            "file": "book/src/error-handling-analysis/overview.md",
-            "estimated_lines": 150,
-            "line_range": "1-150",
-            "source_sections": ["Overview"],
-            "reason": "Introduction to error handling analysis capabilities"
-          },
-          {
-            "id": "error-swallowing",
-            "title": "Error Swallowing Detection",
-            "file": "book/src/error-handling-analysis/error-swallowing.md",
-            "estimated_lines": 250,
-            "line_range": "150-400",
-            "source_sections": ["Error Swallowing Detection"],
-            "reason": "Detection of silently ignored errors"
-          },
-          {
-            "id": "error-propagation",
-            "title": "Error Propagation Patterns",
-            "file": "book/src/error-handling-analysis/error-propagation.md",
-            "estimated_lines": 200,
-            "line_range": "400-600",
-            "source_sections": ["Error Propagation Patterns"],
-            "reason": "Analysis of error propagation best practices"
-          },
-          {
-            "id": "panic-patterns",
-            "title": "Panic Pattern Detection",
-            "file": "book/src/error-handling-analysis/panic-patterns.md",
-            "estimated_lines": 250,
-            "line_range": "600-850",
-            "source_sections": ["Panic Pattern Detection", "Python Error Handling Patterns"],
-            "reason": "Detection of panic-inducing patterns across languages"
-          },
-          {
-            "id": "best-practices",
-            "title": "Best Practices and Recommendations",
-            "file": "book/src/error-handling-analysis/best-practices.md",
-            "estimated_lines": 215,
-            "line_range": "850-1065",
-            "source_sections": ["Best Practices", "Severity Levels", "Recommendations"],
-            "reason": "Guidelines for improving error handling"
-          }
-        ],
-        "estimated_improvement": "Breaking 1065-line analysis guide into 5 pattern-specific subsections (avg 213 lines each) improves navigation"
+          {"id": "overview", "title": "Overview", "estimated_lines": 150, "source_sections": ["Implementation Status", "Overview"]},
+          {"id": "rust-patterns", "title": "Rust Error Handling", "estimated_lines": 290, "source_sections": ["Rust Error Handling Analysis"]},
+          {"id": "python-patterns", "title": "Python Error Handling", "estimated_lines": 155, "source_sections": ["Python Error Handling Analysis (Planned)"]},
+          {"id": "async-patterns", "title": "Async Error Handling", "estimated_lines": 200, "source_sections": ["Async Error Handling"]},
+          {"id": "configuration", "title": "Configuration and Best Practices", "estimated_lines": 220, "source_sections": ["Severity Levels and Prioritization", "Configuration", "Detection Examples", "Suppression Patterns", "Best Practices"]},
+          {"id": "improving-handling", "title": "Improving Error Handling", "estimated_lines": 160, "source_sections": ["Improving Rust Error Handling Based on Debtmap Reports", "Troubleshooting"]}
+        ]
+      }
+    },
+    {
+      "chapter_id": "context-providers",
+      "chapter_title": "Context Providers",
+      "current_file": "book/src/context-providers.md",
+      "priority": "high",
+      "issue": "oversized",
+      "metrics": {
+        "total_lines": 1039,
+        "h2_sections": 16,
+        "code_block_markers": 78,
+        "code_block_ratio": 0.38
+      },
+      "recommended_action": "split_into_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/context-providers/index.md",
+        "subsections": [
+          {"id": "overview", "title": "Overview", "estimated_lines": 120, "source_sections": ["Overview"]},
+          {"id": "critical-path", "title": "Critical Path Provider", "estimated_lines": 180, "source_sections": ["Critical Path Provider", "Dependency Provider"]},
+          {"id": "git-history", "title": "Git History Provider", "estimated_lines": 300, "source_sections": ["Git History Provider", "Enabling Context Providers", "Provider Weights"]},
+          {"id": "scoring-impact", "title": "How Context Affects Scoring", "estimated_lines": 200, "source_sections": ["How Context Affects Scoring", "Context Details Structure", "Practical Examples"]},
+          {"id": "configuration", "title": "Configuration", "estimated_lines": 160, "source_sections": ["Configuration", "Performance Considerations", "Troubleshooting"]},
+          {"id": "advanced", "title": "Advanced Usage", "estimated_lines": 120, "source_sections": ["Advanced Usage", "Future Enhancements", "Best Practices", "Summary"]}
+        ]
       }
     },
     {
       "chapter_id": "compare-analysis",
       "chapter_title": "Compare Analysis",
       "current_file": "book/src/compare-analysis.md",
-      "priority": "medium",
-      "issue": "large",
+      "priority": "high",
+      "issue": "oversized",
       "metrics": {
-        "total_lines": 969,
-        "content_lines": 758,
+        "total_lines": 992,
         "h2_sections": 17,
-        "h3_sections": 37,
-        "h4_sections": 2,
-        "code_block_ratio": 0.54,
-        "substantial_sections": 12
+        "code_block_markers": 74,
+        "code_block_ratio": 0.37
       },
-      "recommended_action": "consider_subsections",
-      "reason": "Nearly 2x threshold (969 lines). High code density (54%) with 17 H2 sections. Could benefit from subsection organization if content continues to grow or if users report navigation difficulties.",
+      "recommended_action": "split_into_subsections",
       "proposed_structure": {
-        "type": "consider_multi_subsection",
-        "rationale": "Currently at 969 lines with good section structure. Monitor for growth or user feedback indicating need for subsections."
-      }
-    }
-  ],
-  "well_organized_chapters": [
-    {
-      "chapter_id": "introduction",
-      "chapter_title": "Introduction",
-      "metrics": {
-        "total_lines": 104,
-        "h2_sections": 6,
-        "status": "well_sized"
-      }
-    },
-    {
-      "chapter_id": "getting-started",
-      "chapter_title": "Getting Started",
-      "metrics": {
-        "total_lines": 519,
-        "h2_sections": 9,
-        "status": "near_threshold_but_appropriate"
-      }
-    },
-    {
-      "chapter_id": "cli-reference",
-      "chapter_title": "CLI Reference",
-      "metrics": {
-        "total_lines": 920,
-        "h2_sections": 11,
-        "status": "large_but_reference_material",
-        "note": "CLI reference naturally contains many commands and options. Current organization is logical."
-      }
-    },
-    {
-      "chapter_id": "tiered-prioritization",
-      "chapter_title": "Tiered Prioritization",
-      "metrics": {
-        "total_lines": 351,
-        "h2_sections": 8,
-        "status": "well_sized"
-      }
-    },
-    {
-      "chapter_id": "entropy-analysis",
-      "chapter_title": "Entropy Analysis",
-      "metrics": {
-        "total_lines": 530,
-        "h2_sections": 10,
-        "status": "near_threshold_but_appropriate"
-      }
-    },
-    {
-      "chapter_id": "coverage-integration",
-      "chapter_title": "Coverage Integration",
-      "metrics": {
-        "total_lines": 593,
-        "h2_sections": 12,
-        "status": "near_threshold_but_appropriate"
-      }
-    },
-    {
-      "chapter_id": "god-object-detection",
-      "chapter_title": "God Object Detection",
-      "metrics": {
-        "total_lines": 655,
-        "h2_sections": 17,
-        "status": "acceptable"
-      }
-    },
-    {
-      "chapter_id": "suppression-patterns",
-      "chapter_title": "Suppression Patterns",
-      "metrics": {
-        "total_lines": 621,
-        "h2_sections": 14,
-        "status": "acceptable"
-      }
-    },
-    {
-      "chapter_id": "context-providers",
-      "chapter_title": "Context Providers",
-      "metrics": {
-        "total_lines": 912,
-        "h2_sections": 17,
-        "status": "large_but_acceptable"
+        "type": "multi-subsection",
+        "index_file": "book/src/compare-analysis/index.md",
+        "subsections": [
+          {"id": "overview", "title": "Overview", "estimated_lines": 180, "source_sections": ["Implementation Status", "Overview", "Basic Usage", "Target Location Tracking"]},
+          {"id": "problem-analysis", "title": "Problem Analysis", "estimated_lines": 200, "source_sections": ["Target Item", "Problem Analysis", "Proposed Solution", "Project Health Metrics"]},
+          {"id": "regression-detection", "title": "Regression Detection", "estimated_lines": 200, "source_sections": ["Regression Detection", "Improvement Tracking", "Before/After Metrics"]},
+          {"id": "output-formats", "title": "Output Formats", "estimated_lines": 180, "source_sections": ["Output Formats", "CI/CD Integration"]},
+          {"id": "examples", "title": "Practical Examples", "estimated_lines": 280, "source_sections": ["Practical Examples", "Troubleshooting"]}
+        ]
       }
     },
     {
       "chapter_id": "design-patterns",
       "chapter_title": "Design Pattern Detection",
+      "current_file": "book/src/design-patterns.md",
+      "priority": "high",
+      "issue": "oversized",
       "metrics": {
-        "total_lines": 874,
-        "h2_sections": 13,
-        "status": "large_but_acceptable"
-      }
-    },
-    {
-      "chapter_id": "validation-gates",
-      "chapter_title": "Validation and Quality Gates",
-      "metrics": {
-        "total_lines": 942,
-        "h2_sections": 14,
-        "status": "large_but_acceptable"
-      }
-    },
-    {
-      "chapter_id": "architectural-analysis",
-      "chapter_title": "Architectural Analysis",
-      "metrics": {
-        "total_lines": 679,
-        "h2_sections": 19,
-        "status": "acceptable"
-      }
-    },
-    {
-      "chapter_id": "multi-pass-analysis",
-      "chapter_title": "Multi-Pass Analysis",
-      "metrics": {
-        "total_lines": 715,
+        "total_lines": 962,
         "h2_sections": 12,
-        "status": "acceptable"
+        "code_block_markers": 72,
+        "code_block_ratio": 0.38
+      },
+      "recommended_action": "split_into_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/design-patterns/index.md",
+        "subsections": [
+          {"id": "overview", "title": "Overview", "estimated_lines": 150, "source_sections": ["Overview"]},
+          {"id": "behavioral-patterns", "title": "Behavioral Patterns", "estimated_lines": 250, "source_sections": ["Pattern Detection Details"]},
+          {"id": "creational-patterns", "title": "Creational Patterns", "estimated_lines": 200, "source_sections": ["Internal Pattern Detection"]},
+          {"id": "configuration", "title": "Configuration", "estimated_lines": 200, "source_sections": ["Configuration", "Confidence Scoring", "Cross-File Pattern Detection"]},
+          {"id": "rust-specific", "title": "Rust-Specific Patterns", "estimated_lines": 150, "source_sections": ["Rust-Specific Pattern Detection", "Integration with Complexity Analysis"]},
+          {"id": "examples", "title": "Examples and Use Cases", "estimated_lines": 180, "source_sections": ["Practical Examples", "Use Cases", "Troubleshooting", "Best Practices"]}
+        ]
+      }
+    },
+    {
+      "chapter_id": "cli-reference",
+      "chapter_title": "CLI Reference",
+      "current_file": "book/src/cli-reference.md",
+      "priority": "high",
+      "issue": "oversized",
+      "metrics": {
+        "total_lines": 951,
+        "h2_sections": 11,
+        "code_block_markers": 68,
+        "code_block_ratio": 0.36
+      },
+      "recommended_action": "split_into_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/cli-reference/index.md",
+        "subsections": [
+          {"id": "quick-start", "title": "Quick Start", "estimated_lines": 140, "source_sections": ["Quick Start"]},
+          {"id": "commands", "title": "Commands", "estimated_lines": 280, "source_sections": ["Commands"]},
+          {"id": "options", "title": "Options Reference", "estimated_lines": 220, "source_sections": ["Options", "Configuration"]},
+          {"id": "workflows", "title": "Common Workflows", "estimated_lines": 230, "source_sections": ["Common Workflows", "Examples"]},
+          {"id": "reference", "title": "Reference", "estimated_lines": 200, "source_sections": ["Command Compatibility Matrix", "Troubleshooting", "Best Practices", "Additional Tools"]}
+        ]
       }
     },
     {
       "chapter_id": "functional-analysis",
       "chapter_title": "Functional Composition Analysis",
+      "current_file": "book/src/functional-analysis.md",
+      "priority": "medium",
+      "issue": "large",
       "metrics": {
-        "total_lines": 939,
+        "total_lines": 949,
         "h2_sections": 14,
-        "status": "large_but_acceptable"
+        "code_block_markers": 68,
+        "code_block_ratio": 0.36
+      },
+      "recommended_action": "consider_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/functional-analysis/index.md",
+        "subsections": [
+          {"id": "overview", "title": "Overview and Configuration", "estimated_lines": 200, "source_sections": ["Overview", "Configuration Profiles"]},
+          {"id": "detection", "title": "Detection Algorithms", "estimated_lines": 280, "source_sections": ["Pure Function Detection", "Pipeline Detection", "Purity Analysis"]},
+          {"id": "side-effects", "title": "Side Effect Analysis", "estimated_lines": 200, "source_sections": ["Side Effect Detection", "Composition Pattern Recognition", "Composition Quality Scoring"]},
+          {"id": "examples", "title": "Examples and Best Practices", "estimated_lines": 260, "source_sections": ["Practical Examples", "Best Practices", "Use Cases", "Troubleshooting"]}
+        ]
       }
     },
     {
-      "chapter_id": "threshold-configuration",
-      "chapter_title": "Threshold Configuration",
+      "chapter_id": "validation-gates",
+      "chapter_title": "Validation and Quality Gates",
+      "current_file": "book/src/validation-gates.md",
+      "priority": "medium",
+      "issue": "large",
       "metrics": {
-        "total_lines": 594,
+        "total_lines": 940,
+        "h2_sections": 14,
+        "code_block_markers": 72,
+        "code_block_ratio": 0.38
+      },
+      "recommended_action": "consider_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/validation-gates/index.md",
+        "subsections": [
+          {"id": "overview", "title": "Overview", "estimated_lines": 200, "source_sections": ["Table of Contents", "Validate vs Analyze", "Quick Start", "Understanding Density-Based Validation"]},
+          {"id": "configuration", "title": "Configuration", "estimated_lines": 200, "source_sections": ["Configuration Setup", "Validation Metrics", "Exit Codes and CI Integration"]},
+          {"id": "coverage", "title": "Coverage Integration", "estimated_lines": 120, "source_sections": ["Coverage Integration", "Context-Aware Validation"]},
+          {"id": "cicd", "title": "CI/CD Examples", "estimated_lines": 230, "source_sections": ["CI/CD Examples", "Migrating from Deprecated Thresholds"]},
+          {"id": "troubleshooting", "title": "Troubleshooting and Best Practices", "estimated_lines": 200, "source_sections": ["Troubleshooting", "Best Practices"]}
+        ]
+      }
+    },
+    {
+      "chapter_id": "coverage-integration",
+      "chapter_title": "Coverage Integration",
+      "current_file": "book/src/coverage-integration.md",
+      "priority": "medium",
+      "issue": "large",
+      "metrics": {
+        "total_lines": 851,
         "h2_sections": 13,
-        "status": "well_sized"
+        "code_block_markers": 62,
+        "code_block_ratio": 0.36
+      },
+      "recommended_action": "consider_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/coverage-integration/index.md",
+        "subsections": [
+          {"id": "overview", "title": "Overview", "estimated_lines": 180, "source_sections": ["Why Coverage Matters", "LCOV Format: The Universal Standard", "Generating Coverage Data"]},
+          {"id": "role-based", "title": "Role-Based Coverage", "estimated_lines": 180, "source_sections": ["Role-Based Coverage Expectations", "How Coverage Affects Scoring", "Transitive Coverage Propagation"]},
+          {"id": "performance", "title": "Performance and Configuration", "estimated_lines": 160, "source_sections": ["Performance Characteristics", "CLI Options Reference"]},
+          {"id": "troubleshooting", "title": "Troubleshooting", "estimated_lines": 200, "source_sections": ["Troubleshooting Coverage Integration", "Best Practices"]},
+          {"id": "language-examples", "title": "Language Examples", "estimated_lines": 120, "source_sections": ["Complete Language Examples", "FAQ"]}
+        ]
       }
     },
     {
       "chapter_id": "dead-code-analysis",
       "chapter_title": "Dead Code Analysis",
+      "current_file": "book/src/dead-code-analysis.md",
+      "priority": "medium",
+      "issue": "large",
       "metrics": {
         "total_lines": 769,
         "h2_sections": 15,
-        "status": "acceptable"
+        "code_block_markers": 58,
+        "code_block_ratio": 0.38
+      },
+      "recommended_action": "consider_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/dead-code-analysis/index.md",
+        "subsections": [
+          {"id": "detection", "title": "Detection and Scoring", "estimated_lines": 250, "source_sections": ["Overview", "Confidence Scoring", "Public API Detection", "Framework Support"]},
+          {"id": "configuration", "title": "Configuration", "estimated_lines": 250, "source_sections": ["Confidence Thresholds", "Suppressing False Positives", "Coverage Integration", "Configuration Reference"]},
+          {"id": "usage", "title": "Usage and Best Practices", "estimated_lines": 260, "source_sections": ["Understanding Results", "Common Patterns", "Best Practices", "Limitations", "Troubleshooting", "Examples"]}
+        ]
+      }
+    },
+    {
+      "chapter_id": "multi-pass-analysis",
+      "chapter_title": "Multi-Pass Analysis",
+      "current_file": "book/src/multi-pass-analysis.md",
+      "priority": "medium",
+      "issue": "large",
+      "metrics": {
+        "total_lines": 715,
+        "h2_sections": 12,
+        "code_block_markers": 52,
+        "code_block_ratio": 0.36
+      },
+      "recommended_action": "consider_subsections",
+      "proposed_structure": {
+        "type": "multi-subsection",
+        "index_file": "book/src/multi-pass-analysis/index.md",
+        "subsections": [
+          {"id": "overview", "title": "Overview", "estimated_lines": 200, "source_sections": ["Overview", "How It Works", "CLI Usage"]},
+          {"id": "attribution", "title": "Attribution Engine", "estimated_lines": 260, "source_sections": ["Attribution Engine", "Understanding Attribution Output", "Insights and Recommendations"]},
+          {"id": "advanced", "title": "Advanced Usage", "estimated_lines": 250, "source_sections": ["Performance Considerations", "Comparative Analysis", "Configuration Options", "Use Cases"]}
+        ]
       }
     }
   ],
-  "tiny_chapters": [
+  "well_organized_chapters": [
+    {
+      "chapter_id": "analysis-guide",
+      "type": "multi-subsection",
+      "metrics": {
+        "subsection_count": 8,
+        "total_lines": 3667,
+        "average_subsection_lines": 458,
+        "subsections": {
+          "advanced-features.md": 570,
+          "analyzer-types.md": 147,
+          "complexity-metrics.md": 302,
+          "debt-patterns.md": 517,
+          "example-outputs.md": 525,
+          "index.md": 16,
+          "interpreting-results.md": 765,
+          "overview.md": 182,
+          "risk-scoring.md": 643
+        },
+        "largest_subsection": "interpreting-results.md (765 lines)"
+      },
+      "notes": "Already organized as multi-subsection. interpreting-results.md could be further split."
+    },
+    {
+      "chapter_id": "architectural-analysis",
+      "metrics": {"total_lines": 687, "h2_sections": 19},
+      "notes": "At threshold boundary. Well-structured with many sections."
+    },
+    {
+      "chapter_id": "god-object-detection",
+      "metrics": {"total_lines": 677, "h2_sections": 17},
+      "notes": "At threshold boundary. Well-structured."
+    },
+    {
+      "chapter_id": "responsibility-analysis",
+      "metrics": {"total_lines": 657, "h2_sections": 10},
+      "notes": "At threshold boundary. Manageable structure."
+    },
+    {
+      "chapter_id": "suppression-patterns",
+      "metrics": {"total_lines": 621, "h2_sections": 8},
+      "notes": "At threshold boundary. Good section balance."
+    },
+    {
+      "chapter_id": "threshold-configuration",
+      "metrics": {"total_lines": 599, "h2_sections": 10},
+      "notes": "At threshold boundary. Well-organized."
+    },
+    {
+      "chapter_id": "architecture",
+      "metrics": {"total_lines": 580, "h2_sections": 8},
+      "notes": "At threshold boundary. Good structure."
+    },
+    {
+      "chapter_id": "entropy-analysis",
+      "metrics": {"total_lines": 530, "h2_sections": 10},
+      "notes": "At threshold boundary. Well-organized."
+    },
+    {
+      "chapter_id": "boilerplate-vs-complexity",
+      "metrics": {"total_lines": 505, "h2_sections": 8},
+      "notes": "At threshold boundary. Focused content."
+    },
+    {
+      "chapter_id": "llm-integration",
+      "metrics": {"total_lines": 455, "h2_sections": 6},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "tui-guide",
+      "metrics": {"total_lines": 392, "h2_sections": 5},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "metrics-reference",
+      "metrics": {"total_lines": 395, "h2_sections": 7},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "tiered-prioritization",
+      "metrics": {"total_lines": 381, "h2_sections": 7},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "getting-started",
+      "metrics": {"total_lines": 353, "h2_sections": 6},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "faq",
+      "metrics": {"total_lines": 292, "h2_sections": 5},
+      "notes": "Well-sized. No action needed."
+    },
     {
       "chapter_id": "call-graph-analysis",
-      "chapter_title": "Call Graph Analysis",
-      "current_file": "book/src/call-graph-analysis.md",
-      "priority": "info",
-      "issue": "incomplete",
-      "metrics": {
-        "total_lines": 100,
-        "content_lines": 70,
-        "h2_sections": 6,
-        "status": "needs_content"
-      },
-      "recommended_action": "expand_content",
-      "reason": "Chapter stub with only 100 lines covering a complex feature. Needs substantial content expansion based on chapter definition (12 topics including AST construction, trait resolution, macro tracking, etc.)."
+      "metrics": {"total_lines": 291, "h2_sections": 6},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "coverage-analysis",
+      "metrics": {"total_lines": 261, "h2_sections": 5},
+      "notes": "Well-sized. No action needed."
     },
     {
       "chapter_id": "boilerplate-detection",
-      "chapter_title": "Boilerplate Detection",
-      "current_file": "book/src/boilerplate-detection.md",
-      "priority": "info",
-      "issue": "incomplete",
-      "metrics": {
-        "total_lines": 109,
-        "content_lines": 77,
-        "h2_sections": 7,
-        "status": "needs_content"
-      },
-      "recommended_action": "expand_content",
-      "reason": "Chapter stub with only 109 lines. Chapter definition includes 8 topics (detection criteria, pattern types, macro recommendations, etc.) that need expansion."
+      "metrics": {"total_lines": 256, "h2_sections": 4},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "why-debtmap",
+      "metrics": {"total_lines": 196, "h2_sections": 3},
+      "notes": "Well-sized. No action needed."
+    },
+    {
+      "chapter_id": "introduction",
+      "metrics": {"total_lines": 100, "h2_sections": 2},
+      "notes": "Well-sized. No action needed."
     }
   ],
   "statistics": {
-    "total_lines": 31087,
-    "average_lines_per_chapter": 1110,
-    "median_lines_per_chapter": 858,
-    "largest_chapter": {
-      "id": "analysis-guide",
-      "lines": 2587
-    },
-    "smallest_complete_chapter": {
-      "id": "introduction",
-      "lines": 104
-    },
-    "chapters_over_1000_lines": 10,
-    "chapters_over_500_lines": 21,
-    "total_code_block_lines": 9741,
-    "code_density": 0.31
+    "total_lines": 34254,
+    "average_lines_per_chapter": 1070,
+    "median_lines_per_chapter": 700,
+    "largest_chapter": {"id": "troubleshooting", "lines": 2553},
+    "smallest_complete_chapter": {"id": "introduction", "lines": 100},
+    "chapters_over_1000_lines": 8,
+    "chapters_over_500_lines": 25,
+    "total_h2_sections": 245
   }
 }
