@@ -1,0 +1,102 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "scoring-strategies",
+  "subsection_id": "data-flow-scoring",
+  "subsection_title": "Data Flow Scoring",
+  "subsection_file": "book/src/scoring-strategies/data-flow.md",
+  "feature_mappings": [
+    "functional_analysis.purity_detection",
+    "configuration.scoring",
+    "risk_assessment"
+  ],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Documentation file does not exist. Data flow scoring is a fully implemented feature (spec 218) with purity spectrum, refactorability factor, and pattern factor scoring - all undocumented.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "The documentation file book/src/scoring-strategies/data-flow.md does not exist. Data flow scoring is implemented in the codebase but completely undocumented.",
+      "feature_reference": "spec 218: Data flow scoring",
+      "fix_suggestion": "Create book/src/scoring-strategies/data-flow.md documenting the purity spectrum, refactorability factor, and pattern factor scoring system.",
+      "source_reference": "src/config/scoring.rs:678-723 (DataFlowScoringConfig)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Purity Spectrum",
+      "description": "PuritySpectrum enum with 5 levels (StrictlyPure, LocallyPure, IOIsolated, IOMixed, Impure) and their score multipliers (0.0-1.0) is not documented.",
+      "feature_reference": "functional_analysis.purity_detection",
+      "fix_suggestion": "Document the PuritySpectrum classification system with score multipliers: StrictlyPure=0.0, LocallyPure=0.3, IOIsolated=0.6, IOMixed=0.9, Impure=1.0",
+      "source_reference": "src/priority/unified_scorer.rs:64-94"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Refactorability Factor",
+      "description": "Refactorability factor calculation is implemented but not documented. Currently returns neutral 1.0 (dead store analysis removed as per code comment).",
+      "feature_reference": "configuration.scoring",
+      "fix_suggestion": "Document that refactorability_factor currently returns 1.0 and explain the original intent for dead store analysis",
+      "source_reference": "src/priority/unified_scorer.rs:937-947"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Pattern Factor",
+      "description": "Pattern factor distinguishes data flow pipelines from business logic (range 0.7-1.0) but is not documented.",
+      "feature_reference": "configuration.scoring",
+      "fix_suggestion": "Document pattern factor calculation: transform_ratio > 0.5 = 0.7 (data flow), > 0.3 = 0.85 (mixed), else 1.0 (business logic)",
+      "source_reference": "src/priority/unified_scorer.rs:949-978"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Configuration",
+      "description": "DataFlowScoringConfig in debtmap.toml is not documented. Supports enabled flag and weight configuration for purity/refactorability/pattern factors.",
+      "feature_reference": "configuration.scoring",
+      "fix_suggestion": "Document [data_flow_scoring] configuration section with enabled, purity_weight (0.4), refactorability_weight (0.3), pattern_weight (0.3) options",
+      "source_reference": "src/config/scoring.rs:678-723"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Purity Analysis",
+      "description": "PurityLevel enum (StrictlyPure, LocallyPure, ReadOnly, Impure) from purity_analysis.rs differs from PuritySpectrum. Relationship between these is unclear.",
+      "feature_reference": "functional_analysis.purity_detection",
+      "fix_suggestion": "Clarify relationship between PurityLevel (analysis) and PuritySpectrum (scoring) classifications",
+      "source_reference": "src/analysis/purity_analysis.rs:32-43"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Data Flow Graph",
+      "description": "DataFlowGraph struct and its role in data flow scoring (purity_info, mutation_info, io_operations) is not documented.",
+      "feature_reference": "functional_analysis",
+      "fix_suggestion": "Document how DataFlowGraph provides purity, mutation, and I/O operation data for scoring",
+      "source_reference": "src/data_flow/mod.rs:113-140"
+    }
+  ],
+  "positive_aspects": [
+    "Well-structured implementation with clear separation between analysis (purity_analysis.rs) and scoring (unified_scorer.rs)",
+    "Configurable weights in DataFlowScoringConfig allow tuning of purity vs refactorability vs pattern factors",
+    "PuritySpectrum provides nuanced 5-level classification rather than binary pure/impure"
+  ],
+  "improvement_suggestions": [
+    "Create data-flow.md with Overview, Purity Spectrum, Pattern Factor, Configuration sections",
+    "Include examples showing how data flow scoring affects final debt scores",
+    "Add cross-reference to rebalanced.md since data flow factors integrate with unified scoring",
+    "Document the calculate_unified_priority_with_data_flow entry point function"
+  ],
+  "cross_references": [
+    "rebalanced",
+    "function-level",
+    "file-level"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [],
+    "validation_focus": "Check data flow scoring configuration and examples"
+  }
+}
