@@ -5,162 +5,87 @@
   "subsection_title": "Example Outputs",
   "subsection_file": "book/src/analysis-guide/example-outputs.md",
   "feature_mappings": [],
-  "drift_detected": true,
-  "severity": "high",
-  "quality_assessment": "Examples use outdated JSON field structure and broken internal links. The terminal output examples are generally accurate, but JSON examples show the legacy format rather than the unified format (spec 108) currently implemented.",
+  "drift_detected": false,
+  "severity": "low",
+  "quality_assessment": "Documentation is accurate and comprehensive. JSON examples correctly use the unified format (spec 108) with proper field structure. Terminal examples accurately reflect actual output. All internal links are valid.",
   "issues": [
     {
-      "type": "broken_links",
-      "severity": "medium",
+      "type": "minor_style",
+      "severity": "low",
       "section": "Next Steps",
-      "description": "Found 2 broken internal links",
-      "broken_links": [
-        {
-          "link_text": "Output Formats",
-          "original_target": "./output-formats.md",
-          "expected_path": "book/src/analysis-guide/output-formats.md",
-          "actual_location": "book/src/output-formats.md",
-          "suggested_fix": "../output-formats.md"
-        },
-        {
-          "link_text": "Configuration",
-          "original_target": "./configuration.md",
-          "expected_path": "book/src/analysis-guide/configuration.md",
-          "actual_location": "book/src/configuration.md",
-          "suggested_fix": "../configuration.md"
-        }
-      ],
-      "fix_suggestion": "Update links to point to book root level: '../output-formats.md' and '../configuration.md'"
+      "description": "Redundant path in Advanced Features link",
+      "current_content": "[Advanced Features](../analysis-guide/advanced-features.md)",
+      "should_be": "[Advanced Features](./advanced-features.md)",
+      "fix_suggestion": "Simplify to relative path within same directory",
+      "note": "Link is functional, just unnecessarily complex"
     },
     {
-      "type": "outdated_information",
-      "severity": "high",
-      "section": "High Complexity Function (Needs Refactoring) - JSON Output",
-      "description": "JSON example uses outdated field structure from legacy format, not unified format (spec 108)",
-      "current_content": "\"debt_type\": \"Complexity\", \"priority\": \"Critical\", \"function_metrics\": { ... }",
-      "should_be": "\"debt_type\": {\"ComplexityHotspot\": {...}}, \"priority\": \"critical\", \"metrics\": {...}, \"purity_analysis\": {...}, \"dependencies\": {...}",
-      "fix_suggestion": "Update JSON example to match UnifiedDebtItemOutput structure from src/output/unified.rs",
-      "source_reference": "src/output/unified.rs:UnifiedDebtItemOutput::Function"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "High Complexity Function (Needs Refactoring) - JSON Output",
-      "description": "JSON example missing new fields from unified format",
-      "missing_fields": [
-        "type: 'Function'",
-        "score: float",
-        "category: 'CodeQuality'|'Architecture'|'Testing'|'Performance'",
-        "location: {file, line, function, file_context_label}",
-        "function_role: 'PureLogic'|'Orchestrator'|'IOWrapper'|...",
-        "pattern_type: Optional pattern classification",
-        "pattern_confidence: Optional pattern confidence score"
-      ],
-      "fix_suggestion": "Add complete unified format fields to make example realistic",
-      "source_reference": "src/output/unified.rs:FunctionDebtItemOutput"
-    },
-    {
-      "type": "incorrect_examples",
-      "severity": "high",
-      "section": "High Complexity Function (Needs Refactoring) - JSON Output",
-      "description": "Field names don't match actual implementation",
-      "discrepancies": [
-        {
-          "documented": "\"debt_type\": \"Complexity\"",
-          "actual": "\"debt_type\": {\"ComplexityHotspot\": {\"cyclomatic\": 25, \"cognitive\": 38, \"adjusted_cyclomatic\": null}}",
-          "reason": "DebtType is a tagged enum with variant-specific data"
-        },
-        {
-          "documented": "\"priority\": \"Critical\"",
-          "actual": "\"priority\": \"critical\"",
-          "reason": "Priority enum serializes to lowercase"
-        },
-        {
-          "documented": "\"function_metrics\": {\"name\": \"process_transaction\", ...}",
-          "actual": "\"location\": {\"file\": \"...\", \"line\": 145, \"function\": \"process_transaction\"}, \"metrics\": {...}",
-          "reason": "Unified format separates location and metrics"
-        },
-        {
-          "documented": "\"function_metrics\": {\"purity_confidence\": 0.15}",
-          "actual": "\"purity_analysis\": {\"is_pure\": false, \"confidence\": 0.15}",
-          "reason": "Purity fields nested in purity_analysis object"
-        },
-        {
-          "documented": "\"function_metrics\": {\"upstream_callers\": [...]}",
-          "actual": "\"dependencies\": {\"upstream_count\": 3, \"upstream_callers\": [...], \"downstream_count\": 8, \"downstream_callees\": [...]}",
-          "reason": "Dependencies separated into own object with counts"
-        }
-      ],
-      "fix_suggestion": "Replace entire JSON example with realistic output from actual UnifiedDebtItemOutput structure",
-      "source_reference": "src/output/unified.rs:174-288"
-    },
-    {
-      "type": "incorrect_examples",
-      "severity": "medium",
-      "section": "Test Gap (Needs Testing) - JSON Output",
-      "description": "Uses mix of unified and legacy format fields",
-      "issues": [
-        "Missing 'type': 'Function' field",
-        "Missing 'category' field",
-        "Missing 'location' object (has bare 'file' and 'line' instead)",
-        "Uses legacy 'current_risk' instead of unified 'score'",
-        "Has 'recommendation.effort_estimate' which is not in unified format",
-        "Has 'test_effort' object which may be part of recommendation not top-level"
-      ],
-      "fix_suggestion": "Align example with unified format structure or clearly label as conceptual",
-      "source_reference": "src/output/unified.rs:UnifiedDebtItemOutput"
-    },
-    {
-      "type": "missing_content",
+      "type": "minor_accuracy",
       "severity": "low",
-      "section": "Example Outputs",
-      "description": "No example showing file-level debt items (god objects, god modules)",
-      "fix_suggestion": "Add example of file-level UnifiedDebtItemOutput with type: 'File' and god_object_indicators",
-      "source_reference": "src/output/unified.rs:FileLevelDebtItemOutput"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Example Outputs",
-      "description": "No example showing summary statistics from unified format",
-      "missing_content": "UnifiedOutput includes summary with total_items, debt_density, score_distribution, by_type, by_category",
-      "fix_suggestion": "Add example showing the summary object structure from UnifiedOutput",
-      "source_reference": "src/output/unified.rs:UnifiedOutput"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Example Outputs",
-      "description": "No example showing function_role classification",
-      "missing_content": "FunctionRole enum (PureLogic, Orchestrator, IOWrapper, EntryPoint, PatternMatch, Debug, Unknown)",
-      "fix_suggestion": "Add example showing function_role field and its interpretation",
-      "source_reference": "src/priority/mod.rs:FunctionRole"
+      "section": "Source References",
+      "description": "Line number references in source documentation may drift as code evolves",
+      "affected_references": [
+        "src/output/unified.rs:FunctionDebtItemOutput (lines 158-183) - verify periodically",
+        "src/priority/semantic_classifier/mod.rs:25-33 - verify periodically"
+      ],
+      "fix_suggestion": "Consider using function/struct names rather than line numbers for stable references"
     }
   ],
   "positive_aspects": [
-    "Terminal output examples accurately reflect the actual formatting with box-drawing characters",
-    "Before/after comparison example is helpful and realistic",
-    "Entropy-dampened validation example shows advanced feature clearly",
-    "Well-tested complex function example demonstrates good practices effectively",
-    "Examples cover diverse scenarios (complexity, test gaps, entropy dampening, refactoring)"
+    "JSON examples correctly use unified format with 'type': 'Function' tagging (spec 108)",
+    "All JSON fields match actual implementation: score, category, priority, location, metrics, debt_type, function_role, dependencies, recommendation, impact, scoring_details",
+    "Priority values correctly shown as lowercase: critical, high, medium, low",
+    "debt_type correctly shown as tagged enum with variant-specific data (e.g., ComplexityHotspot with cyclomatic and cognitive)",
+    "Function role classification accurately documented with all roles: PureLogic, Orchestrator, IOWrapper, EntryPoint, PatternMatch, Debug, Unknown",
+    "Entropy-dampened validation example correctly shows adjusted_complexity and dampening_factor fields",
+    "Pattern detection example correctly shows pattern_type, pattern_confidence, and pattern_details fields",
+    "File-level debt example correctly shows god_object_indicators structure",
+    "Summary statistics example correctly shows format_version, metadata, summary, and items structure",
+    "Test file detection example correctly shows file_context_label field",
+    "Terminal output examples accurately reflect actual formatting with box-drawing characters",
+    "Before/after comparison example demonstrates real improvement workflow",
+    "Well-tested complex function example effectively demonstrates good practices",
+    "All internal links (output-formats.md, configuration.md, advanced-features.md) resolve correctly"
   ],
   "improvement_suggestions": [
-    "Add complete, realistic JSON example copied directly from actual debtmap output",
-    "Include file-level debt item example (god object/module)",
-    "Show the summary statistics structure from UnifiedOutput",
-    "Add example demonstrating function_role classification",
-    "Consider adding example with pattern detection fields (pattern_type, pattern_confidence)",
-    "Include example showing file_context_label (TEST FILE, PROBABLE TEST) for test file detection",
-    "Add note explaining the difference between legacy and unified formats",
-    "Link to output-formats.md for complete JSON schema documentation"
+    "Simplify the Advanced Features link from '../analysis-guide/advanced-features.md' to './advanced-features.md'",
+    "Consider adding example showing cohesion metrics if file has them (spec 198)",
+    "Could add example showing context suggestion output for AI agents (spec 263)"
   ],
   "cross_references": [
-    "output-formats.md (needs correct relative path)",
-    "configuration.md (needs correct relative path)",
-    "advanced-features.md (could link for purity detection details)"
+    "output-formats.md",
+    "configuration.md",
+    "advanced-features.md"
   ],
+  "verified_accuracy": {
+    "priority_thresholds": {
+      "documented": "critical >= 100, high >= 50, medium >= 20, low < 20",
+      "actual": "Matches src/output/unified/priority.rs:16-19",
+      "status": "correct"
+    },
+    "function_role_enum": {
+      "documented": "PureLogic, Orchestrator, IOWrapper, EntryPoint, PatternMatch, Debug, Unknown",
+      "actual": "Matches src/priority/semantic_classifier/mod.rs:25-33",
+      "status": "correct"
+    },
+    "pattern_confidence_threshold": {
+      "documented": "0.7",
+      "actual": "Matches src/io/writers/pattern_display.rs:10 PATTERN_CONFIDENCE_THRESHOLD",
+      "status": "correct"
+    },
+    "debt_type_structure": {
+      "documented": "Tagged enum with variant-specific data",
+      "actual": "Matches src/priority/debt_types.rs DebtType enum serialization",
+      "status": "correct"
+    },
+    "unified_output_structure": {
+      "documented": "format_version, metadata, summary, items",
+      "actual": "Matches src/output/unified/types.rs:14-20 UnifiedOutput",
+      "status": "correct"
+    }
+  },
   "metadata": {
-    "analyzed_at": "2025-12-04T22:31:00Z",
+    "analyzed_at": "2025-12-27T08:30:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Terminal output examples",
@@ -168,12 +93,13 @@
       "Before/after comparisons"
     ],
     "validation_focus": "Verify examples are realistic and helpful",
-    "key_implementation_files": [
-      "src/output/unified.rs",
-      "src/output/json.rs",
-      "src/output/terminal.rs",
-      "src/priority/formatter/mod.rs",
-      "src/priority/mod.rs"
+    "key_implementation_files_verified": [
+      "src/output/unified/types.rs",
+      "src/output/unified/func_item.rs",
+      "src/output/unified/file_item.rs",
+      "src/output/unified/priority.rs",
+      "src/priority/semantic_classifier/mod.rs",
+      "src/io/writers/pattern_display.rs"
     ]
   }
 }
