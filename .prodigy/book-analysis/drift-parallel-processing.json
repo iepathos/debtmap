@@ -5,79 +5,107 @@
   "chapter_file": "book/src/parallel-processing.md",
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Chapter is comprehensive and mostly accurate, but contains some outdated implementation details and missing information about recent optimizations. The core concepts and usage instructions are solid.",
+  "quality_assessment": "Overall comprehensive documentation with good coverage of parallel processing features, but contains several broken links and minor inaccuracies in code references",
   "issues": [
     {
-      "type": "outdated_information",
+      "type": "broken_links",
       "severity": "medium",
-      "section": "Parallel File Processing - Phase 1",
-      "description": "Documentation shows files are parsed in parallel using par_iter(), but actual implementation shows sequential parsing",
-      "current_content": "Files are parsed concurrently using Rayon's parallel iterators:\n\n```rust\nlet parsed_files: Vec<_> = rust_files\n    .par_iter()  // Convert to parallel iterator\n    .filter_map(|file_path| {\n        let content = io::read_file(file_path).ok()?;\n        // Update progress atomically\n        parallel_graph.stats().increment_files();\n        Some((file_path.clone(), content))\n    })\n    .collect();\n```",
-      "should_be": "Phase 1 implementation shows file CONTENTS are read in parallel (par_iter), but AST parsing is sequential:\n\n```rust\n// Step 1: Read file contents in parallel (I/O bound)\nlet file_contents: Vec<_> = rust_files\n    .par_iter()\n    .filter_map(|file_path| {\n        let content = io::read_file(file_path).ok()?;\n        Some((file_path.clone(), content))\n    })\n    .collect();\n\n// Step 2: Parse files to AST (sequential - syn::File not Send)\nlet parsed_files: Vec<_> = file_contents\n    .iter()\n    .enumerate()\n    .filter_map(|(idx, (file_path, content))| {\n        let parsed = syn::parse_file(content).ok()?;\n        parallel_graph.stats().increment_files();\n        Some((file_path.clone(), parsed))\n    })\n    .collect();\n```",
-      "fix_suggestion": "Update Phase 1 section to clarify that I/O is parallelized but AST parsing is sequential due to syn::File not being Send. Add note about why this doesn't significantly impact performance (I/O dominates).",
-      "source_reference": "src/builders/parallel_call_graph.rs:115-143"
+      "section": "See Also",
+      "description": "Found 3 broken or incorrect internal link(s)",
+      "broken_links": [
+        {
+          "link_text": "CLI Reference - Performance & Caching",
+          "target_path": "./cli-reference.md#performance--caching",
+          "issue": "Anchor #performance--caching does not exist. The correct anchor is #performance (section 'Performance' at line 400 of cli-reference.md)",
+          "suggested_fix": "./cli-reference.md#performance"
+        },
+        {
+          "link_text": "Troubleshooting - Slow Analysis",
+          "target_path": "./troubleshooting.md#slow-analysis-performance",
+          "issue": "Anchor #slow-analysis-performance does not exist in troubleshooting.md. The content has been reorganized into subsections. There is no dedicated 'slow-analysis-performance' section.",
+          "suggested_fix": "./troubleshooting.md#performance-issues or ./troubleshooting/quick-fixes.md#slow-analysis"
+        },
+        {
+          "link_text": "Troubleshooting - High Memory Usage",
+          "target_path": "./troubleshooting.md#high-memory-usage",
+          "issue": "Anchor #high-memory-usage does not exist in troubleshooting.md. The section is 'Out of Memory Errors' not 'High Memory Usage'.",
+          "suggested_fix": "./troubleshooting.md#out-of-memory-errors"
+        }
+      ],
+      "fix_suggestion": "Update links to point to correct anchors. The troubleshooting chapter has been reorganized into subsections."
     },
     {
       "type": "outdated_information",
-      "severity": "medium",
-      "section": "Parallel File Processing - Phase 2",
-      "description": "Documentation shows chunked parallel extraction, but actual implementation processes ALL files at once without chunking",
-      "current_content": "Files are grouped into chunks for optimal parallelization:\n\n```rust\nlet chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());\n\nparsed_files.par_chunks(chunk_size).for_each(|chunk| {\n    // Parse syn files within each chunk\n    let parsed_chunk: Vec<_> = chunk\n        .iter()\n        .filter_map(|(path, content)| {\n            syn::parse_file(content)\n                .ok()\n                .map(|parsed| (parsed, path.clone()))\n        })\n        .collect();\n\n    if !parsed_chunk.is_empty() {\n        // Extract call graph for this chunk\n        let chunk_graph = extract_call_graph_multi_file(&parsed_chunk);\n\n        // Merge into main graph concurrently\n        parallel_graph.merge_concurrent(chunk_graph);\n    }\n});\n```",
-      "should_be": "Implementation shows NO chunking - all files processed at once for optimal cross-file resolution:\n\n```rust\n// Process ALL files at once (no chunking)\n// This enables optimal cross-file call resolution with a single PathResolver\nlet files_for_extraction: Vec<_> = parsed_files\n    .iter()\n    .map(|(path, parsed)| (parsed.clone(), path.clone()))\n    .collect();\n\n// Extract call graph for all files with full cross-file resolution\nlet graph = extract_call_graph_multi_file(&files_for_extraction);\n\n// Merge into main graph\nparallel_graph.merge_concurrent(graph);\n```",
-      "fix_suggestion": "Update Phase 2 section to reflect that all files are processed together without chunking. Explain that this design enables optimal cross-file call resolution with complete visibility of all functions. The multi_file extraction itself may use internal parallelism via rayon.",
-      "source_reference": "src/builders/parallel_call_graph.rs:152-176"
-    },
-    {
-      "type": "missing_content",
       "severity": "low",
-      "section": "Configuration",
-      "description": "Documentation mentions DEBTMAP_JOBS environment variable but doesn't document DEBTMAP_CONFIG",
-      "feature_reference": "parallel_processing.environment_variables",
-      "fix_suggestion": "While DEBTMAP_JOBS is documented, consider adding note that other environment variables like DEBTMAP_CONFIG (for config file path) are also available. This provides complete picture of environment-based configuration.",
-      "source_reference": "src/cli.rs:45"
+      "section": "AST Parsing Optimization (Spec 132)",
+      "description": "Reference to 'docs/spec-132-benchmark-results.md' which does not exist",
+      "current_content": "See `docs/spec-132-benchmark-results.md` for detailed benchmarks validating these improvements.",
+      "should_be": "Either remove the reference or point to an actual existing document",
+      "fix_suggestion": "Remove the reference to spec-132-benchmark-results.md since the file does not exist",
+      "source_reference": "book/src/parallel-processing.md:250"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Thread Pool Configuration",
+      "description": "Code reference shows line numbers that may be outdated",
+      "current_content": "// From src/builders/parallel_call_graph.rs:48-53",
+      "should_be": "Thread pool configuration is now handled in src/cli/setup.rs (configure_thread_pool function at lines 15-26). The ParallelCallGraphBuilder.with_config() method no longer configures the thread pool as per the comment 'Config is no longer used as thread pool is configured globally'.",
+      "fix_suggestion": "Update the code reference to point to src/cli/setup.rs:15-26 for configure_thread_pool function",
+      "source_reference": "src/cli/setup.rs:15-26"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Worker Thread Selection",
+      "description": "Code reference shows outdated line numbers for get_worker_count",
+      "current_content": "// From src/main.rs:828-836",
+      "should_be": "Function get_worker_count is now located in src/cli/setup.rs at lines 29-37",
+      "fix_suggestion": "Update the code reference from src/main.rs:828-836 to src/cli/setup.rs:29-37",
+      "source_reference": "src/cli/setup.rs:29-37"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Parallel File Processing",
+      "description": "Code references show outdated line numbers for parallel_call_graph.rs",
+      "current_content": "// From src/builders/parallel_call_graph.rs:115-143",
+      "should_be": "File reading and parsing is now in parallel_parse_files_batch (lines 217-249) and parallel_parse_files_with_progress (lines 253-319). The implementation has changed with batched processing (Spec 210) using BATCH_SIZE of 200 files.",
+      "fix_suggestion": "Update code references to reflect new line numbers and batch processing architecture",
+      "source_reference": "src/builders/parallel_call_graph.rs:217-249"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Cross-File Call Resolution",
-      "description": "Two-phase parallel resolution section is excellent but doesn't mention the CallResolver delegation",
-      "current_content": "Section explains the two-phase architecture (parallel resolution + sequential updates) with performance characteristics",
-      "should_be": "Could add brief mention that the actual resolution logic delegates to a sophisticated CallResolver that handles associated functions, qualified paths, and type hints. This provides context for why the resolution is computationally intensive enough to benefit from parallelization.",
-      "fix_suggestion": "Add a brief note that resolve_call_with_advanced_matching delegates to CallResolver for sophisticated pattern matching including associated functions, qualified paths, and cross-module calls.",
-      "source_reference": "src/priority/call_graph/cross_file.rs:44-58"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Parallel Call Graph Statistics",
-      "description": "Missing explanation of how unified progress system integrates with parallel statistics",
-      "feature_reference": "parallel_processing.progress_tracking",
-      "fix_suggestion": "Add note that parallel statistics are now integrated with a unified progress system (crate::io::progress::AnalysisProgress) that provides consolidated progress reporting across all analysis phases. This replaced older per-phase progress bars.",
-      "source_reference": "src/builders/parallel_call_graph.rs:134-139"
+      "section": "Phase 2: All-Files-At-Once Extraction",
+      "description": "Documentation mentions chunking was removed but doesn't explain the new batch processing introduced by Spec 210",
+      "current_content": "Process ALL files at once (no chunking)",
+      "should_be": "The implementation now uses batch processing (BATCH_SIZE = 200 files) to prevent proc-macro2 SourceMap overflow, with SourceMap reset between batches. This is different from the 'all-at-once' approach described.",
+      "fix_suggestion": "Update to explain the new batch processing approach introduced in Spec 210 that processes files in batches of 200 to prevent SourceMap overflow",
+      "source_reference": "src/builders/parallel_call_graph.rs:128-181"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of Rayon parallel iterators and thread pool configuration",
-    "Excellent explanation of DashMap lock-free concurrency with clear code examples",
-    "Detailed performance characteristics with real-world benchmarks",
-    "Strong explanation of AST parsing optimization (Spec 132) with before/after analysis",
-    "Thorough coverage of two-phase parallel cross-file resolution with performance data",
-    "Comprehensive coverage index optimization section with nested HashMap architecture",
-    "Clear troubleshooting section with actionable solutions",
-    "Good CLI flag documentation with usage examples",
-    "Excellent scaling behavior tables and performance tuning guidance",
-    "All internal links are valid and point to existing files"
+    "Comprehensive documentation of Rayon parallel iterators and DashMap concurrent data structures",
+    "Clear explanation of the three-phase parallel pipeline architecture",
+    "Detailed performance characteristics and scaling behavior tables",
+    "Good coverage of CLI flags (--jobs, --no-parallel) and environment variables (DEBTMAP_JOBS, DEBTMAP_PARALLEL)",
+    "Thorough troubleshooting section with common issues and solutions",
+    "Well-documented ParallelCallGraph and ParallelStats implementations",
+    "Accurate description of cross-file call resolution two-phase approach",
+    "Good coverage index optimization documentation",
+    "Clear tuning guidelines for different environments (workstation, CI/CD, containers)"
   ],
   "improvement_suggestions": [
-    "Update Phase 1 and Phase 2 implementation details to match current code",
-    "Add clarification about sequential AST parsing due to syn::File not being Send",
-    "Mention CallResolver delegation in cross-file resolution section",
-    "Add note about unified progress system integration",
-    "Consider adding a section on the internal parallelism within extract_call_graph_multi_file",
-    "Could add more details about when to use --jobs vs --no-parallel in different scenarios"
+    "Update all code references to use current line numbers from the codebase",
+    "Add documentation about Spec 210 batch processing to prevent SourceMap overflow",
+    "Fix broken links to troubleshooting and CLI reference sections",
+    "Remove reference to non-existent spec-132-benchmark-results.md",
+    "Consider adding a note that thread pool configuration is now centralized in cli/setup.rs",
+    "Update Phase 2 documentation to reflect batch processing approach"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T08:32:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Rayon parallel iterators",
@@ -85,11 +113,10 @@
       "Worker thread tuning",
       "Lock-free concurrent access with DashMap",
       "Performance benchmarks",
-      "Scaling strategies",
-      "AST parsing optimization",
-      "Cross-file call resolution",
-      "Coverage index optimization"
+      "Scaling strategies"
     ],
-    "validation_focus": "Check that parallel processing features, thread configuration, and performance characteristics are documented"
+    "validation_focus": "Check that parallel processing features, thread configuration, and performance characteristics are documented",
+    "internal_links_validated": 7,
+    "broken_links_found": 3
   }
 }
