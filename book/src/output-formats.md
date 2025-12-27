@@ -18,6 +18,9 @@ debtmap analyze . --format markdown
 
 # HTML output - interactive web dashboard
 debtmap analyze . --format html
+
+# DOT output - Graphviz dependency visualization
+debtmap analyze . --format dot
 ```
 
 Available formats:
@@ -25,6 +28,7 @@ Available formats:
 - **json**: Structured data for programmatic processing
 - **markdown**: Reports suitable for documentation and PR comments
 - **html**: Web-viewable HTML reports with interactive dashboard
+- **dot**: Graphviz DOT format for dependency graph visualization
 
 ### Writing to Files
 
@@ -908,6 +912,95 @@ The HTML output uses a built-in template. For custom styling, you can:
 
 > **Note:** Direct template customization requires modifying `src/io/writers/templates/dashboard.html` in the debtmap source code.
 
+## DOT Output
+
+DOT format generates Graphviz-compatible output for visualizing file dependencies and technical debt as a graph. This is useful for understanding code architecture and identifying coupling patterns.
+
+**Source:** `src/io/writers/dot.rs` (Spec 204)
+
+### Basic Usage
+
+```bash
+# Generate DOT output for dependency visualization
+debtmap analyze . --format dot
+
+# Save to file
+debtmap analyze . --format dot -o deps.dot
+```
+
+### Rendering the Graph
+
+DOT files can be rendered using Graphviz tools:
+
+```bash
+# Generate SVG (recommended for web)
+dot -Tsvg deps.dot -o deps.svg
+
+# Generate PNG
+dot -Tpng deps.dot -o deps.png
+
+# Interactive exploration with xdot
+xdot deps.dot
+```
+
+### Graph Features
+
+The DOT output provides:
+
+1. **File Nodes** - Each analyzed file appears as a node
+2. **Dependency Edges** - Arrows show which files depend on which
+3. **Color-Coded Debt Scores** - Node colors indicate debt severity:
+   - **Green** (#6BCB77): Low debt (<20)
+   - **Yellow** (#FFD93D): Medium debt (≥20)
+   - **Orange** (#FF8C00): High debt (≥50)
+   - **Red** (#FF6B6B): Critical debt (≥100)
+4. **Module Clustering** - Files are grouped by directory/module
+5. **Tooltips** - Hover for detailed metrics (score, functions, lines, coupling)
+6. **Legend** - Built-in legend explains the color coding
+
+### Example Output
+
+```dot
+digraph debtmap {
+  rankdir=TB;
+  node [shape=box, style=filled, fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=10];
+
+  subgraph cluster_legend {
+    label="Debt Score Legend";
+    legend_critical [label="Critical (>=100)", fillcolor="#FF6B6B"];
+    legend_high [label="High (>=50)", fillcolor="#FF8C00"];
+    legend_medium [label="Medium (>=20)", fillcolor="#FFD93D"];
+    legend_low [label="Low (<20)", fillcolor="#6BCB77"];
+  }
+
+  subgraph cluster_io {
+    label="io";
+    "src_io_output_rs" [label="output.rs", fillcolor="#6BCB77"];
+    "src_io_writers_json_rs" [label="json.rs", fillcolor="#FFD93D"];
+  }
+
+  // Dependencies
+  "src_io_output_rs" -> "src_io_writers_json_rs";
+}
+```
+
+### When to Use DOT Format
+
+**Use DOT Format When:**
+- Visualizing module dependencies and architecture
+- Identifying tightly coupled file clusters
+- Finding isolated or dead code modules
+- Presenting architecture to team members
+- Detecting circular dependency patterns
+- Understanding code organization
+
+**DOT vs Other Formats:**
+- **DOT**: Best for dependency visualization and architecture understanding
+- **JSON**: Best for programmatic processing and CI/CD integration
+- **HTML**: Best for interactive dashboards and metrics overview
+- **Terminal/Markdown**: Best for readable reports and documentation
+
 ## Tool Integration
 
 ### CI/CD Pipelines
@@ -1297,6 +1390,7 @@ debtmap analyze . --summary --min-priority medium
 | JSON | Automation | Yes | No | .json |
 | Markdown | Documentation | Partially | Yes | .md |
 | HTML | Visualization | Partially | Yes | .html |
+| DOT | Architecture | Yes | Partially | .dot |
 
 ### Combining Formats
 
@@ -1311,6 +1405,9 @@ debtmap analyze . --format json -o ci-report.json
 
 # Generate markdown for documentation
 debtmap analyze . --format markdown -o docs/DEBT.md
+
+# Generate DOT for architecture visualization
+debtmap analyze . --format dot -o deps.dot && dot -Tsvg deps.dot -o deps.svg
 ```
 
 ### Performance Considerations
