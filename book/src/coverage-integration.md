@@ -56,7 +56,7 @@ For Rust projects, Debtmap includes sophisticated name demangling to correlate L
 - **v0 scheme**: Starts with `_RNv` (modern Rust, default since 1.38)
 - **Legacy scheme**: Starts with `_ZN` (older Rust versions)
 
-**Normalization Process** (see `src/risk/lcov.rs:demangle_function_name` and `normalize_demangled_name`):
+**Normalization Process** (see `src/risk/lcov/demangle.rs:demangle_function_name` and `src/risk/lcov/normalize.rs:normalize_demangled_name`):
 
 1. **Demangle**: Convert mangled symbols to human-readable names
 2. **Strip crate hashes**: Remove build-specific hash IDs (e.g., `debtmap[71f4b4990cdcf1ab]` → `debtmap`)
@@ -138,16 +138,28 @@ pytest --cov=src --cov-report=lcov
 debtmap analyze . --lcov coverage.lcov
 ```
 
-### Go: go test with gocover-cobertura
+### Go: go test with gcov2lcov
+
+**Install gcov2lcov:**
+```bash
+go install github.com/jandelgado/gcov2lcov@latest
+```
 
 **Generate Coverage:**
 ```bash
+# Generate Go coverage profile
 go test -coverprofile=coverage.out ./...
-gocover-cobertura < coverage.out > coverage.xml
-# Convert to LCOV using lcov tools
+
+# Convert to LCOV format
+gcov2lcov -infile=coverage.out -outfile=coverage.lcov
 ```
 
-**Note**: Go's native coverage format requires conversion. Most CI systems support LCOV conversion plugins.
+**Analyze with Debtmap:**
+```bash
+debtmap analyze . --lcov coverage.lcov --languages go
+```
+
+**Note**: Go's native coverage format requires conversion to LCOV. The `gcov2lcov` tool provides direct conversion without intermediate formats.
 
 ## Role-Based Coverage Expectations
 
@@ -784,13 +796,19 @@ debtmap analyze . --lcov coverage.lcov --languages python
 ### Go End-to-End
 
 ```bash
-# 1. Generate native coverage
+# 1. Install gcov2lcov (one-time setup)
+go install github.com/jandelgado/gcov2lcov@latest
+
+# 2. Generate coverage
 go test -coverprofile=coverage.out ./...
 
-# 2. Convert to LCOV (requires gocover-cobertura or similar)
-# Note: This step is tool-dependent
+# 3. Convert to LCOV
+gcov2lcov -infile=coverage.out -outfile=coverage.lcov
 
-# 3. Run Debtmap
+# 4. Verify LCOV output
+head coverage.lcov
+
+# 5. Run Debtmap
 debtmap analyze . --lcov coverage.lcov --languages go
 ```
 
