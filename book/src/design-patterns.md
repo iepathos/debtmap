@@ -4,17 +4,19 @@ Debtmap automatically detects common design patterns in your codebase to provide
 
 ## Overview
 
-Debtmap detects 7 design patterns across Python, JavaScript, TypeScript, and Rust:
+Debtmap detects 7 user-facing design patterns across Python, JavaScript, TypeScript, and Rust, plus 2 internal-only patterns (Builder, Visitor) used for scoring adjustments:
 
-| Pattern | Primary Language | Detection Confidence |
-|---------|-----------------|---------------------|
-| Observer | Python, Rust | High (0.8-0.9) |
-| Singleton | Python | High (0.85-0.95) |
-| Factory | Python | Medium-High (0.7-0.85) |
-| Strategy | Python | Medium (0.7-0.8) |
-| Callback | Python, JavaScript | High (0.8-0.9) |
-| Template Method | Python | Medium (0.7-0.8) |
-| Dependency Injection | Python | Medium (0.65-0.75) |
+| Pattern | Primary Language | Detection Confidence | Type |
+|---------|-----------------|---------------------|------|
+| Observer | Python, Rust | High (0.8-0.9) | User-facing |
+| Singleton | Python | High (0.85-0.95) | User-facing |
+| Factory | Python | Medium-High (0.7-0.85) | User-facing |
+| Strategy | Python | Medium (0.7-0.8) | User-facing |
+| Callback | Python, JavaScript | High (0.8-0.9) | User-facing |
+| Template Method | Python | Medium (0.7-0.8) | User-facing |
+| Dependency Injection | Python | Medium (0.65-0.75) | User-facing |
+| Builder | Rust | Internal | [Internal Only](#internal-pattern-detection) |
+| Visitor | Rust | Internal | [Internal Only](#internal-pattern-detection) |
 
 Pattern detection serves multiple purposes:
 - **Reduces false positives**: Avoids flagging idiomatic pattern implementations as overly complex
