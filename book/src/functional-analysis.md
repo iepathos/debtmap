@@ -13,7 +13,7 @@ Functional analysis examines your code at the AST level to detect:
 
 This analysis integrates with debtmap's scoring system, providing score bonuses for high-quality functional code and reducing god object warnings for codebases with many small pure helper functions.
 
-**Specification**: This feature implements [Specification 111: AST-Based Functional Pattern Detection](https://github.com/yourusername/debtmap/specs/111) with accuracy targets of precision ≥90%, recall ≥85%, F1 ≥0.87, and performance overhead <10%.
+**Specification**: This feature implements Specification 111: AST-Based Functional Pattern Detection with accuracy targets of precision ≥90%, recall ≥85%, F1 ≥0.87, and performance overhead <10%.
 
 ## Configuration Profiles
 
