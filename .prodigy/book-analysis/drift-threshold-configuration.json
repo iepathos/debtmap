@@ -4,58 +4,46 @@
   "chapter_title": "Threshold Configuration",
   "chapter_file": "book/src/threshold-configuration.md",
   "drift_detected": true,
-  "severity": "low",
-  "quality_assessment": "Chapter is comprehensive and accurate. Minor issues with internal inconsistency in the code and one unclear description.",
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive and well-organized. The threshold validation section accurately documents which fields are validated. The main issue is a code inconsistency between two preset creation methods that should be unified.",
   "issues": [
     {
-      "type": "incomplete_explanation",
-      "severity": "medium",
-      "section": "Threshold Validation (lines 113-126)",
-      "description": "Documentation states validation rules check for positive (non-zero) values, but actual implementation checks for > 0, which excludes zero but message is misleading. Also, the docs don't mention that `minimum_match_arms`, `minimum_if_else_chain`, and `minimum_function_length` must also be > 0.",
-      "current_content": "The following validation rules apply:\n- `minimum_total_complexity` > 0\n- `minimum_cyclomatic_complexity` > 0\n- `minimum_cognitive_complexity` > 0\n- `minimum_match_arms` > 0\n- `minimum_if_else_chain` > 0\n- `minimum_function_length` > 0\n- All role multipliers > 0",
-      "should_be": "List is complete, but explanation should clarify that the implementation only validates the complexity metrics and multipliers, not the structural thresholds (match_arms, if_else_chain, function_length). Also the validation only checks that values are not exactly 0, not that they are positive (though > 0 is implied).",
-      "fix_suggestion": "Verify which fields are actually validated in ComplexityThresholds::validate() method and update the list to reflect only those fields. Based on src/complexity/threshold_manager.rs:191-217, only the three complexity thresholds and four multipliers are validated.",
-      "source_reference": "src/complexity/threshold_manager.rs:191-217"
-    },
-    {
       "type": "code_inconsistency",
-      "severity": "low",
-      "section": "Internal Code Inconsistency (not visible in docs)",
-      "description": "There's an inconsistency in the codebase: two different methods for creating preset thresholds exist. The `from_preset()` method (lines 120-148) sets test_function_multiplier=3.0 for Strict preset, while the deprecated `preset()` method (lines 220-249) sets test_function_multiplier=1.5 for Strict. The documentation correctly reflects `from_preset()` which is the actively used method.",
-      "current_content": "Documentation states Strict preset uses test_function_multiplier=3.0",
-      "should_be": "Code should be consistent - remove deprecated `preset()` method or fix its values to match `from_preset()`",
-      "fix_suggestion": "This is a code issue, not a documentation issue. Consider deprecating or removing the `preset()` method (lines 220-249) to avoid confusion, since `from_preset()` is the canonical implementation used throughout the codebase.",
-      "source_reference": "src/complexity/threshold_manager.rs:120-148 vs lines 220-249"
+      "severity": "high",
+      "section": "Preset Comparison Table",
+      "description": "There is an inconsistency in the source code between two methods for creating presets. The documentation correctly reflects from_preset() behavior, but preset() returns different values for strict preset test_function_multiplier.",
+      "current_content": "Documentation shows Test Function Multiplier for Strict preset as 3.0x",
+      "code_discrepancy": "from_preset(ThresholdPreset::Strict) at line 132 returns test_function_multiplier: 3.0, but preset(\"strict\") at line 232 returns test_function_multiplier: 1.5",
+      "fix_suggestion": "This is a code bug, not a documentation bug. The two methods should return consistent values. Update preset(\"strict\") at src/complexity/threshold_manager.rs:232 to use test_function_multiplier: 3.0 to match from_preset().",
+      "source_reference": "src/complexity/threshold_manager.rs:132,232"
     },
     {
       "type": "unclear_content",
       "severity": "low",
-      "section": "Understanding Complexity Thresholds (lines 62-112)",
-      "description": "The explanation of the conjunction logic could be clearer. The phrase 'must exceed ALL thresholds' followed by 'Important: Functions are flagged when they meet ALL of these conditions simultaneously' creates some redundancy and could be confusing.",
-      "current_content": "A function must exceed **ALL** thresholds to be flagged... **Important**: Functions are flagged when they meet ALL of these conditions simultaneously",
-      "should_be": "Consolidate the explanation into a single, clear statement that explains the conjunction behavior upfront, rather than mentioning it twice.",
-      "fix_suggestion": "Reorganize section to state the conjunction requirement once, clearly, at the beginning of the explanation.",
-      "source_reference": "book/src/threshold-configuration.md:64, 105-111"
+      "section": "Role-Based Multipliers",
+      "description": "Documentation mentions 'Unknown Functions' in the role table but doesn't explain what patterns result in a function being classified as Unknown",
+      "current_content": "Unknown Functions | 1.0x (defaults to core logic) | Standard | Functions that don't match any role pattern",
+      "code_reference": "FunctionRole::from_name() at lines 264-278 shows the pattern matching logic",
+      "fix_suggestion": "Consider adding a brief note explaining that Unknown is the fallback when function name doesn't match entry point patterns (main, *_handler, handle_*), test patterns (test_*, *_test), or utility patterns (get_*, set_*, is_*, has_*)",
+      "source_reference": "src/complexity/threshold_manager.rs:264-278"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of all threshold types (presets, CLI flags, config file)",
-    "Excellent preset comparison table with clear guidance on when to use each",
-    "Good explanation of role-based multipliers with concrete examples",
-    "Detailed god object thresholds with language-specific guidance",
-    "Strong validation thresholds section with CI/CD best practices",
-    "Helpful tuning guidelines with decision tree",
-    "All code examples are syntactically correct",
-    "Cross-references to related chapters are all valid",
-    "Practical examples covering common use cases",
-    "Best practices section provides actionable advice"
+    "Comprehensive coverage of all three threshold presets (strict, balanced, lenient)",
+    "Clear preset comparison table with accurate threshold values from from_preset()",
+    "Excellent explanation of conjunction logic for flagging functions",
+    "Threshold validation section (lines 113-131) now accurately documents which fields are validated and which are not",
+    "Well-structured CLI and configuration file documentation",
+    "Practical examples for different use cases (CI/CD, gradual debt reduction, etc.)",
+    "Clear decision tree for choosing presets",
+    "Language-specific god object thresholds match GodObjectThresholds implementations (rust_defaults, python_defaults, javascript_defaults)",
+    "Validation thresholds documentation matches ValidationThresholds struct in config/thresholds.rs",
+    "All cross-reference links are valid"
   ],
   "improvement_suggestions": [
-    "Clarify the validation rules section to match actual implementation",
-    "Consider simplifying the conjunction explanation to avoid redundancy",
-    "Add a note about the deprecated `preset()` method if it's intentionally kept for backward compatibility",
-    "Consider adding a troubleshooting item about the difference between `threshold-preset` and `threshold-complexity` flags",
-    "Add examples showing how to override specific thresholds from a preset using config file"
+    "Add explanation of how functions are classified into roles (entry point, test, utility, core logic, unknown)",
+    "Consider adding a section on debugging threshold application (which threshold caused flagging)",
+    "Add example output showing how role multipliers affect actual threshold calculations"
   ],
   "cross_references": [
     "getting-started.md",
@@ -64,8 +52,20 @@
     "scoring-strategies.md",
     "god-object-detection.md"
   ],
+  "link_validation": {
+    "total_internal_links": 5,
+    "broken_links": 0,
+    "all_links_valid": true,
+    "validated_links": [
+      {"link_text": "Getting Started", "target": "getting-started.md", "status": "valid"},
+      {"link_text": "CLI Reference", "target": "cli-reference.md", "status": "valid"},
+      {"link_text": "Configuration", "target": "configuration.md", "status": "valid"},
+      {"link_text": "Scoring Strategies", "target": "scoring-strategies.md", "status": "valid"},
+      {"link_text": "God Object Detection", "target": "god-object-detection.md", "status": "valid"}
+    ]
+  },
   "metadata": {
-    "analyzed_at": "2025-12-04T22:04:00Z",
+    "analyzed_at": "2025-12-27T08:35:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Threshold presets (strict, balanced, lenient)",
@@ -76,8 +76,10 @@
       "Tuning guidelines"
     ],
     "validation_focus": "Check that all threshold presets and configuration options are documented",
-    "internal_links_validated": true,
-    "internal_links_broken": 0,
-    "internal_links_total": 5
+    "source_files_analyzed": [
+      "src/complexity/threshold_manager.rs",
+      "src/cli/args.rs",
+      "src/config/thresholds.rs"
+    ]
   }
 }
