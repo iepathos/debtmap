@@ -28,6 +28,7 @@
 - [Threshold Configuration](threshold-configuration.md)
 - [Suppression Patterns](suppression-patterns.md)
 - [Output Formats](output-formats.md)
+- [TUI Results Viewer](tui-guide.md)
 
 # Advanced Topics
 

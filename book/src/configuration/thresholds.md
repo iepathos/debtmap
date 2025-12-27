@@ -332,52 +332,6 @@ Use glob patterns for file-specific thresholds:
 "src/migrations/*.rs" = 2000    # Allow larger migration files
 ```
 
-## Best Practices
-
-### For New Projects
-
-Use strict thresholds to prevent debt accumulation:
-
-```toml
-[thresholds]
-complexity = 8
-max_function_length = 30
-
-[thresholds.validation]
-max_average_complexity = 8.0
-max_debt_density = 30.0
-min_coverage_percentage = 80.0
-```
-
-### For Legacy Codebases
-
-Start lenient and tighten gradually:
-
-```toml
-[thresholds]
-minimum_debt_score = 5.0        # Focus on high-priority only
-minimum_cyclomatic_complexity = 10
-
-[thresholds.validation]
-max_debt_density = 100.0        # Accommodate existing debt
-max_average_complexity = 15.0   # Start lenient
-```
-
-### For CI/CD Pipelines
-
-Use scale-independent metrics:
-
-```toml
-[thresholds.validation]
-# These metrics don't require adjustment as codebase grows
-max_debt_density = 50.0             # Debt per 1000 LOC
-max_average_complexity = 10.0       # Per-function average
-max_codebase_risk_score = 7.0       # Overall risk level
-
-# Enable coverage gate if you have coverage data
-min_coverage_percentage = 75.0
-```
-
 ## Related Topics
 
 - [Configuration Overview](../configuration.md) - Full configuration reference

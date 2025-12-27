@@ -351,47 +351,6 @@ Several advanced options can be controlled via environment variables:
 | `DEBTMAP_CONTEXT_AWARE` | Enable/disable context-aware detection | `DEBTMAP_CONTEXT_AWARE=false` |
 | `DEBTMAP_JOBS` | Set worker thread count | `DEBTMAP_JOBS=4` |
 
-## Best Practices
-
-### For New Projects
-
-Use default settings which provide balanced analysis:
-
-```toml
-[entropy]
-enabled = true  # Reduce match statement false positives
-
-[parallel]
-enabled = true  # Fast analysis
-```
-
-### For Legacy Codebases
-
-Adjust settings to focus on the most critical issues:
-
-```toml
-[entropy]
-enabled = true
-max_combined_reduction = 0.20  # Less aggressive dampening
-
-[parallel]
-enabled = true
-batch_size = 50  # Smaller batches for large files
-```
-
-### For CI/CD Pipelines
-
-Optimize for speed and determinism:
-
-```toml
-[parallel]
-enabled = true
-max_concurrency = 4  # Consistent across runners
-
-[batch_analysis]
-fail_fast = true     # Stop early on errors
-```
-
 ## Related Topics
 
 - [Thresholds Configuration](thresholds.md) - Configure detection thresholds

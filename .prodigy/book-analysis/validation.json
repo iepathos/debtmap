@@ -1,0 +1,101 @@
+{
+  "validation_timestamp": "2025-12-27T02:52:00Z",
+  "project": "Debtmap",
+  "book_dir": "book",
+  "total_files": 66,
+  "total_chapters": 64,
+  "auto_fix_enabled": true,
+  "issues_found": [
+    {
+      "type": "redundant_best_practices",
+      "severity": "high",
+      "description": "Subsection files have Best Practices sections when their chapter has a dedicated best-practices.md",
+      "files": [
+        {
+          "file": "configuration/advanced.md",
+          "lines": [354, 394],
+          "redundant_with": "configuration/best-practices.md",
+          "status": "FIXED"
+        },
+        {
+          "file": "configuration/thresholds.md",
+          "lines": [335, 380],
+          "redundant_with": "configuration/best-practices.md",
+          "status": "FIXED"
+        }
+      ]
+    },
+    {
+      "type": "best_practices_in_reference",
+      "severity": "medium",
+      "description": "Technical reference pages have Best Practices sections that should be in guides",
+      "files": [
+        {
+          "file": "cli-reference.md",
+          "lines": [1004, 1042],
+          "file_type": "technical_reference",
+          "recommendation": "Consider moving Best Practices to a separate guide or removing if content is duplicated elsewhere",
+          "status": "SKIPPED - Manual review recommended"
+        }
+      ]
+    },
+    {
+      "type": "orphan_files",
+      "severity": "high",
+      "description": "Files exist in book/src but are not referenced in SUMMARY.md",
+      "files": [
+        {
+          "file": "chapter_1.md",
+          "lines": 1,
+          "status": "FIXED - Deleted empty placeholder"
+        },
+        {
+          "file": "scoring-strategies.md",
+          "lines": 920,
+          "status": "FIXED - Deleted (superseded by scoring-strategies/index.md)"
+        },
+        {
+          "file": "tui-guide.md",
+          "lines": 150,
+          "status": "FIXED - Added to SUMMARY.md"
+        }
+      ]
+    },
+    {
+      "type": "stub_index_file",
+      "severity": "low",
+      "description": "Index files that are mostly navigation links with minimal content",
+      "files": [
+        {
+          "file": "analysis-guide/index.md",
+          "lines": 16,
+          "link_count": 8,
+          "status": "SKIPPED - Navigation structure is acceptable"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "redundant_best_practices_found": 2,
+    "redundant_best_practices_fixed": 2,
+    "orphan_files_found": 3,
+    "orphan_files_fixed": 3,
+    "best_practices_in_reference": 1,
+    "stub_navigation_files": 1,
+    "circular_see_also": 0,
+    "generic_see_also": 0,
+    "over_fragmented_chapters": 0,
+    "meta_sections_in_feature_chapters": 0
+  },
+  "fixes_applied": [
+    "Removed redundant Best Practices section from configuration/advanced.md (lines 354-394)",
+    "Removed redundant Best Practices section from configuration/thresholds.md (lines 335-380)",
+    "Deleted orphan file: chapter_1.md (empty placeholder)",
+    "Deleted orphan file: scoring-strategies.md (superseded by scoring-strategies/index.md)",
+    "Added tui-guide.md to SUMMARY.md"
+  ],
+  "manual_review_required": [
+    "cli-reference.md: Best Practices section at line 1004 - consider if this duplicates other guides"
+  ],
+  "build_status": "SUCCESS"
+}
