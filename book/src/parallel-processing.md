@@ -95,7 +95,7 @@ Disabling parallelization significantly increases analysis time:
 - Medium projects (100-1000 files): 5-10x slower
 - Large projects (> 1000 files): 10-50x slower
 
-For more details on both flags, see the [CLI Reference](./cli-reference.md#performance--caching).
+For more details on both flags, see the [CLI Reference](./cli-reference.md#performance).
 
 ## Rayon Parallel Iterators
 
@@ -103,27 +103,35 @@ Debtmap uses [Rayon](https://docs.rs/rayon), a data parallelism library for Rust
 
 ### Thread Pool Configuration
 
-The global Rayon thread pool is configured at startup based on the `--jobs` parameter:
+The global Rayon thread pool is configured at startup based on the `--jobs` parameter. Thread pool configuration is centralized in `src/cli/setup.rs`:
 
 ```rust
-// From src/builders/parallel_call_graph.rs:48-53
-if self.config.num_threads > 0 {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(self.config.num_threads)
-        .build_global()
-        .ok(); // Ignore if already configured
+// From src/cli/setup.rs:15-26
+/// Configure rayon global thread pool once at startup
+pub fn configure_thread_pool(jobs: usize) {
+    let mut builder = rayon::ThreadPoolBuilder::new().stack_size(RAYON_STACK_SIZE);
+
+    if jobs > 0 {
+        builder = builder.num_threads(jobs);
+    }
+
+    if let Err(e) = builder.build_global() {
+        // Already configured - this is fine, just ignore
+        eprintln!("Note: Thread pool already configured: {}", e);
+    }
 }
 ```
 
-This configures Rayon to use a specific number of worker threads for all parallel operations throughout the analysis.
+This configures Rayon to use a specific number of worker threads for all parallel operations throughout the analysis. The Rayon stack size is set to 8MB per thread to handle deeply nested AST traversals.
 
 ### Worker Thread Selection
 
 The `get_worker_count()` function determines how many threads to use:
 
 ```rust
-// From src/main.rs:828-836
-fn get_worker_count(jobs: usize) -> usize {
+// From src/cli/setup.rs:29-37
+/// Get the number of worker threads to use
+pub fn get_worker_count(jobs: usize) -> usize {
     if jobs == 0 {
         std::thread::available_parallelism()
             .map(|n| n.get())
@@ -148,29 +156,38 @@ fn get_worker_count(jobs: usize) -> usize {
 
 **Phase 1: Parallel File I/O and Sequential Parsing**
 
-File reading is parallelized, but AST parsing is sequential due to `syn::File` not being `Send`:
+File reading is parallelized, but AST parsing is sequential due to `syn::File` not being `Send`. Files are processed in batches to prevent proc-macro2 SourceMap overflow (Spec 210):
 
 ```rust
-// From src/builders/parallel_call_graph.rs:115-143
-// Step 1: Read file contents in parallel (I/O bound)
-let file_contents: Vec<_> = rust_files
-    .par_iter()  // Parallel I/O operations
-    .filter_map(|file_path| {
-        let content = io::read_file(file_path).ok()?;
-        Some((file_path.clone(), content))
-    })
-    .collect();
+// From src/builders/parallel_call_graph.rs:217-249
+/// Parse a batch of files without progress tracking (used in batched processing)
+fn parallel_parse_files_batch(
+    &self,
+    batch: &[PathBuf],
+    parallel_graph: &Arc<ParallelCallGraph>,
+) -> Result<Vec<(PathBuf, syn::File)>> {
+    // Read file contents in parallel (I/O bound, content is Send)
+    let file_contents: Vec<_> = batch
+        .par_iter()
+        .filter_map(|file_path| {
+            io::read_file(file_path)
+                .ok()
+                .map(|content| (file_path.clone(), content))
+        })
+        .collect();
 
-// Step 2: Parse files to AST (sequential - syn::File not Send)
-let parsed_files: Vec<_> = file_contents
-    .iter()
-    .enumerate()
-    .filter_map(|(idx, (file_path, content))| {
-        let parsed = syn::parse_file(content).ok()?;
-        parallel_graph.stats().increment_files();
-        Some((file_path.clone(), parsed))
-    })
-    .collect();
+    // Parse sequentially (syn::File is not Send)
+    let parsed_files: Vec<_> = file_contents
+        .iter()
+        .filter_map(|(file_path, content)| {
+            let parsed = syn::parse_file(content).ok()?;
+            parallel_graph.stats().increment_files();
+            Some((file_path.clone(), parsed))
+        })
+        .collect();
+
+    Ok(parsed_files)
+}
 ```
 
 **Key features:**
@@ -179,32 +196,38 @@ let parsed_files: Vec<_> = file_contents
 - **Why this works**: I/O operations dominate analysis time, so parallelizing file reads provides most of the speedup
 - Progress tracking uses atomic counters and unified progress system (see [Parallel Call Graph Statistics](#parallel-call-graph-statistics))
 
-**Phase 2: All-Files-At-Once Extraction**
+**Phase 2: Batched File Extraction (Spec 210)**
 
-All files are processed together without chunking to enable optimal cross-file call resolution:
+Files are processed in batches of 200 to prevent proc-macro2 SourceMap overflow on large codebases. The SourceMap is reset between batches to free memory:
 
 ```rust
-// From src/builders/parallel_call_graph.rs:152-176
-// Process ALL files at once (no chunking)
-// This enables optimal cross-file call resolution with a single PathResolver
-let files_for_extraction: Vec<_> = parsed_files
-    .iter()
-    .map(|(path, parsed)| (parsed.clone(), path.clone()))
-    .collect();
+// From src/builders/parallel_call_graph.rs:128-181
+// Spec 210: Batch size to prevent SourceMap overflow
+// 200 files * ~50KB avg = ~10MB per batch, well under the 4GB limit
+const BATCH_SIZE: usize = 200;
 
-// Extract call graph for all files with full cross-file resolution
-// Internal implementation may use Rayon parallel iterators
-let graph = extract_call_graph_multi_file(&files_for_extraction);
+// Process files in batches to prevent SourceMap overflow
+for batch in rust_files.chunks(BATCH_SIZE) {
+    // Phase 2: Parse ASTs for this batch
+    let parsed_files = self.parallel_parse_files_batch(batch, &parallel_graph)?;
 
-// Merge into main graph
-parallel_graph.merge_concurrent(graph);
+    // Phase 3: Extract calls for this batch
+    self.parallel_multi_file_extraction(&parsed_files, &parallel_graph)?;
+
+    // Phase 4: Enhanced analysis for this batch
+    let (batch_framework_exclusions, batch_function_pointer_used) =
+        self.parallel_enhanced_analysis(&parsed_files, &parallel_graph)?;
+
+    // Reset SourceMap after each batch to prevent overflow
+    crate::core::parsing::reset_span_locations();
+}
 ```
 
 **Design rationale:**
-- **No chunking**: All files processed together for complete visibility
-- **Optimal cross-file resolution**: Single `PathResolver` sees all functions across entire codebase
-- **Internal parallelism**: The `extract_call_graph_multi_file` function may parallelize internally using Rayon
-- **Simplified merging**: One merge operation instead of per-chunk merges
+- **Batched processing**: 200 files per batch to prevent SourceMap overflow (4GB limit)
+- **SourceMap reset**: Each batch releases span location memory before processing the next
+- **Cross-file resolution**: Within each batch, `extract_call_graph_multi_file` provides full cross-file visibility
+- **Scalability**: Can analyze codebases with 10,000+ files without running out of memory
 
 **AST Parsing Optimization (Spec 132)**
 
@@ -247,7 +270,7 @@ for chunk in parsed_files.chunks(chunk_size) {
 - Call graph extraction requires owned AST values
 - Cloning is still significantly faster than re-parsing (1.33ms vs 2.40ms per file)
 
-See `docs/spec-132-benchmark-results.md` for detailed benchmarks validating these improvements.
+Benchmarks showed 44% faster analysis times after eliminating redundant parsing.
 
 **Phase 3: Enhanced Analysis**
 
@@ -1241,11 +1264,11 @@ debtmap analyze --jobs 4
 
 ## See Also
 
-- [CLI Reference - Performance & Caching](./cli-reference.md#performance--caching) - Complete flag documentation
+- [CLI Reference - Performance](./cli-reference.md#performance) - Complete flag documentation
 - [Configuration](configuration.md) - Project-specific settings
 - [Troubleshooting](troubleshooting.md) - General troubleshooting guide
-- [Troubleshooting - Slow Analysis](./troubleshooting.md#slow-analysis-performance) - Performance debugging guide
-- [Troubleshooting - High Memory Usage](./troubleshooting.md#high-memory-usage) - Memory optimization tips
+- [Troubleshooting - Slow Analysis](./troubleshooting/quick-fixes.md#slow-analysis) - Performance debugging guide
+- [Troubleshooting - Out of Memory Errors](./troubleshooting.md#out-of-memory-errors) - Memory optimization tips
 - [FAQ - Reducing Parallelism](./faq.md) - Common questions about parallel processing
 - [Architecture](./architecture.md) - High-level system design
 
