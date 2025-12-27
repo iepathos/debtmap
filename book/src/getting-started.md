@@ -107,7 +107,7 @@ debtmap analyze .
 
 **What happens during analysis:**
 
-1. **File Discovery** - Debtmap scans your project for Rust source files (`.rs`)
+1. **File Discovery** - Debtmap scans your project for source files (Rust `.rs` and Python `.py`)
 2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST)
 3. **Metric Extraction** - Complexity, coverage gaps, and coupling are measured
 4. **Prioritization** - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW)
@@ -316,6 +316,9 @@ patterns = ["**/target/**", "**/tests/**"]
 | `--jobs <N>` | Number of threads (0 = all cores) |
 | `--no-parallel` | Disable parallel processing |
 | `--max-files <N>` | Limit analysis to N files |
+| `--no-tui` | Disable TUI progress visualization (use simple progress bars) |
+| `--streaming` | Enable streaming output mode for large codebases (O(1) memory) |
+| `--stream-to <FILE>` | Output file for streaming mode (use "-" for stdout) |
 
 ## Troubleshooting
 
@@ -330,14 +333,16 @@ patterns = ["**/target/**", "**/tests/**"]
 
 ### Analysis Issues
 
-- **Empty output**: Check that your project contains Rust source files (`.rs`)
+- **Empty output**: Check that your project contains supported source files (`.rs` for Rust, `.py` for Python)
 - **Parser failures**: Run with `-vv` for debug output
 - **Performance issues**: Limit parallel jobs with `--jobs 4`
+- **Large codebase slowness**: Use `--streaming` mode for O(1) memory overhead
 
 ### Coverage Issues
 
 - **Coverage not applied**: Verify LCOV file path is correct
 - **Low coverage detected**: Ensure tests actually run during coverage generation
+- **Coverage debugging**: Use `debtmap diagnose-coverage <file.lcov>` to validate coverage file parsing
 
 ## What's Next?
 
