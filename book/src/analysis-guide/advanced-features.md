@@ -1,8 +1,8 @@
 # Advanced Features
 
-## Advanced Features
+This section covers Debtmap's advanced analysis capabilities: purity detection, data flow analysis, entropy-based complexity, and context-aware analysis.
 
-### Purity Detection
+## Purity Detection
 
 Debtmap detects pure functions - those without side effects that always return the same output for the same input.
 
@@ -18,13 +18,15 @@ Debtmap detects pure functions - those without side effects that always return t
 - May be `None` for some functions or languages where detection is not available
 - Rust has the most comprehensive purity detection support
 
-**Three-level purity classification:**
-The `purity_level` field provides a more nuanced classification than the binary `is_pure`:
-- **Pure**: No side effects detected, deterministic output
-- **ProbablyPure**: Mostly pure with minor suspicious patterns
-- **Impure**: Clear side effects or non-deterministic behavior
+**Four-level purity classification:**
+The `PurityLevel` enum (`src/core/mod.rs:49-62`) provides more nuanced classification than the binary `is_pure`:
 
-This three-level classification (available in `src/core/mod.rs:91`) complements the confidence scoring for more precise analysis.
+- **StrictlyPure**: No mutations whatsoever - pure mathematical functions
+- **LocallyPure**: Uses local mutations for efficiency but no external side effects (builder patterns, accumulators, owned `mut self`)
+- **ReadOnly**: Reads external state but doesn't modify it (constants, `&self` methods)
+- **Impure**: Modifies external state or performs I/O (`&mut self`, statics, I/O)
+
+This four-level classification enables better scoring for functions that use local mutations for efficiency but are functionally pure (referentially transparent). See [Complexity Metrics](complexity-metrics.md) for how purity affects scoring.
 
 **Confidence scoring (when available):**
 - **0.9-1.0**: Very confident (no side effects detected)
@@ -52,11 +54,11 @@ fn save_total(items: &[Item]) -> Result<()> {
 - Safe to parallelize
 - Easier to reason about
 
-### Data Flow Analysis
+## Data Flow Analysis
 
 Debtmap builds a comprehensive `DataFlowGraph` that extends basic call graph analysis with variable dependencies, data transformations, I/O operations, and purity tracking.
 
-#### Call Graph Foundation
+### Call Graph Foundation
 
 **Upstream callers** - Who calls this function
 - Indicates impact radius
@@ -84,22 +86,24 @@ Debtmap builds a comprehensive `DataFlowGraph` that extends basic call graph ana
 }
 ```
 
-#### Variable Dependency Tracking
+### Variable Dependency Tracking
 
-`DataFlowGraph` tracks which variables each function depends on:
+`DataFlowGraph` tracks which variables each function depends on (`src/data_flow/mod.rs:119`):
 
 ```rust
 pub struct DataFlowGraph {
     // Maps function_id -> set of variable names used
-    variable_dependencies: HashMap<String, HashSet<String>>,
+    variable_deps: HashMap<FunctionId, HashSet<String>>,
     // ...
 }
 ```
 
 **What it tracks:**
+- Function parameters (primary source via extraction adapters)
 - Local variables accessed in function body
-- Function parameters
 - Captured variables (closures)
+
+**Note:** Variable dependency tracking stores variable *names* only (as `HashSet<String>`). It does not track mutability information - that analysis is handled separately by the purity detection system.
 
 **Benefits:**
 - Identify functions coupled through shared state
@@ -116,49 +120,48 @@ pub struct DataFlowGraph {
 }
 ```
 
-#### Data Transformation Patterns
+### Data Transformation Patterns
 
-`DataFlowGraph` identifies common functional programming patterns:
+`DataFlowGraph` tracks data transformations between functions. The `TransformationType` enum (`src/organization/data_flow_analyzer.rs:35-46`) classifies transformations by their input/output cardinality:
 
 ```rust
 pub enum TransformationType {
-    Map,        // Transform each element
-    Filter,     // Select subset of elements
-    Reduce,     // Aggregate to single value
-    FlatMap,    // Transform and flatten
-    Unknown,    // Other transformations
+    Direct,        // A → B (pure transformation)
+    Aggregation,   // (A, B) → C (multiple inputs to single output)
+    Decomposition, // A → (B, C) (single input to multiple outputs)
+    Enrichment,    // A → Result<B> (validation/enrichment with Result/Option)
+    Expansion,     // A → Vec<B> (single input to collection)
 }
 ```
 
-**Pattern detection:**
-- Recognizes iterator chains (`.map()`, `.filter()`, `.fold()`)
-- Identifies functional vs imperative data flow
-- Tracks input/output variable relationships
+**Classification logic** (`src/organization/data_flow_analyzer.rs:124-146`):
+- Multiple input parameters → `Aggregation`
+- Return type is `Result<T>` or `Option<T>` → `Enrichment`
+- Return type is `Vec<T>` → `Expansion`
+- Return type is tuple → `Decomposition`
+- Default → `Direct`
 
-**Example:**
+**Example usage:**
 ```rust
-// Detected as: Filter → Map → Reduce pattern
-fn total_active_users(users: &[User]) -> f64 {
-    users.iter()
-        .filter(|u| u.active)      // Filter transformation
-        .map(|u| u.balance)        // Map transformation
-        .sum()                      // Reduce transformation
+// Aggregation: (items, discount_rate) → f64
+fn calculate_discounted_total(items: &[Item], discount_rate: f64) -> f64 {
+    items.iter().map(|i| i.price).sum::<f64>() * (1.0 - discount_rate)
+}
+
+// Enrichment: Config → Result<ValidatedConfig>
+fn validate_config(config: Config) -> Result<ValidatedConfig> {
+    // ...
+}
+
+// Expansion: Order → Vec<LineItem>
+fn extract_line_items(order: &Order) -> Vec<LineItem> {
+    order.items.clone()
 }
 ```
 
-**Transformation metadata:**
-```json
-{
-  "function": "total_active_users",
-  "input_vars": ["users"],
-  "output_vars": ["sum_result"],
-  "transformation_type": "Reduce",
-  "is_functional_style": true,
-  "pipeline_length": 3
-}
-```
+**Note:** The `DataFlowGraph.data_transformations` field (`src/data_flow/mod.rs:149`) stores `transformation_type` as a `String`, allowing flexible pattern descriptions beyond the enum variants.
 
-#### I/O Operation Detection
+### I/O Operation Detection
 
 Tracks functions performing I/O operations for purity and performance analysis:
 
@@ -190,7 +193,7 @@ fn save_config(config: &Config, path: &Path) -> Result<()> {
 }
 ```
 
-#### Purity Analysis Integration
+### Purity Analysis Integration
 
 `DataFlowGraph` integrates with purity detection to provide comprehensive side effect analysis:
 
@@ -221,7 +224,7 @@ fn save_config(config: &Config, path: &Path) -> Result<()> {
 }
 ```
 
-#### Modification Impact Analysis
+### Modification Impact Analysis
 
 `DataFlowGraph` calculates the impact of modifying a function:
 
@@ -268,7 +271,7 @@ debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_p
 - **Code review**: Flag high-risk changes for extra scrutiny
 - **Dependency management**: Identify tightly coupled components
 
-#### DataFlowGraph Methods
+### DataFlowGraph Methods
 
 Key methods for data flow analysis:
 
@@ -324,7 +327,7 @@ due to its critical role in the call graph.
 
 This integration ensures that the unified scoring system considers not just internal function complexity and test coverage, but also the function's importance in the broader codebase architecture.
 
-### Entropy-Based Complexity
+## Entropy-Based Complexity
 
 Advanced pattern detection to reduce false positives.
 
@@ -367,11 +370,11 @@ Function: validate_input
     - Complexity reduced by 67% due to pattern-based code
 ```
 
-### Entropy Analysis Caching
+## Entropy Analysis Caching
 
 `EntropyAnalyzer` includes an LRU-style cache for performance optimization when analyzing large codebases or performing repeated analysis.
 
-#### Cache Structure
+### Cache Structure
 
 ```rust
 struct CacheEntry {
@@ -387,7 +390,7 @@ struct CacheEntry {
 - **Memory per entry**: ~128 bytes
 - **Total memory overhead**: ~128 KB for default size
 
-#### Cache Statistics
+### Cache Statistics
 
 The analyzer tracks cache performance:
 
@@ -419,7 +422,7 @@ pub struct CacheStats {
 - **0.4-0.7**: Good - moderate reuse, typical for incremental analysis
 - **< 0.4**: Low - mostly unique functions, cache less helpful
 
-#### Performance Benefits
+### Performance Benefits
 
 **Typical performance gains:**
 - **Cold analysis**: 100ms baseline (no cache benefit)
@@ -441,7 +444,7 @@ Examples:
 - 10,000 entries: ~1.25 MB (very large)
 ```
 
-#### Cache Management
+### Cache Management
 
 **Automatic eviction:**
 - When cache reaches size limit, oldest entries evicted
@@ -461,7 +464,7 @@ size = 1000           # Number of entries
 ttl_seconds = 3600    # Optional: expire after 1 hour
 ```
 
-### Context-Aware Analysis
+## Context-Aware Analysis
 
 Debtmap adjusts analysis based on code context:
 
@@ -489,7 +492,7 @@ fn validate_user_input(input: &UserInput) -> Result<()> {
 }
 ```
 
-### Coverage Integration
+## Coverage Integration
 
 Debtmap parses LCOV coverage data for risk analysis:
 
@@ -504,7 +507,7 @@ Debtmap parses LCOV coverage data for risk analysis:
 - ~200 bytes per function
 - Thread-safe (`Arc<CoverageIndex>`)
 
-#### Performance Characteristics
+### Performance Characteristics
 
 **Index Build Performance:**
 - Index construction: O(n), approximately 20-30ms for 5,000 functions
@@ -568,3 +571,8 @@ final_score = base_score × (1 - coverage_percentage)
 
 This ensures well-tested complex code gets lower priority than untested simple code.
 
+## See Also
+
+- [Complexity Metrics](complexity-metrics.md) - Detailed metrics used in analysis
+- [Risk Scoring](risk-scoring.md) - How advanced features influence risk scores
+- [Interpreting Results](interpreting-results.md) - Using analysis results effectively
