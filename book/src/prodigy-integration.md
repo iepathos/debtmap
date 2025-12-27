@@ -135,7 +135,7 @@ Create a workflow file `workflows/debtmap.yml`:
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
+        - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
           commit_required: true
         - shell: "just coverage-lcov"
         - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
@@ -368,7 +368,7 @@ Steps can include validation that must pass:
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+        - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
           commit_required: true
       max_attempts: 5
       fail_workflow: true
@@ -477,7 +477,7 @@ Executes the implementation plan.
 
 Validates that the implementation successfully addressed the debt item.
 
-> **Note**: In practice, workflows use the `debtmap validate-improvement` shell command directly. While a Claude slash command wrapper exists, both the sequential workflow (workflows/debtmap.yml:31) and MapReduce workflow (workflows/debtmap-reduce.yml:44) use the shell command for consistency.
+> **Note**: The sequential workflow (workflows/debtmap.yml:31) uses the `debtmap validate-improvement` shell command directly, while the MapReduce workflow (workflows/debtmap-reduce.yml:44) uses the Claude slash command wrapper `/prodigy-validate-debtmap-improvement`. Both approaches are valid.
 
 ```yaml
 # Standard approach (used in actual workflows)
@@ -492,16 +492,16 @@ Validates that the implementation successfully addressed the debt item.
 
 #### `/prodigy-complete-debtmap-fix`
 
-Completes a partial fix based on validation gaps.
+Completes a partial fix based on validation results.
 
 ```yaml
-- claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
+- claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
   commit_required: true
 ```
 
 **Parameters:**
-- `--gaps`: Validation gaps to address
-- `--plan`: Original implementation plan
+- `--plan`: Path to implementation plan file
+- `--validation`: Path to validation JSON file with completion status
 - `--attempt`: Current retry attempt number (from ${validation.attempt_number})
 
 ### Testing and Quality Commands
@@ -635,7 +635,7 @@ map:
         threshold: 75
         on_incomplete:
           commands:
-            - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/plan-${item_id}.md --attempt ${validation.attempt_number}"
+            - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/plan-${item_id}.md --validation .prodigy/debtmap-validation-${item_id}.json --attempt ${validation.attempt_number}"
               commit_required: true
             - shell: "just coverage-lcov"
             - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
@@ -912,7 +912,7 @@ Validation is attached to specific workflow steps:
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
+        - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
           commit_required: true
         - shell: "just coverage-lcov"
         - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
