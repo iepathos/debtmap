@@ -4,85 +4,88 @@
   "chapter_title": "Tiered Prioritization",
   "chapter_file": "book/src/tiered-prioritization.md",
   "drift_detected": true,
-  "severity": "medium",
-  "quality_assessment": "Documentation is generally accurate and well-structured. The main issues are: (1) incorrect score threshold for Critical tier in JSON output example, (2) broken link to analysis-guide.md, and (3) minor inconsistencies in tier classification criteria descriptions. Overall quality is good with clear explanations and helpful examples.",
+  "severity": "high",
+  "quality_assessment": "Chapter is mostly accurate for terminal output but has critical inconsistencies in the JSON output section. The codebase has TWO different display tier systems: (1) `Tier` enum (90/70/50 thresholds) used for terminal/markdown output, and (2) `Priority` enum (100/50/20 thresholds) used for JSON output. Documentation shows 90/70/50 thresholds which is correct for terminal but incorrect for JSON output. Also uses 'moderate' but JSON uses 'medium'.",
   "issues": [
     {
-      "type": "incorrect_example",
+      "type": "outdated_information",
       "severity": "high",
-      "section": "JSON Output",
-      "description": "JSON output example shows incorrect score threshold for Critical tier",
-      "current_content": "The `priority` field is derived from the `score` field using these thresholds:\n- `critical`: score >= 100.0\n- `high`: score >= 50.0\n- `medium`: score >= 20.0\n- `low`: score < 20.0",
-      "should_be": "- `critical`: score >= 90.0 (not 100.0)\n- `high`: score >= 70.0 (not 50.0)\n- `moderate`: score >= 50.0 (not medium >= 20.0)\n- `low`: score < 50.0 (not < 20.0)",
-      "fix_suggestion": "Update the JSON output priority thresholds to match the actual implementation in src/priority/mod.rs:478-484",
-      "source_reference": "src/priority/mod.rs:478-484"
+      "section": "Interpreting Tier Output > JSON Output",
+      "description": "Documentation states incorrect priority score thresholds for JSON output. JSON output uses Priority enum (100/50/20) not Tier enum (90/70/50)",
+      "current_content": "The `priority` field is derived from the `score` field using these thresholds:\n- `critical`: score >= 90.0\n- `high`: score >= 70.0\n- `moderate`: score >= 50.0\n- `low`: score < 50.0",
+      "should_be": "The `priority` field is derived from the `score` field using these thresholds:\n- `critical`: score >= 100.0\n- `high`: score >= 50.0\n- `medium`: score >= 20.0\n- `low`: score < 20.0",
+      "fix_suggestion": "Update lines 340-344 to reflect actual thresholds from src/output/unified/priority.rs:23-32. Note: JSON uses 'medium' not 'moderate'.",
+      "source_reference": "src/output/unified/priority.rs:23-32"
     },
     {
-      "type": "broken_links",
+      "type": "outdated_information",
       "severity": "medium",
-      "section": "See Also",
-      "description": "Link to analysis-guide.md is broken - file does not exist",
-      "broken_links": [
-        {
-          "link_text": "Analysis Guide",
-          "target_path": "./analysis-guide.md",
-          "expected_file": "book/src/analysis-guide.md",
-          "current_file": "book/src/tiered-prioritization.md"
-        }
-      ],
-      "fix_suggestion": "The link [Analysis Guide](./analysis-guide.md) points to a non-existent file. Possible alternatives found: architectural-analysis.md, coverage-analysis.md, entropy-analysis.md, error-handling-analysis.md, functional-analysis.md. Either create analysis-guide.md or change the link to point to the most appropriate existing file (likely architectural-analysis.md or one of the specific analysis guides).",
-      "source_reference": "book/src/tiered-prioritization.md:351"
+      "section": "Interpreting Tier Output > JSON Output",
+      "description": "JSON output example uses 'moderate' but actual JSON output uses 'medium' due to serde rename_all lowercase",
+      "current_content": "\"moderate\": 12",
+      "should_be": "\"medium\": 12",
+      "fix_suggestion": "Update JSON example to use 'medium' instead of 'moderate' to match actual serde serialization in Priority enum",
+      "source_reference": "src/output/unified/priority.rs:14"
+    },
+    {
+      "type": "incorrect_source_reference",
+      "severity": "medium",
+      "section": "Interpreting Tier Output > JSON Output",
+      "description": "Source reference points to wrong location. Priority enum is in src/output/unified/priority.rs, not src/priority/mod.rs",
+      "current_content": "**Source**: Priority tier thresholds defined in src/priority/mod.rs:478-484",
+      "should_be": "**Source**: Priority tier thresholds defined in src/output/unified/priority.rs:23-32",
+      "fix_suggestion": "Update the source reference to point to the correct file location",
+      "source_reference": "src/output/unified/priority.rs:23-32"
     },
     {
       "type": "incomplete_explanation",
       "severity": "medium",
-      "section": "Tier 1: Critical Architecture",
-      "description": "Documentation states 'ComplexityHotspot debt items with cyclomatic complexity > 50' but implementation uses more sophisticated criteria",
-      "current_content": "ComplexityHotspot debt items with cyclomatic complexity > 50 (extreme complexity requiring architectural redesign)",
-      "should_be": "The implementation uses multiple sophisticated signals for Tier 1 classification including: final_score > 10.0, effective_cyclomatic > 50 (after entropy dampening), cognitive >= 20, nesting_depth >= 5, or complexity_factor > 5.0 (weighted: 30% cyclo + 70% cognitive)",
-      "fix_suggestion": "Expand the Tier 1 criteria explanation to reflect the multi-factor analysis approach used in the implementation, not just raw cyclomatic complexity",
-      "source_reference": "src/priority/tiers.rs:183-216"
+      "section": "Overview",
+      "description": "Documentation mentions two tier systems but doesn't explain that JSON output uses different thresholds than terminal output",
+      "current_content": "**Two Tier Systems**: Debtmap uses two complementary tier systems:\n1. **RecommendationTier** (T1-T4): Used internally to classify items based on architectural significance and testing needs\n2. **Display Tier** (Critical/High/Moderate/Low): Score-based tiers shown in terminal output, derived from final calculated scores",
+      "should_be": "**Three Display Systems**: Debtmap uses:\n1. **RecommendationTier** (T1-T4): Internal classification for tier weight application\n2. **Tier** (Critical/High/Moderate/Low): Score-based tiers for terminal/markdown output using 90/70/50 thresholds\n3. **Priority** (critical/high/medium/low): Score-based tiers for JSON output using 100/50/20 thresholds",
+      "fix_suggestion": "Clarify that JSON output uses a different threshold system than terminal output",
+      "source_reference": "src/priority/mod.rs:371-386, src/output/unified/priority.rs:12-33"
     },
     {
-      "type": "incomplete_explanation",
+      "type": "inconsistency",
       "severity": "medium",
-      "section": "Tier 2: Complex Untested",
-      "description": "Documentation describes Tier 2 qualification criteria but omits moderate complexity hotspot classification path",
-      "current_content": "Items qualify for Tier 2 if they meet ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or are entry point functions with any coverage gap.",
-      "should_be": "Items qualify for Tier 2 if they are either: (1) Testing gaps meeting ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or entry point functions with any coverage gap, OR (2) Complexity hotspots with meaningful complexity (complexity_factor >= 2.0, cognitive >= 12, nesting >= 3, or adjusted cyclomatic 8-50)",
-      "fix_suggestion": "Add explanation of the moderate complexity hotspot classification path that uses sophisticated metrics (weighted complexity, cognitive load, nesting depth, entropy-dampened cyclomatic)",
-      "source_reference": "src/priority/tiers.rs:257-302"
+      "section": "The Four Tiers > Tier 1",
+      "description": "Documentation references src/priority/tiers.rs:183-216 but tiers module has been refactored into multiple files (mod.rs, pure.rs, predicates.rs)",
+      "current_content": "**Classification Criteria** (src/priority/tiers.rs:183-216)",
+      "should_be": "**Classification Criteria** (src/priority/tiers/pure.rs:26-41 and src/priority/tiers/predicates.rs)",
+      "fix_suggestion": "Update the source reference to reflect the modular structure of the tiers implementation",
+      "source_reference": "src/priority/tiers/pure.rs:26-41"
     },
     {
-      "type": "incorrect_example",
-      "severity": "low",
-      "section": "Terminal Output",
-      "description": "Terminal output example shows score thresholds that don't match implementation",
-      "current_content": "Critical (score >= 90)\nHigh (score 70-89.9)\nModerate (score 50-69.9)\nLow (score < 50)",
-      "should_be": "The actual thresholds are correct, but the enum variant names in output are 'Critical', 'High', 'Moderate', 'Low' (not 'Medium')",
-      "fix_suggestion": "Verify that terminal output examples use the correct tier labels matching the Tier enum in src/priority/mod.rs:469-475",
-      "source_reference": "src/priority/mod.rs:469-475, src/priority/mod.rs:487-494"
+      "type": "inconsistency",
+      "severity": "medium",
+      "section": "The Four Tiers > Tier 2",
+      "description": "Documentation references src/priority/tiers.rs:257-302 but that file has been refactored",
+      "current_content": "**Classification Criteria** (src/priority/tiers.rs:257-302)",
+      "should_be": "**Classification Criteria** (src/priority/tiers/pure.rs:64-99)",
+      "fix_suggestion": "Update the source reference to point to the correct file and line numbers",
+      "source_reference": "src/priority/tiers/pure.rs:64-99"
     }
   ],
   "positive_aspects": [
-    "Clear explanation of the two-tier system distinction (RecommendationTier vs Display Tier)",
-    "Comprehensive tier descriptions with priority, weight, and examples for each tier",
-    "Good examples showing both TOML configuration and command-line usage",
-    "Helpful use case sections (Sprint Planning, Code Review Focus, Refactoring Strategy)",
-    "Well-documented tier presets (Balanced, Strict, Lenient) with both TOML and programmatic access",
-    "Practical troubleshooting section addressing common issues",
-    "Good cross-references to related documentation (mostly working links)"
+    "Comprehensive explanation of the four-tier RecommendationTier system (T1-T4)",
+    "Clear tier weight configuration examples with correct default values",
+    "Accurate preset configurations (balanced, strict, lenient) matching implementation",
+    "Terminal output section uses correct thresholds (90/70/50) for Tier enum",
+    "Good documentation of TierConfig fields and their effects",
+    "Useful troubleshooting section addressing common issues",
+    "Well-structured use cases section with practical examples",
+    "All internal links are valid (scoring-strategies.md, configuration.md, analysis-guide/index.md)"
   ],
   "improvement_suggestions": [
-    "Add a detailed explanation of how tier weights affect final scores in the scoring pipeline",
-    "Include a flowchart or decision tree showing how items are classified into tiers",
-    "Provide more concrete examples of the sophisticated metrics used in tier classification (complexity_factor, cognitive load, entropy dampening)",
-    "Add a section explaining the relationship between RecommendationTier classification and final score-based display tiers",
-    "Consider adding examples showing how the same item might be classified differently under Balanced vs Strict vs Lenient presets",
-    "Link to or embed examples of actual debtmap output showing tiered prioritization in action"
+    "Add a comparison table showing the different threshold systems (Tier vs Priority) used in different output formats",
+    "Consider unifying the thresholds between terminal and JSON output to reduce confusion",
+    "Add examples showing actual JSON output to help users understand the priority field values they'll see",
+    "Add a section explaining why there are different thresholds for different output formats"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T09:55:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Tier 1: Critical Architecture",
@@ -92,6 +95,13 @@
       "Tier weights and configuration",
       "Customizing tier thresholds"
     ],
-    "validation_focus": "Check that tier strategy, weights, and configuration options are documented with examples"
+    "validation_focus": "Check that tier strategy, weights, and configuration options are documented with examples",
+    "internal_links_validated": [
+      "scoring-strategies.md",
+      "configuration.md",
+      "analysis-guide/index.md"
+    ],
+    "all_links_valid": true,
+    "key_finding": "Two different display threshold systems exist: Tier (terminal, 90/70/50) and Priority (JSON, 100/50/20)"
   }
 }
