@@ -1,0 +1,129 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "god-object-detection",
+  "chapter_title": "God Object Detection",
+  "chapter_file": "book/src/god-object-detection.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive and accurate on core algorithms but has outdated source file references that point to non-existent files. The actual module structure has been reorganized.",
+  "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Source References",
+      "description": "Documentation references src/organization/god_object_detector.rs which does not exist. The module has been reorganized into src/organization/god_object/ subdirectory with multiple files.",
+      "current_content": "See src/organization/god_object_detector.rs:449-505",
+      "should_be": "See src/organization/god_object/detector.rs or src/builders/unified_analysis_phases/phases/god_object.rs",
+      "fix_suggestion": "Update all source file references to reflect the modular src/organization/god_object/ directory structure",
+      "source_reference": "Line 130 and similar"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Source References",
+      "description": "Documentation references src/organization/god_object_analysis.rs:236-268 which does not exist",
+      "current_content": "See src/organization/god_object_analysis.rs:236-268",
+      "should_be": "The determine_confidence function is in src/organization/god_object/classifier.rs",
+      "fix_suggestion": "Update reference to correct file path",
+      "source_reference": "Line 149"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Source References",
+      "description": "Documentation references src/organization/behavioral_decomposition.rs which does not exist as a single file",
+      "current_content": "See BehavioralCategorizer::categorize_method() in src/organization/behavioral_decomposition.rs:151-249",
+      "should_be": "See src/organization/behavioral_decomposition/categorization.rs:32 for categorize_method()",
+      "fix_suggestion": "Update reference to reflect the behavioral_decomposition subdirectory structure",
+      "source_reference": "Lines 271, 280"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Source References",
+      "description": "Documentation references src/organization/god_object/classifier.rs:128-163 for infer_responsibility_with_confidence but function is at line 662",
+      "current_content": "infer_responsibility_with_confidence() in src/organization/god_object/classifier.rs:128-163",
+      "should_be": "infer_responsibility_with_confidence() in src/organization/god_object/classifier.rs:662-698",
+      "fix_suggestion": "Update line number reference to correct location",
+      "source_reference": "Line 280"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Source References",
+      "description": "Documentation references src/config.rs:500-582 which does not exist",
+      "current_content": "See src/config.rs:500-582",
+      "should_be": "Configuration is spread across multiple files including src/commands/analyze/config.rs and src/cli/config_builder.rs",
+      "fix_suggestion": "Update to reference correct configuration file locations",
+      "source_reference": "Line 446"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Refactoring Recommendations",
+      "description": "Documentation references recommend_module_splits function at src/organization/god_object_detector.rs:165-177 which doesn't exist as documented",
+      "current_content": "recommend_module_splits function",
+      "should_be": "The split recommendation logic is in recommended_splits field and related functions in src/organization/god_object/split_types.rs",
+      "fix_suggestion": "Update reference to point to actual implementation location",
+      "source_reference": "Lines 337, 358"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Responsibility Detection",
+      "description": "BehaviorCategory enum includes a Utilities category not mentioned in the documentation table",
+      "current_content": "Table shows 14 categories ending with Domain",
+      "should_be": "Include Utilities category: helpers, builders, factories, converters (with_*, from_*, into_*, as_*, default, any)",
+      "fix_suggestion": "Add Utilities category row to the table",
+      "source_reference": "src/organization/behavioral_decomposition/types.rs:37"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Troubleshooting",
+      "description": "Troubleshooting section mentions 'base_score × 50 × violation_count' but actual code uses multiplier of 20.0",
+      "current_content": "The scoring algorithm uses exponential scaling (base_score × 50 × violation_count)",
+      "should_be": "The scoring algorithm uses 'base_score × 20.0 × violation_count' (reduced from 50.0 for more conservative scoring)",
+      "fix_suggestion": "Update troubleshooting section to reflect current scoring multiplier",
+      "source_reference": "src/organization/god_object/scoring.rs:86"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of god object detection concepts and algorithms",
+    "Clear explanation of detection criteria for both god classes and god modules",
+    "Well-documented language-specific thresholds matching actual implementation",
+    "Good examples and case studies demonstrating detection behavior",
+    "Detailed scoring algorithm documentation matching code implementation",
+    "Clear explanation of confidence levels and violation counting",
+    "Useful troubleshooting section addressing common questions",
+    "All internal documentation links are valid",
+    "Configuration examples are accurate and helpful",
+    "CLI options section is comprehensive and accurate"
+  ],
+  "improvement_suggestions": [
+    "Update all source file references to reflect the reorganized module structure",
+    "Add Utilities category to the responsibility detection table",
+    "Update scoring multiplier reference in troubleshooting from 50.0 to 20.0",
+    "Consider adding a section on the new complexity-weighted scoring with Spec 211",
+    "Add information about FunctionalDecompositionMetrics and the functional bonus system"
+  ],
+  "cross_references": [
+    "scoring-strategies",
+    "configuration",
+    "cli-reference",
+    "tiered-prioritization"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:40:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Detection criteria (method count, field count, responsibilities)",
+      "God object scoring algorithm",
+      "Thresholds and configuration",
+      "File-level aggregation",
+      "Refactoring recommendations",
+      "Examples and case studies"
+    ],
+    "validation_focus": "Check that god object detection algorithm, scoring, and configuration options are documented"
+  }
+}
