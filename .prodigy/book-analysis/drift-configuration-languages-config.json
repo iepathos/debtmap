@@ -1,0 +1,78 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "configuration",
+  "subsection_id": "languages-config",
+  "subsection_title": "Language Configuration",
+  "subsection_file": "book/src/configuration/languages.md",
+  "feature_mappings": [
+    "configuration.config_categories.analysis",
+    "configuration.capabilities"
+  ],
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Subsection file does not exist - chapter requires migration to multi-subsection structure",
+  "issues": [
+    {
+      "type": "missing_file",
+      "severity": "high",
+      "section": "Language Configuration",
+      "description": "The subsection file book/src/configuration/languages.md does not exist. The configuration chapter is currently a single flat file (book/src/configuration.md) that contains Language Configuration content at lines 353-388. The chapter needs to be migrated to a multi-subsection structure with the languages.md file extracted.",
+      "current_state": "Content exists in book/src/configuration.md at lines 353-388 covering: enabled languages, language-specific features (detect_dead_code, detect_complexity, detect_duplication)",
+      "should_be": "Separate file at book/src/configuration/languages.md with expanded documentation",
+      "fix_suggestion": "1. Create directory book/src/configuration/\n2. Create book/src/configuration/index.md as chapter entry point\n3. Extract language configuration content (lines 353-388) to book/src/configuration/languages.md\n4. Expand documentation to cover all topics specified: Enabled languages, Language-specific features, Exclusion patterns, Classification",
+      "source_reference": "src/config/languages.rs:4-61 (LanguagesConfig, LanguageFeatures)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Language-Specific Features",
+      "description": "Current documentation mentions 4 languages (rust, python, javascript, typescript) but the core Language enum in src/core/types.rs only implements Rust and Python. The documentation may be aspirational rather than reflecting current implementation.",
+      "current_content": "Enabled languages: rust, python, javascript, typescript",
+      "should_be": "Clarify which languages are fully supported vs partially supported. Rust and Python appear to be the primary languages with full AST parsing support.",
+      "fix_suggestion": "Document the actual language support status - Rust and Python have full AST-based analysis, while JavaScript/TypeScript may have limited support or be planned features.",
+      "source_reference": "src/core/types.rs:9-12 (Language enum only has Rust and Python)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Exclusion Patterns",
+      "description": "The 'Exclusion patterns' topic is specified for this subsection but exclusion patterns are documented under [ignore] section (lines 392-423) in configuration.md, not in the language configuration section. This topic may belong in a separate subsection or needs clarification.",
+      "feature_reference": "configuration.ignore",
+      "fix_suggestion": "Either: (1) Move exclusion patterns discussion to a separate 'ignore-patterns.md' subsection, or (2) If language-specific exclusion patterns exist, document them in the languages subsection.",
+      "source_reference": "src/config/core.rs:199-202 (IgnoreConfig)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Classification",
+      "description": "The 'Classification' topic is specified for this subsection but classification is documented separately in configuration.md under [classification] section (lines 669-708). Language-specific classification patterns are not documented.",
+      "feature_reference": "semantic_classification",
+      "fix_suggestion": "Document how classification works per-language, or clarify that classification is language-agnostic and cross-reference the main classification section.",
+      "source_reference": "src/config/classification.rs:150-153 (ClassificationConfig)"
+    }
+  ],
+  "positive_aspects": [
+    "The existing configuration.md file has good coverage of language-specific feature toggles (detect_dead_code, detect_complexity, detect_duplication)",
+    "Clear explanation that Rust's dead code detection is disabled by default since the compiler handles it",
+    "TOML examples are syntactically correct and follow best practices"
+  ],
+  "improvement_suggestions": [
+    "Create the multi-subsection structure for the configuration chapter to allow for deeper topic coverage",
+    "Clarify the actual language support status (Rust/Python fully supported, JS/TS may be planned)",
+    "Add documentation for language detection behavior - how debtmap determines file language",
+    "Document any language-specific complexity calculation differences",
+    "Add examples of language-specific configuration for different use cases"
+  ],
+  "cross_references": [
+    "thresholds-config",
+    "scoring-config",
+    "ignore-patterns"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Enabled languages", "Language-specific features", "Exclusion patterns", "Classification"],
+    "validation_focus": "Check language configuration options",
+    "note": "Subsection file does not exist - analyzing content from parent chapter configuration.md"
+  }
+}
