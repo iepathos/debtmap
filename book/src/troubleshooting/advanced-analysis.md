@@ -83,18 +83,28 @@ debtmap analyze . --no-pattern-detection
 # Specify specific patterns to detect
 debtmap analyze . --patterns "god_object,long_function,complex_conditional"
 
-# Adjust pattern detection sensitivity
-debtmap analyze . --pattern-threshold 0.8
+# Adjust pattern detection sensitivity (default: 0.7)
+debtmap analyze . --pattern-threshold 0.6
 
 # Show pattern detection warnings
 debtmap analyze . --show-pattern-warnings
 ```
 
 **Detected Patterns**:
+
+*Debt patterns* (src/cli/args.rs:84):
 - `god_object`: Classes/modules with too many responsibilities
 - `long_function`: Functions exceeding length thresholds
 - `complex_conditional`: Nested or complex branching logic
 - `deep_nesting`: Excessive indentation depth
+
+*Design patterns* (src/cli/args.rs:272-273):
+- `observer`: Event-driven observer pattern implementations
+- `singleton`: Singleton pattern usages
+- `factory`: Factory pattern implementations
+- `strategy`: Strategy pattern for interchangeable algorithms
+- `callback`: Callback-based async patterns
+- `template_method`: Template method pattern implementations
 
 ## Functional Analysis Issues
 
@@ -126,9 +136,47 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenien
 # Disable public API detection
 debtmap analyze . --no-public-api-detection
 
-# Adjust public API detection threshold
+# Adjust public API detection threshold (default: 0.7)
 debtmap analyze . --public-api-threshold 0.5
 ```
+
+## Attribution Issues
+
+Attribution analysis tracks where complexity originates in your code, separating logical complexity from formatting artifacts.
+
+**Enable Attribution** (src/cli/args.rs:206-208):
+
+```bash
+# Show complexity attribution details
+debtmap analyze . --attribution
+```
+
+**Understanding Attribution Output**:
+
+Attribution breaks complexity into three categories:
+
+- **Logical Complexity** (confidence: ~0.9): Genuine control flow and decision points
+- **Formatting Artifacts** (confidence: ~0.75): Complexity from code formatting style
+- **Pattern Complexity**: Complexity from recognized patterns
+
+**Common Issues**:
+
+*Attribution shows high formatting artifacts*:
+```bash
+# Use multi-pass analysis (enabled by default) to filter formatting
+debtmap analyze .
+
+# If disabled, re-enable it
+debtmap analyze . --no-multi-pass  # DON'T do this
+```
+
+*Attribution confidence is too low*:
+- Low confidence indicates the analysis couldn't reliably determine complexity sources
+- This often happens with heavily macro-generated code or unusual control flow patterns
+
+*Missing source mappings*:
+- Source mappings require AST-level analysis
+- Some dynamic patterns may not map to specific source locations
 
 ## See Also
 
