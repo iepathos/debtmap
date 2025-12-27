@@ -1,0 +1,122 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "scoring-strategies",
+  "subsection_id": "role-based-scoring",
+  "subsection_title": "Role-Based Adjustments",
+  "subsection_file": "book/src/scoring-strategies/role-based.md",
+  "feature_mappings": [
+    "semantic_classification.roles",
+    "risk_assessment.context_aware_factors",
+    "coverage_integration"
+  ],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Subsection file does not exist. The SUMMARY.md references scoring-strategies/role-based.md but the directory structure has not been migrated from the flat scoring-strategies.md file.",
+  "issues": [
+    {
+      "type": "missing_file",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "The subsection file 'book/src/scoring-strategies/role-based.md' does not exist. The SUMMARY.md has been updated to expect a multi-subsection structure under 'scoring-strategies/', but the files have not been created.",
+      "feature_reference": "semantic_classification.roles",
+      "fix_suggestion": "Create the scoring-strategies/ directory structure and extract the Role-Based Adjustments content (lines 398-640) from the current scoring-strategies.md into the new role-based.md file.",
+      "source_reference": "book/src/SUMMARY.md:55 references 'scoring-strategies/role-based.md'"
+    },
+    {
+      "type": "structure_mismatch",
+      "severity": "high",
+      "section": "Chapter Structure",
+      "description": "SUMMARY.md expects a multi-subsection chapter structure (index.md, file-level.md, function-level.md, role-based.md, rebalanced.md, exponential-scaling.md, data-flow.md) but only a flat scoring-strategies.md exists.",
+      "feature_reference": "None",
+      "fix_suggestion": "Migrate the flat scoring-strategies.md to the multi-subsection structure: create book/src/scoring-strategies/ directory with index.md and individual subsection files.",
+      "source_reference": "book/src/SUMMARY.md:52-58"
+    }
+  ],
+  "content_available_in": {
+    "file": "book/src/scoring-strategies.md",
+    "line_start": 398,
+    "line_end": 640,
+    "section_title": "Role-Based Adjustments",
+    "content_quality": "high",
+    "content_notes": "The content for role-based adjustments exists in the flat file and is comprehensive. It covers: why role-based adjustments are needed, Stage 1 (role-based coverage weighting), Stage 2 (role multiplier with clamping), false positive reduction examples, and configuration options."
+  },
+  "implementation_status": {
+    "role_coverage_weights": {
+      "status": "implemented",
+      "source_file": "src/config/scoring.rs",
+      "config_struct": "RoleCoverageWeights",
+      "documented_values_match": true
+    },
+    "role_multipliers": {
+      "status": "implemented",
+      "source_file": "src/config/scoring.rs",
+      "config_struct": "RoleMultipliers",
+      "documented_values_match": true,
+      "notes": "Default values in code match documentation (pure_logic=1.2, orchestrator=0.8, io_wrapper=0.7, entry_point=0.9, pattern_match=0.6, debug=0.3)"
+    },
+    "role_multiplier_clamping": {
+      "status": "implemented",
+      "source_file": "src/config/scoring.rs",
+      "config_struct": "RoleMultiplierConfig",
+      "default_clamp_min": 0.3,
+      "default_clamp_max": 1.8,
+      "default_enabled": true
+    },
+    "coverage_expectations": {
+      "status": "implemented",
+      "source_file": "src/priority/scoring/coverage_expectations.rs",
+      "notes": "Implements spec 119 with role-specific coverage ranges (Pure: 90-95-100%, BusinessLogic: 80-90-95%, Debug: 20-30-40%, etc.)"
+    },
+    "coverage_scoring": {
+      "status": "implemented",
+      "source_file": "src/priority/scoring/coverage_scoring.rs",
+      "notes": "Implements functional pipeline: calculate_gap() -> weight_by_severity() -> weight_by_role()"
+    }
+  },
+  "documentation_accuracy": {
+    "role_multiplier_table": {
+      "status": "accurate",
+      "notes": "Table at lines 267-275 correctly shows role multipliers and matches implementation"
+    },
+    "coverage_weight_table": {
+      "status": "accurate",
+      "notes": "Table at lines 433-440 correctly shows coverage weights and matches implementation"
+    },
+    "two_stage_adjustment": {
+      "status": "accurate",
+      "notes": "Documentation correctly explains the two-stage adjustment mechanism (Stage 1: coverage weighting, Stage 2: role multiplier)"
+    },
+    "clamping_configuration": {
+      "status": "accurate",
+      "notes": "Documentation correctly shows clamping defaults (0.3-1.8) and enable_clamping option"
+    }
+  },
+  "positive_aspects": [
+    "Comprehensive explanation of why role-based adjustments are needed",
+    "Clear two-stage adjustment mechanism (coverage weighting + role multiplier)",
+    "Before/after examples showing false positive reduction",
+    "Detailed configuration examples for different use cases",
+    "Accurate role multiplier and coverage weight tables matching implementation"
+  ],
+  "improvement_suggestions": [
+    "Create the multi-subsection structure as referenced in SUMMARY.md",
+    "Add cross-references to coverage-expectations.rs for deep-dive readers",
+    "Consider adding a visual diagram of the two-stage scoring pipeline"
+  ],
+  "cross_references": [
+    "file-level-scoring",
+    "function-level-scoring",
+    "semantic-classification"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Coverage weighting",
+      "Role multipliers",
+      "Two-stage adjustments",
+      "False positive reduction"
+    ],
+    "validation_focus": "Check role-based adjustments and coverage weighting"
+  }
+}
