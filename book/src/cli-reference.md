@@ -22,9 +22,28 @@ debtmap init
 debtmap validate . --config debtmap.toml
 ```
 
+## Global Options
+
+Options that apply to all commands:
+
+- `--show-config-sources` - Show where each configuration value came from (spec 201)
+  - Displays the source of each configuration value (default, config file, environment, CLI)
+  - Useful for debugging configuration precedence issues
+- `--config <PATH>` - Custom config file path (overrides default locations)
+  - Can also use `DEBTMAP_CONFIG` environment variable
+
+**Example:**
+```bash
+# Show configuration sources
+debtmap --show-config-sources analyze .
+
+# Use custom config file
+debtmap --config /path/to/debtmap.toml validate .
+```
+
 ## Commands
 
-Debtmap provides six main commands: five for analysis and validation, plus one debugging tool.
+Debtmap provides seven main commands: five for analysis and validation, plus two debugging tools.
 
 ### `analyze`
 
@@ -205,6 +224,36 @@ debtmap validate-improvement \
   --threshold 80.0
 ```
 
+### `diagnose-coverage` (Debugging)
+
+Diagnose and validate LCOV coverage files.
+
+**Usage:**
+```bash
+debtmap diagnose-coverage <COVERAGE_FILE> [OPTIONS]
+```
+
+**Arguments:**
+- `<COVERAGE_FILE>` - Path to the LCOV coverage file to diagnose
+
+**Options:**
+- `--format <FORMAT>` - Output format: text or json (default: text)
+
+**Description:**
+Validates and diagnoses LCOV coverage files with detailed analysis. This command helps identify issues with coverage data before using it with the `analyze` command. Use this when:
+- Coverage data seems incorrect or incomplete
+- You want to validate an LCOV file before integration
+- Debugging coverage parsing issues
+
+**Example:**
+```bash
+# Validate coverage file with text output
+debtmap diagnose-coverage coverage.lcov
+
+# Get JSON output for automation
+debtmap diagnose-coverage lcov.info --format json
+```
+
 ### `explain-coverage` (Debugging)
 
 Explain coverage detection for a specific function.
@@ -253,7 +302,12 @@ Options are organized by category for clarity. Most options apply to the `analyz
 Control how analysis results are formatted and displayed.
 
 **Format Options:**
-- `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: terminal for analyze)
+- `-f, --format <FORMAT>` - Output format: json, markdown, terminal, html, dot (default: terminal for analyze)
+  - `json` - JSON format for programmatic processing
+  - `markdown` - Markdown format with comprehensive analysis (uses LLM-optimized writer)
+  - `terminal` - Human-readable terminal output with colors and formatting
+  - `html` - HTML format for web display
+  - `dot` - Graphviz DOT format for dependency visualization
 - `-o, --output <OUTPUT>` - Output file path (defaults to stdout)
 - `--plain` - Plain output mode: ASCII-only, no colors, no emoji, machine-parseable
 
@@ -263,9 +317,24 @@ Control how analysis results are formatted and displayed.
 - `-s, --summary` - Use summary format with tiered priority display (compact output)
 - `-c, --compact` - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv). Only available in `analyze` command (note: `validate` uses `-c` for `--config`)
 - `--min-priority <PRIORITY>` - Minimum priority to display: low, medium, high, critical
+- `--min-score <N>` - Minimum score threshold for filtering T3/T4 recommendations (default: 3.0)
+  - T1 Critical Architecture and T2 Complex Untested items bypass this filter and are always shown
+  - Overrides config file setting (Spec 193, 205)
+- `--show-filter-stats` - Show filter statistics (how many items were filtered and why)
 - `--filter <CATEGORIES>` - Filter by debt categories (comma-separated)
 - `--aggregate-only` - Show only aggregated file-level scores
 - `--group-by-category` - Group output by debt category
+
+**Progress Display:**
+- `--no-tui` - Disable TUI progress visualization (use simple progress bars instead)
+- `-q, --quiet` - Suppress progress output (quiet mode)
+
+**Streaming Output:**
+- `--streaming` - Enable streaming output mode for large codebases (Spec 003)
+  - Streams results to output as they're generated with O(1) memory overhead
+  - Useful for processing large codebases that would otherwise exhaust memory
+- `--stream-to <FILE>` - Output file for streaming mode (requires --streaming)
+  - Use "-" for stdout
 
 **Dependency Display Options:**
 - `--show-dependencies` - Show caller/callee information in output
@@ -341,6 +410,12 @@ Optimize analysis performance through parallelization.
 **Other Performance:**
 - `--max-files <N>` - Maximum number of files to analyze (0 = no limit)
 
+**Profiling:**
+- `--profile` - Enable profiling to identify performance bottlenecks (Spec 001)
+  - Outputs timing breakdown for each analysis phase when complete
+- `--profile-output <FILE>` - Write profiling data to file in JSON format (requires --profile)
+  - Use for post-analysis performance investigation
+
 ### Debugging & Verbosity
 
 Control diagnostic output and debugging information.
@@ -378,6 +453,24 @@ Control file-level aggregation and god object detection.
   - Options: sum, weighted_sum, logarithmic_sum, max_plus_average
 - `--min-problematic <N>` - Minimum number of problematic functions for file aggregation
 - `--no-god-object` - Disable god object detection
+
+**God Object Split Recommendations:**
+- `--show-splits` - Show detailed module split recommendations for god objects and large files (experimental)
+  - Suggests how to decompose large files into smaller, focused modules
+- `--min-split-methods <N>` - Minimum methods per god object split recommendation (default: 10)
+- `--min-split-lines <N>` - Minimum lines per god object split recommendation (default: 150)
+
+**Dead Code Analysis:**
+- `--no-public-api-detection` - Disable public API detection heuristics for dead code analysis
+- `--public-api-threshold <N>` - Public API confidence threshold (0.0-1.0, default: 0.7)
+  - Functions above this threshold are considered public APIs
+
+**Pattern Detection:**
+- `--no-pattern-detection` - Disable pattern recognition
+- `--patterns <PATTERNS>` - Enable specific patterns only (comma-separated)
+  - Available patterns: observer, singleton, factory, strategy, callback, template_method
+- `--pattern-threshold <N>` - Pattern confidence threshold (0.0-1.0, default: 0.7)
+- `--show-pattern-warnings` - Show pattern warnings for uncertain detections
 
 ### Option Aliases
 
@@ -777,39 +870,56 @@ debtmap analyze . --explain-metrics -v
 
 ## Command Compatibility Matrix
 
-| Option | analyze | validate | compare | init | explain-coverage |
-|--------|---------|----------|---------|------|------------------|
-| `<PATH>` argument | ✓ | ✓ | ✗ | ✗ | ✓ |
-| `--format` | ✓ | ✓ | ✓ | ✗ | ✓ |
-| `--output` | ✓ | ✓ | ✓ | ✗ | ✗ |
-| `--coverage-file` | ✓ | ✓ | ✗ | ✗ | ✓ |
-| `--context` | ✓ | ✓ | ✗ | ✗ | ✗ |
-| `--threshold-*` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--top / --tail` | ✓ | ✓ | ✗ | ✗ | ✗ |
-| `--jobs` | ✓ | ✓ | ✗ | ✗ | ✗ |
-| `--no-parallel` | ✓ | ✓ | ✗ | ✗ | ✗ |
-| `--verbose` | ✓ | ✓ | ✗ | ✗ | ✓ |
-| `--explain-metrics` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--debug-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--trace-function` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--call-graph-stats` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--validate-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--debug-format` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--show-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--no-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--max-callers` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--max-callees` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--show-external-calls` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--show-std-lib-calls` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--ast-functional-analysis` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--functional-analysis-profile` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--function` | ✗ | ✗ | ✗ | ✗ | ✓ |
-| `--file` | ✗ | ✗ | ✗ | ✗ | ✓ |
-| `--config` | ✗ | ✓ | ✗ | ✗ | ✗ |
-| `--before / --after` | ✗ | ✗ | ✓ | ✗ | ✗ |
-| `--force` | ✗ | ✗ | ✗ | ✓ | ✗ |
+| Option | analyze | validate | compare | init | diagnose-coverage | explain-coverage |
+|--------|---------|----------|---------|------|-------------------|------------------|
+| `<PATH>` argument | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
+| `--format` | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ |
+| `--output` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| `--coverage-file` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ |
+| `--context` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--threshold-*` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--top / --tail` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--min-score` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--show-filter-stats` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--quiet` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--no-tui` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--streaming` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--stream-to` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--jobs` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--no-parallel` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--profile` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--profile-output` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--verbose` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ |
+| `--show-splits` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--min-split-methods` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--min-split-lines` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--no-public-api-detection` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--public-api-threshold` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--no-pattern-detection` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--patterns` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--pattern-threshold` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--show-pattern-warnings` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--explain-metrics` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--debug-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--trace-function` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--call-graph-stats` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--validate-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--debug-format` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--show-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--no-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--max-callers` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--max-callees` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--show-external-calls` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--show-std-lib-calls` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--ast-functional-analysis` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--functional-analysis-profile` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `--function` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `--file` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `--config` | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--before / --after` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| `--force` | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
 
-**Note:** The `validate` command supports output control (`--format`, `--output`), coverage integration (`--coverage-file`), context-aware analysis (`--context`), display filtering (`--top`, `--tail`, `--summary`), performance control (`--jobs`, `--no-parallel`), and verbosity options (`--verbose`) from the `analyze` command. Analysis thresholds (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are configured via the `--config` file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the `analyze` command. The `explain-coverage` command is a specialized debugging tool for diagnosing coverage detection issues and has its own unique options (`--function`, `--file`).
+**Note:** The `validate` command supports output control (`--format`, `--output`), coverage integration (`--coverage-file`), context-aware analysis (`--context`), display filtering (`--top`, `--tail`, `--summary`, `--show-splits`), performance control (`--jobs`, `--no-parallel`), and verbosity options (`--verbose`) from the `analyze` command. Analysis thresholds (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are configured via the `--config` file rather than as command-line options. Debugging features like call graph debugging, functional analysis, profiling, and pattern detection are specific to the `analyze` command. The `diagnose-coverage` and `explain-coverage` commands are specialized debugging tools for diagnosing coverage issues and have their own unique options.
 
 ## Troubleshooting
 
