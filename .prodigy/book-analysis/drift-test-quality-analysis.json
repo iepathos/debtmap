@@ -1,0 +1,143 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "test-quality-analysis",
+  "chapter_title": "Test Quality Analysis",
+  "chapter_file": "book/src/test-quality-analysis.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Documentation is significantly incomplete compared to actual implementation. The codebase has extensive test quality analysis features that are not documented, including multiple detector types, timing classification, and Rust-specific test type classification.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Test Classification by Type",
+      "description": "The documentation mentions test type classification but lacks detail. The implementation provides comprehensive test type classification including: UnitTest, IntegrationTest, BenchmarkTest, PropertyTest, and DocTest.",
+      "feature_reference": "test_quality_analysis.classification.test_type_classification",
+      "fix_suggestion": "Expand the 'Test Classification' section to document all test types and how they're detected, including path-based integration test detection and attribute-based classification.",
+      "source_reference": "src/testing/rust/test_classifier.rs:TestClassifier, src/testing/rust/mod.rs:RustTestType"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Complexity Sources",
+      "description": "The documentation mentions 'high cyclomatic complexity', 'deep nesting', and 'multiple responsibilities' but doesn't document the specific complexity sources detected by the implementation: ExcessiveMocking, NestedConditionals, MultipleAssertions, LoopInTest, ExcessiveSetup.",
+      "feature_reference": "test_quality_analysis.detection.test_complexity",
+      "fix_suggestion": "Add a detailed subsection explaining each complexity source, its detection threshold, and impact on test maintainability.",
+      "source_reference": "src/testing/mod.rs:ComplexitySource, src/testing/complexity_detector.rs:TestComplexityAnalysis"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Flaky Test Detection Patterns",
+      "description": "The documentation lists 'Time-dependent logic', 'Non-deterministic operations', 'External dependency patterns' but the implementation detects many more specific patterns: TimingDependency, RandomValues, ExternalDependency, FilesystemDependency, NetworkDependency, ThreadingIssue, HashOrdering (in Rust-specific detection).",
+      "feature_reference": "test_quality_analysis.detection.flaky_test_detection",
+      "fix_suggestion": "Document the comprehensive list of flaky patterns detected, their severity levels (Critical, High, Medium, Low), and stabilization suggestions for each pattern type.",
+      "source_reference": "src/testing/flaky_detector.rs:FlakinessType, src/testing/rust/mod.rs:RustFlakinessType"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Rust-specific Test Quality Analysis",
+      "description": "The implementation has an entire Rust-specific test quality module (src/testing/rust/) that is not documented. This includes: assertion detector, complexity scorer, flaky detector, framework detector, and test classifier specific to Rust.",
+      "feature_reference": "test_quality_analysis.detection",
+      "fix_suggestion": "Add a dedicated section for Rust-specific test quality analysis, covering the specialized detectors and their capabilities.",
+      "source_reference": "src/testing/rust/mod.rs (entire module)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Assertion Pattern Details",
+      "description": "The documentation shows basic assertion examples but doesn't document the full set of assertion types detected: assert, assert_eq, assert_ne, assert_matches, debug_assert variants, and Rust-specific types like ShouldPanic and ResultOk returns.",
+      "feature_reference": "test_quality_analysis.detection.assertion_patterns",
+      "fix_suggestion": "Expand assertion patterns section with complete list of detected assertion types and quality ratings for each type.",
+      "source_reference": "src/testing/assertion_detector.rs:is_assertion_macro, src/testing/rust/mod.rs:RustAssertionType"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Test Quality Recommendations",
+      "description": "The implementation provides specific simplification recommendations (ExtractHelper, SplitTest, ParameterizeTest, SimplifySetup, ReduceMocking) but the documentation doesn't cover these.",
+      "feature_reference": "test_quality_analysis.detection.test_complexity",
+      "fix_suggestion": "Add a 'Recommendations' section explaining the automatic simplification suggestions and when each applies.",
+      "source_reference": "src/testing/mod.rs:TestSimplification, src/testing/complexity_detector.rs:suggest_simplification"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Timing Classification",
+      "description": "The implementation has a dedicated timing classifier (src/testing/timing_classifier.rs) that categorizes timing operations into CurrentTime, SystemTime, DurationCreation, ElapsedTime, Sleep, Timeout, Wait, ThreadTimeout, Delay, Timer categories. This is not documented.",
+      "feature_reference": "test_quality_analysis.detection.flaky_test_detection",
+      "fix_suggestion": "Document the timing classification system and how each category affects flakiness detection.",
+      "source_reference": "src/testing/timing_classifier.rs:TimingCategory"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Fast vs Slow Test Detection",
+      "description": "The topics mention 'Fast vs slow test detection' but the documentation doesn't explain this at all. The implementation has SlowTest as a RustTestIssueType.",
+      "feature_reference": "test_quality_analysis.classification.timing_classification",
+      "fix_suggestion": "Add a section explaining how slow tests are detected and what criteria are used.",
+      "source_reference": "src/testing/rust/mod.rs:RustTestIssueType::SlowTest"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Test Quality Issue Types",
+      "description": "The implementation tracks multiple issue types (NoAssertions, TooComplex, FlakyPattern, ExcessiveMocking, IsolationIssue, TestsTooMuch, SlowTest) with severity levels and confidence scores, but this is not documented.",
+      "feature_reference": "test_quality_analysis.detection",
+      "fix_suggestion": "Create a reference table of all test quality issue types, their severity levels, and what triggers each detection.",
+      "source_reference": "src/testing/rust/mod.rs:RustTestIssueType, RustTestSeverity"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration",
+      "description": "The configuration section shows only `enabled` and `complexity_threshold`. The implementation has more configurable options: max_test_complexity, max_mock_setups, max_test_length.",
+      "feature_reference": "test_quality_analysis.detection.test_complexity",
+      "fix_suggestion": "Expand configuration documentation to include all available options with their default values.",
+      "source_reference": "src/testing/complexity_detector.rs:TestComplexityDetector"
+    }
+  ],
+  "positive_aspects": [
+    "Good introductory overview that sets context for test quality analysis",
+    "Appropriate cross-references to related documentation (Coverage Integration, Complexity Metrics)",
+    "All internal links are valid",
+    "Clear structure with logical section organization",
+    "Framework detection section correctly identifies supported frameworks"
+  ],
+  "improvement_suggestions": [
+    "Add a 'How It Works' section explaining the detector pipeline",
+    "Include command-line examples showing how to run test quality analysis",
+    "Add a 'Common Issues and Solutions' table for each flaky pattern type",
+    "Document the scoring formula for test complexity calculation",
+    "Add examples of detected issues with before/after code",
+    "Consider restructuring into subsections for better navigation given the depth of features"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Assertion pattern detection",
+      "Test complexity analysis",
+      "Flaky test detection",
+      "Framework detection",
+      "Test type classification (unit, integration, property)",
+      "Fast vs slow test detection",
+      "Test quality recommendations"
+    ],
+    "validation_focus": "Check that test quality detection patterns and classification are documented",
+    "implementation_files_analyzed": [
+      "src/testing/mod.rs",
+      "src/testing/assertion_detector.rs",
+      "src/testing/flaky_detector.rs",
+      "src/testing/complexity_detector.rs",
+      "src/testing/timing_classifier.rs",
+      "src/testing/rust/mod.rs",
+      "src/testing/rust/test_classifier.rs"
+    ],
+    "issue_count": 10,
+    "high_severity_count": 4,
+    "medium_severity_count": 5,
+    "low_severity_count": 1
+  }
+}
