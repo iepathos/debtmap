@@ -1,58 +1,84 @@
 # Debt Patterns
 
-## Debt Patterns
+Debtmap detects **35 types of technical debt**, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
 
-Debtmap detects 27 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
+The 35 debt types consist of:
+- **26 priority-specific variants**: Specialized debt patterns with detailed diagnostic data
+- **9 legacy variants**: Backward-compatible types from earlier versions (prefer specialized variants)
 
-**Source**: All debt types and category mappings verified from src/priority/mod.rs:158-347
+**Source**: DebtType enum defined in `src/priority/debt_types.rs:47-205`, category mappings in `src/priority/mod.rs:216-254`
 
-### Debt Type Enum
+## Debt Type Enum
 
 The `DebtType` enum defines all specific debt patterns that Debtmap can detect.
 
-**Note**: Each `DebtType` variant carries structured diagnostic data specific to that pattern. For example, `ComplexityHotspot` includes `cyclomatic`, `cognitive`, and `adjusted_cyclomatic` (entropy-adjusted) fields that provide detailed metrics for the detected issue. This structured data enables precise prioritization and actionable recommendations.
+**Note**: Each `DebtType` variant carries structured diagnostic data specific to that pattern. For example, `ComplexityHotspot` includes `cyclomatic` and `cognitive` fields that provide detailed metrics for the detected issue. This structured data enables precise prioritization.
 
-**Source**: DebtType structure defined in src/priority/mod.rs:158-288
+**Source**: DebtType structure defined in `src/priority/debt_types.rs:47-205`
 
-**Testing Debt:**
-- `TestingGap` - Functions with insufficient test coverage
-- `TestTodo` - TODO comments in test code
-- `TestComplexity` - Test functions exceeding complexity thresholds
-- `TestDuplication` - Duplicated code in test files
-- `TestComplexityHotspot` - Complex test logic that's hard to maintain
-- `AssertionComplexity` - Complex test assertions
-- `FlakyTestPattern` - Non-deterministic test behavior
+### Priority-Specific Debt Types (26 types)
 
-**Architecture Debt:**
-- `GodObject` - Classes with too many responsibilities
-- `GodModule` - Modules with too many responsibilities
-- `FeatureEnvy` - Using more data from other objects than own
-- `PrimitiveObsession` - Overusing basic types instead of domain objects
-- `ScatteredType` - Types with methods scattered across multiple files
-- `OrphanedFunctions` - Functions that should be methods on a type
-- `UtilitiesSprawl` - Utility modules with poor cohesion
+These are the primary debt types with specialized detection logic and detailed diagnostic data.
 
-**Performance Debt:**
-- `AllocationInefficiency` - Inefficient memory allocations
-- `StringConcatenation` - Inefficient string building in loops
-- `NestedLoops` - Multiple nested iterations (O(n²) or worse)
-- `BlockingIO` - Blocking I/O in async contexts
-- `SuboptimalDataStructure` - Wrong data structure for access pattern
-- `AsyncMisuse` - Improper async/await usage
-- `ResourceLeak` - Resources not properly released
-- `CollectionInefficiency` - Inefficient collection operations
+**Testing Debt (6 types):**
+- `TestingGap` - Functions with insufficient test coverage (fields: `coverage`, `cyclomatic`, `cognitive`)
+- `TestTodo` - TODO comments in test code (fields: `priority`, `reason`)
+- `TestDuplication` - Duplicated code in test files (fields: `instances`, `total_lines`, `similarity`)
+- `TestComplexityHotspot` - Complex test logic that's hard to maintain (fields: `cyclomatic`, `cognitive`, `threshold`)
+- `AssertionComplexity` - Complex test assertions (fields: `assertion_count`, `complexity_score`)
+- `FlakyTestPattern` - Non-deterministic test behavior (fields: `pattern_type`, `reliability_impact`)
 
-**Code Quality Debt:**
-- `ComplexityHotspot` - Functions exceeding complexity thresholds
-- `DeadCode` - Unreachable or unused code
-- `MagicValues` - Unexplained literal values
-- `Risk` - High-risk code (complex + poorly tested)
-- `Duplication` - Duplicated code blocks
-- `ErrorSwallowing` - Errors caught but ignored
+**Architecture Debt (6 types):**
+- `GodObject` - Unified variant for classes/files/modules with too many responsibilities (fields: `methods`, `fields`, `responsibilities`, `god_object_score`, `lines`). The detection type (GodClass, GodFile, GodModule) is determined by `god_object_indicators.detection_type` in the parent structure.
+- `FeatureEnvy` - Using more data from other objects than own (fields: `external_class`, `usage_ratio`)
+- `PrimitiveObsession` - Overusing basic types instead of domain objects (fields: `primitive_type`, `domain_concept`)
+- `ScatteredType` - Types with methods scattered across multiple files (fields: `type_name`, `total_methods`, `file_count`, `severity` as String)
+- `OrphanedFunctions` - Functions that should be methods on a type (fields: `target_type`, `function_count`, `file_count`)
+- `UtilitiesSprawl` - Utility modules with poor cohesion (fields: `function_count`, `distinct_types`)
 
-### Debt Categories
+**Performance Debt (8 types):**
+- `AllocationInefficiency` - Inefficient memory allocations (fields: `pattern`, `impact`)
+- `StringConcatenation` - Inefficient string building in loops (fields: `loop_type`, `iterations`)
+- `NestedLoops` - Multiple nested iterations O(n²) or worse (fields: `depth`, `complexity_estimate`)
+- `BlockingIO` - Blocking I/O in async contexts (fields: `operation`, `context`)
+- `SuboptimalDataStructure` - Wrong data structure for access pattern (fields: `current_type`, `recommended_type`)
+- `AsyncMisuse` - Improper async/await usage (fields: `pattern`, `performance_impact`)
+- `ResourceLeak` - Resources not properly released (fields: `resource_type`, `cleanup_missing`)
+- `CollectionInefficiency` - Inefficient collection operations (fields: `collection_type`, `inefficiency_type`)
+
+**Code Quality Debt (6 types):**
+- `ComplexityHotspot` - Functions exceeding complexity thresholds (fields: `cyclomatic`, `cognitive`)
+- `DeadCode` - Unreachable or unused code (fields: `visibility`, `cyclomatic`, `cognitive`, `usage_hints`)
+- `MagicValues` - Unexplained literal values (fields: `value`, `occurrences`)
+- `Risk` - High-risk code combining complexity + poor test coverage (fields: `risk_score`, `factors`)
+- `Duplication` - Duplicated code blocks (fields: `instances`, `total_lines`)
+- `ErrorSwallowing` - Errors caught but ignored (fields: `pattern`, `context`)
+
+### Legacy Debt Types (9 types)
+
+These variants are maintained for backward compatibility. For new analysis, prefer the specialized priority-specific variants listed above.
+
+**Source**: Legacy variants defined in `src/priority/debt_types.rs:48-77`
+
+| Legacy Type | Preferred Alternative | Migration Note |
+|-------------|----------------------|----------------|
+| `Todo` | Use for general TODO markers | Fields: `reason` |
+| `Fixme` | Use for general FIXME markers | Fields: `reason` |
+| `CodeSmell` | Use specific debt types | Fields: `smell_type` |
+| `Complexity` | `ComplexityHotspot` | Fields: `cyclomatic`, `cognitive` |
+| `Dependency` | Specific architecture types | Fields: `dependency_type` |
+| `ResourceManagement` | `ResourceLeak`, `AllocationInefficiency` | Fields: `issue_type` |
+| `CodeOrganization` | `ScatteredType`, `OrphanedFunctions`, `UtilitiesSprawl` | Fields: `issue_type` |
+| `TestComplexity` | `TestComplexityHotspot` | Fields: `cyclomatic`, `cognitive` |
+| `TestQuality` | `FlakyTestPattern`, `AssertionComplexity` | Fields: `issue_type` |
+
+**Note**: Legacy types are categorized under `CodeQuality` by default (see `src/priority/mod.rs:251-252`).
+
+## Debt Categories
 
 The `DebtCategory` enum groups debt types into strategic categories:
+
+**Source**: `src/priority/mod.rs:196-213`
 
 ```rust
 pub enum DebtCategory {
@@ -63,16 +89,18 @@ pub enum DebtCategory {
 }
 ```
 
-**Category Mapping:**
+### Category Mapping
 
-**Source**: Verified from src/priority/mod.rs:309-347
+**Source**: Category assignment logic in `src/priority/mod.rs:216-254`
 
-| Debt Type | Category | Strategic Focus |
-|-----------|----------|-----------------|
-| GodObject, GodModule, FeatureEnvy, PrimitiveObsession, ScatteredType, OrphanedFunctions, UtilitiesSprawl | Architecture | Structural improvements, design patterns, type organization |
-| TestingGap, TestTodo, TestComplexity, TestDuplication, TestComplexityHotspot, AssertionComplexity, FlakyTestPattern | Testing | Test coverage, test quality |
-| AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency | Performance | Runtime efficiency, resource usage |
-| ComplexityHotspot, DeadCode, MagicValues, Risk, Duplication, ErrorSwallowing | CodeQuality | Maintainability, reliability, code clarity |
+| Category | Debt Types | Strategic Focus |
+|----------|-----------|-----------------|
+| Architecture | GodObject, FeatureEnvy, PrimitiveObsession, ScatteredType, OrphanedFunctions, UtilitiesSprawl | Structural improvements, design patterns, type organization |
+| Testing | TestingGap, TestComplexityHotspot, TestTodo, TestDuplication, AssertionComplexity, FlakyTestPattern | Test coverage, test quality |
+| Performance | AsyncMisuse, CollectionInefficiency, NestedLoops, BlockingIO, AllocationInefficiency, StringConcatenation, SuboptimalDataStructure, ResourceLeak | Runtime efficiency, resource usage |
+| CodeQuality | ComplexityHotspot, DeadCode, Duplication, Risk, ErrorSwallowing, MagicValues, *all legacy types* | Maintainability, reliability, code clarity |
+
+**Note**: `GodObject` is a unified variant that handles all god object detection types (GodClass, GodFile, GodModule). There is no separate `GodModule` debt type in the enum.
 
 **Language-Specific Debt Patterns:**
 
@@ -87,7 +115,10 @@ Debtmap automatically applies only the relevant debt patterns during analysis.
 
 #### Architecture Debt
 
-**GodObject / GodModule**: Too many responsibilities
+**GodObject** (unified variant for GodClass/GodFile/GodModule): Too many responsibilities
+
+**Source**: `src/priority/debt_types.rs:143-154`
+
 ```rust
 // God module: handles parsing, validation, storage, notifications
 mod user_service {
@@ -99,6 +130,15 @@ mod user_service {
     // ... 20+ more functions
 }
 ```
+
+The `GodObject` debt type captures all god object patterns through a unified variant. The specific detection type (GodClass, GodFile, or GodModule) is stored in the parent `UnifiedDebtItem.god_object_indicators.detection_type` field:
+
+| Detection Type | When Used | Fields Used |
+|---------------|-----------|-------------|
+| GodClass | Class with too many methods/fields | `methods`, `fields` (Some), `responsibilities` |
+| GodFile | File with too many functions | `methods`, `fields` (None), `lines` |
+| GodModule | Module with too many responsibilities | `methods`, `fields` (None), `responsibilities` |
+
 **When detected**: Complexity-weighted scoring system (see detailed explanation below)
 **Action**: Split into focused modules (parser, validator, repository, notifier)
 
@@ -179,7 +219,7 @@ When Debtmap detects a god object, the output includes:
 
 #### Type Organization Debt
 
-**Source**: Type organization patterns defined in src/priority/mod.rs:273-288, detection logic in src/organization/codebase_type_analyzer.rs
+**Source**: Type organization patterns defined in `src/priority/debt_types.rs:189-205` (Spec 187), detection logic in `src/organization/codebase_type_analyzer.rs`
 
 These patterns detect issues with how types and their associated functions are organized across the codebase.
 
@@ -211,9 +251,15 @@ impl User {
 // Problem: User methods spread across 4+ files!
 ```
 
-**When detected**: Type has methods in 2+ files (severity: Low=2 files, Medium=3-5 files, High=6+ files)
+**When detected**: Type has methods in 2+ files
+**Severity levels**: Stored as String field derived from `file_count`:
+- Low = 2 files
+- Medium = 3-5 files
+- High = 6+ files
+
 **Action**: Consolidate methods into primary file or create focused trait implementations
-**Source**: Detection criteria from src/organization/codebase_type_analyzer.rs:46-47
+
+**Source**: Detection criteria from `src/organization/codebase_type_analyzer.rs:46-47`, type definition in `src/priority/debt_types.rs:190-195`
 
 **OrphanedFunctions**: Functions that should be methods on a type
 
@@ -241,7 +287,8 @@ impl User {
 
 **When detected**: Multiple functions with shared type parameter pattern (e.g., all take `&User`)
 **Action**: Convert functions to methods on the target type
-**Source**: Detection in src/organization/codebase_type_analyzer.rs:58-71
+
+**Source**: Detection in `src/organization/codebase_type_analyzer.rs:58-71`, type definition in `src/priority/debt_types.rs:196-200`
 
 **UtilitiesSprawl**: Utility module with poor cohesion
 
@@ -266,7 +313,8 @@ mod notifications { fn send(msg: &str) { /* ... */ } }
 
 **When detected**: Utility module has many functions operating on diverse types with low cohesion
 **Action**: Split into focused modules based on domain or responsibility
-**Source**: Detection in src/organization/codebase_type_analyzer.rs:74-80
+
+**Source**: Detection in `src/organization/codebase_type_analyzer.rs:74-80`, type definition in `src/priority/debt_types.rs:201-204`
 
 #### Testing Debt
 
@@ -370,7 +418,7 @@ fn find_duplicates(items: &[Item]) -> Vec<Item> {
 
 **ComplexityHotspot**: Functions exceeding complexity thresholds
 
-**Source**: Categorized as CodeQuality in src/priority/mod.rs:340
+**Source**: Type definition in `src/priority/debt_types.rs:84-87`, categorized as CodeQuality in `src/priority/mod.rs:245`
 
 ```rust
 // Cyclomatic: 22, Cognitive: 35
@@ -392,13 +440,13 @@ fn process_transaction(tx: Transaction, account: &mut Account) -> Result<Receipt
 }
 ```
 
+**Fields captured**: `cyclomatic: u32`, `cognitive: u32`
 **When detected**: Cyclomatic > 10 OR Cognitive > 15 (configurable)
 **Action**: Break into smaller functions, extract validation, simplify control flow
-**Note**: Includes entropy-adjusted complexity (adjusted_cyclomatic) when available
 
 **DeadCode**: Unreachable or unused code
 
-**Source**: Categorized as CodeQuality in src/priority/mod.rs:341
+**Source**: Type definition in `src/priority/debt_types.rs:88-93`, categorized as CodeQuality in `src/priority/mod.rs:246`
 
 ```rust
 // Private function never called within module
@@ -418,7 +466,7 @@ pub fn deprecated_api(data: &str) -> Result<()> {
 
 **MagicValues**: Unexplained literal values
 
-**Source**: Categorized as CodeQuality in src/priority/mod.rs:345
+**Source**: Type definition in `src/priority/debt_types.rs:163-166`, categorized as CodeQuality in `src/priority/mod.rs:250`
 
 ```rust
 // Bad: Magic numbers
