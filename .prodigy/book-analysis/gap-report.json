@@ -1,12 +1,82 @@
 {
-  "analysis_date": "2025-12-04T13:59:08.808354",
-  "features_analyzed": 13,
+  "analysis_date": "2025-12-26T23:45:00.000000",
+  "features_analyzed": 15,
   "meta_features_excluded": [
     "meta_content",
     "architecture"
   ],
-  "documented_topics": 28,
+  "documented_topics": 35,
   "gaps_found": 0,
   "gaps": [],
-  "actions_taken": []
+  "actions_taken": [
+    {
+      "action": "regenerated_flattened_items",
+      "file_path": ".prodigy/book-analysis/flattened-items.json",
+      "items_count": 35
+    }
+  ],
+  "feature_coverage": {
+    "cli_interface": {
+      "status": "covered",
+      "chapters": ["cli-reference", "getting-started"]
+    },
+    "complexity_analysis": {
+      "status": "covered",
+      "chapters": ["analysis-guide/complexity-metrics", "analysis-guide/overview"]
+    },
+    "debt_detection": {
+      "status": "covered",
+      "chapters": ["analysis-guide/debt-patterns"]
+    },
+    "risk_assessment": {
+      "status": "covered",
+      "chapters": ["analysis-guide/risk-scoring", "tiered-prioritization"]
+    },
+    "coverage_integration": {
+      "status": "covered",
+      "chapters": ["coverage-integration"]
+    },
+    "call_graph_analysis": {
+      "status": "covered",
+      "chapters": ["call-graph-analysis"]
+    },
+    "god_object_detection": {
+      "status": "covered",
+      "chapters": ["god-object-detection"]
+    },
+    "boilerplate_detection": {
+      "status": "covered",
+      "chapters": ["boilerplate-detection"]
+    },
+    "functional_analysis": {
+      "status": "covered",
+      "chapters": ["functional-analysis"]
+    },
+    "output_formats": {
+      "status": "covered",
+      "chapters": ["output-formats", "analysis-guide/example-outputs"]
+    },
+    "configuration": {
+      "status": "covered",
+      "chapters": ["configuration", "threshold-configuration"]
+    },
+    "parallel_processing": {
+      "status": "covered",
+      "chapters": ["parallel-processing"]
+    },
+    "comparison_workflow": {
+      "status": "covered",
+      "chapters": ["compare-analysis", "validation-gates"]
+    },
+    "test_quality_analysis": {
+      "status": "covered",
+      "note": "Covered within debt-patterns (FlakyTestPattern, TestComplexity) and coverage-integration",
+      "chapters": ["analysis-guide/debt-patterns", "coverage-integration"]
+    },
+    "semantic_classification": {
+      "status": "covered",
+      "note": "Covered within analyzer-types, risk-scoring, and coverage-integration",
+      "chapters": ["analysis-guide/analyzer-types", "analysis-guide/risk-scoring", "coverage-integration"]
+    }
+  }
 }
