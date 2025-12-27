@@ -1,0 +1,62 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "troubleshooting",
+  "subsection_id": "faq-troubleshooting",
+  "subsection_title": "FAQ",
+  "subsection_file": "book/src/troubleshooting/faq.md",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "low",
+  "quality_assessment": "FAQ covers essential troubleshooting topics with accurate CLI examples but has incomplete coverage penalty tiers and missing technical FAQ content",
+  "issues": [
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Coverage Questions",
+      "description": "Coverage penalty tiers are incomplete - missing 60-80% coverage tier (1.2x penalty)",
+      "current_content": "Shows 4 tiers: <20% (3.0x), 20-40% (2.0x), 40-60% (1.5x), ≥80% (0.8x)",
+      "should_be": "5 tiers: <20% (3.0x), 20-40% (2.0x), 40-60% (1.5x), 60-80% (1.2x), ≥80% (0.8x)",
+      "fix_suggestion": "Add missing coverage tier: '**60-80% coverage**: 1.2x penalty' between 40-60% and ≥80% entries",
+      "source_reference": "src/risk/strategy.rs:189-204"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "General Questions",
+      "description": "Missing technical FAQ content about complexity metrics that exists in feature inventory",
+      "feature_reference": "meta_content.faq",
+      "fix_suggestion": "Consider adding FAQ entries for: cyclomatic vs cognitive complexity, coverage dampening mechanism, god object vs boilerplate detection, measured vs estimated metrics",
+      "source_reference": "features.json:meta_content.faq"
+    }
+  ],
+  "positive_aspects": [
+    "Accurate CLI examples with correct option names",
+    "Good organization with clear sections",
+    "All internal cross-references are valid",
+    "Practical troubleshooting guidance with executable commands",
+    "Clear bug reporting guidance with pre-filing checklist"
+  ],
+  "improvement_suggestions": [
+    "Add the missing 60-80% coverage penalty tier for completeness",
+    "Consider adding a 'Scoring Questions' section with FAQ from feature inventory",
+    "Add examples of common parse error scenarios and solutions"
+  ],
+  "cross_references": [
+    "quick-fixes",
+    "debug-mode",
+    "error-messages"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T09:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "General questions",
+      "Coverage questions",
+      "Output questions",
+      "Bug reports"
+    ],
+    "validation_focus": "Check FAQ covers common user questions",
+    "links_validated": 3,
+    "broken_links": 0
+  }
+}
