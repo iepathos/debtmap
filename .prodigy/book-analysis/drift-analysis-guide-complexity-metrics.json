@@ -4,79 +4,106 @@
   "subsection_id": "complexity-metrics",
   "subsection_title": "Complexity Metrics",
   "subsection_file": "book/src/analysis-guide/complexity-metrics.md",
-  "feature_mappings": ["complexity_analysis"],
+  "feature_mappings": [
+    "complexity_analysis.metrics.measured_metrics",
+    "complexity_analysis.metrics.estimated_metrics"
+  ],
   "drift_detected": true,
-  "severity": "low",
-  "quality_assessment": "Documentation is well-structured and accurate. Minor improvements needed for completeness and clarity on some technical details.",
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive with excellent coverage of all complexity metrics. Source line references are outdated due to code evolution, and there is a factual discrepancy regarding the entropy dampening minimum.",
   "issues": [
     {
-      "type": "incomplete_explanation",
+      "type": "outdated_information",
       "severity": "medium",
-      "section": "Entropy-Based Complexity Analysis",
-      "description": "Documentation mentions 'Token Classification' as a feature with weighted importance, but does not explain what token types exist or how weighting works",
-      "current_content": "Token Classification: Categorizes tokens by type with weighted importance\n- Variables, methods, literals weighted differently\n- Focuses on structural complexity over superficial differences",
-      "should_be": "Add explanation of token categories (Keyword, Operator, Identifier, Literal, ControlFlow, FunctionCall) and how they are weighted in the entropy calculation",
-      "fix_suggestion": "Add a subsection explaining the TokenCategory enum and how different token types contribute to entropy scoring",
-      "source_reference": "src/complexity/entropy_core.rs:44-54 (TokenCategory enum)"
+      "section": "Entropy-Based Complexity Analysis - Dampening cap",
+      "description": "Documentation states dampening factor minimum is 0.7 (max 30% reduction), but actual code in calculate_dampening_factor_pure uses clamp(0.5, 1.0), allowing up to 50% reduction. The config's max_combined_reduction (0.30) is separate from the clamping logic.",
+      "current_content": "The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores.",
+      "should_be": "The dampening factor is clamped between 0.5 and 1.0. The configuration option max_combined_reduction (default 0.30) controls the maximum allowed reduction percentage separately.",
+      "fix_suggestion": "Update the dampening cap description to accurately reflect the 0.5 minimum in the clamping function and explain how max_combined_reduction interacts with this limit",
+      "source_reference": "src/complexity/entropy_core.rs:114 - repetition_dampening.clamp(0.5, 1.0)"
     },
     {
-      "type": "incomplete_explanation",
+      "type": "outdated_information",
       "severity": "low",
-      "section": "Entropy-Based Complexity Analysis",
-      "description": "Documentation mentions 'effective_complexity' in the formula but does not explain it is a composite metric distinct from token_entropy",
-      "current_content": "effective_complexity = entropy × pattern_factor × similarity_factor",
-      "should_be": "Clarify that effective_complexity is a composite metric combining multiple factors, not the same as token_entropy which is used for pattern detection",
-      "fix_suggestion": "Add note explaining: 'effective_complexity is the final adjusted score accounting for dampening, distinct from token_entropy which measures unpredictability'",
-      "source_reference": "src/complexity/entropy_core.rs:28-32 (EntropyScore struct documentation)"
+      "section": "Cognitive Complexity - Calculation",
+      "description": "Line reference 'src/complexity/cognitive.rs:151' for the nesting formula is outdated - the formula is at line 167",
+      "current_content": "Formula: `complexity = 1 + nesting_level` (from src/complexity/cognitive.rs:151)",
+      "should_be": "Formula: `complexity = 1 + nesting_level` (from src/complexity/cognitive.rs:167)",
+      "fix_suggestion": "Update line reference to 167 or use a semantic reference instead of hardcoded line numbers",
+      "source_reference": "src/complexity/cognitive.rs:167 - base_complexity: 1 + self.nesting_level"
     },
     {
-      "type": "missing_content",
+      "type": "outdated_information",
       "severity": "low",
-      "section": "Entropy-Based Complexity Analysis",
-      "description": "EntropyScore output fields documented (unique_variables, max_nesting, dampening_applied) but PatternMetrics is not mentioned",
-      "feature_reference": "complexity_analysis.metrics.estimated_metrics",
-      "fix_suggestion": "Consider adding a brief mention of PatternMetrics (total_patterns, unique_patterns, repetition_ratio) as an intermediate calculation step",
-      "source_reference": "src/complexity/entropy_core.rs:56-85 (PatternMetrics struct)"
+      "section": "Entropy-Based Complexity Analysis - Token Classification",
+      "description": "Line reference 'src/complexity/entropy_core.rs:44-54' for token classification is outdated - TokenCategory enum is now at lines 267-277",
+      "current_content": "Categorizes tokens by type with weighted importance (src/complexity/entropy_core.rs:44-54)",
+      "should_be": "Categorizes tokens by type with weighted importance (src/complexity/entropy_core.rs:267-277)",
+      "fix_suggestion": "Update line reference to point to current TokenCategory enum location",
+      "source_reference": "src/complexity/entropy_core.rs:269 - pub enum TokenCategory"
     },
     {
-      "type": "unclear_content",
+      "type": "outdated_information",
       "severity": "low",
-      "section": "Cognitive Complexity",
-      "description": "Example shows cognitive complexity calculation but the nesting weight multipliers are not explicitly stated",
-      "current_content": "for item in items { // +1 cognitive\n  if item.is_valid() { // +2 (nested in loop)\n    match item.type { // +3 (nested 2 levels)",
-      "should_be": "Clarify that each nesting level increases the weight (e.g., base level = 1, nested once = 2, nested twice = 3)",
-      "fix_suggestion": "Add a brief explanation before the example: 'Each nesting level increases the weight linearly (base = 1, first nesting = 2, second nesting = 3, etc.)'",
-      "source_reference": "src/complexity/cognitive.rs (cognitive complexity calculation with nesting tracking)"
+      "section": "Entropy-Based Complexity Analysis - Pattern detection",
+      "description": "Line reference 'src/complexity/entropy_core.rs:56-85' for PatternMetrics is outdated - PatternMetrics is now at lines 279-300",
+      "current_content": "**Pattern detection** (src/complexity/entropy_core.rs:56-85)",
+      "should_be": "**Pattern detection** (src/complexity/entropy_core.rs:279-300)",
+      "fix_suggestion": "Update line reference to reflect current PatternMetrics location",
+      "source_reference": "src/complexity/entropy_core.rs:281 - pub struct PatternMetrics"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Entropy-Based Complexity Analysis - Note on metrics",
+      "description": "Line reference 'src/complexity/entropy_core.rs:28-32' for EntropyScore distinction is outdated - EntropyScore is now at lines 228-265",
+      "current_content": "**Note on metrics** (src/complexity/entropy_core.rs:28-32)",
+      "should_be": "**Note on metrics** (src/complexity/entropy_core.rs:228-265)",
+      "fix_suggestion": "Update line reference to current EntropyScore struct location",
+      "source_reference": "src/complexity/entropy_core.rs:233 - pub struct EntropyScore"
+    },
+    {
+      "type": "inconsistent_example",
+      "severity": "low",
+      "section": "Entropy-Based Complexity Analysis - Example",
+      "description": "Example shows 67% dampening (from 15 to 5), but documentation states max 30% reduction. This contradicts the stated dampening cap.",
+      "current_content": "// Without entropy: Cyclomatic = 15 (appears very complex)\n// With entropy: Effective = 5 (pattern-based, dampened 67%)",
+      "should_be": "Either update example to show max 50% reduction per clamp limit, or explain why this example exceeds the stated cap",
+      "fix_suggestion": "Update example to show more realistic dampening within stated limits, or clarify that older analysis may have used different settings",
+      "source_reference": "Documentation internal consistency"
     }
   ],
   "positive_aspects": [
     "Excellent progressive structure from simple (cyclomatic) to advanced (entropy) metrics",
-    "Clear threshold tables with practical interpretation guidance",
-    "Strong examples showing before/after refactoring patterns",
-    "Good distinction between cyclomatic and cognitive complexity explained",
-    "Entropy dampening logic is well explained with concrete formula",
+    "Clear threshold tables with practical interpretation guidance for each metric",
+    "Strong examples showing before/after refactoring patterns for nesting depth",
+    "Good distinction between cyclomatic and cognitive complexity explained with rationale",
+    "Token categories and weights are now fully documented with all six categories",
+    "PatternMetrics fields are documented (total_patterns, unique_patterns, repetition_ratio)",
+    "Note on metrics clearly distinguishes token_entropy from effective_complexity",
+    "Nesting weight multipliers are now explicitly stated (Formula: complexity = 1 + nesting_level)",
     "Constructor detection section is comprehensive with AST vs name-based detection comparison",
-    "Configuration example for entropy analysis is accurate and complete",
-    "All code examples are syntactically correct and illustrative",
-    "Nesting depth and function length sections provide actionable guidance",
-    "No broken internal links detected"
+    "Configuration example for entropy analysis covers all key options",
+    "EntropyScore output fields documented (unique_variables, max_nesting, dampening_applied)",
+    "All code examples are syntactically correct Rust",
+    "No broken internal markdown links detected"
   ],
   "improvement_suggestions": [
-    "Add brief explanation of TokenCategory types and their weighting in entropy analysis",
-    "Clarify distinction between token_entropy (unpredictability measure) and effective_complexity (composite adjusted score)",
-    "Consider adding a diagram showing the relationship between different entropy metrics",
-    "Explain nesting weight multipliers more explicitly in cognitive complexity section",
-    "Consider adding cross-reference to 'advanced-features' subsection for semantic normalization (mentioned in code but not documented)",
-    "Add note about pattern-based complexity adjustments (PatternMatchRecognizer) as an advanced feature"
+    "Replace hardcoded line number references with stable semantic references (struct/function names) to avoid drift",
+    "Reconcile dampening cap documentation with actual clamp(0.5, 1.0) behavior in code",
+    "Consider adding a diagram showing the entropy analysis pipeline flow",
+    "Add cross-reference to 'advanced-features' subsection for semantic normalization (mentioned in cognitive.rs but not documented)",
+    "Consider adding an example of how EntropyAnalysis aggregation works for file-level metrics"
   ],
   "cross_references": [
     "overview",
     "debt-patterns",
     "interpreting-results",
-    "advanced-features"
+    "advanced-features",
+    "risk-scoring"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:02:00Z",
+    "analyzed_at": "2025-12-27T08:30:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Cyclomatic complexity",
@@ -88,6 +115,13 @@
     ],
     "validation_focus": "Verify all complexity metric types are documented with examples",
     "internal_links_checked": 0,
-    "broken_links_found": 0
+    "broken_links_found": 0,
+    "previous_analysis": "2025-12-04T22:02:00Z",
+    "issues_resolved_since_last": [
+      "Token categories now fully documented with weights",
+      "PatternMetrics now mentioned with field descriptions",
+      "Distinction between token_entropy and effective_complexity now clarified",
+      "Nesting weight formula now explicitly stated"
+    ]
   }
 }
