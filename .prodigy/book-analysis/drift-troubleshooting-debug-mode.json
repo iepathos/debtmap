@@ -1,0 +1,83 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "troubleshooting",
+  "subsection_id": "debug-mode",
+  "subsection_title": "Debug Mode",
+  "subsection_file": "book/src/troubleshooting/debug-mode.md",
+  "feature_mappings": [
+    "output_formats.display_options",
+    "configuration.config_categories.display",
+    "meta_content.troubleshooting"
+  ],
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Subsection file does not exist - chapter structure migration required",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Entire File",
+      "description": "The file book/src/troubleshooting/debug-mode.md does not exist. The SUMMARY.md references this file as part of a planned multi-subsection Troubleshooting chapter structure, but the migration from the single-file troubleshooting.md has not been completed.",
+      "fix_suggestion": "Create book/src/troubleshooting/ directory structure and migrate relevant content from book/src/troubleshooting.md lines 345-553 (Debug Mode, Performance Tips, and Environment Variables sections) to the new debug-mode.md subsection.",
+      "source_reference": "book/src/SUMMARY.md:71"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Environment Variables",
+      "description": "Several debug-related environment variables documented in code but missing from current troubleshooting.md: DEBTMAP_COVERAGE_DEBUG, DEBTMAP_TIMING, DEBTMAP_DEBUG_SCORING, DEBTMAP_LOG_FILE, DEBTMAP_SHOW_FILTER_STATS, DEBTMAP_ENTROPY_ENABLED, DEBTMAP_FILE_TIMEOUT, DEBTMAP_NO_TIMEOUT",
+      "fix_suggestion": "Add documentation for these debug/diagnostic environment variables when creating the new debug-mode.md subsection",
+      "source_reference": "src/risk/lcov/diagnostics.rs:4, src/analyzers/effects.rs:98, src/priority/mod.rs:551, src/observability/tracing.rs:63"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Profiling Options",
+      "description": "The --profile and --profile-output CLI flags for performance profiling are defined in src/cli/args.rs:356-368 but not documented in the existing troubleshooting.md Performance Tips section",
+      "fix_suggestion": "Add documentation for profiling options (--profile, --profile-output) in the Performance Tips or Debug Mode section",
+      "source_reference": "src/cli/args.rs:356-368"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Diagnostic Options",
+      "description": "The --explain-metrics flag for explaining metric definitions and formulas is available but not documented",
+      "fix_suggestion": "Document --explain-metrics flag in the Debug Mode section",
+      "source_reference": "src/cli/args.rs:313-314"
+    }
+  ],
+  "positive_aspects": [
+    "Existing troubleshooting.md contains comprehensive coverage of verbosity levels (-v, -vv, -vvv)",
+    "Debug Mode section in troubleshooting.md (lines 345-418) covers diagnostic options well",
+    "Performance Tips section provides good optimization guidance",
+    "Environment Variables section documents key variables"
+  ],
+  "improvement_suggestions": [
+    "Complete the chapter structure migration from troubleshooting.md to troubleshooting/index.md + subsections",
+    "Add comprehensive environment variable reference with all DEBTMAP_* variables",
+    "Include profiling documentation for performance analysis",
+    "Add cross-references to related chapters (CLI Reference, Configuration)"
+  ],
+  "cross_references": [
+    "quick-fixes",
+    "context-providers",
+    "advanced-analysis",
+    "error-messages",
+    "output-issues"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Verbosity levels",
+      "Diagnostic options",
+      "Performance tips",
+      "Environment variables"
+    ],
+    "validation_focus": "Check debug options and performance tips are documented",
+    "existing_content_location": "book/src/troubleshooting.md (lines 345-553)",
+    "migration_required": true,
+    "migration_source": "book/src/troubleshooting.md",
+    "migration_target": "book/src/troubleshooting/debug-mode.md"
+  }
+}
