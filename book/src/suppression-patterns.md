@@ -168,6 +168,7 @@ mod tests {
     // TODO: Add more test cases
     fn test_feature() { }
 }
+```
 
 ### Wildcard Suppression
 
@@ -308,12 +309,14 @@ Debtmap automatically uses the correct comment syntax for each language:
 | Language | Comment Prefix | Example |
 |----------|---------------|---------|
 | Rust | `//` | `// debtmap:ignore` |
-| JavaScript | `//` | `// debtmap:ignore` |
-| TypeScript | `//` | `// debtmap:ignore` |
+| JavaScript* | `//` | `// debtmap:ignore` |
+| TypeScript* | `//` | `// debtmap:ignore` |
 | Python | `#` | `# debtmap:ignore` |
 | Other languages | `//` | `// debtmap:ignore` |
 
 **Note**: Languages not explicitly listed use `//` as the default comment prefix.
+
+*\*JavaScript and TypeScript*: While debtmap recognizes suppression comments using `//` syntax in these files, full language analysis (AST parsing, complexity metrics, etc.) currently only supports Rust and Python. JavaScript/TypeScript files will have suppression comments detected if processed, but complete debt analysis for these languages is planned for future releases.
 
 You don't need to configure this—Debtmap detects the language and uses the appropriate syntax.
 
