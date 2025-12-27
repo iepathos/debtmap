@@ -1,0 +1,105 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "semantic-classification",
+  "chapter_title": "Semantic Classification",
+  "chapter_file": "book/src/semantic-classification.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter covers core concepts but is significantly outdated regarding function roles, multiplier values, and detection capabilities",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Function Roles",
+      "description": "Missing Debug and Unknown function roles from the FunctionRole enum",
+      "feature_reference": "semantic_classification.roles.debug",
+      "fix_suggestion": "Add Debug role section: 'Functions used for troubleshooting with lower test priority (e.g., debug_*, print_*, *_diagnostics)' and Unknown role: 'Functions that cannot be classified'",
+      "source_reference": "src/priority/semantic_classifier/mod.rs:24-33"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Scoring Adjustments",
+      "description": "Role multiplier values in documentation do not match current implementation defaults",
+      "current_content": "pure_logic = 1.0, orchestrator = 0.8, io_wrapper = 0.5, entry_point = 0.3, pattern_match = 0.7",
+      "should_be": "pure_logic = 1.2, orchestrator = 0.8, io_wrapper = 0.7, entry_point = 0.9, pattern_match = 0.6, debug = 0.3, unknown = 1.0",
+      "fix_suggestion": "Update the [scoring.role_multipliers] TOML example with current default values",
+      "source_reference": "src/config/scoring.rs:307-332"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Role-Specific Expectations",
+      "description": "Missing Debug role in coverage/complexity expectations table",
+      "current_content": "Table shows 5 roles without Debug",
+      "should_be": "Add Debug role with Low coverage expectation and Low complexity tolerance",
+      "fix_suggestion": "Add row: | Debug | Low | Low | to the expectations table",
+      "source_reference": "src/priority/semantic_classifier/classifiers.rs:14-53"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "AST-Based Detection",
+      "description": "AST-based detection section lacks detail on specific detection strategies",
+      "current_content": "Brief mention of AST patterns with 4 bullet points",
+      "fix_suggestion": "Add subsections for: Constructor detection (spec 117/122), Enum converter detection (spec 124), Accessor method detection (spec 125), Data flow classification (spec 126), Debug function detection (spec 119)",
+      "source_reference": "src/priority/semantic_classifier/classifiers.rs:40-211"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration",
+      "description": "Configuration section is incomplete - missing many configurable options",
+      "current_content": "Shows only [semantic] section with 3 options",
+      "fix_suggestion": "Add documentation for: accessor detection config, constructor detection config (with AST detection toggle), data flow classification config, debug function detection patterns",
+      "source_reference": "src/config/mod.rs, src/config/accessors.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Function Roles",
+      "description": "Missing detection patterns for each role",
+      "current_content": "Only shows examples, not detection criteria",
+      "fix_suggestion": "Add detection criteria lists for each role showing name patterns, complexity thresholds, and behavioral characteristics used for classification",
+      "source_reference": "src/priority/semantic_classifier/pattern_matchers.rs:1-154"
+    }
+  ],
+  "positive_aspects": [
+    "Clear overview of semantic classification purpose",
+    "Good examples for each documented role",
+    "Useful role-specific expectations table",
+    "Links to related chapters exist and are valid"
+  ],
+  "improvement_suggestions": [
+    "Add a section on how to configure detection thresholds",
+    "Include examples of edge cases and how they're classified",
+    "Add troubleshooting section for classification issues",
+    "Document the classification precedence order (entry point > debug > constructor > enum converter > accessor > pattern matching > I/O wrapper > orchestrator > pure logic)"
+  ],
+  "cross_references_validated": [
+    {
+      "link": "scoring-strategies/role-based.md",
+      "status": "valid"
+    },
+    {
+      "link": "functional-analysis.md",
+      "status": "valid"
+    }
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:25:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Function role detection",
+      "Pure logic functions",
+      "Orchestrator functions",
+      "I/O wrapper functions",
+      "Entry point detection",
+      "Pattern match functions",
+      "AST-based role detection",
+      "Role-specific coverage expectations",
+      "Scoring adjustments by role"
+    ],
+    "validation_focus": "Check that semantic role classification and detection criteria are documented"
+  }
+}
