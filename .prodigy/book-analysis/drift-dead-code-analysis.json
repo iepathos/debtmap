@@ -3,27 +3,102 @@
   "chapter_id": "dead-code-analysis",
   "chapter_title": "Dead Code Analysis",
   "chapter_file": "book/src/dead-code-analysis.md",
-  "drift_detected": false,
-  "severity": "good",
-  "quality_assessment": "Excellent documentation with comprehensive coverage of dead code analysis features. All implementation details match the codebase, examples are accurate, and cross-references are valid.",
-  "issues": [],
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Documentation describes a Python-centric 'EnhancedDeadCodeAnalyzer' Rust API that does not exist in the codebase. The actual implementation uses a different architecture based on 'is_dead_code()' and 'is_dead_code_with_exclusions()' functions in src/priority/scoring/classification.rs combined with 'PublicApiDetector' in src/debt/public_api_detector.rs. While the external API configuration in .debtmap.toml is accurate, the programmatic Rust API examples are fictional.",
+  "issues": [
+    {
+      "type": "incorrect_api",
+      "severity": "high",
+      "section": "Confidence Thresholds",
+      "description": "Documentation references 'debtmap::analysis::python_dead_code_enhanced::AnalysisConfig' which does not exist. The actual implementation uses src/priority/scoring/classification.rs for dead code detection and src/debt/public_api_detector.rs::PublicApiConfig for public API detection.",
+      "current_content": "use debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;",
+      "should_be": "The Rust API examples should reference actual types like 'PublicApiConfig' from 'debtmap::debt::public_api_detector' or explain that programmatic configuration is internal.",
+      "fix_suggestion": "Remove or rewrite the Rust API code examples to reflect actual internal implementation, or clarify these are conceptual examples of what the system does internally.",
+      "source_reference": "src/debt/public_api_detector.rs:PublicApiConfig"
+    },
+    {
+      "type": "incorrect_api",
+      "severity": "high",
+      "section": "Programmatic Configuration (Rust API)",
+      "description": "The documented 'AnalysisConfig' struct with fields like 'high_confidence_threshold', 'medium_confidence_threshold', 'respect_suppression_comments', 'include_private_api', 'enable_public_api_detection', and 'public_api_config' does not exist. The actual 'PublicApiConfig' has different fields: 'naming_convention_weight', 'docstring_weight', 'type_annotation_weight', 'symmetric_pair_weight', 'module_export_weight', 'public_api_threshold', 'custom_public_prefixes', and 'custom_symmetric_pairs'.",
+      "current_content": "AnalysisConfig { high_confidence_threshold: 0.8, ... }",
+      "should_be": "Either document actual PublicApiConfig fields or clarify that confidence thresholds are calculated internally and not user-configurable via Rust API.",
+      "fix_suggestion": "Update to document actual 'PublicApiConfig' fields or remove programmatic configuration section if not intended as a public API.",
+      "source_reference": "src/debt/public_api_detector.rs:56-90"
+    },
+    {
+      "type": "incorrect_api",
+      "severity": "high",
+      "section": "Programmatic Coverage Usage",
+      "description": "Documentation shows 'EnhancedDeadCodeAnalyzer::new().with_coverage(coverage)' which does not exist. Coverage integration uses 'CoverageData' from src/risk/lcov/coverage.rs and 'TransitiveCoverage' from the priority module, but not through a 'with_coverage()' builder pattern on a dead code analyzer.",
+      "current_content": "let analyzer = EnhancedDeadCodeAnalyzer::new().with_coverage(coverage);",
+      "should_be": "Document actual coverage integration via CLI flags ('--coverage-file') or remove programmatic API examples.",
+      "fix_suggestion": "Replace with CLI-based coverage integration documentation or explain that coverage is handled internally through the analysis pipeline.",
+      "source_reference": "src/risk/lcov/coverage.rs, src/priority/scoring/classification.rs:71-88"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Overview - Multi-layered Approach",
+      "description": "Documentation mentions 'target false positive rate of less than 10% (see Spec 116)' but this is an internal spec reference. The actual implementation in public_api_detector.rs documents 'reducing false positives from 30% to < 5%' which is more specific.",
+      "current_content": "with the goal of achieving a target false positive rate of less than 10% (see Spec 116 for confidence scoring validation)",
+      "should_be": "Document actual measured or target false positive rates without internal spec references.",
+      "fix_suggestion": "Remove spec references and update to reflect actual implementation goals documented in source.",
+      "source_reference": "src/debt/public_api_detector.rs:1-5"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Public API Detection Heuristics",
+      "description": "Documentation mentions 5 detection heuristics but the actual implementation in public_api_detector.rs implements 6 heuristics: NamingConventionHeuristic, DocstringHeuristic, TypeAnnotationHeuristic, SymmetricPairHeuristic, ModuleExportHeuristic, and RustVisibilityHeuristic. The Rust visibility heuristic and documentation quality heuristic are not fully documented.",
+      "current_content": "Detection heuristics: Public visibility, File location patterns, Naming conventions, Export declarations, Explicit configuration",
+      "should_be": "Include all 6 heuristics: Naming Convention, Docstring Quality, Type Annotation, Symmetric Pair, Module Export, and Rust Visibility.",
+      "fix_suggestion": "Add documentation for docstring quality heuristic, type annotation heuristic, and symmetric pair heuristic.",
+      "source_reference": "src/debt/public_api_detector.rs:325-650"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration Reference",
+      "description": "The 'PublicApiConfig' in the actual codebase has additional configuration options not documented: 'naming_convention_weight', 'docstring_weight', 'type_annotation_weight', 'symmetric_pair_weight', 'module_export_weight', 'public_api_threshold', 'custom_public_prefixes', and 'custom_symmetric_pairs'. These allow fine-tuning detection weights.",
+      "current_content": "TOML configuration only shows detect_external_api, api_functions, api_files",
+      "should_be": "Document that PublicApiConfig has configurable weights for each heuristic and custom symmetric pairs.",
+      "fix_suggestion": "Either document these advanced configuration options or clarify they are internal defaults.",
+      "source_reference": "src/debt/public_api_detector.rs:56-90"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "medium",
+      "section": "Filtering Results by Confidence",
+      "description": "The JSON filtering examples reference '.dead_code' field which may not match actual JSON output structure. The actual dead code information is likely part of debt items in the analysis output.",
+      "current_content": "jq '.dead_code | map(select(.confidence >= 0.8))' results.json",
+      "should_be": "Verify and update jq queries to match actual JSON output structure from 'debtmap analyze --format=json'.",
+      "fix_suggestion": "Run 'debtmap analyze --format=json' to verify the actual JSON structure and update examples accordingly.",
+      "source_reference": "CLI output format"
+    }
+  ],
   "positive_aspects": [
-    "Comprehensive coverage of public API detection heuristics matching src/debt/public_api_detector.rs implementation",
-    "Accurate confidence threshold documentation (0.8 high, 0.5 medium) matching Rust API defaults",
-    "Well-structured configuration examples that correctly reflect DebtmapConfig external_api field (src/config/core.rs:28)",
-    "Detailed framework support matrix covering Flask, Django, FastAPI, Click, pytest, unittest, Qt/PyQt, and Tkinter",
-    "Clear decision tree and confidence interpretation guidance for users",
-    "Excellent examples with Flask, test files, and public API scenarios",
-    "Comprehensive troubleshooting section addressing common false positives",
-    "All internal cross-references are valid (context-providers.md, cli-reference.md, troubleshooting.md, examples.md, coverage-integration.md, suppression-patterns.md, configuration.md)",
-    "Proper documentation of suppression comment formats and placement",
-    "Coverage integration workflow is well-explained with practical examples",
-    "Best practices section is appropriate for a root-level chapter and provides actionable workflow recommendations"
+    "Comprehensive documentation of confidence scoring with clear High/Medium/Low thresholds and actionable guidance",
+    "Excellent decision tree and quick reference tables for interpreting results",
+    "Thorough coverage of suppression comment formats with multiple placement options",
+    "Good framework support matrix covering Flask, Django, FastAPI, Click, pytest, unittest, Qt, and Tkinter",
+    "Clear best practices section with workflow recommendations and CI/CD integration examples",
+    "Accurate documentation of TOML configuration for external_api section (detect_external_api, api_functions, api_files)",
+    "Well-organized limitations section explaining what the analyzer can and cannot detect",
+    "Practical troubleshooting section addressing common user issues",
+    "Excellent examples section showing Flask, test file, and public API scenarios with expected results",
+    "All internal documentation links are valid (7 links checked, 0 broken)"
   ],
   "improvement_suggestions": [
-    "Consider adding a note about the relationship between PublicApiDetector (src/debt/public_api_detector.rs) and ExternalApiDetector (src/priority/external_api_detector.rs) for Rust API users",
-    "Could mention that the public_api_threshold (0.6) and heuristic weights are configurable via PublicApiConfig for advanced users",
-    "The 'Getting Help' section at the end could link to specific GitHub issue templates if they exist"
+    "Remove or heavily revise Rust API code examples to match actual implementation - these appear to be aspirational rather than actual",
+    "Consider whether programmatic Rust API documentation is appropriate for a CLI tool documentation book",
+    "Add a clear note that dead code detection configuration is primarily via TOML and CLI, not programmatic Rust API",
+    "Document the actual heuristic weights used by PublicApiDetector (naming: 0.3, docstring: 0.25, type: 0.15, symmetric: 0.2, export: 0.1)",
+    "Add documentation for symmetric pair detection (load/save, get/set, open/close, etc.)",
+    "Verify and update the jq filter examples against actual JSON output",
+    "Consider adding Rust-specific dead code detection details since the codebase supports Rust analysis",
+    "Remove internal spec references (Spec 113, Spec 116) or replace with user-facing documentation"
   ],
   "cross_references_validated": [
     {
@@ -69,62 +144,27 @@
       "line": 769
     }
   ],
-  "implementation_verification": [
-    {
-      "documented_feature": "ExternalApiConfig with detect_external_api, api_functions, api_files",
-      "source_reference": "src/priority/external_api_detector.rs:10-22",
-      "status": "accurate",
-      "notes": "Configuration structure matches exactly, including default_true() for detect_external_api"
-    },
-    {
-      "documented_feature": "PublicApiDetector heuristics and weights",
-      "source_reference": "src/debt/public_api_detector.rs:56-89",
-      "status": "accurate",
-      "notes": "Default weights and threshold (0.6) match PublicApiConfig::default()"
-    },
-    {
-      "documented_feature": "external_api section in DebtmapConfig",
-      "source_reference": "src/config/core.rs:26-28",
-      "status": "accurate",
-      "notes": "Field exists in root config structure with correct type"
-    },
-    {
-      "documented_feature": "Confidence thresholds (0.8 high, 0.5 medium)",
-      "source_reference": "Documentation lines 179-196",
-      "status": "accurate",
-      "notes": "Rust API configuration example shows correct default values"
-    },
-    {
-      "documented_feature": "Glob pattern support in api_files",
-      "source_reference": "src/priority/external_api_detector.rs:56-75",
-      "status": "accurate",
-      "notes": "Implementation converts ** to .* and * to [^/]* for regex matching"
-    },
-    {
-      "documented_feature": "Suppression comment formats",
-      "source_reference": "Documentation lines 214-244",
-      "status": "needs_verification",
-      "notes": "Could not verify suppression comment parsing in provided code, but documentation is clear about supported formats"
-    }
-  ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T08:30:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Public API detection heuristics",
       "Confidence thresholds",
       "Dead code identification",
       "Configuration options",
-      "Best practices"
+      "Best practices",
+      "Framework support",
+      "Coverage integration",
+      "Suppression patterns"
     ],
     "validation_focus": "Check that dead code analysis and public API detection are documented",
-    "total_internal_links": 7,
-    "broken_links": 0,
-    "implementation_files_checked": [
-      "src/priority/external_api_detector.rs",
+    "source_files_analyzed": [
       "src/debt/public_api_detector.rs",
-      "src/config/core.rs",
-      "src/config/multi_source.rs"
-    ]
+      "src/priority/external_api_detector.rs",
+      "src/priority/scoring/classification.rs"
+    ],
+    "internal_links_checked": 7,
+    "internal_links_valid": 7,
+    "internal_links_broken": 0
   }
 }

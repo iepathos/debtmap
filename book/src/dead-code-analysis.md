@@ -1,6 +1,6 @@
 # Dead Code Analysis
 
-Debtmap's Python dead code detection system uses advanced static analysis to identify unused functions with high accuracy and low false positive rates. The analyzer integrates multiple detection systems to provide confidence-scored results that help you make informed decisions about code removal.
+Debtmap's dead code detection system uses advanced static analysis to identify unused functions with high accuracy and low false positive rates. The analyzer integrates multiple detection systems to provide confidence-scored results that help you make informed decisions about code removal.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The dead code analyzer combines several detection techniques:
 - **Coverage integration** - Uses test coverage data when available to identify live code
 - **Public API detection** - Uses heuristics to identify external API functions
 
-This multi-layered approach significantly reduces false positives compared to naive call graph analysis, with the goal of achieving a target false positive rate of less than 10% (see Spec 116 for confidence scoring validation).
+This multi-layered approach significantly reduces false positives compared to naive call graph analysis, reducing false positives from 30% to less than 5% for library-style modules (see `src/debt/public_api_detector.rs:1-5` for implementation details).
 
 ## Confidence Scoring
 
@@ -82,17 +82,25 @@ Reasons:
 
 ## Public API Detection
 
-Debtmap uses advanced heuristics to identify functions that are likely part of your project's external API (introduced in Spec 113). This prevents false positives when analyzing library code.
+Debtmap uses advanced heuristics to identify functions that are likely part of your project's external API. This prevents false positives when analyzing library code by detecting public-facing functions and excluding them from dead code results.
 
 ### Detection Heuristics
 
-The public API detector considers:
+The public API detector (`src/debt/public_api_detector.rs:325-650`) implements six weighted heuristics:
 
-1. **Public visibility** - Function doesn't start with `_`
-2. **File location patterns** - Functions in `api/`, `public/`, or top-level `__init__.py` files
-3. **Naming conventions** - Functions following API naming patterns
-4. **Export declarations** - Functions listed in `__all__`
-5. **Explicit configuration** - Functions marked as API in `.debtmap.toml`
+1. **Naming Convention Heuristic** (weight: 0.30) - Functions without underscore prefix are likely public; functions starting with `_` are marked private (score: 0.0). Module-level functions without underscore score highest.
+
+2. **Docstring Quality Heuristic** (weight: 0.25) - Functions with comprehensive docstrings (structured with `Args:`, `Returns:`, etc.) are likely public API. Longer docstrings (100+ chars) score higher.
+
+3. **Type Annotation Heuristic** (weight: 0.15) - Fully type-annotated functions (parameters and return type) indicate public API quality.
+
+4. **Symmetric Pair Heuristic** (weight: 0.20) - Paired operations like `load`/`save`, `get`/`set`, `open`/`close`, `create`/`destroy`, `start`/`stop`, `acquire`/`release`, `add`/`remove`, `push`/`pop`, `read`/`write`. If one function in a pair is used, its counterpart is likely public.
+
+5. **Module Export Heuristic** (weight: 0.10) - Functions listed in Python's `__all__` or exported in `__init__.py` are definitely public (score: 1.0).
+
+6. **Rust Visibility Heuristic** - For Rust code, `pub` keyword is definitive (score: 1.0), `pub(crate)` scores 0.5, and trait implementations are never considered dead code.
+
+Functions scoring above the threshold (default: 0.6) are marked as public API and excluded from dead code detection.
 
 ### Configuration
 
@@ -174,26 +182,21 @@ See [Framework Patterns documentation](context-providers.md) for comprehensive f
 
 ## Confidence Thresholds
 
-You can customize confidence thresholds based on your project's tolerance for false positives vs. false negatives:
+Dead code detection uses internal confidence thresholds to classify results:
 
-```rust
-use debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;
+| Confidence Level | Range | Meaning |
+|-----------------|-------|---------|
+| **High** | 0.8 - 1.0 | Safe to remove - very likely dead code |
+| **Medium** | 0.5 - 0.8 | Review recommended - manual verification needed |
+| **Low** | 0.0 - 0.5 | Likely in use - keep the function |
 
-let config = AnalysisConfig {
-    high_confidence_threshold: 0.8,      // Default: 0.8
-    medium_confidence_threshold: 0.5,    // Default: 0.5
-    respect_suppression_comments: true,  // Default: true
-    include_private_api: true,           // Default: true
-    enable_public_api_detection: true,   // Default: true (Spec 113)
-    ..Default::default()
-};
-```
+These thresholds are applied internally during analysis. Functions exceeding the high confidence threshold (0.8) with no callers and no framework indicators are flagged as removable.
 
 **Tuning recommendations:**
 
-- **Conservative projects** (libraries, public APIs): Raise thresholds to 0.9/0.7 to reduce false positives
-- **Aggressive cleanup** (internal tools): Lower thresholds to 0.7/0.4 to catch more dead code
-- **Balanced approach** (most projects): Use defaults of 0.8/0.5
+- **Conservative projects** (libraries, public APIs): Focus on high confidence results (0.8+) only
+- **Aggressive cleanup** (internal tools): Review medium confidence results (0.5+) for additional cleanup opportunities
+- **Balanced approach** (most projects): Start with high confidence, then review medium as needed
 
 ## Suppressing False Positives
 
@@ -273,22 +276,24 @@ This catches functions called:
 - Through plugin systems
 - By external libraries or C extensions
 
-### Programmatic Coverage Usage
+### How Coverage is Used Internally
 
-In Rust code, you can provide coverage data programmatically:
+Coverage data is integrated through the priority scoring system (`src/priority/scoring/classification.rs:71-88`). Functions with coverage data are evaluated using `TransitiveCoverage`:
 
-```rust
-use debtmap::analysis::python_dead_code_enhanced::{EnhancedDeadCodeAnalyzer, CoverageData};
+- **Direct coverage** - Percentage of function lines executed by tests
+- **Transitive coverage** - Coverage inherited from callers
+- **Uncovered lines** - Specific lines not executed
 
-// Load coverage from coverage.json file
-let coverage = CoverageData::from_coverage_json("coverage.json")?;
+Functions with direct coverage above 80% are considered well-tested and unlikely to be dead code.
 
-// Create analyzer with coverage data
-let analyzer = EnhancedDeadCodeAnalyzer::new()
-    .with_coverage(coverage);
+**CLI usage** - Coverage is loaded automatically via the `--coverage-file` flag:
 
-// Analyze functions - covered functions will have higher "live" confidence
-let result = analyzer.analyze_function(&func, &call_graph);
+```bash
+# Generate coverage data first
+pytest --cov=myapp --cov-report=json
+
+# Run debtmap with coverage
+debtmap analyze myapp/ --coverage-file coverage.json
 ```
 
 ### Accuracy Improvement
@@ -309,10 +314,21 @@ Complete dead code analysis configuration in `.debtmap.toml`:
 
 ```toml
 # Language-specific dead code detection
+# Source: src/config/languages.rs:25-38 (LanguageFeatures struct)
 [languages.python]
 detect_dead_code = true           # Enable Python dead code analysis (default: true)
 
-# External API detection (Spec 113)
+[languages.rust]
+detect_dead_code = true           # Enable Rust dead code analysis (default: true)
+
+[languages.javascript]
+detect_dead_code = true           # Enable JavaScript dead code analysis
+
+[languages.typescript]
+detect_dead_code = true           # Enable TypeScript dead code analysis
+
+# External API detection
+# Source: src/priority/external_api_detector.rs:10-22 (ExternalApiConfig struct)
 [external_api]
 detect_external_api = true        # Enable automatic public API detection (default: true)
 
@@ -322,64 +338,41 @@ api_functions = [
 ]
 
 api_files = [
-    "src/api/**/*.py",            # Glob patterns supported
+    "src/api/**/*.py",            # Glob patterns supported (** for recursive)
     "src/public_interface.py",    # Exact file paths
     "**/__init__.py",             # All package entry points
+    "**/public_*.py",             # Files starting with 'public_'
 ]
 ```
 
-### Programmatic Configuration (Rust API)
+### Advanced Configuration: Public API Detection Weights
 
-**Note**: Confidence thresholds and analysis behavior are configured programmatically via the Rust API. These settings are **not available** in `.debtmap.toml` - only the `detect_external_api` and API detection settings can be configured via TOML (see above).
+The `PublicApiConfig` struct (`src/debt/public_api_detector.rs:56-90`) provides fine-tuned control over heuristic weights. These are currently configured programmatically:
 
-For Rust API users, you can customize thresholds:
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `naming_convention_weight` | 0.30 | Weight for underscore prefix detection |
+| `docstring_weight` | 0.25 | Weight for documentation quality |
+| `type_annotation_weight` | 0.15 | Weight for type annotation presence |
+| `symmetric_pair_weight` | 0.20 | Weight for paired function detection |
+| `module_export_weight` | 0.10 | Weight for `__all__` exports |
+| `public_api_threshold` | 0.60 | Minimum score to mark as public API |
+
+**Custom Symmetric Pairs** - You can add project-specific paired functions:
 
 ```rust
-use debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;
+// Source: src/debt/public_api_detector.rs:500-518
+// Built-in pairs: load/save, get/set, open/close, create/destroy,
+// start/stop, acquire/release, add/remove, push/pop, read/write
 
-let config = AnalysisConfig {
-    // Confidence thresholds (Rust API only - not in .debtmap.toml)
-    high_confidence_threshold: 0.8,       // Default: 0.8 (80%)
-    medium_confidence_threshold: 0.5,     // Default: 0.5 (50%)
-
-    // Analysis options (Rust API only)
-    respect_suppression_comments: true,   // Honor # debtmap: not-dead (default: true)
-    include_private_api: true,            // Analyze private functions (default: true)
-    enable_public_api_detection: true,    // Use public API heuristics (default: true)
-
-    // Public API detector configuration (optional)
-    public_api_config: None,              // Use default PublicApiConfig
+// Custom pairs can be added via PublicApiConfig::custom_symmetric_pairs
+let config = PublicApiConfig {
+    custom_symmetric_pairs: vec![
+        ("fetch".to_string(), "submit".to_string()),
+        ("serialize".to_string(), "deserialize".to_string()),
+    ],
+    ..Default::default()
 };
-
-let analyzer = EnhancedDeadCodeAnalyzer::new()
-    .with_config(config);
-```
-
-### Configuration Tuning by Project Type
-
-**Libraries and Public APIs** (conservative):
-```rust
-AnalysisConfig {
-    high_confidence_threshold: 0.9,       // Very strict
-    medium_confidence_threshold: 0.7,
-    enable_public_api_detection: true,    // Critical for libraries
-    ..Default::default()
-}
-```
-
-**Internal Applications** (aggressive):
-```rust
-AnalysisConfig {
-    high_confidence_threshold: 0.7,       // More lenient
-    medium_confidence_threshold: 0.4,
-    include_private_api: true,            // Analyze everything
-    ..Default::default()
-}
-```
-
-**Balanced Approach** (recommended default):
-```rust
-AnalysisConfig::default()  // Uses 0.8/0.5 thresholds
 ```
 
 ## Understanding Results
@@ -459,14 +452,18 @@ To filter dead code results by confidence level, you can process the JSON output
 # Analyze and output JSON
 debtmap analyze --format=json > results.json
 
-# Filter for high confidence dead code using jq
-jq '.dead_code | map(select(.confidence >= 0.8))' results.json
+# Dead code items are part of the debt_items array with debt_type "DeadCode"
+# Filter for dead code items using jq
+jq '.debt_items | map(select(.debt_type == "DeadCode"))' results.json
 
-# Filter for high and medium confidence
-jq '.dead_code | map(select(.confidence >= 0.5))' results.json
+# Filter by visibility (Public, Private, Crate)
+jq '.debt_items | map(select(.debt_type == "DeadCode" and .visibility == "Private"))' results.json
+
+# Get summary of dead code findings
+jq '[.debt_items[] | select(.debt_type == "DeadCode")] | length' results.json
 ```
 
-Note: CLI filtering by confidence threshold (e.g., `--min-confidence`) is planned for a future release (see Spec 116). Currently, filtering must be done via JSON post-processing.
+**Note**: Dead code detection results are integrated into the standard debt item format for consistent analysis alongside other technical debt types.
 
 See [CLI Reference](cli-reference.md) for complete command options.
 
@@ -555,17 +552,60 @@ def process_v1(data):  # Old version, v2 is now used
 
 Prevent dead code from accumulating by integrating into your CI pipeline:
 
-```bash
+```yaml
 # .github/workflows/dead-code.yml
 - name: Check for dead code
   run: |
-    debtmap analyze --min-confidence=0.8 --format=json > dead-code.json
-    # Fail if high-confidence dead code is found
-    if [ $(jq '.dead_code | length' dead-code.json) -gt 0 ]; then
-      echo "High-confidence dead code detected!"
-      jq '.dead_code[] | "\(.file):\(.line) - \(.function)"' dead-code.json
+    debtmap analyze --format=json > analysis.json
+    # Count dead code items
+    DEAD_CODE_COUNT=$(jq '[.debt_items[] | select(.debt_type == "DeadCode")] | length' analysis.json)
+    if [ $DEAD_CODE_COUNT -gt 0 ]; then
+      echo "Dead code detected: $DEAD_CODE_COUNT items"
+      jq '.debt_items[] | select(.debt_type == "DeadCode") | "\(.file):\(.line) - \(.function_name)"' analysis.json
       exit 1
     fi
+```
+
+## Rust-Specific Dead Code Detection
+
+For Rust codebases, debtmap provides enhanced detection with visibility-aware analysis:
+
+### Visibility-Based Detection
+
+Dead code detection (`src/priority/scoring/classification.rs:515-543`) respects Rust's visibility system:
+
+- **`pub` functions** - Analyzed with external API heuristics; may be used by external crates
+- **`pub(crate)` functions** - Internal API; checked for callers within the crate
+- **Private functions** - Must have internal callers to be considered live
+
+### Trait Implementation Protection
+
+Trait methods are automatically excluded from dead code detection (`src/priority/scoring/classification.rs:545-593`):
+
+```rust
+// These are NEVER flagged as dead code (from src/debt/public_api_detector.rs:619-650):
+impl Clone for MyType { fn clone(&self) -> Self { ... } }  // Clone trait
+impl Default for MyType { fn default() -> Self { ... } }    // Default trait
+impl From<T> for MyType { fn from(t: T) -> Self { ... } }   // From trait
+
+// Common trait methods automatically recognized:
+// fmt, clone, default, from, into, try_from, try_into, as_ref, as_mut,
+// drop, deref, index, add, sub, mul, div, eq, ne, cmp, hash,
+// serialize, deserialize, next, size_hint
+```
+
+### Framework Callback Patterns
+
+The analyzer recognizes common framework patterns (`src/priority/scoring/classification.rs:596-612`):
+
+```rust
+// Functions with these name patterns are protected from dead code detection:
+fn handle_event() { }      // Contains "handler"
+fn on_click() { }          // Contains "on_"
+fn route_request() { }     // Contains "route"
+fn middleware_auth() { }   // Contains "middleware"
+fn spawn_worker() { }      // Contains "spawn"
+fn poll_status() { }       // Contains "poll"
 ```
 
 ## Limitations
