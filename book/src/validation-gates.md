@@ -9,6 +9,8 @@ The `validate` command enforces quality gates in your development workflow, maki
 - [Understanding Density-Based Validation](#understanding-density-based-validation)
 - [Configuration Setup](#configuration-setup)
 - [Validation Metrics](#validation-metrics)
+  - [How Validation Works](#how-validation-works)
+  - [Recommended Remediation Priority](#recommended-remediation-priority)
 - [Exit Codes and CI Integration](#exit-codes-and-ci-integration)
 - [Coverage Integration](#coverage-integration)
 - [Context-Aware Validation](#context-aware-validation)
@@ -168,10 +170,11 @@ These are the core quality measures that every project should monitor:
    max_average_complexity = 10.0
    ```
 
-2. **`max_debt_density`** (default: 50.0) - **PRIMARY METRIC**
+2. **`max_debt_density`** (default: 50.0) - **BLOCKING METRIC**
    - Debt items per 1000 lines of code
    - Scale-independent quality measure
    - Remains stable as codebase grows
+   - **This is the only metric that determines validation pass/fail**
 
    ```toml
    max_debt_density = 50.0
@@ -212,19 +215,28 @@ High ceilings to catch extreme cases:
    max_total_debt_score = 10000
    ```
 
-### Metric Priority
+### How Validation Works
 
-**Validation uses AND logic:** All primary metrics must pass for validation to succeed. If any check fails, the entire validation fails with a non-zero exit code.
+**Debt density is the sole blocking metric.** The validation pass/fail decision is based only on whether `max_debt_density` is exceeded (src/commands/validate/thresholds.rs:60-61).
 
-When validation fails, fix issues in this order:
+Other metrics like average complexity, codebase risk score, and coverage percentage are displayed in the output for visibility, but they do not cause validation to fail. When these metrics exceed their thresholds, the output shows `[ERROR]` as an informational warning, helping you identify areas for improvement even when validation passes.
 
-1. **Critical:** `max_debt_density` violations (core quality metric)
+This design provides:
+- **Simple CI integration** - One clear quality signal (debt density)
+- **Visibility without blocking** - See all threshold violations without false failures
+- **Scale-independent quality** - Debt density remains meaningful as your codebase grows
+
+### Recommended Remediation Priority
+
+When improving code quality, address issues in this order:
+
+1. **Critical:** `max_debt_density` violations (this actually blocks validation)
 2. **High:** `max_average_complexity` violations (function-level quality)
 3. **High:** `max_codebase_risk_score` violations (overall risk)
 4. **Medium:** `min_coverage_percentage` violations (test coverage)
 5. **Low:** `max_total_debt_score` violations (extreme cases only)
 
-The priority list above is for remediation order when validation fails, not for which checks are enforced. All configured thresholds are enforced equally.
+Note: Only debt density violations block validation. The other items are prioritized for improving code quality, not for making validation pass.
 
 ## Exit Codes and CI Integration
 
@@ -313,6 +325,8 @@ The validate command uses the actual validation output format from src/utils/val
     [ERROR] Average complexity: 12.3 > 10.0
     [ERROR] Debt density: 65.8 per 1K LOC > 50.0
 ```
+
+> **Note:** In the example above, validation failed because **debt density (65.8)** exceeds its threshold (50.0). The average complexity `[ERROR]` is shown as an informational warning but does not affect the exit code. Even if average complexity were within its threshold, validation would still fail due to debt density. See [How Validation Works](#how-validation-works) for details.
 
 The output format emphasizes:
 - **Debt Density as the primary metric** - shown first with percentage usage
