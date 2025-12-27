@@ -30,7 +30,7 @@ Debtmap builds a **dependency graph** from module imports and uses **depth-first
 4. Track visited nodes and recursion stack
 5. When a node is reached that's already in the recursion stack, a cycle is detected
 
-**Implementation:** `src/debt/circular.rs:44-66` (detect_circular_dependencies)
+**Implementation:** `src/debt/circular.rs:46-66` (detect_circular_dependencies)
 
 ### Example
 
@@ -317,7 +317,7 @@ Debtmap detects code duplication using **hash-based chunk comparison**:
 
 1. **Extract chunks** - Split files into fixed-size chunks (default: 50 lines)
 2. **Normalize** - Remove whitespace and comments
-3. **Calculate hash** - Compute SHA-256 hash for each normalized chunk
+3. **Calculate hash** - Compute xxHash64 hash for each normalized chunk (10-20x faster than SHA-256)
 4. **Match duplicates** - Find chunks with identical hashes
 5. **Merge adjacent** - Consolidate consecutive duplicate blocks
 
@@ -338,15 +338,15 @@ pub fn detect_duplication(
 The algorithm:
 1. Extracts overlapping chunks from each file
 2. Normalizes by trimming whitespace and removing comments
-3. Calculates SHA-256 hash for each normalized chunk
-4. Groups chunks by hash
+3. Calculates xxHash64 hash for each normalized chunk (returns a `u64` value)
+4. Groups chunks by hash using thread-safe concurrent aggregation
 5. Returns groups with 2+ locations (duplicates found)
 
 ### Example Output
 
 ```
 Code duplication detected:
-  Hash: a3f2b9c1...
+  Hash: 14628437538729542158 (xxHash64)
   Lines: 50
   Locations:
     - src/handlers/user.rs:120-169
@@ -371,9 +371,9 @@ threshold_duplication = 50  # Default value
 # threshold_duplication = 100  # Less noise
 ```
 
-**Configuration reference:** `src/cli.rs:69` (threshold_duplication flag definition)
+**Configuration reference:** `src/cli/args.rs:86-87` (threshold_duplication flag definition)
 
-**Implementation:** `src/debt/duplication.rs:6-10`
+**Implementation:** `src/debt/duplication.rs:11-15`
 
 ### Current Limitations
 
@@ -617,7 +617,7 @@ Or via command line:
 debtmap analyze . --threshold-duplication 50
 ```
 
-**Configuration reference:** `src/cli.rs:69` (threshold_duplication flag definition)
+**Configuration reference:** `src/cli/args.rs:86-87` (threshold_duplication flag definition)
 
 ### Hardcoded Thresholds
 
