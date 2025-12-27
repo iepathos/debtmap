@@ -27,7 +27,7 @@ Where each factor is calculated as:
 - **Complexity** = `(avg_complexity / 5.0) × sqrt(total_complexity / 50.0)`
 - **Coverage Factor** = `((1.0 - coverage_percent) × 2.0) + 1.0`
 - **Density** = `1.0 + ((function_count - 50) × 0.02)` if function_count > 50, else 1.0
-- **GodObject** = `2.0 + god_object_score` if detected
+- **GodObject** = `1.0 + (god_object_score / 50.0)` if detected (maps score 0-100 to multiplier 1.0x-3.0x)
 - **FunctionScores** = `sum(function_scores) / 10`
 
 ### Factors
@@ -57,10 +57,12 @@ Where each factor is calculated as:
 - Example: A file with 75 functions gets 1.0 + ((75 - 50) * 0.02) = 1.0 + 0.50 = 1.50x multiplier
 - Rationale: Files with many functions likely violate single responsibility
 
-**God Object Multiplier**: `2.0 + god_object_score` when detected
+**God Object Multiplier**: `1.0 + (god_object_score / 50.0)` when detected
 - Applies when god object detection flags the file
-- Range: 2.0 (borderline) to 3.0 (severe god object)
-- Rationale: God objects need immediate architectural attention
+- Range: 1.0x (borderline, score=0) to 3.0x (severe god object, score=100)
+- Formula maps score 0-100 to multiplier 1.0x-3.0x (proportional scaling)
+- Source: `src/priority/file_metrics.rs:282-293`
+- Rationale: God objects need immediate architectural attention. Proportional scaling aligns with contextual risk cap (max 3x) for consistent scoring
 
 **Function Scores**: `sum(all_function_scores) / 10`
 - Normalized sum of individual function debt scores
@@ -1864,5 +1866,4 @@ Data flow scoring requires data flow analysis, which has moderate performance im
 ### See Also
 
 - [Functional Analysis](./functional-analysis.md) - Purity detection and analysis
-- [Data Flow Analysis](./data-flow-analysis.md) - Data flow graph construction (if available)
 - [Configuration](./configuration.md) - Data flow scoring configuration
