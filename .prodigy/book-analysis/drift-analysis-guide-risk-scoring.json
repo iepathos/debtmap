@@ -4,128 +4,90 @@
   "subsection_id": "risk-scoring",
   "subsection_title": "Risk Scoring",
   "subsection_file": "book/src/analysis-guide/risk-scoring.md",
-  "feature_mappings": [],
+  "feature_mappings": ["risk_assessment", "semantic_classification", "coverage_integration"],
   "drift_detected": true,
-  "severity": "medium",
-  "quality_assessment": "Subsection accurately documents the unified scoring system and legacy risk scoring. Some formulas need clarification and examples could be updated. ROI implementation is richer than documented. No broken internal links detected.",
+  "severity": "low",
+  "quality_assessment": "Documentation is comprehensive and well-maintained. The formulas, role classifications, and scoring strategies accurately match the implementation. Minor source reference updates needed for line numbers and two broken links to source files.",
   "issues": [
     {
-      "type": "incomplete_explanation",
+      "type": "broken_links",
       "severity": "medium",
-      "section": "Unified Scoring System - Scoring Formula",
-      "description": "Documentation shows default weights as 40% complexity, 40% coverage, 20% dependency, but actual implementation uses different weights when coverage data is absent (50% complexity, 25% dependency, 25% for debt patterns)",
-      "current_content": "Complexity: 40% - How difficult the code is to understand and test\nCoverage: 40% - How well the code is tested\nDependency: 20% - How many other functions depend on this code",
-      "should_be": "When coverage data is available:\n  - Complexity: ~35-40% (via complexity factor)\n  - Coverage: ~35-40% (via coverage multiplier dampening)\n  - Dependency: ~20-25%\n\nWhen coverage data is NOT available:\n  - Complexity: 50%\n  - Dependency: 25%\n  - Debt patterns: 25% (reserved for additive adjustments)",
-      "fix_suggestion": "Add a note explaining that weights are dynamically adjusted based on coverage data availability. Include both scenarios in the formula section.",
-      "source_reference": "src/priority/unified_scorer.rs:420-445 (calculate_base_score), src/priority/scoring/calculation.rs:111-129 (calculate_base_score_no_coverage)"
+      "section": "Source References",
+      "description": "Found 2 broken internal source file links",
+      "broken_links": [
+        {
+          "link_text": "src/priority/tiers.rs",
+          "target": "../../src/priority/tiers.rs",
+          "actual_location": "src/priority/tiers/mod.rs",
+          "fix": "Update link to ../../src/priority/tiers/mod.rs"
+        },
+        {
+          "link_text": "src/priority/debt_aggregator/",
+          "target": "../../src/priority/debt_aggregator/",
+          "actual_location": "src/priority/debt_aggregator.rs",
+          "fix": "Update link to ../../src/priority/debt_aggregator.rs (it's a file, not a directory)"
+        }
+      ],
+      "fix_suggestion": "Update source references to point to correct file locations"
     },
     {
-      "type": "incomplete_explanation",
-      "severity": "medium",
-      "section": "Role-Based Prioritization",
-      "description": "Documentation shows 6 function roles but implementation has 7 roles including 'Orchestrator' with 0.8x multiplier",
-      "current_content": "Entry Points: 1.5×\nBusiness Logic: 1.2×\nData Access: 1.0×\nInfrastructure: 0.8×\nUtilities: 0.5×\nTest Code: 0.1×",
-      "should_be": "Entry Points: 1.5×\nPureLogic (Complex): 1.3×\nPureLogic (Simple): 1.0×\nOrchestrator: 0.8×\nIOWrapper: 0.5×\nPatternMatch: 0.6×\nDebug: 0.3×\nTest Code: 0.1× (implicit)",
-      "fix_suggestion": "Update role table to match actual FunctionRole enum. Explain that PureLogic has dynamic multiplier based on complexity. Document Orchestrator, PatternMatch, and Debug roles.",
-      "source_reference": "src/priority/semantic_classifier/mod.rs:25-33 (FunctionRole enum), src/priority/unified_scorer.rs:388-399 (calculate_role_multiplier)"
-    },
-    {
-      "type": "incomplete_explanation",
+      "type": "outdated_line_numbers",
       "severity": "low",
-      "section": "Role-Based Prioritization - How role classification works",
-      "description": "Role classification documentation is high-level but doesn't explain the actual detection mechanisms",
-      "current_content": "Entry points: Functions named main, handlers with routing decorators, public API functions\nBusiness logic: Core domain operations, calculation functions, decision-making code\n...",
-      "should_be": "Add implementation details:\n- Entry points: Detected by name (main, handle_*, run_*) or call graph analysis (no upstream callers)\n- Debug: Matches debug patterns (debug_*, dump_*, log_*, print_*, display_*)\n- Constructors: Pattern matching (new, with_*, from_*, default) + low complexity\n- Accessors: Getter patterns (get_*, is_*, has_*) + simple field access\n- Pattern matchers: Simple match/if-else chains with low complexity\n- I/O wrappers: Simple file/network operations\n- Orchestrators: High delegation ratio, calls 5+ functions, low cognitive relative to cyclomatic",
-      "fix_suggestion": "Add a subsection explaining detection heuristics with code examples. Link to semantic_classifier module documentation.",
-      "source_reference": "src/priority/semantic_classifier/mod.rs:35-114 (classify_by_rules), src/priority/semantic_classifier/classifiers.rs"
+      "section": "Multiple Sections",
+      "description": "Several source reference line numbers have drifted due to code evolution",
+      "details": [
+        {
+          "reference": "src/priority/unified_scorer.rs:385-399 (calculate_role_multiplier)",
+          "actual_line": "624-634",
+          "note": "Function has moved significantly in the file"
+        },
+        {
+          "reference": "src/priority/unified_scorer.rs:22-291",
+          "note": "The file has grown; UnifiedScore struct is now around lines 97-144"
+        },
+        {
+          "reference": "src/priority/unified_scorer.rs:170-291 (calculate_unified_priority_with_debt)",
+          "actual_line": "300-325",
+          "note": "Function has moved"
+        }
+      ],
+      "fix_suggestion": "Update line number references to match current source locations. Consider using function names as primary references instead of line numbers."
     },
     {
-      "type": "incomplete_explanation",
-      "severity": "medium",
-      "section": "Coverage Propagation",
-      "description": "Documentation mentions transitive coverage but doesn't explain the actual implementation or that it's stored in UnifiedDebtItem",
-      "current_content": "Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)",
-      "should_be": "Add explanation that:\n1. Transitive coverage is calculated via call graph traversal\n2. Results are stored in UnifiedDebtItem.transitive_coverage field\n3. Weights decay with call graph depth\n4. Used to adjust coverage factor in scoring",
-      "fix_suggestion": "Expand section with implementation details, show how to interpret transitive coverage in output, explain when it matters most.",
-      "source_reference": "src/priority/unified_scorer.rs:50 (transitive_coverage field), src/priority/coverage_propagation/"
-    },
-    {
-      "type": "missing_content",
+      "type": "minor_discrepancy",
       "severity": "low",
-      "section": "Unified Score Example",
-      "description": "Example uses Business Logic role with 1.2x multiplier, but actual implementation would classify this as PureLogic with dynamic multiplier",
-      "current_content": "Role: Business Logic\n...\nFinal Score = 8.2 × 1.2 (Business Logic multiplier)",
-      "should_be": "Update example to use actual role classification:\n- For process_payment: likely PureLogic (complex) = 1.3x multiplier\n- Show the full calculation including coverage multiplier dampening\n- Explain why this would be PureLogic not a made-up 'Business Logic' role",
-      "fix_suggestion": "Update example to reflect actual FunctionRole enum values and scoring logic from unified_scorer.rs",
-      "source_reference": "src/priority/unified_scorer.rs:388-399, src/priority/semantic_classifier/mod.rs:25-33"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Testing Recommendations - ROI calculation",
-      "description": "Documentation shows basic ROI formula but implementation has much richer calculation with cascade impacts, module multipliers, and complexity weighting",
-      "current_content": "roi = potential_risk_reduction / estimated_effort_hours",
-      "should_be": "Enhanced ROI formula:\nroi = ((direct_impact × module_multiplier) + (cascade_impact × cascade_weight)) × dependency_factor × complexity_weight / adjusted_effort\n\nWhere:\n- direct_impact: Risk reduction from testing this function\n- module_multiplier: 1.0-2.0 based on module type (EntryPoint=2.0, Core=1.5)\n- cascade_impact: Risk reduction in dependent functions\n- cascade_weight: Configurable (default 0.5)\n- dependency_factor: 1.0 + (dependents × 0.1, capped at 2.0)\n- complexity_weight: 0.1-1.0 (penalizes trivial delegation functions)\n- adjusted_effort: Base effort adjusted by learning system if enabled",
-      "fix_suggestion": "Add detailed ROI calculation section explaining all components. Show example with cascade impacts. Document learning system for effort estimation.",
-      "source_reference": "src/risk/roi/mod.rs:66-113 (calculate method), src/risk/roi/effort.rs, src/risk/roi/cascade.rs"
-    },
-    {
-      "type": "incomplete_explanation",
-      "severity": "low",
-      "section": "Test Effort Assessment",
-      "description": "Documentation shows effort levels but doesn't explain how cognitive complexity maps to test case counts",
-      "current_content": "Trivial (cognitive < 5): 1-2 test cases, < 1 hour\nSimple (cognitive 5-10): 3-5 test cases, 1-2 hours\n...",
-      "should_be": "Add explanation of effort model:\n- Test cases are estimated from cyclomatic complexity (branch coverage)\n- Hours are calculated from cognitive complexity (comprehension difficulty)\n- Formula includes setup cost, assertion cost, and complexity multipliers\n- Learning system can adjust estimates based on historical data",
-      "fix_suggestion": "Add subsection explaining effort estimation model. Link to EffortModel trait and AdvancedEffortModel implementation.",
-      "source_reference": "src/risk/roi/effort.rs:AdvancedEffortModel"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "low",
-      "section": "Legacy Risk Calculation",
-      "description": "Legacy risk scoring section uses 'debt_score' in formula but doesn't explain where debt_score comes from or that it's from DebtAggregator",
-      "current_content": "debt_factor = debt_score / 10  // If debt data available",
-      "should_be": "debt_factor = debt_score / 10\n\nNote: debt_score comes from DebtAggregator which combines multiple debt dimensions:\n- Testing debt (unwrap, untested error paths)\n- Resource debt (unclosed files, memory leaks)\n- Duplication debt (code clones)",
-      "fix_suggestion": "Add brief explanation of debt_score source or cross-reference to debt patterns section",
-      "source_reference": "src/priority/debt_aggregator/"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Risk Distribution",
-      "description": "Documentation explains minimal_count but doesn't mention it only appears in unified scoring output, not in legacy RiskCategory enum",
-      "current_content": "Important: minimal_count does not appear in the standard risk_categories from features.json (Low, Medium, High, Critical, WellTested). It's specific to unified scoring's 0-10 scale priority classifications.",
-      "should_be": "Clarify that:\n1. minimal_count is only in unified scoring priority tiers (0-10 scale)\n2. Legacy RiskCategory enum uses: Low, Medium, High, Critical, WellTested\n3. When using legacy scoring, there is NO minimal_count\n4. The mapping between systems is explained in the priority classifications table",
-      "fix_suggestion": "Add table showing legacy vs unified risk distribution field names to avoid confusion",
-      "source_reference": "src/risk/mod.rs:36-42 (RiskCategory enum), src/priority/tiers.rs (unified priority tiers)"
+      "section": "Role-Based Prioritization / Role Multipliers Table",
+      "description": "Documentation shows multiplier values that match calculate_role_multiplier() but differ from config defaults in scoring.rs",
+      "current_content": "EntryPoint: 1.5×, PureLogic (complex): 1.3×, Orchestrator: 0.8×, IOWrapper: 0.5×, PatternMatch: 0.6×, Debug: 0.3×",
+      "implementation_note": "calculate_role_multiplier in unified_scorer.rs uses: EntryPoint=1.5, PureLogic(complex)=1.3, PureLogic(simple)=1.0, Orchestrator=0.8, IOWrapper=0.5, PatternMatch=0.6, Debug=0.3 (MATCHES documentation). Config defaults in scoring.rs:307-331 differ: PureLogic=1.2, IOWrapper=0.7, EntryPoint=0.9",
+      "fix_suggestion": "The documentation correctly reflects the hardcoded values in calculate_role_multiplier. Consider adding a note that configuration allows overriding these defaults with different values.",
+      "source_reference": "src/priority/unified_scorer.rs:624-634 and src/config/scoring.rs:307-331"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of both unified and legacy scoring systems",
-    "Clear examples showing score calculations step-by-step",
-    "Good explanation of coverage dampening concept",
-    "Accurate formula documentation for unified scoring base components",
-    "Well-structured progression from basic to advanced concepts",
-    "Helpful visual tables for score ranges and priority levels",
-    "Good separation of legacy vs modern approaches"
+    "Comprehensive and accurate coverage of the unified scoring system with correct formulas",
+    "Clear explanation of how coverage acts as a dampening multiplier (not additive)",
+    "Excellent worked examples showing score calculations step-by-step with source references",
+    "Good documentation of role classification heuristics with detection rules and line references",
+    "Thorough coverage propagation explanation with multiple scenarios and formulas",
+    "Clear distinction between unified (0-10) and legacy scoring systems",
+    "Accurate test effort estimation with difficulty levels and hour estimates",
+    "Comprehensive ROI formula documentation with component breakdown",
+    "Source references throughout documentation aid verification",
+    "Well-structured progression from basic concepts to advanced topics"
   ],
   "improvement_suggestions": [
-    "Add diagrams showing scoring pipeline flow: metrics → factors → base score → role adjustment → final score",
-    "Include more real-world examples from different codebases (not just payment processing)",
-    "Add troubleshooting section for unexpected scores (e.g., 'Why is my simple function scoring high?')",
-    "Document configuration options for adjusting weights, role multipliers, and thresholds",
-    "Add section on interpreting UnifiedScore fields in JSON output (complexity_factor, coverage_factor, etc.)",
-    "Include examples of good vs bad ROI recommendations to help users understand prioritization",
-    "Add cross-references to other analysis guide sections (complexity metrics, debt patterns)",
-    "Consider adding a glossary of scoring terms (dampening, propagation, transitive coverage, etc.)"
+    "Consider using function names instead of line numbers for source references to improve long-term maintainability",
+    "Add a cross-reference to complexity-metrics.md for the detailed explanation of cyclomatic vs cognitive complexity",
+    "Consider documenting how to customize role multipliers via debtmap.toml configuration file"
   ],
   "cross_references": [
     "complexity-metrics",
-    "debt-patterns",
-    "interpreting-results"
+    "interpreting-results",
+    "debt-patterns"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T08:30:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Unified scoring system",
@@ -133,11 +95,13 @@
       "Coverage propagation",
       "ROI calculation",
       "Role-based prioritization",
+      "Test effort estimation",
       "Legacy risk scoring",
-      "Test effort assessment"
+      "Transitive coverage"
     ],
     "validation_focus": "Check risk scoring formulas and prioritization strategies",
     "internal_links_checked": true,
-    "broken_links_found": 0
+    "broken_links_found": 2,
+    "source_references_validated": true
   }
 }
