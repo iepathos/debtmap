@@ -127,7 +127,7 @@ Previously, Debtmap combined standalone functions with struct methods, causing *
 - **God Class:** No (15 methods < 20 threshold)
 - **God Module:** Possibly (20 standalone functions, approaching threshold)
 
-See `src/organization/god_object_detector.rs:449-505` for implementation details.
+See `src/organization/god_object/detector.rs` and `src/organization/god_object/classifier.rs` for implementation details.
 
 ## Confidence Levels
 
@@ -146,7 +146,7 @@ Debtmap assigns confidence levels based **solely on the number of thresholds vio
 
 Both receive the same "Possible" confidence level, but File B will have a much higher god object score for prioritization purposes. This separation ensures consistent confidence classification while still allowing scores to reflect severity.
 
-See `src/organization/god_object_analysis.rs:236-268` for the `determine_confidence` function.
+See `src/organization/god_object/classifier.rs:582` for the `determine_confidence` function.
 
 ## Scoring Algorithms
 
@@ -171,7 +171,7 @@ base_score = method_factor × field_factor × responsibility_factor × size_fact
   - Where `min_score` is: 1 violation → 30.0, 2 violations → 50.0, 3+ violations → 70.0
 - Else: `final_score = base_score × 10`
 
-**Source**: src/organization/god_object/scoring.rs:44-90
+**Source**: `src/organization/god_object/scoring.rs:44-90`
 
 The graduated minimum scores ensure that severity matches the number of violations while preventing over-flagging of moderate files.
 
@@ -201,7 +201,7 @@ Where `min_score` is: 1 violation → 30.0, 2 violations → 50.0, 3+ violations
 
 This approach better reflects the true maintainability burden of a large module while using conservative scaling to prevent small files from being over-flagged.
 
-**Source**: src/organization/god_object/scoring.rs:118-178
+**Source**: `src/organization/god_object/scoring.rs:118-178`
 
 ### Purity-Weighted Scoring (Advanced)
 
@@ -242,11 +242,11 @@ This advanced scoring variant combines both **complexity weighting** and **purit
 
 **Impact:** A file with 100 pure helper functions (total complexity 150) might have a weighted method count of only `150 × 0.3 = 45`, avoiding false positives while still catching stateful god objects with many impure methods.
 
-See `src/organization/god_object_detector.rs:196-258` and `src/organization/purity_analyzer.rs`.
+See `src/organization/god_object/scoring.rs` and `src/organization/purity_analyzer.rs`.
 
 ## Responsibility Detection
 
-Responsibilities are inferred from method names using behavioral heuristics. Debtmap recognizes the following categories based on the `BehaviorCategory` enum (src/organization/behavioral_decomposition.rs:10-41):
+Responsibilities are inferred from method names using behavioral heuristics. Debtmap recognizes the following categories based on the `BehaviorCategory` enum (`src/organization/behavioral_decomposition/types.rs:8-41`):
 
 | Category | Method Patterns | Examples |
 |----------|----------------|----------|
@@ -264,11 +264,12 @@ Responsibilities are inferred from method names using behavioral heuristics. Deb
 | **Construction** | `create`, `build`, `make`, `construct` | Object construction |
 | **Processing** | `process`, `handle`, `execute`, `run` | General processing |
 | **Communication** | `send`, `receive`, `transmit`, `broadcast`, `notify` | Inter-process communication |
+| **Utilities** | `with_*`, `from_*`, `into_*`, `as_*`, `default`, `any` | Helpers, builders, factories, converters |
 | **Domain** | *(no match)* | Domain-specific with custom name |
 
 **Note:** The `Domain` category serves as the fallback when no behavioral pattern matches. It extracts a domain name from the method's first word to provide context-specific categorization.
 
-**Classification Order**: More specific categories are checked first (Construction before Lifecycle, Validation before Rendering) to ensure accurate categorization. See `BehavioralCategorizer::categorize_method()` in src/organization/behavioral_decomposition.rs:151-249.
+**Classification Order**: More specific categories are checked first (Construction before Lifecycle, Validation before Rendering) to ensure accurate categorization. See `BehavioralCategorizer::categorize_method()` in `src/organization/behavioral_decomposition/categorization.rs:32`.
 
 **Distinct Responsibility Counting:** Debtmap counts the number of **unique** responsibility categories used by a struct/module's methods. A high responsibility count (e.g., >5) indicates the module is handling too many different concerns, violating the Single Responsibility Principle.
 
@@ -277,7 +278,7 @@ Responsibility count directly affects:
 - Refactoring recommendations (methods grouped by responsibility for suggested splits)
 - Detection confidence (counted as one of the five violation criteria)
 
-See `BehavioralCategorizer::categorize_method()` in src/organization/behavioral_decomposition.rs:151-249 and `infer_responsibility_with_confidence()` in src/organization/god_object/classifier.rs:128-163.
+See `BehavioralCategorizer::categorize_method()` in `src/organization/behavioral_decomposition/categorization.rs:32` and `infer_responsibility_with_confidence()` in `src/organization/god_object/classifier.rs:662`.
 
 ## Examples and Case Studies
 
@@ -334,7 +335,7 @@ See `BehavioralCategorizer::categorize_method()` in src/organization/behavioral_
 
 ## Refactoring Recommendations
 
-When `is_god_object = true`, Debtmap generates **recommended module splits** using the `recommend_module_splits` function. This feature:
+When `is_god_object = true`, Debtmap generates **recommended module splits** using the `recommended_splits` field (see `src/organization/god_object/split_types.rs` for the `ModuleSplit` type). This feature:
 
 1. Groups methods by their inferred responsibilities
 2. Creates a `ModuleSplit` for each responsibility group containing:
@@ -355,7 +356,7 @@ Recommended Splits:
 
 This provides an actionable roadmap for breaking down god objects into focused, single-responsibility modules.
 
-See `src/organization/god_object_detector.rs:165-177` and `src/organization/god_object_analysis.rs:40-45`.
+See `src/organization/god_object/split_types.rs:35-125` for the `ModuleSplit` struct definition and `src/organization/god_object/core_types.rs:80` for how splits are stored in detection results.
 
 ### Code Examples
 
@@ -443,7 +444,7 @@ max_complexity = 150
 
 **Note:** `enabled` defaults to `true`. Set to `false` to disable god object detection entirely (equivalent to `--no-god-object` CLI flag).
 
-See `src/config.rs:500-582`.
+See `src/config/display.rs:90-115` for `GodObjectConfig` and `src/organization/god_object/thresholds.rs:63-113` for `GodObjectThresholds`.
 
 ### Tuning for Your Project
 
@@ -603,7 +604,7 @@ See `src/organization/god_object_metrics.rs:1-228`.
 
 ### "My god object score seems too high"
 
-**Answer:** The scoring algorithm uses exponential scaling (`base_score × 50 × violation_count`) to ensure god objects are prioritized.
+**Answer:** The scoring algorithm uses scaling (`base_score × 20 × violation_count`) to ensure god objects are prioritized. The multiplier was reduced from 50 to 20 for more conservative scoring.
 
 **Solutions:**
 1. Check the violation count - 5 violations means severe issues
