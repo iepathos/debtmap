@@ -6,7 +6,7 @@ Debtmap's risk scoring identifies code that is both complex AND poorly tested - 
 
 Debtmap uses a **unified scoring system** (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.
 
-**Source**: [src/priority/unified_scorer.rs:22-291](../../src/priority/unified_scorer.rs)
+**Source**: [src/priority/unified_scorer.rs:97-144](../../src/priority/unified_scorer.rs) (UnifiedScore struct)
 
 ### Score Scale and Priority Classifications
 
@@ -30,7 +30,7 @@ Base Score = (Complexity Factor × Weight) + (Coverage Factor × Weight) + (Depe
 Final Score = Base Score × Role Multiplier × Purity Adjustment
 ```
 
-**Source**: [src/priority/unified_scorer.rs:170-291](../../src/priority/unified_scorer.rs) (calculate_unified_priority_with_debt)
+**Source**: [src/priority/unified_scorer.rs:300-325](../../src/priority/unified_scorer.rs) (calculate_unified_priority_with_debt)
 
 #### Dynamic Weight Adjustment
 
@@ -64,7 +64,7 @@ Complexity Factor = (raw_complexity / 2.0).clamp(0.0, 10.0)
 // For orchestrators: 25% cyclomatic + 75% cognitive
 ```
 
-Maps normalized complexity (0-20 range) to 0-10 scale. Uses configurable weights that prioritize cognitive complexity (70%) over cyclomatic complexity (30%) as it correlates better with defect density.
+Maps normalized complexity (0-20 range) to 0-10 scale. Uses configurable weights that prioritize cognitive complexity (70%) over cyclomatic complexity (30%) as it correlates better with defect density. See [Complexity Metrics](complexity-metrics.md) for detailed explanations of cyclomatic vs cognitive complexity.
 
 **Source**: [src/config/scoring.rs:221-267](../../src/config/scoring.rs) (ComplexityWeightsConfig)
 
@@ -116,8 +116,10 @@ The unified score is multiplied by a **role multiplier** based on the function's
 | **Debug** | 0.3× | Debug/diagnostic functions | Lowest test priority |
 
 **Source**:
-- Multiplier values: [src/priority/unified_scorer.rs:385-399](../../src/priority/unified_scorer.rs) (calculate_role_multiplier)
+- Multiplier values: [src/priority/unified_scorer.rs:624-635](../../src/priority/unified_scorer.rs) (calculate_role_multiplier)
 - Configuration defaults: [src/config/scoring.rs:147-220](../../src/config/scoring.rs) (RoleMultipliers)
+
+**Note**: Configuration allows overriding these default multipliers via `.debtmap.toml`. See [Configuration](../configuration.md) for details on customizing role weights.
 
 **Note**: PureLogic has a **dynamic multiplier** that adjusts based on complexity. Simple business logic (≤ 5.0 complexity) gets baseline priority, while complex business logic (> 5.0) receives elevated priority (1.3×).
 
@@ -222,7 +224,7 @@ Where:
 **Implementation Details**:
 
 1. **Transitive coverage** is calculated via recursive call graph traversal
-2. Results are stored in `UnifiedDebtItem.transitive_coverage` field (**Source**: [src/priority/unified_scorer.rs:50](../../src/priority/unified_scorer.rs))
+2. Results are stored in `UnifiedDebtItem.transitive_coverage` field (**Source**: [src/priority/unified_scorer.rs:154](../../src/priority/unified_scorer.rs))
 3. Weights decay exponentially with call graph depth:
    - 1 hop away: contribution × 0.7
    - 2 hops away: contribution × 0.49 (0.7²)
@@ -328,7 +330,7 @@ Step 5: Calculate base score (with dynamic weights)
 
 Step 6: Apply role multiplier
   Role Multiplier = 1.3 (PureLogic with complexity > 5.0)
-  // Source: src/priority/unified_scorer.rs:385-399
+  // Source: src/priority/unified_scorer.rs:624-635
 
   Final Score = 3.04 × 1.3 = 3.95 → LOW priority
 
@@ -424,7 +426,7 @@ where:
 - Resource debt (unclosed files, memory leaks)
 - Duplication debt (code clones)
 
-**Source**: [src/priority/debt_aggregator/](../../src/priority/debt_aggregator/)
+**Source**: [src/priority/debt_aggregator.rs](../../src/priority/debt_aggregator.rs)
 
 **Example (legacy scoring):**
 ```
@@ -523,7 +525,7 @@ Debtmap provides codebase-wide risk metrics:
 | Not present | `well_tested_count` (legacy outcome) |
 
 **Sources**:
-- Unified priority tiers: [src/priority/tiers.rs](../../src/priority/tiers.rs)
+- Unified priority tiers: [src/priority/tiers/mod.rs](../../src/priority/tiers/mod.rs)
 - Legacy RiskCategory enum: [src/risk/mod.rs:36-42](../../src/risk/mod.rs)
 
 **Note on minimal_count:**
