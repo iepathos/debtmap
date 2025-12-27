@@ -6,11 +6,13 @@ Debtmap uses a sophisticated tiered prioritization system to surface critical ar
 
 The tiered prioritization system organizes technical debt into four distinct tiers based on impact, urgency, and architectural significance. This prevents "walls of similar-scored items" and ensures critical issues don't get lost among minor problems.
 
-**Two Tier Systems**: Debtmap uses two complementary tier systems:
-1. **RecommendationTier** (T1-T4): Used internally to classify items based on architectural significance and testing needs
-2. **Display Tier** (Critical/High/Moderate/Low): Score-based tiers shown in terminal output, derived from final calculated scores
+**Three Display Systems**: Debtmap uses three complementary tier/priority systems:
 
-The configuration examples below control the RecommendationTier classification logic, which influences scoring through tier weights. The final display uses score-based tiers for consistency across all output formats.
+1. **RecommendationTier** (T1-T4): Internal classification based on architectural significance and testing needs. Controls tier weight application during scoring.
+2. **Tier** (Critical/High/Moderate/Low): Score-based tiers for terminal and markdown output using 90/70/50 thresholds (src/priority/mod.rs:371-386)
+3. **Priority** (critical/high/medium/low): Score-based tiers for JSON output using 100/50/20 thresholds (src/output/unified/priority.rs:23-32)
+
+The configuration examples below control the RecommendationTier classification logic, which influences scoring through tier weights. The final display uses different score-based tiers depending on output format.
 
 ## The Four Tiers
 
@@ -24,7 +26,7 @@ The configuration examples below control the RecommendationTier classification l
 
 **Impact**: High impact on maintainability and team velocity
 
-**Classification Criteria** (src/priority/tiers.rs:183-216):
+**Classification Criteria** (src/priority/tiers/pure.rs:26-41 and src/priority/tiers/predicates.rs):
 
 Debtmap uses sophisticated multi-factor analysis for Tier 1 classification, not just raw cyclomatic complexity. Items qualify for Tier 1 if they meet **any** of these criteria:
 
@@ -60,7 +62,7 @@ debtmap analyze . --min-priority high --top 5
 
 **Action**: Should be tested before refactoring to prevent regressions
 
-**Classification Criteria** (src/priority/tiers.rs:257-302):
+**Classification Criteria** (src/priority/tiers/pure.rs:64-99):
 
 Items qualify for Tier 2 through **two distinct paths**:
 
@@ -300,7 +302,7 @@ Low (score < 50)
 
 ### JSON Output
 
-JSON output uses the same **score-based priority** levels as terminal output:
+JSON output uses **score-based priority** levels with different thresholds than terminal output:
 
 ```json
 {
@@ -308,7 +310,7 @@ JSON output uses the same **score-based priority** levels as terminal output:
     "score_distribution": {
       "critical": 2,
       "high": 5,
-      "moderate": 12,
+      "medium": 12,
       "low": 45
     }
   },
@@ -337,13 +339,13 @@ JSON output uses the same **score-based priority** levels as terminal output:
 }
 ```
 
-The `priority` field is derived from the `score` field using these thresholds:
-- `critical`: score >= 90.0
-- `high`: score >= 70.0
-- `moderate`: score >= 50.0
-- `low`: score < 50.0
+The `priority` field is derived from the `score` field using these thresholds (src/output/unified/priority.rs:23-32):
+- `critical`: score >= 100.0
+- `high`: score >= 50.0
+- `medium`: score >= 20.0
+- `low`: score < 20.0
 
-**Source**: Priority tier thresholds defined in src/priority/mod.rs:478-484
+**Note**: JSON output uses different thresholds than terminal output. Terminal/markdown uses the `Tier` enum (90/70/50 thresholds), while JSON uses the `Priority` enum (100/50/20 thresholds) for broader score distribution.
 
 **Note**: While RecommendationTier (T1-T4) classifications exist internally for applying tier weights, they are not included in JSON output. The output shows final calculated scores and their corresponding priority levels.
 
