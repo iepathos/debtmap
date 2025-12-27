@@ -1,0 +1,154 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "troubleshooting",
+  "subsection_id": "context-providers-troubleshooting",
+  "subsection_title": "Context Provider Issues",
+  "subsection_file": "book/src/troubleshooting/context-providers.md",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Documentation file does not exist - SUMMARY.md references a multi-subsection chapter structure that hasn't been created yet",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "The subsection file 'book/src/troubleshooting/context-providers.md' referenced in SUMMARY.md does not exist. The troubleshooting chapter has been restructured in SUMMARY.md as a multi-subsection chapter with index.md and separate files for each topic, but the directory and files haven't been created yet.",
+      "feature_reference": "risk_assessment.context_aware_factors",
+      "fix_suggestion": "Create the troubleshooting/ directory structure with subsections extracted from the existing troubleshooting.md file. The context-providers.md subsection should contain the 'Context Provider Troubleshooting' section content (currently lines 555-686 of troubleshooting.md) plus relevant content from context-providers.md (lines 842-946).",
+      "source_reference": "book/src/SUMMARY.md:72"
+    },
+    {
+      "type": "broken_links",
+      "severity": "high",
+      "section": "SUMMARY.md",
+      "description": "All 7 links in SUMMARY.md referencing the troubleshooting/ directory are broken because the directory doesn't exist. Links affected: troubleshooting/index.md, troubleshooting/quick-fixes.md, troubleshooting/debug-mode.md, troubleshooting/context-providers.md, troubleshooting/advanced-analysis.md, troubleshooting/error-messages.md, troubleshooting/output-issues.md, troubleshooting/faq.md",
+      "broken_links": [
+        {
+          "link_text": "Troubleshooting",
+          "target": "troubleshooting/index.md",
+          "resolved_path": "book/src/troubleshooting/index.md",
+          "current_file": "book/src/SUMMARY.md"
+        },
+        {
+          "link_text": "Quick Fixes",
+          "target": "troubleshooting/quick-fixes.md",
+          "resolved_path": "book/src/troubleshooting/quick-fixes.md",
+          "current_file": "book/src/SUMMARY.md"
+        },
+        {
+          "link_text": "Debug Mode",
+          "target": "troubleshooting/debug-mode.md",
+          "resolved_path": "book/src/troubleshooting/debug-mode.md",
+          "current_file": "book/src/SUMMARY.md"
+        },
+        {
+          "link_text": "Context Provider Issues",
+          "target": "troubleshooting/context-providers.md",
+          "resolved_path": "book/src/troubleshooting/context-providers.md",
+          "current_file": "book/src/SUMMARY.md"
+        },
+        {
+          "link_text": "Advanced Analysis Issues",
+          "target": "troubleshooting/advanced-analysis.md",
+          "resolved_path": "book/src/troubleshooting/advanced-analysis.md",
+          "current_file": "book/src/SUMMARY.md"
+        },
+        {
+          "link_text": "Error Messages Reference",
+          "target": "troubleshooting/error-messages.md",
+          "resolved_path": "book/src/troubleshooting/error-messages.md",
+          "current_file": "book/src/SUMMARY.md"
+        },
+        {
+          "link_text": "Output and Command Issues",
+          "target": "troubleshooting/output-issues.md",
+          "resolved_path": "book/src/troubleshooting/output-issues.md",
+          "current_file": "book/src/SUMMARY.md"
+        },
+        {
+          "link_text": "FAQ",
+          "target": "troubleshooting/faq.md",
+          "resolved_path": "book/src/troubleshooting/faq.md",
+          "current_file": "book/src/SUMMARY.md"
+        }
+      ],
+      "fix_suggestion": "Create the troubleshooting/ directory and all subsection files, or revert SUMMARY.md to reference the single troubleshooting.md file"
+    },
+    {
+      "type": "incomplete_migration",
+      "severity": "high",
+      "section": "Chapter Structure",
+      "description": "SUMMARY.md has been updated to reflect a multi-subsection chapter structure for troubleshooting, but the actual migration of content hasn't been completed. The original troubleshooting.md (2554 lines) contains all the content that should be split into the subsections.",
+      "fix_suggestion": "Complete the migration by: 1) Creating book/src/troubleshooting/ directory, 2) Creating index.md from intro sections, 3) Creating quick-fixes.md from 'Quick Fixes' section, 4) Creating debug-mode.md from 'Debug Mode' section, 5) Creating context-providers.md from 'Context Provider Troubleshooting' section, 6) Creating advanced-analysis.md from 'Advanced Analysis Troubleshooting' section, 7) Creating error-messages.md from 'Error Messages Reference' section, 8) Creating output-issues.md from output-related content, 9) Creating faq.md from 'FAQ' section",
+      "source_reference": "book/src/troubleshooting.md"
+    }
+  ],
+  "content_sources": [
+    {
+      "file": "book/src/troubleshooting.md",
+      "section": "Context Provider Troubleshooting",
+      "lines": "555-686",
+      "description": "Contains existing context provider troubleshooting content including enabling context, disabling providers, git history issues, dependency issues, critical path issues, and debug guidance"
+    },
+    {
+      "file": "book/src/context-providers.md",
+      "section": "Troubleshooting",
+      "lines": "842-946",
+      "description": "Contains detailed troubleshooting for context providers including git history analysis slow, incorrect role classification, context providers not available, and common issues"
+    }
+  ],
+  "topics_expected": [
+    "Context provider errors",
+    "Git history issues",
+    "Dependency issues",
+    "Critical path issues"
+  ],
+  "topics_covered_in_sources": [
+    "Enable Context Analysis",
+    "Disable Specific Providers",
+    "Git History Provider Issues",
+    "Dependency Provider Issues",
+    "Critical Path Provider Issues",
+    "Context Impact on Scoring",
+    "Performance Impact",
+    "Debug Context Providers",
+    "Git History Analysis Slow",
+    "Incorrect Role Classification",
+    "Context Providers Not Available",
+    "Common Issues"
+  ],
+  "positive_aspects": [
+    "Comprehensive context provider troubleshooting content already exists in source files",
+    "Content is well-structured and includes practical examples",
+    "Both conceptual explanations and command-line solutions provided",
+    "Content covers all three context providers (critical_path, dependency, git_history)"
+  ],
+  "improvement_suggestions": [
+    "Create the troubleshooting/ directory structure to match SUMMARY.md",
+    "Extract and consolidate context provider troubleshooting from both source files",
+    "Add cross-references between context-providers.md and the new troubleshooting subsection",
+    "Deduplicate content that appears in both source files",
+    "Update links in other documentation files to point to new structure"
+  ],
+  "cross_references": [
+    "quick-fixes",
+    "debug-mode",
+    "advanced-analysis"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T00:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "context provider errors",
+      "git history issues",
+      "dependency issues",
+      "critical path issues"
+    ],
+    "validation_focus": "Check context provider troubleshooting is complete",
+    "file_exists": false,
+    "migration_status": "incomplete",
+    "source_file_line_count": 2554,
+    "estimated_subsection_lines": 250
+  }
+}
