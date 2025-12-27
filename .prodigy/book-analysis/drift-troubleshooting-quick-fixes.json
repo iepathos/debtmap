@@ -1,0 +1,88 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "troubleshooting",
+  "subsection_id": "quick-fixes",
+  "subsection_title": "Quick Fixes",
+  "subsection_file": "book/src/troubleshooting/quick-fixes.md",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Subsection file does not exist - chapter uses flat file structure instead of multi-subsection layout",
+  "structural_drift": {
+    "type": "missing_subsection_file",
+    "expected_file": "book/src/troubleshooting/quick-fixes.md",
+    "actual_structure": "flat_file",
+    "existing_file": "book/src/troubleshooting.md",
+    "existing_content_section": "Quick Fixes for Common Issues (lines 5-13)",
+    "migration_required": true
+  },
+  "issues": [
+    {
+      "type": "structural_drift",
+      "severity": "critical",
+      "section": "File Structure",
+      "description": "Expected subsection file 'book/src/troubleshooting/quick-fixes.md' does not exist. The troubleshooting chapter currently uses a flat file structure (book/src/troubleshooting.md) rather than a multi-subsection directory structure.",
+      "fix_suggestion": "Either: (1) Create troubleshooting/ directory with index.md and quick-fixes.md, migrating content from flat file; OR (2) Update book analysis configuration to reflect flat file structure",
+      "source_reference": "book/src/troubleshooting.md"
+    },
+    {
+      "type": "content_location_mismatch",
+      "severity": "medium",
+      "section": "Quick Fixes Content",
+      "description": "Quick fixes content exists in book/src/troubleshooting.md (lines 5-13) but expected in separate subsection file",
+      "current_content": "Quick Fixes section covers: slow analysis (--jobs, --no-multi-pass, --semantic-off), parse errors, no output, inconsistent results",
+      "fix_suggestion": "Extract quick fixes section to dedicated quick-fixes.md file when migrating to multi-subsection structure"
+    }
+  ],
+  "existing_content_analysis": {
+    "location": "book/src/troubleshooting.md:5-13",
+    "quick_fixes_covered": [
+      "Slow analysis - adjust --jobs, use --no-multi-pass, --semantic-off",
+      "Parse errors - use --semantic-off, exclude problematic files",
+      "No output - increase verbosity with -v, lower --min-priority",
+      "Inconsistent results - check coverage file, context providers"
+    ],
+    "completeness": "basic",
+    "comprehensiveness_assessment": "Current quick fixes section is minimal (4 items). Based on features.json, additional quick fixes should cover: coverage file issues (explain-coverage command), threshold/preset confusion, JSON format issues, context provider errors, call graph debugging, god object false positives, pattern detection adjustment"
+  },
+  "content_gap_analysis": {
+    "current_quick_fixes": 4,
+    "recommended_quick_fixes_based_on_features": [
+      "Coverage data not matching functions - use explain-coverage command",
+      "Too many low-priority warnings - increase --min-score or use stricter preset",
+      "Slow analysis on large codebases - enable parallel, increase --jobs",
+      "False positives from pattern detection - adjust --pattern-threshold",
+      "Call graph resolution failures - use --debug-call-graph",
+      "God object false positives - use --no-god-object",
+      "JSON format parsing errors - use unified format",
+      "Context provider errors - disable problematic providers",
+      "Multi-pass overhead - use --no-multi-pass for quick checks"
+    ],
+    "gap_severity": "medium",
+    "note": "Detailed solutions for these issues exist later in troubleshooting.md but are not in the quick fixes section"
+  },
+  "positive_aspects": [
+    "Quick fixes content exists within flat troubleshooting file",
+    "Core quick fixes (slow analysis, parse errors, no output) are documented",
+    "Flat file structure is comprehensive with 2500+ lines of troubleshooting content"
+  ],
+  "improvement_suggestions": [
+    "Migrate troubleshooting chapter to multi-subsection structure if subsection organization is desired",
+    "Expand quick fixes section to cover more common issues based on features",
+    "Add quick fixes for coverage issues, pattern detection, and call graph debugging",
+    "Cross-reference detailed troubleshooting sections from quick fixes"
+  ],
+  "cross_references": [
+    "debug-mode",
+    "performance-tips",
+    "error-messages-reference",
+    "context-provider-troubleshooting"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:30:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Quick fixes", "Common issues", "Parse errors", "Coverage issues"],
+    "validation_focus": "Check quick fixes are current and comprehensive",
+    "analysis_notes": "File structure mismatch - expected multi-subsection but found flat file"
+  }
+}
