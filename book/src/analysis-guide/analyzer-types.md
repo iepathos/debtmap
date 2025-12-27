@@ -6,7 +6,7 @@
 
 While the architecture supports extensibility through the `Analyzer` trait, only Rust is actively supported and maintained. Files in other programming languages are automatically filtered during discovery and never reach the analysis phase.
 
-**Source**: As documented in src/core/mod.rs:376-377 and src/core/injection.rs:198-200
+**Source**: Language enum at src/core/mod.rs:416-421, AnalyzerFactory at src/core/injection.rs:190-203
 
 ## Rust Analyzer
 
@@ -48,7 +48,7 @@ These classifications are used to calculate role-based priority multipliers in t
 
 Debtmap exclusively analyzes Rust source files (`.rs` extension). All analysis features, metrics, and debt detection patterns are designed specifically for Rust's syntax and semantics.
 
-**Language Detection** (src/core/mod.rs:386-391):
+**Language Detection** (src/core/mod.rs:435-440):
 
 ```rust
 pub fn from_path(path: &std::path::Path) -> Self {
@@ -59,7 +59,7 @@ pub fn from_path(path: &std::path::Path) -> Self {
 }
 ```
 
-The `Language` enum (src/core/mod.rs:368-372) includes `Rust`, `Python`, and `Unknown` variants, but only `Rust` is actively processed:
+The `Language` enum (src/core/mod.rs:416-421) includes `Rust`, `Python`, and `Unknown` variants, but only `Rust` is actively processed:
 
 ```rust
 pub enum Language {
@@ -77,7 +77,7 @@ During file discovery, debtmap filters files by extension:
 2. **All other files**: Silently filtered out—no warnings or errors generated
 3. **Unknown extensions**: Mapped to `Language::Unknown` and filtered during discovery
 
-**Source**: Language detection implemented in src/core/mod.rs:375-391
+**Source**: Language detection implemented in src/core/mod.rs:423-440
 
 **Example Usage**:
 
@@ -98,7 +98,7 @@ While debtmap currently focuses on Rust-only analysis, the architecture is desig
 
 ### Analyzer Trait
 
-The core `Analyzer` trait defines the interface for language-specific analyzers (src/analyzers/mod.rs:39-43):
+The core `Analyzer` trait defines the interface for language-specific analyzers (src/analyzers/mod.rs:40-44):
 
 ```rust
 pub trait Analyzer: Send + Sync {
@@ -133,9 +133,9 @@ impl AnalyzerFactory {
 To add support for a new language:
 
 1. **Implement the `Analyzer` trait** with language-specific parsing and analysis
-2. **Add the language variant** to the `Language` enum (src/core/mod.rs:368-372)
-3. **Update `from_extension()`** to recognize the file extension (src/core/mod.rs:375-384)
-4. **Register in `AnalyzerFactory`** to instantiate your analyzer (src/core/injection.rs:196-201)
+2. **Add the language variant** to the `Language` enum (src/core/mod.rs:416-421)
+3. **Update `from_extension()`** to recognize the file extension (src/core/mod.rs:423-433)
+4. **Register in `AnalyzerFactory`** to instantiate your analyzer (src/core/injection.rs:190-203)
 
 **Reference Implementation**: See `src/analyzers/rust.rs` for a complete example of implementing the `Analyzer` trait with full complexity analysis, purity detection, and call graph support.
 
