@@ -37,11 +37,12 @@ A: Several factors affect scores:
 
 **Q: How does coverage affect scores?**
 
-A: Coverage affects scores through multiplicative factors:
+A: Coverage affects scores through multiplicative factors (from `src/risk/strategy.rs:189-204`):
 - **< 20% coverage**: 3.0x penalty
 - **20-40% coverage**: 2.0x penalty
 - **40-60% coverage**: 1.5x penalty
-- **≥ 80% coverage**: 0.8x reduction
+- **60-80% coverage**: 1.2x penalty
+- **≥ 80% coverage**: 0.8x reduction (bonus for high coverage)
 
 **Q: Why isn't my coverage data being applied?**
 
@@ -74,6 +75,24 @@ debtmap analyze . --threshold-preset lenient
 A:
 - **Legacy**: `{File: {...}}` - nested structure
 - **Unified**: `{type: "File", ...}` - consistent structure
+
+## Scoring Questions
+
+**Q: What's the difference between cyclomatic and cognitive complexity?**
+
+A: Cyclomatic complexity counts decision points (branches, conditions), while cognitive complexity measures human comprehension difficulty (nested structures, breaks in linear flow). Both are measured metrics computed directly from the AST.
+
+**Q: How does coverage dampening work?**
+
+A: Well-tested code gets lower debt scores through a dampening multiplier. Functions with high coverage (≥80%) receive a 0.8x reduction, surfacing untested complex functions as higher priority targets for improvement.
+
+**Q: When should I use god object detection vs boilerplate detection?**
+
+A: Use **god object detection** for large, complex classes that have too many responsibilities and need to be split into modules. Use **boilerplate detection** for repetitive, low-complexity code patterns that could benefit from macros or code generation.
+
+**Q: What are measured vs estimated metrics?**
+
+A: **Measured metrics** (cyclomatic, cognitive complexity, nesting depth) are precise values computed from AST analysis. **Estimated metrics** (branches) are heuristic approximations used for test planning and coverage predictions.
 
 ## When to File Bug Reports
 
