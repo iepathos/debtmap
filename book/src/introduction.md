@@ -54,6 +54,8 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 - **Coupling signals** - Fan-in, fan-out, call graph depth
 - **Quality signals** - Entropy (false positive reduction), purity (testability)
 
+For a complete list of metrics and their formulas, see the [Metrics Reference](./metrics-reference.md).
+
 ### AI-Optimized Output
 - **LLM markdown format** - Minimal tokens, maximum information
 - **Context suggestions** - File ranges the AI should read
@@ -63,13 +65,14 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 ### Analysis Capabilities
 - **Rust-first analysis** - Full AST parsing, macro expansion, trait resolution
 - **Coverage integration** - Native LCOV support for risk assessment
+- **Debt pattern detection** - God objects, boilerplate code, error handling anti-patterns
 - **Entropy analysis** - Reduces false positives from repetitive code
 - **Parallel processing** - Fast analysis (10-100x faster than Java/Python tools)
 
 ### Workflow Integration
 - **Direct piping** - Pipe output to Claude, Cursor, or custom agents
-- **CI/CD gates** - Validate debt thresholds in pipelines
-- **Progress tracking** - Compare debt across commits
+- **CI/CD gates** - Validate debt thresholds with the `validate` command
+- **Progress tracking** - Compare debt across commits with `compare` and `validate-improvement` commands
 
 ## Current Status
 
@@ -96,5 +99,6 @@ Ready to start? Check out:
 - [Getting Started](./getting-started.md) - Installation and first analysis
 - [LLM Integration](./llm-integration.md) - AI workflow patterns
 - [Why Debtmap?](./why-debtmap.md) - The AI sensor model explained
+- [TUI Guide](./tui-guide.md) - Interactive exploration with the terminal UI
 
 **Quick tip:** Start with `debtmap analyze . --format markdown --top 5` to see the top priority items with context suggestions.
