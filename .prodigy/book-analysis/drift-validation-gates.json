@@ -5,79 +5,55 @@
   "chapter_file": "book/src/validation-gates.md",
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Documentation is comprehensive and well-structured, but contains incorrect information about the --summary flag implementation and references CLI output format that doesn't match the actual implementation. The core concepts and workflows are accurate.",
+  "quality_assessment": "Documentation is comprehensive and well-structured with accurate output format examples. The main issue is a discrepancy between what the output shows as 'failed checks' and what actually determines the exit code (only debt_density).",
   "issues": [
     {
-      "type": "incorrect_example",
+      "type": "outdated_information",
       "severity": "high",
-      "section": "Summary Output Format",
-      "description": "Documentation describes a --summary/-s flag for the validate command that exists in the CLI definition but is not actually implemented in ValidateConfig or used anywhere in the validation logic",
-      "current_content": "For compact output suitable for CI logs, use the `--summary` or `-s` flag:\n\n```bash\ndebtmap validate . --summary\n# or\ndebtmap validate . -s\n```",
-      "should_be": "The --summary flag is defined in CLI but not implemented. Either implement it or remove documentation until feature is complete.",
-      "fix_suggestion": "Remove the Summary Output Format section (lines 299-330) until the --summary flag is properly implemented in ValidateConfig and validation_printer",
-      "source_reference": "src/cli.rs:105,362 defines summary: bool but src/commands/validate.rs:ValidateConfig lacks this field"
+      "section": "Validation Metrics - Metric Priority",
+      "description": "Documentation states 'Validation uses AND logic: All primary metrics must pass for validation to succeed' but the actual implementation (thresholds.rs:60-61) only uses debt_density as the blocking check. The output may show '[ERROR]' for other metrics like average_complexity, but these don't affect the exit code.",
+      "current_content": "**Validation uses AND logic:** All primary metrics must pass for validation to succeed. If any check fails, the entire validation fails with a non-zero exit code.",
+      "should_be": "**Debt density is the sole blocking metric.** Other metrics (average complexity, codebase risk score, coverage) are displayed in the output but do not cause validation failure. The validation_printer shows '[ERROR]' for metrics exceeding thresholds as informational warnings.",
+      "fix_suggestion": "Update this section to accurately describe that only max_debt_density determines pass/fail, while other metrics are shown for visibility but are informational only.",
+      "source_reference": "src/commands/validate/thresholds.rs:60-61 - Only debt_density is in the blocking checks vector"
     },
     {
-      "type": "incorrect_example",
-      "severity": "high",
-      "section": "Summary Output Format",
-      "description": "Documentation shows tiered priority output format that is not produced by the validate command",
-      "current_content": "**Summary format output:**\n```\n✅ Validation PASSED\n\nPriority Tiers:\n  P0 (Critical): 2 items\n  P1 (High): 8 items\n  P2 (Medium): 15 items\n  P3 (Low): 23 items\n\nTop Issues:\n  1. Complex authentication logic (complexity: 28)\n  2. Database connection pool (risk: 9.2)\n  3. Untested error handler (coverage: 0%)\n```",
-      "should_be": "Actual validation output format from validation_printer.rs shows metrics and thresholds, not priority tiers",
-      "fix_suggestion": "Replace example output with actual format from validation_printer::print_validation_success() and print_validation_failure_with_details()",
-      "source_reference": "src/utils/validation_printer.rs:4-33 shows actual output format"
-    },
-    {
-      "type": "incorrect_example",
+      "type": "incomplete_explanation",
       "severity": "medium",
       "section": "Understanding Validation Output",
-      "description": "Success and failure output examples show checkmarks/X symbols that aren't in the actual implementation",
-      "current_content": "**Success output:**\n```\n✅ Validation PASSED\n\nMetrics:\n  Average Complexity: 7.2 / 10.0 ✓\n  Debt Density: 32.5 / 50.0 ✓\n  Codebase Risk: 5.8 / 7.0 ✓\n  Total Debt Score: 1250 / 10000 ✓\n```",
-      "should_be": "Actual output uses [OK] prefix and different format per validation_printer.rs",
-      "fix_suggestion": "Update examples to match actual validation_printer output format with '[OK]' or '[ERROR]' prefixes",
-      "source_reference": "src/utils/validation_printer.rs:5,20 shows actual output format with [OK] and [ERROR] prefixes"
+      "description": "The failure output example shows '[ERROR] Average complexity: 12.3 > 10.0' which implies this metric caused the failure. However, only debt_density actually determines pass/fail. This can confuse users who think fixing average_complexity would help pass validation.",
+      "current_content": "Failed checks:\n    [ERROR] Average complexity: 12.3 > 10.0\n    [ERROR] Debt density: 65.8 per 1K LOC > 50.0",
+      "should_be": "Add a note explaining that only debt_density affects the exit code, while other '[ERROR]' lines are informational warnings.",
+      "fix_suggestion": "Add clarification after the example: 'Note: Only debt density determines the exit code. Other metrics shown as [ERROR] are informational warnings about thresholds being exceeded, but do not block validation.'",
+      "source_reference": "src/utils/validation_printer.rs:112-121 shows all failed checks but src/commands/validate/thresholds.rs only uses debt_density for pass/fail"
     },
     {
-      "type": "missing_content",
+      "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Troubleshooting",
-      "description": "Documentation mentions --summary flag in troubleshooting section but flag is not implemented",
-      "current_content": "**Issue: Output is too verbose for CI logs**\n```bash\n# Solution: Use --summary flag for compact tiered output\ndebtmap validate . --summary\n# or\ndebtmap validate . -s\n```",
-      "should_be": "Remove --summary flag references until implemented, suggest other verbosity controls",
-      "fix_suggestion": "Replace with: Use lower verbosity levels or filter output with --top flag",
-      "source_reference": "src/commands/validate.rs:11-29 ValidateConfig has verbosity and top, not summary"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Exit Codes and CI Integration",
-      "description": "Documentation doesn't explain the actual exit code behavior when validation fails",
-      "current_content": "**Exit codes:**\n- **`0`** - Success: All thresholds passed\n- **Non-zero** - Failure: One or more thresholds exceeded or errors occurred",
-      "should_be": "Add detail that failure returns anyhow::bail! with 'Validation failed' message",
-      "fix_suggestion": "Add note: 'The validate command uses anyhow::bail! to return a non-zero exit code with the message \"Validation failed\" when thresholds are exceeded.'",
-      "source_reference": "src/commands/validate.rs:166 shows anyhow::bail!(\"Validation failed\")"
+      "section": "Metric Priority",
+      "description": "The priority list for fixing issues ('1. Critical: max_debt_density violations, 2. High: max_average_complexity violations...') implies these all block validation, which is misleading given only debt_density is blocking.",
+      "fix_suggestion": "Reframe the priority list as 'Recommended priority for improving code quality' rather than 'priority for fixing validation failures'.",
+      "source_reference": "src/commands/validate/thresholds.rs:60-61"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of density-based validation concept with clear rationale",
-    "Excellent explanation of why density metrics are superior to absolute counts",
-    "Clear migration guidance from deprecated thresholds with timeline",
+    "Excellent coverage of density-based validation concept with clear rationale for scale-independence",
+    "Output format examples now accurately match validation_printer.rs implementation",
     "Well-structured CI/CD integration examples for GitHub Actions, GitLab CI, and CircleCI",
-    "Good coverage of context-aware validation and coverage integration",
-    "Helpful troubleshooting section with practical debugging advice",
-    "Accurate documentation of core validation metrics and thresholds",
+    "Clear migration guidance from deprecated thresholds with timeline",
+    "Comprehensive troubleshooting section with verbosity levels documentation",
+    "Accurate documentation of --semantic-off flag and its use cases",
     "Good progressive threshold tightening recommendations",
-    "Accurate semantic-off flag documentation with clear use cases"
+    "Pre-commit hook integration example is practical and correct",
+    "Accurate documentation of exit codes and DEBTMAP_QUIET environment variable",
+    "Good coverage of context-aware validation and coverage integration"
   ],
   "improvement_suggestions": [
-    "Implement the --summary flag feature or remove all references to it",
-    "Update all output format examples to match actual validation_printer.rs implementation",
-    "Add examples of actual validation output captured from running the command",
-    "Consider adding a section on how validation integrates with the unified analysis pipeline (spec 130)",
-    "Add information about timing output at different verbosity levels",
-    "Document the DEBTMAP_QUIET environment variable mentioned in display_timing_information",
-    "Add examples of JSON validation output format for programmatic consumption",
-    "Clarify that validation uses the same analysis pipeline as analyze command for consistency"
+    "Clarify that debt_density is the only blocking metric early in the document",
+    "Explain the design rationale for single-metric blocking (simplicity, clear quality signal)",
+    "Add a prominent note about informational vs blocking metrics",
+    "Consider whether the output should distinguish blocking vs informational failures",
+    "Add a 'How Validation Works' section explaining the actual pass/fail logic"
   ],
   "cross_references": [
     "configuration.md",
@@ -85,7 +61,7 @@
     "cli-reference.md"
   ],
   "metadata": {
-    "analyzed_at": "2025-12-04T22:00:00Z",
+    "analyzed_at": "2025-12-27T08:35:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Validate command usage",
@@ -93,8 +69,25 @@
       "Quality gate configuration",
       "CI/CD integration",
       "Exit codes and automation",
-      "Deprecated threshold migration"
+      "Deprecated metrics migration"
     ],
-    "validation_focus": "Check that validate command and quality gate configuration are documented"
+    "validation_focus": "Check that validate command and quality gate configuration are documented",
+    "source_files_analyzed": [
+      "src/commands/validate/mod.rs",
+      "src/commands/validate/thresholds.rs",
+      "src/commands/validate/output.rs",
+      "src/config/thresholds.rs",
+      "src/cli/args.rs",
+      "src/cli/commands/validate.rs",
+      "src/utils/validation_printer.rs"
+    ],
+    "internal_links_validated": true,
+    "broken_links": [],
+    "previous_issues_resolved": [
+      "Summary output format examples fixed",
+      "Tiered priority output references removed",
+      "Output format examples now match validation_printer.rs",
+      "Emoji symbols in output examples corrected to [OK]/[ERROR] format"
+    ]
   }
 }
