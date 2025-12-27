@@ -248,7 +248,7 @@ fn load_config(path: &Path) -> Result<Config> {
 When you run with `--attribution`, you'll see a detailed breakdown:
 
 ```bash
-$ debtmap analyze src/main.rs --multi-pass --attribution --detail-level comprehensive
+$ debtmap analyze src/main.rs --attribution --detail-level comprehensive
 ```
 
 ### Sample Output
