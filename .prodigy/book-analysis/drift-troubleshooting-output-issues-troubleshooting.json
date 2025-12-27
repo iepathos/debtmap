@@ -1,0 +1,111 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "troubleshooting",
+  "subsection_id": "output-issues-troubleshooting",
+  "subsection_title": "Output and Command Issues",
+  "subsection_file": "book/src/troubleshooting/output-issues.md",
+  "feature_mappings": [
+    "cli_interface.commands.compare",
+    "cli_interface.commands.validate",
+    "cli_interface.commands.validate_improvement",
+    "output_formats"
+  ],
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Documentation contains multiple inaccuracies about CLI flags and features that don't exist",
+  "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "JSON Format Options",
+      "description": "Documentation mentions --output-format flag with 'legacy' and 'unified' options, but this flag does not exist in the CLI",
+      "current_content": "debtmap analyze . --format json --output-format legacy\ndebtmap analyze . --format json --output-format unified",
+      "should_be": "Remove references to --output-format flag entirely - the unified format is always used internally (spec 202 removed legacy format)",
+      "fix_suggestion": "Remove the --output-format examples from the JSON Format Options section. The flag does not exist.",
+      "source_reference": "src/cli/args.rs - no --output-format flag defined; src/output/json.rs:32 - 'Always use unified format (spec 202 - removed legacy format)'"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Plain Output Mode",
+      "description": "Documentation mentions NO_EMOJI environment variable, but this is not implemented in the codebase",
+      "current_content": "export NO_EMOJI=1\ndebtmap analyze .",
+      "should_be": "Only document the --plain flag which does exist",
+      "fix_suggestion": "Remove the NO_EMOJI environment variable reference. Only the --plain flag is supported for ASCII-only output.",
+      "source_reference": "src/cli/args.rs:176-178 - only --plain flag is defined, no NO_EMOJI env var support found in codebase"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "medium",
+      "section": "Filtering Output",
+      "description": "Documentation shows --filter flag but the actual flag is --filter-categories with value_delimiter",
+      "current_content": "debtmap analyze . --filter \"complexity,debt\"",
+      "should_be": "Use the correct flag name",
+      "fix_suggestion": "Update examples to use the correct flag syntax. The flag is defined as --filter with value_delimiter=',' in the CLI args.",
+      "source_reference": "src/cli/args.rs:153-155 - filter_categories with long = 'filter'"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Validate-Improvement Command Issues",
+      "description": "The subsection topics include 'Validate-improvement command' but no troubleshooting guidance is provided for this command",
+      "feature_reference": "cli_interface.commands.validate_improvement",
+      "fix_suggestion": "Add a section for validate-improvement command troubleshooting, including: comparison file format requirements, threshold configuration, output format options, and common error scenarios",
+      "source_reference": "src/commands/validate_improvement/mod.rs - full validate-improvement command implementation"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Compare Command Issues",
+      "description": "Missing troubleshooting for common compare command issues like target location parsing failures or plan file format issues",
+      "fix_suggestion": "Add troubleshooting for: --target-location format requirements (file:function:line), --plan file parsing issues, and handling empty comparison results",
+      "source_reference": "src/cli/args.rs:483-489 - target_location format specification"
+    }
+  ],
+  "positive_aspects": [
+    "Good structure with clear section headings",
+    "Helpful basic usage examples for compare command workflow",
+    "Correct documentation of --plain flag for machine-parseable output",
+    "Valid internal links to related documentation pages",
+    "Useful CI/CD integration example for validate command"
+  ],
+  "improvement_suggestions": [
+    "Add troubleshooting section for validate-improvement command",
+    "Include examples of common error messages and their solutions",
+    "Add cross-references to output-formats.md for detailed format documentation",
+    "Consider adding a 'Common Errors' table with error message -> solution mappings"
+  ],
+  "cross_references": [
+    "quick-fixes",
+    "cli-reference"
+  ],
+  "link_validation": {
+    "total_internal_links": 2,
+    "broken_links": 0,
+    "validated_links": [
+      {
+        "link_text": "Quick Fixes",
+        "target": "quick-fixes.md",
+        "status": "valid"
+      },
+      {
+        "link_text": "CLI Reference",
+        "target": "../cli-reference.md",
+        "status": "valid"
+      }
+    ]
+  },
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:23:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Output formatting",
+      "Compare command",
+      "Validate command"
+    ],
+    "topics_missing": [
+      "Validate-improvement command"
+    ],
+    "validation_focus": "Check output and command troubleshooting is complete"
+  }
+}
