@@ -1,0 +1,114 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "configuration",
+  "subsection_id": "advanced-config",
+  "subsection_title": "Advanced Options",
+  "subsection_file": "book/src/configuration/advanced.md",
+  "file_exists": false,
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Documentation file does not exist - subsection is completely missing and needs to be created",
+  "issues": [
+    {
+      "type": "missing_file",
+      "severity": "critical",
+      "section": "Entire Subsection",
+      "description": "The documentation file 'book/src/configuration/advanced.md' does not exist. This subsection covering advanced configuration options needs to be created from scratch.",
+      "fix_suggestion": "Create the advanced.md file with documentation for entropy analysis, god object detection, context-aware detection, and parallel processing configuration",
+      "source_references": [
+        "src/complexity/entropy.rs - Entropy analysis implementation",
+        "src/organization/god_object/mod.rs - God object detection",
+        "src/analyzers/context_aware.rs - Context-aware false positive reduction",
+        "src/config/parallel.rs - Parallel processing configuration"
+      ]
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Entropy Analysis Configuration",
+      "description": "Entropy-based complexity analysis is a key advanced feature. Documentation should explain: EntropyAnalyzer configuration, token_entropy scoring, pattern_repetition detection, branch_similarity calculation, and how dampening is applied to complexity scores.",
+      "feature_reference": "complexity_analysis.entropy",
+      "fix_suggestion": "Add section documenting DEBTMAP_ENTROPY_ENABLED environment variable, entropy thresholds, and how entropy analysis affects complexity scores",
+      "source_reference": "src/complexity/entropy.rs:EntropyAnalyzer, EntropyScore, apply_entropy_dampening()"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "God Object Detection Configuration",
+      "description": "God object detection is a major feature with multiple configurable thresholds. Documentation should cover: method count thresholds, field count thresholds, LOC thresholds, responsibility detection, and split recommendations.",
+      "feature_reference": "god_object_detection",
+      "fix_suggestion": "Add section documenting god object thresholds (GodObjectThresholds), detection predicates, and scoring algorithms",
+      "source_reference": "src/organization/god_object/thresholds.rs, src/organization/god_object/scoring.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Context-Aware Detection Configuration",
+      "description": "Context-aware analysis provides false positive reduction based on code context. Documentation should explain: --no-context-aware flag, DEBTMAP_CONTEXT_AWARE environment variable, and how context rules affect debt detection.",
+      "feature_reference": "debt_detection.context_aware",
+      "fix_suggestion": "Add section documenting context-aware analyzer, ContextRuleEngine, and how to enable/disable this feature",
+      "source_reference": "src/analyzers/context_aware.rs:ContextAwareAnalyzer, src/cli/args.rs:no_context_aware"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Parallel Processing Configuration",
+      "description": "Parallel processing is an important performance feature. Documentation should cover: ParallelConfig options (enabled, max_concurrency, batch_size), BatchAnalysisConfig, and when to use sequential vs parallel analysis.",
+      "feature_reference": "parallel_processing",
+      "fix_suggestion": "Add section documenting [parallel] config block in debtmap.toml, --jobs CLI flag, and performance tuning",
+      "source_reference": "src/config/parallel.rs:ParallelConfig, BatchAnalysisConfig"
+    }
+  ],
+  "expected_content": {
+    "sections": [
+      {
+        "title": "Entropy Analysis",
+        "description": "Information theory-based complexity dampening",
+        "topics": ["Token entropy calculation", "Pattern repetition detection", "Branch similarity analysis", "Complexity dampening factors", "Cache configuration"]
+      },
+      {
+        "title": "God Object Detection",
+        "description": "Detection and analysis of overly complex types",
+        "topics": ["Detection thresholds", "Method count weighting", "Responsibility inference", "Split recommendations", "Cohesion calculation"]
+      },
+      {
+        "title": "Context-Aware Detection",
+        "description": "Smart false positive reduction",
+        "topics": ["File type context (test vs production)", "Function context detection", "Rule-based severity adjustment", "Custom context rules"]
+      },
+      {
+        "title": "Parallel Processing",
+        "description": "Multi-threaded analysis configuration",
+        "topics": ["Enable/disable parallelism", "Concurrency limits", "Batch size tuning", "Memory considerations", "Fail-fast vs accumulating modes"]
+      }
+    ],
+    "examples": [
+      {
+        "title": "TOML Configuration Example",
+        "content": "[parallel]\nenabled = true\nmax_concurrency = 8\nbatch_size = 100"
+      },
+      {
+        "title": "CLI Flags Example",
+        "content": "debtmap analyze . --no-context-aware --jobs 4"
+      }
+    ]
+  },
+  "positive_aspects": [],
+  "improvement_suggestions": [
+    "Create the file with clear sections for each advanced option category",
+    "Include TOML configuration examples for each feature",
+    "Add CLI flag documentation for each option",
+    "Include best practices for when to enable/disable each feature",
+    "Add cross-references to related chapters (thresholds.md, scoring.md)"
+  ],
+  "cross_references": [
+    "thresholds",
+    "scoring"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-27T08:28:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Entropy analysis", "God object detection", "Context-aware detection", "Parallel processing"],
+    "validation_focus": "Check advanced configuration options"
+  }
+}
