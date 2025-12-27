@@ -141,6 +141,20 @@ Debtmap automatically adjusts thresholds based on function role, recognizing tha
 | Test Functions | 2.0x - 3.0x (preset-specific) | Most lenient | Unit tests, integration tests |
 | Unknown Functions | 1.0x (defaults to core logic) | Standard | Functions that don't match any role pattern |
 
+### Function Role Classification
+
+Debtmap automatically determines function roles based on naming patterns (src/complexity/threshold_manager.rs:264-278):
+
+| Role | Matching Patterns | Examples |
+|------|------------------|----------|
+| Entry Point | `main`, `*_handler`, `handle_*` | `main()`, `request_handler()`, `handle_event()` |
+| Test | `test_*`, `*_test` | `test_validation()`, `parser_test()` |
+| Utility | `get_*`, `set_*`, `is_*`, `has_*` | `get_name()`, `set_config()`, `is_valid()`, `has_permission()` |
+| Core Logic | All other functions | `process_data()`, `calculate_score()`, `validate()` |
+| Unknown | Fallback (uses core logic multiplier) | Rare edge cases |
+
+**Note**: The "Unknown" role uses the same multiplier as Core Logic (1.0x). In practice, functions are classified as Core Logic if they don't match any specific pattern.
+
 **Note**: Some multipliers vary by preset:
 - **Entry Points**: Strict=1.2x, Balanced=1.5x, Lenient=2.0x
 - **Utility Functions**: Strict=0.6x, Balanced=0.8x, Lenient=1.0x
