@@ -5,9 +5,9 @@ Debtmap analyzes code through multiple lenses to provide a comprehensive view of
 ## Supported Languages
 
 - **Rust** - Full analysis support with AST-based parsing via `syn`
-- **Python** - Partial support for basic metrics
+- **Python** - File detection only; analysis not yet implemented (language enum defined for future expansion)
 
-Source: `src/organization/language.rs:4-7`
+Source: `src/organization/language.rs:4-7` (Language enum), `src/analyzers/implementations.rs:185-186` (analysis status)
 
 ## Analysis Capabilities
 
@@ -54,7 +54,7 @@ Identifies **25+ types of technical debt** across 4 major categories:
 - Dead code and duplication
 - Error swallowing and magic values
 
-Source: `src/priority/mod.rs:158-288` (DebtType enum)
+Source: `src/priority/debt_types.rs:47` (DebtType enum)
 
 See [Debt Patterns](debt-patterns.md) for detailed detection rules and examples.
 
