@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-08efffac.js";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-d4b9eccb.js"></script>
+        <script src="../toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,7 +181,7 @@
 <p>Debtmap’s risk scoring identifies code that is both complex AND poorly tested - the true risk hotspots.</p>
 <h2 id="unified-scoring-system"><a class="header" href="#unified-scoring-system">Unified Scoring System</a></h2>
 <p>Debtmap uses a <strong>unified scoring system</strong> (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.</p>
-<p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:22-291</a></p>
+<p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:97-144</a> (UnifiedScore struct)</p>
 <h3 id="score-scale-and-priority-classifications"><a class="header" href="#score-scale-and-priority-classifications">Score Scale and Priority Classifications</a></h3>
 <p>Functions receive scores from 0 (minimal risk) to 10 (critical risk):</p>
 <div class="table-wrapper">
@@ -204,7 +204,7 @@
 
 Final Score = Base Score × Role Multiplier × Purity Adjustment
 </code></pre>
-<p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:170-291</a> (calculate_unified_priority_with_debt)</p>
+<p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:300-325</a> (calculate_unified_priority_with_debt)</p>
 <h4 id="dynamic-weight-adjustment"><a class="header" href="#dynamic-weight-adjustment">Dynamic Weight Adjustment</a></h4>
 <p><strong>IMPORTANT</strong>: Weights are dynamically adjusted based on coverage data availability.</p>
 <p><strong>When coverage data is available</strong> (default):</p>
@@ -236,7 +236,7 @@ Complexity Factor = (raw_complexity / 2.0).clamp(0.0, 10.0)
 // Default: 30% cyclomatic + 70% cognitive
 // For orchestrators: 25% cyclomatic + 75% cognitive
 <span class="boring">}</span></code></pre>
-<p>Maps normalized complexity (0-20 range) to 0-10 scale. Uses configurable weights that prioritize cognitive complexity (70%) over cyclomatic complexity (30%) as it correlates better with defect density.</p>
+<p>Maps normalized complexity (0-20 range) to 0-10 scale. Uses configurable weights that prioritize cognitive complexity (70%) over cyclomatic complexity (30%) as it correlates better with defect density. See <a href="complexity-metrics.html">Complexity Metrics</a> for detailed explanations of cyclomatic vs cognitive complexity.</p>
 <p><strong>Source</strong>: <a href="../../src/config/scoring.rs">src/config/scoring.rs:221-267</a> (ComplexityWeightsConfig)</p>
 <p><strong>Coverage Factor</strong> (0-10 scale):</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -289,9 +289,10 @@ Dependency Factor = (upstream_caller_count / 2.0).min(10.0)
 </div>
 <p><strong>Source</strong>:</p>
 <ul>
-<li>Multiplier values: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:385-399</a> (calculate_role_multiplier)</li>
+<li>Multiplier values: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:624-635</a> (calculate_role_multiplier)</li>
 <li>Configuration defaults: <a href="../../src/config/scoring.rs">src/config/scoring.rs:147-220</a> (RoleMultipliers)</li>
 </ul>
+<p><strong>Note</strong>: Configuration allows overriding these default multipliers via <code>.debtmap.toml</code>. See <a href="../configuration.html">Configuration</a> for details on customizing role weights.</p>
 <p><strong>Note</strong>: PureLogic has a <strong>dynamic multiplier</strong> that adjusts based on complexity. Simple business logic (≤ 5.0 complexity) gets baseline priority, while complex business logic (&gt; 5.0) receives elevated priority (1.3×).</p>
 <h4 id="how-role-classification-works"><a class="header" href="#how-role-classification-works">How Role Classification Works</a></h4>
 <p>Debtmap identifies function roles through a rule-based classifier with specific detection heuristics:</p>
@@ -406,7 +407,7 @@ Where:
 <p><strong>Implementation Details</strong>:</p>
 <ol>
 <li><strong>Transitive coverage</strong> is calculated via recursive call graph traversal</li>
-<li>Results are stored in <code>UnifiedDebtItem.transitive_coverage</code> field (<strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:50</a>)</li>
+<li>Results are stored in <code>UnifiedDebtItem.transitive_coverage</code> field (<strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:154</a>)</li>
 <li>Weights decay exponentially with call graph depth:
 <ul>
 <li>1 hop away: contribution × 0.7</li>
@@ -501,7 +502,7 @@ Step 5: Calculate base score (with dynamic weights)
 
 Step 6: Apply role multiplier
   Role Multiplier = 1.3 (PureLogic with complexity &gt; 5.0)
-  // Source: src/priority/unified_scorer.rs:385-399
+  // Source: src/priority/unified_scorer.rs:624-635
 
   Final Score = 3.04 × 1.3 = 3.95 → LOW priority
 
@@ -591,7 +592,7 @@ where:
 <li>Resource debt (unclosed files, memory leaks)</li>
 <li>Duplication debt (code clones)</li>
 </ul>
-<p><strong>Source</strong>: <a href="../../src/priority/debt_aggregator/">src/priority/debt_aggregator/</a></p>
+<p><strong>Source</strong>: <a href="../../src/priority/debt_aggregator.rs">src/priority/debt_aggregator.rs</a></p>
 <p><strong>Example (legacy scoring):</strong></p>
 <pre><code>Function: process_payment
   - Cyclomatic complexity: 18
@@ -696,7 +697,7 @@ Calculation:
 </div>
 <p><strong>Sources</strong>:</p>
 <ul>
-<li>Unified priority tiers: <a href="../../src/priority/tiers.rs">src/priority/tiers.rs</a></li>
+<li>Unified priority tiers: <a href="../../src/priority/tiers/mod.rs">src/priority/tiers/mod.rs</a></li>
 <li>Legacy RiskCategory enum: <a href="../../src/risk/mod.rs">src/risk/mod.rs:36-42</a></li>
 </ul>
 <p><strong>Note on minimal_count:</strong></p>

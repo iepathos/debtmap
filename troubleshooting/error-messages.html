@@ -1,0 +1,645 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Error Messages Reference - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-3bdbe002.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="error-messages-reference"><a class="header" href="#error-messages-reference">Error Messages Reference</a></h1>
+<p>Understanding common error messages, error codes, and how to resolve them.</p>
+<h2 id="error-code-system"><a class="header" href="#error-code-system">Error Code System</a></h2>
+<p>Debtmap uses structured error codes for programmatic handling and documentation lookup. Error codes are assigned by category (from <code>src/debtmap_error.rs:62-116</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code Range</th><th>Category</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>E001-E009</td><td>I/O</td><td>File system and I/O errors</td></tr>
+<tr><td>E010-E019</td><td>Parse</td><td>Source code parsing errors</td></tr>
+<tr><td>E020-E029</td><td>Config</td><td>Configuration file errors</td></tr>
+<tr><td>E030-E039</td><td>Analysis</td><td>Analysis algorithm errors</td></tr>
+<tr><td>E040-E049</td><td>CLI</td><td>Command-line argument errors</td></tr>
+<tr><td>E050-E059</td><td>Validation</td><td>Input validation errors</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="io-error-codes-e001-e009"><a class="header" href="#io-error-codes-e001-e009">I/O Error Codes (E001-E009)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>E001</td><td><code>IO_FILE_NOT_FOUND</code></td><td>File or directory does not exist</td></tr>
+<tr><td>E002</td><td><code>IO_PERMISSION_DENIED</code></td><td>Insufficient permissions to read file</td></tr>
+<tr><td>E003</td><td><code>IO_RESOURCE_BUSY</code></td><td>File is locked or resource temporarily unavailable</td></tr>
+<tr><td>E009</td><td><code>IO_GENERIC</code></td><td>Other I/O errors</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="parse-error-codes-e010-e019"><a class="header" href="#parse-error-codes-e010-e019">Parse Error Codes (E010-E019)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>E010</td><td><code>PARSE_SYNTAX</code></td><td>Syntax error in source file</td></tr>
+<tr><td>E011</td><td><code>PARSE_UNSUPPORTED</code></td><td>Unsupported language or feature</td></tr>
+<tr><td>E012</td><td><code>PARSE_ENCODING</code></td><td>Invalid file encoding</td></tr>
+<tr><td>E019</td><td><code>PARSE_GENERIC</code></td><td>Other parse errors</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="configuration-error-codes-e020-e029"><a class="header" href="#configuration-error-codes-e020-e029">Configuration Error Codes (E020-E029)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>E020</td><td><code>CONFIG_INVALID</code></td><td>Invalid configuration value</td></tr>
+<tr><td>E021</td><td><code>CONFIG_MISSING</code></td><td>Missing required configuration field</td></tr>
+<tr><td>E022</td><td><code>CONFIG_FILE_NOT_FOUND</code></td><td>Configuration file not found</td></tr>
+<tr><td>E029</td><td><code>CONFIG_GENERIC</code></td><td>Other configuration errors</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="analysis-error-codes-e030-e039"><a class="header" href="#analysis-error-codes-e030-e039">Analysis Error Codes (E030-E039)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>E030</td><td><code>ANALYSIS_COMPLEXITY</code></td><td>Complexity calculation failed</td></tr>
+<tr><td>E031</td><td><code>ANALYSIS_COVERAGE</code></td><td>Coverage data loading failed</td></tr>
+<tr><td>E032</td><td><code>ANALYSIS_SCORING</code></td><td>Debt scoring calculation failed</td></tr>
+<tr><td>E039</td><td><code>ANALYSIS_GENERIC</code></td><td>Other analysis errors</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="cli-error-codes-e040-e049"><a class="header" href="#cli-error-codes-e040-e049">CLI Error Codes (E040-E049)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>E040</td><td><code>CLI_INVALID_COMMAND</code></td><td>Unknown or invalid command</td></tr>
+<tr><td>E041</td><td><code>CLI_MISSING_ARG</code></td><td>Required argument not provided</td></tr>
+<tr><td>E042</td><td><code>CLI_INVALID_ARG</code></td><td>Invalid argument value</td></tr>
+<tr><td>E049</td><td><code>CLI_GENERIC</code></td><td>Other CLI errors</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="validation-error-codes-e050-e059"><a class="header" href="#validation-error-codes-e050-e059">Validation Error Codes (E050-E059)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>E050</td><td><code>VALIDATION_GENERIC</code></td><td>General validation failure</td></tr>
+<tr><td>E051</td><td><code>VALIDATION_THRESHOLD</code></td><td>Threshold validation exceeded</td></tr>
+<tr><td>E052</td><td><code>VALIDATION_CONSTRAINT</code></td><td>Constraint violation</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="error-classification"><a class="header" href="#error-classification">Error Classification</a></h2>
+<p>Debtmap classifies errors to help determine appropriate action (from <code>src/debtmap_error.rs:466-519</code>):</p>
+<h3 id="retryable-vs-non-retryable-errors"><a class="header" href="#retryable-vs-non-retryable-errors">Retryable vs Non-Retryable Errors</a></h3>
+<p><strong>Retryable errors</strong> may succeed on a subsequent attempt:</p>
+<ul>
+<li>Resource busy / file locks (<code>E003</code>)</li>
+<li>Network timeouts</li>
+<li>Connection issues</li>
+<li>“Temporarily unavailable” errors</li>
+</ul>
+<p><strong>Non-retryable errors</strong> require user intervention:</p>
+<ul>
+<li>Parse/syntax errors</li>
+<li>Configuration errors</li>
+<li>File not found (permanent)</li>
+<li>Validation errors</li>
+</ul>
+<h3 id="user-fixable-vs-system-errors"><a class="header" href="#user-fixable-vs-system-errors">User-Fixable vs System Errors</a></h3>
+<p><strong>User-fixable errors</strong> can be resolved by modifying input:</p>
+<ul>
+<li>Configuration errors (fix config file)</li>
+<li>CLI errors (fix command arguments)</li>
+<li>Validation errors (fix input values)</li>
+<li>Parse errors (fix source code syntax)</li>
+</ul>
+<p><strong>System errors</strong> are outside user control:</p>
+<ul>
+<li>I/O errors (system issues)</li>
+<li>Analysis errors (internal algorithm issues)</li>
+</ul>
+<h2 id="exit-codes"><a class="header" href="#exit-codes">Exit Codes</a></h2>
+<p>Debtmap returns specific exit codes for CI/CD integration (from <code>src/debtmap_error.rs:521-532</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Exit Code</th><th>Meaning</th><th>When Returned</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td>Success</td><td>Analysis completed successfully</td></tr>
+<tr><td>1</td><td>Analysis/I/O Error</td><td>Analysis failed or I/O error occurred</td></tr>
+<tr><td>2</td><td>CLI Error</td><td>Invalid command-line usage</td></tr>
+<tr><td>3</td><td>Config Error</td><td>Configuration file or value error</td></tr>
+<tr><td>4</td><td>Validation Error</td><td>Validation threshold exceeded</td></tr>
+<tr><td>5</td><td>Parse Error</td><td>Source code parsing failed</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>CI/CD Integration Example:</strong></p>
+<pre><code class="language-bash">#!/bin/bash
+debtmap analyze .
+EXIT_CODE=$?
+
+case $EXIT_CODE in
+  0)
+    echo "Analysis passed"
+    ;;
+  1)
+    echo "Analysis or I/O error - check logs"
+    exit 1
+    ;;
+  2)
+    echo "CLI usage error - check command syntax"
+    exit 1
+    ;;
+  3)
+    echo "Configuration error - check .debtmap.toml"
+    exit 1
+    ;;
+  4)
+    echo "Validation failed - thresholds exceeded"
+    exit 1
+    ;;
+  5)
+    echo "Parse error - source code issues"
+    exit 1
+    ;;
+esac
+</code></pre>
+<h2 id="file-system-errors"><a class="header" href="#file-system-errors">File System Errors</a></h2>
+<p><strong>Message</strong>: <code>[E001] I/O error: No such file or directory</code></p>
+<p><strong>Meaning</strong>: File or directory does not exist</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Verify path is correct: <code>ls -la &lt;path&gt;</code></li>
+<li>Check current working directory: <code>pwd</code></li>
+<li>Use absolute paths if needed</li>
+</ul>
+<hr>
+<p><strong>Message</strong>: <code>[E002] I/O error: Permission denied</code></p>
+<p><strong>Meaning</strong>: Cannot read file or directory due to permissions</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check file permissions: <code>ls -la &lt;file&gt;</code></li>
+<li>Ensure user has read access</li>
+<li>Run from appropriate directory</li>
+</ul>
+<hr>
+<p><strong>Message</strong>: <code>[E003] I/O error: Resource busy</code></p>
+<p><strong>Meaning</strong>: File is locked or temporarily unavailable (retryable)</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Wait and retry the analysis</li>
+<li>Close other programs using the file</li>
+<li>Check for file locks</li>
+</ul>
+<h2 id="parse-errors"><a class="header" href="#parse-errors">Parse Errors</a></h2>
+<p><strong>Message</strong>: <code>[E010] Parse error in file.rs: unexpected token at line 42, column 10</code></p>
+<p><strong>Meaning</strong>: Syntax that debtmap cannot parse</p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Try fallback mode without semantic analysis
+debtmap analyze . --semantic-off
+
+# For Rust macro issues, enable verbose warnings
+debtmap analyze . --verbose-macro-warnings --show-macro-stats
+</code></pre>
+<hr>
+<p><strong>Message</strong>: <code>[E011] Parse error: unsupported language</code></p>
+<p><strong>Meaning</strong>: The file type is not supported or has unsupported features</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check that the file is a supported language (Rust, Python, JavaScript, TypeScript)</li>
+<li>For Rust, complex procedural macros may require <code>--semantic-off</code></li>
+</ul>
+<h2 id="configuration-errors"><a class="header" href="#configuration-errors">Configuration Errors</a></h2>
+<p><strong>Message</strong>: <code>[E020] Configuration error: invalid config value</code></p>
+<p><strong>Meaning</strong>: Invalid configuration in <code>.debtmap.toml</code> or CLI flags</p>
+<p><strong>Configuration File Locations</strong> (checked in order):</p>
+<ol>
+<li><code>.debtmap.toml</code> in project root (project-level)</li>
+<li><code>~/.config/debtmap/config.toml</code> (global user config)</li>
+</ol>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check <code>.debtmap.toml</code> syntax with a TOML validator</li>
+<li>Review CLI flag values</li>
+<li>Check for typos in configuration keys</li>
+</ul>
+<p><strong>Example valid configuration:</strong></p>
+<pre><code class="language-toml"># .debtmap.toml
+[thresholds]
+complexity = 10
+max_file_length = 500
+
+[scoring]
+coverage = 0.40
+complexity = 0.30
+</code></pre>
+<hr>
+<p><strong>Message</strong>: <code>[E022] Configuration error: file not found</code></p>
+<p><strong>Meaning</strong>: Specified configuration file does not exist</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Create <code>.debtmap.toml</code> from the example: <code>cp .debtmap.toml.example .debtmap.toml</code></li>
+<li>Verify the configuration path if using <code>--config</code> flag</li>
+</ul>
+<h2 id="validation-errors"><a class="header" href="#validation-errors">Validation Errors</a></h2>
+<p><strong>Message</strong>: <code>[E051] Validation error: threshold validation failed</code></p>
+<p><strong>Meaning</strong>: Analysis results exceed configured thresholds</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check threshold values in <code>.debtmap.toml</code> under <code>[thresholds.validation]</code></li>
+<li>Ensure <code>--min-priority</code> is in valid range (0-10)</li>
+<li>Use <code>--threshold-preset</code> with a valid preset name</li>
+</ul>
+<p><strong>Validation thresholds example:</strong></p>
+<pre><code class="language-toml">[thresholds.validation]
+max_average_complexity = 10.0
+max_high_complexity_count = 100
+max_debt_items = 2000
+max_total_debt_score = 10000
+max_codebase_risk_score = 7.0
+</code></pre>
+<h2 id="analysis-errors"><a class="header" href="#analysis-errors">Analysis Errors</a></h2>
+<p><strong>Message</strong>: <code>[E039] Analysis error: internal analysis failure</code></p>
+<p><strong>Meaning</strong>: Internal error during analysis phase</p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Try fallback mode
+debtmap analyze . --semantic-off
+
+# Report with debug info
+debtmap analyze . -vvv 2&gt;&amp;1 | tee error.log
+
+# Isolate problem file
+debtmap analyze . --max-files 1 path/to/suspected/file
+</code></pre>
+<hr>
+<p><strong>Message</strong>: <code>[E031] Analysis error: Coverage error</code></p>
+<p><strong>Meaning</strong>: Failed to load or process coverage data</p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Analyze without coverage data
+debtmap analyze . --no-coverage
+
+# Check coverage file format
+debtmap explain-coverage &lt;coverage-file&gt;
+
+# Verify function name matching
+debtmap analyze . -vvv | grep -i coverage
+</code></pre>
+<h2 id="dependency-errors"><a class="header" href="#dependency-errors">Dependency Errors</a></h2>
+<p><strong>Message</strong>: <code>Dependency error: cannot resolve dependency graph</code></p>
+<p><strong>Meaning</strong>: Cannot build dependency relationships</p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Disable dependency provider
+debtmap analyze . --context --disable-context dependency
+
+# Try without context
+debtmap analyze .
+</code></pre>
+<h2 id="concurrency-errors"><a class="header" href="#concurrency-errors">Concurrency Errors</a></h2>
+<p><strong>Message</strong>: <code>Concurrency error: parallel processing failure</code></p>
+<p><strong>Meaning</strong>: Error during parallel execution</p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Disable parallel processing
+debtmap analyze . --no-parallel
+
+# Reduce thread count
+debtmap analyze . --jobs 1
+</code></pre>
+<h2 id="pattern-errors"><a class="header" href="#pattern-errors">Pattern Errors</a></h2>
+<p><strong>Message</strong>: <code>Pattern error: invalid glob pattern</code></p>
+<p><strong>Meaning</strong>: Invalid glob pattern in configuration or CLI</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check glob pattern syntax</li>
+<li>Escape special characters if needed</li>
+<li>Use simpler patterns or path prefixes</li>
+</ul>
+<h2 id="handling-false-positives"><a class="header" href="#handling-false-positives">Handling False Positives</a></h2>
+<p>Debtmap includes context-aware false positive reduction, enabled by default. This uses pattern-based classification to reduce spurious debt reports (from <code>src/cli/args.rs:202-204</code>).</p>
+<h3 id="controlling-false-positive-reduction"><a class="header" href="#controlling-false-positive-reduction">Controlling False Positive Reduction</a></h3>
+<pre><code class="language-bash"># Default: context-aware analysis enabled
+debtmap analyze .
+
+# Disable context-aware analysis for raw results
+debtmap analyze . --no-context-aware
+</code></pre>
+<h3 id="when-to-expect-false-positives"><a class="header" href="#when-to-expect-false-positives">When to Expect False Positives</a></h3>
+<p>False positives are more likely with:</p>
+<ul>
+<li>Complex macro-generated code</li>
+<li>Unusual code patterns</li>
+<li>Generated or vendored code</li>
+<li>Test utilities with intentionally complex patterns</li>
+</ul>
+<p><strong>Reducing false positives:</strong></p>
+<ol>
+<li>Use context-aware analysis (default)</li>
+<li>Configure exclusion patterns in <code>.debtmap.toml</code></li>
+<li>Use <code>--verbose-macro-warnings</code> to identify macro issues</li>
+</ol>
+<h2 id="boilerplate-detection-messages"><a class="header" href="#boilerplate-detection-messages">Boilerplate Detection Messages</a></h2>
+<p>Debtmap identifies boilerplate patterns that may be better suited for macros or code generation (from <code>src/organization/boilerplate_detector.rs:33-58</code>).</p>
+<h3 id="understanding-boilerplate-reports"><a class="header" href="#understanding-boilerplate-reports">Understanding Boilerplate Reports</a></h3>
+<p><strong>Message</strong>: <code>Boilerplate detected: high trait implementation density</code></p>
+<p><strong>Meaning</strong>: File contains many similar trait implementations with low complexity, suggesting macro-ification would reduce maintenance burden.</p>
+<p><strong>Detection criteria:</strong></p>
+<ul>
+<li>20+ impl blocks (configurable via <code>min_impl_blocks</code>)</li>
+<li>70%+ method uniformity across implementations</li>
+<li>Average complexity below 2.0 (simple, repetitive code)</li>
+<li>70%+ confidence threshold</li>
+</ul>
+<h3 id="acting-on-boilerplate-recommendations"><a class="header" href="#acting-on-boilerplate-recommendations">Acting on Boilerplate Recommendations</a></h3>
+<p>When a file is flagged as boilerplate:</p>
+<ol>
+<li><strong>Consider macro extraction</strong>: If implementing the same trait for many types, use a declarative macro</li>
+<li><strong>Consider code generation</strong>: For very large patterns, use build.rs or proc-macros</li>
+<li><strong>Review the recommendation</strong>: Debtmap provides specific suggestions for each pattern</li>
+</ol>
+<p><strong>Boilerplate is NOT the same as complex code:</strong></p>
+<ul>
+<li>Complex code (high cyclomatic complexity) → split into modules</li>
+<li>Boilerplate code (low complexity, high repetition) → macro-ify or generate</li>
+</ul>
+<h2 id="language-specific-issues"><a class="header" href="#language-specific-issues">Language-Specific Issues</a></h2>
+<h3 id="rust-macro-handling"><a class="header" href="#rust-macro-handling">Rust Macro Handling</a></h3>
+<p>Rust macros may produce parse warnings or analysis limitations:</p>
+<pre><code class="language-bash"># Enable verbose macro warnings
+debtmap analyze . --verbose-macro-warnings
+
+# Show macro expansion statistics
+debtmap analyze . --show-macro-stats
+
+# Both together for full diagnostics
+debtmap analyze . --verbose-macro-warnings --show-macro-stats
+</code></pre>
+<h3 id="language-support-status"><a class="header" href="#language-support-status">Language Support Status</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Support Level</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td>Rust</td><td>Full</td><td>Primary language, best analysis</td></tr>
+<tr><td>Python</td><td>Stub</td><td>Basic complexity analysis</td></tr>
+<tr><td>JavaScript</td><td>Stub</td><td>Basic complexity analysis</td></tr>
+<tr><td>TypeScript</td><td>Stub</td><td>Basic complexity analysis</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="quick-fixes.html">Quick Fixes</a> - Common problems with immediate solutions</li>
+<li><a href="debug-mode.html">Debug Mode</a> - Verbosity levels for diagnostics</li>
+<li><a href="faq.html">FAQ</a> - Frequently asked questions</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../troubleshooting/advanced-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../troubleshooting/output-issues.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../troubleshooting/advanced-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../troubleshooting/output-issues.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

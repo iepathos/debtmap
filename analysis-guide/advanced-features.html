@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-08efffac.js";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-d4b9eccb.js"></script>
+        <script src="../toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,8 +178,8 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h1>
-<h2 id="advanced-features-1"><a class="header" href="#advanced-features-1">Advanced Features</a></h2>
-<h3 id="purity-detection"><a class="header" href="#purity-detection">Purity Detection</a></h3>
+<p>This section covers Debtmap’s advanced analysis capabilities: purity detection, data flow analysis, entropy-based complexity, and context-aware analysis.</p>
+<h2 id="purity-detection"><a class="header" href="#purity-detection">Purity Detection</a></h2>
 <p>Debtmap detects pure functions - those without side effects that always return the same output for the same input.</p>
 <p><strong>What makes a function pure:</strong></p>
 <ul>
@@ -195,14 +195,15 @@
 <li>May be <code>None</code> for some functions or languages where detection is not available</li>
 <li>Rust has the most comprehensive purity detection support</li>
 </ul>
-<p><strong>Three-level purity classification:</strong>
-The <code>purity_level</code> field provides a more nuanced classification than the binary <code>is_pure</code>:</p>
+<p><strong>Four-level purity classification:</strong>
+The <code>PurityLevel</code> enum (<code>src/core/mod.rs:49-62</code>) provides more nuanced classification than the binary <code>is_pure</code>:</p>
 <ul>
-<li><strong>Pure</strong>: No side effects detected, deterministic output</li>
-<li><strong>ProbablyPure</strong>: Mostly pure with minor suspicious patterns</li>
-<li><strong>Impure</strong>: Clear side effects or non-deterministic behavior</li>
+<li><strong>StrictlyPure</strong>: No mutations whatsoever - pure mathematical functions</li>
+<li><strong>LocallyPure</strong>: Uses local mutations for efficiency but no external side effects (builder patterns, accumulators, owned <code>mut self</code>)</li>
+<li><strong>ReadOnly</strong>: Reads external state but doesn’t modify it (constants, <code>&amp;self</code> methods)</li>
+<li><strong>Impure</strong>: Modifies external state or performs I/O (<code>&amp;mut self</code>, statics, I/O)</li>
 </ul>
-<p>This three-level classification (available in <code>src/core/mod.rs:91</code>) complements the confidence scoring for more precise analysis.</p>
+<p>This four-level classification enables better scoring for functions that use local mutations for efficiency but are functionally pure (referentially transparent). See <a href="complexity-metrics.html">Complexity Metrics</a> for how purity affects scoring.</p>
 <p><strong>Confidence scoring (when available):</strong></p>
 <ul>
 <li><strong>0.9-1.0</strong>: Very confident (no side effects detected)</li>
@@ -231,9 +232,9 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
 <li>Safe to parallelize</li>
 <li>Easier to reason about</li>
 </ul>
-<h3 id="data-flow-analysis"><a class="header" href="#data-flow-analysis">Data Flow Analysis</a></h3>
+<h2 id="data-flow-analysis"><a class="header" href="#data-flow-analysis">Data Flow Analysis</a></h2>
 <p>Debtmap builds a comprehensive <code>DataFlowGraph</code> that extends basic call graph analysis with variable dependencies, data transformations, I/O operations, and purity tracking.</p>
-<h4 id="call-graph-foundation"><a class="header" href="#call-graph-foundation">Call Graph Foundation</a></h4>
+<h3 id="call-graph-foundation"><a class="header" href="#call-graph-foundation">Call Graph Foundation</a></h3>
 <p><strong>Upstream callers</strong> - Who calls this function</p>
 <ul>
 <li>Indicates impact radius</li>
@@ -260,22 +261,23 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
   ]
 }
 </code></pre>
-<h4 id="variable-dependency-tracking"><a class="header" href="#variable-dependency-tracking">Variable Dependency Tracking</a></h4>
-<p><code>DataFlowGraph</code> tracks which variables each function depends on:</p>
+<h3 id="variable-dependency-tracking"><a class="header" href="#variable-dependency-tracking">Variable Dependency Tracking</a></h3>
+<p><code>DataFlowGraph</code> tracks which variables each function depends on (<code>src/data_flow/mod.rs:119</code>):</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct DataFlowGraph {
     // Maps function_id -&gt; set of variable names used
-    variable_dependencies: HashMap&lt;String, HashSet&lt;String&gt;&gt;,
+    variable_deps: HashMap&lt;FunctionId, HashSet&lt;String&gt;&gt;,
     // ...
 }
 <span class="boring">}</span></code></pre>
 <p><strong>What it tracks:</strong></p>
 <ul>
+<li>Function parameters (primary source via extraction adapters)</li>
 <li>Local variables accessed in function body</li>
-<li>Function parameters</li>
 <li>Captured variables (closures)</li>
 </ul>
+<p><strong>Note:</strong> Variable dependency tracking stores variable <em>names</em> only (as <code>HashSet&lt;String&gt;</code>). It does not track mutability information - that analysis is handled separately by the purity detection system.</p>
 <p><strong>Benefits:</strong></p>
 <ul>
 <li>Identify functions coupled through shared state</li>
@@ -290,46 +292,46 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
   "local_var_count": 1
 }
 </code></pre>
-<h4 id="data-transformation-patterns"><a class="header" href="#data-transformation-patterns">Data Transformation Patterns</a></h4>
-<p><code>DataFlowGraph</code> identifies common functional programming patterns:</p>
+<h3 id="data-transformation-patterns"><a class="header" href="#data-transformation-patterns">Data Transformation Patterns</a></h3>
+<p><code>DataFlowGraph</code> tracks data transformations between functions. The <code>TransformationType</code> enum (<code>src/organization/data_flow_analyzer.rs:35-46</code>) classifies transformations by their input/output cardinality:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum TransformationType {
-    Map,        // Transform each element
-    Filter,     // Select subset of elements
-    Reduce,     // Aggregate to single value
-    FlatMap,    // Transform and flatten
-    Unknown,    // Other transformations
+    Direct,        // A → B (pure transformation)
+    Aggregation,   // (A, B) → C (multiple inputs to single output)
+    Decomposition, // A → (B, C) (single input to multiple outputs)
+    Enrichment,    // A → Result&lt;B&gt; (validation/enrichment with Result/Option)
+    Expansion,     // A → Vec&lt;B&gt; (single input to collection)
 }
 <span class="boring">}</span></code></pre>
-<p><strong>Pattern detection:</strong></p>
+<p><strong>Classification logic</strong> (<code>src/organization/data_flow_analyzer.rs:124-146</code>):</p>
 <ul>
-<li>Recognizes iterator chains (<code>.map()</code>, <code>.filter()</code>, <code>.fold()</code>)</li>
-<li>Identifies functional vs imperative data flow</li>
-<li>Tracks input/output variable relationships</li>
+<li>Multiple input parameters → <code>Aggregation</code></li>
+<li>Return type is <code>Result&lt;T&gt;</code> or <code>Option&lt;T&gt;</code> → <code>Enrichment</code></li>
+<li>Return type is <code>Vec&lt;T&gt;</code> → <code>Expansion</code></li>
+<li>Return type is tuple → <code>Decomposition</code></li>
+<li>Default → <code>Direct</code></li>
 </ul>
-<p><strong>Example:</strong></p>
+<p><strong>Example usage:</strong></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Detected as: Filter → Map → Reduce pattern
-fn total_active_users(users: &amp;[User]) -&gt; f64 {
-    users.iter()
-        .filter(|u| u.active)      // Filter transformation
-        .map(|u| u.balance)        // Map transformation
-        .sum()                      // Reduce transformation
+</span>// Aggregation: (items, discount_rate) → f64
+fn calculate_discounted_total(items: &amp;[Item], discount_rate: f64) -&gt; f64 {
+    items.iter().map(|i| i.price).sum::&lt;f64&gt;() * (1.0 - discount_rate)
+}
+
+// Enrichment: Config → Result&lt;ValidatedConfig&gt;
+fn validate_config(config: Config) -&gt; Result&lt;ValidatedConfig&gt; {
+    // ...
+}
+
+// Expansion: Order → Vec&lt;LineItem&gt;
+fn extract_line_items(order: &amp;Order) -&gt; Vec&lt;LineItem&gt; {
+    order.items.clone()
 }
 <span class="boring">}</span></code></pre>
-<p><strong>Transformation metadata:</strong></p>
-<pre><code class="language-json">{
-  "function": "total_active_users",
-  "input_vars": ["users"],
-  "output_vars": ["sum_result"],
-  "transformation_type": "Reduce",
-  "is_functional_style": true,
-  "pipeline_length": 3
-}
-</code></pre>
-<h4 id="io-operation-detection"><a class="header" href="#io-operation-detection">I/O Operation Detection</a></h4>
+<p><strong>Note:</strong> The <code>DataFlowGraph.data_transformations</code> field (<code>src/data_flow/mod.rs:149</code>) stores <code>transformation_type</code> as a <code>String</code>, allowing flexible pattern descriptions beyond the enum variants.</p>
+<h3 id="io-operation-detection"><a class="header" href="#io-operation-detection">I/O Operation Detection</a></h3>
 <p>Tracks functions performing I/O operations for purity and performance analysis:</p>
 <p><strong>I/O categories tracked:</strong></p>
 <ul>
@@ -358,7 +360,7 @@ fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
   "async_safe": false
 }
 </code></pre>
-<h4 id="purity-analysis-integration"><a class="header" href="#purity-analysis-integration">Purity Analysis Integration</a></h4>
+<h3 id="purity-analysis-integration"><a class="header" href="#purity-analysis-integration">Purity Analysis Integration</a></h3>
 <p><code>DataFlowGraph</code> integrates with purity detection to provide comprehensive side effect analysis:</p>
 <p><strong>Side effect tracking:</strong></p>
 <ul>
@@ -387,7 +389,7 @@ fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
   "safe_to_cache": true
 }
 </code></pre>
-<h4 id="modification-impact-analysis"><a class="header" href="#modification-impact-analysis">Modification Impact Analysis</a></h4>
+<h3 id="modification-impact-analysis"><a class="header" href="#modification-impact-analysis">Modification Impact Analysis</a></h3>
 <p><code>DataFlowGraph</code> calculates the impact of modifying a function:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -429,7 +431,7 @@ debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_p
 <li><strong>Code review</strong>: Flag high-risk changes for extra scrutiny</li>
 <li><strong>Dependency management</strong>: Identify tightly coupled components</li>
 </ul>
-<h4 id="dataflowgraph-methods"><a class="header" href="#dataflowgraph-methods">DataFlowGraph Methods</a></h4>
+<h3 id="dataflowgraph-methods"><a class="header" href="#dataflowgraph-methods">DataFlowGraph Methods</a></h3>
 <p>Key methods for data flow analysis:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -480,7 +482,7 @@ Both have same complexity, but validate_payment_method gets higher unified score
 due to its critical role in the call graph.
 </code></pre>
 <p>This integration ensures that the unified scoring system considers not just internal function complexity and test coverage, but also the function’s importance in the broader codebase architecture.</p>
-<h3 id="entropy-based-complexity"><a class="header" href="#entropy-based-complexity">Entropy-Based Complexity</a></h3>
+<h2 id="entropy-based-complexity"><a class="header" href="#entropy-based-complexity">Entropy-Based Complexity</a></h2>
 <p>Advanced pattern detection to reduce false positives.</p>
 <p><strong>Token Classification:</strong></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -517,9 +519,9 @@ due to its critical role in the call graph.
     - Similar branch structures found (92% similarity)
     - Complexity reduced by 67% due to pattern-based code
 </code></pre>
-<h3 id="entropy-analysis-caching"><a class="header" href="#entropy-analysis-caching">Entropy Analysis Caching</a></h3>
+<h2 id="entropy-analysis-caching"><a class="header" href="#entropy-analysis-caching">Entropy Analysis Caching</a></h2>
 <p><code>EntropyAnalyzer</code> includes an LRU-style cache for performance optimization when analyzing large codebases or performing repeated analysis.</p>
-<h4 id="cache-structure"><a class="header" href="#cache-structure">Cache Structure</a></h4>
+<h3 id="cache-structure"><a class="header" href="#cache-structure">Cache Structure</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>struct CacheEntry {
@@ -535,7 +537,7 @@ due to its critical role in the call graph.
 <li><strong>Memory per entry</strong>: ~128 bytes</li>
 <li><strong>Total memory overhead</strong>: ~128 KB for default size</li>
 </ul>
-<h4 id="cache-statistics"><a class="header" href="#cache-statistics">Cache Statistics</a></h4>
+<h3 id="cache-statistics"><a class="header" href="#cache-statistics">Cache Statistics</a></h3>
 <p>The analyzer tracks cache performance:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -564,7 +566,7 @@ due to its critical role in the call graph.
 <li><strong>0.4-0.7</strong>: Good - moderate reuse, typical for incremental analysis</li>
 <li><strong>&lt; 0.4</strong>: Low - mostly unique functions, cache less helpful</li>
 </ul>
-<h4 id="performance-benefits"><a class="header" href="#performance-benefits">Performance Benefits</a></h4>
+<h3 id="performance-benefits"><a class="header" href="#performance-benefits">Performance Benefits</a></h3>
 <p><strong>Typical performance gains:</strong></p>
 <ul>
 <li><strong>Cold analysis</strong>: 100ms baseline (no cache benefit)</li>
@@ -585,7 +587,7 @@ Examples:
 - 5,000 entries: ~640 KB (large projects)
 - 10,000 entries: ~1.25 MB (very large)
 </code></pre>
-<h4 id="cache-management"><a class="header" href="#cache-management">Cache Management</a></h4>
+<h3 id="cache-management"><a class="header" href="#cache-management">Cache Management</a></h3>
 <p><strong>Automatic eviction:</strong></p>
 <ul>
 <li>When cache reaches size limit, oldest entries evicted</li>
@@ -604,7 +606,7 @@ enabled = true
 size = 1000           # Number of entries
 ttl_seconds = 3600    # Optional: expire after 1 hour
 </code></pre>
-<h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
+<h2 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h2>
 <p>Debtmap adjusts analysis based on code context:</p>
 <p><strong>Pattern Recognition:</strong></p>
 <ul>
@@ -632,7 +634,7 @@ fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
     Ok(())
 }
 <span class="boring">}</span></code></pre>
-<h3 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h3>
+<h2 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h2>
 <p>Debtmap parses LCOV coverage data for risk analysis:</p>
 <p><strong>LCOV Support:</strong></p>
 <ul>
@@ -647,7 +649,7 @@ fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
 <li>~200 bytes per function</li>
 <li>Thread-safe (<code>Arc&lt;CoverageIndex&gt;</code>)</li>
 </ul>
-<h4 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h4>
+<h3 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h3>
 <p><strong>Index Build Performance:</strong></p>
 <ul>
 <li>Index construction: O(n), approximately 20-30ms for 5,000 functions</li>
@@ -707,6 +709,12 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
 <pre><code>final_score = base_score × (1 - coverage_percentage)
 </code></pre>
 <p>This ensures well-tested complex code gets lower priority than untested simple code.</p>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="complexity-metrics.html">Complexity Metrics</a> - Detailed metrics used in analysis</li>
+<li><a href="risk-scoring.html">Risk Scoring</a> - How advanced features influence risk scores</li>
+<li><a href="interpreting-results.html">Interpreting Results</a> - Using analysis results effectively</li>
+</ul>
 
                     </main>
 

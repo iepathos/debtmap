@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-08efffac.js";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-d4b9eccb.js"></script>
+        <script src="../toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -264,7 +264,7 @@
   }
 }
 </code></pre>
-<p><strong>Source</strong>: Structure from <code>src/output/unified.rs:FunctionDebtItemOutput</code> (lines 158-183)</p>
+<p><strong>Source</strong>: Structure from <code>src/output/unified/func_item.rs:FunctionDebtItemOutput</code> (lines 50-84)</p>
 <p><strong>Key Fields Explained:</strong></p>
 <ul>
 <li><code>type</code>: Always <code>"Function"</code> for function-level debt items</li>
@@ -352,7 +352,7 @@
   }
 }
 </code></pre>
-<p><strong>Source</strong>: Structure from <code>src/output/unified.rs:FileDebtItemOutput</code> (lines 110-123) and <code>src/priority/file_metrics.rs:GodObjectIndicators</code></p>
+<p><strong>Source</strong>: Structure from <code>src/output/unified/file_item.rs:FileDebtItemOutput</code> and <code>src/priority/file_metrics.rs:GodObjectIndicators</code></p>
 <h2 id="test-gap-needs-testing"><a class="header" href="#test-gap-needs-testing">Test Gap (Needs Testing)</a></h2>
 <p><strong>Terminal Output:</strong></p>
 <pre><code>#3 SCORE: 8.9 [CRITICAL]
@@ -431,7 +431,7 @@
   }
 }
 </code></pre>
-<p><strong>Source</strong>: Structure from <code>src/output/unified.rs:FunctionDebtItemOutput</code> with <code>debt_type</code> from <code>src/priority/mod.rs:158-171</code></p>
+<p><strong>Source</strong>: Structure from <code>src/output/unified/func_item.rs:FunctionDebtItemOutput</code> with <code>debt_type</code> from <code>src/priority/debt_types.rs:DebtType</code></p>
 <h2 id="entropy-dampened-validation-function"><a class="header" href="#entropy-dampened-validation-function">Entropy-Dampened Validation Function</a></h2>
 <p>This example shows how debtmap’s entropy analysis reduces false positives for repetitive code patterns.</p>
 <p><strong>Terminal Output:</strong></p>
@@ -499,7 +499,7 @@
   }
 }
 </code></pre>
-<p><strong>Source</strong>: <code>adjusted_complexity</code> from <code>src/output/unified.rs:186-190</code>, entropy dampening spec 182</p>
+<p><strong>Source</strong>: <code>adjusted_complexity</code> from <code>src/output/unified/func_item.rs:AdjustedComplexity</code>, entropy dampening spec 182</p>
 <p><strong>Key Points:</strong></p>
 <ul>
 <li><code>adjusted_cyclomatic</code>: Entropy-dampened complexity value (7 vs original 20)</li>
@@ -531,7 +531,7 @@
   "complexity_pattern": "State machine with 12 states, high cohesion"
 }
 </code></pre>
-<p><strong>Source</strong>: <code>pattern_type</code> and <code>pattern_confidence</code> from <code>src/output/unified.rs:178-182</code></p>
+<p><strong>Source</strong>: <code>pattern_type</code> and <code>pattern_confidence</code> from <code>src/output/unified/func_item.rs:FunctionDebtItemOutput</code></p>
 <p><strong>Available Pattern Types:</strong></p>
 <ul>
 <li><code>state_machine</code> - State transition logic</li>
@@ -556,7 +556,7 @@
 <li><code>"TEST FILE"</code> - File is definitively a test file</li>
 <li><code>"PROBABLE TEST"</code> - File likely contains tests but not confirmed</li>
 </ul>
-<p><strong>Source</strong>: <code>file_context_label</code> from <code>src/output/unified.rs:106</code></p>
+<p><strong>Source</strong>: <code>file_context_label</code> from <code>src/output/unified/location.rs:UnifiedLocation</code></p>
 <h2 id="summary-statistics"><a class="header" href="#summary-statistics">Summary Statistics</a></h2>
 <p>The unified format includes summary statistics at the top level.</p>
 <p><strong>JSON Output:</strong></p>
@@ -593,7 +593,7 @@
   "items": []
 }
 </code></pre>
-<p><strong>Source</strong>: <code>UnifiedOutput</code> structure from <code>src/output/unified.rs:18-24</code> and <code>DebtSummary</code> from lines 36-45</p>
+<p><strong>Source</strong>: <code>UnifiedOutput</code> structure from <code>src/output/unified/types.rs:14-20</code> and <code>DebtSummary</code> from lines 32-44</p>
 <p><strong>Key Summary Fields:</strong></p>
 <ul>
 <li><code>debt_density</code>: Total debt score per 1000 lines of code</li>
@@ -649,7 +649,7 @@ Impact:
 <ul>
 <li><strong><a href="../output-formats.html">Output Formats</a></strong> - Complete JSON schema and format documentation</li>
 <li><strong><a href="../configuration.html">Configuration</a></strong> - Customize thresholds and analysis behavior</li>
-<li><strong><a href="../analysis-guide/advanced-features.html">Advanced Features</a></strong> - Purity analysis, entropy dampening, pattern detection</li>
+<li><strong><a href="./advanced-features.html">Advanced Features</a></strong> - Purity analysis, entropy dampening, pattern detection</li>
 </ul>
 <p>For questions or issues, visit <a href="https://github.com/iepathos/debtmap/issues">GitHub Issues</a>.</p>
 

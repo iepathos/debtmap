@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -225,7 +225,7 @@ end_of_record
 <li><strong>v0 scheme</strong>: Starts with <code>_RNv</code> (modern Rust, default since 1.38)</li>
 <li><strong>Legacy scheme</strong>: Starts with <code>_ZN</code> (older Rust versions)</li>
 </ul>
-<p><strong>Normalization Process</strong> (see <code>src/risk/lcov.rs:demangle_function_name</code> and <code>normalize_demangled_name</code>):</p>
+<p><strong>Normalization Process</strong> (see <code>src/risk/lcov/demangle.rs:demangle_function_name</code> and <code>src/risk/lcov/normalize.rs:normalize_demangled_name</code>):</p>
 <ol>
 <li><strong>Demangle</strong>: Convert mangled symbols to human-readable names</li>
 <li><strong>Strip crate hashes</strong>: Remove build-specific hash IDs (e.g., <code>debtmap[71f4b4990cdcf1ab]</code> → <code>debtmap</code>)</li>
@@ -292,13 +292,21 @@ end_of_record
 <p><strong>Analyze with Debtmap:</strong></p>
 <pre><code class="language-bash">debtmap analyze . --lcov coverage.lcov
 </code></pre>
-<h3 id="go-go-test-with-gocover-cobertura"><a class="header" href="#go-go-test-with-gocover-cobertura">Go: go test with gocover-cobertura</a></h3>
-<p><strong>Generate Coverage:</strong></p>
-<pre><code class="language-bash">go test -coverprofile=coverage.out ./...
-gocover-cobertura &lt; coverage.out &gt; coverage.xml
-# Convert to LCOV using lcov tools
+<h3 id="go-go-test-with-gcov2lcov"><a class="header" href="#go-go-test-with-gcov2lcov">Go: go test with gcov2lcov</a></h3>
+<p><strong>Install gcov2lcov:</strong></p>
+<pre><code class="language-bash">go install github.com/jandelgado/gcov2lcov@latest
 </code></pre>
-<p><strong>Note</strong>: Go’s native coverage format requires conversion. Most CI systems support LCOV conversion plugins.</p>
+<p><strong>Generate Coverage:</strong></p>
+<pre><code class="language-bash"># Generate Go coverage profile
+go test -coverprofile=coverage.out ./...
+
+# Convert to LCOV format
+gcov2lcov -infile=coverage.out -outfile=coverage.lcov
+</code></pre>
+<p><strong>Analyze with Debtmap:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.lcov --languages go
+</code></pre>
+<p><strong>Note</strong>: Go’s native coverage format requires conversion to LCOV. The <code>gcov2lcov</code> tool provides direct conversion without intermediate formats.</p>
 <h2 id="role-based-coverage-expectations"><a class="header" href="#role-based-coverage-expectations">Role-Based Coverage Expectations</a></h2>
 <p>Not all functions need the same level of test coverage. Debtmap uses a <strong>role-based coverage expectation system</strong> to adjust scoring based on function purpose (see <code>src/priority/scoring/coverage_expectations.rs</code> and <code>src/risk/evidence/coverage_analyzer.rs</code>).</p>
 <h3 id="function-roles-and-coverage-targets"><a class="header" href="#function-roles-and-coverage-targets">Function Roles and Coverage Targets</a></h3>
@@ -893,13 +901,19 @@ head coverage.lcov
 debtmap analyze . --lcov coverage.lcov --languages python
 </code></pre>
 <h3 id="go-end-to-end"><a class="header" href="#go-end-to-end">Go End-to-End</a></h3>
-<pre><code class="language-bash"># 1. Generate native coverage
+<pre><code class="language-bash"># 1. Install gcov2lcov (one-time setup)
+go install github.com/jandelgado/gcov2lcov@latest
+
+# 2. Generate coverage
 go test -coverprofile=coverage.out ./...
 
-# 2. Convert to LCOV (requires gocover-cobertura or similar)
-# Note: This step is tool-dependent
+# 3. Convert to LCOV
+gcov2lcov -infile=coverage.out -outfile=coverage.lcov
 
-# 3. Run Debtmap
+# 4. Verify LCOV output
+head coverage.lcov
+
+# 5. Run Debtmap
 debtmap analyze . --lcov coverage.lcov --languages go
 </code></pre>
 <h2 id="faq"><a class="header" href="#faq">FAQ</a></h2>

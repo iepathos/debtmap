@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -241,7 +241,7 @@ enable_cross_module_analysis = true
 # Maximum depth for transitive analysis (optional)
 max_analysis_depth = 10
 </code></pre>
-<p><strong>Source</strong>: Configuration fields from src/config/core.rs:149-167 (AnalysisSettings)</p>
+<p><strong>Source</strong>: Configuration fields from src/config/core.rs:159-175 (AnalysisSettings)</p>
 <h3 id="callercallee-display-settings"><a class="header" href="#callercallee-display-settings">Caller/Callee Display Settings</a></h3>
 <p>Configure how dependencies are displayed in the <code>[classification.caller_callee]</code> section:</p>
 <pre><code class="language-toml">[classification.caller_callee]
@@ -297,10 +297,11 @@ show_std_lib = false
 <tr><td><code>--validate-call-graph</code></td><td>false</td><td>Validate call graph structure and report issues</td></tr>
 <tr><td><code>--call-graph-stats</code></td><td>false</td><td>Show call graph statistics with resolution percentiles (p50, p95, p99)</td></tr>
 <tr><td><code>--trace-function &lt;NAMES&gt;</code></td><td>none</td><td>Trace specific functions during call resolution (comma-separated)</td></tr>
+<tr><td><code>--debug-format &lt;FORMAT&gt;</code></td><td>text</td><td>Debug output format (text or json)</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Source</strong>: CLI flags from src/cli.rs:163-289</p>
+<p><strong>Source</strong>: CLI flags from src/cli/args.rs:341-350</p>
 <h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
 <h3 id="basic-call-graph-analysis"><a class="header" href="#basic-call-graph-analysis">Basic Call Graph Analysis</a></h3>
 <pre><code class="language-bash"># Analyze with call graph enabled (default)
@@ -398,7 +399,7 @@ debtmap analyze . --no-parallel
 <li><strong>Structural issues</strong> - Orphaned functions, disconnected components</li>
 <li><strong>Warnings</strong> - Potential resolution problems</li>
 </ul>
-<p><strong>Source</strong>: Validation implementation from tests/call_graph_debug_output_test.rs:134-151</p>
+<p><strong>Source</strong>: Validation implementation from src/analyzers/call_graph/validation.rs:185 (CallGraphValidator)</p>
 <h2 id="performance-tuning"><a class="header" href="#performance-tuning">Performance Tuning</a></h2>
 <p>For large codebases, consider these performance optimizations:</p>
 <ul>

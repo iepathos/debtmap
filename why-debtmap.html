@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -336,7 +336,7 @@
 <h2 id="how-debtmap-fits-in-your-workflow"><a class="header" href="#how-debtmap-fits-in-your-workflow">How Debtmap Fits in Your Workflow</a></h2>
 <h3 id="ai-assisted-development"><a class="header" href="#ai-assisted-development">AI-Assisted Development</a></h3>
 <pre><code class="language-bash"># Generate debt signals
-debtmap analyze . --format llm-markdown --lcov coverage.lcov
+debtmap analyze . --format markdown --lcov coverage.lcov
 
 # Pipe to AI
 cat debt.md | claude "Fix the top item, read the suggested context first"

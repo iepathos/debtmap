@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-08efffac.js";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-d4b9eccb.js"></script>
+        <script src="../toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,7 +181,7 @@
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p><strong>Debtmap is a Rust-only code analysis tool.</strong> As of specification 191, debtmap focuses exclusively on Rust codebases to provide deep, language-specific insights into code complexity, technical debt, and architectural patterns.</p>
 <p>While the architecture supports extensibility through the <code>Analyzer</code> trait, only Rust is actively supported and maintained. Files in other programming languages are automatically filtered during discovery and never reach the analysis phase.</p>
-<p><strong>Source</strong>: As documented in src/core/mod.rs:376-377 and src/core/injection.rs:198-200</p>
+<p><strong>Source</strong>: Language enum at src/core/mod.rs:416-421, AnalyzerFactory at src/core/injection.rs:190-203</p>
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
@@ -212,7 +212,7 @@
 <h2 id="language-support"><a class="header" href="#language-support">Language Support</a></h2>
 <h3 id="supported-rust-only"><a class="header" href="#supported-rust-only">Supported: Rust Only</a></h3>
 <p>Debtmap exclusively analyzes Rust source files (<code>.rs</code> extension). All analysis features, metrics, and debt detection patterns are designed specifically for Rust’s syntax and semantics.</p>
-<p><strong>Language Detection</strong> (src/core/mod.rs:386-391):</p>
+<p><strong>Language Detection</strong> (src/core/mod.rs:435-440):</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn from_path(path: &amp;std::path::Path) -&gt; Self {
@@ -222,7 +222,7 @@
         .unwrap_or(Language::Unknown)
 }
 <span class="boring">}</span></code></pre>
-<p>The <code>Language</code> enum (src/core/mod.rs:368-372) includes <code>Rust</code>, <code>Python</code>, and <code>Unknown</code> variants, but only <code>Rust</code> is actively processed:</p>
+<p>The <code>Language</code> enum (src/core/mod.rs:416-421) includes <code>Rust</code>, <code>Python</code>, and <code>Unknown</code> variants, but only <code>Rust</code> is actively processed:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum Language {
@@ -238,7 +238,7 @@
 <li><strong>All other files</strong>: Silently filtered out—no warnings or errors generated</li>
 <li><strong>Unknown extensions</strong>: Mapped to <code>Language::Unknown</code> and filtered during discovery</li>
 </ol>
-<p><strong>Source</strong>: Language detection implemented in src/core/mod.rs:375-391</p>
+<p><strong>Source</strong>: Language detection implemented in src/core/mod.rs:423-440</p>
 <p><strong>Example Usage</strong>:</p>
 <pre><code class="language-bash"># Analyze all Rust files in current directory
 debtmap analyze .
@@ -252,7 +252,7 @@ debtmap analyze src/main.rs
 <h2 id="extensibility"><a class="header" href="#extensibility">Extensibility</a></h2>
 <p>While debtmap currently focuses on Rust-only analysis, the architecture is designed to support additional languages in the future through the <code>Analyzer</code> trait.</p>
 <h3 id="analyzer-trait"><a class="header" href="#analyzer-trait">Analyzer Trait</a></h3>
-<p>The core <code>Analyzer</code> trait defines the interface for language-specific analyzers (src/analyzers/mod.rs:39-43):</p>
+<p>The core <code>Analyzer</code> trait defines the interface for language-specific analyzers (src/analyzers/mod.rs:40-44):</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub trait Analyzer: Send + Sync {
@@ -282,9 +282,9 @@ debtmap analyze src/main.rs
 <p>To add support for a new language:</p>
 <ol>
 <li><strong>Implement the <code>Analyzer</code> trait</strong> with language-specific parsing and analysis</li>
-<li><strong>Add the language variant</strong> to the <code>Language</code> enum (src/core/mod.rs:368-372)</li>
-<li><strong>Update <code>from_extension()</code></strong> to recognize the file extension (src/core/mod.rs:375-384)</li>
-<li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer (src/core/injection.rs:196-201)</li>
+<li><strong>Add the language variant</strong> to the <code>Language</code> enum (src/core/mod.rs:416-421)</li>
+<li><strong>Update <code>from_extension()</code></strong> to recognize the file extension (src/core/mod.rs:423-433)</li>
+<li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer (src/core/injection.rs:190-203)</li>
 </ol>
 <p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code> for a complete example of implementing the <code>Analyzer</code> trait with full complexity analysis, purity detection, and call graph support.</p>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>

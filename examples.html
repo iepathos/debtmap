@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -381,8 +381,8 @@ debtmap analyze . \
   --context \
   --context-providers critical_path,dependency,git_history
 
-# Multi-pass analysis with attribution
-debtmap analyze . --multi-pass --attribution
+# Multi-pass analysis with attribution (multi-pass is default)
+debtmap analyze . --attribution
 </code></pre>
 <h3 id="complete-ci-example"><a class="header" href="#complete-ci-example">Complete CI Example</a></h3>
 <p>This is from Debtmap’s own <code>.github/workflows/debtmap.yml</code>:</p>

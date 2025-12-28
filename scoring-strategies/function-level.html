@@ -1,0 +1,551 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Function-Level Scoring - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-3bdbe002.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="function-level-scoring"><a class="header" href="#function-level-scoring">Function-Level Scoring</a></h1>
+<p>Function-level scoring identifies specific functions needing attention for targeted improvements. This subsection covers the scoring formula, constructor detection, role classification, and role multipliers.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Function-level scoring combines complexity, coverage, and dependency metrics to calculate a priority score for each function. The formula uses coverage as a multiplicative dampener rather than an additive factor, reflecting that testing gaps amplify existing complexity.</p>
+<p><strong>Key Principle</strong>: Untested complex code is riskier than well-tested complex code. Coverage acts as a multiplier that reduces the score for well-tested functions and preserves the full score for untested functions.</p>
+<h2 id="scoring-formula"><a class="header" href="#scoring-formula">Scoring Formula</a></h2>
+<p>The function-level scoring formula consists of three stages:</p>
+<h3 id="stage-1-factor-calculation"><a class="header" href="#stage-1-factor-calculation">Stage 1: Factor Calculation</a></h3>
+<p><strong>Complexity Factor</strong> (<code>src/priority/scoring/calculation.rs:55-59</code>):</p>
+<pre><code>complexity_factor = raw_complexity / 2.0  (clamped to 0-10)
+</code></pre>
+<p>Complexity of 20+ maps to the maximum factor of 10.0. This provides linear scaling with a reasonable cap.</p>
+<p><strong>Dependency Factor</strong> (<code>src/priority/scoring/calculation.rs:62-66</code>):</p>
+<pre><code>dependency_factor = upstream_count / 2.0  (capped at 10.0)
+</code></pre>
+<p>20+ upstream dependencies map to the maximum factor of 10.0.</p>
+<h3 id="stage-2-base-score-calculation"><a class="header" href="#stage-2-base-score-calculation">Stage 2: Base Score Calculation</a></h3>
+<p><strong>Without Coverage Data</strong> (<code>src/priority/scoring/calculation.rs:119-129</code>):</p>
+<pre><code>base_score = (complexity_factor × 10 × 0.50) + (dependency_factor × 10 × 0.25)
+</code></pre>
+<p>Weights:</p>
+<ul>
+<li><strong>50%</strong> weight on complexity</li>
+<li><strong>25%</strong> weight on dependencies</li>
+<li><strong>25%</strong> reserved for debt pattern adjustments</li>
+</ul>
+<p><strong>With Coverage Data</strong> (<code>src/priority/scoring/calculation.rs:70-82</code>):</p>
+<pre><code>coverage_multiplier = 1.0 - coverage_percent
+base_score = base_score_no_coverage × coverage_multiplier
+</code></pre>
+<p>Coverage acts as a dampening multiplier:</p>
+<ul>
+<li><strong>0% coverage</strong> (multiplier = 1.0): Full base score preserved</li>
+<li><strong>50% coverage</strong> (multiplier = 0.5): Half the base score</li>
+<li><strong>100% coverage</strong> (multiplier = 0.0): Near-zero score</li>
+</ul>
+<h3 id="stage-3-role-multiplier"><a class="header" href="#stage-3-role-multiplier">Stage 3: Role Multiplier</a></h3>
+<p>The final score applies a role-based multiplier:</p>
+<pre><code>final_score = base_score × role_multiplier
+</code></pre>
+<p>See <a href="#role-multipliers">Role Multipliers</a> for the specific values.</p>
+<h3 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h3>
+<pre><code>Function: calculate_risk_score()
+  Cyclomatic: 12, Cognitive: 18
+  Coverage: 20%
+  Upstream dependencies: 8
+
+Step 1: Calculate factors
+  complexity_factor = (12 + 18) / 2 / 2.0 = 7.5 (capped at 10)
+  dependency_factor = 8 / 2.0 = 4.0
+
+Step 2: Base score (no coverage)
+  base = (7.5 × 10 × 0.50) + (4.0 × 10 × 0.25)
+  base = 37.5 + 10.0 = 47.5
+
+Step 3: Apply coverage multiplier
+  coverage_multiplier = 1.0 - 0.20 = 0.80
+  score_with_coverage = 47.5 × 0.80 = 38.0
+
+Step 4: Apply role multiplier (PureLogic = 1.2)
+  final_score = 38.0 × 1.2 = 45.6
+</code></pre>
+<h2 id="metrics"><a class="header" href="#metrics">Metrics</a></h2>
+<h3 id="cyclomatic-complexity"><a class="header" href="#cyclomatic-complexity">Cyclomatic Complexity</a></h3>
+<p>Counts decision points (if, match, loops, boolean operators). Guides the number of test cases needed for full branch coverage.</p>
+<p><strong>Interpretation</strong>:</p>
+<ul>
+<li>1-5: Low complexity, easy to test</li>
+<li>6-10: Moderate complexity, reasonable test effort</li>
+<li>11-20: High complexity, significant test effort</li>
+<li>20+: Very high complexity, consider refactoring</li>
+</ul>
+<h3 id="cognitive-complexity"><a class="header" href="#cognitive-complexity">Cognitive Complexity</a></h3>
+<p>Measures how difficult code is to understand, accounting for:</p>
+<ul>
+<li>Nesting depth (deeper nesting = higher penalty)</li>
+<li>Control flow breaks</li>
+<li>Recursion</li>
+</ul>
+<p><strong>Why Cognitive Gets Higher Weight</strong> (<code>src/config/scoring.rs:367-373</code>):</p>
+<ul>
+<li>Cyclomatic weight: 30%</li>
+<li>Cognitive weight: 70%</li>
+</ul>
+<p>Cognitive complexity correlates better with bug density because it measures comprehension difficulty, not just branching paths.</p>
+<h3 id="coverage-percentage"><a class="header" href="#coverage-percentage">Coverage Percentage</a></h3>
+<p>Direct line coverage from LCOV data. Functions with 0% coverage receive maximum urgency.</p>
+<p><strong>Coverage Dampening</strong> (<code>src/priority/scoring/calculation.rs:8-21</code>):</p>
+<ul>
+<li>Test code automatically receives 0.0 multiplier (near-zero score)</li>
+<li>Production code: multiplier = 1.0 - coverage_percent</li>
+</ul>
+<h3 id="dependency-count"><a class="header" href="#dependency-count">Dependency Count</a></h3>
+<p>Upstream callers indicate impact radius. Functions with many callers are riskier to modify.</p>
+<h2 id="constructor-detection"><a class="header" href="#constructor-detection">Constructor Detection</a></h2>
+<p>Debtmap identifies simple constructors to prevent false positives where trivial initialization functions are flagged as critical business logic.</p>
+<h3 id="detection-strategy"><a class="header" href="#detection-strategy">Detection Strategy</a></h3>
+<p>A function is classified as a constructor if it meets these criteria (<code>src/analyzers/rust_constructor_detector.rs:1-50</code>):</p>
+<p><strong>1. Name Pattern Match</strong>:</p>
+<ul>
+<li>Exact: <code>new</code>, <code>default</code>, <code>empty</code>, <code>zero</code>, <code>any</code></li>
+<li>Prefix: <code>from_*</code>, <code>with_*</code>, <code>create_*</code>, <code>make_*</code>, <code>build_*</code></li>
+</ul>
+<p><strong>2. Complexity Thresholds</strong>:</p>
+<ul>
+<li>Cyclomatic complexity: &lt;= 2</li>
+<li>Cognitive complexity: &lt;= 3</li>
+<li>Function length: &lt; 15 lines</li>
+<li>Nesting depth: &lt;= 1</li>
+</ul>
+<p><strong>3. AST Analysis</strong> (when enabled):</p>
+<ul>
+<li>Return type: <code>Self</code>, <code>Result&lt;Self, E&gt;</code>, or <code>Option&lt;Self&gt;</code></li>
+<li>Body pattern: Struct initialization, no loops</li>
+<li>No complex control flow</li>
+</ul>
+<h3 id="return-type-classification"><a class="header" href="#return-type-classification">Return Type Classification</a></h3>
+<p>The AST detector classifies return types (<code>src/analyzers/rust_constructor_detector.rs:36-42</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Return Type</th><th>Classification</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Self</code></td><td>OwnedSelf</td></tr>
+<tr><td><code>Result&lt;Self, E&gt;</code></td><td>ResultSelf</td></tr>
+<tr><td><code>Option&lt;Self&gt;</code></td><td>OptionSelf</td></tr>
+<tr><td><code>&amp;Self</code>, <code>&amp;mut Self</code></td><td>RefSelf (builder pattern)</td></tr>
+<tr><td>Other</td><td>Other</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="body-pattern-analysis"><a class="header" href="#body-pattern-analysis">Body Pattern Analysis</a></h3>
+<p>The constructor detector visits the function body (<code>src/analyzers/rust_constructor_detector.rs:104-130</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Tracks these patterns:
+struct BodyPattern {
+    struct_init_count: usize,  // Struct initialization expressions
+    self_refs: usize,          // References to Self
+    field_assignments: usize,  // Field assignment expressions
+    has_if: bool,              // Contains if expression
+    has_match: bool,           // Contains match expression
+    has_loop: bool,            // Contains any loop
+    early_returns: usize,      // Return statements
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Constructor-Like Pattern</strong> (<code>src/analyzers/rust_constructor_detector.rs:152-158</code>):</p>
+<ul>
+<li>Has struct initialization AND no loops, OR</li>
+<li>Has Self references AND no loops AND no match AND no field assignments</li>
+</ul>
+<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
+<p><strong>Detected as Constructor</strong> (classified as IOWrapper, score reduced):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn new() -&gt; Self {
+    Self { field: 0 }
+}
+
+fn from_config(config: Config) -&gt; Self {
+    Self {
+        timeout: config.timeout,
+        retries: 3,
+    }
+}
+
+fn try_new(value: i32) -&gt; Result&lt;Self, Error&gt; {
+    if value &gt; 0 {
+        Ok(Self { value })
+    } else {
+        Err(Error::InvalidValue)
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>NOT Detected as Constructor</strong> (remains PureLogic):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Has loop - disqualified
+fn process_items() -&gt; Self {
+    let mut result = Self::new();
+    for item in items {
+        result.add(item);
+    }
+    result
+}
+
+// High complexity - disqualified
+fn create_complex(data: Data) -&gt; Result&lt;Self&gt; {
+    validate(&amp;data)?;
+    // ... 30 lines of logic
+    Ok(Self { ... })
+}
+<span class="boring">}</span></code></pre>
+<h2 id="role-classification"><a class="header" href="#role-classification">Role Classification</a></h2>
+<p>Functions are classified by semantic role to adjust their priority scores appropriately.</p>
+<h3 id="classification-order"><a class="header" href="#classification-order">Classification Order</a></h3>
+<p>The classifier applies rules in precedence order (<code>src/priority/semantic_classifier/mod.rs:47-114</code>):</p>
+<ol>
+<li><strong>EntryPoint</strong>: Main functions, CLI handlers, routes</li>
+<li><strong>Debug</strong>: Functions with debug/diagnostic patterns</li>
+<li><strong>Constructor</strong>: Simple object construction (enhanced detection)</li>
+<li><strong>EnumConverter</strong>: Match-based enum to value conversion</li>
+<li><strong>Accessor</strong>: Getters, is_<em>, has_</em> methods</li>
+<li><strong>DataFlow</strong>: High transformation ratio (spec 126)</li>
+<li><strong>PatternMatch</strong>: Pattern matching functions</li>
+<li><strong>IOWrapper</strong>: File/network I/O thin wrappers</li>
+<li><strong>Orchestrator</strong>: Functions coordinating other functions</li>
+<li><strong>PureLogic</strong>: Default for unclassified functions</li>
+</ol>
+<h3 id="entry-point-detection"><a class="header" href="#entry-point-detection">Entry Point Detection</a></h3>
+<p>Entry points are identified by:</p>
+<ul>
+<li>Call graph analysis: No upstream callers</li>
+<li>Name patterns: <code>main</code>, <code>handle_*</code>, <code>run_*</code>, <code>execute_*</code></li>
+</ul>
+<h3 id="debug-function-detection"><a class="header" href="#debug-function-detection">Debug Function Detection</a></h3>
+<p>Debug/diagnostic functions are detected via (<code>src/priority/semantic_classifier/mod.rs:59-61</code>):</p>
+<ul>
+<li>Name patterns: <code>debug_*</code>, <code>print_*</code>, <code>dump_*</code>, <code>trace_*</code>, <code>*_diagnostics</code>, <code>*_stats</code></li>
+<li>Low complexity threshold</li>
+<li>Output-focused behavior</li>
+</ul>
+<h3 id="accessor-detection"><a class="header" href="#accessor-detection">Accessor Detection</a></h3>
+<p>Accessor methods are identified when (<code>src/priority/semantic_classifier/mod.rs:147-177</code>):</p>
+<ul>
+<li>Name matches accessor pattern: <code>id</code>, <code>name</code>, <code>get_*</code>, <code>is_*</code>, <code>has_*</code>, <code>as_*</code>, <code>to_*</code></li>
+<li>Cyclomatic complexity &lt;= 2</li>
+<li>Cognitive complexity &lt;= 1</li>
+<li>Length &lt; 10 lines</li>
+<li>(With AST) Simple field access body</li>
+</ul>
+<h2 id="role-multipliers"><a class="header" href="#role-multipliers">Role Multipliers</a></h2>
+<p>Each role receives a score multiplier based on test priority importance (<code>src/config/scoring.rs:307-333</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Role</th><th>Multiplier</th><th>Rationale</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>PureLogic</strong></td><td>1.2</td><td>Core business logic deserves high test priority</td></tr>
+<tr><td><strong>Unknown</strong></td><td>1.0</td><td>Default, no adjustment</td></tr>
+<tr><td><strong>EntryPoint</strong></td><td>0.9</td><td>Often integration tested, slight reduction</td></tr>
+<tr><td><strong>Orchestrator</strong></td><td>0.8</td><td>Coordinates tested functions, reduced priority</td></tr>
+<tr><td><strong>IOWrapper</strong></td><td>0.7</td><td>Thin I/O wrappers, integration tested</td></tr>
+<tr><td><strong>PatternMatch</strong></td><td>0.6</td><td>Simple pattern dispatch, lower priority</td></tr>
+<tr><td><strong>Debug</strong></td><td>0.3</td><td>Diagnostic functions, lowest priority</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="multiplier-rationale"><a class="header" href="#multiplier-rationale">Multiplier Rationale</a></h3>
+<p><strong>PureLogic (1.2x)</strong>: Business rules and algorithms should have comprehensive unit tests. They’re easy to test in isolation and contain the core value of the application.</p>
+<p><strong>Orchestrator (0.8x)</strong>: Orchestrators coordinate other tested functions. If the delegated functions are well-tested, the orchestrator is partially covered through integration.</p>
+<p><strong>IOWrapper (0.7x)</strong>: Thin I/O wrappers are often tested via integration tests. Unit testing them provides limited value compared to integration testing.</p>
+<p><strong>Debug (0.3x)</strong>: Diagnostic and debug functions have the lowest test priority. They’re not production-critical and are often exercised manually during development.</p>
+<h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
+<p>Role multipliers are configurable in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[role_multipliers]
+pure_logic = 1.2
+orchestrator = 0.8
+io_wrapper = 0.7
+entry_point = 0.9
+pattern_match = 0.6
+debug = 0.3
+unknown = 1.0
+</code></pre>
+<h3 id="role-multiplier-clamping"><a class="header" href="#role-multiplier-clamping">Role Multiplier Clamping</a></h3>
+<p>To prevent extreme score swings, multipliers can be clamped (<code>src/config/scoring.rs:457-493</code>):</p>
+<pre><code class="language-toml">[scoring.role_multiplier]
+clamp_min = 0.3    # Floor for all multipliers
+clamp_max = 1.8    # Ceiling for all multipliers
+enable_clamping = true
+</code></pre>
+<h2 id="complexity-weight-configuration"><a class="header" href="#complexity-weight-configuration">Complexity Weight Configuration</a></h2>
+<p>The balance between cyclomatic and cognitive complexity is configurable (<code>src/config/scoring.rs:335-381</code>):</p>
+<pre><code class="language-toml">[complexity_weights]
+cyclomatic = 0.3   # 30% weight
+cognitive = 0.7    # 70% weight
+max_cyclomatic = 50.0
+max_cognitive = 100.0
+</code></pre>
+<p><strong>Default Rationale</strong>:</p>
+<ul>
+<li>Cognitive complexity (70%) correlates better with bug density</li>
+<li>Cyclomatic complexity (30%) guides test case count</li>
+<li>Combined weighting provides balanced assessment</li>
+</ul>
+<h2 id="score-normalization"><a class="header" href="#score-normalization">Score Normalization</a></h2>
+<p>Raw scores undergo normalization for display (<code>src/priority/scoring/calculation.rs:174-206</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Score Range</th><th>Method</th><th>Formula</th></tr>
+</thead>
+<tbody>
+<tr><td>0-10</td><td>Linear</td><td>score (unchanged)</td></tr>
+<tr><td>10-100</td><td>Square root</td><td>10.0 + sqrt(score - 10.0) × 3.33</td></tr>
+<tr><td>100+</td><td>Logarithmic</td><td>41.59 + ln(score / 100.0) × 10.0</td></tr>
+</tbody>
+</table>
+</div>
+<p>This multi-phase approach:</p>
+<ul>
+<li>Preserves distinctions for low scores</li>
+<li>Moderately dampens medium scores</li>
+<li>Strongly dampens extreme values</li>
+</ul>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="file-level.html">File-Level Scoring</a>: Aggregate file scoring</li>
+<li><a href="role-based.html">Role-Based Adjustments</a>: Detailed role adjustment mechanics</li>
+<li><a href="rebalanced.html">Rebalanced Scoring</a>: Alternative scoring algorithm</li>
+<li><a href="data-flow.html">Data Flow Scoring</a>: Purity-based adjustments</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../scoring-strategies/file-level.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../scoring-strategies/role-based.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../scoring-strategies/file-level.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../scoring-strategies/role-based.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

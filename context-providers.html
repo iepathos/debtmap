@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -179,6 +179,24 @@
                     <main>
                         <h1 id="context-providers"><a class="header" href="#context-providers">Context Providers</a></h1>
 <p>Context providers enhance debtmap’s risk analysis by incorporating additional factors beyond complexity and test coverage. They analyze critical execution paths, dependency relationships, and version control history to provide a more comprehensive understanding of technical risk.</p>
+<h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of Contents</a></h2>
+<ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#critical-path-provider">Critical Path Provider</a></li>
+<li><a href="#dependency-provider">Dependency Provider</a></li>
+<li><a href="#git-history-provider">Git History Provider</a></li>
+<li><a href="#enabling-context-providers">Enabling Context Providers</a></li>
+<li><a href="#provider-weights">Provider Weights</a></li>
+<li><a href="#how-context-affects-scoring">How Context Affects Scoring</a></li>
+<li><a href="#context-details-structure">Context Details Structure</a></li>
+<li><a href="#practical-examples">Practical Examples</a></li>
+<li><a href="#configuration">Configuration</a></li>
+<li><a href="#performance-considerations">Performance Considerations</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#advanced-usage">Advanced Usage</a></li>
+<li><a href="#best-practices">Best Practices</a></li>
+<li><a href="#see-also">See Also</a></li>
+</ul>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p>Context providers implement the <code>ContextProvider</code> trait, which gathers risk-relevant information about functions and modules. Each provider analyzes a specific dimension of risk:</p>
 <ul>
@@ -380,6 +398,7 @@ max_depth = 5
 <li>Recent activity</li>
 </ul>
 <h3 id="risk-classification"><a class="header" href="#risk-classification">Risk Classification</a></h3>
+<p>The table below shows approximate contribution thresholds for understanding risk levels:</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -390,6 +409,52 @@ max_depth = 5
 <tr><td>Moderately unstable</td><td>freq &gt; 2.0 OR bug_density &gt; 0.2</td><td>1.0</td><td>Frequent changes or bug-prone</td></tr>
 <tr><td>Slightly unstable</td><td>freq &gt; 1.0 OR bug_density &gt; 0.1</td><td>0.5</td><td>Some instability</td></tr>
 <tr><td>Stable</td><td>freq ≤ 1.0 AND bug_density ≤ 0.1</td><td>0.1</td><td>Low change rate, few bugs</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="continuous-scoring-model"><a class="header" href="#continuous-scoring-model">Continuous Scoring Model</a></h4>
+<p>The actual implementation uses a <strong>continuous scoring formula</strong> rather than discrete thresholds. This provides more accurate differentiation between risk levels (from <code>src/risk/context/git_history.rs:495</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>contribution = (bug_density * 1.5) + min(change_frequency / 20.0, 0.5)
+<span class="boring">}</span></code></pre>
+<p><strong>Scoring breakdown:</strong></p>
+<ul>
+<li>
+<p><strong>Bug density</strong> (primary signal): Scales linearly from 0.0 to 1.5</p>
+<ul>
+<li>0% bugs → 0.0 contribution</li>
+<li>50% bugs → 0.75 contribution</li>
+<li>100% bugs → 1.5 contribution</li>
+</ul>
+</li>
+<li>
+<p><strong>Change frequency</strong> (secondary signal): Scales from 0.0 to 0.5, saturates at 10/month</p>
+<ul>
+<li>0/month → 0.0</li>
+<li>5/month → 0.25</li>
+<li>10+/month → 0.5 (capped)</li>
+</ul>
+</li>
+<li>
+<p><strong>Total</strong> is capped at 2.0 to prevent excessive score amplification</p>
+</li>
+<li>
+<p>Stable code with no bugs and no changes contributes 0.0 (no risk increase)</p>
+</li>
+</ul>
+<p><strong>Example calculations:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Scenario</th><th>Frequency</th><th>Bug Density</th><th>Contribution</th></tr>
+</thead>
+<tbody>
+<tr><td>Stable code</td><td>0.0/month</td><td>0%</td><td>0.0</td></tr>
+<tr><td>Low activity, some bugs</td><td>2.0/month</td><td>25%</td><td>0.475</td></tr>
+<tr><td>High churn, no bugs</td><td>10.0/month</td><td>0%</td><td>0.5</td></tr>
+<tr><td>Bug-prone</td><td>0.5/month</td><td>100%</td><td>1.525</td></tr>
+<tr><td>Critical hotspot</td><td>10.0/month</td><td>50%</td><td>1.25</td></tr>
 </tbody>
 </table>
 </div>
@@ -888,6 +953,20 @@ max_depth = 5
 <li>Git history: +30-50% (slow for large repos - multiple git commands per file)</li>
 </ul>
 <p><strong>Combined overhead:</strong> ~60-80% increase in analysis time</p>
+<h3 id="batched-git-history-optimization"><a class="header" href="#batched-git-history-optimization">Batched Git History Optimization</a></h3>
+<p>The git history provider uses a <strong>batched loading strategy</strong> to minimize subprocess overhead. Instead of running separate git commands for each file (which would create N subprocess calls for N files), the provider:</p>
+<ol>
+<li>Fetches all git history data upfront in a single batch (<code>BatchedGitHistory</code>)</li>
+<li>Parses the complete log output into an in-memory index</li>
+<li>Serves subsequent file lookups via O(1) HashMap access</li>
+</ol>
+<p>This optimization reduces the git subprocess calls from O(N) to O(1), making git history analysis practical even for large repositories.</p>
+<p><strong>Implementation details</strong> (from <code>src/risk/context/git_history/batched.rs</code>):</p>
+<ul>
+<li>On initialization, runs a single <code>git log --numstat</code> to fetch all file changes</li>
+<li>Builds per-file indexes for change frequency, bug density, authors, etc.</li>
+<li>Falls back to direct git queries only if batch loading fails</li>
+</ul>
 <h3 id="optimization-tips"><a class="header" href="#optimization-tips">Optimization Tips</a></h3>
 <ol>
 <li><strong>Start minimal</strong>: Use <code>--context-providers critical_path,dependency</code> initially</li>

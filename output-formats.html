@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -192,6 +192,9 @@ debtmap analyze . --format markdown
 
 # HTML output - interactive web dashboard
 debtmap analyze . --format html
+
+# DOT output - Graphviz dependency visualization
+debtmap analyze . --format dot
 </code></pre>
 <p>Available formats:</p>
 <ul>
@@ -199,6 +202,7 @@ debtmap analyze . --format html
 <li><strong>json</strong>: Structured data for programmatic processing</li>
 <li><strong>markdown</strong>: Reports suitable for documentation and PR comments</li>
 <li><strong>html</strong>: Web-viewable HTML reports with interactive dashboard</li>
+<li><strong>dot</strong>: Graphviz DOT format for dependency graph visualization</li>
 </ul>
 <h3 id="writing-to-files"><a class="header" href="#writing-to-files">Writing to Files</a></h3>
 <p>By default, output goes to stdout. Use <code>-o</code> or <code>--output</code> to write to a file:</p>
@@ -1039,6 +1043,85 @@ debtmap analyze . --format html -o dashboard.html &amp;&amp; open dashboard.html
 <blockquote>
 <p><strong>Note:</strong> Direct template customization requires modifying <code>src/io/writers/templates/dashboard.html</code> in the debtmap source code.</p>
 </blockquote>
+<h2 id="dot-output"><a class="header" href="#dot-output">DOT Output</a></h2>
+<p>DOT format generates Graphviz-compatible output for visualizing file dependencies and technical debt as a graph. This is useful for understanding code architecture and identifying coupling patterns.</p>
+<p><strong>Source:</strong> <code>src/io/writers/dot.rs</code> (Spec 204)</p>
+<h3 id="basic-usage-3"><a class="header" href="#basic-usage-3">Basic Usage</a></h3>
+<pre><code class="language-bash"># Generate DOT output for dependency visualization
+debtmap analyze . --format dot
+
+# Save to file
+debtmap analyze . --format dot -o deps.dot
+</code></pre>
+<h3 id="rendering-the-graph"><a class="header" href="#rendering-the-graph">Rendering the Graph</a></h3>
+<p>DOT files can be rendered using Graphviz tools:</p>
+<pre><code class="language-bash"># Generate SVG (recommended for web)
+dot -Tsvg deps.dot -o deps.svg
+
+# Generate PNG
+dot -Tpng deps.dot -o deps.png
+
+# Interactive exploration with xdot
+xdot deps.dot
+</code></pre>
+<h3 id="graph-features"><a class="header" href="#graph-features">Graph Features</a></h3>
+<p>The DOT output provides:</p>
+<ol>
+<li><strong>File Nodes</strong> - Each analyzed file appears as a node</li>
+<li><strong>Dependency Edges</strong> - Arrows show which files depend on which</li>
+<li><strong>Color-Coded Debt Scores</strong> - Node colors indicate debt severity:
+<ul>
+<li><strong>Green</strong> (#6BCB77): Low debt (&lt;20)</li>
+<li><strong>Yellow</strong> (#FFD93D): Medium debt (≥20)</li>
+<li><strong>Orange</strong> (#FF8C00): High debt (≥50)</li>
+<li><strong>Red</strong> (#FF6B6B): Critical debt (≥100)</li>
+</ul>
+</li>
+<li><strong>Module Clustering</strong> - Files are grouped by directory/module</li>
+<li><strong>Tooltips</strong> - Hover for detailed metrics (score, functions, lines, coupling)</li>
+<li><strong>Legend</strong> - Built-in legend explains the color coding</li>
+</ol>
+<h3 id="example-output-1"><a class="header" href="#example-output-1">Example Output</a></h3>
+<pre><code class="language-dot">digraph debtmap {
+  rankdir=TB;
+  node [shape=box, style=filled, fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=10];
+
+  subgraph cluster_legend {
+    label="Debt Score Legend";
+    legend_critical [label="Critical (&gt;=100)", fillcolor="#FF6B6B"];
+    legend_high [label="High (&gt;=50)", fillcolor="#FF8C00"];
+    legend_medium [label="Medium (&gt;=20)", fillcolor="#FFD93D"];
+    legend_low [label="Low (&lt;20)", fillcolor="#6BCB77"];
+  }
+
+  subgraph cluster_io {
+    label="io";
+    "src_io_output_rs" [label="output.rs", fillcolor="#6BCB77"];
+    "src_io_writers_json_rs" [label="json.rs", fillcolor="#FFD93D"];
+  }
+
+  // Dependencies
+  "src_io_output_rs" -&gt; "src_io_writers_json_rs";
+}
+</code></pre>
+<h3 id="when-to-use-dot-format"><a class="header" href="#when-to-use-dot-format">When to Use DOT Format</a></h3>
+<p><strong>Use DOT Format When:</strong></p>
+<ul>
+<li>Visualizing module dependencies and architecture</li>
+<li>Identifying tightly coupled file clusters</li>
+<li>Finding isolated or dead code modules</li>
+<li>Presenting architecture to team members</li>
+<li>Detecting circular dependency patterns</li>
+<li>Understanding code organization</li>
+</ul>
+<p><strong>DOT vs Other Formats:</strong></p>
+<ul>
+<li><strong>DOT</strong>: Best for dependency visualization and architecture understanding</li>
+<li><strong>JSON</strong>: Best for programmatic processing and CI/CD integration</li>
+<li><strong>HTML</strong>: Best for interactive dashboards and metrics overview</li>
+<li><strong>Terminal/Markdown</strong>: Best for readable reports and documentation</li>
+</ul>
 <h2 id="tool-integration"><a class="header" href="#tool-integration">Tool Integration</a></h2>
 <h3 id="cicd-pipelines"><a class="header" href="#cicd-pipelines">CI/CD Pipelines</a></h3>
 <p>Debtmap JSON output integrates seamlessly with CI/CD systems.</p>
@@ -1385,6 +1468,7 @@ debtmap analyze . --summary --min-priority medium
 <tr><td>JSON</td><td>Automation</td><td>Yes</td><td>No</td><td>.json</td></tr>
 <tr><td>Markdown</td><td>Documentation</td><td>Partially</td><td>Yes</td><td>.md</td></tr>
 <tr><td>HTML</td><td>Visualization</td><td>Partially</td><td>Yes</td><td>.html</td></tr>
+<tr><td>DOT</td><td>Architecture</td><td>Yes</td><td>Partially</td><td>.dot</td></tr>
 </tbody>
 </table>
 </div>
@@ -1398,6 +1482,9 @@ debtmap analyze . --format json -o ci-report.json
 
 # Generate markdown for documentation
 debtmap analyze . --format markdown -o docs/DEBT.md
+
+# Generate DOT for architecture visualization
+debtmap analyze . --format dot -o deps.dot &amp;&amp; dot -Tsvg deps.dot -o deps.svg
 </code></pre>
 <h3 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h3>
 <ul>
@@ -1468,7 +1555,7 @@ fi
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="tui-guide.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -1482,7 +1569,7 @@ fi
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="tui-guide.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

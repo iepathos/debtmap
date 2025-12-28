@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -216,8 +216,8 @@
 <li><strong>HighMethodUniformity(f64)</strong> - Methods are highly uniform across implementations</li>
 <li><strong>LowAvgComplexity(f64)</strong> - Average complexity is below threshold</li>
 <li><strong>LowComplexityVariance(f64)</strong> - Complexity variance is low (consistent complexity)</li>
-<li><strong>HighStructDensity(usize)</strong> - Many structs with similar implementations</li>
 </ul>
+<p><strong>Note</strong>: The <code>HighStructDensity</code> signal is defined as an enum variant but is not currently extracted by the detection algorithm. It is reserved for future enhancement to detect struct-level boilerplate patterns.</p>
 <h2 id="boilerplate-scoring-algorithm"><a class="header" href="#boilerplate-scoring-algorithm">Boilerplate Scoring Algorithm</a></h2>
 <p>The confidence score is calculated using weighted signals (src/organization/boilerplate_detector.rs:124-161):</p>
 <ol>
@@ -316,6 +316,14 @@ fn test_case_b() {
 // ... 20 more similar test functions
 <span class="boring">}</span></code></pre>
 <p><strong>Recommendation</strong>: Use parameterized tests with <code>rstest</code> or table-driven tests.</p>
+<h3 id="planned-pattern-types"><a class="header" href="#planned-pattern-types">Planned Pattern Types</a></h3>
+<p>The following pattern types are defined in the feature specification but not yet fully implemented:</p>
+<ul>
+<li><strong>State machine patterns</strong> - Repetitive state transition implementations</li>
+<li><strong>Registry patterns</strong> - Similar registration logic across modules</li>
+<li><strong>Delegation patterns</strong> - Wrapper types with passthrough implementations</li>
+</ul>
+<p>These are tracked for future enhancement. Currently, the implementation focuses on trait implementation boilerplate detection with partial support for builder and test patterns.</p>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <p>Boilerplate detection is controlled via configuration file (src/organization/boilerplate_detector.rs:256-322):</p>
 <pre><code class="language-toml">[boilerplate_detection]
@@ -343,6 +351,7 @@ detect_builders = true
 # Enable test boilerplate detection (default: true)
 detect_test_boilerplate = true
 </code></pre>
+<p><strong>Implementation Status</strong>: The <code>detect_trait_impls</code> option is fully implemented. The <code>detect_builders</code> and <code>detect_test_boilerplate</code> options are configuration placeholders with partial implementation - the current <code>detect()</code> method primarily focuses on trait implementation detection (src/organization/boilerplate_detector.rs:75-121).</p>
 <p><strong>Field reference</strong> (src/organization/boilerplate_detector.rs:48-57, 310-322):</p>
 <ul>
 <li>All fields have serde defaults</li>
@@ -373,13 +382,15 @@ Recommendation:
 - Consider code generation in build.rs for large enums
 </code></pre>
 <h3 id="for-builder-patterns"><a class="header" href="#for-builder-patterns">For Builder Patterns</a></h3>
-<pre><code>Detected boilerplate: 15 setter methods in ConfigBuilder
-Estimated line reduction: 75 lines → 10 lines (87% reduction)
+<p>The MacroRecommendationEngine suggests multiple builder crates (src/organization/macro_recommendations.rs:119-131):</p>
+<pre><code>BUILDER PATTERN BOILERPLATE DETECTED: 5 builder structs
 
-Recommendation:
-- Add derive_builder to Cargo.toml
-- Use #[derive(Builder)] on struct
-- Configure with #[builder(setter(into))] for ergonomics
+Consider using existing builder libraries:
+- `bon` crate for declarative builders
+- `typed-builder` for compile-time checked builders
+- `derive_builder` for macro-based generation
+
+This reduces boilerplate while maintaining type safety.
 </code></pre>
 <h3 id="for-test-boilerplate"><a class="header" href="#for-test-boilerplate">For Test Boilerplate</a></h3>
 <pre><code>Detected boilerplate: 20 similar test functions

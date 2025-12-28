@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -189,17 +189,17 @@
 </ol>
 <p><strong>Example workflow:</strong></p>
 <pre><code class="language-bash"># Pipe directly to Claude Code
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 </code></pre>
 <h3 id="what-output-format-is-best-for-ai"><a class="header" href="#what-output-format-is-best-for-ai">What output format is best for AI?</a></h3>
-<p>Use <code>--format llm-markdown</code> for AI workflows. This format:</p>
+<p>Use <code>--format markdown</code> for AI workflows. This format:</p>
 <ul>
 <li>Minimizes tokens while maximizing information</li>
 <li>Includes context suggestions inline</li>
 <li>Uses consistent structure for reliable parsing</li>
 <li>Avoids verbose descriptions that waste context window</li>
 </ul>
-<pre><code class="language-bash">debtmap analyze . --format llm-markdown --top 5
+<pre><code class="language-bash">debtmap analyze . --format markdown --top 5
 </code></pre>
 <h3 id="does-debtmap-provide-fix-suggestions"><a class="header" href="#does-debtmap-provide-fix-suggestions">Does debtmap provide fix suggestions?</a></h3>
 <p>No. Debtmap is a <strong>sensor</strong>, not a prescriber. It provides signals (metrics, coverage, coupling) and lets the AI decide how to fix issues.</p>
@@ -217,13 +217,13 @@ debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
 └─ Test: tests/parser_test.rs:50-75 (expected behavior)
 </code></pre>
 <p>Tell your AI to read these files before making changes:</p>
-<pre><code class="language-bash">debtmap analyze . --format llm-markdown --top 1 | \
+<pre><code class="language-bash">debtmap analyze . --format markdown --top 1 | \
   claude "Read the context files first, then fix the top item"
 </code></pre>
 <h3 id="can-i-integrate-debtmap-with-cursor"><a class="header" href="#can-i-integrate-debtmap-with-cursor">Can I integrate debtmap with Cursor?</a></h3>
 <p>Yes. Generate a report file and reference it in Cursor:</p>
 <pre><code class="language-bash"># Generate report
-debtmap analyze . --format llm-markdown --top 10 &gt; debt-report.md
+debtmap analyze . --format markdown --top 10 &gt; debt-report.md
 
 # In Cursor, use: @debt-report.md Fix the top critical item
 </code></pre>
@@ -434,7 +434,7 @@ exclude_patterns = ["**/target/**", "**/vendor/**"]
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="troubleshooting.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="troubleshooting/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -448,7 +448,7 @@ exclude_patterns = ["**/target/**", "**/vendor/**"]
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="troubleshooting.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="troubleshooting/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

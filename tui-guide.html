@@ -1,0 +1,584 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>TUI Results Viewer - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-3bdbe002.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="tui-results-viewer-guide"><a class="header" href="#tui-results-viewer-guide">TUI Results Viewer Guide</a></h1>
+<p>Debtmap includes an interactive TUI (Text User Interface) results viewer that allows you to explore analysis results in detail without re-running the analysis.</p>
+<h2 id="launching-the-tui"><a class="header" href="#launching-the-tui">Launching the TUI</a></h2>
+<p>After running an analysis that produces a results file, launch the TUI viewer:</p>
+<pre><code class="language-bash"># Run analysis and save results
+debtmap analyze . -o results.json --format json
+
+# Launch interactive TUI viewer
+debtmap results results.json
+</code></pre>
+<p>The TUI provides an interactive interface for exploring technical debt items, with detailed views and keyboard navigation.</p>
+<h2 id="navigation"><a class="header" href="#navigation">Navigation</a></h2>
+<h3 id="list-view-main-screen"><a class="header" href="#list-view-main-screen">List View (Main Screen)</a></h3>
+<p>The main screen shows a list of technical debt items sorted by priority score:</p>
+<p><strong>Keyboard Controls:</strong></p>
+<ul>
+<li><code>↑/↓</code> or <code>j/k</code> - Navigate up/down through the list</li>
+<li><code>Enter</code> - View detailed information for selected item</li>
+<li><code>q</code> - Quit the application</li>
+<li><code>?</code> - Show help</li>
+</ul>
+<p><strong>Display Information:</strong></p>
+<ul>
+<li>Item rank and priority score</li>
+<li>Function location (file:line)</li>
+<li>Debt type indicator</li>
+<li>Brief description</li>
+</ul>
+<h3 id="detail-view"><a class="header" href="#detail-view">Detail View</a></h3>
+<p>When you select an item with <code>Enter</code>, the detail view opens with multiple pages of information.</p>
+<h2 id="detail-pages"><a class="header" href="#detail-pages">Detail Pages</a></h2>
+<p>The detail view provides 5 pages of in-depth analysis for each debt item:</p>
+<h3 id="page-1-overview"><a class="header" href="#page-1-overview">Page 1: Overview</a></h3>
+<p>Displays core information about the technical debt item:</p>
+<ul>
+<li><strong>Priority Score:</strong> Final unified score and breakdown</li>
+<li><strong>Location:</strong> File path, line number, and function name</li>
+<li><strong>Debt Type:</strong> Classification (Complexity, Side Effects, etc.)</li>
+<li><strong>Description:</strong> Detailed explanation of the issue</li>
+<li><strong>Function Role:</strong> Role in the codebase (Entry Point, Core Logic, etc.)</li>
+</ul>
+<p><strong>Score Breakdown:</strong></p>
+<ul>
+<li>Base complexity score</li>
+<li>Impact multipliers (downstream dependencies, test coverage)</li>
+<li>Contextual adjustments</li>
+<li>Final unified score</li>
+</ul>
+<h3 id="page-2-metrics"><a class="header" href="#page-2-metrics">Page 2: Metrics</a></h3>
+<p>Shows detailed complexity and quality metrics:</p>
+<p><strong>Complexity Metrics:</strong></p>
+<ul>
+<li>Cyclomatic Complexity</li>
+<li>Cognitive Complexity</li>
+<li>Lines of Code (LOC)</li>
+<li>Nesting Depth</li>
+</ul>
+<p><strong>Understanding Complexity Metric Labels:</strong></p>
+<p>The “Complexity” section uses different metric labels depending on whether you’re viewing a regular function or a god object:</p>
+<ul>
+<li>
+<p><strong>Regular Functions:</strong> Shows individual function metrics with simple labels:</p>
+<ul>
+<li><strong>cyclomatic:</strong> The function’s own cyclomatic complexity</li>
+<li><strong>cognitive:</strong> The function’s own cognitive complexity</li>
+<li><strong>nesting:</strong> Maximum nesting depth within the function</li>
+</ul>
+</li>
+<li>
+<p><strong>God Objects:</strong> Shows aggregated metrics with descriptive labels indicating the aggregation strategy:</p>
+<ul>
+<li><strong>accumulated cyclomatic:</strong> Sum of cyclomatic complexity across all methods</li>
+<li><strong>accumulated cognitive:</strong> Sum of cognitive complexity across all methods</li>
+<li><strong>max nesting:</strong> Maximum nesting depth found in any method</li>
+</ul>
+</li>
+</ul>
+<p>The descriptive labels (“accumulated” for sums, “max” for maximum) clearly indicate how the metrics are calculated across all functions in the class. This helps identify classes that have grown too large and may need to be split into smaller, more focused components.</p>
+<p><strong>Quality Indicators:</strong></p>
+<ul>
+<li>Maintainability Index</li>
+<li>Halstead Metrics (if available)</li>
+<li>Code duplication percentage</li>
+<li>Comment density</li>
+</ul>
+<p><strong>Boilerplate Analysis:</strong></p>
+<ul>
+<li>Boilerplate percentage</li>
+<li>Pattern repetition score</li>
+<li>Effective complexity (adjusted for boilerplate)</li>
+</ul>
+<h3 id="page-3-recommendations"><a class="header" href="#page-3-recommendations">Page 3: Recommendations</a></h3>
+<p>Provides actionable refactoring guidance:</p>
+<p><strong>Refactoring Strategy:</strong></p>
+<ul>
+<li>Recommended approach (Extract Method, Decompose, etc.)</li>
+<li>Estimated effort (hours)</li>
+<li>Expected benefit/improvement</li>
+</ul>
+<p><strong>Step-by-Step Actions:</strong></p>
+<ol>
+<li>Specific refactoring steps</li>
+<li>Pattern recommendations</li>
+<li>Testing strategies</li>
+</ol>
+<p><strong>Code Examples:</strong></p>
+<ul>
+<li>Before/after snippets (when applicable)</li>
+<li>Suggested function signatures</li>
+<li>Pattern implementations</li>
+</ul>
+<h3 id="page-4-context"><a class="header" href="#page-4-context">Page 4: Context</a></h3>
+<p>Displays contextual information about the function’s role and impact:</p>
+<p><strong>Call Graph Analysis:</strong></p>
+<ul>
+<li>Upstream callers (who calls this function)</li>
+<li>Downstream dependencies (what this function calls)</li>
+<li>Depth in call graph</li>
+</ul>
+<p><strong>Module Dependencies:</strong></p>
+<ul>
+<li>Module coupling metrics</li>
+<li>Circular dependency warnings</li>
+<li>Cross-module calls</li>
+</ul>
+<p><strong>Git History Insights:</strong></p>
+<ul>
+<li>Change frequency</li>
+<li>Recent modifications</li>
+<li>Contributing authors</li>
+<li>Historical complexity trend</li>
+</ul>
+<h3 id="page-5-data-flow"><a class="header" href="#page-5-data-flow">Page 5: Data Flow</a></h3>
+<p>Shows detailed data flow analysis for understanding mutations, I/O operations, and variable escape behavior.</p>
+<p><strong>Mutation Analysis:</strong></p>
+<ul>
+<li><strong>Total Mutations:</strong> Count of all variable mutations in the function</li>
+<li><strong>Live Mutations:</strong> Variables that are mutated and their new values are used</li>
+<li><strong>Dead Stores:</strong> Variables that are assigned but never read (optimization opportunity)</li>
+</ul>
+<p>Example display:</p>
+<pre><code>Total Mutations:     5
+Live Mutations:      2
+Dead Stores:         1
+
+Live Mutations:
+  • counter
+  • state
+
+Dead Stores:
+  • temp (never read)
+</code></pre>
+<p><strong>I/O Operations:</strong></p>
+<ul>
+<li>Detected I/O operations by type (File, Network, Database, etc.)</li>
+<li>Line numbers where I/O occurs</li>
+<li>Variables involved in I/O</li>
+</ul>
+<p>Example display:</p>
+<pre><code>File Read at line 105 (variables: file)
+Network Call at line 110 (variables: socket)
+Database Query at line 120 (variables: db)
+</code></pre>
+<p><strong>Escape Analysis:</strong></p>
+<ul>
+<li><strong>Escaping Variables:</strong> Variables whose values escape the function scope</li>
+<li><strong>Return Dependencies:</strong> Variables that affect the return value</li>
+</ul>
+<p>Example display:</p>
+<pre><code>Escaping Variables:   2
+
+Variables affecting return value:
+  • result
+  • accumulator
+</code></pre>
+<p><strong>Purity Analysis:</strong></p>
+<ul>
+<li><strong>Is Pure:</strong> Whether the function is pure (no side effects, deterministic)</li>
+<li><strong>Confidence:</strong> Confidence level of the purity assessment (0-100%)</li>
+<li><strong>Impurity Reasons:</strong> Specific reasons why the function is not pure</li>
+</ul>
+<p>Example display:</p>
+<pre><code>Is Pure:        No
+Confidence:     95.0%
+
+Impurity Reasons:
+  • Mutates shared state
+  • Performs I/O operations
+  • Calls impure functions
+</code></pre>
+<p><strong>Navigation in Data Flow Page:</strong></p>
+<ul>
+<li>Use <code>←/→</code> keys to switch between detail pages</li>
+<li>All data flow insights help identify refactoring opportunities</li>
+<li>Pure functions are easier to test and reason about</li>
+<li>High mutation counts suggest opportunities for functional refactoring</li>
+</ul>
+<h2 id="page-navigation"><a class="header" href="#page-navigation">Page Navigation</a></h2>
+<p><strong>In Detail View:</strong></p>
+<ul>
+<li><code>←/→</code> or <code>h/l</code> - Switch between detail pages (1-5)</li>
+<li><code>Esc</code> or <code>q</code> - Return to list view</li>
+<li><code>?</code> - Show help</li>
+</ul>
+<p><strong>Page Indicator:</strong>
+The bottom of the screen shows which page you’re viewing:</p>
+<pre><code>[1/5] Overview   [2/5] Metrics   [3/5] Recommendations   [4/5] Context   [5/5] Data Flow
+</code></pre>
+<h2 id="filtering-and-sorting"><a class="header" href="#filtering-and-sorting">Filtering and Sorting</a></h2>
+<p>The TUI supports filtering results by various criteria:</p>
+<h3 id="filter-by-debt-type"><a class="header" href="#filter-by-debt-type">Filter by Debt Type</a></h3>
+<pre><code class="language-bash"># Only show complexity issues
+debtmap results results.json --filter complexity
+
+# Only show side effect issues
+debtmap results results.json --filter side-effects
+</code></pre>
+<h3 id="sort-options"><a class="header" href="#sort-options">Sort Options</a></h3>
+<p>Results are pre-sorted by priority score, but you can change the sort order:</p>
+<pre><code class="language-bash"># Sort by cyclomatic complexity
+debtmap results results.json --sort complexity
+
+# Sort by lines of code
+debtmap results results.json --sort loc
+
+# Sort by file name
+debtmap results results.json --sort file
+</code></pre>
+<h2 id="theme-customization"><a class="header" href="#theme-customization">Theme Customization</a></h2>
+<p>The TUI supports custom color themes for better readability:</p>
+<pre><code class="language-bash"># Use light theme
+debtmap results results.json --theme light
+
+# Use dark theme (default)
+debtmap results results.json --theme dark
+
+# Use high-contrast theme
+debtmap results results.json --theme contrast
+</code></pre>
+<h2 id="export-from-tui"><a class="header" href="#export-from-tui">Export from TUI</a></h2>
+<p>While viewing results in the TUI, you can export specific items:</p>
+<ul>
+<li><code>e</code> - Export current item to markdown</li>
+<li><code>E</code> - Export all visible items to markdown</li>
+</ul>
+<p>The exported markdown includes all detail page information in a readable format.</p>
+<h2 id="tips-and-best-practices"><a class="header" href="#tips-and-best-practices">Tips and Best Practices</a></h2>
+<ol>
+<li>
+<p><strong>Use Data Flow Page:</strong> The data flow page (Page 5) provides deep insights into mutations and I/O operations, helping identify refactoring opportunities for functional programming patterns.</p>
+</li>
+<li>
+<p><strong>Focus on Top Items:</strong> Start with the highest-priority items (top 5-10) for maximum impact.</p>
+</li>
+<li>
+<p><strong>Review Recommendations:</strong> Always check Page 3 (Recommendations) for specific refactoring steps before making changes.</p>
+</li>
+<li>
+<p><strong>Check Context:</strong> Use Page 4 (Context) to understand the function’s role before refactoring to avoid breaking critical paths.</p>
+</li>
+<li>
+<p><strong>Understand Purity:</strong> Pure functions (shown in Data Flow page) are easier to test and maintain. High mutation counts indicate opportunities for functional refactoring.</p>
+</li>
+<li>
+<p><strong>Look for Dead Stores:</strong> Variables in the “Dead Stores” section can be removed to simplify code.</p>
+</li>
+<li>
+<p><strong>Identify I/O Boundaries:</strong> Functions with many I/O operations should isolate I/O from business logic.</p>
+</li>
+<li>
+<p><strong>Track Git History:</strong> Frequently changing functions (shown in Context page) may indicate design issues.</p>
+</li>
+</ol>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="tui-wont-launch"><a class="header" href="#tui-wont-launch">TUI Won’t Launch</a></h3>
+<p>Ensure you have a valid results file:</p>
+<pre><code class="language-bash"># Check file exists and is valid JSON
+cat results.json | jq .
+</code></pre>
+<h3 id="colors-not-showing"><a class="header" href="#colors-not-showing">Colors Not Showing</a></h3>
+<p>Some terminals don’t support 256-color mode. Try:</p>
+<pre><code class="language-bash"># Use basic colors
+export TERM=xterm-color
+debtmap results results.json
+</code></pre>
+<h3 id="navigation-keys-not-working"><a class="header" href="#navigation-keys-not-working">Navigation Keys Not Working</a></h3>
+<p>Ensure your terminal supports the required key codes. Try alternative keys:</p>
+<ul>
+<li>Use <code>j/k</code> instead of arrow keys for up/down</li>
+<li>Use <code>h/l</code> instead of arrow keys for left/right</li>
+</ul>
+<h2 id="integration-with-workflows"><a class="header" href="#integration-with-workflows">Integration with Workflows</a></h2>
+<h3 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h3>
+<p>Generate results in CI and review locally:</p>
+<pre><code class="language-bash"># In CI pipeline
+debtmap analyze . -o ci-results.json --format json
+
+# Download and review locally
+scp ci-server:ci-results.json .
+debtmap results ci-results.json
+</code></pre>
+<h3 id="team-review"><a class="header" href="#team-review">Team Review</a></h3>
+<p>Share results files with team members:</p>
+<pre><code class="language-bash"># Generate results
+debtmap analyze . -o team-review.json --format json
+
+# Commit to repository (small file)
+git add team-review.json
+git commit -m "Add debtmap analysis results for review"
+
+# Team members can view
+debtmap results team-review.json
+</code></pre>
+<h3 id="progressive-refactoring"><a class="header" href="#progressive-refactoring">Progressive Refactoring</a></h3>
+<p>Track progress across refactoring sessions:</p>
+<pre><code class="language-bash"># Initial analysis
+debtmap analyze . -o before.json --format json
+
+# After refactoring
+debtmap analyze . -o after.json --format json
+
+# Compare results
+debtmap compare before.json after.json
+</code></pre>
+<h2 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h2>
+<h3 id="custom-data-retention"><a class="header" href="#custom-data-retention">Custom Data Retention</a></h3>
+<p>Control how much detail is stored in results:</p>
+<pre><code class="language-bash"># Minimal results (scores only)
+debtmap analyze . -o minimal.json --detail-level minimal
+
+# Full results (all metrics and context)
+debtmap analyze . -o full.json --detail-level full
+</code></pre>
+<h3 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h3>
+<p>For large codebases, optimize TUI performance:</p>
+<pre><code class="language-bash"># Limit results to top N items
+debtmap analyze . -o top100.json --top 100
+
+# View subset
+debtmap results top100.json
+</code></pre>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="output-formats.html">Output Formats</a> - Other output format options</li>
+<li><a href="cli-reference.html">CLI Reference</a> - Complete command reference</li>
+<li><a href="configuration.html">Configuration</a> - Customization options</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="output-formats.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="output-formats.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

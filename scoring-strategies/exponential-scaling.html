@@ -1,0 +1,465 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Exponential Scaling - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-3bdbe002.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="exponential-scaling"><a class="header" href="#exponential-scaling">Exponential Scaling</a></h1>
+<p>Debtmap uses exponential scaling and risk boosting to amplify high-severity technical debt items, ensuring critical issues stand out clearly in priority lists. This section explains how these mechanisms work.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Traditional linear multipliers create uniform gaps between scores:</p>
+<ul>
+<li>Linear 2x multiplier: Score 50 → 100, Score 100 → 200 (uniform +50 and +100 gaps)</li>
+</ul>
+<p>Exponential scaling creates growing gaps that make critical issues impossible to miss:</p>
+<ul>
+<li>Exponential scaling (^1.4): Score 50 → 279, Score 100 → 1000 (gaps grow dramatically)</li>
+</ul>
+<p><strong>Key Benefits</strong>:</p>
+<ul>
+<li><strong>Visual Separation</strong>: Critical items have dramatically higher scores than medium items</li>
+<li><strong>Natural Clustering</strong>: Similar-severity items cluster together in ranked lists</li>
+<li><strong>Actionable Ordering</strong>: Work through the list from top to bottom with confidence</li>
+<li><strong>No Arbitrary Thresholds</strong>: Pure score-based ranking eliminates debates about tier boundaries</li>
+</ul>
+<h2 id="how-exponential-scaling-works"><a class="header" href="#how-exponential-scaling-works">How Exponential Scaling Works</a></h2>
+<p>After calculating the base score (complexity + coverage + dependencies), Debtmap applies pattern-specific exponential scaling.</p>
+<p><strong>Formula</strong> (from <code>src/priority/scoring/scaling.rs:77</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>scaled_score = base_score.max(1.0).powf(exponent)
+<span class="boring">}</span></code></pre>
+<p>The <code>max(1.0)</code> ensures minimum base score to avoid zero^exponent = 0.</p>
+<h3 id="debt-type-specific-exponents"><a class="header" href="#debt-type-specific-exponents">Debt-Type-Specific Exponents</a></h3>
+<p>The exponents are defined in <code>ScalingConfig</code> (<code>src/priority/scoring/scaling.rs:16-28</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Debt Type</th><th>Exponent</th><th>Condition</th><th>Rationale</th></tr>
+</thead>
+<tbody>
+<tr><td>God Objects</td><td>1.4</td><td>All God Objects</td><td>Highest amplification - architectural issues deserve top priority</td></tr>
+<tr><td>God Modules</td><td>1.4</td><td>All God Modules</td><td>Same as God Objects - file-level architectural issues</td></tr>
+<tr><td>High Complexity</td><td>1.2</td><td>cyclomatic &gt; 30</td><td>Moderate amplification - major complexity issues</td></tr>
+<tr><td>Moderate Complexity</td><td>1.1</td><td>cyclomatic &gt; 15</td><td>Light amplification - notable but less severe</td></tr>
+<tr><td>Complex Testing Gap</td><td>1.1</td><td>cyclomatic &gt; 20</td><td>Functions with complex untested code</td></tr>
+<tr><td>All Other Types</td><td>1.0</td><td>Default</td><td>Linear scaling (no amplification)</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Source</strong>: <code>src/priority/scoring/scaling.rs:53-75</code> - <code>apply_exponential_scaling()</code> function</p>
+<h3 id="example-god-object-scaling-exponent--14"><a class="header" href="#example-god-object-scaling-exponent--14">Example: God Object Scaling (exponent = 1.4)</a></h3>
+<p>Comparing three God Objects with different base scores:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Base Score</th><th>Calculation</th><th>Scaled Score</th><th>Amplification</th></tr>
+</thead>
+<tbody>
+<tr><td>10</td><td>10^1.4</td><td>25.1</td><td>2.5x</td></tr>
+<tr><td>50</td><td>50^1.4</td><td>279.5</td><td>5.6x</td></tr>
+<tr><td>100</td><td>100^1.4</td><td>1000.0</td><td>10x</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Result</strong>: The highest-severity God Object (score 100) gets 10x amplification, while a minor issue (score 10) only gets 2.5x. This creates clear visual separation in priority lists.</p>
+<p><strong>Source</strong>: Test validation in <code>src/priority/scoring/scaling.rs:271-293</code></p>
+<h2 id="risk-boosting"><a class="header" href="#risk-boosting">Risk Boosting</a></h2>
+<p>After exponential scaling, Debtmap applies additional risk multipliers based on architectural position and code patterns.</p>
+<p><strong>Formula</strong> (from <code>src/priority/scoring/scaling.rs:84-109</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>final_score = scaled_score * risk_multiplier
+<span class="boring">}</span></code></pre>
+<h3 id="risk-multipliers"><a class="header" href="#risk-multipliers">Risk Multipliers</a></h3>
+<p>Risk factors are applied multiplicatively. The multipliers are defined in <code>ScalingConfig</code> (<code>src/priority/scoring/scaling.rs:23-28</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Risk Factor</th><th>Multiplier</th><th>Condition</th><th>Rationale</th></tr>
+</thead>
+<tbody>
+<tr><td>High Dependency Count</td><td>1.2x</td><td>total_deps &gt; 15</td><td>Central code that affects more of the codebase</td></tr>
+<tr><td>Entry Point</td><td>1.15x</td><td><code>FunctionRole::EntryPoint</code></td><td>Failures cascade to all downstream code</td></tr>
+<tr><td>Complex + Untested</td><td>1.25x</td><td>cyclomatic &gt; 20 AND coverage &lt; 10%</td><td>High-risk combination of complexity and no tests</td></tr>
+<tr><td>Error Swallowing</td><td>1.15x</td><td>error_swallowing_count &gt; 0</td><td>Functions with poor error handling patterns</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Note</strong>: Multiple risk factors combine multiplicatively. A function with high dependencies AND entry point status would get 1.2 * 1.15 = 1.38x boost.</p>
+<p><strong>Source</strong>: <code>src/priority/scoring/scaling.rs:84-109</code> - <code>apply_risk_boosts()</code> function</p>
+<h3 id="error-swallowing-boost"><a class="header" href="#error-swallowing-boost">Error Swallowing Boost</a></h3>
+<p>Functions that swallow errors receive a 1.15x boost to encourage proper error handling. This includes patterns like:</p>
+<ul>
+<li><code>if let Ok(x) = expr</code> without handling the <code>Err</code> case</li>
+<li>Ignoring error returns from fallible operations</li>
+</ul>
+<p><strong>Source</strong>: <code>src/priority/scoring/scaling.rs:103-107</code></p>
+<h3 id="example-complete-score-calculation"><a class="header" href="#example-complete-score-calculation">Example: Complete Score Calculation</a></h3>
+<pre><code>Function: process_payment (God Object)
+  Base Score: 85.0
+
+  Step 1 - Exponential Scaling (exponent 1.4):
+    85.0^1.4 = 554.3
+
+  Step 2 - Risk Boosting:
+    - Entry point: ×1.15 → 637.4
+    - High dependencies (20 deps): ×1.2 → 764.9
+
+  Final Score: 764.9
+</code></pre>
+<p><strong>Source</strong>: Integration test in <code>src/priority/scoring/scaling.rs:355-383</code></p>
+<h2 id="complete-scoring-pipeline"><a class="header" href="#complete-scoring-pipeline">Complete Scoring Pipeline</a></h2>
+<p>Debtmap processes scores through multiple stages:</p>
+<pre><code>1. Base Score Calculation
+   ↓
+   Weighted sum of:
+   - Coverage factor (50% weight)
+   - Complexity factor (35% weight)
+   - Dependency factor (15% weight)
+
+2. Exponential Scaling
+   ↓
+   Debt-type-specific exponent applied:
+   - God Objects/Modules: ^1.4
+   - High Complexity (&gt;30): ^1.2
+   - Moderate Complexity (&gt;15): ^1.1
+   - Complex Testing Gap (&gt;20): ^1.1
+   - Others: ^1.0 (linear)
+
+3. Risk Boosting
+   ↓
+   Architectural position multipliers:
+   - High dependencies (&gt;15 total): ×1.2
+   - Entry points: ×1.15
+   - Complex + untested: ×1.25
+   - Error swallowing: ×1.15
+
+4. Final Score
+   ↓
+   Used for ranking (no tier bucketing)
+
+5. Output
+   ↓
+   Sorted descending by final score
+</code></pre>
+<p><strong>Note on weights</strong>: The default scoring weights are defined in <code>src/config/scoring.rs:187-198</code>:</p>
+<ul>
+<li><code>coverage_weight</code>: 0.50 (50%)</li>
+<li><code>complexity_weight</code>: 0.35 (35%)</li>
+<li><code>dependency_weight</code>: 0.15 (15%)</li>
+</ul>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>The exponential scaling parameters are defined in the <code>ScalingConfig</code> struct but are <strong>not currently configurable via TOML</strong>. The system uses hardcoded defaults:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/scoring/scaling.rs:30-43
+impl Default for ScalingConfig {
+    fn default() -&gt; Self {
+        Self {
+            god_object_exponent: 1.4,
+            god_module_exponent: 1.4,
+            high_complexity_exponent: 1.2,
+            moderate_complexity_exponent: 1.1,
+            high_dependency_boost: 1.2,
+            entry_point_boost: 1.15,
+            complex_untested_boost: 1.25,
+            error_swallowing_boost: 1.15,
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Future Enhancement</strong>: TOML configuration support for these parameters could be added to allow per-project tuning.</p>
+<h2 id="comparing-with-vs-without-exponential-scaling"><a class="header" href="#comparing-with-vs-without-exponential-scaling">Comparing With vs Without Exponential Scaling</a></h2>
+<p><strong>Without Exponential Scaling (Linear Multipliers)</strong>:</p>
+<pre><code>Priority List:
+1. God Object (base: 85) → final: 170 (2x multiplier)
+2. Long Function (base: 80) → final: 160 (2x multiplier)
+3. Complex Function (base: 75) → final: 150 (2x multiplier)
+4. Medium Issue (base: 70) → final: 140 (2x multiplier)
+</code></pre>
+<p><strong>Problem</strong>: Gaps are uniform (10 points). Hard to distinguish critical from medium issues.</p>
+<p><strong>With Exponential Scaling</strong>:</p>
+<pre><code>Priority List:
+1. God Object (base: 85) → scaled: 554 → with risk: 701
+2. Complex Function (base: 80, cyclomatic&gt;30) → scaled: 447 → with risk: 492
+3. Moderate Complexity (base: 75, cyclomatic&gt;15) → scaled: 357 → with risk: 357
+4. Simple Issue (base: 70) → scaled: 70 → with risk: 70
+</code></pre>
+<p><strong>Result</strong>: Clear separation. God Object stands out as nearly 10x higher than simple issues.</p>
+<h2 id="score-ordering-guarantees"><a class="header" href="#score-ordering-guarantees">Score Ordering Guarantees</a></h2>
+<p>The exponential scaling implementation provides mathematical guarantees validated by property tests:</p>
+<ol>
+<li><strong>Monotonicity</strong>: Higher base scores always result in higher scaled scores</li>
+<li><strong>Non-decreasing boosts</strong>: Risk boosts never decrease scores (all multipliers ≥ 1.0)</li>
+<li><strong>Strict ordering</strong>: No score inversions in final ranking</li>
+</ol>
+<p><strong>Source</strong>: Property tests in <code>src/priority/scoring/scaling.rs:513-694</code></p>
+<h2 id="practical-example"><a class="header" href="#practical-example">Practical Example</a></h2>
+<pre><code class="language-bash">debtmap analyze . --top 10
+</code></pre>
+<p><strong>Output</strong>:</p>
+<pre><code>Top 10 Technical Debt Items (Sorted by Score)
+
+1. src/services/user_service.rs:45 - UserService::authenticate
+   Score: 1247.3 | Pattern: God Object | Coverage: 12%
+   → 45 methods, 892 lines, high complexity
+   → Risk factors: Entry point (×1.15), High dependencies (×1.2)
+
+2. src/payment/processor.rs:142 - process_payment
+   Score: 891.2 | Pattern: Complexity Hotspot | Coverage: 8%
+   → Cyclomatic: 42, Cognitive: 77
+   → Risk factors: Entry point (×1.15), Complex untested (×1.25)
+
+3. src/reporting/generator.rs:234 - generate_monthly_report
+   Score: 654.1 | Pattern: Complexity Hotspot | Coverage: 45%
+   → Cyclomatic: 35, Cognitive: 50
+   → Risk factors: High dependencies (×1.2)
+</code></pre>
+<p><strong>Action</strong>: Focus on top 3 items first - they have dramatically higher scores than items 4-10.</p>
+<h2 id="performance-impact"><a class="header" href="#performance-impact">Performance Impact</a></h2>
+<p>Exponential scaling has negligible performance impact:</p>
+<ul>
+<li><strong>Computation</strong>: Simple <code>powf()</code> operation per item</li>
+<li><strong>Overhead</strong>: &lt;1% additional analysis time</li>
+<li><strong>Scalability</strong>: Works with parallel processing (no synchronization needed)</li>
+<li><strong>Memory</strong>: No additional data structures required</li>
+</ul>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="function-level.html">Function-Level Scoring</a> - Base score calculation at function level</li>
+<li><a href="file-level.html">File-Level Scoring</a> - Aggregation and file-level metrics</li>
+<li><a href="rebalanced.html">Rebalanced Scoring</a> - Score normalization and balancing</li>
+<li><a href="data-flow.html">Data Flow Scoring</a> - Purity and refactorability adjustments</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../scoring-strategies/rebalanced.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../scoring-strategies/data-flow.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../scoring-strategies/rebalanced.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../scoring-strategies/data-flow.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

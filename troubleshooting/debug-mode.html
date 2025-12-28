@@ -1,0 +1,613 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Debug Mode - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-3bdbe002.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="debug-mode"><a class="header" href="#debug-mode">Debug Mode</a></h1>
+<p>Use verbosity flags and environment variables to diagnose issues and understand analysis behavior.</p>
+<h2 id="verbosity-levels"><a class="header" href="#verbosity-levels">Verbosity Levels</a></h2>
+<p>Debtmap provides three verbosity levels for progressive debugging:</p>
+<pre><code class="language-bash"># Level 1: Show main score factors
+debtmap analyze . -v
+
+# Level 2: Show detailed calculations
+debtmap analyze . -vv
+
+# Level 3: Show all debug information
+debtmap analyze . -vvv
+</code></pre>
+<p><strong>What each level shows</strong>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Level</th><th>Flag</th><th>Information Displayed</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><code>-v</code></td><td>Score breakdowns, main contributing factors</td></tr>
+<tr><td>2</td><td><code>-vv</code></td><td>Detailed metric calculations, file processing</td></tr>
+<tr><td>3</td><td><code>-vvv</code></td><td>Full debug output, context provider details</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="example-output-at-each-level"><a class="header" href="#example-output-at-each-level">Example Output at Each Level</a></h3>
+<p><strong>Level 1 (<code>-v</code>)</strong> - Score factors:</p>
+<pre><code>[Score] src/main.rs::process_file
+  Complexity: 15 (cyclomatic) + 20 (cognitive)
+  Coverage: 45%
+  Priority: 7.2
+</code></pre>
+<p><strong>Level 2 (<code>-vv</code>)</strong> - Detailed calculations:</p>
+<pre><code>[Score] src/main.rs::process_file
+  Base risk: 3.6
+  Coverage penalty: 1.5× (40-60% coverage tier)
+  Debt factor: 1.2×
+  Final: 7.2
+  Processing time: 45ms
+</code></pre>
+<p><strong>Level 3 (<code>-vvv</code>)</strong> - Full debug:</p>
+<pre><code>[Debug] Parsing src/main.rs
+[Debug] AST nodes: 1,234
+[Debug] Functions detected: 15
+[Context] critical_path: distance=2 from entry point
+[Context] dependency: 8 callers, 3 callees
+...
+</code></pre>
+<h2 id="diagnostic-options"><a class="header" href="#diagnostic-options">Diagnostic Options</a></h2>
+<h3 id="macro-debugging-rust"><a class="header" href="#macro-debugging-rust">Macro Debugging (Rust)</a></h3>
+<pre><code class="language-bash"># Show macro parsing warnings
+debtmap analyze . --verbose-macro-warnings
+
+# Show macro expansion statistics
+debtmap analyze . --show-macro-stats
+</code></pre>
+<p>These flags help diagnose Rust macro-related parse issues:</p>
+<ul>
+<li><code>--verbose-macro-warnings</code>: Shows warnings for each macro that couldn’t be fully expanded</li>
+<li><code>--show-macro-stats</code>: Displays statistics about macro expansion success rates</li>
+</ul>
+<h3 id="semantic-analysis-control"><a class="header" href="#semantic-analysis-control">Semantic Analysis Control</a></h3>
+<pre><code class="language-bash"># Disable semantic analysis (faster fallback mode)
+debtmap analyze . --semantic-off
+
+# Validate LOC consistency
+debtmap analyze . --validate-loc
+</code></pre>
+<p>Use <code>--semantic-off</code> when:</p>
+<ul>
+<li>Encountering parse errors on valid syntax</li>
+<li>Need faster analysis with reduced accuracy</li>
+<li>Testing files with unsupported language constructs</li>
+</ul>
+<h3 id="explain-metrics"><a class="header" href="#explain-metrics">Explain Metrics</a></h3>
+<p>The <code>--explain-metrics</code> flag displays detailed explanations of all metrics and scoring formulas:</p>
+<pre><code class="language-bash">debtmap --explain-metrics
+</code></pre>
+<p>This shows:</p>
+<ul>
+<li>Metric definitions (cyclomatic complexity, cognitive complexity, etc.)</li>
+<li>Scoring formula breakdowns</li>
+<li>Threshold explanations</li>
+<li>Priority calculation details</li>
+</ul>
+<p><strong>Source</strong>: <code>src/cli/args.rs:313-314</code></p>
+<p><strong>Note</strong>: The <code>--explain-score</code> flag has been deprecated in favor of granular verbosity levels (<code>-v</code>, <code>-vv</code>, <code>-vvv</code>).</p>
+<h2 id="performance-profiling"><a class="header" href="#performance-profiling">Performance Profiling</a></h2>
+<h3 id="enable-profiling"><a class="header" href="#enable-profiling">Enable Profiling</a></h3>
+<p>Use the <code>--profile</code> flag to identify performance bottlenecks (Spec 001):</p>
+<pre><code class="language-bash"># Enable profiling output
+debtmap --profile
+
+# Write profiling data to JSON file
+debtmap --profile --profile-output profile-data.json
+</code></pre>
+<p><strong>Source</strong>: <code>src/cli/args.rs:356-368</code></p>
+<p><strong>Profiling output includes</strong>:</p>
+<ul>
+<li>Time spent in each analysis phase</li>
+<li>File processing times</li>
+<li>Memory usage statistics</li>
+<li>Bottleneck identification</li>
+</ul>
+<h3 id="analyze-profiling-results"><a class="header" href="#analyze-profiling-results">Analyze Profiling Results</a></h3>
+<pre><code class="language-bash"># Generate profile and analyze
+debtmap --profile --profile-output analysis.json
+jq '.phases | to_entries | sort_by(.value.duration_ms) | reverse' analysis.json
+</code></pre>
+<h2 id="debugging-score-calculations"><a class="header" href="#debugging-score-calculations">Debugging Score Calculations</a></h2>
+<pre><code class="language-bash"># Use verbosity levels to see score breakdown
+debtmap analyze . -v    # Shows score factors
+
+# See how coverage affects scores
+debtmap analyze . --coverage-file coverage.info -v
+
+# See how context affects scores
+debtmap analyze . --context --context-providers critical_path -v
+</code></pre>
+<h3 id="debug-session-example"><a class="header" href="#debug-session-example">Debug Session Example</a></h3>
+<pre><code class="language-bash"># Step 1: Run with verbosity to see what's happening
+debtmap analyze . -vv
+
+# Step 2: Try without semantic analysis
+debtmap analyze . --semantic-off -v
+
+# Step 3: Check specific file
+debtmap analyze path/to/file.rs -vvv
+
+# Step 4: Validate results
+debtmap analyze . --validate-loc
+</code></pre>
+<h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
+<p>Debtmap supports various environment variables for debugging and diagnostics without command-line flags.</p>
+<h3 id="debug-environment-variables"><a class="header" href="#debug-environment-variables">Debug Environment Variables</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Variable</th><th>Purpose</th><th>Source</th></tr>
+</thead>
+<tbody>
+<tr><td><code>DEBTMAP_COVERAGE_DEBUG</code></td><td>Enable detailed coverage matching diagnostics</td><td><code>src/risk/lcov/diagnostics.rs:4</code></td></tr>
+<tr><td><code>DEBTMAP_TIMING</code></td><td>Show timing information for analysis phases</td><td><code>src/analyzers/effects.rs:98</code></td></tr>
+<tr><td><code>DEBTMAP_DEBUG_SCORING</code></td><td>Enable detailed score calculation output</td><td><code>src/priority/mod.rs:551</code></td></tr>
+<tr><td><code>DEBTMAP_LOG_FILE</code></td><td>Write tracing output to a log file</td><td><code>src/observability/tracing.rs:63</code></td></tr>
+<tr><td><code>DEBTMAP_SHOW_FILTER_STATS</code></td><td>Show filter statistics summary</td><td><code>src/priority/mod.rs:649</code></td></tr>
+<tr><td><code>DEBTMAP_ENTROPY_ENABLED</code></td><td>Enable entropy-based pattern dampening</td><td><code>src/complexity/entropy.rs</code></td></tr>
+<tr><td><code>DEBTMAP_FILE_TIMEOUT</code></td><td>Override per-file analysis timeout (seconds)</td><td><code>src/analysis_utils.rs:206</code></td></tr>
+<tr><td><code>DEBTMAP_NO_TIMEOUT</code></td><td>Disable file analysis timeouts entirely</td><td><code>src/analysis_utils.rs:220</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="coverage-debugging"><a class="header" href="#coverage-debugging">Coverage Debugging</a></h3>
+<p>Enable detailed coverage matching diagnostics when troubleshooting coverage file issues:</p>
+<pre><code class="language-bash"># Enable coverage debug mode
+DEBTMAP_COVERAGE_DEBUG=1 debtmap analyze .
+
+# Combine with explain-coverage for detailed matching
+DEBTMAP_COVERAGE_DEBUG=1 debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "my_function" \
+  -v
+</code></pre>
+<p><strong>Source</strong>: <code>src/risk/lcov/diagnostics.rs:4-18</code></p>
+<p>When enabled, this shows:</p>
+<ul>
+<li>Coverage file parsing statistics</li>
+<li>Function name matching attempts and results</li>
+<li>Path normalization details</li>
+<li>Match success rates by strategy (exact, suffix, method name, etc.)</li>
+</ul>
+<p><strong>Example output</strong>:</p>
+<pre><code>=== Coverage Matching Statistics ===
+Total functions analyzed: 150
+Functions with coverage: 123 (82.0%)
+Functions without coverage: 27 (18.0%)
+
+Match Strategy Breakdown:
+  exact_match: 95 (77.2%)
+  suffix_match: 20 (16.3%)
+  method_name_match: 8 (6.5%)
+</code></pre>
+<h3 id="timing-information"><a class="header" href="#timing-information">Timing Information</a></h3>
+<p>Enable timing output to identify slow files or analysis phases:</p>
+<pre><code class="language-bash"># Enable timing output
+DEBTMAP_TIMING=1 debtmap analyze .
+</code></pre>
+<p><strong>Source</strong>: <code>src/analyzers/effects.rs:81-99</code>, <code>src/analyzers/rust.rs:211-213</code></p>
+<p><strong>Example output</strong>:</p>
+<pre><code>[TIMING] analyze_rust_file src/main.rs: total=0.45s (analysis=0.32s, debt=0.08s, deps=0.05s)
+[TIMING] analyze_rust_file src/lib.rs: total=0.12s (analysis=0.09s, debt=0.02s, deps=0.01s)
+</code></pre>
+<h3 id="score-calculation-debugging"><a class="header" href="#score-calculation-debugging">Score Calculation Debugging</a></h3>
+<p>For detailed score calculation output:</p>
+<pre><code class="language-bash">DEBTMAP_DEBUG_SCORING=1 debtmap analyze .
+</code></pre>
+<p><strong>Source</strong>: <code>src/priority/mod.rs:551-553</code></p>
+<p><strong>Example output</strong>:</p>
+<pre><code>=== Score Calculation Debug ===
+Function-level items count: 150
+Base risk calculation:
+  complexity_component: 0.27
+  coverage_component: 0.45
+  base_risk: 3.6
+...
+</code></pre>
+<h3 id="filter-statistics"><a class="header" href="#filter-statistics">Filter Statistics</a></h3>
+<p>Show statistics about filtering operations:</p>
+<pre><code class="language-bash">DEBTMAP_SHOW_FILTER_STATS=1 debtmap analyze .
+</code></pre>
+<p><strong>Source</strong>: <code>src/priority/mod.rs:649-653</code></p>
+<p><strong>Example output</strong>:</p>
+<pre><code>=== Filter Statistics ===
+Items before filtering: 500
+Items after priority filter: 150
+Items after category filter: 120
+Items in final output: 100
+</code></pre>
+<h3 id="file-logging"><a class="header" href="#file-logging">File Logging</a></h3>
+<p>Write tracing output to a file instead of stderr (useful for TUI debugging):</p>
+<pre><code class="language-bash">DEBTMAP_LOG_FILE=debtmap.log debtmap analyze .
+</code></pre>
+<p><strong>Source</strong>: <code>src/observability/tracing.rs:41-42</code>, <code>src/observability/tracing.rs:63-65</code></p>
+<p>This is particularly useful when:</p>
+<ul>
+<li>Using the TUI mode (prevents display corruption)</li>
+<li>Need to capture debug output for later analysis</li>
+<li>Debugging issues that require verbose output</li>
+</ul>
+<h3 id="file-timeout-control"><a class="header" href="#file-timeout-control">File Timeout Control</a></h3>
+<p>Control per-file analysis timeouts:</p>
+<pre><code class="language-bash"># Set custom timeout (in seconds, default varies by file size)
+DEBTMAP_FILE_TIMEOUT=30 debtmap analyze .
+
+# Disable timeouts entirely (use with caution)
+DEBTMAP_NO_TIMEOUT=1 debtmap analyze .
+</code></pre>
+<p><strong>Source</strong>: <code>src/analysis_utils.rs:206-221</code></p>
+<p><strong>When to adjust timeouts</strong>:</p>
+<ul>
+<li><code>DEBTMAP_FILE_TIMEOUT</code>: When analyzing very large or complex files that need more time</li>
+<li><code>DEBTMAP_NO_TIMEOUT</code>: When debugging timeout issues or analyzing files that consistently timeout</li>
+</ul>
+<p><strong>Warning</strong>: Disabling timeouts can cause the analysis to hang on problematic files.</p>
+<h3 id="rust_log-for-tracing"><a class="header" href="#rust_log-for-tracing">RUST_LOG for Tracing</a></h3>
+<p>Control the structured tracing verbosity:</p>
+<pre><code class="language-bash"># Default: warnings and errors only
+debtmap analyze .
+
+# Show phase-level progress
+RUST_LOG=info debtmap analyze .
+
+# Detailed debugging output
+RUST_LOG=debug debtmap analyze .
+
+# Debug only debtmap crate
+RUST_LOG=debtmap=debug debtmap analyze .
+
+# Trace-level (very verbose)
+RUST_LOG=trace debtmap analyze .
+</code></pre>
+<p><strong>Source</strong>: <code>src/observability/tracing.rs:17-31</code></p>
+<h3 id="analysis-feature-flags"><a class="header" href="#analysis-feature-flags">Analysis Feature Flags</a></h3>
+<pre><code class="language-bash"># Enable context-aware analysis by default
+export DEBTMAP_CONTEXT_AWARE=true
+
+# Enable functional analysis by default
+export DEBTMAP_FUNCTIONAL_ANALYSIS=true
+
+# Single-pass analysis (disable multi-pass)
+export DEBTMAP_SINGLE_PASS=1
+</code></pre>
+<h3 id="output-customization"><a class="header" href="#output-customization">Output Customization</a></h3>
+<pre><code class="language-bash"># Disable emoji in output
+export NO_EMOJI=1
+
+# Force plain text output (no colors)
+export NO_COLOR=1
+</code></pre>
+<h3 id="cicd-variables"><a class="header" href="#cicd-variables">CI/CD Variables</a></h3>
+<pre><code class="language-bash"># Enable automation-friendly output
+export PRODIGY_AUTOMATION=true
+
+# Enable validation mode (stricter checks)
+export PRODIGY_VALIDATION=true
+</code></pre>
+<h2 id="precedence-rules"><a class="header" href="#precedence-rules">Precedence Rules</a></h2>
+<p>When both environment variables and CLI flags are present:</p>
+<ol>
+<li><strong>CLI flags take precedence</strong> over environment variables</li>
+<li><strong>Environment variables override</strong> config file defaults</li>
+<li><strong>Config file settings override</strong> built-in defaults</li>
+</ol>
+<pre><code class="language-bash"># CLI flag overrides environment variable
+DEBTMAP_CONTEXT_AWARE=false debtmap --context  # Flag wins, context enabled
+</code></pre>
+<h2 id="performance-tips"><a class="header" href="#performance-tips">Performance Tips</a></h2>
+<h3 id="parallel-processing"><a class="header" href="#parallel-processing">Parallel Processing</a></h3>
+<pre><code class="language-bash"># Use all CPU cores (default)
+debtmap --jobs 0
+
+# Limit to 4 threads
+debtmap --jobs 4
+
+# Disable parallel processing (debugging)
+debtmap --no-parallel
+</code></pre>
+<p><strong>When to adjust parallelism</strong>:</p>
+<ul>
+<li><strong>Use <code>--jobs 0</code></strong> (default): Maximum performance on dedicated machine</li>
+<li><strong>Use <code>--jobs N</code></strong>: Limit resource usage while other tasks run</li>
+<li><strong>Use <code>--no-parallel</code></strong>: Debugging concurrency issues</li>
+</ul>
+<h3 id="analysis-optimizations"><a class="header" href="#analysis-optimizations">Analysis Optimizations</a></h3>
+<pre><code class="language-bash"># Faster: disable multi-pass analysis (single-pass mode)
+debtmap --no-multi-pass
+
+# Fast mode: disable semantic analysis
+debtmap --semantic-off
+
+# Plain output: faster terminal rendering
+debtmap --plain
+
+# Limit files for testing
+debtmap --max-files 100
+
+# Analyze subdirectory only
+debtmap src/specific/module
+
+# Reduce output with filters
+debtmap --min-priority 4 --top 20
+</code></pre>
+<h3 id="performance-comparison"><a class="header" href="#performance-comparison">Performance Comparison</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Configuration</th><th>Speed</th><th>Accuracy</th></tr>
+</thead>
+<tbody>
+<tr><td>Default (multi-pass)</td><td>Fast</td><td>Highest</td></tr>
+<tr><td><code>--no-multi-pass</code></td><td>Faster</td><td>High</td></tr>
+<tr><td><code>--semantic-off</code></td><td>Fastest</td><td>Medium</td></tr>
+<tr><td><code>--no-parallel</code></td><td>Slowest</td><td>High</td></tr>
+<tr><td><code>--jobs 4</code></td><td>Medium</td><td>High</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="monitoring-performance"><a class="header" href="#monitoring-performance">Monitoring Performance</a></h3>
+<pre><code class="language-bash"># Time analysis
+time debtmap
+
+# Profile with verbosity
+debtmap -vv 2&gt;&amp;1 | grep "processed in"
+
+# Use built-in profiling
+debtmap --profile
+</code></pre>
+<h2 id="troubleshooting-environment-variables"><a class="header" href="#troubleshooting-environment-variables">Troubleshooting Environment Variables</a></h2>
+<pre><code class="language-bash"># Test with specific environment
+env DEBTMAP_CONTEXT_AWARE=true debtmap -v
+
+# See all debtmap-related environment variables
+env | grep -i debtmap
+env | grep -i prodigy
+
+# Combine multiple debug variables
+DEBTMAP_COVERAGE_DEBUG=1 DEBTMAP_TIMING=1 debtmap analyze . -v
+</code></pre>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="quick-fixes.html">Quick Fixes</a> - Common problems with immediate solutions</li>
+<li><a href="error-messages.html">Error Messages Reference</a> - Detailed error message explanations</li>
+<li><a href="../cli-reference.html">CLI Reference</a> - Complete command-line documentation</li>
+<li><a href="../configuration.html">Configuration Guide</a> - Configure debtmap behavior</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../troubleshooting/quick-fixes.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../troubleshooting/context-providers.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../troubleshooting/quick-fixes.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../troubleshooting/context-providers.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

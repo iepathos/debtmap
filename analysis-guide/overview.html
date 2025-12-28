@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-08efffac.js";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-d4b9eccb.js"></script>
+        <script src="../toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -182,9 +182,9 @@
 <h2 id="supported-languages"><a class="header" href="#supported-languages">Supported Languages</a></h2>
 <ul>
 <li><strong>Rust</strong> - Full analysis support with AST-based parsing via <code>syn</code></li>
-<li><strong>Python</strong> - Partial support for basic metrics</li>
+<li><strong>Python</strong> - File detection only; analysis not yet implemented (language enum defined for future expansion)</li>
 </ul>
-<p>Source: <code>src/organization/language.rs:4-7</code></p>
+<p>Source: <code>src/organization/language.rs:4-7</code> (Language enum), <code>src/analyzers/implementations.rs:185-186</code> (analysis status)</p>
 <h2 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h2>
 <h3 id="complexity-metrics"><a class="header" href="#complexity-metrics">Complexity Metrics</a></h3>
 <p>Calculates multiple dimensions of code complexity:</p>
@@ -228,7 +228,7 @@
 <li>Dead code and duplication</li>
 <li>Error swallowing and magic values</li>
 </ul>
-<p>Source: <code>src/priority/mod.rs:158-288</code> (DebtType enum)</p>
+<p>Source: <code>src/priority/debt_types.rs:47</code> (DebtType enum)</p>
 <p>See <a href="debt-patterns.html">Debt Patterns</a> for detailed detection rules and examples.</p>
 <h3 id="risk-scoring"><a class="header" href="#risk-scoring">Risk Scoring</a></h3>
 <p>Combines complexity, test coverage, coupling, and change frequency through a <strong>multi-factor risk model</strong>:</p>

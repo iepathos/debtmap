@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -313,6 +313,23 @@
 </tbody>
 </table>
 </div>
+<h3 id="function-role-classification"><a class="header" href="#function-role-classification">Function Role Classification</a></h3>
+<p>Debtmap automatically determines function roles based on naming patterns (src/complexity/threshold_manager.rs:264-278):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Role</th><th>Matching Patterns</th><th>Examples</th></tr>
+</thead>
+<tbody>
+<tr><td>Entry Point</td><td><code>main</code>, <code>*_handler</code>, <code>handle_*</code></td><td><code>main()</code>, <code>request_handler()</code>, <code>handle_event()</code></td></tr>
+<tr><td>Test</td><td><code>test_*</code>, <code>*_test</code></td><td><code>test_validation()</code>, <code>parser_test()</code></td></tr>
+<tr><td>Utility</td><td><code>get_*</code>, <code>set_*</code>, <code>is_*</code>, <code>has_*</code></td><td><code>get_name()</code>, <code>set_config()</code>, <code>is_valid()</code>, <code>has_permission()</code></td></tr>
+<tr><td>Core Logic</td><td>All other functions</td><td><code>process_data()</code>, <code>calculate_score()</code>, <code>validate()</code></td></tr>
+<tr><td>Unknown</td><td>Fallback (uses core logic multiplier)</td><td>Rare edge cases</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Note</strong>: The “Unknown” role uses the same multiplier as Core Logic (1.0x). In practice, functions are classified as Core Logic if they don’t match any specific pattern.</p>
 <p><strong>Note</strong>: Some multipliers vary by preset:</p>
 <ul>
 <li><strong>Entry Points</strong>: Strict=1.2x, Balanced=1.5x, Lenient=2.0x</li>
@@ -703,7 +720,7 @@ debtmap analyze . --output current.json
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="configuration/best-practices.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -717,7 +734,7 @@ debtmap analyze . --output current.json
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="configuration/best-practices.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

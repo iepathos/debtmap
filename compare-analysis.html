@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -237,6 +237,21 @@
 <li><code>lib/parser.rs:parse_expression:156</code></li>
 <li><code>api/handler.rs:process_request:89</code></li>
 </ul>
+<p><strong>Location Format Variations</strong> (src/comparison/location_matcher.rs:12-19):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Pattern</th><th>Description</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr><td><code>file:function:line</code></td><td>Exact match</td><td><code>src/main.rs:process:42</code></td></tr>
+<tr><td><code>file:function</code></td><td>Function-level match (any line)</td><td><code>src/main.rs:process</code></td></tr>
+<tr><td><code>file:*:line</code></td><td>Line range match (any function at line)</td><td><code>src/main.rs:*:42</code></td></tr>
+<tr><td><code>file</code></td><td>File-level match (all items in file)</td><td><code>src/main.rs</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The <code>file:*:line</code> format is useful when you want to target a specific line number regardless of the function name, which is helpful when function names change during refactoring.</p>
 <h3 id="specifying-target-locations"><a class="header" href="#specifying-target-locations">Specifying Target Locations</a></h3>
 <h4 id="option-1-via-implementation-plan"><a class="header" href="#option-1-via-implementation-plan">Option 1: Via Implementation Plan</a></h4>
 <p>Create an <code>IMPLEMENTATION_PLAN.md</code> file with a target location section:</p>
@@ -388,7 +403,7 @@ fi
 <h2 id="improvement-tracking"><a class="header" href="#improvement-tracking">Improvement Tracking</a></h2>
 <p>The compare command tracks improvements as a list of <code>ImprovementItem</code> objects with detailed before/after metrics.</p>
 <h3 id="improvement-types"><a class="header" href="#improvement-types">Improvement Types</a></h3>
-<p>The <code>ImprovementType</code> enum (src/comparison/types.rs:120-126) defines four improvement categories:</p>
+<p>The <code>ImprovementType</code> enum (src/comparison/types.rs:121-126) defines four improvement categories:</p>
 <ul>
 <li><strong>Resolved</strong> - Debt item completely eliminated (no longer in after analysis) ✓ <em>Auto-detected</em></li>
 <li><strong>ScoreReduced</strong> - Overall debt score reduced significantly (≥ 30% reduction) ✓ <em>Auto-detected</em></li>
@@ -1063,7 +1078,7 @@ debtmap compare \
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="configuration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="configuration/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -1077,7 +1092,7 @@ debtmap compare \
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="configuration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="configuration/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

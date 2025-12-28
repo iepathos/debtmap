@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-08efffac.js";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-d4b9eccb.js"></script>
+        <script src="../toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -226,7 +226,7 @@
 <li>Base level (no nesting): weight = 1</li>
 <li>First nesting level: weight = 2</li>
 <li>Second nesting level: weight = 3</li>
-<li>Formula: <code>complexity = 1 + nesting_level</code> (from src/complexity/cognitive.rs:151)</li>
+<li>Formula: <code>complexity = 1 + nesting_level</code> (from src/complexity/cognitive.rs:167)</li>
 </ul>
 </li>
 <li>Break/continue/return in middle of function adds cognitive load</li>
@@ -289,7 +289,7 @@ fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
 </ul>
 </li>
 <li>
-<p><strong>Token Classification</strong>: Categorizes tokens by type with weighted importance (src/complexity/entropy_core.rs:44-54)</p>
+<p><strong>Token Classification</strong>: Categorizes tokens by type with weighted importance (src/complexity/entropy_core.rs:267-277)</p>
 <ul>
 <li><strong>Token categories and weights</strong> (from src/complexity/entropy_traits.rs:24-44):
 <ul>
@@ -312,7 +312,7 @@ fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
 <li>High pattern repetition (&gt; 0.6) shows similar code blocks (measured via PatternMetrics)</li>
 <li>High branch similarity (&gt; 0.7) indicates consistent branching logic</li>
 </ul>
-<p><strong>Pattern detection</strong> (src/complexity/entropy_core.rs:56-85):</p>
+<p><strong>Pattern detection</strong> (src/complexity/entropy_core.rs:279-308):</p>
 <ul>
 <li><code>PatternMetrics</code> tracks intermediate calculations:
 <ul>
@@ -326,18 +326,18 @@ fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
 <p>When these conditions are met:</p>
 <pre><code>effective_complexity = entropy × pattern_factor × similarity_factor
 </code></pre>
-<p><strong>Note on metrics</strong> (src/complexity/entropy_core.rs:28-32):</p>
+<p><strong>Note on metrics</strong> (src/complexity/entropy_core.rs:228-265):</p>
 <ul>
 <li><code>token_entropy</code>: Measures unpredictability of code tokens (0.0-1.0), used for pattern detection</li>
 <li><code>effective_complexity</code>: Final composite score after applying dampening adjustments</li>
 <li>These are distinct metrics - <code>effective_complexity</code> combines multiple factors, while <code>token_entropy</code> is a single entropy measurement</li>
 </ul>
-<p><strong>Dampening cap:</strong> The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores. This prevents over-correction of pattern-based code and maintains a baseline complexity floor for functions that still require understanding and maintenance.</p>
+<p><strong>Dampening cap:</strong> The dampening factor is clamped between 0.5 and 1.0 (src/complexity/entropy_core.rs:114), allowing a maximum of 50% complexity reduction. The configuration option <code>max_combined_reduction</code> (default 0.30) provides additional control over the maximum allowed reduction. This prevents over-correction of pattern-based code while still providing meaningful adjustments for repetitive structures.</p>
 <p><strong>Example:</strong></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Without entropy: Cyclomatic = 15 (appears very complex)
-// With entropy: Effective = 5 (pattern-based, dampened 67%)
+// With entropy: Effective = 8 (pattern-based, dampened ~47%)
 fn validate_config(config: &amp;Config) -&gt; Result&lt;(), ValidationError&gt; {
     if config.name.is_empty() { return Err(ValidationError::EmptyName); }
     if config.port == 0 { return Err(ValidationError::InvalidPort); }

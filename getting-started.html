@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -236,11 +236,11 @@ debtmap --help
 <pre><code class="language-bash"># Basic analysis (simplest command)
 debtmap analyze .
 
-# LLM-optimized output for AI workflows (recommended)
-debtmap analyze . --format llm-markdown
+# Markdown output for AI workflows (recommended)
+debtmap analyze . --format markdown
 
 # Pipe directly to Claude Code
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # JSON output for programmatic access
 debtmap analyze . --format json --top 10 &gt; debt.json
@@ -261,7 +261,7 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for Rust source files (<code>.rs</code>)</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for source files (Rust <code>.rs</code> and Python <code>.py</code>)</li>
 <li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW)</li>
@@ -270,7 +270,7 @@ debtmap analyze . --format terminal
 </ol>
 <p><strong>Expected timing</strong>: Analyzing a 10,000 LOC project typically takes 2-5 seconds.</p>
 <h2 id="example-output"><a class="header" href="#example-output">Example Output</a></h2>
-<p>When you run <code>debtmap analyze . --format llm-markdown</code>, you’ll see output like this:</p>
+<p>When you run <code>debtmap analyze . --format markdown</code>, you’ll see output like this:</p>
 <pre><code class="language-markdown"># Technical Debt Analysis
 
 ## Summary
@@ -336,8 +336,8 @@ debtmap analyze . --format terminal
 </code></pre>
 <p>These suggestions help AI assistants understand the code before making changes.</p>
 <h2 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h2>
-<h3 id="llm-markdown-for-ai-workflows"><a class="header" href="#llm-markdown-for-ai-workflows">LLM Markdown (for AI workflows)</a></h3>
-<pre><code class="language-bash">debtmap analyze . --format llm-markdown
+<h3 id="markdown-for-ai-workflows"><a class="header" href="#markdown-for-ai-workflows">Markdown (for AI workflows)</a></h3>
+<pre><code class="language-bash">debtmap analyze . --format markdown
 </code></pre>
 <p>Optimized for minimal token usage while providing all necessary context.</p>
 <h3 id="json-for-programmatic-access"><a class="header" href="#json-for-programmatic-access">JSON (for programmatic access)</a></h3>
@@ -368,16 +368,16 @@ debtmap analyze . --lcov coverage.lcov
 <h2 id="ai-workflow-examples"><a class="header" href="#ai-workflow-examples">AI Workflow Examples</a></h2>
 <h3 id="claude-code"><a class="header" href="#claude-code">Claude Code</a></h3>
 <pre><code class="language-bash"># Direct piping
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # With coverage
 cargo llvm-cov --lcov --output-path coverage.lcov
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1 | \
+debtmap analyze . --format markdown --lcov coverage.lcov --top 1 | \
   claude "Add tests for this function"
 </code></pre>
 <h3 id="cursor"><a class="header" href="#cursor">Cursor</a></h3>
 <pre><code class="language-bash"># Generate report for Cursor to reference
-debtmap analyze . --format llm-markdown --top 10 &gt; debt-report.md
+debtmap analyze . --format markdown --top 10 &gt; debt-report.md
 
 # In Cursor: @debt-report.md Fix the top critical item
 </code></pre>
@@ -412,7 +412,7 @@ patterns = ["**/target/**", "**/tests/**"]
 <tr><th>Option</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>--format &lt;FORMAT&gt;</code></td><td>Output format: terminal, json, markdown, llm-markdown</td></tr>
+<tr><td><code>--format &lt;FORMAT&gt;</code></td><td>Output format: terminal, json, markdown</td></tr>
 <tr><td><code>--output &lt;FILE&gt;</code></td><td>Write to file instead of stdout</td></tr>
 <tr><td><code>--lcov &lt;FILE&gt;</code></td><td>LCOV coverage file for risk analysis</td></tr>
 <tr><td><code>--top &lt;N&gt;</code></td><td>Show only top N priority items</td></tr>
@@ -445,6 +445,9 @@ patterns = ["**/target/**", "**/tests/**"]
 <tr><td><code>--jobs &lt;N&gt;</code></td><td>Number of threads (0 = all cores)</td></tr>
 <tr><td><code>--no-parallel</code></td><td>Disable parallel processing</td></tr>
 <tr><td><code>--max-files &lt;N&gt;</code></td><td>Limit analysis to N files</td></tr>
+<tr><td><code>--no-tui</code></td><td>Disable TUI progress visualization (use simple progress bars)</td></tr>
+<tr><td><code>--streaming</code></td><td>Enable streaming output mode for large codebases (O(1) memory)</td></tr>
+<tr><td><code>--stream-to &lt;FILE&gt;</code></td><td>Output file for streaming mode (use “-” for stdout)</td></tr>
 </tbody>
 </table>
 </div>
@@ -460,14 +463,16 @@ patterns = ["**/target/**", "**/tests/**"]
 </ul>
 <h3 id="analysis-issues"><a class="header" href="#analysis-issues">Analysis Issues</a></h3>
 <ul>
-<li><strong>Empty output</strong>: Check that your project contains Rust source files (<code>.rs</code>)</li>
+<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code> for Rust, <code>.py</code> for Python)</li>
 <li><strong>Parser failures</strong>: Run with <code>-vv</code> for debug output</li>
 <li><strong>Performance issues</strong>: Limit parallel jobs with <code>--jobs 4</code></li>
+<li><strong>Large codebase slowness</strong>: Use <code>--streaming</code> mode for O(1) memory overhead</li>
 </ul>
 <h3 id="coverage-issues"><a class="header" href="#coverage-issues">Coverage Issues</a></h3>
 <ul>
 <li><strong>Coverage not applied</strong>: Verify LCOV file path is correct</li>
 <li><strong>Low coverage detected</strong>: Ensure tests actually run during coverage generation</li>
+<li><strong>Coverage debugging</strong>: Use <code>debtmap diagnose-coverage &lt;file.lcov&gt;</code> to validate coverage file parsing</li>
 </ul>
 <h2 id="whats-next"><a class="header" href="#whats-next">What’s Next?</a></h2>
 <p>Now that you’ve run your first analysis:</p>

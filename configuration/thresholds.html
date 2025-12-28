@@ -1,0 +1,543 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Thresholds Configuration - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-3bdbe002.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="thresholds-configuration"><a class="header" href="#thresholds-configuration">Thresholds Configuration</a></h1>
+<p>This subsection covers threshold configuration in Debtmap, including basic thresholds, minimum thresholds for filtering, and validation thresholds for CI/CD pipelines.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Thresholds control what gets flagged as technical debt. Debtmap provides multiple threshold categories:</p>
+<ul>
+<li><strong>Basic thresholds</strong> - Core complexity and size limits</li>
+<li><strong>Minimum thresholds</strong> - Filter out trivial functions</li>
+<li><strong>Validation thresholds</strong> - CI/CD quality gates</li>
+<li><strong>Coverage expectations</strong> - Role-based test coverage requirements</li>
+</ul>
+<h2 id="basic-thresholds"><a class="header" href="#basic-thresholds">Basic Thresholds</a></h2>
+<p>Basic thresholds define when code is flagged as technical debt. Configure them in the <code>[thresholds]</code> section of <code>.debtmap.toml</code>.</p>
+<p><strong>Source:</strong> <code>src/config/thresholds.rs:83-118</code> (<code>ThresholdsConfig</code>)</p>
+<pre><code class="language-toml">[thresholds]
+complexity = 10                # Cyclomatic complexity threshold (default: 10)
+duplication = 50               # Duplication threshold in lines (default: 50)
+max_file_length = 500          # Maximum lines per file (default: 500)
+max_function_length = 50       # Maximum lines per function (default: 50)
+</code></pre>
+<h3 id="configuration-options"><a class="header" href="#configuration-options">Configuration Options</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>complexity</code></td><td><code>u32</code></td><td>10</td><td>Cyclomatic complexity threshold</td></tr>
+<tr><td><code>duplication</code></td><td><code>u32</code></td><td>50</td><td>Minimum duplicate lines to flag</td></tr>
+<tr><td><code>max_file_length</code></td><td><code>usize</code></td><td>500</td><td>Maximum lines per file</td></tr>
+<tr><td><code>max_function_length</code></td><td><code>usize</code></td><td>50</td><td>Maximum lines per function</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="cli-override"><a class="header" href="#cli-override">CLI Override</a></h3>
+<p>You can override basic thresholds from the command line:</p>
+<pre><code class="language-bash"># Override cyclomatic complexity threshold
+debtmap analyze . --threshold-complexity 15
+
+# Override duplication threshold
+debtmap analyze . --threshold-duplication 30
+
+# Combine multiple threshold flags
+debtmap analyze . --threshold-complexity 15 --threshold-duplication 30
+</code></pre>
+<h2 id="minimum-thresholds"><a class="header" href="#minimum-thresholds">Minimum Thresholds</a></h2>
+<p>Minimum thresholds filter out trivial functions that aren’t significant technical debt. This helps focus analysis on meaningful issues.</p>
+<p><strong>Source:</strong> <code>src/config/thresholds.rs:90-109</code> (<code>ThresholdsConfig</code>)</p>
+<pre><code class="language-toml">[thresholds]
+# Filter items below these scores
+minimum_debt_score = 2.0              # Only show debt score &gt;= 2.0 (default: none)
+minimum_risk_score = 2.0              # Only show risk score &gt;= 2.0 (default: none)
+min_score_threshold = 3.0             # Hide LOW severity items (default: 3.0)
+
+# Complexity minimums (filter out simple functions)
+minimum_cyclomatic_complexity = 3     # Ignore cyclomatic &lt; 3 (default: none)
+minimum_cognitive_complexity = 5      # Ignore cognitive &lt; 5 (default: none)
+</code></pre>
+<h3 id="configuration-options-1"><a class="header" href="#configuration-options-1">Configuration Options</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>minimum_debt_score</code></td><td><code>f64</code></td><td>None</td><td>Minimum debt score to include in results</td></tr>
+<tr><td><code>minimum_risk_score</code></td><td><code>f64</code></td><td>None</td><td>Minimum risk score (0-10) to include</td></tr>
+<tr><td><code>min_score_threshold</code></td><td><code>f64</code></td><td>3.0</td><td>Score threshold for recommendations</td></tr>
+<tr><td><code>minimum_cyclomatic_complexity</code></td><td><code>u32</code></td><td>None</td><td>Minimum cyclomatic to analyze</td></tr>
+<tr><td><code>minimum_cognitive_complexity</code></td><td><code>u32</code></td><td>None</td><td>Minimum cognitive to analyze</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h3>
+<p><strong>Focus on High-Priority Issues:</strong></p>
+<pre><code class="language-toml">[thresholds]
+minimum_debt_score = 5.0        # Only show significant debt
+minimum_risk_score = 4.0        # Only show meaningful risk
+</code></pre>
+<p><strong>Legacy Codebase (Reduce Noise):</strong></p>
+<pre><code class="language-toml">[thresholds]
+minimum_cyclomatic_complexity = 10   # Ignore moderate complexity
+minimum_cognitive_complexity = 15    # Focus on worst offenders
+</code></pre>
+<h2 id="validation-thresholds"><a class="header" href="#validation-thresholds">Validation Thresholds</a></h2>
+<p>Validation thresholds are used by the <code>debtmap validate</code> command to enforce quality gates in CI/CD pipelines.</p>
+<p><strong>Source:</strong> <code>src/config/thresholds.rs:120-196</code> (<code>ValidationThresholds</code>)</p>
+<h3 id="primary-quality-metrics-scale-independent"><a class="header" href="#primary-quality-metrics-scale-independent">Primary Quality Metrics (Scale-Independent)</a></h3>
+<p>These metrics work for codebases of any size:</p>
+<pre><code class="language-toml">[thresholds.validation]
+# Primary quality metrics
+max_average_complexity = 10.0      # Maximum average complexity per function (default: 10.0)
+max_debt_density = 50.0            # Debt items per 1000 LOC (default: 50.0)
+max_codebase_risk_score = 7.0      # Overall risk score 0-10 (default: 7.0)
+
+# Optional metrics
+min_coverage_percentage = 0.0       # Minimum test coverage % (default: 0.0 - disabled)
+
+# Safety net
+max_total_debt_score = 10000        # Maximum total debt (default: 10000)
+</code></pre>
+<h3 id="configuration-options-2"><a class="header" href="#configuration-options-2">Configuration Options</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>max_average_complexity</code></td><td><code>f64</code></td><td>10.0</td><td>Maximum average complexity per function</td></tr>
+<tr><td><code>max_debt_density</code></td><td><code>f64</code></td><td>50.0</td><td>Maximum debt per 1000 LOC (scale-independent)</td></tr>
+<tr><td><code>max_codebase_risk_score</code></td><td><code>f64</code></td><td>7.0</td><td>Maximum overall risk score (0-10)</td></tr>
+<tr><td><code>min_coverage_percentage</code></td><td><code>f64</code></td><td>0.0</td><td>Minimum required test coverage (0 = disabled)</td></tr>
+<tr><td><code>max_total_debt_score</code></td><td><code>u32</code></td><td>10000</td><td>Safety ceiling for total debt</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="using-validation-in-cicd"><a class="header" href="#using-validation-in-cicd">Using Validation in CI/CD</a></h3>
+<pre><code class="language-bash"># Run validation (exits with error if thresholds exceeded)
+debtmap validate . --config .debtmap.toml
+
+# Example CI/CD pipeline
+debtmap analyze . --output report.json
+debtmap validate . --config .debtmap.toml || exit 1
+</code></pre>
+<h3 id="deprecated-fields"><a class="header" href="#deprecated-fields">Deprecated Fields</a></h3>
+<p>The following fields are deprecated since v0.3.0 and will be removed in v1.0:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Deprecated Field</th><th>Replacement</th></tr>
+</thead>
+<tbody>
+<tr><td><code>max_high_complexity_count</code></td><td>Use <code>max_debt_density</code></td></tr>
+<tr><td><code>max_debt_items</code></td><td>Use <code>max_debt_density</code></td></tr>
+<tr><td><code>max_high_risk_functions</code></td><td>Use <code>max_debt_density</code> + <code>max_codebase_risk_score</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Migration Example:</strong></p>
+<pre><code class="language-toml"># Old (deprecated)
+[thresholds.validation]
+max_debt_items = 100
+
+# New (scale-independent)
+[thresholds.validation]
+max_debt_density = 50.0  # Works for any codebase size
+</code></pre>
+<h2 id="coverage-expectations"><a class="header" href="#coverage-expectations">Coverage Expectations</a></h2>
+<p>Coverage expectations define role-based test coverage requirements. Different function types have different testing strategies.</p>
+<p><strong>Source:</strong> <code>src/priority/scoring/coverage_expectations.rs:103-173</code></p>
+<pre><code class="language-toml"># High expectations for pure functions
+[coverage_expectations.pure]
+min = 90.0                # Minimum acceptable coverage
+target = 95.0             # Target/ideal coverage
+max = 100.0               # Maximum meaningful coverage
+
+# Moderate expectations for I/O operations
+[coverage_expectations.io_operations]
+min = 60.0
+target = 70.0
+max = 80.0
+
+# Low expectations for debug/diagnostic code
+[coverage_expectations.debug]
+min = 20.0
+target = 30.0
+max = 40.0
+</code></pre>
+<h3 id="default-coverage-expectations-by-role"><a class="header" href="#default-coverage-expectations-by-role">Default Coverage Expectations by Role</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Function Role</th><th>Min</th><th>Target</th><th>Max</th><th>Rationale</th></tr>
+</thead>
+<tbody>
+<tr><td>Pure Logic</td><td>90%</td><td>95%</td><td>100%</td><td>Easy to unit test, should be comprehensive</td></tr>
+<tr><td>Business Logic</td><td>80%</td><td>90%</td><td>95%</td><td>Core functionality requires thorough testing</td></tr>
+<tr><td>Validation</td><td>85%</td><td>92%</td><td>98%</td><td>Input validation is critical</td></tr>
+<tr><td>State Management</td><td>75%</td><td>85%</td><td>90%</td><td>State transitions need coverage</td></tr>
+<tr><td>Error Handling</td><td>70%</td><td>80%</td><td>90%</td><td>Error paths should be tested</td></tr>
+<tr><td>Orchestration</td><td>65%</td><td>75%</td><td>85%</td><td>Tested via higher-level tests</td></tr>
+<tr><td>Configuration</td><td>60%</td><td>70%</td><td>80%</td><td>Often integration tested</td></tr>
+<tr><td>I/O Operations</td><td>60%</td><td>70%</td><td>80%</td><td>Often integration tested</td></tr>
+<tr><td>Initialization</td><td>50%</td><td>65%</td><td>75%</td><td>Setup code with less testing priority</td></tr>
+<tr><td>Performance</td><td>40%</td><td>50%</td><td>60%</td><td>Optimization code with lower priority</td></tr>
+<tr><td>Debug</td><td>20%</td><td>30%</td><td>40%</td><td>Diagnostic code has lowest priority</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="complete-coverage-configuration"><a class="header" href="#complete-coverage-configuration">Complete Coverage Configuration</a></h3>
+<pre><code class="language-toml"># Strict quality standards
+[coverage_expectations.pure]
+min = 95.0
+target = 98.0
+max = 100.0
+
+[coverage_expectations.business_logic]
+min = 90.0
+target = 95.0
+max = 98.0
+
+[coverage_expectations.validation]
+min = 92.0
+target = 96.0
+max = 100.0
+
+# More lenient for I/O
+[coverage_expectations.io_operations]
+min = 50.0
+target = 65.0
+max = 75.0
+</code></pre>
+<h2 id="complexity-thresholds"><a class="header" href="#complexity-thresholds">Complexity Thresholds</a></h2>
+<p>For fine-grained control over function complexity detection, use the <code>[complexity_thresholds]</code> section.</p>
+<p><strong>Source:</strong> <code>src/complexity/threshold_manager.rs:16-58</code> (<code>ComplexityThresholds</code>)</p>
+<pre><code class="language-toml">[complexity_thresholds]
+# Core complexity metrics
+minimum_total_complexity = 8        # Sum of cyclomatic + cognitive (default: 8)
+minimum_cyclomatic_complexity = 5   # Decision points (default: 5)
+minimum_cognitive_complexity = 10   # Mental effort to understand (default: 10)
+
+# Structural complexity metrics
+minimum_match_arms = 4              # Maximum match/switch arms (default: 4)
+minimum_if_else_chain = 3           # Maximum if-else chain length (default: 3)
+minimum_function_length = 20        # Minimum lines before flagging (default: 20)
+
+# Role-based multipliers (adjust thresholds by function role)
+entry_point_multiplier = 1.5        # main(), handlers - more lenient (default: 1.5)
+core_logic_multiplier = 1.0         # Business logic - standard (default: 1.0)
+utility_multiplier = 0.8            # Getters, setters - stricter (default: 0.8)
+test_function_multiplier = 2.0      # Test functions - most lenient (default: 2.0)
+</code></pre>
+<h3 id="threshold-presets"><a class="header" href="#threshold-presets">Threshold Presets</a></h3>
+<p>Use <code>--threshold-preset</code> to apply predefined configurations:</p>
+<pre><code class="language-bash"># Strict preset (new projects, libraries)
+debtmap analyze . --threshold-preset strict
+
+# Balanced preset (default - typical projects)
+debtmap analyze . --threshold-preset balanced
+
+# Lenient preset (legacy codebases)
+debtmap analyze . --threshold-preset lenient
+</code></pre>
+<p><strong>Preset Comparison:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Threshold</th><th>Strict</th><th>Balanced</th><th>Lenient</th></tr>
+</thead>
+<tbody>
+<tr><td>Cyclomatic Complexity</td><td>3</td><td>5</td><td>10</td></tr>
+<tr><td>Cognitive Complexity</td><td>7</td><td>10</td><td>20</td></tr>
+<tr><td>Total Complexity</td><td>5</td><td>8</td><td>15</td></tr>
+<tr><td>Function Length</td><td>15</td><td>20</td><td>50</td></tr>
+<tr><td>Match Arms</td><td>3</td><td>4</td><td>8</td></tr>
+<tr><td>If-Else Chain</td><td>2</td><td>3</td><td>5</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Source:</strong> <code>src/complexity/threshold_manager.rs:120-148</code> (<code>from_preset</code>)</p>
+<h3 id="role-based-multiplier-examples"><a class="header" href="#role-based-multiplier-examples">Role-Based Multiplier Examples</a></h3>
+<p>Role multipliers adjust ALL thresholds for different function types:</p>
+<p><strong>Entry Point with Balanced preset (1.5x multiplier):</strong></p>
+<ul>
+<li>Cyclomatic threshold: 7.5 (5 x 1.5)</li>
+<li>Cognitive threshold: 15 (10 x 1.5)</li>
+<li>Total threshold: 12 (8 x 1.5)</li>
+</ul>
+<p><strong>Utility function with Balanced preset (0.8x multiplier):</strong></p>
+<ul>
+<li>Cyclomatic threshold: 4 (5 x 0.8)</li>
+<li>Cognitive threshold: 8 (10 x 0.8)</li>
+<li>Total threshold: 6.4 (8 x 0.8)</li>
+</ul>
+<h3 id="validation-rules"><a class="header" href="#validation-rules">Validation Rules</a></h3>
+<p>Debtmap validates thresholds to prevent misconfiguration:</p>
+<p><strong>Source:</strong> <code>src/complexity/threshold_manager.rs:191-217</code></p>
+<ul>
+<li>Core complexity metrics must be &gt; 0</li>
+<li>Role multipliers must be positive (&gt; 0)</li>
+<li>Invalid configurations fall back to defaults with a warning</li>
+</ul>
+<h2 id="file-size-thresholds"><a class="header" href="#file-size-thresholds">File Size Thresholds</a></h2>
+<p>Context-aware file size limits vary by file type to avoid unrealistic recommendations.</p>
+<p><strong>Source:</strong> <code>src/config/thresholds.rs:293-375</code> (<code>FileSizeThresholds</code>)</p>
+<pre><code class="language-toml">[thresholds.file_size]
+business_logic = 400          # Strict limit for business logic (default: 400)
+test_code = 650               # Moderate limit for tests (default: 650)
+declarative_config = 1200     # Lenient for config files (default: 1200)
+generated_code = 5000         # Very lenient for generated (default: 5000)
+proc_macro = 500              # Moderate-strict for macros (default: 500)
+build_script = 300            # Strict for build scripts (default: 300)
+min_lines_per_function = 3.0  # Safety threshold (default: 3.0)
+</code></pre>
+<h3 id="file-specific-overrides"><a class="header" href="#file-specific-overrides">File-Specific Overrides</a></h3>
+<p>Use glob patterns for file-specific thresholds:</p>
+<pre><code class="language-toml">[thresholds.file_size.overrides]
+"src/generated/*.rs" = 10000    # Allow large generated files
+"src/migrations/*.rs" = 2000    # Allow larger migration files
+</code></pre>
+<h2 id="related-topics"><a class="header" href="#related-topics">Related Topics</a></h2>
+<ul>
+<li><a href="../configuration.html">Configuration Overview</a> - Full configuration reference</li>
+<li><a href="../threshold-configuration.html">Threshold Configuration Guide</a> - Extended guide with examples</li>
+<li><a href="../scoring-strategies.html">Scoring Strategies</a> - How thresholds affect scoring</li>
+<li><a href="../validation-gates.html">Validation and Quality Gates</a> - CI/CD integration</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../configuration/scoring.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../configuration/languages.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../configuration/scoring.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../configuration/languages.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

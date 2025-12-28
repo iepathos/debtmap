@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -180,20 +180,22 @@
                         <h1 id="design-pattern-detection"><a class="header" href="#design-pattern-detection">Design Pattern Detection</a></h1>
 <p>Debtmap automatically detects common design patterns in your codebase to provide better architectural insights and reduce false positives in complexity analysis. When recognized design patterns are detected, Debtmap applies appropriate complexity adjustments to avoid penalizing idiomatic code.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
-<p>Debtmap detects 7 design patterns across Python, JavaScript, TypeScript, and Rust:</p>
+<p>Debtmap detects 7 user-facing design patterns across Python, JavaScript, TypeScript, and Rust, plus 2 internal-only patterns (Builder, Visitor) used for scoring adjustments:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Pattern</th><th>Primary Language</th><th>Detection Confidence</th></tr>
+<tr><th>Pattern</th><th>Primary Language</th><th>Detection Confidence</th><th>Type</th></tr>
 </thead>
 <tbody>
-<tr><td>Observer</td><td>Python, Rust</td><td>High (0.8-0.9)</td></tr>
-<tr><td>Singleton</td><td>Python</td><td>High (0.85-0.95)</td></tr>
-<tr><td>Factory</td><td>Python</td><td>Medium-High (0.7-0.85)</td></tr>
-<tr><td>Strategy</td><td>Python</td><td>Medium (0.7-0.8)</td></tr>
-<tr><td>Callback</td><td>Python, JavaScript</td><td>High (0.8-0.9)</td></tr>
-<tr><td>Template Method</td><td>Python</td><td>Medium (0.7-0.8)</td></tr>
-<tr><td>Dependency Injection</td><td>Python</td><td>Medium (0.65-0.75)</td></tr>
+<tr><td>Observer</td><td>Python, Rust</td><td>High (0.8-0.9)</td><td>User-facing</td></tr>
+<tr><td>Singleton</td><td>Python</td><td>High (0.85-0.95)</td><td>User-facing</td></tr>
+<tr><td>Factory</td><td>Python</td><td>Medium-High (0.7-0.85)</td><td>User-facing</td></tr>
+<tr><td>Strategy</td><td>Python</td><td>Medium (0.7-0.8)</td><td>User-facing</td></tr>
+<tr><td>Callback</td><td>Python, JavaScript</td><td>High (0.8-0.9)</td><td>User-facing</td></tr>
+<tr><td>Template Method</td><td>Python</td><td>Medium (0.7-0.8)</td><td>User-facing</td></tr>
+<tr><td>Dependency Injection</td><td>Python</td><td>Medium (0.65-0.75)</td><td>User-facing</td></tr>
+<tr><td>Builder</td><td>Rust</td><td>Internal</td><td><a href="#internal-pattern-detection">Internal Only</a></td></tr>
+<tr><td>Visitor</td><td>Rust</td><td>Internal</td><td><a href="#internal-pattern-detection">Internal Only</a></td></tr>
 </tbody>
 </table>
 </div>

@@ -1,0 +1,667 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Test Quality Analysis - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-3bdbe002.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="test-quality-analysis"><a class="header" href="#test-quality-analysis">Test Quality Analysis</a></h1>
+<p>Debtmap provides comprehensive analysis of test code quality, detecting anti-patterns, identifying potentially flaky tests, and providing actionable recommendations for improvement.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Test quality analysis examines your test suite to identify:</p>
+<ul>
+<li><strong>Assertion patterns</strong> - Missing or weak assertions that reduce test effectiveness</li>
+<li><strong>Test complexity</strong> - Overly complex tests that are hard to maintain</li>
+<li><strong>Flaky test patterns</strong> - Tests that may fail intermittently</li>
+<li><strong>Framework detection</strong> - Automatic detection of testing frameworks</li>
+<li><strong>Test type classification</strong> - Categorization of tests by type (unit, integration, property, benchmark)</li>
+</ul>
+<p>The analysis pipeline uses multiple detectors defined in <code>src/testing/mod.rs:111-115</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let detectors: Vec&lt;Box&lt;dyn TestingDetector&gt;&gt; = vec![
+    Box::new(assertion_detector::AssertionDetector::new()),
+    Box::new(complexity_detector::TestComplexityDetector::new()),
+    Box::new(flaky_detector::FlakyTestDetector::new()),
+];
+<span class="boring">}</span></code></pre>
+<h2 id="test-type-classification"><a class="header" href="#test-type-classification">Test Type Classification</a></h2>
+<p>Tests are classified into distinct types based on attributes, file paths, and naming patterns. The classification is handled by <code>TestClassifier</code> in <code>src/testing/rust/test_classifier.rs</code>.</p>
+<h3 id="test-types"><a class="header" href="#test-types">Test Types</a></h3>
+<p>From <code>src/testing/rust/mod.rs:69-76</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Test Type</th><th>Description</th><th>Detection Method</th></tr>
+</thead>
+<tbody>
+<tr><td><code>UnitTest</code></td><td>Isolated function testing</td><td>Default for <code>src/</code> tests</td></tr>
+<tr><td><code>IntegrationTest</code></td><td>Cross-module testing</td><td>Tests in <code>tests/</code> directory</td></tr>
+<tr><td><code>BenchmarkTest</code></td><td>Performance benchmarks</td><td><code>#[bench]</code> attribute</td></tr>
+<tr><td><code>PropertyTest</code></td><td>Generative testing</td><td><code>proptest!</code> or <code>quickcheck!</code> macros</td></tr>
+<tr><td><code>DocTest</code></td><td>Documentation tests</td><td>Extracted from doc comments</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="classification-logic"><a class="header" href="#classification-logic">Classification Logic</a></h3>
+<p>The classifier checks in order (<code>src/testing/rust/test_classifier.rs:22-44</code>):</p>
+<ol>
+<li><strong>Benchmark detection</strong>: Functions with <code>#[bench]</code> attribute</li>
+<li><strong>Property test detection</strong>: Functions using proptest or quickcheck</li>
+<li><strong>Integration test path</strong>: Files in <code>tests/</code> directory</li>
+<li><strong>Default</strong>: Unit test</li>
+</ol>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Example: Integration test detection
+fn is_integration_test_path(&amp;self, path: &amp;Path) -&gt; bool {
+    let path_str = path.to_string_lossy();
+    path_str.contains("/tests/") || path_str.starts_with("tests/")
+}
+<span class="boring">}</span></code></pre>
+<h2 id="assertion-pattern-detection"><a class="header" href="#assertion-pattern-detection">Assertion Pattern Detection</a></h2>
+<p>The <code>AssertionDetector</code> (<code>src/testing/assertion_detector.rs</code>) identifies tests with missing or inadequate assertions.</p>
+<h3 id="detected-assertion-types"><a class="header" href="#detected-assertion-types">Detected Assertion Types</a></h3>
+<p>From <code>src/testing/rust/mod.rs:79-95</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Assertion Type</th><th>Description</th><th>Quality Rating</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Assert</code></td><td><code>assert!(condition)</code></td><td>Weak - no context on failure</td></tr>
+<tr><td><code>AssertEq</code></td><td><code>assert_eq!(left, right)</code></td><td>Strong - shows expected vs actual</td></tr>
+<tr><td><code>AssertNe</code></td><td><code>assert_ne!(left, right)</code></td><td>Strong - shows values</td></tr>
+<tr><td><code>Matches</code></td><td><code>matches!(value, pattern)</code></td><td>Medium - pattern-based</td></tr>
+<tr><td><code>ShouldPanic</code></td><td><code>#[should_panic]</code> attribute</td><td>Valid for panic tests</td></tr>
+<tr><td><code>ResultOk</code></td><td><code>Ok(())</code> return</td><td>Valid for Result-based tests</td></tr>
+<tr><td><code>Custom(String)</code></td><td>Custom assertion macros</td><td>Depends on implementation</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="assertion-macro-recognition"><a class="header" href="#assertion-macro-recognition">Assertion Macro Recognition</a></h3>
+<p>The detector recognizes these macros (<code>src/testing/assertion_detector.rs:227-237</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn is_assertion_macro(name: &amp;str) -&gt; bool {
+    matches!(
+        name,
+        "assert" | "assert_eq" | "assert_ne" | "assert_matches"
+            | "debug_assert" | "debug_assert_eq" | "debug_assert_ne"
+    )
+}
+<span class="boring">}</span></code></pre>
+<h3 id="tests-without-assertions"><a class="header" href="#tests-without-assertions">Tests Without Assertions</a></h3>
+<p>Tests flagged as having no assertions receive suggested fixes:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/testing/assertion_detector.rs:257-278
+fn suggest_assertions(analysis: &amp;TestStructureAnalysis) -&gt; Vec&lt;String&gt; {
+    if analysis.has_action &amp;&amp; !analysis.has_assertions {
+        vec![
+            "Add assertions to verify the behavior".to_string(),
+            "Consider using assert!, assert_eq!, or assert_ne!".to_string(),
+        ]
+    }
+    // ...
+}
+<span class="boring">}</span></code></pre>
+<h2 id="test-complexity-analysis"><a class="header" href="#test-complexity-analysis">Test Complexity Analysis</a></h2>
+<p>The <code>TestComplexityDetector</code> (<code>src/testing/complexity_detector.rs</code>) measures test complexity and suggests simplifications.</p>
+<h3 id="complexity-sources"><a class="header" href="#complexity-sources">Complexity Sources</a></h3>
+<p>From <code>src/testing/mod.rs:39-46</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Source</th><th>Description</th><th>Threshold</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ExcessiveMocking</code></td><td>Too many mock setups</td><td>&gt; 3 mocks</td></tr>
+<tr><td><code>NestedConditionals</code></td><td>Deeply nested if/match</td><td>Nesting &gt; 1 level</td></tr>
+<tr><td><code>MultipleAssertions</code></td><td>Too many assertions</td><td>&gt; 5 assertions</td></tr>
+<tr><td><code>LoopInTest</code></td><td>Loops in test code</td><td>Any loop detected</td></tr>
+<tr><td><code>ExcessiveSetup</code></td><td>Long test functions</td><td>&gt; 30 lines</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="complexity-scoring"><a class="header" href="#complexity-scoring">Complexity Scoring</a></h3>
+<p>The complexity score is calculated in <code>src/testing/complexity_detector.rs:304-309</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub(crate) fn calculate_total_complexity(analysis: &amp;TestComplexityAnalysis) -&gt; u32 {
+    analysis.cyclomatic_complexity
+        + (analysis.mock_setup_count as u32 * 2)
+        + analysis.assertion_complexity
+        + (analysis.line_count as u32 / 10)  // Penalty for long tests
+}
+<span class="boring">}</span></code></pre>
+<p>The Rust-specific complexity scoring (<code>src/testing/rust/mod.rs:24-29</code> in doc comments):</p>
+<ul>
+<li><strong>Conditional statements</strong>: +2 per <code>if</code>/<code>match</code></li>
+<li><strong>Loops</strong>: +3 per loop</li>
+<li><strong>Assertions beyond 5</strong>: +1 per additional assertion</li>
+<li><strong>Nesting depth &gt; 2</strong>: +2 per level</li>
+<li><strong>Tests &gt; 30 lines</strong>: +(lines-30)/10</li>
+</ul>
+<h3 id="simplification-recommendations"><a class="header" href="#simplification-recommendations">Simplification Recommendations</a></h3>
+<p>From <code>src/testing/mod.rs:48-55</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Recommendation</th><th>When Applied</th><th>Action</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ExtractHelper</code></td><td>Long tests with shared setup</td><td>Extract common code to helper function</td></tr>
+<tr><td><code>SplitTest</code></td><td>Many assertions + many mocks</td><td>Split into focused tests</td></tr>
+<tr><td><code>ParameterizeTest</code></td><td>High cyclomatic complexity (&gt; 5)</td><td>Use parameterized testing</td></tr>
+<tr><td><code>SimplifySetup</code></td><td>Default recommendation</td><td>Reduce test setup complexity</td></tr>
+<tr><td><code>ReduceMocking</code></td><td>Excessive mocks (&gt; max_mock_setups)</td><td>Use real implementations or simpler mocks</td></tr>
+</tbody>
+</table>
+</div>
+<p>The suggestion logic (<code>src/testing/complexity_detector.rs:320-334</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub(crate) fn suggest_simplification(
+    analysis: &amp;TestComplexityAnalysis,
+    detector: &amp;TestComplexityDetector,
+) -&gt; TestSimplification {
+    match () {
+        _ if analysis.mock_setup_count &gt; detector.max_mock_setups =&gt; {
+            TestSimplification::ReduceMocking
+        }
+        _ if analysis.line_count &gt; detector.max_test_length =&gt; {
+            classify_length_based_simplification(analysis)
+        }
+        _ if analysis.cyclomatic_complexity &gt; 5 =&gt; TestSimplification::ParameterizeTest,
+        _ =&gt; TestSimplification::SimplifySetup,
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="flaky-test-detection"><a class="header" href="#flaky-test-detection">Flaky Test Detection</a></h2>
+<p>The <code>FlakyTestDetector</code> (<code>src/testing/flaky_detector.rs</code>) identifies patterns that can cause intermittent test failures.</p>
+<h3 id="flakiness-types"><a class="header" href="#flakiness-types">Flakiness Types</a></h3>
+<p>From <code>src/testing/mod.rs:57-65</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Description</th><th>Impact</th></tr>
+</thead>
+<tbody>
+<tr><td><code>TimingDependency</code></td><td>Uses sleep, timeouts, or time measurements</td><td>High</td></tr>
+<tr><td><code>RandomValues</code></td><td>Uses random number generation</td><td>Medium</td></tr>
+<tr><td><code>ExternalDependency</code></td><td>Calls external services or APIs</td><td>Critical</td></tr>
+<tr><td><code>FilesystemDependency</code></td><td>Reads/writes files</td><td>Medium</td></tr>
+<tr><td><code>NetworkDependency</code></td><td>Network operations</td><td>Critical</td></tr>
+<tr><td><code>ThreadingIssue</code></td><td>Thread spawning or synchronization</td><td>High</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="rust-specific-flakiness-types"><a class="header" href="#rust-specific-flakiness-types">Rust-Specific Flakiness Types</a></h3>
+<p>From <code>src/testing/rust/mod.rs:98-107</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>HashOrdering</code></td><td>HashMap iteration (non-deterministic order)</td></tr>
+<tr><td><code>ThreadingIssue</code></td><td>Unsynchronized concurrent access</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="reliability-impact-levels"><a class="header" href="#reliability-impact-levels">Reliability Impact Levels</a></h3>
+<p>From <code>src/testing/mod.rs:67-73</code>:</p>
+<ul>
+<li><strong>Critical</strong>: External dependencies, network calls - high failure probability</li>
+<li><strong>High</strong>: Timing dependencies, threading issues - moderate failure probability</li>
+<li><strong>Medium</strong>: Random values, filesystem operations - occasional failures</li>
+<li><strong>Low</strong>: Minor ordering issues - rare failures</li>
+</ul>
+<h3 id="detection-patterns"><a class="header" href="#detection-patterns">Detection Patterns</a></h3>
+<p>The detector uses pattern categories defined in <code>src/testing/flaky_detector.rs:190-284</code>:</p>
+<p><strong>Timing Patterns</strong> (<code>TimingDependency</code>):</p>
+<pre><code>sleep, Instant::now, SystemTime::now, Duration::from, delay,
+timeout, wait_for, park_timeout, recv_timeout
+</code></pre>
+<p><strong>Random Patterns</strong> (<code>RandomValues</code>):</p>
+<pre><code>rand, random, thread_rng, StdRng, SmallRng, gen_range,
+sample, shuffle, choose
+</code></pre>
+<p><strong>External Service Patterns</strong> (<code>ExternalDependency</code>):</p>
+<pre><code>reqwest, hyper, http, Client::new, HttpClient, ApiClient,
+database, db, postgres, mysql, redis, mongodb, sqlx, diesel
+</code></pre>
+<p><strong>Filesystem Patterns</strong> (<code>FilesystemDependency</code>):</p>
+<pre><code>fs::, File::, std::fs, tokio::fs, async_std::fs,
+read_to_string, write, create, remove_file, remove_dir
+</code></pre>
+<p><strong>Network Patterns</strong> (<code>NetworkDependency</code>):</p>
+<pre><code>TcpStream, TcpListener, UdpSocket, connect, bind,
+listen, accept, send_to, recv_from
+</code></pre>
+<h3 id="stabilization-suggestions"><a class="header" href="#stabilization-suggestions">Stabilization Suggestions</a></h3>
+<p>Each flaky pattern includes a stabilization suggestion:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/testing/flaky_detector.rs:156-187
+_ if is_timing_function(path_str) =&gt; Some(FlakinessIndicator {
+    flakiness_type: FlakinessType::TimingDependency,
+    impact: ReliabilityImpact::High,
+    suggestion: "Replace sleep/timing dependencies with deterministic waits or mocks"
+        .to_string(),
+}),
+_ if is_external_service_call(path_str) =&gt; Some(FlakinessIndicator {
+    flakiness_type: FlakinessType::ExternalDependency,
+    impact: ReliabilityImpact::Critical,
+    suggestion: "Mock external service calls for unit tests".to_string(),
+}),
+<span class="boring">}</span></code></pre>
+<h2 id="timing-classification"><a class="header" href="#timing-classification">Timing Classification</a></h2>
+<p>The timing classifier (<code>src/testing/timing_classifier.rs</code>) categorizes timing-related operations to assess flakiness risk.</p>
+<h3 id="timing-categories"><a class="header" href="#timing-categories">Timing Categories</a></h3>
+<p>From <code>src/testing/timing_classifier.rs:31-44</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Category</th><th>Description</th><th>Flaky Risk</th></tr>
+</thead>
+<tbody>
+<tr><td><code>CurrentTime</code></td><td><code>Instant::now()</code></td><td>Yes</td></tr>
+<tr><td><code>SystemTime</code></td><td><code>SystemTime::now()</code></td><td>Yes</td></tr>
+<tr><td><code>DurationCreation</code></td><td><code>Duration::from_*()</code></td><td>No</td></tr>
+<tr><td><code>ElapsedTime</code></td><td><code>elapsed()</code>, <code>duration_since()</code></td><td>Yes</td></tr>
+<tr><td><code>Sleep</code></td><td>Thread sleep operations</td><td>Yes</td></tr>
+<tr><td><code>Timeout</code></td><td>Operations with timeout</td><td>Yes</td></tr>
+<tr><td><code>Wait</code></td><td>Waiting operations (not await)</td><td>Yes</td></tr>
+<tr><td><code>ThreadTimeout</code></td><td><code>park_timeout</code>, <code>recv_timeout</code></td><td>Yes</td></tr>
+<tr><td><code>Delay</code></td><td>Delay operations</td><td>Yes</td></tr>
+<tr><td><code>Timer</code></td><td>Timer-based operations</td><td>Yes</td></tr>
+<tr><td><code>Unknown</code></td><td>Unrecognized patterns</td><td>No</td></tr>
+</tbody>
+</table>
+</div>
+<p>Only <code>DurationCreation</code> and <code>Unknown</code> are considered non-flaky.</p>
+<h2 id="test-quality-issue-types"><a class="header" href="#test-quality-issue-types">Test Quality Issue Types</a></h2>
+<p>The Rust-specific module tracks comprehensive issue types (<code>src/testing/rust/mod.rs:131-140</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Issue Type</th><th>Severity</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>NoAssertions</code></td><td>High</td><td>Test has no assertions</td></tr>
+<tr><td><code>TooComplex(u32)</code></td><td>Medium</td><td>Complexity score exceeds threshold</td></tr>
+<tr><td><code>FlakyPattern(type)</code></td><td>High</td><td>Contains flaky pattern</td></tr>
+<tr><td><code>ExcessiveMocking(usize)</code></td><td>Medium</td><td>Too many mock setups</td></tr>
+<tr><td><code>IsolationIssue</code></td><td>High</td><td>Test affects shared state</td></tr>
+<tr><td><code>TestsTooMuch</code></td><td>Medium</td><td>Tests too many concerns</td></tr>
+<tr><td><code>SlowTest</code></td><td>Low</td><td>Test may be slow</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="severity-levels"><a class="header" href="#severity-levels">Severity Levels</a></h3>
+<p>From <code>src/testing/rust/mod.rs:110-116</code>:</p>
+<ul>
+<li><strong>Critical</strong>: Fundamental test quality issues</li>
+<li><strong>High</strong>: Significant problems affecting reliability</li>
+<li><strong>Medium</strong>: Quality concerns worth addressing</li>
+<li><strong>Low</strong>: Minor improvements possible</li>
+</ul>
+<h2 id="framework-detection"><a class="header" href="#framework-detection">Framework Detection</a></h2>
+<p>Debtmap automatically detects testing frameworks to provide context-aware analysis.</p>
+<h3 id="supported-frameworks"><a class="header" href="#supported-frameworks">Supported Frameworks</a></h3>
+<p>From <code>src/testing/rust/mod.rs:54-66</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Framework</th><th>Detection</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Std</code></td><td><code>#[test]</code> attribute</td><td>Standard library test</td></tr>
+<tr><td><code>Criterion</code></td><td><code>criterion</code> crate usage</td><td>Benchmarking framework</td></tr>
+<tr><td><code>Proptest</code></td><td><code>proptest!</code> macro</td><td>Property-based testing</td></tr>
+<tr><td><code>Quickcheck</code></td><td><code>quickcheck!</code> macro</td><td>Property-based testing</td></tr>
+<tr><td><code>Rstest</code></td><td><code>#[rstest]</code> attribute</td><td>Parameterized testing</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="multi-language-support"><a class="header" href="#multi-language-support">Multi-Language Support</a></h3>
+<p>From <code>src/testing/mod.rs:89-106</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Test attribute detection
+path_str == "test"
+    || path_str == "tokio::test"
+    || path_str == "async_std::test"
+    || path_str == "bench"
+    || path_str.ends_with("::test")
+<span class="boring">}</span></code></pre>
+<p>The documentation also covers:</p>
+<ul>
+<li><strong>Rust</strong>: <code>#[test]</code>, <code>#[tokio::test]</code>, proptest, rstest, criterion</li>
+<li><strong>Python</strong>: pytest, unittest</li>
+<li><strong>JavaScript</strong>: jest, mocha</li>
+</ul>
+<h2 id="fast-vs-slow-test-detection"><a class="header" href="#fast-vs-slow-test-detection">Fast vs Slow Test Detection</a></h2>
+<p>Slow tests are identified as a quality issue (<code>src/testing/rust/mod.rs:139</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>RustTestIssueType::SlowTest
+<span class="boring">}</span></code></pre>
+<p>Detection criteria include:</p>
+<ul>
+<li>Long test functions (&gt; 50 lines by default)</li>
+<li>Timing operations that suggest waiting</li>
+<li>External service calls that may have latency</li>
+</ul>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<h3 id="basic-configuration"><a class="header" href="#basic-configuration">Basic Configuration</a></h3>
+<pre><code class="language-toml">[test_quality]
+enabled = true
+complexity_threshold = 10
+</code></pre>
+<h3 id="advanced-configuration"><a class="header" href="#advanced-configuration">Advanced Configuration</a></h3>
+<p>From <code>src/testing/complexity_detector.rs:9-13</code>:</p>
+<pre><code class="language-toml">[test_quality]
+enabled = true
+
+# Maximum allowed test complexity score
+complexity_threshold = 10
+
+# Maximum number of mock setups per test
+max_mock_setups = 5
+
+# Maximum test function length (lines)
+max_test_length = 50
+</code></pre>
+<p>Default values from <code>TestComplexityDetector::new()</code>:</p>
+<ul>
+<li><code>max_test_complexity</code>: 10</li>
+<li><code>max_mock_setups</code>: 5</li>
+<li><code>max_test_length</code>: 50</li>
+</ul>
+<h2 id="common-issues-and-solutions"><a class="header" href="#common-issues-and-solutions">Common Issues and Solutions</a></h2>
+<h3 id="issue-test-without-assertions"><a class="header" href="#issue-test-without-assertions">Issue: Test Without Assertions</a></h3>
+<p><strong>Detection</strong>: <code>TestWithoutAssertions</code> anti-pattern</p>
+<p><strong>Example of problematic code</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_without_assertion() {
+    let result = calculate(10);
+    // No assertion!
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Fix</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_with_assertion() {
+    let result = calculate(10);
+    assert_eq!(result, 20);
+}
+<span class="boring">}</span></code></pre>
+<h3 id="issue-timing-dependent-test"><a class="header" href="#issue-timing-dependent-test">Issue: Timing-Dependent Test</a></h3>
+<p><strong>Detection</strong>: <code>FlakinessType::TimingDependency</code></p>
+<p><strong>Example of problematic code</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_timing_dependent() {
+    let start = Instant::now();
+    do_work();
+    assert!(start.elapsed() &lt; Duration::from_millis(100));
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Fix</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_deterministic() {
+    let result = do_work();
+    assert!(result.is_success());
+}
+<span class="boring">}</span></code></pre>
+<h3 id="issue-excessive-mocking"><a class="header" href="#issue-excessive-mocking">Issue: Excessive Mocking</a></h3>
+<p><strong>Detection</strong>: <code>ComplexitySource::ExcessiveMocking</code></p>
+<p><strong>Solution</strong>: Consider using real implementations, test doubles, or restructuring to reduce mock count below 5.</p>
+<h3 id="issue-tests-with-loops"><a class="header" href="#issue-tests-with-loops">Issue: Tests with Loops</a></h3>
+<p><strong>Detection</strong>: <code>ComplexitySource::LoopInTest</code></p>
+<p><strong>Solution</strong>: Use parameterized tests with <code>#[rstest]</code> or property-based testing with <code>proptest</code> instead of loops.</p>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="coverage-integration.html">Coverage Integration</a> - Combining coverage with test quality analysis</li>
+<li><a href="analysis-guide/complexity-metrics.html">Complexity Metrics</a> - Understanding complexity scoring</li>
+<li><a href="configuration.html">Configuration</a> - Full configuration reference</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="semantic-classification.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="tiered-prioritization.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="semantic-classification.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="tiered-prioritization.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

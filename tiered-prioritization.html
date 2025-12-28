@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,19 +181,20 @@
 <p>Debtmap uses a sophisticated tiered prioritization system to surface critical architectural issues above simple testing gaps. This chapter explains the tier strategy, how to interpret tier classifications, and how to customize tier thresholds for your project.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p>The tiered prioritization system organizes technical debt into four distinct tiers based on impact, urgency, and architectural significance. This prevents “walls of similar-scored items” and ensures critical issues don’t get lost among minor problems.</p>
-<p><strong>Two Tier Systems</strong>: Debtmap uses two complementary tier systems:</p>
+<p><strong>Three Display Systems</strong>: Debtmap uses three complementary tier/priority systems:</p>
 <ol>
-<li><strong>RecommendationTier</strong> (T1-T4): Used internally to classify items based on architectural significance and testing needs</li>
-<li><strong>Display Tier</strong> (Critical/High/Moderate/Low): Score-based tiers shown in terminal output, derived from final calculated scores</li>
+<li><strong>RecommendationTier</strong> (T1-T4): Internal classification based on architectural significance and testing needs. Controls tier weight application during scoring.</li>
+<li><strong>Tier</strong> (Critical/High/Moderate/Low): Score-based tiers for terminal and markdown output using 90/70/50 thresholds (src/priority/mod.rs:371-386)</li>
+<li><strong>Priority</strong> (critical/high/medium/low): Score-based tiers for JSON output using 100/50/20 thresholds (src/output/unified/priority.rs:23-32)</li>
 </ol>
-<p>The configuration examples below control the RecommendationTier classification logic, which influences scoring through tier weights. The final display uses score-based tiers for consistency across all output formats.</p>
+<p>The configuration examples below control the RecommendationTier classification logic, which influences scoring through tier weights. The final display uses different score-based tiers depending on output format.</p>
 <h2 id="the-four-tiers"><a class="header" href="#the-four-tiers">The Four Tiers</a></h2>
 <h3 id="tier-1-critical-architecture"><a class="header" href="#tier-1-critical-architecture">Tier 1: Critical Architecture</a></h3>
 <p><strong>Description</strong>: God Objects, God Modules, excessive complexity requiring immediate architectural attention</p>
 <p><strong>Priority</strong>: Must address before adding new features</p>
 <p><strong>Weight</strong>: 1.5x (highest priority multiplier)</p>
 <p><strong>Impact</strong>: High impact on maintainability and team velocity</p>
-<p><strong>Classification Criteria</strong> (src/priority/tiers.rs:183-216):</p>
+<p><strong>Classification Criteria</strong> (src/priority/tiers/pure.rs:26-41 and src/priority/tiers/predicates.rs):</p>
 <p>Debtmap uses sophisticated multi-factor analysis for Tier 1 classification, not just raw cyclomatic complexity. Items qualify for Tier 1 if they meet <strong>any</strong> of these criteria:</p>
 <ol>
 <li><strong>Critical Patterns</strong>: AsyncMisuse or ErrorSwallowing debt types (always Tier 1)</li>
@@ -221,7 +222,7 @@ debtmap analyze . --min-priority high --top 5
 <p><strong>Priority</strong>: Risk of bugs in critical paths</p>
 <p><strong>Weight</strong>: 1.0x (standard multiplier)</p>
 <p><strong>Action</strong>: Should be tested before refactoring to prevent regressions</p>
-<p><strong>Classification Criteria</strong> (src/priority/tiers.rs:257-302):</p>
+<p><strong>Classification Criteria</strong> (src/priority/tiers/pure.rs:64-99):</p>
 <p>Items qualify for Tier 2 through <strong>two distinct paths</strong>:</p>
 <p><strong>Path 1: Testing Gaps</strong> - Untested code meeting ANY of:</p>
 <ul>
@@ -409,13 +410,13 @@ Low (score &lt; 50)
 </code></pre>
 <p><strong>Note</strong>: The scores shown reflect tier weight multipliers applied during classification. Items classified as Tier 1 (Critical Architecture) receive a 1.5x weight boost, which often elevates them into the Critical or High score ranges.</p>
 <h3 id="json-output"><a class="header" href="#json-output">JSON Output</a></h3>
-<p>JSON output uses the same <strong>score-based priority</strong> levels as terminal output:</p>
+<p>JSON output uses <strong>score-based priority</strong> levels with different thresholds than terminal output:</p>
 <pre><code class="language-json">{
   "summary": {
     "score_distribution": {
       "critical": 2,
       "high": 5,
-      "moderate": 12,
+      "medium": 12,
       "low": 45
     }
   },
@@ -443,14 +444,14 @@ Low (score &lt; 50)
   ]
 }
 </code></pre>
-<p>The <code>priority</code> field is derived from the <code>score</code> field using these thresholds:</p>
+<p>The <code>priority</code> field is derived from the <code>score</code> field using these thresholds (src/output/unified/priority.rs:23-32):</p>
 <ul>
-<li><code>critical</code>: score &gt;= 90.0</li>
-<li><code>high</code>: score &gt;= 70.0</li>
-<li><code>moderate</code>: score &gt;= 50.0</li>
-<li><code>low</code>: score &lt; 50.0</li>
+<li><code>critical</code>: score &gt;= 100.0</li>
+<li><code>high</code>: score &gt;= 50.0</li>
+<li><code>medium</code>: score &gt;= 20.0</li>
+<li><code>low</code>: score &lt; 20.0</li>
 </ul>
-<p><strong>Source</strong>: Priority tier thresholds defined in src/priority/mod.rs:478-484</p>
+<p><strong>Note</strong>: JSON output uses different thresholds than terminal output. Terminal/markdown uses the <code>Tier</code> enum (90/70/50 thresholds), while JSON uses the <code>Priority</code> enum (100/50/20 thresholds) for broader score distribution.</p>
 <p><strong>Note</strong>: While RecommendationTier (T1-T4) classifications exist internally for applying tier weights, they are not included in JSON output. The output shows final calculated scores and their corresponding priority levels.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: Too many Tier 1 items</p>
@@ -480,7 +481,7 @@ minimum_cyclomatic_complexity = 2
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="scoring-strategies.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="test-quality-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -494,7 +495,7 @@ minimum_cyclomatic_complexity = 2
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="scoring-strategies.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="test-quality-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

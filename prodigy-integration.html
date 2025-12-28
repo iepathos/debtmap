@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -297,7 +297,7 @@ debtmap --version
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
+        - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
           commit_required: true
         - shell: "just coverage-lcov"
         - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
@@ -489,7 +489,7 @@ prodigy clean
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+        - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
           commit_required: true
       max_attempts: 5
       fail_workflow: true
@@ -574,7 +574,7 @@ prodigy clean
 <h4 id="prodigy-validate-debtmap-improvement"><a class="header" href="#prodigy-validate-debtmap-improvement"><code>/prodigy-validate-debtmap-improvement</code></a></h4>
 <p>Validates that the implementation successfully addressed the debt item.</p>
 <blockquote>
-<p><strong>Note</strong>: In practice, workflows use the <code>debtmap validate-improvement</code> shell command directly. While a Claude slash command wrapper exists, both the sequential workflow (workflows/debtmap.yml:31) and MapReduce workflow (workflows/debtmap-reduce.yml:44) use the shell command for consistency.</p>
+<p><strong>Note</strong>: The sequential workflow (workflows/debtmap.yml:31) uses the <code>debtmap validate-improvement</code> shell command directly, while the MapReduce workflow (workflows/debtmap-reduce.yml:44) uses the Claude slash command wrapper <code>/prodigy-validate-debtmap-improvement</code>. Both approaches are valid.</p>
 </blockquote>
 <pre><code class="language-yaml"># Standard approach (used in actual workflows)
 - shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
@@ -587,14 +587,14 @@ prodigy clean
 <li><code>--threshold</code>: (Optional) Improvement threshold percentage (default: 75.0)</li>
 </ul>
 <h4 id="prodigy-complete-debtmap-fix"><a class="header" href="#prodigy-complete-debtmap-fix"><code>/prodigy-complete-debtmap-fix</code></a></h4>
-<p>Completes a partial fix based on validation gaps.</p>
-<pre><code class="language-yaml">- claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
+<p>Completes a partial fix based on validation results.</p>
+<pre><code class="language-yaml">- claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
   commit_required: true
 </code></pre>
 <p><strong>Parameters:</strong></p>
 <ul>
-<li><code>--gaps</code>: Validation gaps to address</li>
-<li><code>--plan</code>: Original implementation plan</li>
+<li><code>--plan</code>: Path to implementation plan file</li>
+<li><code>--validation</code>: Path to validation JSON file with completion status</li>
 <li><code>--attempt</code>: Current retry attempt number (from ${validation.attempt_number})</li>
 </ul>
 <h3 id="testing-and-quality-commands"><a class="header" href="#testing-and-quality-commands">Testing and Quality Commands</a></h3>
@@ -713,7 +713,7 @@ map:
         threshold: 75
         on_incomplete:
           commands:
-            - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/plan-${item_id}.md --attempt ${validation.attempt_number}"
+            - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/plan-${item_id}.md --validation .prodigy/debtmap-validation-${item_id}.json --attempt ${validation.attempt_number}"
               commit_required: true
             - shell: "just coverage-lcov"
             - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
@@ -977,7 +977,7 @@ Final Results:
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
+        - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt ${validation.attempt_number}"
           commit_required: true
         - shell: "just coverage-lcov"
         - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"

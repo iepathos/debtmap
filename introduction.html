@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -208,14 +208,14 @@
 cargo install debtmap
 
 # Analyze and pipe to Claude Code
-debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # Get structured signals for your AI workflow
 debtmap analyze . --format json --top 10 &gt; debt.json
 
 # With coverage data for accurate risk assessment
 cargo llvm-cov --lcov --output-path coverage.lcov
-debtmap analyze . --lcov coverage.lcov --format llm-markdown
+debtmap analyze . --lcov coverage.lcov --format markdown
 </code></pre>
 <h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
 <h3 id="signal-generation"><a class="header" href="#signal-generation">Signal Generation</a></h3>
@@ -225,6 +225,7 @@ debtmap analyze . --lcov coverage.lcov --format llm-markdown
 <li><strong>Coupling signals</strong> - Fan-in, fan-out, call graph depth</li>
 <li><strong>Quality signals</strong> - Entropy (false positive reduction), purity (testability)</li>
 </ul>
+<p>For a complete list of metrics and their formulas, see the <a href="./metrics-reference.html">Metrics Reference</a>.</p>
 <h3 id="ai-optimized-output"><a class="header" href="#ai-optimized-output">AI-Optimized Output</a></h3>
 <ul>
 <li><strong>LLM markdown format</strong> - Minimal tokens, maximum information</li>
@@ -236,14 +237,15 @@ debtmap analyze . --lcov coverage.lcov --format llm-markdown
 <ul>
 <li><strong>Rust-first analysis</strong> - Full AST parsing, macro expansion, trait resolution</li>
 <li><strong>Coverage integration</strong> - Native LCOV support for risk assessment</li>
+<li><strong>Debt pattern detection</strong> - God objects, boilerplate code, error handling anti-patterns</li>
 <li><strong>Entropy analysis</strong> - Reduces false positives from repetitive code</li>
 <li><strong>Parallel processing</strong> - Fast analysis (10-100x faster than Java/Python tools)</li>
 </ul>
 <h3 id="workflow-integration"><a class="header" href="#workflow-integration">Workflow Integration</a></h3>
 <ul>
 <li><strong>Direct piping</strong> - Pipe output to Claude, Cursor, or custom agents</li>
-<li><strong>CI/CD gates</strong> - Validate debt thresholds in pipelines</li>
-<li><strong>Progress tracking</strong> - Compare debt across commits</li>
+<li><strong>CI/CD gates</strong> - Validate debt thresholds with the <code>validate</code> command</li>
+<li><strong>Progress tracking</strong> - Compare debt across commits with <code>compare</code> and <code>validate-improvement</code> commands</li>
 </ul>
 <h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
 <p>Debtmap focuses exclusively on Rust. This focused approach allows us to:</p>
@@ -267,8 +269,9 @@ debtmap analyze . --lcov coverage.lcov --format llm-markdown
 <li><a href="./getting-started.html">Getting Started</a> - Installation and first analysis</li>
 <li><a href="./llm-integration.html">LLM Integration</a> - AI workflow patterns</li>
 <li><a href="./why-debtmap.html">Why Debtmap?</a> - The AI sensor model explained</li>
+<li><a href="./tui-guide.html">TUI Guide</a> - Interactive exploration with the terminal UI</li>
 </ul>
-<p><strong>Quick tip:</strong> Start with <code>debtmap analyze . --format llm-markdown --top 5</code> to see the top priority items with context suggestions.</p>
+<p><strong>Quick tip:</strong> Start with <code>debtmap analyze . --format markdown --top 5</code> to see the top priority items with context suggestions.</p>
 
                     </main>
 

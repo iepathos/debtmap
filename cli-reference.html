@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -196,8 +196,30 @@ debtmap analyze . --top 10 --min-priority high
 debtmap init
 debtmap validate . --config debtmap.toml
 </code></pre>
+<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
+<p>Options that apply to all commands:</p>
+<ul>
+<li><code>--show-config-sources</code> - Show where each configuration value came from (spec 201)
+<ul>
+<li>Displays the source of each configuration value (default, config file, environment, CLI)</li>
+<li>Useful for debugging configuration precedence issues</li>
+</ul>
+</li>
+<li><code>--config &lt;PATH&gt;</code> - Custom config file path (overrides default locations)
+<ul>
+<li>Can also use <code>DEBTMAP_CONFIG</code> environment variable</li>
+</ul>
+</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Show configuration sources
+debtmap --show-config-sources analyze .
+
+# Use custom config file
+debtmap --config /path/to/debtmap.toml validate .
+</code></pre>
 <h2 id="commands"><a class="header" href="#commands">Commands</a></h2>
-<p>Debtmap provides six main commands: five for analysis and validation, plus one debugging tool.</p>
+<p>Debtmap provides seven main commands: five for analysis and validation, plus two debugging tools.</p>
 <h3 id="analyze"><a class="header" href="#analyze"><code>analyze</code></a></h3>
 <p>Analyze code for complexity and technical debt.</p>
 <p><strong>Usage:</strong></p>
@@ -371,6 +393,33 @@ debtmap validate-improvement \
   --output .prodigy/validation.json \
   --threshold 80.0
 </code></pre>
+<h3 id="diagnose-coverage-debugging"><a class="header" href="#diagnose-coverage-debugging"><code>diagnose-coverage</code> (Debugging)</a></h3>
+<p>Diagnose and validate LCOV coverage files.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-bash">debtmap diagnose-coverage &lt;COVERAGE_FILE&gt; [OPTIONS]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>&lt;COVERAGE_FILE&gt;</code> - Path to the LCOV coverage file to diagnose</li>
+</ul>
+<p><strong>Options:</strong></p>
+<ul>
+<li><code>--format &lt;FORMAT&gt;</code> - Output format: text or json (default: text)</li>
+</ul>
+<p><strong>Description:</strong>
+Validates and diagnoses LCOV coverage files with detailed analysis. This command helps identify issues with coverage data before using it with the <code>analyze</code> command. Use this when:</p>
+<ul>
+<li>Coverage data seems incorrect or incomplete</li>
+<li>You want to validate an LCOV file before integration</li>
+<li>Debugging coverage parsing issues</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Validate coverage file with text output
+debtmap diagnose-coverage coverage.lcov
+
+# Get JSON output for automation
+debtmap diagnose-coverage lcov.info --format json
+</code></pre>
 <h3 id="explain-coverage-debugging"><a class="header" href="#explain-coverage-debugging"><code>explain-coverage</code> (Debugging)</a></h3>
 <p>Explain coverage detection for a specific function.</p>
 <p><strong>Usage:</strong></p>
@@ -414,7 +463,15 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <p>Control how analysis results are formatted and displayed.</p>
 <p><strong>Format Options:</strong></p>
 <ul>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: terminal for analyze)</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, html, dot (default: terminal for analyze)
+<ul>
+<li><code>json</code> - JSON format for programmatic processing</li>
+<li><code>markdown</code> - Markdown format with comprehensive analysis (uses LLM-optimized writer)</li>
+<li><code>terminal</code> - Human-readable terminal output with colors and formatting</li>
+<li><code>html</code> - HTML format for web display</li>
+<li><code>dot</code> - Graphviz DOT format for dependency visualization</li>
+</ul>
+</li>
 <li><code>-o, --output &lt;OUTPUT&gt;</code> - Output file path (defaults to stdout)</li>
 <li><code>--plain</code> - Plain output mode: ASCII-only, no colors, no emoji, machine-parseable</li>
 </ul>
@@ -425,9 +482,35 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <li><code>-s, --summary</code> - Use summary format with tiered priority display (compact output)</li>
 <li><code>-c, --compact</code> - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv). Only available in <code>analyze</code> command (note: <code>validate</code> uses <code>-c</code> for <code>--config</code>)</li>
 <li><code>--min-priority &lt;PRIORITY&gt;</code> - Minimum priority to display: low, medium, high, critical</li>
+<li><code>--min-score &lt;N&gt;</code> - Minimum score threshold for filtering T3/T4 recommendations (default: 3.0)
+<ul>
+<li>T1 Critical Architecture and T2 Complex Untested items bypass this filter and are always shown</li>
+<li>Overrides config file setting (Spec 193, 205)</li>
+</ul>
+</li>
+<li><code>--show-filter-stats</code> - Show filter statistics (how many items were filtered and why)</li>
 <li><code>--filter &lt;CATEGORIES&gt;</code> - Filter by debt categories (comma-separated)</li>
 <li><code>--aggregate-only</code> - Show only aggregated file-level scores</li>
 <li><code>--group-by-category</code> - Group output by debt category</li>
+</ul>
+<p><strong>Progress Display:</strong></p>
+<ul>
+<li><code>--no-tui</code> - Disable TUI progress visualization (use simple progress bars instead)</li>
+<li><code>-q, --quiet</code> - Suppress progress output (quiet mode)</li>
+</ul>
+<p><strong>Streaming Output:</strong></p>
+<ul>
+<li><code>--streaming</code> - Enable streaming output mode for large codebases (Spec 003)
+<ul>
+<li>Streams results to output as they’re generated with O(1) memory overhead</li>
+<li>Useful for processing large codebases that would otherwise exhaust memory</li>
+</ul>
+</li>
+<li><code>--stream-to &lt;FILE&gt;</code> - Output file for streaming mode (requires –streaming)
+<ul>
+<li>Use “-” for stdout</li>
+</ul>
+</li>
 </ul>
 <p><strong>Dependency Display Options:</strong></p>
 <ul>
@@ -526,6 +609,19 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <ul>
 <li><code>--max-files &lt;N&gt;</code> - Maximum number of files to analyze (0 = no limit)</li>
 </ul>
+<p><strong>Profiling:</strong></p>
+<ul>
+<li><code>--profile</code> - Enable profiling to identify performance bottlenecks (Spec 001)
+<ul>
+<li>Outputs timing breakdown for each analysis phase when complete</li>
+</ul>
+</li>
+<li><code>--profile-output &lt;FILE&gt;</code> - Write profiling data to file in JSON format (requires –profile)
+<ul>
+<li>Use for post-analysis performance investigation</li>
+</ul>
+</li>
+</ul>
 <h3 id="debugging--verbosity"><a class="header" href="#debugging--verbosity">Debugging &amp; Verbosity</a></h3>
 <p>Control diagnostic output and debugging information.</p>
 <p><strong>Verbosity Levels:</strong></p>
@@ -578,6 +674,36 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 </li>
 <li><code>--min-problematic &lt;N&gt;</code> - Minimum number of problematic functions for file aggregation</li>
 <li><code>--no-god-object</code> - Disable god object detection</li>
+</ul>
+<p><strong>God Object Split Recommendations:</strong></p>
+<ul>
+<li><code>--show-splits</code> - Show detailed module split recommendations for god objects and large files (experimental)
+<ul>
+<li>Suggests how to decompose large files into smaller, focused modules</li>
+</ul>
+</li>
+<li><code>--min-split-methods &lt;N&gt;</code> - Minimum methods per god object split recommendation (default: 10)</li>
+<li><code>--min-split-lines &lt;N&gt;</code> - Minimum lines per god object split recommendation (default: 150)</li>
+</ul>
+<p><strong>Dead Code Analysis:</strong></p>
+<ul>
+<li><code>--no-public-api-detection</code> - Disable public API detection heuristics for dead code analysis</li>
+<li><code>--public-api-threshold &lt;N&gt;</code> - Public API confidence threshold (0.0-1.0, default: 0.7)
+<ul>
+<li>Functions above this threshold are considered public APIs</li>
+</ul>
+</li>
+</ul>
+<p><strong>Pattern Detection:</strong></p>
+<ul>
+<li><code>--no-pattern-detection</code> - Disable pattern recognition</li>
+<li><code>--patterns &lt;PATTERNS&gt;</code> - Enable specific patterns only (comma-separated)
+<ul>
+<li>Available patterns: observer, singleton, factory, strategy, callback, template_method</li>
+</ul>
+</li>
+<li><code>--pattern-threshold &lt;N&gt;</code> - Pattern confidence threshold (0.0-1.0, default: 0.7)</li>
+<li><code>--show-pattern-warnings</code> - Show pattern warnings for uncertain detections</li>
 </ul>
 <h3 id="option-aliases"><a class="header" href="#option-aliases">Option Aliases</a></h3>
 <p>Common option shortcuts and aliases for convenience:</p>
@@ -917,42 +1043,59 @@ debtmap analyze . --explain-metrics -v
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Option</th><th>analyze</th><th>validate</th><th>compare</th><th>init</th><th>explain-coverage</th></tr>
+<tr><th>Option</th><th>analyze</th><th>validate</th><th>compare</th><th>init</th><th>diagnose-coverage</th><th>explain-coverage</th></tr>
 </thead>
 <tbody>
-<tr><td><code>&lt;PATH&gt;</code> argument</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✓</td></tr>
-<tr><td><code>--format</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td><td>✓</td></tr>
-<tr><td><code>--output</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--coverage-file</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✓</td></tr>
-<tr><td><code>--context</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--threshold-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--top / --tail</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--jobs</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--no-parallel</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--verbose</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✓</td></tr>
-<tr><td><code>--explain-metrics</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--debug-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--trace-function</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--call-graph-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--validate-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--debug-format</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--no-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--max-callers</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--max-callees</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-external-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-std-lib-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--ast-functional-analysis</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--functional-analysis-profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--function</code></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
-<tr><td><code>--file</code></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
-<tr><td><code>--config</code></td><td>✗</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--before / --after</code></td><td>✗</td><td>✗</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--force</code></td><td>✗</td><td>✗</td><td>✗</td><td>✓</td><td>✗</td></tr>
+<tr><td><code>&lt;PATH&gt;</code> argument</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✓</td><td>✓</td></tr>
+<tr><td><code>--format</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td><td>✓</td><td>✓</td></tr>
+<tr><td><code>--output</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--coverage-file</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--context</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--threshold-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--top / --tail</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--min-score</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-filter-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--quiet</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-tui</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--streaming</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--stream-to</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--jobs</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-parallel</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--profile-output</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--verbose</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--show-splits</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--min-split-methods</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--min-split-lines</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-public-api-detection</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--public-api-threshold</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-pattern-detection</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--patterns</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--pattern-threshold</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-pattern-warnings</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--explain-metrics</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--debug-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--trace-function</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--call-graph-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--validate-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--debug-format</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--max-callers</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--max-callees</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-external-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-std-lib-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--ast-functional-analysis</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--functional-analysis-profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--function</code></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--file</code></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--config</code></td><td>✗</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--before / --after</code></td><td>✗</td><td>✗</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--force</code></td><td>✗</td><td>✗</td><td>✗</td><td>✓</td><td>✗</td><td>✗</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Note:</strong> The <code>validate</code> command supports output control (<code>--format</code>, <code>--output</code>), coverage integration (<code>--coverage-file</code>), context-aware analysis (<code>--context</code>), display filtering (<code>--top</code>, <code>--tail</code>, <code>--summary</code>), performance control (<code>--jobs</code>, <code>--no-parallel</code>), and verbosity options (<code>--verbose</code>) from the <code>analyze</code> command. Analysis thresholds (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are configured via the <code>--config</code> file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the <code>analyze</code> command. The <code>explain-coverage</code> command is a specialized debugging tool for diagnosing coverage detection issues and has its own unique options (<code>--function</code>, <code>--file</code>).</p>
+<p><strong>Note:</strong> The <code>validate</code> command supports output control (<code>--format</code>, <code>--output</code>), coverage integration (<code>--coverage-file</code>), context-aware analysis (<code>--context</code>), display filtering (<code>--top</code>, <code>--tail</code>, <code>--summary</code>, <code>--show-splits</code>), performance control (<code>--jobs</code>, <code>--no-parallel</code>), and verbosity options (<code>--verbose</code>) from the <code>analyze</code> command. Analysis thresholds (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are configured via the <code>--config</code> file rather than as command-line options. Debugging features like call graph debugging, functional analysis, profiling, and pattern detection are specific to the <code>analyze</code> command. The <code>diagnose-coverage</code> and <code>explain-coverage</code> commands are specialized debugging tools for diagnosing coverage issues and have their own unique options.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="performance-issues"><a class="header" href="#performance-issues">Performance Issues</a></h3>
 <p><strong>Problem:</strong> Analysis is slow on large codebases</p>

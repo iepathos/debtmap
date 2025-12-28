@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -185,7 +185,12 @@
 <li><a href="#quick-start">Quick Start</a></li>
 <li><a href="#understanding-density-based-validation">Understanding Density-Based Validation</a></li>
 <li><a href="#configuration-setup">Configuration Setup</a></li>
-<li><a href="#validation-metrics">Validation Metrics</a></li>
+<li><a href="#validation-metrics">Validation Metrics</a>
+<ul>
+<li><a href="#how-validation-works">How Validation Works</a></li>
+<li><a href="#recommended-remediation-priority">Recommended Remediation Priority</a></li>
+</ul>
+</li>
 <li><a href="#exit-codes-and-ci-integration">Exit Codes and CI Integration</a></li>
 <li><a href="#coverage-integration">Coverage Integration</a></li>
 <li><a href="#context-aware-validation">Context-Aware Validation</a></li>
@@ -331,11 +336,12 @@ debtmap validate . --max-debt-density 40.0
 </code></pre>
 </li>
 <li>
-<p><strong><code>max_debt_density</code></strong> (default: 50.0) - <strong>PRIMARY METRIC</strong></p>
+<p><strong><code>max_debt_density</code></strong> (default: 50.0) - <strong>BLOCKING METRIC</strong></p>
 <ul>
 <li>Debt items per 1000 lines of code</li>
 <li>Scale-independent quality measure</li>
 <li>Remains stable as codebase grows</li>
+<li><strong>This is the only metric that determines validation pass/fail</strong></li>
 </ul>
 <pre><code class="language-toml">max_debt_density = 50.0
 </code></pre>
@@ -379,17 +385,25 @@ debtmap validate . --max-debt-density 40.0
 </code></pre>
 </li>
 </ol>
-<h3 id="metric-priority"><a class="header" href="#metric-priority">Metric Priority</a></h3>
-<p><strong>Validation uses AND logic:</strong> All primary metrics must pass for validation to succeed. If any check fails, the entire validation fails with a non-zero exit code.</p>
-<p>When validation fails, fix issues in this order:</p>
+<h3 id="how-validation-works"><a class="header" href="#how-validation-works">How Validation Works</a></h3>
+<p><strong>Debt density is the sole blocking metric.</strong> The validation pass/fail decision is based only on whether <code>max_debt_density</code> is exceeded (src/commands/validate/thresholds.rs:60-61).</p>
+<p>Other metrics like average complexity, codebase risk score, and coverage percentage are displayed in the output for visibility, but they do not cause validation to fail. When these metrics exceed their thresholds, the output shows <code>[ERROR]</code> as an informational warning, helping you identify areas for improvement even when validation passes.</p>
+<p>This design provides:</p>
+<ul>
+<li><strong>Simple CI integration</strong> - One clear quality signal (debt density)</li>
+<li><strong>Visibility without blocking</strong> - See all threshold violations without false failures</li>
+<li><strong>Scale-independent quality</strong> - Debt density remains meaningful as your codebase grows</li>
+</ul>
+<h3 id="recommended-remediation-priority"><a class="header" href="#recommended-remediation-priority">Recommended Remediation Priority</a></h3>
+<p>When improving code quality, address issues in this order:</p>
 <ol>
-<li><strong>Critical:</strong> <code>max_debt_density</code> violations (core quality metric)</li>
+<li><strong>Critical:</strong> <code>max_debt_density</code> violations (this actually blocks validation)</li>
 <li><strong>High:</strong> <code>max_average_complexity</code> violations (function-level quality)</li>
 <li><strong>High:</strong> <code>max_codebase_risk_score</code> violations (overall risk)</li>
 <li><strong>Medium:</strong> <code>min_coverage_percentage</code> violations (test coverage)</li>
 <li><strong>Low:</strong> <code>max_total_debt_score</code> violations (extreme cases only)</li>
 </ol>
-<p>The priority list above is for remediation order when validation fails, not for which checks are enforced. All configured thresholds are enforced equally.</p>
+<p>Note: Only debt density violations block validation. The other items are prioritized for improving code quality, not for making validation pass.</p>
 <h2 id="exit-codes-and-ci-integration"><a class="header" href="#exit-codes-and-ci-integration">Exit Codes and CI Integration</a></h2>
 <p>The <code>validate</code> command uses exit codes to signal success or failure:</p>
 <h3 id="exit-code-behavior"><a class="header" href="#exit-code-behavior">Exit Code Behavior</a></h3>
@@ -459,6 +473,9 @@ fi
     [ERROR] Average complexity: 12.3 &gt; 10.0
     [ERROR] Debt density: 65.8 per 1K LOC &gt; 50.0
 </code></pre>
+<blockquote>
+<p><strong>Note:</strong> In the example above, validation failed because <strong>debt density (65.8)</strong> exceeds its threshold (50.0). The average complexity <code>[ERROR]</code> is shown as an informational warning but does not affect the exit code. Even if average complexity were within its threshold, validation would still fail due to debt density. See <a href="#how-validation-works">How Validation Works</a> for details.</p>
+</blockquote>
 <p>The output format emphasizes:</p>
 <ul>
 <li><strong>Debt Density as the primary metric</strong> - shown first with percentage usage</li>

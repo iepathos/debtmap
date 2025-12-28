@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -470,7 +470,7 @@ fn load_settings() -&gt; Settings {
 </table>
 </div>
 <p>All these patterns are detected at <strong>Medium to High priority</strong> depending on context, as they represent lost error information that makes debugging difficult.</p>
-<p><strong>Source:</strong> Error swallowing patterns are defined in <code>src/debt/error_swallowing.rs:229-238</code> and comprehensively tested in <code>tests/error_swallowing_test.rs</code>.</p>
+<p><strong>Source:</strong> Error swallowing patterns are defined in <code>src/debt/error_swallowing.rs:234-243</code> and comprehensively tested in <code>tests/error_swallowing_test.rs</code>.</p>
 <h2 id="python-error-handling-analysis-planned"><a class="header" href="#python-error-handling-analysis-planned">Python Error Handling Analysis (Planned)</a></h2>
 <p>⚠️ <strong>Python error handling detection is planned but not yet implemented. Currently only Rust error patterns are fully supported.</strong></p>
 <p>The patterns described below represent the intended future behavior once Python analysis is implemented.</p>
@@ -798,7 +798,7 @@ async fn process_with_timeout(data: Data) -&gt; Result&lt;()&gt; {
 </table>
 </div>
 <p>All async error patterns emphasize the importance of properly handling errors in concurrent Rust code, where failures can easily go unnoticed.</p>
-<p><strong>Source:</strong> Async error patterns are defined in <code>src/debt/async_errors.rs:205-212</code> and tested with tokio-specific patterns.</p>
+<p><strong>Source:</strong> Async error patterns are defined in <code>src/debt/async_errors.rs:210-217</code> and tested with tokio-specific patterns.</p>
 <h2 id="severity-levels-and-prioritization"><a class="header" href="#severity-levels-and-prioritization">Severity Levels and Prioritization</a></h2>
 <p>Error handling issues are assigned severity based on their impact:</p>
 <div class="table-wrapper">

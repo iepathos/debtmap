@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -326,13 +326,12 @@ mod tests {
     // TODO: Add more test cases
     fn test_feature() { }
 }
-
-## Wildcard Suppression
-
-Use `[*]` to explicitly suppress all types (equivalent to no bracket notation):
-
-```rust
-// debtmap:ignore[*]
+<span class="boring">}</span></code></pre>
+<h3 id="wildcard-suppression"><a class="header" href="#wildcard-suppression">Wildcard Suppression</a></h3>
+<p>Use <code>[*]</code> to explicitly suppress all types (equivalent to no bracket notation):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// debtmap:ignore[*]
 // Suppresses all debt types
 <span class="boring">}</span></code></pre>
 <h3 id="type-specific-blocks"><a class="header" href="#type-specific-blocks">Type-Specific Blocks</a></h3>
@@ -451,14 +450,15 @@ patterns = [
 </thead>
 <tbody>
 <tr><td>Rust</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
-<tr><td>JavaScript</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
-<tr><td>TypeScript</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
+<tr><td>JavaScript*</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
+<tr><td>TypeScript*</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
 <tr><td>Python</td><td><code>#</code></td><td><code># debtmap:ignore</code></td></tr>
 <tr><td>Other languages</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
 </tbody>
 </table>
 </div>
 <p><strong>Note</strong>: Languages not explicitly listed use <code>//</code> as the default comment prefix.</p>
+<p><em>*JavaScript and TypeScript</em>: While debtmap recognizes suppression comments using <code>//</code> syntax in these files, full language analysis (AST parsing, complexity metrics, etc.) currently only supports Rust and Python. JavaScript/TypeScript files will have suppression comments detected if processed, but complete debt analysis for these languages is planned for future releases.</p>
 <p>You don’t need to configure this—Debtmap detects the language and uses the appropriate syntax.</p>
 <h2 id="explicitly-specified-files"><a class="header" href="#explicitly-specified-files">Explicitly Specified Files</a></h2>
 <p><strong>Important behavior</strong>: When you analyze a specific file directly, ignore patterns are bypassed:</p>

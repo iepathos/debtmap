@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,9 +188,9 @@
 <li>Interpreting signals for effective prompts</li>
 </ol>
 <h2 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h2>
-<h3 id="llm-markdown-recommended"><a class="header" href="#llm-markdown-recommended">LLM Markdown (Recommended)</a></h3>
-<p>The <code>llm-markdown</code> format is specifically designed for LLM consumption:</p>
-<pre><code class="language-bash">debtmap analyze . --format llm-markdown --top 5
+<h3 id="markdown-recommended"><a class="header" href="#markdown-recommended">Markdown (Recommended)</a></h3>
+<p>The <code>markdown</code> format is specifically designed for LLM consumption:</p>
+<pre><code class="language-bash">debtmap analyze . --format markdown --top 5
 </code></pre>
 <p><strong>Output structure:</strong></p>
 <pre><code class="language-markdown"># Technical Debt Analysis
@@ -323,17 +323,17 @@ debtmap analyze . --format json | jq '.items[0].location'
 </code></pre>
 <p><strong>Full context (most accurate):</strong></p>
 <pre><code class="language-bash"># Read all suggested files
-debtmap analyze . --format llm-markdown --top 1
+debtmap analyze . --format markdown --top 1
 # Then have the AI read each file in the context section
 </code></pre>
 <h2 id="example-workflows"><a class="header" href="#example-workflows">Example Workflows</a></h2>
 <h3 id="claude-code-integration"><a class="header" href="#claude-code-integration">Claude Code Integration</a></h3>
 <p><strong>Direct piping:</strong></p>
-<pre><code class="language-bash">debtmap analyze . --format llm-markdown --top 3 | claude "Fix the top item. Read the context files first."
+<pre><code class="language-bash">debtmap analyze . --format markdown --top 3 | claude "Fix the top item. Read the context files first."
 </code></pre>
 <p><strong>Two-step workflow:</strong></p>
 <pre><code class="language-bash"># Step 1: Get the analysis
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 5 &gt; debt.md
+debtmap analyze . --format markdown --lcov coverage.lcov --top 5 &gt; debt.md
 
 # Step 2: Send to Claude with context
 cat debt.md | claude "
@@ -349,16 +349,16 @@ Then fix the debt item following these rules:
 cargo llvm-cov --lcov --output-path coverage.lcov
 
 # Analyze with coverage
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1
+debtmap analyze . --format markdown --lcov coverage.lcov --top 1
 
 # Send the top item to Claude
-debtmap analyze . --format llm-markdown --lcov coverage.lcov --top 1 | \
+debtmap analyze . --format markdown --lcov coverage.lcov --top 1 | \
   claude "Add tests for this function to reach 80% coverage"
 </code></pre>
 <h3 id="cursor-integration"><a class="header" href="#cursor-integration">Cursor Integration</a></h3>
 <p>Cursor works best with file-based context:</p>
 <pre><code class="language-bash"># Generate debt report
-debtmap analyze . --format llm-markdown --top 10 &gt; .cursor/debt-report.md
+debtmap analyze . --format markdown --top 10 &gt; .cursor/debt-report.md
 
 # In Cursor, reference the report:
 # @debt-report.md Fix the top critical item
@@ -583,7 +583,7 @@ jobs:
 <h3 id="large-context-suggestions"><a class="header" href="#large-context-suggestions">Large context suggestions</a></h3>
 <p><strong>Cause:</strong> High coupling in codebase</p>
 <p><strong>Solution:</strong> Use <code>--max-context-lines</code> to limit:</p>
-<pre><code class="language-bash">debtmap analyze . --format llm-markdown --max-context-lines 300
+<pre><code class="language-bash">debtmap analyze . --format markdown --max-context-lines 300
 </code></pre>
 <h2 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h2>
 <h3 id="cli-options-for-llm-integration"><a class="header" href="#cli-options-for-llm-integration">CLI Options for LLM Integration</a></h3>
@@ -593,7 +593,7 @@ jobs:
 <tr><th>Option</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>--format llm-markdown</code></td><td>LLM-optimized markdown output</td></tr>
+<tr><td><code>--format markdown</code></td><td>LLM-optimized markdown output</td></tr>
 <tr><td><code>--format json</code></td><td>Structured JSON output</td></tr>
 <tr><td><code>--top N</code></td><td>Limit to top N items</td></tr>
 <tr><td><code>--lcov FILE</code></td><td>Include coverage data</td></tr>

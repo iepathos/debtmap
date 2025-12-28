@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -202,7 +202,7 @@
 <li>Track visited nodes and recursion stack</li>
 <li>When a node is reached that’s already in the recursion stack, a cycle is detected</li>
 </ol>
-<p><strong>Implementation:</strong> <code>src/debt/circular.rs:44-66</code> (detect_circular_dependencies)</p>
+<p><strong>Implementation:</strong> <code>src/debt/circular.rs:46-66</code> (detect_circular_dependencies)</p>
 <h3 id="example"><a class="header" href="#example">Example</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -432,7 +432,7 @@ concrete value. It changes often, breaking implementations.
 <ol>
 <li><strong>Extract chunks</strong> - Split files into fixed-size chunks (default: 50 lines)</li>
 <li><strong>Normalize</strong> - Remove whitespace and comments</li>
-<li><strong>Calculate hash</strong> - Compute SHA-256 hash for each normalized chunk</li>
+<li><strong>Calculate hash</strong> - Compute xxHash64 hash for each normalized chunk (10-20x faster than SHA-256)</li>
 <li><strong>Match duplicates</strong> - Find chunks with identical hashes</li>
 <li><strong>Merge adjacent</strong> - Consolidate consecutive duplicate blocks</li>
 </ol>
@@ -451,13 +451,13 @@ concrete value. It changes often, breaking implementations.
 <ol>
 <li>Extracts overlapping chunks from each file</li>
 <li>Normalizes by trimming whitespace and removing comments</li>
-<li>Calculates SHA-256 hash for each normalized chunk</li>
-<li>Groups chunks by hash</li>
+<li>Calculates xxHash64 hash for each normalized chunk (returns a <code>u64</code> value)</li>
+<li>Groups chunks by hash using thread-safe concurrent aggregation</li>
 <li>Returns groups with 2+ locations (duplicates found)</li>
 </ol>
 <h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
 <pre><code>Code duplication detected:
-  Hash: a3f2b9c1...
+  Hash: 14628437538729542158 (xxHash64)
   Lines: 50
   Locations:
     - src/handlers/user.rs:120-169
@@ -477,8 +477,8 @@ threshold_duplication = 50  # Default value
 # Larger values only catch major duplications
 # threshold_duplication = 100  # Less noise
 </code></pre>
-<p><strong>Configuration reference:</strong> <code>src/cli.rs:69</code> (threshold_duplication flag definition)</p>
-<p><strong>Implementation:</strong> <code>src/debt/duplication.rs:6-10</code></p>
+<p><strong>Configuration reference:</strong> <code>src/cli/args.rs:86-87</code> (threshold_duplication flag definition)</p>
+<p><strong>Implementation:</strong> <code>src/debt/duplication.rs:11-15</code></p>
 <h3 id="current-limitations"><a class="header" href="#current-limitations">Current Limitations</a></h3>
 <ul>
 <li><strong>Exact matching only</strong> - Currently uses hash-based exact matching</li>
@@ -697,7 +697,7 @@ threshold_duplication = 50  # Default value
 <p>Or via command line:</p>
 <pre><code class="language-bash">debtmap analyze . --threshold-duplication 50
 </code></pre>
-<p><strong>Configuration reference:</strong> <code>src/cli.rs:69</code> (threshold_duplication flag definition)</p>
+<p><strong>Configuration reference:</strong> <code>src/cli/args.rs:86-87</code> (threshold_duplication flag definition)</p>
 <h3 id="hardcoded-thresholds"><a class="header" href="#hardcoded-thresholds">Hardcoded Thresholds</a></h3>
 <p><strong>Note:</strong> Most architectural thresholds are currently hardcoded in the implementation and cannot be configured. These thresholds are based on industry-standard metrics from Robert C. Martin’s research and empirical software engineering studies:</p>
 <ul>

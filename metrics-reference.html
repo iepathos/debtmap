@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-08efffac.js";
+            window.path_to_searchindex_js = "searchindex-d16419a3.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-d4b9eccb.js"></script>
+        <script src="toc-3bdbe002.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -523,7 +523,7 @@ debtmap analyze --explain-metrics
 <h2 id="using-signals-with-ai"><a class="header" href="#using-signals-with-ai">Using Signals with AI</a></h2>
 <p>When piping debtmap output to an AI assistant, signals provide the context needed for intelligent fixes:</p>
 <pre><code class="language-bash"># Get structured signals for AI consumption
-debtmap analyze . --format llm-markdown --top 5 | claude "Fix the top item"
+debtmap analyze . --format markdown --top 5 | claude "Fix the top item"
 </code></pre>
 <p>The AI uses these signals to:</p>
 <ul>
