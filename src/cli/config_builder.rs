@@ -519,12 +519,17 @@ pub fn compute_verbosity(verbosity: u8, compact: bool) -> u8 {
     }
 }
 
-/// Pure function to check if single-pass mode is enabled via env var (spec 202)
-pub fn is_single_pass_env_enabled() -> bool {
-    std::env::var("DEBTMAP_SINGLE_PASS")
-        .ok()
+/// Pure function to parse single-pass env value (spec 202)
+/// Takes the raw env value and returns whether single-pass is enabled
+pub fn parse_single_pass_env(env_value: Option<&str>) -> bool {
+    env_value
         .and_then(|v| v.parse::<bool>().ok().or_else(|| Some(v == "1")))
         .unwrap_or(false)
+}
+
+/// Shell function that reads env and delegates to pure logic
+pub fn is_single_pass_env_enabled() -> bool {
+    parse_single_pass_env(std::env::var("DEBTMAP_SINGLE_PASS").ok().as_deref())
 }
 
 /// Pure function to compute multi-pass setting (spec 204)
@@ -625,29 +630,33 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_multi_pass_enabled() {
-        std::env::remove_var("DEBTMAP_SINGLE_PASS");
-        assert!(compute_multi_pass(false));
+    fn test_parse_single_pass_env_none() {
+        assert!(!parse_single_pass_env(None));
     }
 
     #[test]
-    fn test_is_single_pass_env_disabled() {
-        std::env::remove_var("DEBTMAP_SINGLE_PASS");
-        assert!(!is_single_pass_env_enabled());
+    fn test_parse_single_pass_env_true() {
+        assert!(parse_single_pass_env(Some("true")));
     }
 
     #[test]
-    fn test_is_single_pass_env_true() {
-        std::env::set_var("DEBTMAP_SINGLE_PASS", "true");
-        assert!(is_single_pass_env_enabled());
-        std::env::remove_var("DEBTMAP_SINGLE_PASS");
+    fn test_parse_single_pass_env_false() {
+        assert!(!parse_single_pass_env(Some("false")));
     }
 
     #[test]
-    fn test_is_single_pass_env_numeric() {
-        std::env::set_var("DEBTMAP_SINGLE_PASS", "1");
-        assert!(is_single_pass_env_enabled());
-        std::env::remove_var("DEBTMAP_SINGLE_PASS");
+    fn test_parse_single_pass_env_numeric_one() {
+        assert!(parse_single_pass_env(Some("1")));
+    }
+
+    #[test]
+    fn test_parse_single_pass_env_numeric_zero() {
+        assert!(!parse_single_pass_env(Some("0")));
+    }
+
+    #[test]
+    fn test_parse_single_pass_env_invalid() {
+        assert!(!parse_single_pass_env(Some("invalid")));
     }
 
     #[test]
