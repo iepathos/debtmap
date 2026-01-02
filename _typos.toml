@@ -1,0 +1,16 @@
+[default.extend-words]
+# ratatui is a Rust TUI library name (not ratatouille)
+ratatui = "ratatui"
+# ment is a valid suffix (e.g., management, placement)
+ment = "ment"
+# rror appears in regex patterns like [Ee]rror for case-insensitive matching
+rror = "rror"
+
+[default.extend-identifiers]
+# These are valid identifier patterns
+validat = "validat"
+# pn is short for pre_norm
+pn = "pn"
+
+[files]
+extend-exclude = []
