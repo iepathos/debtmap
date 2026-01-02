@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b767d121.js";
+            window.path_to_searchindex_js = "searchindex-a84da0e9.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-3bdbe002.js"></script>
+        <script src="toc-2efaaad0.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -1205,7 +1205,7 @@ jobs:
 <ul>
 <li><strong>Configure analysis:</strong> See <a href="configuration.html">Configuration</a></li>
 <li><strong>Understand metrics:</strong> See <a href="#metrics-reference">Metrics Reference</a></li>
-<li><strong>View examples:</strong> See <a href="#examples-6">Examples</a></li>
+<li><strong>View examples:</strong> See <a href="#examples-5">Examples</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="cli-reference"><a class="header" href="#cli-reference">CLI Reference</a></h1>
@@ -2225,7 +2225,7 @@ See Prodigy documentation for detailed usage instructions.</p>
 <li><a href="#output-formats-3">Output Formats</a> - Understanding JSON, Markdown, and Terminal output</li>
 <li><a href="#coverage-integration-1">Coverage Integration</a> - Integrating test coverage data</li>
 <li><a href="#context-providers">Context Providers</a> - Understanding context-aware analysis</li>
-<li><a href="#examples-6">Examples</a> - More comprehensive usage examples</li>
+<li><a href="#examples-5">Examples</a> - More comprehensive usage examples</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="analysis-guide"><a class="header" href="#analysis-guide">Analysis Guide</a></h1>
@@ -15575,762 +15575,9 @@ debtmap analyze . --lcov coverage.lcov --languages go
 <li><a href="troubleshooting.html">Troubleshooting</a> - More debugging tips for coverage issues</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="dead-code-analysis"><a class="header" href="#dead-code-analysis">Dead Code Analysis</a></h1>
-<p>Debtmap’s dead code detection system uses advanced static analysis to identify unused functions with high accuracy and low false positive rates. The analyzer integrates multiple detection systems to provide confidence-scored results that help you make informed decisions about code removal.</p>
-<h2 id="overview-14"><a class="header" href="#overview-14">Overview</a></h2>
-<p>The dead code analyzer combines several detection techniques:</p>
-<ul>
-<li><strong>Static call graph analysis</strong> - Tracks which functions call each other across your codebase</li>
-<li><strong>Framework pattern detection</strong> - Recognizes entry points from Flask, Django, FastAPI, Click, pytest, and more</li>
-<li><strong>Test detection</strong> - Identifies test functions and test files to avoid false positives</li>
-<li><strong>Callback tracking</strong> - Detects functions registered as callbacks or event handlers</li>
-<li><strong>Import analysis</strong> - Tracks which functions are imported and exported by other modules</li>
-<li><strong>Coverage integration</strong> - Uses test coverage data when available to identify live code</li>
-<li><strong>Public API detection</strong> - Uses heuristics to identify external API functions</li>
-</ul>
-<p>This multi-layered approach significantly reduces false positives compared to naive call graph analysis, reducing false positives from 30% to less than 5% for library-style modules (see <code>src/debt/public_api_detector.rs:1-5</code> for implementation details).</p>
-<h2 id="confidence-scoring"><a class="header" href="#confidence-scoring">Confidence Scoring</a></h2>
-<p>Every analysis result includes a confidence score to help you prioritize code removal:</p>
-<h3 id="high-confidence-08-10"><a class="header" href="#high-confidence-08-10">High Confidence (0.8-1.0)</a></h3>
-<p><strong>Safe to remove</strong> - These functions are very likely dead code.</p>
-<p>Characteristics:</p>
-<ul>
-<li>No static callers found in the codebase</li>
-<li>Not a framework entry point (route, command, view, etc.)</li>
-<li>Not a test function or in a test file</li>
-<li>Not registered as a callback or event handler</li>
-<li>Not exported in <code>__all__</code> or used in public API patterns</li>
-<li>Often private functions (starting with <code>_</code>)</li>
-</ul>
-<p>Example output:</p>
-<pre><code>Function: _old_helper
-Confidence: High (0.95)
-Suggestion: High confidence this function is dead code and can be safely removed.
-</code></pre>
-<h3 id="medium-confidence-05-08"><a class="header" href="#medium-confidence-05-08">Medium Confidence (0.5-0.8)</a></h3>
-<p><strong>Review recommended</strong> - These functions might be dead code but require manual verification.</p>
-<p>Characteristics:</p>
-<ul>
-<li>No static callers but function is public</li>
-<li>In a test file but not called by any tests</li>
-<li>Might be used dynamically (via <code>getattr</code>, plugins, etc.)</li>
-<li>Public API that might be used by external code</li>
-</ul>
-<p>Example output:</p>
-<pre><code>Function: legacy_api_method
-Confidence: Medium (0.65)
-Suggestion: Medium confidence this function is dead code. Manual verification recommended.
-Risks:
-  - Function is public and may be used by external code.
-</code></pre>
-<h3 id="low-confidence-00-05"><a class="header" href="#low-confidence-00-05">Low Confidence (0.0-0.5)</a></h3>
-<p><strong>Likely in use</strong> - These functions are probably not dead code.</p>
-<p>Characteristics:</p>
-<ul>
-<li>Has static callers in the codebase</li>
-<li>Framework entry point (Flask route, Django view, Click command)</li>
-<li>Test function (starts with <code>test_</code>, in test file)</li>
-<li>Callback target or event handler</li>
-<li>Magic method (<code>__init__</code>, <code>__str__</code>, etc.)</li>
-<li>Property accessor or descriptor</li>
-</ul>
-<p>Example output:</p>
-<pre><code>Function: index
-Confidence: Low (0.15)
-Result: LIVE
-Reasons:
-  - Framework entry point (Flask route)
-  - Function is public
-</code></pre>
-<h2 id="public-api-detection"><a class="header" href="#public-api-detection">Public API Detection</a></h2>
-<p>Debtmap uses advanced heuristics to identify functions that are likely part of your project’s external API. This prevents false positives when analyzing library code by detecting public-facing functions and excluding them from dead code results.</p>
-<h3 id="detection-heuristics"><a class="header" href="#detection-heuristics">Detection Heuristics</a></h3>
-<p>The public API detector (<code>src/debt/public_api_detector.rs:325-650</code>) implements six weighted heuristics:</p>
-<ol>
-<li>
-<p><strong>Naming Convention Heuristic</strong> (weight: 0.30) - Functions without underscore prefix are likely public; functions starting with <code>_</code> are marked private (score: 0.0). Module-level functions without underscore score highest.</p>
-</li>
-<li>
-<p><strong>Docstring Quality Heuristic</strong> (weight: 0.25) - Functions with comprehensive docstrings (structured with <code>Args:</code>, <code>Returns:</code>, etc.) are likely public API. Longer docstrings (100+ chars) score higher.</p>
-</li>
-<li>
-<p><strong>Type Annotation Heuristic</strong> (weight: 0.15) - Fully type-annotated functions (parameters and return type) indicate public API quality.</p>
-</li>
-<li>
-<p><strong>Symmetric Pair Heuristic</strong> (weight: 0.20) - Paired operations like <code>load</code>/<code>save</code>, <code>get</code>/<code>set</code>, <code>open</code>/<code>close</code>, <code>create</code>/<code>destroy</code>, <code>start</code>/<code>stop</code>, <code>acquire</code>/<code>release</code>, <code>add</code>/<code>remove</code>, <code>push</code>/<code>pop</code>, <code>read</code>/<code>write</code>. If one function in a pair is used, its counterpart is likely public.</p>
-</li>
-<li>
-<p><strong>Module Export Heuristic</strong> (weight: 0.10) - Functions listed in Python’s <code>__all__</code> or exported in <code>__init__.py</code> are definitely public (score: 1.0).</p>
-</li>
-<li>
-<p><strong>Rust Visibility Heuristic</strong> - For Rust code, <code>pub</code> keyword is definitive (score: 1.0), <code>pub(crate)</code> scores 0.5, and trait implementations are never considered dead code.</p>
-</li>
-</ol>
-<p>Functions scoring above the threshold (default: 0.6) are marked as public API and excluded from dead code detection.</p>
-<h3 id="configuration-9"><a class="header" href="#configuration-9">Configuration</a></h3>
-<p>Configure public API detection in <code>.debtmap.toml</code>:</p>
-<pre><code class="language-toml">[external_api]
-# Enable/disable automatic public API detection (default: true)
-detect_external_api = true
-
-# Explicitly mark specific functions as external APIs
-api_functions = [
-    "calculate_score",           # Just function name
-    "mylib.api::process_data",   # Module-qualified name
-    "public_handler",            # Any function matching this name
-]
-
-# Mark entire files as containing external APIs (supports glob patterns)
-api_files = [
-    "src/api/**/*.py",           # All Python files in api directory recursively
-    "src/lib.rs",                # Rust library entry point (all public functions)
-    "src/public_interface.py",   # Specific Python file
-    "**/__init__.py",            # All __init__.py files in any directory
-    "**/public_*.py",            # Any file starting with 'public_'
-    "myapp/api.py",              # Specific API module
-]
-</code></pre>
-<p>Functions identified as public APIs receive lower dead code confidence scores, even if they have no internal callers.</p>
-<h2 id="framework-support"><a class="header" href="#framework-support">Framework Support</a></h2>
-<p>The analyzer recognizes entry points from popular Python frameworks to avoid false positives:</p>
-<h3 id="web-frameworks"><a class="header" href="#web-frameworks">Web Frameworks</a></h3>
-<ul>
-<li><strong>Flask</strong>: <code>@app.route</code>, <code>@app.before_request</code>, <code>@app.after_request</code>, <code>@app.errorhandler</code></li>
-<li><strong>Django</strong>: View functions, admin actions, signal handlers, middleware methods</li>
-<li><strong>FastAPI</strong>: <code>@app.get</code>, <code>@app.post</code>, <code>@app.put</code>, <code>@app.delete</code>, route decorators</li>
-</ul>
-<h3 id="cli-frameworks"><a class="header" href="#cli-frameworks">CLI Frameworks</a></h3>
-<ul>
-<li><strong>Click</strong>: <code>@click.command</code>, <code>@click.group</code>, subcommand handlers</li>
-<li><strong>argparse</strong>: Functions registered as subcommand handlers</li>
-</ul>
-<h3 id="testing-frameworks"><a class="header" href="#testing-frameworks">Testing Frameworks</a></h3>
-<ul>
-<li><strong>pytest</strong>: Functions starting with <code>test_</code>, <code>@pytest.fixture</code>, parametrized tests</li>
-<li><strong>unittest</strong>: <code>TestCase</code> methods, <code>setUp</code>, <code>tearDown</code>, <code>setUpClass</code>, <code>tearDownClass</code></li>
-</ul>
-<h3 id="event-systems"><a class="header" href="#event-systems">Event Systems</a></h3>
-<ul>
-<li><strong>Qt/PyQt</strong>: Signal connections, slot decorators (<code>@pyqtSlot</code>)</li>
-<li><strong>Tkinter</strong>: Event bindings, button command callbacks, widget event handlers</li>
-</ul>
-<h3 id="framework-detection-matrix"><a class="header" href="#framework-detection-matrix">Framework Detection Matrix</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Framework</th><th>Pattern</th><th>Decorator/Keyword</th><th>Detection Method</th><th>Example</th></tr>
-</thead>
-<tbody>
-<tr><td><strong>Flask</strong></td><td>Routes</td><td><code>@app.route</code></td><td>Decorator analysis</td><td><code>@app.route('/')</code></td></tr>
-<tr><td>Flask</td><td>Before request</td><td><code>@app.before_request</code></td><td>Decorator analysis</td><td>Handler hooks</td></tr>
-<tr><td>Flask</td><td>Error handlers</td><td><code>@app.errorhandler</code></td><td>Decorator analysis</td><td>Custom error pages</td></tr>
-<tr><td><strong>Django</strong></td><td>Views</td><td>Function-based views</td><td>Module structure</td><td><code>def my_view(request):</code></td></tr>
-<tr><td>Django</td><td>Admin actions</td><td><code>@admin.action</code></td><td>Decorator analysis</td><td>Admin panel actions</td></tr>
-<tr><td>Django</td><td>Signals</td><td><code>@receiver</code></td><td>Decorator analysis</td><td>Signal handlers</td></tr>
-<tr><td><strong>FastAPI</strong></td><td>Routes</td><td><code>@app.get</code>, <code>@app.post</code></td><td>Decorator analysis</td><td>REST endpoints</td></tr>
-<tr><td>FastAPI</td><td>Dependencies</td><td><code>Depends()</code></td><td>Call graph analysis</td><td>Dependency injection</td></tr>
-<tr><td><strong>Click</strong></td><td>Commands</td><td><code>@click.command</code></td><td>Decorator analysis</td><td>CLI commands</td></tr>
-<tr><td>Click</td><td>Groups</td><td><code>@click.group</code></td><td>Decorator analysis</td><td>Command groups</td></tr>
-<tr><td><strong>pytest</strong></td><td>Tests</td><td><code>test_*</code> prefix</td><td>Naming convention</td><td><code>def test_foo():</code></td></tr>
-<tr><td>pytest</td><td>Fixtures</td><td><code>@pytest.fixture</code></td><td>Decorator analysis</td><td>Test fixtures</td></tr>
-<tr><td><strong>unittest</strong></td><td>Tests</td><td><code>TestCase</code> methods</td><td>Class hierarchy</td><td><code>class TestFoo(TestCase):</code></td></tr>
-<tr><td>unittest</td><td>Setup/Teardown</td><td><code>setUp</code>, <code>tearDown</code></td><td>Method naming</td><td>Lifecycle methods</td></tr>
-<tr><td><strong>Qt/PyQt</strong></td><td>Slots</td><td><code>@pyqtSlot</code></td><td>Decorator analysis</td><td>Signal handlers</td></tr>
-<tr><td>Qt</td><td>Connections</td><td><code>.connect()</code> calls</td><td>Call graph analysis</td><td>Event wiring</td></tr>
-<tr><td><strong>Tkinter</strong></td><td>Callbacks</td><td><code>command=func</code></td><td>Assignment tracking</td><td>Button callbacks</td></tr>
-</tbody>
-</table>
-</div>
-<p>See <a href="#context-providers">Framework Patterns documentation</a> for comprehensive framework support details and language-specific patterns.</p>
-<h2 id="confidence-thresholds"><a class="header" href="#confidence-thresholds">Confidence Thresholds</a></h2>
-<p>Dead code detection uses internal confidence thresholds to classify results:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Confidence Level</th><th>Range</th><th>Meaning</th></tr>
-</thead>
-<tbody>
-<tr><td><strong>High</strong></td><td>0.8 - 1.0</td><td>Safe to remove - very likely dead code</td></tr>
-<tr><td><strong>Medium</strong></td><td>0.5 - 0.8</td><td>Review recommended - manual verification needed</td></tr>
-<tr><td><strong>Low</strong></td><td>0.0 - 0.5</td><td>Likely in use - keep the function</td></tr>
-</tbody>
-</table>
-</div>
-<p>These thresholds are applied internally during analysis. Functions exceeding the high confidence threshold (0.8) with no callers and no framework indicators are flagged as removable.</p>
-<p><strong>Tuning recommendations:</strong></p>
-<ul>
-<li><strong>Conservative projects</strong> (libraries, public APIs): Focus on high confidence results (0.8+) only</li>
-<li><strong>Aggressive cleanup</strong> (internal tools): Review medium confidence results (0.5+) for additional cleanup opportunities</li>
-<li><strong>Balanced approach</strong> (most projects): Start with high confidence, then review medium as needed</li>
-</ul>
-<h2 id="suppressing-false-positives-1"><a class="header" href="#suppressing-false-positives-1">Suppressing False Positives</a></h2>
-<p>Mark functions as intentionally unused with suppression comments:</p>
-<pre><code class="language-python"># debtmap: not-dead
-def future_api_endpoint():
-    """Will be activated in v2.0"""
-    pass
-
-def compatibility_shim():  # noqa: dead-code
-    """Kept for backwards compatibility"""
-    pass
-</code></pre>
-<h3 id="supported-comment-formats"><a class="header" href="#supported-comment-formats">Supported Comment Formats</a></h3>
-<p>All of these formats are recognized:</p>
-<ul>
-<li><code># debtmap: not-dead</code> (recommended)</li>
-<li><code># debtmap:not-dead</code></li>
-<li><code># noqa: dead-code</code></li>
-<li><code># noqa:dead-code</code></li>
-</ul>
-<h3 id="comment-placement"><a class="header" href="#comment-placement">Comment Placement</a></h3>
-<p>Suppression comments can appear:</p>
-<ul>
-<li>
-<p><strong>Above the function</strong> (most common):</p>
-<pre><code class="language-python"># debtmap: not-dead
-def my_function():
-    pass
-</code></pre>
-</li>
-<li>
-<p><strong>Same line as function definition</strong>:</p>
-<pre><code class="language-python">def my_function():  # debtmap: not-dead
-    pass
-</code></pre>
-</li>
-<li>
-<p><strong>Below the function definition</strong> (less common):</p>
-<pre><code class="language-python">def my_function():
-# debtmap: not-dead
-    pass
-</code></pre>
-</li>
-</ul>
-<h2 id="coverage-integration-2"><a class="header" href="#coverage-integration-2">Coverage Integration</a></h2>
-<p>When test coverage data is available, the analyzer uses it to dramatically improve accuracy by marking covered functions as live:</p>
-<h3 id="generating-coverage-data-1"><a class="header" href="#generating-coverage-data-1">Generating Coverage Data</a></h3>
-<pre><code class="language-bash"># With pytest and pytest-cov
-pytest --cov=myapp --cov-report=json
-
-# With coverage.py directly
-coverage run -m pytest
-coverage json
-
-# Debtmap automatically detects and uses coverage.json
-debtmap analyze myapp/
-</code></pre>
-<h3 id="how-it-works-4"><a class="header" href="#how-it-works-4">How It Works</a></h3>
-<p>Functions that appear in coverage data are considered live, even if:</p>
-<ul>
-<li>No static callers are found</li>
-<li>They’re private functions</li>
-<li>They’re not framework entry points</li>
-</ul>
-<p>This catches functions called:</p>
-<ul>
-<li>Dynamically via <code>getattr()</code> or <code>exec()</code></li>
-<li>Through plugin systems</li>
-<li>By external libraries or C extensions</li>
-</ul>
-<h3 id="how-coverage-is-used-internally"><a class="header" href="#how-coverage-is-used-internally">How Coverage is Used Internally</a></h3>
-<p>Coverage data is integrated through the priority scoring system (<code>src/priority/scoring/classification.rs:71-88</code>). Functions with coverage data are evaluated using <code>TransitiveCoverage</code>:</p>
-<ul>
-<li><strong>Direct coverage</strong> - Percentage of function lines executed by tests</li>
-<li><strong>Transitive coverage</strong> - Coverage inherited from callers</li>
-<li><strong>Uncovered lines</strong> - Specific lines not executed</li>
-</ul>
-<p>Functions with direct coverage above 80% are considered well-tested and unlikely to be dead code.</p>
-<p><strong>CLI usage</strong> - Coverage is loaded automatically via the <code>--coverage-file</code> flag:</p>
-<pre><code class="language-bash"># Generate coverage data first
-pytest --cov=myapp --cov-report=json
-
-# Run debtmap with coverage
-debtmap analyze myapp/ --coverage-file coverage.json
-</code></pre>
-<h3 id="accuracy-improvement"><a class="header" href="#accuracy-improvement">Accuracy Improvement</a></h3>
-<p>Coverage integration substantially improves accuracy by:</p>
-<ul>
-<li><strong>Significantly reducing false positives</strong> - Eliminates most false positives in complex codebases</li>
-<li><strong>High accuracy for covered functions</strong> - Functions with test coverage are correctly identified as live</li>
-<li><strong>Clear removal candidates</strong> - Uncovered code with no static callers is more confidently dead</li>
-<li><strong>Dynamic call detection</strong> - Catches functions called via <code>getattr()</code>, plugins, or other dynamic mechanisms that static analysis misses</li>
-</ul>
-<p><strong>Coverage data format</strong>: Debtmap uses the standard <code>coverage.json</code> format produced by <code>coverage.py</code> and <code>pytest-cov</code>. The file should be in your project root and contain executed line numbers for each source file.</p>
-<h2 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h2>
-<h3 id="toml-configuration"><a class="header" href="#toml-configuration">TOML Configuration</a></h3>
-<p>Complete dead code analysis configuration in <code>.debtmap.toml</code>:</p>
-<pre><code class="language-toml"># Language-specific dead code detection
-# Source: src/config/languages.rs:25-38 (LanguageFeatures struct)
-[languages.python]
-detect_dead_code = true           # Enable Python dead code analysis (default: true)
-
-[languages.rust]
-detect_dead_code = true           # Enable Rust dead code analysis (default: true)
-
-[languages.javascript]
-detect_dead_code = true           # Enable JavaScript dead code analysis
-
-[languages.typescript]
-detect_dead_code = true           # Enable TypeScript dead code analysis
-
-# External API detection
-# Source: src/priority/external_api_detector.rs:10-22 (ExternalApiConfig struct)
-[external_api]
-detect_external_api = true        # Enable automatic public API detection (default: true)
-
-api_functions = [
-    "public_function_name",       # Function name only
-    "module::qualified_name",     # Module-qualified format
-]
-
-api_files = [
-    "src/api/**/*.py",            # Glob patterns supported (** for recursive)
-    "src/public_interface.py",    # Exact file paths
-    "**/__init__.py",             # All package entry points
-    "**/public_*.py",             # Files starting with 'public_'
-]
-</code></pre>
-<h3 id="advanced-configuration-public-api-detection-weights"><a class="header" href="#advanced-configuration-public-api-detection-weights">Advanced Configuration: Public API Detection Weights</a></h3>
-<p>The <code>PublicApiConfig</code> struct (<code>src/debt/public_api_detector.rs:56-90</code>) provides fine-tuned control over heuristic weights. These are currently configured programmatically:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Setting</th><th>Default</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>naming_convention_weight</code></td><td>0.30</td><td>Weight for underscore prefix detection</td></tr>
-<tr><td><code>docstring_weight</code></td><td>0.25</td><td>Weight for documentation quality</td></tr>
-<tr><td><code>type_annotation_weight</code></td><td>0.15</td><td>Weight for type annotation presence</td></tr>
-<tr><td><code>symmetric_pair_weight</code></td><td>0.20</td><td>Weight for paired function detection</td></tr>
-<tr><td><code>module_export_weight</code></td><td>0.10</td><td>Weight for <code>__all__</code> exports</td></tr>
-<tr><td><code>public_api_threshold</code></td><td>0.60</td><td>Minimum score to mark as public API</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Custom Symmetric Pairs</strong> - You can add project-specific paired functions:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Source: src/debt/public_api_detector.rs:500-518
-// Built-in pairs: load/save, get/set, open/close, create/destroy,
-// start/stop, acquire/release, add/remove, push/pop, read/write
-
-// Custom pairs can be added via PublicApiConfig::custom_symmetric_pairs
-let config = PublicApiConfig {
-    custom_symmetric_pairs: vec![
-        ("fetch".to_string(), "submit".to_string()),
-        ("serialize".to_string(), "deserialize".to_string()),
-    ],
-    ..Default::default()
-};
-<span class="boring">}</span></code></pre>
-<h2 id="understanding-results"><a class="header" href="#understanding-results">Understanding Results</a></h2>
-<h3 id="interpreting-output"><a class="header" href="#interpreting-output">Interpreting Output</a></h3>
-<p>When you run dead code analysis, you’ll see results like:</p>
-<pre><code>Dead code analysis for 'calculate_total':
-  Result: LIVE
-  Confidence: Low (0.2)
-
-  Reasons it's LIVE:
-    - HasStaticCallers (called by 3 functions)
-    - PublicApi
-
-  Suggestion:
-    Function appears to be in use or is a framework/test entry point.
-</code></pre>
-<h3 id="decision-guide"><a class="header" href="#decision-guide">Decision Guide</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Result</th><th>Confidence</th><th>Action</th></tr>
-</thead>
-<tbody>
-<tr><td><code>is_dead: true</code></td><td>High (0.8-1.0)</td><td><strong>Safe to remove</strong> - Very likely unused</td></tr>
-<tr><td><code>is_dead: true</code></td><td>Medium (0.5-0.8)</td><td><strong>Review manually</strong> - Might be dead, verify first</td></tr>
-<tr><td><code>is_dead: true</code></td><td>Low (0.0-0.5)</td><td><strong>Keep</strong> - Likely used dynamically</td></tr>
-<tr><td><code>is_dead: false</code></td><td>Any</td><td><strong>Keep</strong> - Function is in use</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="decision-tree-for-confidence-interpretation"><a class="header" href="#decision-tree-for-confidence-interpretation">Decision Tree for Confidence Interpretation</a></h3>
-<p>Use this decision tree to determine what action to take:</p>
-<pre><code>Is the function flagged as dead?
-│
-├─ NO → Keep the function (it's in use)
-│
-└─ YES → What is the confidence level?
-    │
-    ├─ HIGH (0.8-1.0)
-    │   ├─ Is it a public API function? → Review, add suppression comment if keeping
-    │   └─ Is it private (_prefix)? → **SAFE TO REMOVE**
-    │
-    ├─ MEDIUM (0.5-0.8)
-    │   ├─ Check git history: recently added? → Keep for now, review in next sprint
-    │   ├─ Has coverage data been generated? → Run with coverage first
-    │   ├─ Is it used dynamically (getattr, plugins)? → Add suppression comment
-    │   └─ No clear reason to keep? → **REVIEW MANUALLY, likely safe to remove**
-    │
-    └─ LOW (0.0-0.5)
-        ├─ Review "Reasons it's LIVE" → If reasons are valid, keep it
-        ├─ Function is public and might be external API? → Keep it
-        └─ Truly unused but marked live incorrectly? → Report issue or use suppression
-</code></pre>
-<h3 id="confidence-level-quick-reference"><a class="header" href="#confidence-level-quick-reference">Confidence Level Quick Reference</a></h3>
-<p><strong>When to act without review:</strong></p>
-<ul>
-<li><code>is_dead: true</code> + <code>confidence: HIGH</code> + <code>private function (_prefix)</code> → <strong>Remove immediately</strong></li>
-<li><code>is_dead: true</code> + <code>confidence: HIGH</code> + <code>in test file</code> + <code>not test function</code> → <strong>Remove immediately</strong></li>
-</ul>
-<p><strong>When to review before acting:</strong></p>
-<ul>
-<li><code>is_dead: true</code> + <code>confidence: MEDIUM</code> → <strong>Manual review required</strong></li>
-<li><code>is_dead: true</code> + <code>confidence: HIGH</code> + <code>public function</code> → <strong>Check git history, verify external usage</strong></li>
-</ul>
-<p><strong>When to keep:</strong></p>
-<ul>
-<li><code>is_dead: false</code> → <strong>Always keep (function is live)</strong></li>
-<li><code>is_dead: true</code> + <code>confidence: LOW</code> → <strong>Keep (too uncertain to remove)</strong></li>
-</ul>
-<h3 id="filtering-results-by-confidence"><a class="header" href="#filtering-results-by-confidence">Filtering Results by Confidence</a></h3>
-<p>To filter dead code results by confidence level, you can process the JSON output:</p>
-<pre><code class="language-bash"># Analyze and output JSON
-debtmap analyze --format=json &gt; results.json
-
-# Dead code items are part of the debt_items array with debt_type "DeadCode"
-# Filter for dead code items using jq
-jq '.debt_items | map(select(.debt_type == "DeadCode"))' results.json
-
-# Filter by visibility (Public, Private, Crate)
-jq '.debt_items | map(select(.debt_type == "DeadCode" and .visibility == "Private"))' results.json
-
-# Get summary of dead code findings
-jq '[.debt_items[] | select(.debt_type == "DeadCode")] | length' results.json
-</code></pre>
-<p><strong>Note</strong>: Dead code detection results are integrated into the standard debt item format for consistent analysis alongside other technical debt types.</p>
-<p>See <a href="#cli-reference">CLI Reference</a> for complete command options.</p>
-<h2 id="common-patterns-1"><a class="header" href="#common-patterns-1">Common Patterns</a></h2>
-<h3 id="false-positives-and-how-to-handle-them"><a class="header" href="#false-positives-and-how-to-handle-them">False Positives (and How to Handle Them)</a></h3>
-<p><strong>Public API methods</strong></p>
-<pre><code class="language-python">class Calculator:
-    def add(self, a, b):  # Might be used by external code
-        return a + b
-</code></pre>
-<p><em>Solution</em>: Add to <code>api_functions</code> in <code>.debtmap.toml</code> or use suppression comment</p>
-<p><strong>Dynamic imports</strong></p>
-<pre><code class="language-python"># Module loaded dynamically via importlib
-def handle_command(cmd):  # Called via getattr()
-    pass
-</code></pre>
-<p><em>Solution</em>: Add <code># debtmap: not-dead</code> suppression comment</p>
-<p><strong>Plugin registration</strong></p>
-<pre><code class="language-python">@registry.register
-def handler():  # Registered at import time
-    pass
-</code></pre>
-<p><em>Solution</em>: Should be detected by callback tracker; if not, add suppression comment</p>
-<h3 id="true-positives-safe-to-remove"><a class="header" href="#true-positives-safe-to-remove">True Positives (Safe to Remove)</a></h3>
-<p><strong>Old implementations</strong></p>
-<pre><code class="language-python">def _old_calculate(x):  # Replaced but not removed
-    return x * 2
-</code></pre>
-<p><em>Action</em>: Safe to remove (high confidence)</p>
-<p><strong>Unused helper functions</strong></p>
-<pre><code class="language-python">def _format_date(date):  # Was used but caller was removed
-    return date.strftime("%Y-%m-%d")
-</code></pre>
-<p><em>Action</em>: Safe to remove (high confidence)</p>
-<p><strong>Commented-out code alternatives</strong></p>
-<pre><code class="language-python">def process_v1(data):  # Old version, v2 is now used
-    pass
-</code></pre>
-<p><em>Action</em>: Safe to remove (high confidence)</p>
-<h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
-<h3 id="workflow-recommendations"><a class="header" href="#workflow-recommendations">Workflow Recommendations</a></h3>
-<ol>
-<li>
-<p><strong>Start with high confidence items</strong> - Remove functions with 0.8+ confidence first to build trust in the tool</p>
-</li>
-<li>
-<p><strong>Run with coverage data</strong> - Generate <code>coverage.json</code> to dramatically improve accuracy:</p>
-<pre><code class="language-bash">pytest --cov=myapp --cov-report=json
-debtmap analyze myapp/
-</code></pre>
-</li>
-<li>
-<p><strong>Review medium confidence items</strong> - These often find real dead code but need manual verification</p>
-</li>
-<li>
-<p><strong>Use suppression comments liberally</strong> - Better to mark something as intentionally unused than to have noise in results</p>
-</li>
-<li>
-<p><strong>Check git history</strong> - Before removing, verify the function wasn’t recently added:</p>
-<pre><code class="language-bash">git log -p -- path/to/file.py | grep -A5 "def function_name"
-</code></pre>
-</li>
-<li>
-<p><strong>Remove incrementally</strong> - Remove a few functions, run tests, commit. Don’t remove everything at once:</p>
-<pre><code class="language-bash"># Remove 3-5 high confidence functions
-pytest  # Verify tests still pass
-git commit -m "Remove dead code: _old_helper, _unused_formatter"
-</code></pre>
-</li>
-<li>
-<p><strong>Look for patterns</strong> - If multiple related functions are flagged, they might all be part of an abandoned feature</p>
-</li>
-</ol>
-<h3 id="cicd-integration-5"><a class="header" href="#cicd-integration-5">CI/CD Integration</a></h3>
-<p>Prevent dead code from accumulating by integrating into your CI pipeline:</p>
-<pre><code class="language-yaml"># .github/workflows/dead-code.yml
-- name: Check for dead code
-  run: |
-    debtmap analyze --format=json &gt; analysis.json
-    # Count dead code items
-    DEAD_CODE_COUNT=$(jq '[.debt_items[] | select(.debt_type == "DeadCode")] | length' analysis.json)
-    if [ $DEAD_CODE_COUNT -gt 0 ]; then
-      echo "Dead code detected: $DEAD_CODE_COUNT items"
-      jq '.debt_items[] | select(.debt_type == "DeadCode") | "\(.file):\(.line) - \(.function_name)"' analysis.json
-      exit 1
-    fi
-</code></pre>
-<h2 id="rust-specific-dead-code-detection"><a class="header" href="#rust-specific-dead-code-detection">Rust-Specific Dead Code Detection</a></h2>
-<p>For Rust codebases, debtmap provides enhanced detection with visibility-aware analysis:</p>
-<h3 id="visibility-based-detection"><a class="header" href="#visibility-based-detection">Visibility-Based Detection</a></h3>
-<p>Dead code detection (<code>src/priority/scoring/classification.rs:515-543</code>) respects Rust’s visibility system:</p>
-<ul>
-<li><strong><code>pub</code> functions</strong> - Analyzed with external API heuristics; may be used by external crates</li>
-<li><strong><code>pub(crate)</code> functions</strong> - Internal API; checked for callers within the crate</li>
-<li><strong>Private functions</strong> - Must have internal callers to be considered live</li>
-</ul>
-<h3 id="trait-implementation-protection"><a class="header" href="#trait-implementation-protection">Trait Implementation Protection</a></h3>
-<p>Trait methods are automatically excluded from dead code detection (<code>src/priority/scoring/classification.rs:545-593</code>):</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// These are NEVER flagged as dead code (from src/debt/public_api_detector.rs:619-650):
-impl Clone for MyType { fn clone(&amp;self) -&gt; Self { ... } }  // Clone trait
-impl Default for MyType { fn default() -&gt; Self { ... } }    // Default trait
-impl From&lt;T&gt; for MyType { fn from(t: T) -&gt; Self { ... } }   // From trait
-
-// Common trait methods automatically recognized:
-// fmt, clone, default, from, into, try_from, try_into, as_ref, as_mut,
-// drop, deref, index, add, sub, mul, div, eq, ne, cmp, hash,
-// serialize, deserialize, next, size_hint
-<span class="boring">}</span></code></pre>
-<h3 id="framework-callback-patterns"><a class="header" href="#framework-callback-patterns">Framework Callback Patterns</a></h3>
-<p>The analyzer recognizes common framework patterns (<code>src/priority/scoring/classification.rs:596-612</code>):</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Functions with these name patterns are protected from dead code detection:
-fn handle_event() { }      // Contains "handler"
-fn on_click() { }          // Contains "on_"
-fn route_request() { }     // Contains "route"
-fn middleware_auth() { }   // Contains "middleware"
-fn spawn_worker() { }      // Contains "spawn"
-fn poll_status() { }       // Contains "poll"
-<span class="boring">}</span></code></pre>
-<h2 id="limitations-1"><a class="header" href="#limitations-1">Limitations</a></h2>
-<h3 id="what-the-analyzer-can-detect"><a class="header" href="#what-the-analyzer-can-detect">What the Analyzer CAN Detect</a></h3>
-<ul>
-<li>✅ Static function calls across modules</li>
-<li>✅ Framework entry points via decorators</li>
-<li>✅ Test functions in test files</li>
-<li>✅ Callback registrations and event handlers</li>
-<li>✅ Functions in <code>__all__</code> exports</li>
-<li>✅ Property decorators and descriptors</li>
-<li>✅ Magic methods (<code>__init__</code>, <code>__str__</code>, etc.)</li>
-<li>✅ Functions covered by test coverage data</li>
-</ul>
-<h3 id="what-the-analyzer-cannot-detect"><a class="header" href="#what-the-analyzer-cannot-detect">What the Analyzer CANNOT Detect</a></h3>
-<ul>
-<li>❌ <code>eval()</code> or <code>exec()</code> usage - arbitrary code execution</li>
-<li>❌ <code>getattr()</code> with dynamic string names - runtime attribute lookup</li>
-<li>❌ Reflection-based calls - <code>inspect</code> module usage</li>
-<li>❌ Functions called from C extensions</li>
-<li>❌ Plugin systems using string-based loading - dynamic imports</li>
-</ul>
-<h3 id="mitigation-strategies"><a class="header" href="#mitigation-strategies">Mitigation Strategies</a></h3>
-<p>For functions the analyzer cannot detect, use suppression comments:</p>
-<pre><code class="language-python"># Called dynamically via getattr in plugin system
-# debtmap: not-dead
-def handle_dynamic_command():
-    pass
-
-# Loaded via string-based plugin system
-# debtmap: not-dead
-def plugin_entrypoint():
-    pass
-</code></pre>
-<h2 id="troubleshooting-13"><a class="header" href="#troubleshooting-13">Troubleshooting</a></h2>
-<h3 id="function-marked-as-dead-but-its-actually-used"><a class="header" href="#function-marked-as-dead-but-its-actually-used">“Function marked as dead but it’s actually used”</a></h3>
-<p><strong>Possible causes and solutions:</strong></p>
-<ol>
-<li>
-<p><strong>Dynamic call via <code>getattr()</code> or <code>exec()</code></strong></p>
-<ul>
-<li><em>Solution</em>: Add <code># debtmap: not-dead</code> suppression comment</li>
-<li><em>Example</em>: Plugin systems, command dispatchers</li>
-</ul>
-</li>
-<li>
-<p><strong>Called from external code or C extension</strong></p>
-<ul>
-<li><em>Solution</em>: Add function to <code>api_functions</code> in <code>.debtmap.toml</code></li>
-<li><em>Example</em>: Public library APIs</li>
-</ul>
-</li>
-<li>
-<p><strong>Framework pattern not recognized</strong></p>
-<ul>
-<li><em>Solution</em>: Report issue on GitHub with framework details</li>
-<li><em>Workaround</em>: Add suppression comment</li>
-</ul>
-</li>
-<li>
-<p><strong>Callback registration not detected</strong></p>
-<ul>
-<li><em>Solution</em>: Check if decorator is supported; add suppression if not</li>
-<li><em>Example</em>: Custom registration decorators</li>
-</ul>
-</li>
-</ol>
-<h3 id="too-many-false-positives-in-my-codebase"><a class="header" href="#too-many-false-positives-in-my-codebase">“Too many false positives in my codebase”</a></h3>
-<p><strong>Solutions to try (in order):</strong></p>
-<ol>
-<li>
-<p><strong>Run with coverage data</strong> - Biggest impact on accuracy:</p>
-<pre><code class="language-bash">pytest --cov=myapp --cov-report=json
-debtmap analyze myapp/
-</code></pre>
-</li>
-<li>
-<p><strong>Configure public API detection</strong> - Mark your external APIs:</p>
-<pre><code class="language-toml">[external_api]
-api_files = ["src/api/**/*.py", "src/public/**/*.py"]
-</code></pre>
-</li>
-<li>
-<p><strong>Add framework patterns</strong> - Report unrecognized frameworks on GitHub</p>
-</li>
-<li>
-<p><strong>Add suppression comments</strong> - Mark intentionally unused functions</p>
-</li>
-<li>
-<p><strong>Adjust confidence thresholds</strong> - Raise to 0.9/0.7 for conservative analysis</p>
-</li>
-</ol>
-<h3 id="low-confidence-on-obviously-dead-code"><a class="header" href="#low-confidence-on-obviously-dead-code">“Low confidence on obviously dead code”</a></h3>
-<p>This is working as intended - the analyzer is <strong>conservative</strong> to avoid false positives.</p>
-<p><strong>What to do:</strong></p>
-<ol>
-<li><strong>Review the “Reasons it’s LIVE”</strong> - Understand why confidence is low</li>
-<li><strong>Check if function is truly unused</strong> - Verify no dynamic calls</li>
-<li><strong>Run with coverage</strong> - Coverage data will increase confidence for truly dead code</li>
-<li><strong>Accept medium/low confidence</strong> - Manual review is valuable for complex cases</li>
-</ol>
-<h2 id="examples-2"><a class="header" href="#examples-2">Examples</a></h2>
-<h3 id="example-1-flask-application"><a class="header" href="#example-1-flask-application">Example 1: Flask Application</a></h3>
-<pre><code class="language-python">from flask import Flask
-app = Flask(__name__)
-
-@app.route('/')
-def index():  # ✅ LIVE - Framework entry point
-    return helper()
-
-def helper():  # ✅ LIVE - Called by index()
-    return format_response("Hello")
-
-def format_response(msg):  # ✅ LIVE - Called by helper()
-    return f"&lt;html&gt;{msg}&lt;/html&gt;"
-
-def _old_route():  # ❌ DEAD - No callers, not a route (High: 0.95)
-    return "Unused"
-</code></pre>
-<p><strong>Analysis results:</strong></p>
-<ul>
-<li><code>index</code>: LIVE (Low: 0.15) - Flask route decorator detected</li>
-<li><code>helper</code>: LIVE (Low: 0.25) - Has static caller (index)</li>
-<li><code>format_response</code>: LIVE (Low: 0.30) - Has static caller (helper)</li>
-<li><code>_old_route</code>: DEAD (High: 0.95) - No callers, private function</li>
-</ul>
-<h3 id="example-2-test-file"><a class="header" href="#example-2-test-file">Example 2: Test File</a></h3>
-<pre><code class="language-python">import pytest
-
-def test_addition():  # ✅ LIVE - Test function
-    assert add(1, 2) == 3
-
-def add(a, b):  # ✅ LIVE - Called by test
-    return a + b
-
-@pytest.fixture
-def sample_data():  # ✅ LIVE - pytest fixture
-    return [1, 2, 3]
-
-def _unused_helper():  # ❌ DEAD - No callers (High: 0.90)
-    return 42
-
-def _old_test_helper():  # ❌ DEAD - Was used, now orphaned (High: 0.92)
-    return "test data"
-</code></pre>
-<p><strong>Analysis results:</strong></p>
-<ul>
-<li><code>test_addition</code>: LIVE (Low: 0.10) - Test function pattern</li>
-<li><code>add</code>: LIVE (Low: 0.20) - Called by test</li>
-<li><code>sample_data</code>: LIVE (Low: 0.15) - pytest fixture decorator</li>
-<li><code>_unused_helper</code>: DEAD (High: 0.90) - No callers in test file</li>
-<li><code>_old_test_helper</code>: DEAD (High: 0.92) - Orphaned helper</li>
-</ul>
-<h3 id="example-3-public-api-with-configuration"><a class="header" href="#example-3-public-api-with-configuration">Example 3: Public API with Configuration</a></h3>
-<pre><code class="language-python"># src/api/calculator.py
-
-__all__ = ['calculate', 'format_result']
-
-def calculate(x):  # ✅ LIVE - Exported in __all__
-    return _internal_multiply(x, 2)
-
-def format_result(x):  # ✅ LIVE - Exported in __all__
-    return f"Result: {x}"
-
-def _internal_multiply(a, b):  # ✅ LIVE - Called by calculate
-    return a * b
-
-def _internal_helper():  # ❌ DEAD - Not exported, no callers (High: 0.88)
-    return None
-
-# Public API but not in __all__
-def legacy_api():  # ⚠️ MEDIUM - Public but no callers (Medium: 0.65)
-    """Kept for backwards compatibility"""
-    pass
-</code></pre>
-<p><strong>.debtmap.toml configuration:</strong></p>
-<pre><code class="language-toml">[external_api]
-api_files = ["src/api/**/*.py"]
-
-# Explicitly mark legacy API
-api_functions = ["legacy_api"]
-</code></pre>
-<p><strong>Analysis results:</strong></p>
-<ul>
-<li><code>calculate</code>: LIVE (Low: 0.20) - In <code>__all__</code>, has callers</li>
-<li><code>format_result</code>: LIVE (Low: 0.25) - In <code>__all__</code></li>
-<li><code>_internal_multiply</code>: LIVE (Low: 0.30) - Called by calculate</li>
-<li><code>_internal_helper</code>: DEAD (High: 0.88) - Private, no callers</li>
-<li><code>legacy_api</code>: LIVE (Low: 0.35) - Marked as API in config</li>
-</ul>
-<h2 id="getting-help-1"><a class="header" href="#getting-help-1">Getting Help</a></h2>
-<ul>
-<li><strong>Documentation</strong>: See <a href="troubleshooting.html">Troubleshooting Guide</a> for common issues</li>
-<li><strong>Report issues</strong>: https://github.com/anthropics/debtmap/issues</li>
-<li><strong>Examples</strong>: Check the <a href="#examples-6">Examples chapter</a> for more scenarios</li>
-<li><strong>Related topics</strong>:
-<ul>
-<li><a href="#coverage-integration-1">Coverage Integration</a> - Detailed coverage setup</li>
-<li><a href="#suppression-patterns">Suppression Patterns</a> - Advanced suppression techniques</li>
-<li><a href="configuration.html">Configuration</a> - Complete configuration reference</li>
-</ul>
-</li>
-</ul>
-<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="design-pattern-detection"><a class="header" href="#design-pattern-detection">Design Pattern Detection</a></h1>
 <p>Debtmap automatically detects common design patterns in your codebase to provide better architectural insights and reduce false positives in complexity analysis. When recognized design patterns are detected, Debtmap applies appropriate complexity adjustments to avoid penalizing idiomatic code.</p>
-<h2 id="overview-15"><a class="header" href="#overview-15">Overview</a></h2>
+<h2 id="overview-14"><a class="header" href="#overview-14">Overview</a></h2>
 <p>Debtmap detects 7 user-facing design patterns across Python, JavaScript, TypeScript, and Rust, plus 2 internal-only patterns (Builder, Visitor) used for scoring adjustments:</p>
 <div class="table-wrapper">
 <table>
@@ -16739,7 +15986,7 @@ impl Visitor for ComplexityVisitor {
 <span class="boring">}</span></code></pre>
 <p><strong>Why Internal Only</strong>: Visitor patterns often involve exhaustive pattern matching which can appear complex by traditional metrics. Debtmap detects these patterns to apply logarithmic scaling (<code>log2(match_arms) * avg_complexity</code>) instead of linear, preventing false positives in complexity analysis. This is a complexity adjustment mechanism, not a user-visible pattern detection feature.</p>
 <p><strong>Source</strong>: <code>src/complexity/visitor_detector.rs</code> - Used for complexity analysis, not pattern reporting</p>
-<h2 id="configuration-10"><a class="header" href="#configuration-10">Configuration</a></h2>
+<h2 id="configuration-9"><a class="header" href="#configuration-9">Configuration</a></h2>
 <h3 id="current-implementation-status"><a class="header" href="#current-implementation-status">Current Implementation Status</a></h3>
 <p>Pattern detection is currently <strong>internal-only</strong> and used for analysis adjustments. The CLI flags for pattern detection exist in the codebase but are not yet fully integrated into the analysis pipeline.</p>
 <p><strong>Status Summary</strong>:</p>
@@ -16806,7 +16053,7 @@ debtmap analyze --show-pattern-warnings
 <li>Compare complexity scores and god object detection results</li>
 <li>Patterns are being detected, but not explicitly reported in output</li>
 </ol>
-<h2 id="confidence-scoring-1"><a class="header" href="#confidence-scoring-1">Confidence Scoring</a></h2>
+<h2 id="confidence-scoring"><a class="header" href="#confidence-scoring">Confidence Scoring</a></h2>
 <p>Pattern detection uses a confidence scoring system (0.0-1.0) to indicate match quality:</p>
 <ul>
 <li><strong>0.9-1.0</strong>: Very High - Strong structural match with all key elements present</li>
@@ -17052,7 +16299,7 @@ pub struct HttpClientBuilder {
 <pre><code class="language-bash">debtmap analyze --patterns observer --output-format json &gt; observers.json
 </code></pre>
 <p><strong>Current Status</strong>: Pattern detection logic exists and works internally, but results aren’t yet exposed in output</p>
-<h2 id="troubleshooting-14"><a class="header" href="#troubleshooting-14">Troubleshooting</a></h2>
+<h2 id="troubleshooting-13"><a class="header" href="#troubleshooting-13">Troubleshooting</a></h2>
 <h3 id="pattern-detection-not-visible-in-output"><a class="header" href="#pattern-detection-not-visible-in-output">Pattern Detection Not Visible in Output</a></h3>
 <p><strong>Symptoms</strong>: Cannot see detected patterns in analysis output</p>
 <p><strong>Explanation</strong>: Pattern detection is currently <strong>internal-only</strong>. Patterns are detected and used to adjust complexity scoring, but results are not exposed in terminal, JSON, or markdown output.</p>
@@ -17100,7 +16347,7 @@ pub struct HttpClientBuilder {
 <pre><code class="language-bash">debtmap analyze --no-pattern-detection  # Disable all pattern detection
 debtmap analyze --pattern-threshold 0.9  # Require very high confidence
 </code></pre>
-<h2 id="best-practices-10"><a class="header" href="#best-practices-10">Best Practices</a></h2>
+<h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
 <h3 id="current-recommendations"><a class="header" href="#current-recommendations">Current Recommendations</a></h3>
 <ol>
 <li><strong>Trust automatic detection</strong>: Pattern detection runs automatically with sensible defaults (threshold 0.7, all 7 patterns enabled)</li>
@@ -17162,14 +16409,14 @@ debtmap analyze --pattern-threshold 0.9  # Require very high confidence
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="entropy-analysis-1"><a class="header" href="#entropy-analysis-1">Entropy Analysis</a></h1>
 <p>Entropy analysis is Debtmap’s unique approach to distinguishing genuinely complex code from repetitive pattern-based code. This reduces false positives by 60-75% compared to traditional cyclomatic complexity metrics.</p>
-<h2 id="overview-16"><a class="header" href="#overview-16">Overview</a></h2>
+<h2 id="overview-15"><a class="header" href="#overview-15">Overview</a></h2>
 <p>Traditional static analysis tools flag code as “complex” based purely on cyclomatic complexity or lines of code. However, not all complexity is equal:</p>
 <ul>
 <li><strong>Repetitive patterns</strong> (validation functions, dispatchers) have high cyclomatic complexity but low cognitive load</li>
 <li><strong>Diverse logic</strong> (state machines, business rules) may have moderate cyclomatic complexity but high cognitive load</li>
 </ul>
 <p>Entropy analysis uses information theory to distinguish between these cases.</p>
-<h2 id="how-it-works-5"><a class="header" href="#how-it-works-5">How It Works</a></h2>
+<h2 id="how-it-works-4"><a class="header" href="#how-it-works-4">How It Works</a></h2>
 <p>Debtmap’s entropy analysis is <strong>language-agnostic</strong>, working across Rust, Python, JavaScript, and TypeScript codebases using a universal token classification approach. This ensures consistent complexity assessment regardless of the programming language used.</p>
 <h3 id="language-agnostic-analysis"><a class="header" href="#language-agnostic-analysis">Language-Agnostic Analysis</a></h3>
 <p>The same entropy concepts apply consistently across all supported languages. Here’s how a validation function would be analyzed in different languages:</p>
@@ -17423,7 +16670,7 @@ Result: 0% reduction (complexity preserved)
 <li>Effective Complexity: 9</li>
 <li>Assessment: HIGH PRIORITY</li>
 </ul>
-<h2 id="configuration-11"><a class="header" href="#configuration-11">Configuration</a></h2>
+<h2 id="configuration-10"><a class="header" href="#configuration-10">Configuration</a></h2>
 <p>Configure entropy analysis in <code>.debtmap.toml</code> or disable via the <code>--semantic-off</code> CLI flag.</p>
 <pre><code class="language-toml">[entropy]
 # Enable entropy analysis (default: true)
@@ -17573,7 +16820,7 @@ max_repetition_reduction = 0.10  # Reduce individual factors
 max_entropy_reduction = 0.08
 max_branch_reduction = 0.12
 </code></pre>
-<h2 id="best-practices-11"><a class="header" href="#best-practices-11">Best Practices</a></h2>
+<h2 id="best-practices-10"><a class="header" href="#best-practices-10">Best Practices</a></h2>
 <ol>
 <li><strong>Use default settings</strong> - They work well for most projects</li>
 <li><strong>Verify results</strong> - Spot-check top-priority items to ensure correctness</li>
@@ -17581,7 +16828,7 @@ max_branch_reduction = 0.12
 <li><strong>Disable for debugging</strong> - Use <code>--semantic-off</code> if entropy seems incorrect</li>
 <li><strong>Report issues</strong> - If entropy incorrectly flags code, report it</li>
 </ol>
-<h2 id="limitations-2"><a class="header" href="#limitations-2">Limitations</a></h2>
+<h2 id="limitations-1"><a class="header" href="#limitations-1">Limitations</a></h2>
 <p>Entropy analysis works best for:</p>
 <ul>
 <li>Functions with cyclomatic complexity 10-50</li>
@@ -17632,7 +16879,7 @@ max_branch_reduction = 0.12
 </table>
 </div>
 <p><strong>Current Focus:</strong> Rust error handling analysis is fully implemented and production-ready. Python and JavaScript/TypeScript support is limited or planned for future releases.</p>
-<h2 id="overview-17"><a class="header" href="#overview-17">Overview</a></h2>
+<h2 id="overview-16"><a class="header" href="#overview-16">Overview</a></h2>
 <p>Error handling issues are classified as <strong>ErrorSwallowing</strong> debt with <strong>Major severity</strong> (weight 4), reflecting their significant impact on code reliability and debuggability.</p>
 <p><strong>Fully Implemented for Rust:</strong></p>
 <ul>
@@ -18299,7 +17546,7 @@ fn process_transaction(tx: Transaction) -&gt; bool {  // Cyclomatic: 12, Cogniti
 <li>Error swallowing (ignored Result)</li>
 <li>Coverage gaps in error handling paths</li>
 </ul>
-<h2 id="configuration-12"><a class="header" href="#configuration-12">Configuration</a></h2>
+<h2 id="configuration-11"><a class="header" href="#configuration-11">Configuration</a></h2>
 <h3 id="error-handling-configuration-options"><a class="header" href="#error-handling-configuration-options">Error Handling Configuration Options</a></h3>
 <p><strong>All Rust error handling detection is enabled by default.</strong> You typically don’t need to configure anything - Debtmap will automatically detect all error patterns in your Rust code.</p>
 <p><strong>When to Use Configuration:</strong></p>
@@ -18395,7 +17642,7 @@ except:  # debtmap: ignore - Intentional catch-all during migration
     use_fallback()
 </code></pre>
 <p>See <a href="#suppression-patterns">Suppression Patterns</a> for complete syntax and usage.</p>
-<h2 id="best-practices-12"><a class="header" href="#best-practices-12">Best Practices</a></h2>
+<h2 id="best-practices-11"><a class="header" href="#best-practices-11">Best Practices</a></h2>
 <h3 id="rust-error-handling"><a class="header" href="#rust-error-handling">Rust Error Handling</a></h3>
 <ol>
 <li>
@@ -18553,7 +17800,7 @@ detect_context_loss = false    # Add later
 <pre><code class="language-bash"># Weekly error handling health check
 debtmap analyze --filter-categories ErrorSwallowing | tee weekly-error-health.txt
 </code></pre>
-<h2 id="troubleshooting-15"><a class="header" href="#troubleshooting-15">Troubleshooting</a></h2>
+<h2 id="troubleshooting-14"><a class="header" href="#troubleshooting-14">Troubleshooting</a></h2>
 <h3 id="too-many-false-positives-in-test-code"><a class="header" href="#too-many-false-positives-in-test-code">Too Many False Positives in Test Code</a></h3>
 <p><strong>Problem:</strong> Debtmap flagging <code>unwrap()</code> in test functions</p>
 <p><strong>Solution:</strong> Debtmap should automatically detect test code via:</p>
@@ -18650,7 +17897,7 @@ debtmap compare baseline.json improved.json
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="functional-composition-analysis"><a class="header" href="#functional-composition-analysis">Functional Composition Analysis</a></h1>
 <p>Debtmap provides deep AST-based analysis to detect and evaluate functional programming patterns in Rust code. This feature helps you understand how effectively your codebase uses functional composition patterns like iterator pipelines, identify opportunities for refactoring imperative code to functional style, and rewards pure, side-effect-free functions in complexity scoring.</p>
-<h2 id="overview-18"><a class="header" href="#overview-18">Overview</a></h2>
+<h2 id="overview-17"><a class="header" href="#overview-17">Overview</a></h2>
 <p>Functional analysis examines your code at the AST level to detect:</p>
 <ul>
 <li><strong>Iterator pipelines</strong> - Chains like <code>.iter().map().filter().collect()</code></li>
@@ -18716,7 +17963,7 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenien
 <li>Doesn’t mutate external state</li>
 <li>Doesn’t perform I/O</li>
 </ol>
-<h3 id="examples-3"><a class="header" href="#examples-3">Examples</a></h3>
+<h3 id="examples-2"><a class="header" href="#examples-2">Examples</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Pure function
@@ -19305,7 +18552,7 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 // Immutability ratio: 0.0 (mutable parameter)
 // Side effects: I/O (println), mutation
 <span class="boring">}</span></code></pre>
-<h2 id="best-practices-13"><a class="header" href="#best-practices-13">Best Practices</a></h2>
+<h2 id="best-practices-12"><a class="header" href="#best-practices-12">Best Practices</a></h2>
 <h3 id="writing-functional-rust-code"><a class="header" href="#writing-functional-rust-code">Writing Functional Rust Code</a></h3>
 <p>To achieve high composition quality scores:</p>
 <ol>
@@ -19461,7 +18708,7 @@ debtmap analyze src/core/ --ast-functional-analysis --functional-analysis-profil
 <pre><code class="language-bash"># Show functional patterns in codebase
 debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced --summary
 </code></pre>
-<h2 id="troubleshooting-16"><a class="header" href="#troubleshooting-16">Troubleshooting</a></h2>
+<h2 id="troubleshooting-15"><a class="header" href="#troubleshooting-15">Troubleshooting</a></h2>
 <h3 id="no-pipelines-detected-but-i-have-iterator-chains"><a class="header" href="#no-pipelines-detected-but-i-have-iterator-chains">“No pipelines detected” but I have iterator chains</a></h3>
 <ul>
 <li><strong>Check pipeline depth</strong>: Your chains may be too short for the profile
@@ -19544,7 +18791,7 @@ items.map(process_item)
 <p>Enable it with <code>--functional-analysis-profile</code> to start benefiting from functional programming insights in your technical debt analysis.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="god-object-detection-1"><a class="header" href="#god-object-detection-1">God Object Detection</a></h1>
-<h2 id="overview-19"><a class="header" href="#overview-19">Overview</a></h2>
+<h2 id="overview-18"><a class="header" href="#overview-18">Overview</a></h2>
 <p>Debtmap includes sophisticated god object detection that identifies files and types that have grown too large and taken on too many responsibilities. God objects (also called “god classes” or “god modules”) are a significant source of technical debt as they:</p>
 <ul>
 <li>Violate the Single Responsibility Principle</li>
@@ -19926,8 +19173,8 @@ impl UserFacade {
     }
 }
 <span class="boring">}</span></code></pre>
-<h2 id="configuration-13"><a class="header" href="#configuration-13">Configuration</a></h2>
-<h3 id="toml-configuration-1"><a class="header" href="#toml-configuration-1">TOML Configuration</a></h3>
+<h2 id="configuration-12"><a class="header" href="#configuration-12">Configuration</a></h2>
+<h3 id="toml-configuration"><a class="header" href="#toml-configuration">TOML Configuration</a></h3>
 <p>Add a <code>[god_object_detection]</code> section to your <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[god_object_detection]
 enabled = true
@@ -20050,7 +19297,7 @@ Score: 1350 (Confidence: Definite)
 </ul>
 <p>This enables longitudinal analysis: “Are we reducing god objects sprint-over-sprint?”</p>
 <p>See <code>src/organization/god_object_metrics.rs:1-228</code>.</p>
-<h2 id="troubleshooting-17"><a class="header" href="#troubleshooting-17">Troubleshooting</a></h2>
+<h2 id="troubleshooting-16"><a class="header" href="#troubleshooting-16">Troubleshooting</a></h2>
 <h3 id="why-is-my-functional-module-flagged-as-a-god-object"><a class="header" href="#why-is-my-functional-module-flagged-as-a-god-object">“Why is my functional module flagged as a god object?”</a></h3>
 <p><strong>Answer:</strong> Debtmap now analyzes god classes (structs) separately from god modules (standalone functions). If your functional module with 100 pure helper functions is flagged, it’s being detected as a <strong>god module</strong> (not a god class), which indicates the file has grown too large and should be split for better organization.</p>
 <p><strong>Solutions:</strong></p>
@@ -20085,7 +19332,7 @@ Score: 1350 (Confidence: Definite)
 <li>Use <code>--no-aggregation</code> to skip file-level analysis</li>
 <li>Adjust thresholds in <code>.debtmap.toml</code> to be more lenient</li>
 </ol>
-<h2 id="best-practices-14"><a class="header" href="#best-practices-14">Best Practices</a></h2>
+<h2 id="best-practices-13"><a class="header" href="#best-practices-13">Best Practices</a></h2>
 <p>To avoid god objects:</p>
 <ol>
 <li><strong>Follow Single Responsibility Principle</strong> - Each module should have one clear purpose</li>
@@ -20132,7 +19379,7 @@ Score: 1350 (Confidence: Definite)
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="multi-pass-analysis"><a class="header" href="#multi-pass-analysis">Multi-Pass Analysis</a></h1>
 <p>Multi-pass analysis is enabled by default in debtmap. It performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.</p>
-<h2 id="overview-20"><a class="header" href="#overview-20">Overview</a></h2>
+<h2 id="overview-19"><a class="header" href="#overview-19">Overview</a></h2>
 <p>Traditional complexity analysis treats all code as-is, which means formatting choices like multiline expressions, whitespace, and indentation can artificially inflate complexity metrics. Multi-pass analysis solves this problem by:</p>
 <ol>
 <li><strong>Raw Analysis</strong> - Measures complexity of code exactly as written</li>
@@ -20140,7 +19387,7 @@ Score: 1350 (Confidence: Definite)
 <li><strong>Attribution</strong> - Compares the two analyses to identify complexity sources</li>
 </ol>
 <p>The difference between raw and normalized complexity reveals how much “complexity” comes from formatting versus genuine logical complexity from control flow, branching, and nesting.</p>
-<h2 id="how-it-works-6"><a class="header" href="#how-it-works-6">How It Works</a></h2>
+<h2 id="how-it-works-5"><a class="header" href="#how-it-works-5">How It Works</a></h2>
 <h3 id="two-pass-analysis-process"><a class="header" href="#two-pass-analysis-process">Two-Pass Analysis Process</a></h3>
 <pre><code>┌─────────────┐
 │  Raw Code   │
@@ -20817,12 +20064,12 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li><a href="#analysis-guide">Analysis Guide</a> - General analysis capabilities</li>
 <li><a href="scoring-strategies.html">Scoring Strategies</a> - How complexity affects debt scores</li>
 <li><a href="#coverage-integration-1">Coverage Integration</a> - Combining complexity with coverage</li>
-<li><a href="#examples-6">Examples</a> - Real-world multi-pass analysis examples</li>
+<li><a href="#examples-5">Examples</a> - Real-world multi-pass analysis examples</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="parallel-processing-1"><a class="header" href="#parallel-processing-1">Parallel Processing</a></h1>
 <p>Debtmap leverages Rust’s powerful parallel processing capabilities to analyze large codebases efficiently. Built on Rayon for data parallelism and DashMap for lock-free concurrent data structures, debtmap achieves 10-100x faster performance than Java/Python-based competitors.</p>
-<h2 id="overview-21"><a class="header" href="#overview-21">Overview</a></h2>
+<h2 id="overview-20"><a class="header" href="#overview-20">Overview</a></h2>
 <p>Debtmap’s parallel processing architecture uses a three-phase approach:</p>
 <ol>
 <li><strong>Parallel File Parsing</strong> - Parse source files concurrently across all available CPU cores</li>
@@ -21388,7 +20635,7 @@ Build Initial Call Graph
     ↓
 Call Graph Complete
 </code></pre>
-<h3 id="configuration-14"><a class="header" href="#configuration-14">Configuration</a></h3>
+<h3 id="configuration-13"><a class="header" href="#configuration-13">Configuration</a></h3>
 <p>Cross-file resolution respects the <code>--jobs</code> flag for thread pool sizing:</p>
 <pre><code class="language-bash"># Use all cores for maximum speedup
 debtmap analyze --jobs 0
@@ -21819,14 +21066,14 @@ time debtmap analyze --no-parallel  # Sequential
 <pre><code class="language-bash"># Monitor peak memory usage
 /usr/bin/time -v debtmap analyze --jobs 8
 </code></pre>
-<h2 id="best-practices-15"><a class="header" href="#best-practices-15">Best Practices</a></h2>
+<h2 id="best-practices-14"><a class="header" href="#best-practices-14">Best Practices</a></h2>
 <ol>
 <li><strong>Use default settings</strong> - Debtmap auto-detects optimal thread count</li>
 <li><strong>Limit threads in CI</strong> - Use <code>--jobs 2</code> or <code>--jobs 4</code> in shared environments</li>
 <li><strong>Profile before tuning</strong> - Measure actual performance impact</li>
 <li><strong>Consider I/O</strong> - If using slow storage, reduce thread count</li>
 </ol>
-<h2 id="troubleshooting-18"><a class="header" href="#troubleshooting-18">Troubleshooting</a></h2>
+<h2 id="troubleshooting-17"><a class="header" href="#troubleshooting-17">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-despite-parallelism"><a class="header" href="#analysis-is-slow-despite-parallelism">Analysis is Slow Despite Parallelism</a></h3>
 <p><strong>Possible causes:</strong></p>
 <ol>
@@ -22301,7 +21548,7 @@ prodigy clean
 <li><code>max_attempts</code>: Maximum fix attempts</li>
 <li><code>fail_workflow</code>: If true, workflow fails after max_attempts; if false, continues to next step</li>
 </ul>
-<h3 id="coverage-integration-3"><a class="header" href="#coverage-integration-3">Coverage Integration</a></h3>
+<h3 id="coverage-integration-2"><a class="header" href="#coverage-integration-2">Coverage Integration</a></h3>
 <p>Generate and use coverage data in workflows. See <a href="#coverage-integration-1">Coverage Integration</a> for details on generating LCOV files and understanding coverage metrics.</p>
 <pre><code class="language-yaml"># Generate coverage
 - shell: "just coverage-lcov"
@@ -22902,7 +22149,7 @@ jobs:
 <li><strong>Timeout</strong>: CI jobs may need extended timeout for multiple iterations</li>
 <li><strong>Review</strong>: Always create a PR for human review before merging automated changes</li>
 </ul>
-<h2 id="best-practices-16"><a class="header" href="#best-practices-16">Best Practices</a></h2>
+<h2 id="best-practices-15"><a class="header" href="#best-practices-15">Best Practices</a></h2>
 <h3 id="1-start-small"><a class="header" href="#1-start-small">1. Start Small</a></h3>
 <p>Begin with low iteration counts:</p>
 <pre><code class="language-bash"># First run: 1 iteration to test workflow
@@ -22961,7 +22208,7 @@ debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-a
 # View detailed metrics
 cat .prodigy/comparison.json | jq
 </code></pre>
-<h2 id="troubleshooting-19"><a class="header" href="#troubleshooting-19">Troubleshooting</a></h2>
+<h2 id="troubleshooting-18"><a class="header" href="#troubleshooting-18">Troubleshooting</a></h2>
 <h3 id="workflow-fails-to-start"><a class="header" href="#workflow-fails-to-start">Workflow Fails to Start</a></h3>
 <p><strong>Issue</strong>: “Prodigy not found” or “API key missing”</p>
 <p><strong>Solution</strong>:</p>
@@ -23216,7 +22463,7 @@ Arguments: --module &lt;module_name&gt;
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="responsibility-analysis"><a class="header" href="#responsibility-analysis">Responsibility Analysis</a></h1>
-<h2 id="overview-22"><a class="header" href="#overview-22">Overview</a></h2>
+<h2 id="overview-21"><a class="header" href="#overview-21">Overview</a></h2>
 <p>Responsibility analysis is a core feature of Debtmap that helps identify violations of the <strong>Single Responsibility Principle (SRP)</strong>, one of the fundamental SOLID design principles. By analyzing function and method names, Debtmap automatically infers the distinct functional responsibilities within a code unit and detects when a single module, struct, or class has taken on too many concerns.</p>
 <p>This chapter provides an in-depth look at how Debtmap determines responsibilities, categorizes them, and uses this information to guide refactoring decisions.</p>
 <h2 id="what-are-responsibilities"><a class="header" href="#what-are-responsibilities">What Are Responsibilities?</a></h2>
@@ -23613,8 +22860,8 @@ fn test_multiple_responsibility_groups() {
     assert!(groups.contains_key("Validation"));
 }
 <span class="boring">}</span></code></pre>
-<h2 id="configuration-15"><a class="header" href="#configuration-15">Configuration</a></h2>
-<h3 id="toml-configuration-2"><a class="header" href="#toml-configuration-2">TOML Configuration</a></h3>
+<h2 id="configuration-14"><a class="header" href="#configuration-14">Configuration</a></h2>
+<h3 id="toml-configuration-1"><a class="header" href="#toml-configuration-1">TOML Configuration</a></h3>
 <p>Customize responsibility thresholds in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[god_object_detection]
 enabled = true
@@ -23695,7 +22942,7 @@ max_traits = 7
   ]
 }
 </code></pre>
-<h2 id="best-practices-17"><a class="header" href="#best-practices-17">Best Practices</a></h2>
+<h2 id="best-practices-16"><a class="header" href="#best-practices-16">Best Practices</a></h2>
 <h3 id="writing-srp-compliant-code"><a class="header" href="#writing-srp-compliant-code">Writing SRP-Compliant Code</a></h3>
 <ol>
 <li><strong>Name functions descriptively</strong> - Use standard prefixes (<code>get_</code>, <code>validate_</code>, etc.)</li>
@@ -23800,7 +23047,7 @@ fn validate_email() { }
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="scoring-strategies"><a class="header" href="#scoring-strategies">Scoring Strategies</a></h1>
 <p>Debtmap uses sophisticated scoring strategies to prioritize technical debt based on multiple factors including complexity, test coverage, and functional role. This section explains the different scoring approaches available.</p>
-<h2 id="overview-23"><a class="header" href="#overview-23">Overview</a></h2>
+<h2 id="overview-22"><a class="header" href="#overview-22">Overview</a></h2>
 <p>Scoring strategies determine how debtmap calculates priority scores for functions and files. The goal is to identify the most impactful technical debt that provides the best return on investment for refactoring efforts.</p>
 <h2 id="strategy-types"><a class="header" href="#strategy-types">Strategy Types</a></h2>
 <h3 id="file-level-vs-function-level"><a class="header" href="#file-level-vs-function-level">File-Level vs Function-Level</a></h3>
@@ -23834,7 +23081,7 @@ fn validate_email() { }
 </tbody>
 </table>
 </div>
-<h2 id="configuration-16"><a class="header" href="#configuration-16">Configuration</a></h2>
+<h2 id="configuration-15"><a class="header" href="#configuration-15">Configuration</a></h2>
 <p>Scoring can be tuned via the <code>[scoring]</code> section in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[scoring]
 coverage = 0.50    # Weight for test coverage
@@ -23845,7 +23092,7 @@ dependency = 0.15  # Weight for dependency analysis
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="file-level-scoring"><a class="header" href="#file-level-scoring">File-Level Scoring</a></h1>
 <p>File-level scoring aggregates metrics across all functions in a file to identify architectural problems and module-level refactoring opportunities.</p>
-<h2 id="overview-24"><a class="header" href="#overview-24">Overview</a></h2>
+<h2 id="overview-23"><a class="header" href="#overview-23">Overview</a></h2>
 <p>While function-level scoring helps identify specific hot spots, file-level scoring reveals broader architectural issues:</p>
 <ul>
 <li>God objects with too many responsibilities</li>
@@ -24080,7 +23327,7 @@ debtmap analyze . --aggregate-only --top 10
 <h3 id="generate-file-level-report"><a class="header" href="#generate-file-level-report">Generate File-Level Report</a></h3>
 <pre><code class="language-bash">debtmap analyze . --aggregate-only --format markdown -o report.md
 </code></pre>
-<h2 id="configuration-17"><a class="header" href="#configuration-17">Configuration</a></h2>
+<h2 id="configuration-16"><a class="header" href="#configuration-16">Configuration</a></h2>
 <blockquote>
 <p><strong>IMPORTANT</strong>: The configuration file must be named <strong><code>.debtmap.toml</code></strong> (not <code>debtmap.yml</code> or other variants) and placed in your project root directory.</p>
 </blockquote>
@@ -24124,7 +23371,7 @@ debtmap analyze . --aggregate-only --min-problematic 50
 <pre><code class="language-bash"># Generate file-level report for executive summary
 debtmap analyze . --aggregate-only --format markdown -o report.md
 </code></pre>
-<h2 id="best-practices-18"><a class="header" href="#best-practices-18">Best Practices</a></h2>
+<h2 id="best-practices-17"><a class="header" href="#best-practices-17">Best Practices</a></h2>
 <ol>
 <li><strong>Start with file-level analysis</strong> for strategic planning before drilling into function-level details</li>
 <li><strong>Use logarithmic aggregation</strong> for legacy codebases to prevent score explosion</li>
@@ -24142,7 +23389,7 @@ debtmap analyze . --aggregate-only --format markdown -o report.md
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="function-level-scoring"><a class="header" href="#function-level-scoring">Function-Level Scoring</a></h1>
 <p>Function-level scoring identifies specific functions needing attention for targeted improvements. This subsection covers the scoring formula, constructor detection, role classification, and role multipliers.</p>
-<h2 id="overview-25"><a class="header" href="#overview-25">Overview</a></h2>
+<h2 id="overview-24"><a class="header" href="#overview-24">Overview</a></h2>
 <p>Function-level scoring combines complexity, coverage, and dependency metrics to calculate a priority score for each function. The formula uses coverage as a multiplicative dampener rather than an additive factor, reflecting that testing gaps amplify existing complexity.</p>
 <p><strong>Key Principle</strong>: Untested complex code is riskier than well-tested complex code. Coverage acts as a multiplier that reduces the score for well-tested functions and preserves the full score for untested functions.</p>
 <h2 id="scoring-formula-2"><a class="header" href="#scoring-formula-2">Scoring Formula</a></h2>
@@ -24292,7 +23539,7 @@ struct BodyPattern {
 <li>Has struct initialization AND no loops, OR</li>
 <li>Has Self references AND no loops AND no match AND no field assignments</li>
 </ul>
-<h3 id="examples-4"><a class="header" href="#examples-4">Examples</a></h3>
+<h3 id="examples-3"><a class="header" href="#examples-3">Examples</a></h3>
 <p><strong>Detected as Constructor</strong> (classified as IOWrapper, score reduced):</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -24395,7 +23642,7 @@ fn create_complex(data: Data) -&gt; Result&lt;Self&gt; {
 <p><strong>Orchestrator (0.8x)</strong>: Orchestrators coordinate other tested functions. If the delegated functions are well-tested, the orchestrator is partially covered through integration.</p>
 <p><strong>IOWrapper (0.7x)</strong>: Thin I/O wrappers are often tested via integration tests. Unit testing them provides limited value compared to integration testing.</p>
 <p><strong>Debug (0.3x)</strong>: Diagnostic and debug functions have the lowest test priority. They’re not production-critical and are often exercised manually during development.</p>
-<h3 id="configuration-18"><a class="header" href="#configuration-18">Configuration</a></h3>
+<h3 id="configuration-17"><a class="header" href="#configuration-17">Configuration</a></h3>
 <p>Role multipliers are configurable in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[role_multipliers]
 pure_logic = 1.2
@@ -24485,7 +23732,7 @@ max_cognitive = 100.0
 <p><strong>Solution</strong>: DebtMap applies role-based adjustments in two stages to address both coverage expectations and architectural importance.</p>
 <h2 id="stage-1-role-based-coverage-weighting"><a class="header" href="#stage-1-role-based-coverage-weighting">Stage 1: Role-Based Coverage Weighting</a></h2>
 <p>The first stage adjusts coverage penalty expectations based on function role. This prevents functions that use different testing strategies from unfairly dominating the priority list.</p>
-<h3 id="how-it-works-7"><a class="header" href="#how-it-works-7">How It Works</a></h3>
+<h3 id="how-it-works-6"><a class="header" href="#how-it-works-6">How It Works</a></h3>
 <p>For each function, DebtMap:</p>
 <ol>
 <li>Detects the function’s role (entry point, pure logic, I/O wrapper, etc.)</li>
@@ -24752,7 +23999,7 @@ debtmap analyze . --config minimal.toml
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="rebalanced-scoring"><a class="header" href="#rebalanced-scoring">Rebalanced Scoring</a></h1>
 <p>Rebalanced scoring is a multi-dimensional scoring algorithm that prioritizes actual code quality issues over pure file size concerns. It provides a more nuanced approach to technical debt prioritization by considering complexity, coverage gaps, structural problems, and code smells.</p>
-<h2 id="overview-26"><a class="header" href="#overview-26">Overview</a></h2>
+<h2 id="overview-25"><a class="header" href="#overview-25">Overview</a></h2>
 <p>Traditional scoring often over-emphasizes file size, causing large but simple files to rank higher than complex, untested code. The rebalanced algorithm fixes this by:</p>
 <ol>
 <li><strong>De-emphasizing size</strong>: Reduces size weight from ~1.5 to 0.3 (80% reduction)</li>
@@ -24975,7 +24222,7 @@ if is_generated_file(&amp;func.file) {
 }
 <span class="boring">}</span></code></pre>
 <p><strong>Source</strong>: <code>src/priority/scoring/rebalanced.rs:246-249</code></p>
-<h3 id="examples-5"><a class="header" href="#examples-5">Examples</a></h3>
+<h3 id="examples-4"><a class="header" href="#examples-4">Examples</a></h3>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -24989,7 +24236,7 @@ if is_generated_file(&amp;func.file) {
 </tbody>
 </table>
 </div>
-<h2 id="configuration-19"><a class="header" href="#configuration-19">Configuration</a></h2>
+<h2 id="configuration-18"><a class="header" href="#configuration-18">Configuration</a></h2>
 <p>Rebalanced scoring is configured in your <code>.debtmap.toml</code> configuration file.</p>
 <p><strong>Source</strong>: <code>src/config/scoring.rs:495-554</code> (RebalancedScoringConfig)</p>
 <h3 id="enabling-rebalanced-scoring"><a class="header" href="#enabling-rebalanced-scoring">Enabling Rebalanced Scoring</a></h3>
@@ -25190,7 +24437,7 @@ EOF
 
 debtmap analyze . --config .debtmap-quality.toml --top 10
 </code></pre>
-<h2 id="best-practices-19"><a class="header" href="#best-practices-19">Best Practices</a></h2>
+<h2 id="best-practices-18"><a class="header" href="#best-practices-18">Best Practices</a></h2>
 <ol>
 <li><strong>Start with balanced preset</strong> for standard development workflows</li>
 <li><strong>Use quality-focused</strong> when code quality is the primary concern</li>
@@ -25229,7 +24476,7 @@ preset = "size-focused"
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="exponential-scaling"><a class="header" href="#exponential-scaling">Exponential Scaling</a></h1>
 <p>Debtmap uses exponential scaling and risk boosting to amplify high-severity technical debt items, ensuring critical issues stand out clearly in priority lists. This section explains how these mechanisms work.</p>
-<h2 id="overview-27"><a class="header" href="#overview-27">Overview</a></h2>
+<h2 id="overview-26"><a class="header" href="#overview-26">Overview</a></h2>
 <p>Traditional linear multipliers create uniform gaps between scores:</p>
 <ul>
 <li>Linear 2x multiplier: Score 50 → 100, Score 100 → 200 (uniform +50 and +100 gaps)</li>
@@ -25372,7 +24619,7 @@ preset = "size-focused"
 <li><code>complexity_weight</code>: 0.35 (35%)</li>
 <li><code>dependency_weight</code>: 0.15 (15%)</li>
 </ul>
-<h2 id="configuration-20"><a class="header" href="#configuration-20">Configuration</a></h2>
+<h2 id="configuration-19"><a class="header" href="#configuration-19">Configuration</a></h2>
 <p>The exponential scaling parameters are defined in the <code>ScalingConfig</code> struct but are <strong>not currently configurable via TOML</strong>. The system uses hardcoded defaults:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -25458,7 +24705,7 @@ impl Default for ScalingConfig {
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="data-flow-scoring-1"><a class="header" href="#data-flow-scoring-1">Data Flow Scoring</a></h1>
 <p>Data flow scoring enhances Debtmap’s technical debt analysis by evaluating function purity, refactorability, and code patterns. This subsection explains how data flow analysis affects debt prioritization through three key factors: purity, refactorability, and pattern recognition.</p>
-<h2 id="overview-28"><a class="header" href="#overview-28">Overview</a></h2>
+<h2 id="overview-27"><a class="header" href="#overview-27">Overview</a></h2>
 <p>Data flow scoring is an optional scoring layer that adjusts debt priorities based on functional programming principles. Functions that are pure, easily refactorable, or follow recognized patterns receive reduced priority scores, reflecting their lower maintenance burden.</p>
 <p><strong>Key principle</strong>: Pure functions and data transformation pipelines represent less technical debt than impure functions with side effects, because they’re easier to test, reason about, and refactor.</p>
 <p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:995-1020</code> (<code>calculate_unified_priority_with_data_flow</code>)</p>
@@ -25604,7 +24851,7 @@ if transform_ratio &gt; 0.5 {
 <li><code>data_transformations</code>: Transformation relationships between functions</li>
 </ul>
 <p><strong>Source</strong>: <code>src/data_flow/mod.rs:113-140</code></p>
-<h2 id="configuration-21"><a class="header" href="#configuration-21">Configuration</a></h2>
+<h2 id="configuration-20"><a class="header" href="#configuration-20">Configuration</a></h2>
 <p>Configure data flow scoring in your <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[data_flow_scoring]
 enabled = true              # Enable/disable data flow scoring (default: true)
@@ -25706,7 +24953,7 @@ enabled = false
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="semantic-classification"><a class="header" href="#semantic-classification">Semantic Classification</a></h1>
 <p>Debtmap performs semantic analysis to classify functions by their architectural role, enabling more accurate complexity scoring and prioritization.</p>
-<h2 id="overview-29"><a class="header" href="#overview-29">Overview</a></h2>
+<h2 id="overview-28"><a class="header" href="#overview-28">Overview</a></h2>
 <p>Semantic classification identifies the purpose of each function based on AST patterns, helping debtmap:</p>
 <ul>
 <li>Apply appropriate complexity expectations</li>
@@ -25973,7 +25220,7 @@ unknown = 1.0         # No adjustment
 <li><code>pure_logic = 1.2</code> means pure logic functions are prioritized 20% higher</li>
 <li><code>debug = 0.3</code> means debug functions are de-prioritized significantly</li>
 </ul>
-<h2 id="configuration-22"><a class="header" href="#configuration-22">Configuration</a></h2>
+<h2 id="configuration-21"><a class="header" href="#configuration-21">Configuration</a></h2>
 <h3 id="semantic-classification-1"><a class="header" href="#semantic-classification-1">Semantic Classification</a></h3>
 <pre><code class="language-toml">[semantic]
 enabled = true
@@ -26026,7 +25273,7 @@ max_business_logic_ratio = 0.3  # Maximum business logic for orchestrator
 <li>Cognitive complexity ≤ 10 for name-matched functions</li>
 <li>Cognitive complexity &lt; 5 and length &lt; 20 for behavior-matched functions</li>
 </ul>
-<h2 id="troubleshooting-20"><a class="header" href="#troubleshooting-20">Troubleshooting</a></h2>
+<h2 id="troubleshooting-19"><a class="header" href="#troubleshooting-19">Troubleshooting</a></h2>
 <h3 id="function-classified-incorrectly"><a class="header" href="#function-classified-incorrectly">Function Classified Incorrectly</a></h3>
 <p>If a function is classified with the wrong role:</p>
 <ol>
@@ -26058,7 +25305,7 @@ max_business_logic_ratio = 0.3  # Maximum business logic for orchestrator
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="test-quality-analysis"><a class="header" href="#test-quality-analysis">Test Quality Analysis</a></h1>
 <p>Debtmap provides comprehensive analysis of test code quality, detecting anti-patterns, identifying potentially flaky tests, and providing actionable recommendations for improvement.</p>
-<h2 id="overview-30"><a class="header" href="#overview-30">Overview</a></h2>
+<h2 id="overview-29"><a class="header" href="#overview-29">Overview</a></h2>
 <p>Test quality analysis examines your test suite to identify:</p>
 <ul>
 <li><strong>Assertion patterns</strong> - Missing or weak assertions that reduce test effectiveness</li>
@@ -26406,7 +25653,7 @@ path_str == "test"
 <li>Timing operations that suggest waiting</li>
 <li>External service calls that may have latency</li>
 </ul>
-<h2 id="configuration-23"><a class="header" href="#configuration-23">Configuration</a></h2>
+<h2 id="configuration-22"><a class="header" href="#configuration-22">Configuration</a></h2>
 <h3 id="basic-configuration"><a class="header" href="#basic-configuration">Basic Configuration</a></h3>
 <pre><code class="language-toml">[test_quality]
 enabled = true
@@ -26489,7 +25736,7 @@ fn test_deterministic() {
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="tiered-prioritization-3"><a class="header" href="#tiered-prioritization-3">Tiered Prioritization</a></h1>
 <p>Debtmap uses a sophisticated tiered prioritization system to surface critical architectural issues above simple testing gaps. This chapter explains the tier strategy, how to interpret tier classifications, and how to customize tier thresholds for your project.</p>
-<h2 id="overview-31"><a class="header" href="#overview-31">Overview</a></h2>
+<h2 id="overview-30"><a class="header" href="#overview-30">Overview</a></h2>
 <p>The tiered prioritization system organizes technical debt into four distinct tiers based on impact, urgency, and architectural significance. This prevents “walls of similar-scored items” and ensures critical issues don’t get lost among minor problems.</p>
 <p><strong>Three Display Systems</strong>: Debtmap uses three complementary tier/priority systems:</p>
 <ol>
@@ -26583,7 +25830,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority high
 <li>Minor duplication in test code</li>
 </ul>
 <p><strong>When to Address</strong>: During cleanup sprints or when refactoring nearby code.</p>
-<h2 id="configuration-24"><a class="header" href="#configuration-24">Configuration</a></h2>
+<h2 id="configuration-23"><a class="header" href="#configuration-23">Configuration</a></h2>
 <p>Tier configuration is optional in <code>.debtmap.toml</code>. If not specified, Debtmap uses the balanced defaults shown below.</p>
 <h3 id="default-tier-thresholds"><a class="header" href="#default-tier-thresholds">Default Tier Thresholds</a></h3>
 <pre><code class="language-toml">[tiers]
@@ -26689,7 +25936,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority high
 # Phase 3: Improve Tier 3 coverage
 debtmap analyze . --lcov coverage.lcov --min-priority medium
 </code></pre>
-<h2 id="best-practices-20"><a class="header" href="#best-practices-20">Best Practices</a></h2>
+<h2 id="best-practices-19"><a class="header" href="#best-practices-19">Best Practices</a></h2>
 <ol>
 <li><strong>Always address Tier 1 before feature work</strong> - Architectural issues compound</li>
 <li><strong>Test Tier 2 items before refactoring</strong> - Avoid regressions</li>
@@ -26763,7 +26010,7 @@ Low (score &lt; 50)
 </ul>
 <p><strong>Note</strong>: JSON output uses different thresholds than terminal output. Terminal/markdown uses the <code>Tier</code> enum (90/70/50 thresholds), while JSON uses the <code>Priority</code> enum (100/50/20 thresholds) for broader score distribution.</p>
 <p><strong>Note</strong>: While RecommendationTier (T1-T4) classifications exist internally for applying tier weights, they are not included in JSON output. The output shows final calculated scores and their corresponding priority levels.</p>
-<h2 id="troubleshooting-21"><a class="header" href="#troubleshooting-21">Troubleshooting</a></h2>
+<h2 id="troubleshooting-20"><a class="header" href="#troubleshooting-20">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: Too many Tier 1 items</p>
 <p><strong>Solution</strong>: Lower tier weights or increase thresholds temporarily:</p>
 <pre><code class="language-toml">[tiers]
@@ -26802,12 +26049,12 @@ minimum_cyclomatic_complexity = 2
 </ul>
 </li>
 <li><a href="#exit-codes-and-ci-integration">Exit Codes and CI Integration</a></li>
-<li><a href="#coverage-integration-4">Coverage Integration</a></li>
+<li><a href="#coverage-integration-3">Coverage Integration</a></li>
 <li><a href="#context-aware-validation">Context-Aware Validation</a></li>
 <li><a href="#cicd-examples">CI/CD Examples</a></li>
 <li><a href="#migrating-from-deprecated-thresholds">Migrating from Deprecated Thresholds</a></li>
-<li><a href="#troubleshooting-22">Troubleshooting</a></li>
-<li><a href="#best-practices-21">Best Practices</a></li>
+<li><a href="#troubleshooting-21">Troubleshooting</a></li>
+<li><a href="#best-practices-20">Best Practices</a></li>
 </ul>
 <h2 id="validate-vs-analyze"><a class="header" href="#validate-vs-analyze">Validate vs Analyze</a></h2>
 <p>Understanding when to use each command is crucial:</p>
@@ -27093,9 +26340,9 @@ fi
 <li><strong>Clear failure indicators</strong> - <code>[ERROR]</code> prefix for failed checks</li>
 <li><strong>Informational statistics</strong> - absolute counts shown as context, not validation criteria</li>
 </ul>
-<h2 id="coverage-integration-4"><a class="header" href="#coverage-integration-4">Coverage Integration</a></h2>
+<h2 id="coverage-integration-3"><a class="header" href="#coverage-integration-3">Coverage Integration</a></h2>
 <p>Integrate test coverage data to enable risk-based validation:</p>
-<h3 id="generating-coverage-data-2"><a class="header" href="#generating-coverage-data-2">Generating Coverage Data</a></h3>
+<h3 id="generating-coverage-data-1"><a class="header" href="#generating-coverage-data-1">Generating Coverage Data</a></h3>
 <p><strong>For Rust projects with <code>cargo-tarpaulin</code>:</strong></p>
 <pre><code class="language-bash">cargo tarpaulin --out Lcov --output-dir target/coverage
 </code></pre>
@@ -27373,7 +26620,7 @@ New: max_debt_density = (100 / 10000) × 1000 = 10.0
 <li><strong>v0.4.0 - v0.9.x</strong> - Deprecation warnings shown</li>
 <li><strong>v1.0.0</strong> - Deprecated metrics removed</li>
 </ul>
-<h2 id="troubleshooting-22"><a class="header" href="#troubleshooting-22">Troubleshooting</a></h2>
+<h2 id="troubleshooting-21"><a class="header" href="#troubleshooting-21">Troubleshooting</a></h2>
 <h3 id="debugging-validation-failures"><a class="header" href="#debugging-validation-failures">Debugging Validation Failures</a></h3>
 <p>Use verbosity flags to understand why validation failed:</p>
 <p><strong>Level 1: Basic details (<code>-v</code>)</strong></p>
@@ -27477,7 +26724,7 @@ cat validation-report.json | jq '.validation_details'
 <p><strong>Terminal format with filtering:</strong></p>
 <pre><code class="language-bash">debtmap validate . --format terminal --top 20 -vv
 </code></pre>
-<h2 id="best-practices-21"><a class="header" href="#best-practices-21">Best Practices</a></h2>
+<h2 id="best-practices-20"><a class="header" href="#best-practices-20">Best Practices</a></h2>
 <h3 id="setting-initial-thresholds"><a class="header" href="#setting-initial-thresholds">Setting Initial Thresholds</a></h3>
 <p><strong>1. Establish baseline:</strong></p>
 <pre><code class="language-bash"># Run analysis to see current metrics
@@ -27590,7 +26837,7 @@ max_average_complexity = 10.0
 <p>Next steps:</p>
 <ul>
 <li>Review <a href="configuration.html">Configuration Reference</a> for detailed threshold options</li>
-<li>See <a href="#examples-6">Examples</a> for more CI/CD integration patterns</li>
+<li>See <a href="#examples-5">Examples</a> for more CI/CD integration patterns</li>
 <li>Check <a href="#cli-reference">CLI Reference</a> for complete command documentation</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -27957,7 +27204,7 @@ debtmap analyze . --format markdown --top 5 | claude "Fix the top item"
 <li><a href="scoring-strategies.html">Scoring Strategies</a> - How signals combine</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="examples-6"><a class="header" href="#examples-6">Examples</a></h1>
+<h1 id="examples-5"><a class="header" href="#examples-5">Examples</a></h1>
 <p>This chapter provides practical, real-world examples of using Debtmap across different project types and workflows. All examples use current CLI syntax verified against the source code.</p>
 <blockquote>
 <p><strong>Quick Start</strong>: New to Debtmap? Start with <a href="#basic-rust-analysis">Basic Rust Analysis</a> for the simplest introduction, then explore <a href="#coverage-integration-with-cargo-tarpaulin">Coverage Integration</a> for risk-based prioritization.</p>
@@ -27965,7 +27212,7 @@ debtmap analyze . --format markdown --top 5 | claude "Fix the top item"
 <blockquote>
 <p><strong>Quick Navigation</strong>: For detailed explanations of all CLI options, see the <a href="#cli-reference">CLI Reference</a> chapter.</p>
 </blockquote>
-<h2 id="overview-32"><a class="header" href="#overview-32">Overview</a></h2>
+<h2 id="overview-31"><a class="header" href="#overview-31">Overview</a></h2>
 <p>This chapter demonstrates:</p>
 <ul>
 <li><strong>Language-specific analysis</strong>: Rust, Python, JavaScript/TypeScript with their respective testing tools</li>
@@ -29308,7 +28555,7 @@ debtmap analyze . --lcov coverage.lcov --top 10
 <p>Coverage tools (tarpaulin, llvm-cov) tell you what’s tested. Debtmap tells you which untested code is most risky.</p>
 <p><strong>Coverage tools:</strong> “You have 75% coverage”
 <strong>Debtmap:</strong> “Function X has 0% coverage and complexity 12—fix this first”</p>
-<h2 id="troubleshooting-23"><a class="header" href="#troubleshooting-23">Troubleshooting</a></h2>
+<h2 id="troubleshooting-22"><a class="header" href="#troubleshooting-22">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-on-my-large-codebase"><a class="header" href="#analysis-is-slow-on-my-large-codebase">Analysis is slow on my large codebase</a></h3>
 <p><strong>Optimization strategies:</strong></p>
 <ol>
@@ -29343,15 +28590,15 @@ exclude_patterns = ["**/target/**", "**/vendor/**"]
 <li>Files aren’t excluded by ignore patterns</li>
 <li>No syntax errors: <code>debtmap analyze . -vv</code></li>
 </ol>
-<h2 id="getting-help-2"><a class="header" href="#getting-help-2">Getting Help</a></h2>
+<h2 id="getting-help-1"><a class="header" href="#getting-help-1">Getting Help</a></h2>
 <ul>
 <li><strong>Documentation:</strong> <a href="https://iepathos.github.io/debtmap/">debtmap.dev</a></li>
 <li><strong>GitHub Issues:</strong> <a href="https://github.com/iepathos/debtmap/issues">Report bugs</a></li>
 <li><strong>LLM Integration:</strong> See <a href="#llm-integration-guide">LLM Integration Guide</a></li>
-<li><strong>Examples:</strong> See <a href="#examples-6">Examples</a></li>
+<li><strong>Examples:</strong> See <a href="#examples-5">Examples</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="troubleshooting-24"><a class="header" href="#troubleshooting-24">Troubleshooting</a></h1>
+<h1 id="troubleshooting-23"><a class="header" href="#troubleshooting-23">Troubleshooting</a></h1>
 <p>Common issues and solutions for using debtmap effectively.</p>
 <h2 id="getting-started-with-troubleshooting"><a class="header" href="#getting-started-with-troubleshooting">Getting Started with Troubleshooting</a></h2>
 <p>When you encounter an issue with debtmap, start with these steps:</p>
@@ -29446,7 +28693,7 @@ debtmap analyze . -vv 2&gt;&amp;1 | grep "processed in"
 <li><a href="#configuration-2">Configuration</a> - Configure debtmap behavior</li>
 <li><a href="#cli-reference">CLI Reference</a> - Complete CLI flag documentation</li>
 <li><a href="#analysis-guide">Analysis Guide</a> - Understanding analysis results</li>
-<li><a href="#examples-6">Examples</a> - Practical usage examples</li>
+<li><a href="#examples-5">Examples</a> - Practical usage examples</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="quick-fixes"><a class="header" href="#quick-fixes">Quick Fixes</a></h1>
@@ -30110,7 +29357,7 @@ DEBTMAP_COVERAGE_DEBUG=1 DEBTMAP_TIMING=1 debtmap analyze . -v
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="context-provider-issues"><a class="header" href="#context-provider-issues">Context Provider Issues</a></h1>
 <p>This section covers troubleshooting for debtmap’s context providers: <code>critical_path</code>, <code>dependency</code>, and <code>git_history</code>. Context providers gather additional risk-relevant information to enhance the base complexity analysis.</p>
-<h2 id="overview-33"><a class="header" href="#overview-33">Overview</a></h2>
+<h2 id="overview-32"><a class="header" href="#overview-32">Overview</a></h2>
 <p>Context providers implement the <code>ContextProvider</code> trait (defined in <code>src/risk/context/mod.rs:13-25</code>) and gather context for analysis targets. Each provider:</p>
 <ul>
 <li>Has a name identifying the provider</li>
@@ -31040,7 +30287,7 @@ debtmap validate /path/to/project --max-debt-density 10.0
 # Use configuration file for thresholds
 debtmap validate /path/to/project --config debtmap.toml
 </code></pre>
-<h3 id="cicd-integration-6"><a class="header" href="#cicd-integration-6">CI/CD Integration</a></h3>
+<h3 id="cicd-integration-5"><a class="header" href="#cicd-integration-5">CI/CD Integration</a></h3>
 <pre><code class="language-bash"># In CI pipeline (fails build if validation fails)
 debtmap validate . --max-debt-density 10.0 || exit 1
 
