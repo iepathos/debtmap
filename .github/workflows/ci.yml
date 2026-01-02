@@ -23,11 +23,12 @@ env:
 
 jobs:
   test:
-    name: Test
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v6
@@ -46,8 +47,21 @@ jobs:
       with:
         tool: cargo-nextest
 
-    - name: Run tests
+    - name: Run tests (Unix)
+      if: runner.os != 'Windows'
       run: just test
+
+    - name: Run tests (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        cargo build
+        echo "Running tests with cargo nextest..."
+        SKIP_INTEGRATION_TESTS=1 cargo nextest run --lib
+        echo "Running safe integration tests..."
+        SKIP_INTEGRATION_TESTS=1 cargo nextest run --test analyzer_tests \
+            --test complexity_tests --test core_metrics_tests \
+            --test debt_tests --test entropy_tests
 
   lint:
     name: Lint
@@ -85,10 +99,70 @@ jobs:
     - name: Run Clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
 
+  msrv:
+    name: Check MSRV
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-hack
+      uses: taiki-e/install-action@cargo-hack
+
+    - name: Check MSRV
+      run: cargo hack check --each-feature --locked --rust-version --workspace --all-targets --keep-going
+
+  minimal-versions:
+    name: Minimal versions
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install Rust nightly
+      uses: dtolnay/rust-toolchain@nightly
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Generate minimal lockfile
+      run: cargo +nightly generate-lockfile -Z minimal-versions
+
+    - name: Check with minimal versions
+      run: cargo +stable check --workspace --all-features --locked
+
+  feature-combinations:
+    name: Feature combinations
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-hack
+      uses: taiki-e/install-action@cargo-hack
+
+    - name: Test each feature combination
+      run: cargo hack check --each-feature --workspace --keep-going
+
   # Aggregation job that reports overall CI status
   ci:
     name: CI
-    needs: [test, lint, clippy]
+    needs: [test, lint, clippy, msrv, minimal-versions, feature-combinations]
     runs-on: ubuntu-latest
     if: always()
     steps:

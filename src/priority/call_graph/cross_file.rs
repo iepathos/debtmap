@@ -287,7 +287,7 @@ impl CallGraph {
 
                 // Update progress counter
                 let count = processed_counter.fetch_add(1, Ordering::Relaxed) + 1;
-                if count.is_multiple_of(100) || count == total_calls {
+                if count % 100 == 0 || count == total_calls {
                     progress.set_position(count as u64);
                 }
 
