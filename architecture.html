@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d16419a3.js";
+            window.path_to_searchindex_js = "searchindex-b767d121.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3bdbe002.js"></script>
@@ -420,11 +420,11 @@ Effective Complexity = Cyclomatic * (1 - (1 - Entropy/Max_Entropy) * 0.75)
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum DebtType {
-    TestGap { missing_tests: u32 },
-    HighComplexity { score: u32 },
-    DeepNesting { depth: u32 },
-    LongFunction { loc: u32 },
-    TooManyParams { count: u32 },
+    TestingGap { coverage: f64, cyclomatic: u32, cognitive: u32 },
+    ComplexityHotspot { cyclomatic: u32, cognitive: u32 },
+    DeadCode { visibility: FunctionVisibility, cyclomatic: u32, cognitive: u32, usage_hints: Vec&lt;String&gt; },
+    GodObject { methods: u32, fields: Option&lt;u32&gt;, responsibilities: u32, god_object_score: f64, lines: u32 },
+    // ... 35 total variants
 }
 <span class="boring">}</span></code></pre>
 <h3 id="7-coverage-integration"><a class="header" href="#7-coverage-integration">7. Coverage Integration</a></h3>
@@ -481,12 +481,13 @@ where:
 
   Risk = (8.5 * 0.7) + (3 * 2 * 0.3) = 5.95 + 1.8 = 7.75
 <span class="boring">}</span></code></pre>
-<p><strong>Risk Tiers:</strong></p>
+<p><strong>Risk Tiers (Unified Score 0-10):</strong></p>
 <ul>
-<li><strong>Critical (8.0+):</strong> High complexity with no test coverage</li>
-<li><strong>High (5.0-7.9):</strong> Moderate complexity with coverage gaps</li>
-<li><strong>Moderate (2.0-4.9):</strong> Low-moderate risk, monitor</li>
-<li><strong>Low (&lt;2.0):</strong> Acceptable state</li>
+<li><strong>Critical (9.0-10.0):</strong> Severe risk requiring immediate attention</li>
+<li><strong>High (7.0-8.9):</strong> Significant risk, address this sprint</li>
+<li><strong>Medium (5.0-6.9):</strong> Moderate risk, plan for next sprint</li>
+<li><strong>Low (3.0-4.9):</strong> Minor risk, monitor</li>
+<li><strong>Minimal (0.0-2.9):</strong> Well-managed code</li>
 </ul>
 <h3 id="9-tiered-prioritization"><a class="header" href="#9-tiered-prioritization">9. Tiered Prioritization</a></h3>
 <p><strong>Purpose:</strong> Classify and rank technical debt items by severity.</p>
@@ -503,10 +504,11 @@ where:
 </li>
 <li><strong>Classify into tiers:</strong>
 <ul>
-<li>Critical: score &gt;= 8.0</li>
-<li>High: score &gt;= 5.0</li>
-<li>Moderate: score &gt;= 2.0</li>
-<li>Low: score &lt; 2.0</li>
+<li>Critical: score &gt;= 9.0</li>
+<li>High: score &gt;= 7.0</li>
+<li>Medium: score &gt;= 5.0</li>
+<li>Low: score &gt;= 3.0</li>
+<li>Minimal: score &lt; 3.0</li>
 </ul>
 </li>
 <li><strong>Sort within tiers by:</strong>

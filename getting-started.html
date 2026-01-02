@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d16419a3.js";
+            window.path_to_searchindex_js = "searchindex-b767d121.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3bdbe002.js"></script>
@@ -261,10 +261,10 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for source files (Rust <code>.rs</code> and Python <code>.py</code>)</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for source files (currently Rust <code>.rs</code> with full analysis; Python <code>.py</code> file detection only)</li>
 <li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
-<li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW)</li>
+<li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
 <li><strong>Output</strong> - Results are displayed in your chosen format</li>
 </ol>
@@ -302,10 +302,11 @@ debtmap analyze . --format terminal
 <tr><th>Tier</th><th>Score</th><th>Meaning</th></tr>
 </thead>
 <tbody>
-<tr><td>CRITICAL</td><td>8.0-10.0</td><td>High complexity with no test coverage</td></tr>
-<tr><td>HIGH</td><td>5.0-7.9</td><td>Moderate complexity with coverage gaps</td></tr>
-<tr><td>MODERATE</td><td>2.0-4.9</td><td>Lower risk, monitor</td></tr>
-<tr><td>LOW</td><td>0.0-1.9</td><td>Acceptable state</td></tr>
+<tr><td>CRITICAL</td><td>9.0-10.0</td><td>Severe risk requiring immediate attention</td></tr>
+<tr><td>HIGH</td><td>7.0-8.9</td><td>Significant risk, address this sprint</td></tr>
+<tr><td>MEDIUM</td><td>5.0-6.9</td><td>Moderate risk, plan for next sprint</td></tr>
+<tr><td>LOW</td><td>3.0-4.9</td><td>Minor risk, monitor</td></tr>
+<tr><td>MINIMAL</td><td>0.0-2.9</td><td>Well-managed code</td></tr>
 </tbody>
 </table>
 </div>

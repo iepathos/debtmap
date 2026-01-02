@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d16419a3.js";
+            window.path_to_searchindex_js = "searchindex-b767d121.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3bdbe002.js"></script>
@@ -549,10 +549,10 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for source files (Rust <code>.rs</code> and Python <code>.py</code>)</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for source files (currently Rust <code>.rs</code> with full analysis; Python <code>.py</code> file detection only)</li>
 <li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
-<li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW)</li>
+<li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
 <li><strong>Output</strong> - Results are displayed in your chosen format</li>
 </ol>
@@ -590,10 +590,11 @@ debtmap analyze . --format terminal
 <tr><th>Tier</th><th>Score</th><th>Meaning</th></tr>
 </thead>
 <tbody>
-<tr><td>CRITICAL</td><td>8.0-10.0</td><td>High complexity with no test coverage</td></tr>
-<tr><td>HIGH</td><td>5.0-7.9</td><td>Moderate complexity with coverage gaps</td></tr>
-<tr><td>MODERATE</td><td>2.0-4.9</td><td>Lower risk, monitor</td></tr>
-<tr><td>LOW</td><td>0.0-1.9</td><td>Acceptable state</td></tr>
+<tr><td>CRITICAL</td><td>9.0-10.0</td><td>Severe risk requiring immediate attention</td></tr>
+<tr><td>HIGH</td><td>7.0-8.9</td><td>Significant risk, address this sprint</td></tr>
+<tr><td>MEDIUM</td><td>5.0-6.9</td><td>Moderate risk, plan for next sprint</td></tr>
+<tr><td>LOW</td><td>3.0-4.9</td><td>Minor risk, monitor</td></tr>
+<tr><td>MINIMAL</td><td>0.0-2.9</td><td>Well-managed code</td></tr>
 </tbody>
 </table>
 </div>
@@ -1272,7 +1273,7 @@ Primary command for code analysis. Supports multiple output formats (json, markd
 <li><code>-f, --force</code> - Force overwrite existing config</li>
 </ul>
 <p><strong>Description:</strong>
-Creates a <code>debtmap.toml</code> configuration file in the current directory with default settings. Use <code>--force</code> to overwrite an existing configuration file.</p>
+Creates a <code>.debtmap.toml</code> configuration file in the current directory with default settings. Use <code>--force</code> to overwrite an existing configuration file.</p>
 <h3 id="validate"><a class="header" href="#validate"><code>validate</code></a></h3>
 <p>Validate code against thresholds defined in configuration file.</p>
 <p><strong>Usage:</strong></p>
@@ -1566,7 +1567,7 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 </li>
 <li><code>--max-debt-density &lt;N&gt;</code> - Maximum debt density allowed per 1000 LOC [validate command]</li>
 </ul>
-<p><strong>Note:</strong> Threshold options (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are command-line options for the <code>analyze</code> command. For the <code>validate</code> command, these thresholds are configured via the <code>--config</code> file (<code>debtmap.toml</code>) rather than as command-line flags.</p>
+<p><strong>Note:</strong> Threshold options (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are command-line options for the <code>analyze</code> command. For the <code>validate</code> command, these thresholds are configured via the <code>--config</code> file (<code>.debtmap.toml</code>) rather than as command-line flags.</p>
 <p><strong>Language Selection:</strong></p>
 <ul>
 <li><code>--languages &lt;LANGS&gt;</code> - Comma-separated list of languages to analyze
@@ -1759,7 +1760,7 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 </ul>
 <h2 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h2>
 <h3 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h3>
-<p>Created via <code>debtmap init</code> command. The configuration file (<code>debtmap.toml</code>) is used by the <code>validate</code> command for threshold enforcement and default settings.</p>
+<p>Created via <code>debtmap init</code> command. The configuration file (<code>.debtmap.toml</code>) is used by the <code>validate</code> command for threshold enforcement and default settings.</p>
 <p><strong>Creating Configuration:</strong></p>
 <pre><code class="language-bash"># Create new config
 debtmap init
@@ -2265,7 +2266,7 @@ See Prodigy documentation for detailed usage instructions.</p>
 <p>Source: <code>src/core/mod.rs:62-92</code> (FunctionMetrics struct)</p>
 <p>See <a href="#complexity-metrics-1">Complexity Metrics</a> for detailed explanations and examples.</p>
 <h3 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h3>
-<p>Identifies <strong>25+ types of technical debt</strong> across 4 major categories:</p>
+<p>Identifies <strong>35 types of technical debt</strong> across 4 major categories:</p>
 <p><strong>Testing Issues</strong> (6 types):</p>
 <ul>
 <li>Testing gaps in complex code</li>
@@ -2331,14 +2332,14 @@ untested_penalty:  2.0   // Multiplier for untested code
 <li><strong>ROI Calculation</strong> - Estimate return on investment for test writing</li>
 <li><strong>Final Priority</strong> - Assign priority tiers with risk reduction impact estimates</li>
 </ol>
-<p><strong>Priority Tiers</strong>:</p>
+<p><strong>Recommendation Tiers</strong> (based on strategic value):</p>
 <ul>
-<li>P0 (Critical) - Immediate action required</li>
-<li>P1 (High) - Address in current sprint</li>
-<li>P2 (Medium) - Plan for next cycle</li>
-<li>P3 (Low) - Monitor and review</li>
+<li>T1 Critical Architecture - God objects, excessive complexity; must address before adding features</li>
+<li>T2 Complex Untested - High complexity with no tests; risk of bugs in critical paths</li>
+<li>T3 Testing Gaps - Moderate complexity without tests; improve coverage to prevent future issues</li>
+<li>T4 Maintenance - Low-complexity issues; address opportunistically</li>
 </ul>
-<p>Source: Features documented in <code>.prodigy/book-analysis/features.json:risk_assessment.prioritization</code></p>
+<p>Source: <code>src/priority/tiers/mod.rs:29-45</code> (RecommendationTier enum)</p>
 <p>See <a href="#interpreting-results">Interpreting Results</a> for guidance on using priority rankings.</p>
 <h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
 <p>Debtmap uses a <strong>functional, multi-layered architecture</strong> for accurate and performant analysis:</p>
@@ -11751,11 +11752,11 @@ Effective Complexity = Cyclomatic * (1 - (1 - Entropy/Max_Entropy) * 0.75)
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum DebtType {
-    TestGap { missing_tests: u32 },
-    HighComplexity { score: u32 },
-    DeepNesting { depth: u32 },
-    LongFunction { loc: u32 },
-    TooManyParams { count: u32 },
+    TestingGap { coverage: f64, cyclomatic: u32, cognitive: u32 },
+    ComplexityHotspot { cyclomatic: u32, cognitive: u32 },
+    DeadCode { visibility: FunctionVisibility, cyclomatic: u32, cognitive: u32, usage_hints: Vec&lt;String&gt; },
+    GodObject { methods: u32, fields: Option&lt;u32&gt;, responsibilities: u32, god_object_score: f64, lines: u32 },
+    // ... 35 total variants
 }
 <span class="boring">}</span></code></pre>
 <h3 id="7-coverage-integration"><a class="header" href="#7-coverage-integration">7. Coverage Integration</a></h3>
@@ -11812,12 +11813,13 @@ where:
 
   Risk = (8.5 * 0.7) + (3 * 2 * 0.3) = 5.95 + 1.8 = 7.75
 <span class="boring">}</span></code></pre>
-<p><strong>Risk Tiers:</strong></p>
+<p><strong>Risk Tiers (Unified Score 0-10):</strong></p>
 <ul>
-<li><strong>Critical (8.0+):</strong> High complexity with no test coverage</li>
-<li><strong>High (5.0-7.9):</strong> Moderate complexity with coverage gaps</li>
-<li><strong>Moderate (2.0-4.9):</strong> Low-moderate risk, monitor</li>
-<li><strong>Low (&lt;2.0):</strong> Acceptable state</li>
+<li><strong>Critical (9.0-10.0):</strong> Severe risk requiring immediate attention</li>
+<li><strong>High (7.0-8.9):</strong> Significant risk, address this sprint</li>
+<li><strong>Medium (5.0-6.9):</strong> Moderate risk, plan for next sprint</li>
+<li><strong>Low (3.0-4.9):</strong> Minor risk, monitor</li>
+<li><strong>Minimal (0.0-2.9):</strong> Well-managed code</li>
 </ul>
 <h3 id="9-tiered-prioritization"><a class="header" href="#9-tiered-prioritization">9. Tiered Prioritization</a></h3>
 <p><strong>Purpose:</strong> Classify and rank technical debt items by severity.</p>
@@ -11834,10 +11836,11 @@ where:
 </li>
 <li><strong>Classify into tiers:</strong>
 <ul>
-<li>Critical: score &gt;= 8.0</li>
-<li>High: score &gt;= 5.0</li>
-<li>Moderate: score &gt;= 2.0</li>
-<li>Low: score &lt; 2.0</li>
+<li>Critical: score &gt;= 9.0</li>
+<li>High: score &gt;= 7.0</li>
+<li>Medium: score &gt;= 5.0</li>
+<li>Low: score &gt;= 3.0</li>
+<li>Minimal: score &lt; 3.0</li>
 </ul>
 </li>
 <li><strong>Sort within tiers by:</strong>

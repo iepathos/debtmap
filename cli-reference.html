@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d16419a3.js";
+            window.path_to_searchindex_js = "searchindex-b767d121.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3bdbe002.js"></script>
@@ -242,7 +242,7 @@ Primary command for code analysis. Supports multiple output formats (json, markd
 <li><code>-f, --force</code> - Force overwrite existing config</li>
 </ul>
 <p><strong>Description:</strong>
-Creates a <code>debtmap.toml</code> configuration file in the current directory with default settings. Use <code>--force</code> to overwrite an existing configuration file.</p>
+Creates a <code>.debtmap.toml</code> configuration file in the current directory with default settings. Use <code>--force</code> to overwrite an existing configuration file.</p>
 <h3 id="validate"><a class="header" href="#validate"><code>validate</code></a></h3>
 <p>Validate code against thresholds defined in configuration file.</p>
 <p><strong>Usage:</strong></p>
@@ -536,7 +536,7 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 </li>
 <li><code>--max-debt-density &lt;N&gt;</code> - Maximum debt density allowed per 1000 LOC [validate command]</li>
 </ul>
-<p><strong>Note:</strong> Threshold options (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are command-line options for the <code>analyze</code> command. For the <code>validate</code> command, these thresholds are configured via the <code>--config</code> file (<code>debtmap.toml</code>) rather than as command-line flags.</p>
+<p><strong>Note:</strong> Threshold options (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are command-line options for the <code>analyze</code> command. For the <code>validate</code> command, these thresholds are configured via the <code>--config</code> file (<code>.debtmap.toml</code>) rather than as command-line flags.</p>
 <p><strong>Language Selection:</strong></p>
 <ul>
 <li><code>--languages &lt;LANGS&gt;</code> - Comma-separated list of languages to analyze
@@ -729,7 +729,7 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 </ul>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <h3 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h3>
-<p>Created via <code>debtmap init</code> command. The configuration file (<code>debtmap.toml</code>) is used by the <code>validate</code> command for threshold enforcement and default settings.</p>
+<p>Created via <code>debtmap init</code> command. The configuration file (<code>.debtmap.toml</code>) is used by the <code>validate</code> command for threshold enforcement and default settings.</p>
 <p><strong>Creating Configuration:</strong></p>
 <pre><code class="language-bash"># Create new config
 debtmap init

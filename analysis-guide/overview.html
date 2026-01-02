@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d16419a3.js";
+            window.path_to_searchindex_js = "../searchindex-b767d121.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-3bdbe002.js"></script>
@@ -200,7 +200,7 @@
 <p>Source: <code>src/core/mod.rs:62-92</code> (FunctionMetrics struct)</p>
 <p>See <a href="complexity-metrics.html">Complexity Metrics</a> for detailed explanations and examples.</p>
 <h3 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h3>
-<p>Identifies <strong>25+ types of technical debt</strong> across 4 major categories:</p>
+<p>Identifies <strong>35 types of technical debt</strong> across 4 major categories:</p>
 <p><strong>Testing Issues</strong> (6 types):</p>
 <ul>
 <li>Testing gaps in complex code</li>
@@ -266,14 +266,14 @@ untested_penalty:  2.0   // Multiplier for untested code
 <li><strong>ROI Calculation</strong> - Estimate return on investment for test writing</li>
 <li><strong>Final Priority</strong> - Assign priority tiers with risk reduction impact estimates</li>
 </ol>
-<p><strong>Priority Tiers</strong>:</p>
+<p><strong>Recommendation Tiers</strong> (based on strategic value):</p>
 <ul>
-<li>P0 (Critical) - Immediate action required</li>
-<li>P1 (High) - Address in current sprint</li>
-<li>P2 (Medium) - Plan for next cycle</li>
-<li>P3 (Low) - Monitor and review</li>
+<li>T1 Critical Architecture - God objects, excessive complexity; must address before adding features</li>
+<li>T2 Complex Untested - High complexity with no tests; risk of bugs in critical paths</li>
+<li>T3 Testing Gaps - Moderate complexity without tests; improve coverage to prevent future issues</li>
+<li>T4 Maintenance - Low-complexity issues; address opportunistically</li>
 </ul>
-<p>Source: Features documented in <code>.prodigy/book-analysis/features.json:risk_assessment.prioritization</code></p>
+<p>Source: <code>src/priority/tiers/mod.rs:29-45</code> (RecommendationTier enum)</p>
 <p>See <a href="interpreting-results.html">Interpreting Results</a> for guidance on using priority rankings.</p>
 <h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
 <p>Debtmap uses a <strong>functional, multi-layered architecture</strong> for accurate and performant analysis:</p>
