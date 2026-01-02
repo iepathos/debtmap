@@ -432,7 +432,10 @@ impl DebtmapError {
             Self::Config { message, .. } => message,
             Self::Analysis { message, .. } => message,
             Self::Cli { message, .. } => message,
-            Self::Validation { errors, .. } => errors.first().map(String::as_str).unwrap_or("Validation failed"),
+            Self::Validation { errors, .. } => errors
+                .first()
+                .map(String::as_str)
+                .unwrap_or("Validation failed"),
         }
     }
 

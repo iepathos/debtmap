@@ -328,7 +328,11 @@ pub fn parse_suppression_comments(
     let mut context = SuppressionContext::new();
     let mut open_blocks: Vec<(usize, Vec<DebtType>, Option<String>)> = Vec::new();
 
-    for (line_number, line) in content.lines().enumerate().map(|(idx, line)| (idx + 1, line)) {
+    for (line_number, line) in content
+        .lines()
+        .enumerate()
+        .map(|(idx, line)| (idx + 1, line))
+    {
         let result = parse_line(line, line_number, &patterns);
         process_parsed_line(result, &mut context, &mut open_blocks);
     }
