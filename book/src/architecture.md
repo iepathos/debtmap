@@ -253,11 +253,11 @@ This approach reduces false positives from validation/configuration code while s
 **Implementation:**
 ```rust
 pub enum DebtType {
-    TestGap { missing_tests: u32 },
-    HighComplexity { score: u32 },
-    DeepNesting { depth: u32 },
-    LongFunction { loc: u32 },
-    TooManyParams { count: u32 },
+    TestingGap { coverage: f64, cyclomatic: u32, cognitive: u32 },
+    ComplexityHotspot { cyclomatic: u32, cognitive: u32 },
+    DeadCode { visibility: FunctionVisibility, cyclomatic: u32, cognitive: u32, usage_hints: Vec<String> },
+    GodObject { methods: u32, fields: Option<u32>, responsibilities: u32, god_object_score: f64, lines: u32 },
+    // ... 35 total variants
 }
 ```
 
@@ -317,11 +317,12 @@ fn calculate_risk_score():
   Risk = (8.5 * 0.7) + (3 * 2 * 0.3) = 5.95 + 1.8 = 7.75
 ```
 
-**Risk Tiers:**
-- **Critical (8.0+):** High complexity with no test coverage
-- **High (5.0-7.9):** Moderate complexity with coverage gaps
-- **Moderate (2.0-4.9):** Low-moderate risk, monitor
-- **Low (<2.0):** Acceptable state
+**Risk Tiers (Unified Score 0-10):**
+- **Critical (9.0-10.0):** Severe risk requiring immediate attention
+- **High (7.0-8.9):** Significant risk, address this sprint
+- **Medium (5.0-6.9):** Moderate risk, plan for next sprint
+- **Low (3.0-4.9):** Minor risk, monitor
+- **Minimal (0.0-2.9):** Well-managed code
 
 ### 9. Tiered Prioritization
 
@@ -336,10 +337,11 @@ fn calculate_risk_score():
    - Frequently changed files: +1.0 score (git history analysis)
    - Critical paths: +0.5 score per untested caller
 3. **Classify into tiers:**
-   - Critical: score >= 8.0
-   - High: score >= 5.0
-   - Moderate: score >= 2.0
-   - Low: score < 2.0
+   - Critical: score >= 9.0
+   - High: score >= 7.0
+   - Medium: score >= 5.0
+   - Low: score >= 3.0
+   - Minimal: score < 3.0
 4. **Sort within tiers by:**
    - Severity score
    - Coupling impact

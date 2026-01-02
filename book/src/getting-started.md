@@ -107,10 +107,10 @@ debtmap analyze .
 
 **What happens during analysis:**
 
-1. **File Discovery** - Debtmap scans your project for source files (Rust `.rs` and Python `.py`)
+1. **File Discovery** - Debtmap scans your project for source files (currently Rust `.rs` with full analysis; Python `.py` file detection only)
 2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST)
 3. **Metric Extraction** - Complexity, coverage gaps, and coupling are measured
-4. **Prioritization** - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW)
+4. **Prioritization** - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)
 5. **Context Generation** - File ranges are suggested for each debt item
 6. **Output** - Results are displayed in your chosen format
 
@@ -151,10 +151,11 @@ When you run `debtmap analyze . --format markdown`, you'll see output like this:
 
 | Tier | Score | Meaning |
 |------|-------|---------|
-| CRITICAL | 8.0-10.0 | High complexity with no test coverage |
-| HIGH | 5.0-7.9 | Moderate complexity with coverage gaps |
-| MODERATE | 2.0-4.9 | Lower risk, monitor |
-| LOW | 0.0-1.9 | Acceptable state |
+| CRITICAL | 9.0-10.0 | Severe risk requiring immediate attention |
+| HIGH | 7.0-8.9 | Significant risk, address this sprint |
+| MEDIUM | 5.0-6.9 | Moderate risk, plan for next sprint |
+| LOW | 3.0-4.9 | Minor risk, monitor |
+| MINIMAL | 0.0-2.9 | Well-managed code |
 
 ### Key Signals
 

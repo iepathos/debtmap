@@ -29,7 +29,7 @@ See [Complexity Metrics](complexity-metrics.md) for detailed explanations and ex
 
 ### Debt Patterns
 
-Identifies **25+ types of technical debt** across 4 major categories:
+Identifies **35 types of technical debt** across 4 major categories:
 
 **Testing Issues** (6 types):
 - Testing gaps in complex code
@@ -97,13 +97,13 @@ Uses a **multi-stage pipeline** to assign priority tiers and estimate test writi
 4. **ROI Calculation** - Estimate return on investment for test writing
 5. **Final Priority** - Assign priority tiers with risk reduction impact estimates
 
-**Priority Tiers**:
-- P0 (Critical) - Immediate action required
-- P1 (High) - Address in current sprint
-- P2 (Medium) - Plan for next cycle
-- P3 (Low) - Monitor and review
+**Recommendation Tiers** (based on strategic value):
+- T1 Critical Architecture - God objects, excessive complexity; must address before adding features
+- T2 Complex Untested - High complexity with no tests; risk of bugs in critical paths
+- T3 Testing Gaps - Moderate complexity without tests; improve coverage to prevent future issues
+- T4 Maintenance - Low-complexity issues; address opportunistically
 
-Source: Features documented in `.prodigy/book-analysis/features.json:risk_assessment.prioritization`
+Source: `src/priority/tiers/mod.rs:29-45` (RecommendationTier enum)
 
 See [Interpreting Results](interpreting-results.md) for guidance on using priority rankings.
 

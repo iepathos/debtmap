@@ -75,7 +75,7 @@ debtmap init [OPTIONS]
 - `-f, --force` - Force overwrite existing config
 
 **Description:**
-Creates a `debtmap.toml` configuration file in the current directory with default settings. Use `--force` to overwrite an existing configuration file.
+Creates a `.debtmap.toml` configuration file in the current directory with default settings. Use `--force` to overwrite an existing configuration file.
 
 ### `validate`
 
@@ -357,7 +357,7 @@ Configure analysis behavior, thresholds, and language selection.
   - `lenient` - Lenient thresholds for legacy or complex domains
 - `--max-debt-density <N>` - Maximum debt density allowed per 1000 LOC [validate command]
 
-**Note:** Threshold options (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are command-line options for the `analyze` command. For the `validate` command, these thresholds are configured via the `--config` file (`debtmap.toml`) rather than as command-line flags.
+**Note:** Threshold options (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are command-line options for the `analyze` command. For the `validate` command, these thresholds are configured via the `--config` file (`.debtmap.toml`) rather than as command-line flags.
 
 **Language Selection:**
 - `--languages <LANGS>` - Comma-separated list of languages to analyze
@@ -497,7 +497,7 @@ The following options are deprecated and should be migrated:
 
 ### Configuration File
 
-Created via `debtmap init` command. The configuration file (`debtmap.toml`) is used by the `validate` command for threshold enforcement and default settings.
+Created via `debtmap init` command. The configuration file (`.debtmap.toml`) is used by the `validate` command for threshold enforcement and default settings.
 
 **Creating Configuration:**
 ```bash
