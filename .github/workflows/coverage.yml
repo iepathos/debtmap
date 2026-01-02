@@ -6,8 +6,17 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   coverage:
@@ -17,32 +26,17 @@ jobs:
     - uses: actions/checkout@v6
 
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        override: true
         components: llvm-tools-preview
 
-    - name: Cache cargo-llvm-cov
-      id: cache-llvm-cov
-      uses: actions/cache@v5
-      with:
-        path: ~/.cargo/bin/cargo-llvm-cov
-        key: ${{ runner.os }}-cargo-llvm-cov-0.6.18
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
 
     - name: Install cargo-llvm-cov
-      if: steps.cache-llvm-cov.outputs.cache-hit != 'true'
-      run: cargo install cargo-llvm-cov
-
-    - name: Cache dependencies
-      uses: actions/cache@v5
+      uses: taiki-e/install-action@v2
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-coverage-
+        tool: cargo-llvm-cov
 
     - name: Free up disk space
       run: |

@@ -10,8 +10,16 @@ on:
         required: true
         type: string
 
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
 permissions:
   contents: write
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   create-release:
@@ -19,12 +27,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
-    
+
     steps:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 0
-    
+
     - name: Get version
       id: get_version
       run: |
@@ -33,17 +41,17 @@ jobs:
         else
           echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         fi
-    
+
     - name: Generate release notes
       id: release_notes
       run: |
         echo "# Release ${{ steps.get_version.outputs.version }}" > release_notes.md
         echo "" >> release_notes.md
         echo "## Changes" >> release_notes.md
-        
+
         # Get the previous tag
         PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        
+
         if [[ -n "$PREVIOUS_TAG" ]]; then
           echo "Changes since $PREVIOUS_TAG:" >> release_notes.md
           git log --oneline --format="- %s" $PREVIOUS_TAG..HEAD >> release_notes.md
@@ -51,7 +59,7 @@ jobs:
           echo "Initial release" >> release_notes.md
           git log --oneline --format="- %s" >> release_notes.md
         fi
-    
+
     - name: Create Release
       id: create_release
       env:
@@ -90,35 +98,29 @@ jobs:
             target: x86_64-pc-windows-msvc
             binary: debtmap.exe
             archive: zip
-    
+
     steps:
     - uses: actions/checkout@v6
-    
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
-    
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
     - name: Install musl tools
       if: matrix.target == 'x86_64-unknown-linux-musl'
       run: |
         sudo apt-get update
         sudo apt-get install -y musl-tools pkg-config
-    
-    - name: Cache dependencies
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target/
-        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    
+
     - name: Build release binary
       run: cargo build --release --target ${{ matrix.target }}
       env:
         OPENSSL_STATIC: ${{ matrix.target == 'x86_64-unknown-linux-musl' && '1' || '' }}
-    
+
     - name: Create archive (Unix)
       if: matrix.archive == 'tar.gz'
       run: |
@@ -127,7 +129,7 @@ jobs:
         cp README.md LICENSE release/
         cd release
         tar -czf ../debtmap-${{ matrix.target }}.tar.gz .
-    
+
     - name: Create archive (Windows)
       if: matrix.archive == 'zip'
       run: |
@@ -137,7 +139,7 @@ jobs:
         cp LICENSE release/
         cd release
         7z a ../debtmap-${{ matrix.target }}.zip .
-    
+
     - name: Generate checksums
       shell: bash
       run: |
@@ -154,7 +156,7 @@ jobs:
             sha256sum debtmap-${{ matrix.target }}.zip > debtmap-${{ matrix.target }}.zip.sha256
           fi
         fi
-    
+
     - name: Upload Release Assets
       shell: bash
       env:

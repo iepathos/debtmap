@@ -7,41 +7,53 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+    # Only run security audit when dependency files change
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
   workflow_dispatch:
+
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v6
-    
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-    
-    - name: Cache dependencies
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target/
-        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
-    
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
     - name: Install cargo-audit
-      run: cargo install cargo-audit
-    
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-audit
+
     - name: Run security audit
       run: cargo audit --json > audit-results.json || true
-    
+
     - name: Display audit results
       run: |
         if [ -f audit-results.json ]; then
           echo "Security audit results:"
           cat audit-results.json | jq -r '.vulnerabilities[] | "\(.advisory.id): \(.advisory.title) (\(.advisory.severity))"' || echo "No vulnerabilities found"
         fi
-    
+
     - name: Upload audit results
       uses: actions/upload-artifact@v6
       if: always()
@@ -52,25 +64,21 @@ jobs:
   dependency-check:
     name: Dependency Check
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v6
-    
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-    
-    - name: Cache dependencies
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target/
-        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
-    
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
     - name: Install cargo-deny
-      run: cargo install cargo-deny
-    
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-deny
+
     - name: Create deny.toml if not exists
       run: |
         if [ ! -f deny.toml ]; then
@@ -78,7 +86,7 @@ jobs:
         [bans]
         multiple-versions = "warn"
         wildcards = "deny"
-        
+
         [licenses]
         copyleft = "deny"
         allow-osi-fsf-free = "neither"
@@ -91,54 +99,51 @@ jobs:
             "ISC",
             "Unicode-DFS-2016",
         ]
-        
+
         [advisories]
         vulnerability = "deny"
         unmaintained = "warn"
         yanked = "warn"
         notice = "warn"
-        
+
         [sources]
         unknown-registry = "warn"
         unknown-git = "warn"
         EOF
         fi
-    
+
     - name: Run cargo deny
       run: cargo deny check --hide-inclusion-graph
-    
+
+    - name: Install cargo-machete
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-machete
+
     - name: Check for unused dependencies
-      run: |
-        cargo install cargo-machete
-        cargo machete --with-metadata || true
+      run: cargo machete --with-metadata || true
 
   supply-chain:
     name: Supply Chain Security
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v6
-    
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-    
-    - name: Cache dependencies
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target/
-        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
-    
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
     - name: Check for suspicious dependencies
       run: |
         echo "Checking for suspicious dependencies..."
         cargo tree --duplicates || true
-        
+
         echo "Checking for potential typosquatting..."
         cargo tree --format "{p}" | grep -E "(reqwest|serde|tokio|clap)" | sort | uniq -c | sort -nr
-    
+
     - name: Verify Cargo.lock is up to date
       run: |
         cargo generate-lockfile
@@ -146,7 +151,7 @@ jobs:
           echo "Cargo.lock is not up to date!"
           exit 1
         fi
-    
+
     - name: Check for overly broad feature flags
       run: |
         echo "Checking for overly broad feature flags..."

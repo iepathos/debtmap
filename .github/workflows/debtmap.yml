@@ -7,15 +7,24 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   RUST_BACKTRACE: 1
 
 jobs:
   validate:
     name: Technical Debt Validation
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -26,6 +35,9 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy, llvm-tools-preview
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
 
     - name: Free disk space
       run: |
@@ -38,25 +50,10 @@ jobs:
         echo "Disk space after cleanup:"
         df -h
 
-    - name: Cache cargo dependencies
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-
     - name: Install cargo-llvm-cov
-      run: |
-        if ! command -v cargo-llvm-cov &> /dev/null; then
-          cargo install cargo-llvm-cov
-        else
-          echo "cargo-llvm-cov already installed"
-        fi
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-llvm-cov
 
     - name: Generate coverage data
       run: |
@@ -79,7 +76,7 @@ jobs:
           echo "Warning: LCOV file not found, running validation without coverage data"
           ./target/release/debtmap validate . --format json --output debtmap-report.json
         fi
-      
+
     - name: Upload debtmap report and coverage
       if: always()
       uses: actions/upload-artifact@v6

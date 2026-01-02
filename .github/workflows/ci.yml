@@ -6,27 +6,38 @@ on:
   pull_request:
     branches: [master]
 
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   RUSTFLAGS: "-Dwarnings"
   RUST_BACKTRACE: 1
 
 jobs:
-  ci:
-    name: CI Checks
+  test:
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v6
 
     - name: Install Rust
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        components: rustfmt, clippy
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
 
     - name: Install just
       uses: extractions/setup-just@v3
@@ -36,5 +47,145 @@ jobs:
       with:
         tool: cargo-nextest
 
-    - name: Run CI checks
-      run: just ci
+    - name: Run tests (Unix)
+      if: runner.os != 'Windows'
+      run: just test
+
+    - name: Run tests (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        cargo build
+        echo "Running tests with cargo nextest..."
+        SKIP_INTEGRATION_TESTS=1 cargo nextest run --lib
+        echo "Running safe integration tests..."
+        SKIP_INTEGRATION_TESTS=1 cargo nextest run --test analyzer_tests \
+            --test complexity_tests --test core_metrics_tests \
+            --test debt_tests --test entropy_tests
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install SARIF tools
+      run: cargo install clippy-sarif sarif-fmt --locked
+
+    - name: Run Clippy with SARIF output
+      run: >
+        cargo clippy --workspace --all-features --all-targets --message-format=json
+        | clippy-sarif
+        | tee clippy-results.sarif
+        | sarif-fmt
+      continue-on-error: true
+
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: clippy-results.sarif
+        wait-for-processing: true
+
+    - name: Check for errors
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+  msrv:
+    name: Check MSRV
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-hack
+      uses: taiki-e/install-action@cargo-hack
+
+    - name: Check MSRV
+      run: cargo hack check --each-feature --locked --rust-version --workspace --all-targets --keep-going
+
+  minimal-versions:
+    name: Minimal versions
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install Rust nightly
+      uses: dtolnay/rust-toolchain@nightly
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Generate minimal lockfile
+      run: cargo +nightly generate-lockfile -Z minimal-versions
+
+    - name: Check with minimal versions
+      run: cargo +stable check --workspace --all-features --locked
+
+  feature-combinations:
+    name: Feature combinations
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-hack
+      uses: taiki-e/install-action@cargo-hack
+
+    - name: Test each feature combination
+      run: cargo hack check --each-feature --workspace --keep-going
+
+  # Aggregation job that reports overall CI status
+  ci:
+    name: CI
+    needs: [test, lint, clippy, msrv, minimal-versions, feature-combinations]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Failed
+        run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')

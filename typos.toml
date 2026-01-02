@@ -1,0 +1,13 @@
+[default.extend-words]
+# Project-specific words that aren't typos
+ratatui = "ratatui"  # Rust TUI library name
+pn = "pn"            # Variable name for pre_norm
+ment = "ment"        # Word suffix check (e.g., ends_with("ment"))
+rror = "rror"        # Regex pattern for [Ee]rror matching
+validat = "validat"  # Partial match in test assertion
+
+[files]
+extend-exclude = [
+  "*.lock",
+  "target/",
+]

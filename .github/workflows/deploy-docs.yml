@@ -12,6 +12,11 @@ on:
       - 'book/**'
       - '.github/workflows/deploy-docs.yml'
 
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
