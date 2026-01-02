@@ -40,7 +40,6 @@
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)
-- [Dead Code Analysis](dead-code-analysis.md)
 - [Design Pattern Detection](design-patterns.md)
 - [Entropy Analysis](entropy-analysis.md)
 - [Error Handling Analysis](error-handling-analysis.md)
