@@ -84,6 +84,9 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
     - uses: actions/checkout@v6
@@ -96,7 +99,24 @@ jobs:
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
 
-    - name: Run Clippy
+    - name: Install SARIF tools
+      run: cargo install clippy-sarif sarif-fmt --locked
+
+    - name: Run Clippy with SARIF output
+      run: >
+        cargo clippy --workspace --all-features --all-targets --message-format=json
+        | clippy-sarif
+        | tee clippy-results.sarif
+        | sarif-fmt
+      continue-on-error: true
+
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: clippy-results.sarif
+        wait-for-processing: true
+
+    - name: Check for errors
       run: cargo clippy --all-targets --all-features -- -D warnings
 
   msrv:
