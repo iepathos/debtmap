@@ -7,6 +7,11 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+    # Only run security audit when dependency files change
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
   workflow_dispatch:
 
 # Cancel in-progress runs when new commits are pushed
