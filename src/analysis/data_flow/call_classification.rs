@@ -743,7 +743,10 @@ mod tests {
         assert_eq!(default_behavior, UnknownCallBehavior::Conservative);
     }
 
+    /// Performance test only runs in release builds since debug mode is ~20x slower.
+    /// Use `cargo test --release` to run this test.
     #[test]
+    #[cfg_attr(debug_assertions, ignore)]
     fn test_classification_performance() {
         use std::time::Instant;
 
