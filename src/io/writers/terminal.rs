@@ -40,7 +40,9 @@ impl OutputWriter for TerminalWriter {
             print_pass_fail_status,
         ];
 
-        printers.iter().for_each(|printer| printer(results));
+        for printer in &printers {
+            printer(results);
+        }
         Ok(())
     }
 

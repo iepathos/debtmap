@@ -50,7 +50,10 @@ impl<W: Write> OutputWriter for MarkdownWriter<W> {
             |w, _| w.write_recommendations(),
         ];
 
-        writers.iter().try_for_each(|writer| writer(self, results))
+        for writer in &writers {
+            writer(self, results)?;
+        }
+        Ok(())
     }
 
     fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
@@ -74,9 +77,9 @@ impl<W: Write> MarkdownWriter<W> {
             String::new(),
         ];
 
-        header_lines
-            .iter()
-            .try_for_each(|line| writeln!(self.writer, "{line}"))?;
+        for line in &header_lines {
+            writeln!(self.writer, "{line}")?;
+        }
         Ok(())
     }
 
@@ -99,9 +102,10 @@ impl<W: Write> MarkdownWriter<W> {
         let debt_score = total_debt_score(&results.technical_debt.items);
         let debt_threshold = 100;
 
-        build_summary_rows(results, debt_score, debt_threshold)
-            .into_iter()
-            .try_for_each(|(metric, value, status)| self.write_summary_row(metric, &value, &status))
+        for (metric, value, status) in build_summary_rows(results, debt_score, debt_threshold) {
+            self.write_summary_row(metric, &value, &status)?;
+        }
+        Ok(())
     }
 
     fn write_summary_row(&mut self, metric: &str, value: &str, status: &str) -> anyhow::Result<()> {
@@ -120,9 +124,9 @@ impl<W: Write> MarkdownWriter<W> {
     }
 
     fn write_complexity_header(&mut self) -> anyhow::Result<()> {
-        complexity_header_lines()
-            .iter()
-            .try_for_each(|line| writeln!(self.writer, "{line}"))?;
+        for line in complexity_header_lines().iter() {
+            writeln!(self.writer, "{line}")?;
+        }
         Ok(())
     }
 
@@ -204,9 +208,9 @@ impl<W: Write> MarkdownWriter<W> {
             ("Well Tested", distribution.well_tested_count),
         ];
 
-        distribution_items
-            .iter()
-            .try_for_each(|(label, count)| writeln!(self.writer, "- {label}: {count}"))?;
+        for (label, count) in &distribution_items {
+            writeln!(self.writer, "- {label}: {count}")?;
+        }
 
         writeln!(self.writer)?;
         Ok(())
@@ -228,10 +232,9 @@ impl<W: Write> MarkdownWriter<W> {
             high_priority.len()
         )?;
 
-        high_priority
-            .iter()
-            .take(10)
-            .try_for_each(|item| self.write_debt_item(item))?;
+        for item in high_priority.iter().take(10) {
+            self.write_debt_item(item)?;
+        }
 
         writeln!(self.writer)?;
         Ok(())
@@ -262,9 +265,9 @@ impl<W: Write> MarkdownWriter<W> {
             "3. **Long Term**: Establish complexity budget and monitor trends over time",
         ];
 
-        recommendations
-            .iter()
-            .try_for_each(|rec| writeln!(self.writer, "{rec}"))?;
+        for rec in &recommendations {
+            writeln!(self.writer, "{rec}")?;
+        }
 
         Ok(())
     }

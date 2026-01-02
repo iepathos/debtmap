@@ -124,7 +124,7 @@ fn can_merge(block1: &DuplicationBlock, block2: &DuplicationBlock) -> bool {
 fn merge_blocks(target: &mut DuplicationBlock, source: DuplicationBlock) {
     target.lines += source.lines;
 
-    target.locations.iter_mut().for_each(|loc| {
+    for loc in target.locations.iter_mut() {
         if let Some(src_loc) = source
             .locations
             .iter()
@@ -132,5 +132,5 @@ fn merge_blocks(target: &mut DuplicationBlock, source: DuplicationBlock) {
         {
             loc.end_line = src_loc.end_line;
         }
-    });
+    }
 }

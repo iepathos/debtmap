@@ -404,16 +404,13 @@ fn extract_rust_function_smell_items(
 }
 
 fn report_rust_unclosed_blocks(suppression_context: &SuppressionContext) {
-    suppression_context
-        .unclosed_blocks
-        .iter()
-        .for_each(|unclosed| {
-            eprintln!(
-                "Warning: Unclosed suppression block in {} at line {}",
-                unclosed.file.display(),
-                unclosed.start_line
-            );
-        });
+    for unclosed in &suppression_context.unclosed_blocks {
+        eprintln!(
+            "Warning: Unclosed suppression block in {} at line {}",
+            unclosed.file.display(),
+            unclosed.start_line
+        );
+    }
 }
 
 #[derive(Debug, Clone)]

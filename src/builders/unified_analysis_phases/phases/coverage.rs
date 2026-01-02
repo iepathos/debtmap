@@ -27,13 +27,15 @@ pub fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<LcovD
 
 /// Calculate coverage percentage from coverage data (pure).
 pub fn calculate_coverage_percent(coverage_data: Option<&LcovData>) -> f64 {
-    coverage_data.map_or(0.0, |data| {
-        if data.total_lines > 0 {
-            (data.lines_hit as f64 / data.total_lines as f64) * 100.0
-        } else {
-            0.0
-        }
-    })
+    coverage_data
+        .map(|data| {
+            if data.total_lines > 0 {
+                (data.lines_hit as f64 / data.total_lines as f64) * 100.0
+            } else {
+                0.0
+            }
+        })
+        .unwrap_or(0.0)
 }
 
 /// Check if coverage data is available (pure).

@@ -192,13 +192,13 @@ pub fn analyze_module_dependencies(
             let module_name = extract_module_name(file_path);
             graph.add_module(module_name.clone());
 
-            file_deps
+            for dep_module in file_deps
                 .iter()
                 .filter_map(|dep| extract_module_from_dependency(&dep.name))
                 .filter(|dep_module| *dep_module != module_name)
-                .for_each(|dep_module| {
-                    graph.add_dependency(module_name.clone(), dep_module);
-                });
+            {
+                graph.add_dependency(module_name.clone(), dep_module);
+            }
 
             graph
         },

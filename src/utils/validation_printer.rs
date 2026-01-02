@@ -113,11 +113,10 @@ fn print_failed_validation_checks(details: &ValidationDetails) {
     // Define validation checks as data
     let checks = create_validation_checks(details);
 
-    // Process each check functionally
-    checks
-        .into_iter()
-        .filter(|check| check.is_failed())
-        .for_each(|check| println!("{}", check.format_failure()));
+    // Process each check
+    for check in checks.into_iter().filter(|check| check.is_failed()) {
+        println!("{}", check.format_failure());
+    }
 }
 
 /// Represents a single validation check
@@ -271,11 +270,9 @@ fn print_risk_metrics(insights: &risk::RiskInsight) {
 
     if !insights.top_risks.is_empty() {
         println!("\n  Critical risk functions (high complexity + low/no coverage):");
-        insights
-            .top_risks
-            .iter()
-            .take(5)
-            .for_each(print_risk_function);
+        for func in insights.top_risks.iter().take(5) {
+            print_risk_function(func);
+        }
     }
 }
 

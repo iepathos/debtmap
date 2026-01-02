@@ -145,12 +145,9 @@ impl<'a> ErrorPropagationAnalyzer<'a> {
         let type_str = quote::quote!(#ty).to_string();
 
         // Apply all error type checks using functional style
-        ERROR_TYPE_CHECKS
-            .iter()
-            .filter_map(|check| check(&type_str))
-            .for_each(|(quality, context)| {
-                self.add_debt_item(line, quality, context);
-            });
+        for (quality, context) in ERROR_TYPE_CHECKS.iter().filter_map(|check| check(&type_str)) {
+            self.add_debt_item(line, quality, context);
+        }
     }
 }
 
