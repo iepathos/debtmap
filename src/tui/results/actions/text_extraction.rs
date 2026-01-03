@@ -223,6 +223,95 @@ fn extract_responsibilities_text(item: &UnifiedDebtItem) -> String {
 // Re-export format_debt_type_name from overview module (single source of truth)
 pub use overview::format_debt_type_name;
 
+// =============================================================================
+// LLM Markdown extraction (Spec 001)
+// =============================================================================
+
+/// Extract complete item data as LLM-optimized markdown.
+///
+/// Uses the same pure formatting functions as `LlmMarkdownWriter` to ensure
+/// consistency with the CLI `--format llm` output. This is the pure core
+/// of the `C` key action in detail view.
+pub fn extract_item_as_llm_markdown(item: &UnifiedDebtItem) -> String {
+    use crate::io::writers::llm_markdown::format;
+    use crate::output::unified::FunctionDebtItemOutput;
+
+    // Convert UnifiedDebtItem to FunctionDebtItemOutput for formatting
+    // Include scoring details for completeness
+    let output_item = FunctionDebtItemOutput::from_function_item(item, true);
+
+    let mut result = String::new();
+
+    // Header (no item number since we're extracting a single item)
+    result.push_str("### Debt Item\n\n");
+
+    // Identification section
+    result.push_str(&format::identification(
+        &output_item.location,
+        &output_item.category,
+    ));
+    result.push('\n');
+
+    // Severity section
+    result.push_str(&format::severity(output_item.score, &output_item.priority));
+    result.push('\n');
+
+    // Metrics section
+    result.push_str(&format::metrics(
+        &output_item.metrics,
+        output_item.adjusted_complexity.as_ref(),
+    ));
+    result.push('\n');
+
+    // Coverage section (optional)
+    if let Some(cov) = format::coverage(&output_item.metrics) {
+        result.push_str(&cov);
+        result.push('\n');
+    }
+
+    // Dependencies section
+    result.push_str(&format::dependencies(&output_item.dependencies));
+    result.push('\n');
+
+    // Purity analysis section (optional)
+    if let Some(pur) = format::purity(output_item.purity_analysis.as_ref()) {
+        result.push_str(&pur);
+        result.push('\n');
+    }
+
+    // Pattern analysis section (optional)
+    if let Some(pat) = format::pattern_analysis(
+        output_item.pattern_type.as_ref(),
+        output_item.pattern_confidence,
+    ) {
+        result.push_str(&pat);
+        result.push('\n');
+    }
+
+    // Scoring breakdown section (optional)
+    if let Some(scr) = format::scoring(
+        output_item.scoring_details.as_ref(),
+        &output_item.function_role,
+    ) {
+        result.push_str(&scr);
+        result.push('\n');
+    }
+
+    // Context suggestion section (optional)
+    if let Some(ctx) = format::context(output_item.context.as_ref()) {
+        result.push_str(&ctx);
+        result.push('\n');
+    }
+
+    // Git history section (optional)
+    if let Some(git) = format::git_history(output_item.git_history.as_ref()) {
+        result.push_str(&git);
+        result.push('\n');
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

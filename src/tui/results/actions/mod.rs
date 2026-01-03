@@ -31,7 +31,9 @@ pub mod text_extraction;
 // Re-export commonly used items
 pub use clipboard::copy_to_clipboard;
 pub use editor::open_in_editor;
-pub use text_extraction::{extract_page_text, format_debt_type_name, format_path_text};
+pub use text_extraction::{
+    extract_item_as_llm_markdown, extract_page_text, format_debt_type_name, format_path_text,
+};
 
 use super::{app::ResultsApp, detail_page::DetailPage};
 use crate::priority::UnifiedDebtItem;
@@ -52,6 +54,15 @@ pub fn copy_page_to_clipboard(
 ) -> Result<String> {
     let content = extract_page_text(item, page, app);
     copy_to_clipboard(&content, "page content")
+}
+
+/// Copy complete item data as LLM-optimized markdown to clipboard.
+///
+/// This copies all item data in a format designed for AI agent consumption,
+/// matching the output of `debtmap --format llm` for a single item.
+pub fn copy_item_as_llm_to_clipboard(item: &UnifiedDebtItem) -> Result<String> {
+    let content = extract_item_as_llm_markdown(item);
+    copy_to_clipboard(&content, "LLM markdown")
 }
 
 #[cfg(test)]
