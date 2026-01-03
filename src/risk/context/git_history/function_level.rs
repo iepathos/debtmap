@@ -83,7 +83,7 @@ impl FunctionHistory {
     /// Calculate function age in days since introduction
     pub fn age_days(&self) -> u32 {
         self.introduced
-            .map(|d| (Utc::now() - d).num_days().max(0) as u32)
+            .map(|d| Utc::now().signed_duration_since(d).num_days().max(0) as u32)
             .unwrap_or(0)
     }
 }

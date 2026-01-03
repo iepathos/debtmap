@@ -73,7 +73,7 @@ impl FileHistoryData {
     /// Pure function: Calculate file age in days
     fn calculate_age_days(&self) -> u32 {
         self.first_seen
-            .map(|first| (Utc::now() - first).num_days().max(0) as u32)
+            .map(|first| Utc::now().signed_duration_since(first).num_days().max(0) as u32)
             .unwrap_or(0)
     }
 

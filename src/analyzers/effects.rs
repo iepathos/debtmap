@@ -160,8 +160,10 @@ pub fn analyze_project_effect(
     let files_effect = analyze_files_effect(files_with_lang);
 
     crate::effects::effect_from_fn(move |env: &RealEnv| {
-        let runtime = tokio::runtime::Handle::try_current()
-            .map_err(|_| AnalysisError::analysis("Tokio runtime not available"))?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|_| AnalysisError::analysis("Failed to create Tokio runtime"))?;
 
         let result = runtime.block_on(async { files_effect.run(env).await })?;
 

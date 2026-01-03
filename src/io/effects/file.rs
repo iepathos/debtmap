@@ -271,7 +271,7 @@ pub fn read_files_parallel_with_accumulation(
                         }
                         Err(e) => {
                             result.add_error(
-                                FileError::new(path, format!("Failed to read: {}", e.message()))
+                                FileError::new(path, format!("Failed to read: {e}"))
                                     .with_code("E001"),
                             );
                         }
