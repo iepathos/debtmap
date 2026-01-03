@@ -717,12 +717,23 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_format_project_name_absolute_path() {
         let path = Path::new("/absolute/path/to/project");
         let formatted = format_project_name(path);
 
         // Should return the path as-is for absolute paths
         assert_eq!(formatted, "/absolute/path/to/project");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_format_project_name_absolute_path() {
+        let path = Path::new("C:\\absolute\\path\\to\\project");
+        let formatted = format_project_name(path);
+
+        // Should return the path as-is for absolute paths
+        assert_eq!(formatted, "C:\\absolute\\path\\to\\project");
     }
 
     #[test]
