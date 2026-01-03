@@ -77,6 +77,7 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
         Line::from("  1-8         Jump to page"),
         Line::from("  ↑↓/jk       Next/prev item"),
         Line::from("  c           Copy page content"),
+        Line::from("  C           Copy item as LLM markdown"),
         Line::from("  Esc         Back to list"),
         Line::from(""),
         Line::from(vec![Span::styled(

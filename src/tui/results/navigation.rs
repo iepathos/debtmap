@@ -197,6 +197,13 @@ fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<b
             }
         }
 
+        DetailAction::CopyItemAsLlm => {
+            if let Some(item) = app.selected_item() {
+                let message = super::actions::copy_item_as_llm_to_clipboard(item)?;
+                app.set_status_message(message);
+            }
+        }
+
         DetailAction::OpenInEditor => {
             if let Some(item) = app.selected_item() {
                 super::actions::open_in_editor(&item.location.file, Some(item.location.line))?;

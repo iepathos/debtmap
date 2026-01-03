@@ -39,6 +39,9 @@ pub enum DetailAction {
     /// Copy current page content.
     CopyPage,
 
+    /// Copy complete item as LLM-optimized markdown.
+    CopyItemAsLlm,
+
     /// Open the current item in an external editor.
     OpenInEditor,
 
@@ -114,6 +117,9 @@ pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<D
 
         // Copy current page content
         KeyCode::Char('c') => Some(DetailAction::CopyPage),
+
+        // Copy complete item as LLM-optimized markdown
+        KeyCode::Char('C') => Some(DetailAction::CopyItemAsLlm),
 
         // Open in editor
         KeyCode::Char('e') | KeyCode::Char('o') => Some(DetailAction::OpenInEditor),
@@ -315,6 +321,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn uppercase_c_copies_item_as_llm() {
+        for page in [
+            DetailPage::Overview,
+            DetailPage::ScoreBreakdown,
+            DetailPage::Context,
+            DetailPage::Dependencies,
+            DetailPage::GitContext,
+            DetailPage::Patterns,
+            DetailPage::DataFlow,
+            DetailPage::Responsibilities,
+        ] {
+            let ctx = DetailActionContext::new(page);
+            assert_eq!(
+                classify_detail_key(key(KeyCode::Char('C')), ctx),
+                Some(DetailAction::CopyItemAsLlm),
+                "'C' on {:?} should copy item as LLM markdown",
+                page
+            );
+        }
+    }
+
     // ============================================================================
     // Editor and Help Tests
     // ============================================================================
@@ -460,6 +488,7 @@ mod property_tests {
             Just(KeyCode::Up),
             Just(KeyCode::Down),
             Just(KeyCode::Char('c')),
+            Just(KeyCode::Char('C')), // Copy item as LLM markdown
             Just(KeyCode::Char('e')),
             Just(KeyCode::Char('o')),
             Just(KeyCode::Char('?')),
@@ -509,6 +538,16 @@ mod property_tests {
 
             let action = classify_detail_key(c, ctx);
             prop_assert_eq!(action, Some(DetailAction::CopyPage));
+        }
+
+        /// Property: 'C' key always copies item as LLM markdown.
+        #[test]
+        fn uppercase_c_always_copies_llm(page in detail_page_strategy()) {
+            let ctx = DetailActionContext::new(page);
+            let big_c = KeyEvent::new(KeyCode::Char('C'), KeyModifiers::NONE);
+
+            let action = classify_detail_key(big_c, ctx);
+            prop_assert_eq!(action, Some(DetailAction::CopyItemAsLlm));
         }
 
         /// Property: Pure function - same input always produces same output.

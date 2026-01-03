@@ -28,8 +28,10 @@ use std::io::Write;
 // =============================================================================
 // These functions are pure: they take data, return strings, no side effects.
 // Easy to test, easy to reason about, composable.
+//
+// This module is public so the TUI can reuse it for clipboard copy (Spec 001).
 
-mod format {
+pub mod format {
     use super::*;
     use crate::output::unified::{ContextSuggestionOutput, PurityAnalysis, UnifiedLocation};
     use crate::priority::FunctionRole;
@@ -630,7 +632,7 @@ impl<W: Write> LlmMarkdownWriter<W> {
 }
 
 /// Generate a stable ID for an item based on file and line
-fn generate_item_id(file: &str, line: Option<usize>) -> String {
+pub fn generate_item_id(file: &str, line: Option<usize>) -> String {
     let file_part: String = file
         .chars()
         .map(|c| match c {
@@ -645,7 +647,7 @@ fn generate_item_id(file: &str, line: Option<usize>) -> String {
 }
 
 /// Determine the priority tier based on score
-fn priority_tier(score: f64) -> &'static str {
+pub fn priority_tier(score: f64) -> &'static str {
     if score >= 100.0 {
         "Critical (>=100)"
     } else if score >= 50.0 {
