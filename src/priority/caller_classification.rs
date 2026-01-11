@@ -82,14 +82,18 @@ impl ClassifiedCallers {
 pub fn classify_caller(caller: &str, call_graph: Option<&CallGraph>) -> CallerType {
     // Try call graph first for accurate classification
     if let Some(cg) = call_graph {
-        // Parse the caller string to extract file and function info
-        // Caller format: "file::function" or just "function"
+        // Try to parse the caller string to extract file and function info
         if let Some(func_id) = parse_caller_to_func_id(caller) {
             if cg.is_test_function(&func_id) {
                 return CallerType::Test;
             }
-            // Also check if this is a test helper (only called by tests)
             if cg.is_test_helper(&func_id) {
+                return CallerType::Test;
+            }
+        } else {
+            // Caller string is just a function name - search by name in call graph
+            // This handles cases where upstream_callers only contains function names
+            if is_test_function_by_name(caller, cg) {
                 return CallerType::Test;
             }
         }
@@ -99,14 +103,26 @@ pub fn classify_caller(caller: &str, call_graph: Option<&CallGraph>) -> CallerTy
     classify_by_heuristics(caller)
 }
 
+/// Check if any function with this name in the call graph is a test function.
+///
+/// This is used when we only have a function name without file context.
+/// It searches all functions in the call graph with the given name and returns
+/// true if any of them is marked as a test function.
+fn is_test_function_by_name(name: &str, call_graph: &CallGraph) -> bool {
+    call_graph
+        .get_all_functions()
+        .any(|func_id| func_id.name == name && call_graph.is_test_function(func_id))
+}
+
 /// Parse a caller string into a FunctionId for call graph lookup.
 ///
 /// Caller strings may be in various formats:
 /// - "function_name" (simple)
-/// - "module::function" (with module)
+/// - "module::function" (with module, double colon)
+/// - "file.rs:function" (with file, single colon)
 /// - "path/to/file.rs::function" (with file path)
 fn parse_caller_to_func_id(caller: &str) -> Option<FunctionId> {
-    // Handle common formats
+    // Handle double-colon format: "module::function" or "path/file.rs::function"
     if caller.contains("::") {
         let parts: Vec<&str> = caller.rsplitn(2, "::").collect();
         if parts.len() == 2 {
@@ -128,6 +144,28 @@ fn parse_caller_to_func_id(caller: &str) -> Option<FunctionId> {
                 func_name.to_string(),
                 0,
             ));
+        }
+    }
+
+    // Handle single-colon format: "file.rs:function" (common in debtmap output)
+    if caller.contains(':') && !caller.contains("::") {
+        let parts: Vec<&str> = caller.rsplitn(2, ':').collect();
+        if parts.len() == 2 {
+            let func_name = parts[0];
+            let file_path = parts[1];
+
+            // Must look like a file path
+            if file_path.ends_with(".rs")
+                || file_path.ends_with(".py")
+                || file_path.ends_with(".js")
+                || file_path.ends_with(".ts")
+            {
+                return Some(FunctionId::new(
+                    std::path::PathBuf::from(file_path),
+                    func_name.to_string(),
+                    0,
+                ));
+            }
         }
     }
 
@@ -160,12 +198,25 @@ pub fn classify_by_heuristics(caller: &str) -> CallerType {
     let caller_lower = caller.to_lowercase();
 
     // Path-based patterns (highest confidence)
-    let path_patterns = ["/tests/", "/test/", "::tests::", "::test::"];
+    // Include both double-colon (::) and single-colon (:) variants
+    let path_patterns = [
+        "/tests/",
+        "/test/",
+        "::tests::",
+        "::test::",
+        ":test:",   // Single-colon variant for test module
+        ":tests:",  // Single-colon variant for tests module
+    ];
 
     for pattern in path_patterns {
         if caller_lower.contains(pattern) {
             return CallerType::Test;
         }
+    }
+
+    // Check if caller is from a test file (e.g., test_*.rs or *_test.rs)
+    if is_test_file_path(&caller_lower) {
+        return CallerType::Test;
     }
 
     // Extract the function name part for prefix/suffix matching
@@ -222,15 +273,48 @@ pub fn classify_by_heuristics(caller: &str) -> CallerType {
     CallerType::Production
 }
 
+/// Check if the caller path indicates a test file.
+///
+/// Test file patterns:
+/// - test_*.rs - Rust test file prefix
+/// - *_test.rs - Rust test file suffix
+/// - tests/*.rs - Files in tests directory
+fn is_test_file_path(caller: &str) -> bool {
+    // Extract file name from path (before function separator)
+    let file_part = caller.split(':').next().unwrap_or("");
+
+    // Check for test file naming conventions
+    let file_name = file_part.rsplit('/').next().unwrap_or(file_part);
+
+    // Test file name patterns
+    if file_name.starts_with("test_") && file_name.ends_with(".rs") {
+        return true;
+    }
+    if file_name.ends_with("_test.rs") || file_name.ends_with("_tests.rs") {
+        return true;
+    }
+
+    // Check for tests directory
+    if file_part.contains("/tests/") || file_part.starts_with("tests/") {
+        return true;
+    }
+
+    false
+}
+
 /// Extract the function name from a full path/module string.
 ///
 /// Examples:
 /// - "module::function" -> "function"
 /// - "path/to/file.rs::function" -> "function"
+/// - "file.rs:function" -> "function"
 /// - "function" -> "function"
 fn extract_function_name(caller: &str) -> &str {
     caller
         .rsplit("::")
+        .next()
+        .unwrap_or(caller)
+        .rsplit(':')
         .next()
         .unwrap_or(caller)
         .rsplit('/')
@@ -419,5 +503,102 @@ mod tests {
         result.production_count = 5;
         result.test_count = 10;
         assert_eq!(result.total_count(), 15);
+    }
+
+    #[test]
+    fn test_parse_single_colon_format() {
+        // Single colon format: file.rs:function
+        let func_id = parse_caller_to_func_id("overflow.rs:inline_table_containing_array");
+        assert!(func_id.is_some());
+        let id = func_id.unwrap();
+        assert_eq!(id.name, "inline_table_containing_array");
+        assert_eq!(
+            id.file.to_string_lossy(),
+            "overflow.rs"
+        );
+    }
+
+    #[test]
+    fn test_parse_double_colon_format() {
+        // Double colon format: module::function
+        let func_id = parse_caller_to_func_id("overflow::test::inline_table");
+        assert!(func_id.is_some());
+        let id = func_id.unwrap();
+        assert_eq!(id.name, "inline_table");
+    }
+
+    #[test]
+    fn test_is_test_file_path() {
+        // Test file naming patterns
+        assert!(is_test_file_path("test_overflow.rs:some_func"));
+        assert!(is_test_file_path("path/to/test_helpers.rs:setup"));
+        assert!(is_test_file_path("overflow_test.rs:verify"));
+        assert!(is_test_file_path("tests/integration.rs:test_flow"));
+
+        // Production files
+        assert!(!is_test_file_path("overflow.rs:reflow_arrays"));
+        assert!(!is_test_file_path("src/main.rs:main"));
+        assert!(!is_test_file_path("formatting.rs:process"));
+    }
+
+    #[test]
+    fn test_extract_function_name_single_colon() {
+        // Single colon format
+        assert_eq!(extract_function_name("file.rs:function"), "function");
+        assert_eq!(
+            extract_function_name("overflow.rs:inline_table"),
+            "inline_table"
+        );
+    }
+
+    #[test]
+    fn test_is_test_function_by_name_with_call_graph() {
+        use std::path::PathBuf;
+
+        // Create a call graph with a test function
+        let mut call_graph = CallGraph::new();
+        let test_fn = FunctionId::new(
+            PathBuf::from("overflow.rs"),
+            "inline_table_containing_array".to_string(),
+            100,
+        );
+        call_graph.add_function(
+            test_fn.clone(),
+            false, // not entry point
+            true,  // IS A TEST
+            5,
+            10,
+        );
+
+        let prod_fn = FunctionId::new(
+            PathBuf::from("overflow.rs"),
+            "reflow_arrays".to_string(),
+            50,
+        );
+        call_graph.add_function(
+            prod_fn.clone(),
+            true,  // entry point
+            false, // NOT a test
+            10,
+            25,
+        );
+
+        // Test function lookup by name only
+        assert!(is_test_function_by_name(
+            "inline_table_containing_array",
+            &call_graph
+        ));
+        assert!(!is_test_function_by_name("reflow_arrays", &call_graph));
+        assert!(!is_test_function_by_name("unknown_function", &call_graph));
+
+        // Verify classify_caller works with call graph
+        assert_eq!(
+            classify_caller("inline_table_containing_array", Some(&call_graph)),
+            CallerType::Test
+        );
+        assert_eq!(
+            classify_caller("reflow_arrays", Some(&call_graph)),
+            CallerType::Production
+        );
     }
 }
