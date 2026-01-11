@@ -4,11 +4,11 @@
 //! from inputs without side effects. Functions are kept under 20 lines.
 
 use super::types::{
-    extract_function_keys, extract_functions, extract_location_keys, extract_max_coverage,
-    is_critical, is_score_unchanged, is_significantly_improved, AnalysisSummary, DebtmapJsonInput,
+    extract_function_keys, extract_functions, extract_location_keys, is_critical,
+    is_score_unchanged, is_significantly_improved, AnalysisSummary, DebtmapJsonInput,
     IdentifiedChanges, ImprovedItems, ItemInfo, NewItems, ResolvedItems, UnchangedCritical,
 };
-use crate::priority::unified_scorer::UnifiedDebtItem;
+use crate::output::unified::{FunctionDebtItemOutput, UnifiedDebtItemOutput};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -19,10 +19,7 @@ use std::path::PathBuf;
 /// Pure: Create summary from function items
 pub fn create_summary(analysis: &DebtmapJsonInput) -> AnalysisSummary {
     let function_items: Vec<_> = extract_functions(&analysis.items).collect();
-    let scores: Vec<f64> = function_items
-        .iter()
-        .map(|f| f.unified_score.final_score)
-        .collect();
+    let scores: Vec<f64> = function_items.iter().map(|f| f.score).collect();
 
     AnalysisSummary {
         total_items: function_items.len(),
@@ -82,22 +79,23 @@ pub fn identify_resolved_items(
 
 /// Pure: Find functions that exist in items but not in keys set
 fn find_removed_functions<'a>(
-    items: &'a [crate::priority::DebtItem],
+    items: &'a [UnifiedDebtItemOutput],
     existing_keys: &HashSet<(PathBuf, String)>,
-) -> Vec<&'a UnifiedDebtItem> {
+) -> Vec<&'a FunctionDebtItemOutput> {
     extract_functions(items)
         .filter(|f| {
-            !existing_keys.contains(&(f.location.file.clone(), f.location.function.clone()))
+            let key = (
+                PathBuf::from(&f.location.file),
+                f.location.function.clone().unwrap_or_default(),
+            );
+            !existing_keys.contains(&key)
         })
         .collect()
 }
 
 /// Pure: Count high priority items in resolved list
-fn count_high_priority(items: &[&UnifiedDebtItem]) -> usize {
-    items
-        .iter()
-        .filter(|item| is_critical(item.unified_score.final_score))
-        .count()
+fn count_high_priority(items: &[&FunctionDebtItemOutput]) -> usize {
+    items.iter().filter(|item| is_critical(item.score)).count()
 }
 
 // =============================================================================
@@ -123,12 +121,15 @@ struct ImprovementMetrics {
 
 /// Pure: Collect improvement metrics for each improved item
 fn collect_improvements(
-    after_items: &[crate::priority::DebtItem],
-    before_map: &HashMap<(PathBuf, String), &UnifiedDebtItem>,
+    after_items: &[UnifiedDebtItemOutput],
+    before_map: &HashMap<(PathBuf, String), &FunctionDebtItemOutput>,
 ) -> Vec<ImprovementMetrics> {
     extract_functions(after_items)
         .filter_map(|after| {
-            let key = (after.location.file.clone(), after.location.function.clone());
+            let key = (
+                PathBuf::from(&after.location.file),
+                after.location.function.clone().unwrap_or_default(),
+            );
             before_map
                 .get(&key)
                 .and_then(|before| compute_improvement_if_significant(before, after))
@@ -138,11 +139,11 @@ fn collect_improvements(
 
 /// Pure: Compute improvement metrics if the improvement is significant
 fn compute_improvement_if_significant(
-    before: &UnifiedDebtItem,
-    after: &UnifiedDebtItem,
+    before: &FunctionDebtItemOutput,
+    after: &FunctionDebtItemOutput,
 ) -> Option<ImprovementMetrics> {
-    let before_score = before.unified_score.final_score;
-    let after_score = after.unified_score.final_score;
+    let before_score = before.score;
+    let after_score = after.score;
 
     if !is_significantly_improved(before_score, after_score) {
         return None;
@@ -155,18 +156,24 @@ fn compute_improvement_if_significant(
 }
 
 /// Pure: Compute complexity reduction ratio
-fn compute_complexity_reduction(before: &UnifiedDebtItem, after: &UnifiedDebtItem) -> f64 {
-    if after.cyclomatic_complexity >= before.cyclomatic_complexity {
+fn compute_complexity_reduction(
+    before: &FunctionDebtItemOutput,
+    after: &FunctionDebtItemOutput,
+) -> f64 {
+    let before_cc = before.metrics.cyclomatic_complexity;
+    let after_cc = after.metrics.cyclomatic_complexity;
+
+    if after_cc >= before_cc {
         return 0.0;
     }
-    let reduction = before.cyclomatic_complexity - after.cyclomatic_complexity;
-    reduction as f64 / before.cyclomatic_complexity as f64
+    let reduction = before_cc - after_cc;
+    reduction as f64 / before_cc as f64
 }
 
 /// Pure: Check if coverage improved
-fn has_coverage_improved(before: &UnifiedDebtItem, after: &UnifiedDebtItem) -> bool {
-    let before_cov = extract_max_coverage(&before.transitive_coverage);
-    let after_cov = extract_max_coverage(&after.transitive_coverage);
+fn has_coverage_improved(before: &FunctionDebtItemOutput, after: &FunctionDebtItemOutput) -> bool {
+    let before_cov = before.metrics.coverage.unwrap_or(0.0);
+    let after_cov = after.metrics.coverage.unwrap_or(0.0);
     after_cov > before_cov
 }
 
@@ -210,23 +217,29 @@ pub fn identify_new_items(before: &DebtmapJsonInput, after: &DebtmapJsonInput) -
 
 /// Pure: Find new critical items not in before
 fn find_new_critical_items(
-    after_items: &[crate::priority::DebtItem],
+    after_items: &[UnifiedDebtItemOutput],
     before_keys: &HashSet<(PathBuf, String)>,
 ) -> Vec<ItemInfo> {
     extract_functions(after_items)
-        .filter(|f| !before_keys.contains(&(f.location.file.clone(), f.location.function.clone())))
-        .filter(|f| is_critical(f.unified_score.final_score))
-        .map(unified_to_item_info)
+        .filter(|f| {
+            let key = (
+                PathBuf::from(&f.location.file),
+                f.location.function.clone().unwrap_or_default(),
+            );
+            !before_keys.contains(&key)
+        })
+        .filter(|f| is_critical(f.score))
+        .map(function_to_item_info)
         .collect()
 }
 
-/// Pure: Convert UnifiedDebtItem to ItemInfo
-fn unified_to_item_info(item: &UnifiedDebtItem) -> ItemInfo {
+/// Pure: Convert FunctionDebtItemOutput to ItemInfo
+fn function_to_item_info(item: &FunctionDebtItemOutput) -> ItemInfo {
     ItemInfo {
-        file: item.location.file.clone(),
-        function: item.location.function.clone(),
-        line: item.location.line,
-        score: item.unified_score.final_score,
+        file: PathBuf::from(&item.location.file),
+        function: item.location.function.clone().unwrap_or_default(),
+        line: item.location.line.unwrap_or(0),
+        score: item.score,
     }
 }
 
@@ -250,30 +263,30 @@ pub fn identify_unchanged_critical(
 
 /// Pure: Find critical items that remained unchanged
 fn find_unchanged_critical(
-    before_items: &[crate::priority::DebtItem],
-    after_map: &HashMap<(PathBuf, String), &UnifiedDebtItem>,
+    before_items: &[UnifiedDebtItemOutput],
+    after_map: &HashMap<(PathBuf, String), &FunctionDebtItemOutput>,
 ) -> Vec<ItemInfo> {
     extract_functions(before_items)
-        .filter(|before| is_critical(before.unified_score.final_score))
+        .filter(|before| is_critical(before.score))
         .filter_map(|before| check_if_unchanged(before, after_map))
         .collect()
 }
 
 /// Pure: Check if a critical item remained unchanged in after
 fn check_if_unchanged(
-    before: &UnifiedDebtItem,
-    after_map: &HashMap<(PathBuf, String), &UnifiedDebtItem>,
+    before: &FunctionDebtItemOutput,
+    after_map: &HashMap<(PathBuf, String), &FunctionDebtItemOutput>,
 ) -> Option<ItemInfo> {
     let key = (
-        before.location.file.clone(),
-        before.location.function.clone(),
+        PathBuf::from(&before.location.file),
+        before.location.function.clone().unwrap_or_default(),
     );
-    let before_score = before.unified_score.final_score;
+    let before_score = before.score;
 
     after_map.get(&key).and_then(|after| {
-        let after_score = after.unified_score.final_score;
+        let after_score = after.score;
         if is_score_unchanged(before_score, after_score) && is_critical(after_score) {
-            Some(unified_to_item_info(before))
+            Some(function_to_item_info(before))
         } else {
             None
         }
@@ -284,11 +297,11 @@ fn check_if_unchanged(
 // Helper for Tests
 // =============================================================================
 
-/// Build a map of (file, function) -> FunctionMetrics for quick lookup.
+/// Build a map of (file, function) -> FunctionDebtItemOutput for quick lookup.
 /// Used primarily in tests.
 #[cfg(test)]
 pub fn build_function_map(
-    items: &[crate::priority::DebtItem],
-) -> HashMap<(PathBuf, String), &UnifiedDebtItem> {
+    items: &[UnifiedDebtItemOutput],
+) -> HashMap<(PathBuf, String), &FunctionDebtItemOutput> {
     extract_function_keys(items).collect()
 }

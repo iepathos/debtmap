@@ -3,16 +3,17 @@
 //! This module defines all the data structures used in comparing
 //! before and after debtmap analysis results.
 
-use crate::priority::{DebtItem, ImpactMetrics};
+use crate::output::unified::UnifiedDebtItemOutput;
+use crate::priority::ImpactMetrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Internal type for parsing debtmap JSON files during comparison.
-/// This supports parsing the unified JSON format.
+/// This supports parsing the unified JSON format produced by `debtmap analyze`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DebtmapJsonInput {
-    pub items: Vec<DebtItem>,
+    pub items: Vec<UnifiedDebtItemOutput>,
     #[serde(default = "default_impact_metrics")]
     pub total_impact: ImpactMetrics,
     #[serde(default)]
@@ -129,37 +130,46 @@ pub(crate) struct ScoringComponents {
 // Iterator Helpers
 // =============================================================================
 
-use crate::priority::unified_scorer::UnifiedDebtItem;
+use crate::output::unified::FunctionDebtItemOutput;
 
-/// Extract function items from a slice of DebtItems.
+/// Extract function items from a slice of UnifiedDebtItemOutput.
 ///
-/// This eliminates repeated DebtItem::Function/DebtItem::File pattern matching
-/// throughout the codebase.
-pub fn extract_functions(items: &[DebtItem]) -> impl Iterator<Item = &UnifiedDebtItem> {
+/// This eliminates repeated pattern matching throughout the codebase.
+pub fn extract_functions(
+    items: &[UnifiedDebtItemOutput],
+) -> impl Iterator<Item = &FunctionDebtItemOutput> {
     items.iter().filter_map(|item| match item {
-        DebtItem::Function(f) => Some(f.as_ref()),
-        DebtItem::File(_) => None,
+        UnifiedDebtItemOutput::Function(f) => Some(f.as_ref()),
+        UnifiedDebtItemOutput::File(_) => None,
     })
 }
 
 /// Extract function items with their keys (file, function) for lookup operations.
 pub fn extract_function_keys(
-    items: &[DebtItem],
-) -> impl Iterator<Item = ((PathBuf, String), &UnifiedDebtItem)> {
+    items: &[UnifiedDebtItemOutput],
+) -> impl Iterator<Item = ((PathBuf, String), &FunctionDebtItemOutput)> {
     items.iter().filter_map(|item| match item {
-        DebtItem::Function(f) => Some((
-            (f.location.file.clone(), f.location.function.clone()),
-            f.as_ref(),
-        )),
-        DebtItem::File(_) => None,
+        UnifiedDebtItemOutput::Function(f) => {
+            let key = (
+                PathBuf::from(&f.location.file),
+                f.location.function.clone().unwrap_or_default(),
+            );
+            Some((key, f.as_ref()))
+        }
+        UnifiedDebtItemOutput::File(_) => None,
     })
 }
 
 /// Extract just the location keys from function items.
-pub fn extract_location_keys(items: &[DebtItem]) -> impl Iterator<Item = (PathBuf, String)> + '_ {
+pub fn extract_location_keys(
+    items: &[UnifiedDebtItemOutput],
+) -> impl Iterator<Item = (PathBuf, String)> + '_ {
     items.iter().filter_map(|item| match item {
-        DebtItem::Function(f) => Some((f.location.file.clone(), f.location.function.clone())),
-        DebtItem::File(_) => None,
+        UnifiedDebtItemOutput::Function(f) => Some((
+            PathBuf::from(&f.location.file),
+            f.location.function.clone().unwrap_or_default(),
+        )),
+        UnifiedDebtItemOutput::File(_) => None,
     })
 }
 
@@ -193,14 +203,4 @@ pub fn is_score_unchanged(before: f64, after: f64) -> bool {
 /// Check if there was significant score improvement
 pub fn is_significantly_improved(before_score: f64, after_score: f64) -> bool {
     before_score - after_score > SCORE_IMPROVEMENT_THRESHOLD
-}
-
-/// Extract maximum coverage value from transitive coverage
-pub fn extract_max_coverage(
-    coverage: &Option<crate::priority::coverage_propagation::TransitiveCoverage>,
-) -> f64 {
-    coverage
-        .as_ref()
-        .map(|tc| tc.direct.max(tc.transitive))
-        .unwrap_or(0.0)
 }

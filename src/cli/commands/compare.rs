@@ -68,24 +68,27 @@ pub fn handle_compare_command(
 }
 
 /// Pure function to convert DebtmapJsonInput to UnifiedAnalysis
-/// Splits merged DebtItem enum into separate function and file vectors
+/// Converts output format types back to internal types for comparison
 fn json_to_analysis(json: DebtmapJsonInput) -> UnifiedAnalysis {
-    use crate::priority::{call_graph::CallGraph, DebtItem};
+    use crate::output::unified::UnifiedDebtItemOutput;
+    use crate::priority::call_graph::CallGraph;
     use im::Vector;
 
     let mut items = Vector::new();
     let mut file_items = Vector::new();
 
-    // Split DebtItems into function and file items
+    // Convert output format items to internal types
     for item in json.items {
         match item {
-            DebtItem::Function(func) => items.push_back(*func),
-            DebtItem::File(file) => file_items.push_back(*file),
+            UnifiedDebtItemOutput::Function(func) => {
+                items.push_back(output_to_internal_function(&func));
+            }
+            UnifiedDebtItemOutput::File(file) => {
+                file_items.push_back(output_to_internal_file(&file));
+            }
         }
     }
 
-    // Create UnifiedAnalysis with empty call graph and data flow graph
-    // These aren't serialized in JSON output anyway
     let call_graph = CallGraph::new();
 
     UnifiedAnalysis {
@@ -102,6 +105,144 @@ fn json_to_analysis(json: DebtmapJsonInput) -> UnifiedAnalysis {
         timings: None,
         stats: crate::priority::FilterStatistics::new(),
         analyzed_files: std::collections::HashMap::new(),
+    }
+}
+
+/// Convert FunctionDebtItemOutput to UnifiedDebtItem with minimal fields for comparison
+fn output_to_internal_function(
+    output: &crate::output::unified::FunctionDebtItemOutput,
+) -> crate::priority::unified_scorer::UnifiedDebtItem {
+    use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
+    use crate::priority::{ActionableRecommendation, ImpactMetrics};
+    use std::path::PathBuf;
+
+    UnifiedDebtItem {
+        location: Location {
+            file: PathBuf::from(&output.location.file),
+            function: output.location.function.clone().unwrap_or_default(),
+            line: output.location.line.unwrap_or(0),
+        },
+        debt_type: output.debt_type.clone(),
+        unified_score: UnifiedScore {
+            complexity_factor: 0.0,
+            coverage_factor: 0.0,
+            dependency_factor: 0.0,
+            role_multiplier: 1.0,
+            final_score: output.score,
+            base_score: None,
+            exponential_factor: None,
+            risk_boost: None,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
+            purity_factor: None,
+            refactorability_factor: None,
+            pattern_factor: None,
+            debt_adjustment: None,
+            pre_normalization_score: None,
+            structural_multiplier: None,
+            has_coverage_data: output.metrics.coverage.is_some(),
+            contextual_risk_multiplier: None,
+            pre_contextual_score: None,
+        },
+        function_role: output.function_role,
+        recommendation: ActionableRecommendation {
+            primary_action: output.recommendation.action.clone(),
+            rationale: String::new(),
+            implementation_steps: output.recommendation.implementation_steps.clone(),
+            related_items: vec![],
+            steps: None,
+            estimated_effort_hours: None,
+        },
+        expected_impact: ImpactMetrics {
+            complexity_reduction: 0.0,
+            coverage_improvement: 0.0,
+            risk_reduction: 0.0,
+            lines_reduction: 0,
+        },
+        transitive_coverage: output.metrics.coverage.map(|cov| {
+            crate::priority::coverage_propagation::TransitiveCoverage {
+                direct: cov,
+                transitive: cov,
+                propagated_from: vec![],
+                uncovered_lines: output.metrics.uncovered_lines.clone().unwrap_or_default(),
+            }
+        }),
+        upstream_dependencies: output.dependencies.upstream_count,
+        downstream_dependencies: output.dependencies.downstream_count,
+        upstream_callers: vec![],
+        downstream_callees: vec![],
+        upstream_production_callers: vec![],
+        upstream_test_callers: vec![],
+        production_blast_radius: 0,
+        nesting_depth: output.metrics.nesting_depth,
+        function_length: output.metrics.length,
+        cyclomatic_complexity: output.metrics.cyclomatic_complexity,
+        cognitive_complexity: output.metrics.cognitive_complexity,
+        is_pure: output.purity_analysis.as_ref().map(|p| p.is_pure),
+        purity_confidence: output.purity_analysis.as_ref().map(|p| p.confidence),
+        purity_level: None,
+        god_object_indicators: None,
+        tier: None,
+        function_context: None,
+        context_confidence: None,
+        contextual_recommendation: None,
+        pattern_analysis: None,
+        file_context: None,
+        context_multiplier: None,
+        context_type: None,
+        language_specific: None,
+        detected_pattern: None,
+        contextual_risk: None,
+        file_line_count: None,
+        responsibility_category: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
+        entropy_analysis: None,
+        context_suggestion: None,
+    }
+}
+
+/// Convert FileDebtItemOutput to FileDebtItem with minimal fields for comparison
+fn output_to_internal_file(
+    output: &crate::output::unified::FileDebtItemOutput,
+) -> crate::priority::file_metrics::FileDebtItem {
+    use crate::priority::file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact};
+    use std::path::PathBuf;
+
+    FileDebtItem {
+        metrics: FileDebtMetrics {
+            path: PathBuf::from(&output.location.file),
+            total_lines: output.metrics.lines,
+            function_count: output.metrics.functions,
+            class_count: output.metrics.classes,
+            avg_complexity: output.metrics.avg_complexity,
+            max_complexity: output.metrics.max_complexity,
+            total_complexity: output.metrics.total_complexity,
+            coverage_percent: output.metrics.coverage,
+            uncovered_lines: output.metrics.uncovered_lines,
+            god_object_analysis: None,
+            function_scores: vec![],
+            god_object_type: None,
+            file_type: None,
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            dependents: vec![],
+            dependencies_list: vec![],
+        },
+        score: output.score,
+        priority_rank: match output.priority {
+            crate::output::unified::Priority::Critical => 1,
+            crate::output::unified::Priority::High => 2,
+            crate::output::unified::Priority::Medium => 3,
+            crate::output::unified::Priority::Low => 4,
+        },
+        recommendation: output.recommendation.action.clone(),
+        impact: FileImpact {
+            complexity_reduction: 0.0,
+            maintainability_improvement: 0.0,
+            test_effort: 0.0,
+        },
     }
 }
 

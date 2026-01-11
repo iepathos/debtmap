@@ -349,6 +349,7 @@ pub enum ImpactLevel {
 // FunctionVisibility moved to debt_types module
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum DebtItem {
     File(Box<FileDebtItem>),
     Function(Box<UnifiedDebtItem>),
@@ -721,32 +722,31 @@ mod tests {
 
     #[test]
     fn test_debtitem_from_real_json() {
-        // This is the actual format from debtmap analyze output
+        // This is the internally-tagged format (using "type" field)
         let json = r#"{
-          "File": {
-            "metrics": {
-              "path": "./test.rs",
-              "total_lines": 100,
-              "function_count": 5,
-              "class_count": 1,
-              "avg_complexity": 3.0,
-              "max_complexity": 10,
-              "total_complexity": 50,
-              "coverage_percent": 0.5,
-              "uncovered_lines": 50,
-              "function_scores": [],
-              "god_object_analysis": null,
-              "god_object_type": null,
-              "file_type": null
-            },
-            "score": 50.0,
-            "priority_rank": 1,
-            "recommendation": "Test",
-            "impact": {
-              "complexity_reduction": 10.0,
-              "maintainability_improvement": 5.0,
-              "test_effort": 2.0
-            }
+          "type": "File",
+          "metrics": {
+            "path": "./test.rs",
+            "total_lines": 100,
+            "function_count": 5,
+            "class_count": 1,
+            "avg_complexity": 3.0,
+            "max_complexity": 10,
+            "total_complexity": 50,
+            "coverage_percent": 0.5,
+            "uncovered_lines": 50,
+            "function_scores": [],
+            "god_object_analysis": null,
+            "god_object_type": null,
+            "file_type": null
+          },
+          "score": 50.0,
+          "priority_rank": 1,
+          "recommendation": "Test",
+          "impact": {
+            "complexity_reduction": 10.0,
+            "maintainability_improvement": 5.0,
+            "test_effort": 2.0
           }
         }"#;
 

@@ -15,11 +15,12 @@ use super::types::{
     is_critical, is_score_unchanged, AnalysisSummary, DebtmapJsonInput, ImprovedItems, ItemInfo,
     NewItems, ResolvedItems, UnchangedCritical, CRITICAL_SCORE_THRESHOLD,
 };
-use crate::priority::coverage_propagation::TransitiveCoverage;
-
+use crate::output::unified::{
+    Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput, Priority,
+    RecommendationOutput, UnifiedDebtItemOutput, UnifiedLocation,
+};
 use crate::priority::semantic_classifier::FunctionRole;
-use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
-use crate::priority::{ActionableRecommendation, DebtItem, DebtType, ImpactMetrics};
+use crate::priority::{DebtType, ImpactMetrics};
 use std::path::PathBuf;
 
 // =============================================================================
@@ -42,7 +43,7 @@ fn create_empty_output() -> DebtmapJsonInput {
     }
 }
 
-fn create_output_with_items(items: Vec<DebtItem>) -> DebtmapJsonInput {
+fn create_output_with_items(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInput {
     DebtmapJsonInput {
         items,
         total_impact: ImpactMetrics {
@@ -58,6 +59,7 @@ fn create_output_with_items(items: Vec<DebtItem>) -> DebtmapJsonInput {
     }
 }
 
+/// Create a function item in the output format (UnifiedDebtItemOutput)
 fn create_function_item(
     file: &str,
     function: &str,
@@ -65,272 +67,88 @@ fn create_function_item(
     score: f64,
     complexity: u32,
     coverage: Option<f64>,
-) -> DebtItem {
-    let transitive_coverage = coverage.map(|c| TransitiveCoverage {
-        direct: c,
-        transitive: c,
-        propagated_from: vec![],
-        uncovered_lines: vec![],
-    });
-
-    DebtItem::Function(Box::new(UnifiedDebtItem {
-        location: Location {
-            file: PathBuf::from(file),
-            function: function.to_string(),
-            line,
+) -> UnifiedDebtItemOutput {
+    UnifiedDebtItemOutput::Function(Box::new(FunctionDebtItemOutput {
+        score: score.max(0.0),
+        category: "Complexity".to_string(),
+        priority: if score >= 8.0 {
+            Priority::Critical
+        } else if score >= 5.0 {
+            Priority::High
+        } else if score >= 2.0 {
+            Priority::Medium
+        } else {
+            Priority::Low
+        },
+        location: UnifiedLocation {
+            file: file.to_string(),
+            line: Some(line),
+            function: Some(function.to_string()),
+            file_context_label: None,
+        },
+        metrics: FunctionMetricsOutput {
+            cyclomatic_complexity: complexity,
+            cognitive_complexity: 0,
+            length: 50,
+            nesting_depth: 0,
+            coverage,
+            uncovered_lines: None,
+            entropy_score: None,
+            pattern_repetition: None,
+            branch_similarity: None,
+            entropy_adjusted_cognitive: None,
+            transitive_coverage: None,
         },
         debt_type: DebtType::ComplexityHotspot {
             cyclomatic: complexity,
             cognitive: 0,
         },
-        unified_score: UnifiedScore {
-            complexity_factor: 0.0,
-            coverage_factor: 0.0,
-            dependency_factor: 0.0,
-            role_multiplier: 1.0,
-            final_score: score.max(0.0),
-            base_score: None,
-            exponential_factor: None,
-            risk_boost: None,
-            pre_adjustment_score: None,
-            adjustment_applied: None,
-            purity_factor: None,
-            refactorability_factor: None,
-            pattern_factor: None,
-            // Spec 260: Score transparency fields
-            debt_adjustment: None,
-            pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
-            has_coverage_data: false,
-            contextual_risk_multiplier: None,
-            pre_contextual_score: None,
-        },
         function_role: FunctionRole::Unknown,
-        recommendation: ActionableRecommendation {
-            primary_action: String::new(),
-            rationale: String::new(),
+        purity_analysis: None,
+        dependencies: Dependencies::default(),
+        recommendation: RecommendationOutput {
+            action: "Refactor".to_string(),
+            priority: None,
             implementation_steps: vec![],
-            related_items: vec![],
-            steps: None,
-            estimated_effort_hours: None,
         },
-        expected_impact: ImpactMetrics {
-            coverage_improvement: 0.0,
-            lines_reduction: 0,
+        impact: FunctionImpactOutput {
             complexity_reduction: 0.0,
+            coverage_improvement: 0.0,
             risk_reduction: 0.0,
         },
-        transitive_coverage,
-        upstream_dependencies: 0,
-        downstream_dependencies: 0,
-        upstream_callers: vec![],
-        downstream_callees: vec![],
-        upstream_production_callers: vec![],
-        upstream_test_callers: vec![],
-        production_blast_radius: 0,
-        nesting_depth: 0,
-        function_length: 50,
-        cyclomatic_complexity: complexity,
-        cognitive_complexity: 0,
-        is_pure: None,
-        purity_confidence: None,
-        purity_level: None,
-        god_object_indicators: None,
-        tier: None,
-        function_context: None,
-        context_confidence: None,
-        contextual_recommendation: None,
-        pattern_analysis: None,
-        file_context: None,
-        context_multiplier: None,
-        context_type: None,
-        language_specific: None,
-        detected_pattern: None,
-        contextual_risk: None,
-        file_line_count: None,
-        responsibility_category: None,
-        error_swallowing_count: None,
-        error_swallowing_patterns: None,
-        entropy_analysis: None,
-        context_suggestion: None,
+        scoring_details: None,
+        adjusted_complexity: None,
+        complexity_pattern: None,
+        pattern_type: None,
+        pattern_confidence: None,
+        pattern_details: None,
+        context: None,
+        git_history: None,
     }))
 }
 
+/// Create a test function item with coverage support
 fn create_test_function_item(
     file: &str,
     function: &str,
     score: f64,
     complexity: u32,
-    coverage: Option<TransitiveCoverage>,
-) -> DebtItem {
-    DebtItem::Function(Box::new(UnifiedDebtItem {
-        location: Location {
-            file: PathBuf::from(file),
-            function: function.to_string(),
-            line: 1,
-        },
-        debt_type: DebtType::ComplexityHotspot {
-            cyclomatic: complexity,
-            cognitive: 5,
-        },
-        unified_score: UnifiedScore {
-            complexity_factor: 0.0,
-            coverage_factor: 0.0,
-            dependency_factor: 0.0,
-            role_multiplier: 1.0,
-            final_score: score.max(0.0),
-            base_score: None,
-            exponential_factor: None,
-            risk_boost: None,
-            pre_adjustment_score: None,
-            adjustment_applied: None,
-            purity_factor: None,
-            refactorability_factor: None,
-            pattern_factor: None,
-            // Spec 260: Score transparency fields
-            debt_adjustment: None,
-            pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
-            has_coverage_data: false,
-            contextual_risk_multiplier: None,
-            pre_contextual_score: None,
-        },
-        function_role: FunctionRole::PureLogic,
-        recommendation: ActionableRecommendation {
-            primary_action: "refactor".to_string(),
-            rationale: "test".to_string(),
-            implementation_steps: vec![],
-            related_items: vec![],
-            steps: None,
-            estimated_effort_hours: None,
-        },
-        expected_impact: ImpactMetrics {
-            complexity_reduction: 0.0,
-            coverage_improvement: 0.0,
-            risk_reduction: 0.0,
-            lines_reduction: 0,
-        },
-        transitive_coverage: coverage,
-        file_context: None,
-        upstream_dependencies: 0,
-        downstream_dependencies: 0,
-        upstream_callers: vec![],
-        downstream_callees: vec![],
-        upstream_production_callers: vec![],
-        upstream_test_callers: vec![],
-        production_blast_radius: 0,
-        nesting_depth: 1,
-        function_length: 10,
-        cyclomatic_complexity: complexity,
-        cognitive_complexity: 5,
-        is_pure: None,
-        purity_confidence: None,
-        purity_level: None,
-        god_object_indicators: None,
-        tier: None,
-        function_context: None,
-        context_confidence: None,
-        contextual_recommendation: None,
-        pattern_analysis: None,
-        context_multiplier: None,
-        context_type: None,
-        language_specific: None,
-        detected_pattern: None,
-        contextual_risk: None,
-        file_line_count: None,
-        responsibility_category: None,
-        error_swallowing_count: None,
-        error_swallowing_patterns: None,
-        entropy_analysis: None,
-        context_suggestion: None,
-    }))
+    coverage: Option<f64>,
+) -> UnifiedDebtItemOutput {
+    create_function_item(file, function, 1, score, complexity, coverage)
 }
 
-fn create_test_debt_item(file: &str, function: &str, line: usize, score: f64) -> UnifiedDebtItem {
-    UnifiedDebtItem {
-        location: Location {
-            file: PathBuf::from(file),
-            function: function.to_string(),
-            line,
-        },
-        debt_type: DebtType::ComplexityHotspot {
-            cyclomatic: 5,
-            cognitive: 8,
-        },
-        unified_score: UnifiedScore {
-            complexity_factor: 0.0,
-            coverage_factor: 0.0,
-            dependency_factor: 0.0,
-            role_multiplier: 1.0,
-            final_score: score.max(0.0),
-            base_score: None,
-            exponential_factor: None,
-            risk_boost: None,
-            pre_adjustment_score: None,
-            adjustment_applied: None,
-            purity_factor: None,
-            refactorability_factor: None,
-            pattern_factor: None,
-            // Spec 260: Score transparency fields
-            debt_adjustment: None,
-            pre_normalization_score: None,
-            structural_multiplier: Some(1.0),
-            has_coverage_data: false,
-            contextual_risk_multiplier: None,
-            pre_contextual_score: None,
-        },
-        function_role: FunctionRole::PureLogic,
-        recommendation: ActionableRecommendation {
-            primary_action: "Test".into(),
-            rationale: "Test".into(),
-            implementation_steps: vec![],
-            related_items: vec![],
-            steps: None,
-            estimated_effort_hours: None,
-        },
-        expected_impact: ImpactMetrics {
-            risk_reduction: 0.0,
-            complexity_reduction: 0.0,
-            coverage_improvement: 0.0,
-            lines_reduction: 0,
-        },
-        transitive_coverage: None,
-        file_context: None,
-        upstream_dependencies: 0,
-        downstream_dependencies: 0,
-        upstream_callers: vec![],
-        downstream_callees: vec![],
-        upstream_production_callers: vec![],
-        upstream_test_callers: vec![],
-        production_blast_radius: 0,
-        nesting_depth: 1,
-        function_length: 10,
-        cyclomatic_complexity: 5,
-        cognitive_complexity: 8,
-        is_pure: Some(false),
-        purity_confidence: Some(0.0),
-        purity_level: None,
-        god_object_indicators: None,
-        tier: None,
-        function_context: None,
-        context_confidence: None,
-        contextual_recommendation: None,
-        pattern_analysis: None,
-        context_multiplier: None,
-        context_type: None,
-        language_specific: None,
-        detected_pattern: None,
-        contextual_risk: None,
-        file_line_count: None,
-        responsibility_category: None,
-        error_swallowing_count: None,
-        error_swallowing_patterns: None,
-        entropy_analysis: None,
-        context_suggestion: None,
-    }
+/// Create a test debt item (returns UnifiedDebtItemOutput for use in tests)
+fn create_test_debt_item(
+    file: &str,
+    function: &str,
+    line: usize,
+    score: f64,
+) -> UnifiedDebtItemOutput {
+    create_function_item(file, function, line, score, 5, None)
 }
 
-fn create_test_output(items: Vec<DebtItem>) -> DebtmapJsonInput {
+fn create_test_output(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInput {
     DebtmapJsonInput {
         items,
         total_impact: ImpactMetrics {
@@ -677,32 +495,19 @@ fn test_score_improvement_above_threshold_with_complexity_reduction() {
 
 #[test]
 fn test_score_improvement_with_coverage_increase() {
-    let before_coverage = Some(TransitiveCoverage {
-        direct: 0.3,
-        transitive: 0.2,
-        propagated_from: vec![],
-        uncovered_lines: vec![],
-    });
-    let after_coverage = Some(TransitiveCoverage {
-        direct: 0.8,
-        transitive: 0.7,
-        propagated_from: vec![],
-        uncovered_lines: vec![],
-    });
-
     let before = create_output_with_items(vec![create_test_function_item(
         "test.rs",
         "func1",
         10.0,
         10,
-        before_coverage,
+        Some(0.3),
     )]);
     let after = create_output_with_items(vec![create_test_function_item(
         "test.rs",
         "func1",
         9.0,
         10,
-        after_coverage,
+        Some(0.8),
     )]);
 
     let result = identify_improved_items(&before, &after);
@@ -746,37 +551,14 @@ fn test_identify_unchanged_critical_empty_inputs() {
 
 #[test]
 fn test_identify_unchanged_critical_no_critical_items() {
-    let before_items = vec![
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/foo.rs",
-            "low_score",
-            10,
-            5.0,
-        ))),
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/bar.rs",
-            "another_low",
-            20,
-            7.5,
-        ))),
-    ];
-    let after_items = vec![
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/foo.rs",
-            "low_score",
-            10,
-            5.2,
-        ))),
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/bar.rs",
-            "another_low",
-            20,
-            7.3,
-        ))),
-    ];
-
-    let before = create_test_output(before_items);
-    let after = create_test_output(after_items);
+    let before = create_test_output(vec![
+        create_test_debt_item("src/foo.rs", "low_score", 10, 5.0),
+        create_test_debt_item("src/bar.rs", "another_low", 20, 7.5),
+    ]);
+    let after = create_test_output(vec![
+        create_test_debt_item("src/foo.rs", "low_score", 10, 5.2),
+        create_test_debt_item("src/bar.rs", "another_low", 20, 7.3),
+    ]);
 
     let result = identify_unchanged_critical(&before, &after);
 
@@ -786,16 +568,13 @@ fn test_identify_unchanged_critical_no_critical_items() {
 
 #[test]
 fn test_identify_unchanged_critical_items_resolved() {
-    let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+    let before = create_test_output(vec![create_test_debt_item(
         "src/foo.rs",
         "critical_fn",
         10,
         9.0,
-    )))];
-    let after_items = vec![];
-
-    let before = create_test_output(before_items);
-    let after = create_test_output(after_items);
+    )]);
+    let after = create_test_output(vec![]);
 
     let result = identify_unchanged_critical(&before, &after);
 
@@ -805,37 +584,14 @@ fn test_identify_unchanged_critical_items_resolved() {
 
 #[test]
 fn test_identify_unchanged_critical_items_unchanged() {
-    let before_items = vec![
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/foo.rs",
-            "critical_fn",
-            10,
-            9.0,
-        ))),
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/bar.rs",
-            "another_critical",
-            20,
-            10.5,
-        ))),
-    ];
-    let after_items = vec![
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/foo.rs",
-            "critical_fn",
-            10,
-            9.2,
-        ))),
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/bar.rs",
-            "another_critical",
-            20,
-            10.3,
-        ))),
-    ];
-
-    let before = create_test_output(before_items);
-    let after = create_test_output(after_items);
+    let before = create_test_output(vec![
+        create_test_debt_item("src/foo.rs", "critical_fn", 10, 9.0),
+        create_test_debt_item("src/bar.rs", "another_critical", 20, 10.5),
+    ]);
+    let after = create_test_output(vec![
+        create_test_debt_item("src/foo.rs", "critical_fn", 10, 9.2),
+        create_test_debt_item("src/bar.rs", "another_critical", 20, 10.3),
+    ]);
 
     let result = identify_unchanged_critical(&before, &after);
 
@@ -904,7 +660,7 @@ fn test_is_score_unchanged_outside_tolerance() {
 
 #[test]
 fn test_build_function_map_empty() {
-    let items: Vec<DebtItem> = vec![];
+    let items: Vec<UnifiedDebtItemOutput> = vec![];
     let result = build_function_map(&items);
     assert_eq!(result.len(), 0);
 }
@@ -912,18 +668,8 @@ fn test_build_function_map_empty() {
 #[test]
 fn test_build_function_map_only_functions() {
     let items = vec![
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/foo.rs",
-            "func1",
-            10,
-            9.0,
-        ))),
-        DebtItem::Function(Box::new(create_test_debt_item(
-            "src/bar.rs",
-            "func2",
-            20,
-            8.5,
-        ))),
+        create_test_debt_item("src/foo.rs", "func1", 10, 9.0),
+        create_test_debt_item("src/bar.rs", "func2", 20, 8.5),
     ];
 
     let result = build_function_map(&items);
@@ -1362,6 +1108,60 @@ fn test_build_all_gaps_combined() {
 }
 
 // =============================================================================
+// Serialization Format Tests
+// =============================================================================
+
+/// Test that UnifiedDebtItemOutput JSON can be deserialized into DebtmapJsonInput.
+/// This ensures the analyze output format is compatible with compare input.
+#[test]
+fn test_output_json_deserializes_for_compare() {
+    use crate::output::unified::{
+        DebtSummary, OutputMetadata, ScoreDistribution, TypeBreakdown, UnifiedOutput,
+    };
+
+    // Create a minimal UnifiedOutput similar to what debtmap analyze produces
+    let unified_output = UnifiedOutput {
+        format_version: "3.0".to_string(),
+        metadata: OutputMetadata {
+            debtmap_version: "0.12.0".to_string(),
+            generated_at: "2024-01-01T00:00:00Z".to_string(),
+            project_root: None,
+            analysis_type: "unified".to_string(),
+        },
+        summary: DebtSummary {
+            total_items: 0,
+            total_debt_score: 0.0,
+            debt_density: 0.0,
+            total_loc: 0,
+            by_type: TypeBreakdown {
+                file: 0,
+                function: 0,
+            },
+            by_category: std::collections::HashMap::new(),
+            score_distribution: ScoreDistribution {
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+            },
+            cohesion: None,
+        },
+        items: vec![],
+    };
+
+    // Serialize to JSON (what analyze writes)
+    let json = serde_json::to_string_pretty(&unified_output).expect("Failed to serialize");
+
+    // Deserialize as DebtmapJsonInput (what compare reads)
+    let result: Result<DebtmapJsonInput, _> = serde_json::from_str(&json);
+    assert!(
+        result.is_ok(),
+        "UnifiedOutput JSON should deserialize as DebtmapJsonInput: {:?}",
+        result.err()
+    );
+}
+
+// =============================================================================
 // Property-based Tests
 // =============================================================================
 
@@ -1395,19 +1195,19 @@ mod property_tests {
 
         #[test]
         fn prop_count_equals_length(count in 0usize..50) {
-            let before_items: Vec<DebtItem> = (0..count)
+            let items: Vec<UnifiedDebtItemOutput> = (0..count)
                 .map(|i| {
-                    DebtItem::Function(Box::new(create_test_debt_item(
+                    create_test_debt_item(
                         "src/test.rs",
                         &format!("fn_{}", i),
                         i * 10,
                         8.5 + (i as f64 % 5.0),
-                    )))
+                    )
                 })
                 .collect();
 
-            let after_output = create_test_output(before_items.clone());
-            let before_output = create_test_output(before_items);
+            let before_output = create_test_output(items.clone());
+            let after_output = create_test_output(items);
 
             let result = identify_unchanged_critical(&before_output, &after_output);
 
