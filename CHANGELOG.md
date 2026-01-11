@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2025-01-11
+
+### Fixed
+
+- **Test Caller Filtering for Production Blast Radius** (Spec 267)
+  - Fixed path-based test attribute detection (`#[tokio::test]`, `#[actix_rt::test]`)
+    - `syn::Path::is_ident()` only matches single identifiers, not paths
+    - Now properly checks path segments for async test framework attributes
+  - Fixed caller classification path mismatch
+    - Caller strings have short paths (`overflow.rs:func`) but call graph has full paths
+    - Added name-based fallback when path-based lookup fails
+  - Fixed module-qualified name matching
+    - Call graph stores `test::func_name` but caller strings only have `func_name`
+    - Now matches if function name ends with `::name` pattern
+  - Fixed god object caller classification
+    - File-scope debt items were bypassing caller classification entirely
+    - Now properly separates production and test callers for god objects
+  - Result: Production blast radius now correctly excludes test callers
+    - Example: overflow.rs went from 129 (90+39) to 55 (16+39) after filtering 74 test callers
+
 ## [0.11.0] - 2025-12-20
 
 ### Added
