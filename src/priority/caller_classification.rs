@@ -90,6 +90,11 @@ pub fn classify_caller(caller: &str, call_graph: Option<&CallGraph>) -> CallerTy
             if cg.is_test_helper(&func_id) {
                 return CallerType::Test;
             }
+            // Path-based lookup failed (paths don't match exactly)
+            // Fall back to name-based lookup using just the function name
+            if is_test_function_by_name(&func_id.name, cg) {
+                return CallerType::Test;
+            }
         } else {
             // Caller string is just a function name - search by name in call graph
             // This handles cases where upstream_callers only contains function names
@@ -599,6 +604,70 @@ mod tests {
         assert_eq!(
             classify_caller("reflow_arrays", Some(&call_graph)),
             CallerType::Production
+        );
+    }
+
+    #[test]
+    fn test_path_mismatch_falls_back_to_name_lookup() {
+        use std::path::PathBuf;
+
+        // Simulate real scenario: call graph has FULL path, caller string has SHORT path
+        let mut call_graph = CallGraph::new();
+
+        // Call graph stores function with full path (as built during analysis)
+        let test_fn = FunctionId::new(
+            PathBuf::from("./src/formatting/overflow.rs"), // Full path in call graph
+            "vertical_with_comment_stays_vertical".to_string(),
+            450,
+        );
+        call_graph.add_function(
+            test_fn.clone(),
+            false, // not entry point
+            true,  // IS A TEST
+            5,
+            10,
+        );
+
+        // Caller string only has filename (as appears in debt item output)
+        // This creates a FunctionId with path "overflow.rs" which won't match
+        // "./src/formatting/overflow.rs" in the call graph HashMap lookup.
+        // The fix: if path lookup fails, fall back to name-based lookup.
+        let caller = "overflow.rs:vertical_with_comment_stays_vertical";
+
+        assert_eq!(
+            classify_caller(caller, Some(&call_graph)),
+            CallerType::Test,
+            "Path mismatch should fall back to name-based lookup"
+        );
+    }
+
+    #[test]
+    fn test_prod_function_with_path_mismatch_stays_production() {
+        use std::path::PathBuf;
+
+        let mut call_graph = CallGraph::new();
+
+        // Production function with full path
+        let prod_fn = FunctionId::new(
+            PathBuf::from("./src/formatting/overflow.rs"),
+            "reflow_arrays".to_string(),
+            100,
+        );
+        call_graph.add_function(
+            prod_fn.clone(),
+            true,  // entry point
+            false, // NOT a test
+            10,
+            25,
+        );
+
+        // Caller string with short path - should still be Production
+        let caller = "overflow.rs:reflow_arrays";
+
+        assert_eq!(
+            classify_caller(caller, Some(&call_graph)),
+            CallerType::Production,
+            "Production functions should remain Production even with path mismatch"
         );
     }
 }
