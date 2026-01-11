@@ -4,6 +4,8 @@
 //! and creating debt items without any I/O or progress reporting.
 
 use crate::organization::GodObjectAnalysis;
+use crate::priority::call_graph::CallGraph;
+use crate::priority::caller_classification::{classify_callers, ClassifiedCallers};
 use crate::priority::file_metrics::FileDebtMetrics;
 use crate::priority::god_object_aggregation::GodObjectAggregatedMetrics;
 use crate::priority::{
@@ -25,6 +27,7 @@ pub fn create_god_object_debt_item(
     god_analysis: &GodObjectAnalysis,
     mut aggregated_metrics: GodObjectAggregatedMetrics,
     coverage_data: Option<&LcovData>,
+    call_graph: Option<&CallGraph>,
 ) -> UnifiedDebtItem {
     // Fallback: If no function-level coverage, use file-level coverage from LCOV
     if aggregated_metrics.weighted_coverage.is_none() {
@@ -81,13 +84,24 @@ pub fn create_god_object_debt_item(
         transitive_coverage: aggregated_metrics.weighted_coverage,
         upstream_dependencies: aggregated_metrics.upstream_dependencies,
         downstream_dependencies: aggregated_metrics.downstream_dependencies,
-        upstream_callers: aggregated_metrics.unique_upstream_callers,
-        downstream_callees: aggregated_metrics.unique_downstream_callees,
-        // Spec 267: Caller classification not available for god objects yet
-        upstream_production_callers: vec![],
-        upstream_test_callers: vec![],
-        production_blast_radius: aggregated_metrics.upstream_dependencies
-            + aggregated_metrics.downstream_dependencies,
+        upstream_callers: aggregated_metrics.unique_upstream_callers.clone(),
+        downstream_callees: aggregated_metrics.unique_downstream_callees.clone(),
+        // Spec 267: Classify callers into production and test for god objects
+        upstream_production_callers: classify_god_object_callers(
+            &aggregated_metrics.unique_upstream_callers,
+            call_graph,
+        )
+        .production,
+        upstream_test_callers: classify_god_object_callers(
+            &aggregated_metrics.unique_upstream_callers,
+            call_graph,
+        )
+        .test,
+        production_blast_radius: calculate_god_object_production_blast_radius(
+            &aggregated_metrics.unique_upstream_callers,
+            aggregated_metrics.downstream_dependencies,
+            call_graph,
+        ),
         nesting_depth: aggregated_metrics.max_nesting_depth,
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
@@ -504,6 +518,30 @@ pub fn analyze_file_git_context(
         base_risk,
         project_root.to_path_buf(),
     )
+}
+
+/// Classify callers for god object items (Spec 267).
+///
+/// This applies caller classification to separate test callers from production callers
+/// for god object debt items, enabling accurate production blast radius calculation.
+fn classify_god_object_callers(
+    upstream_callers: &[String],
+    call_graph: Option<&CallGraph>,
+) -> ClassifiedCallers {
+    classify_callers(upstream_callers.iter(), call_graph)
+}
+
+/// Calculate production blast radius for god object items (Spec 267).
+///
+/// Production blast radius = production_upstream_count + downstream_count
+/// This excludes test callers from the blast radius calculation.
+fn calculate_god_object_production_blast_radius(
+    upstream_callers: &[String],
+    downstream_count: usize,
+    call_graph: Option<&CallGraph>,
+) -> usize {
+    let classified = classify_god_object_callers(upstream_callers, call_graph);
+    classified.production_count + downstream_count
 }
 
 #[cfg(test)]

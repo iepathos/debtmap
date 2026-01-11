@@ -1244,6 +1244,7 @@ impl ParallelUnifiedAnalysisBuilder {
                             &god_analysis,
                             aggregated_metrics,
                             coverage_data,
+                            Some(&self.call_graph),
                         );
 
                     // Generate context suggestion for AI agents (spec 263)

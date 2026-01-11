@@ -621,6 +621,7 @@ fn process_file_analysis(
                     &enriched,
                     aggregated,
                     coverage_data,
+                    Some(call_graph),
                 );
 
                 // Generate context suggestion for AI agents (spec 263)
