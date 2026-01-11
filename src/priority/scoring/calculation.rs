@@ -65,6 +65,91 @@ pub fn calculate_dependency_factor(upstream_count: usize) -> f64 {
     ((upstream_count as f64) / 2.0).min(10.0)
 }
 
+// =============================================================================
+// Instability-Aware Scoring (Spec 269)
+// =============================================================================
+
+/// Result of instability-aware dependency factor calculation (spec 269).
+#[derive(Debug, Clone)]
+pub struct InstabilityAwareDependencyResult {
+    /// The adjusted dependency factor (with architectural multiplier applied)
+    pub adjusted_factor: f64,
+    /// The base factor before adjustment
+    pub base_factor: f64,
+    /// The multiplier that was applied
+    pub multiplier: f64,
+    /// The architectural classification name
+    pub classification: &'static str,
+    /// Whether this is a stable-by-design module (should reduce debt priority)
+    pub is_stable_by_design: bool,
+    /// Whether this is an architectural concern (actual debt)
+    pub is_architectural_concern: bool,
+}
+
+/// Calculate dependency factor with instability-aware adjustment (spec 269).
+///
+/// This function adjusts the dependency factor based on architectural
+/// classification using the Stable Dependencies Principle:
+/// - Stable modules (low instability) with many callers are intentional foundations
+/// - Unstable modules (high instability) with many callers are actual debt
+///
+/// # Arguments
+///
+/// * `production_caller_count` - Number of production code callers (from spec 267)
+/// * `test_caller_count` - Number of test code callers (from spec 267)
+/// * `efferent_count` - Number of dependencies this module has (callees)
+///
+/// # Returns
+///
+/// An `InstabilityAwareDependencyResult` containing the adjusted factor and metadata.
+pub fn calculate_instability_aware_dependency_factor(
+    production_caller_count: usize,
+    test_caller_count: usize,
+    efferent_count: usize,
+) -> InstabilityAwareDependencyResult {
+    use crate::output::unified::{
+        calculate_instability, classify_coupling_pattern, CouplingClassification,
+    };
+
+    let afferent_count = production_caller_count + test_caller_count;
+    let instability = calculate_instability(afferent_count, efferent_count);
+
+    let classification = classify_coupling_pattern(
+        instability,
+        production_caller_count,
+        test_caller_count,
+        efferent_count,
+    );
+
+    // Base factor from production callers only (spec 267)
+    let base_factor = calculate_dependency_factor(production_caller_count);
+
+    // Apply architectural multiplier
+    let multiplier = classification.score_multiplier();
+    let adjusted_factor = (base_factor * multiplier).min(10.0);
+
+    let classification_name = match classification {
+        CouplingClassification::WellTestedCore => "Well-Tested Core",
+        CouplingClassification::StableFoundation => "Stable Foundation",
+        CouplingClassification::UnstableHighCoupling => "Unstable High Coupling",
+        CouplingClassification::StableCore => "Stable Core",
+        CouplingClassification::UtilityModule => "Utility Module",
+        CouplingClassification::ArchitecturalHub => "Architectural Hub",
+        CouplingClassification::LeafModule => "Leaf Module",
+        CouplingClassification::Isolated => "Isolated",
+        CouplingClassification::HighlyCoupled => "Highly Coupled",
+    };
+
+    InstabilityAwareDependencyResult {
+        adjusted_factor,
+        base_factor,
+        multiplier,
+        classification: classification_name,
+        is_stable_by_design: classification.is_stable_by_design(),
+        is_architectural_concern: classification.is_architectural_concern(),
+    }
+}
+
 /// Calculate base score with coverage as multiplier (spec 122)
 /// Coverage dampens the complexity+dependency base score instead of adding to it
 pub fn calculate_base_score_with_coverage_multiplier(
@@ -743,6 +828,93 @@ mod tests {
             "High max ({}) should be higher than low max ({})",
             high_max,
             low_max
+        );
+    }
+
+    // =========================================================================
+    // Tests for Instability-Aware Scoring (Spec 269)
+    // =========================================================================
+
+    #[test]
+    fn test_instability_aware_well_tested_core() {
+        // Well-tested core should have reduced score
+        let result = calculate_instability_aware_dependency_factor(
+            5,  // production callers
+            85, // test callers (high test ratio)
+            10, // efferent count
+        );
+
+        assert_eq!(result.classification, "Well-Tested Core");
+        assert!(result.is_stable_by_design);
+        assert!(!result.is_architectural_concern);
+        assert!(result.multiplier < 0.5);
+        assert!(result.adjusted_factor < result.base_factor);
+    }
+
+    #[test]
+    fn test_instability_aware_unstable_high_coupling() {
+        // Unstable high coupling should have increased score
+        let result = calculate_instability_aware_dependency_factor(
+            15, // production callers
+            2,  // test callers
+            60, // efferent count (high instability)
+        );
+
+        assert_eq!(result.classification, "Unstable High Coupling");
+        assert!(!result.is_stable_by_design);
+        assert!(result.is_architectural_concern);
+        assert!(result.multiplier > 1.0);
+        assert!(result.adjusted_factor > result.base_factor);
+    }
+
+    #[test]
+    fn test_instability_aware_stable_foundation() {
+        // Stable foundation should have reduced score
+        let result = calculate_instability_aware_dependency_factor(
+            15, // production callers (many)
+            3,  // test callers
+            5,  // efferent count (low instability)
+        );
+
+        assert_eq!(result.classification, "Stable Foundation");
+        assert!(result.is_stable_by_design);
+        assert!(!result.is_architectural_concern);
+        assert!(result.multiplier < 1.0);
+    }
+
+    #[test]
+    fn test_instability_aware_leaf_module() {
+        // Leaf module (few callers, many dependencies)
+        let result = calculate_instability_aware_dependency_factor(
+            1,  // production callers (few)
+            0,  // test callers
+            10, // efferent count (many)
+        );
+
+        assert_eq!(result.classification, "Leaf Module");
+        assert!(!result.is_stable_by_design);
+        assert!(!result.is_architectural_concern);
+    }
+
+    #[test]
+    fn test_instability_aware_overflow_rs_scenario() {
+        // Simulate overflow.rs: instability 0.26, 5 prod + 85 test callers
+        // This should be classified as WellTestedCore and get reduced score
+        let result = calculate_instability_aware_dependency_factor(
+            5,  // production callers
+            85, // test callers
+            35, // efferent count (results in ~0.26 instability)
+        );
+
+        assert_eq!(result.classification, "Well-Tested Core");
+        assert!(result.is_stable_by_design);
+        assert!(result.multiplier < 0.5);
+
+        // Base factor for 5 callers: 5/2 = 2.5
+        // With 0.3 multiplier: 2.5 * 0.3 = 0.75
+        assert!(
+            result.adjusted_factor < 1.5,
+            "Score should be heavily reduced"
         );
     }
 }

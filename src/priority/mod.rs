@@ -1,3 +1,4 @@
+pub mod architecture_recognition;
 pub mod call_graph;
 pub mod caller_classification;
 pub mod classification;
