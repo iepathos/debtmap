@@ -129,8 +129,7 @@ impl GraphBuilder {
             if segments.len() == 2 {
                 let first = segments[0].as_str();
                 let second = segments[1].as_str();
-                return (first == "tokio" && second == "test")
-                    || (first == "actix_rt" && second == "test");
+                return (first == "actix_rt" || first == "tokio") && second == "test";
             }
 
             false

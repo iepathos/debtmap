@@ -4,6 +4,7 @@
 //! and creating debt items without any I/O or progress reporting.
 
 use crate::organization::GodObjectAnalysis;
+use crate::priority::architecture_recognition::calculate_instability;
 use crate::priority::call_graph::CallGraph;
 use crate::priority::caller_classification::{classify_callers, ClassifiedCallers};
 use crate::priority::file_metrics::FileDebtMetrics;
@@ -43,8 +44,28 @@ pub fn create_god_object_debt_item(
         }
     }
 
-    // Calculate unified score
-    let unified_score = calculate_god_object_score(god_analysis, &aggregated_metrics);
+    // Spec 267: Classify callers into production and test for god objects
+    let classified_callers =
+        classify_god_object_callers(&aggregated_metrics.unique_upstream_callers, call_graph);
+
+    // Spec 269: Calculate coupling classification for score dampening
+    let coupling_classification = crate::output::unified::classify_coupling_pattern(
+        calculate_instability(
+            aggregated_metrics.upstream_dependencies,
+            aggregated_metrics.downstream_dependencies,
+        ),
+        classified_callers.production_count,
+        classified_callers.test_count,
+        aggregated_metrics.downstream_dependencies,
+    );
+
+    // Calculate unified score with architectural dampening
+    let mut unified_score = calculate_god_object_score(god_analysis, &aggregated_metrics);
+    let score_multiplier = coupling_classification.score_multiplier();
+    if score_multiplier < 1.0 {
+        // Apply dampening for stable/well-tested cores (spec 269)
+        unified_score.final_score *= score_multiplier;
+    }
 
     // Create debt type
     let debt_type = create_god_object_debt_type(god_analysis);
@@ -58,9 +79,9 @@ pub fn create_god_object_debt_item(
     // Create recommendation
     let recommendation = create_god_object_recommendation(god_analysis);
 
-    // Determine tier
-    let base_score = god_analysis.god_object_score;
-    let tier = if base_score >= 50.0 {
+    // Determine tier based on dampened score
+    let dampened_score = unified_score.final_score;
+    let tier = if dampened_score >= 50.0 {
         crate::priority::RecommendationTier::T1CriticalArchitecture
     } else {
         crate::priority::RecommendationTier::T2ComplexUntested
@@ -69,6 +90,10 @@ pub fn create_god_object_debt_item(
     // Determine appropriate function role based on detection type (spec 233)
     // God objects are architectural issues - classify based on their nature
     let function_role = classify_god_object_role(god_analysis);
+
+    // Calculate production blast radius
+    let production_blast_radius =
+        classified_callers.production_count + aggregated_metrics.downstream_dependencies;
 
     UnifiedDebtItem {
         location: crate::priority::unified_scorer::Location {
@@ -86,22 +111,9 @@ pub fn create_god_object_debt_item(
         downstream_dependencies: aggregated_metrics.downstream_dependencies,
         upstream_callers: aggregated_metrics.unique_upstream_callers.clone(),
         downstream_callees: aggregated_metrics.unique_downstream_callees.clone(),
-        // Spec 267: Classify callers into production and test for god objects
-        upstream_production_callers: classify_god_object_callers(
-            &aggregated_metrics.unique_upstream_callers,
-            call_graph,
-        )
-        .production,
-        upstream_test_callers: classify_god_object_callers(
-            &aggregated_metrics.unique_upstream_callers,
-            call_graph,
-        )
-        .test,
-        production_blast_radius: calculate_god_object_production_blast_radius(
-            &aggregated_metrics.unique_upstream_callers,
-            aggregated_metrics.downstream_dependencies,
-            call_graph,
-        ),
+        upstream_production_callers: classified_callers.production,
+        upstream_test_callers: classified_callers.test,
+        production_blast_radius,
         nesting_depth: aggregated_metrics.max_nesting_depth,
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
@@ -529,19 +541,6 @@ fn classify_god_object_callers(
     call_graph: Option<&CallGraph>,
 ) -> ClassifiedCallers {
     classify_callers(upstream_callers.iter(), call_graph)
-}
-
-/// Calculate production blast radius for god object items (Spec 267).
-///
-/// Production blast radius = production_upstream_count + downstream_count
-/// This excludes test callers from the blast radius calculation.
-fn calculate_god_object_production_blast_radius(
-    upstream_callers: &[String],
-    downstream_count: usize,
-    call_graph: Option<&CallGraph>,
-) -> usize {
-    let classified = classify_god_object_callers(upstream_callers, call_graph);
-    classified.production_count + downstream_count
 }
 
 #[cfg(test)]

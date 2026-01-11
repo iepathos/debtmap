@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_classify_callers_separates_correctly() {
-        let callers = vec![
+        let callers = [
             "test_parse_array".to_string(),
             "process_file".to_string(),
             "should_format".to_string(),

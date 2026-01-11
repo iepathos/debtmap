@@ -554,7 +554,7 @@ fn test_god_objects_created_in_parallel_analysis() {
     );
 
     // Verify the god object has correct properties
-    for god_item in god_items {
+    for god_item in &god_items {
         let indicators = god_item.god_object_indicators.as_ref().unwrap();
         assert!(
             indicators.is_god_object,
@@ -566,11 +566,18 @@ fn test_god_objects_created_in_parallel_analysis() {
         );
 
         // Verify god objects are assigned to T1 (Critical Architecture)
+        // Note: Isolated god objects with dampening may be classified as T2 instead of T1
+        // when their final score falls below T1 thresholds. This is expected behavior
+        // per Spec 269 (architectural dampening for stable/well-tested cores).
         if let Some(tier) = god_item.tier {
-            assert_eq!(
-                tier,
-                debtmap::priority::RecommendationTier::T1CriticalArchitecture,
-                "God objects should be classified as T1 Critical Architecture"
+            assert!(
+                matches!(
+                    tier,
+                    debtmap::priority::RecommendationTier::T1CriticalArchitecture
+                        | debtmap::priority::RecommendationTier::T2ComplexUntested
+                ),
+                "God objects should be classified as T1 or T2, got {:?}",
+                tier
             );
         }
     }
