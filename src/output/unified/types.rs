@@ -221,6 +221,7 @@ mod tests {
                 total_complexity: 160,
                 coverage: 0.7,
                 uncovered_lines: 150,
+                distribution: None,
             },
             god_object_indicators: None,
             dependencies: None,

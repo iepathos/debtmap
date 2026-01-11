@@ -17,6 +17,15 @@
 //! individual functions don't exceed complexity thresholds, the god object
 //! still shows all its cross-file dependencies for proper assessment.
 //!
+//! ## Complexity Distribution Analysis (Spec 268)
+//!
+//! For file-scope items, we now analyze how complexity is distributed:
+//! - **Concentrated**: Max complexity > 50% of total → likely god function
+//! - **Distributed**: Max complexity < 20% of total → well-structured file
+//! - **Mixed**: Between 20-50% → needs investigation
+//!
+//! This helps distinguish "many simple functions" from "one god function".
+//!
 //! # Examples
 //!
 //! ```rust,ignore
@@ -33,8 +42,73 @@ use crate::core::FunctionMetrics;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
 use crate::risk::lcov::LcovData;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
+
+/// Default threshold for flagging individual functions as complex (Spec 268).
+pub const FUNCTION_COMPLEXITY_THRESHOLD: u32 = 15;
+
+/// Classification of how complexity is distributed across functions in a file.
+///
+/// Used to distinguish between:
+/// - Files with one dominant god function (Concentrated)
+/// - Files with many small, well-structured functions (Distributed)
+/// - Files that need further investigation (Mixed)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ComplexityDistribution {
+    /// Max complexity > 50% of total - likely contains god function(s)
+    Concentrated,
+    /// Max complexity 20-50% of total - needs investigation
+    Mixed,
+    /// Max complexity < 20% of total - well-structured file
+    Distributed,
+}
+
+impl ComplexityDistribution {
+    /// Human-readable name for display
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::Concentrated => "Concentrated",
+            Self::Mixed => "Mixed",
+            Self::Distributed => "Distributed",
+        }
+    }
+
+    /// Explanation of what the classification means for refactoring
+    pub fn classification_explanation(&self) -> &'static str {
+        match self {
+            Self::Concentrated => "Contains god function(s) - refactoring recommended",
+            Self::Mixed => "Some complexity concentration - review recommended",
+            Self::Distributed => "Well-Structured File - complexity evenly distributed",
+        }
+    }
+}
+
+/// Distribution metrics for file-scope complexity analysis (Spec 268).
+///
+/// These metrics help distinguish between:
+/// - A file with many simple functions (low max, distributed complexity)
+/// - A file with one or more god functions (high max, concentrated complexity)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistributionMetrics {
+    /// Number of functions in the file
+    pub function_count: usize,
+    /// Highest cyclomatic complexity among all functions
+    pub max_complexity: u32,
+    /// Average cyclomatic complexity per function
+    pub avg_complexity: f64,
+    /// Median cyclomatic complexity (robust to outliers)
+    pub median_complexity: u32,
+    /// Number of functions exceeding the complexity threshold
+    pub exceeding_threshold: usize,
+    /// Classification based on complexity distribution
+    pub distribution: ComplexityDistribution,
+    /// Production code lines (excluding test modules)
+    pub production_loc: usize,
+    /// Test code lines (inside #[cfg(test)] modules)
+    pub test_loc: usize,
+}
 
 /// Aggregated metrics from member functions.
 #[derive(Debug, Clone)]
@@ -54,6 +128,8 @@ pub struct GodObjectAggregatedMetrics {
     pub error_swallowing_patterns: Vec<String>,
     /// Aggregated entropy analysis from member functions (Spec 218)
     pub aggregated_entropy: Option<EntropyAnalysis>,
+    /// Distribution metrics for file-scope analysis (Spec 268)
+    pub distribution_metrics: Option<DistributionMetrics>,
 }
 
 /// Extract member functions for a file.
@@ -134,6 +210,142 @@ pub fn aggregate_coverage_metrics(members: &[&UnifiedDebtItem]) -> Option<Transi
         propagated_from,
         uncovered_lines,
     })
+}
+
+// =============================================================================
+// Distribution Metrics Functions (Spec 268)
+// =============================================================================
+
+/// Calculate the median of a slice of complexity values.
+///
+/// Pure function that computes the median without modifying input.
+/// Returns 0 for empty slices.
+pub fn calculate_median(values: &[u32]) -> u32 {
+    if values.is_empty() {
+        return 0;
+    }
+
+    let mut sorted: Vec<u32> = values.to_vec();
+    sorted.sort_unstable();
+
+    let mid = sorted.len() / 2;
+    if sorted.len() % 2 == 0 {
+        // Even number of elements: average of two middle values
+        (sorted[mid - 1] + sorted[mid]) / 2
+    } else {
+        // Odd number of elements: middle value
+        sorted[mid]
+    }
+}
+
+/// Classify complexity distribution based on max/total ratio.
+///
+/// - Concentrated: max > 50% of total (one function dominates)
+/// - Distributed: max < 20% of total (well-structured file)
+/// - Mixed: 20-50% (needs investigation)
+pub fn classify_distribution(max_complexity: u32, total_complexity: u32) -> ComplexityDistribution {
+    if total_complexity == 0 {
+        return ComplexityDistribution::Distributed;
+    }
+
+    let ratio = max_complexity as f64 / total_complexity as f64;
+
+    if ratio > 0.5 {
+        ComplexityDistribution::Concentrated
+    } else if ratio > 0.2 {
+        ComplexityDistribution::Mixed
+    } else {
+        ComplexityDistribution::Distributed
+    }
+}
+
+/// Calculate distribution metrics from UnifiedDebtItem members (Spec 268).
+///
+/// Returns metrics describing how complexity is distributed across functions,
+/// helping distinguish well-structured files from those with god functions.
+pub fn aggregate_distribution_metrics(members: &[&UnifiedDebtItem]) -> DistributionMetrics {
+    let complexities: Vec<u32> = members.iter().map(|m| m.cyclomatic_complexity).collect();
+
+    let total: u32 = complexities.iter().sum();
+    let max = complexities.iter().max().copied().unwrap_or(0);
+    let count = complexities.len();
+
+    let avg = if count > 0 {
+        total as f64 / count as f64
+    } else {
+        0.0
+    };
+
+    let median = calculate_median(&complexities);
+
+    let exceeding = complexities
+        .iter()
+        .filter(|&&c| c > FUNCTION_COMPLEXITY_THRESHOLD)
+        .count();
+
+    let distribution = classify_distribution(max, total);
+
+    // Calculate LOC from function lengths
+    let production_loc: usize = members.iter().map(|m| m.function_length).sum();
+
+    DistributionMetrics {
+        function_count: count,
+        max_complexity: max,
+        avg_complexity: avg,
+        median_complexity: median,
+        exceeding_threshold: exceeding,
+        distribution,
+        production_loc,
+        test_loc: 0, // Updated separately via AST analysis
+    }
+}
+
+/// Calculate distribution metrics from raw FunctionMetrics (Spec 268).
+///
+/// This version works with raw metrics before filtering, providing complete
+/// distribution analysis including test code separation.
+pub fn aggregate_distribution_metrics_from_raw(
+    functions: &[FunctionMetrics],
+) -> DistributionMetrics {
+    // Separate production and test functions
+    let production_functions: Vec<_> = functions.iter().filter(|f| !f.is_test).collect();
+    let test_functions: Vec<_> = functions.iter().filter(|f| f.is_test).collect();
+
+    let complexities: Vec<u32> = production_functions.iter().map(|f| f.cyclomatic).collect();
+
+    let total: u32 = complexities.iter().sum();
+    let max = complexities.iter().max().copied().unwrap_or(0);
+    let count = complexities.len();
+
+    let avg = if count > 0 {
+        total as f64 / count as f64
+    } else {
+        0.0
+    };
+
+    let median = calculate_median(&complexities);
+
+    let exceeding = complexities
+        .iter()
+        .filter(|&&c| c > FUNCTION_COMPLEXITY_THRESHOLD)
+        .count();
+
+    let distribution = classify_distribution(max, total);
+
+    // Calculate LOC separately for production and test code
+    let production_loc: usize = production_functions.iter().map(|f| f.length).sum();
+    let test_loc: usize = test_functions.iter().map(|f| f.length).sum();
+
+    DistributionMetrics {
+        function_count: count,
+        max_complexity: max,
+        avg_complexity: avg,
+        median_complexity: median,
+        exceeding_threshold: exceeding,
+        distribution,
+        production_loc,
+        test_loc,
+    }
 }
 
 /// Aggregate dependencies: unique set deduplication.
@@ -327,6 +539,7 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
     let (callers, callees, up_count, down_count) = aggregate_dependency_metrics(members);
     let contextual_risk = aggregate_contextual_risk(members);
     let entropy = aggregate_entropy_metrics(members);
+    let distribution = aggregate_distribution_metrics(members);
 
     // Note: Error swallowing is aggregated from raw FunctionMetrics, not UnifiedDebtItem
     // This function sets defaults; use aggregate_from_raw_metrics for full error swallowing data
@@ -343,6 +556,7 @@ pub fn aggregate_god_object_metrics(members: &[&UnifiedDebtItem]) -> GodObjectAg
         total_error_swallowing_count: 0,
         error_swallowing_patterns: Vec::new(),
         aggregated_entropy: entropy,
+        distribution_metrics: Some(distribution),
     }
 }
 
@@ -489,6 +703,7 @@ pub fn aggregate_coverage_from_raw_metrics(
 /// before any filtering, ensuring god objects show:
 /// - TRUE complexity of all their functions
 /// - TRUE architectural dependencies (complete blast radius)
+/// - Distribution metrics with production/test LOC separation (Spec 268)
 ///
 /// Note: Coverage is NOT aggregated here. Use `aggregate_coverage_from_raw_metrics`
 /// separately with LCOV data for coverage metrics.
@@ -511,6 +726,9 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
         downstream_dependencies,
     ) = aggregate_dependency_metrics_from_raw(functions);
 
+    // Aggregate distribution metrics with production/test LOC separation (Spec 268)
+    let distribution_metrics = aggregate_distribution_metrics_from_raw(functions);
+
     GodObjectAggregatedMetrics {
         total_cyclomatic,
         total_cognitive,
@@ -524,6 +742,7 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
         total_error_swallowing_count: total_error_swallowing,
         error_swallowing_patterns: error_patterns,
         aggregated_entropy,
+        distribution_metrics: Some(distribution_metrics),
     }
 }
 
@@ -1421,5 +1640,381 @@ mod tests {
         assert_eq!(metrics.downstream_dependencies, 1);
         assert_eq!(metrics.unique_upstream_callers.len(), 2);
         assert_eq!(metrics.unique_downstream_callees.len(), 1);
+    }
+
+    // =========================================================================
+    // Tests for Distribution Metrics (Spec 268)
+    // =========================================================================
+
+    #[test]
+    fn test_calculate_median_odd_count() {
+        assert_eq!(calculate_median(&[1, 2, 3, 4, 5]), 3);
+        assert_eq!(calculate_median(&[5, 1, 3]), 3); // Tests sorting
+        assert_eq!(calculate_median(&[100]), 100);
+    }
+
+    #[test]
+    fn test_calculate_median_even_count() {
+        // For even count, returns average of two middle values
+        assert_eq!(calculate_median(&[1, 2, 3, 4]), 2); // (2+3)/2 = 2 (integer division)
+        assert_eq!(calculate_median(&[1, 3, 5, 7]), 4); // (3+5)/2 = 4
+    }
+
+    #[test]
+    fn test_calculate_median_empty() {
+        assert_eq!(calculate_median(&[]), 0);
+    }
+
+    #[test]
+    fn test_classify_distribution_concentrated() {
+        // Single function has 60% of complexity
+        assert_eq!(
+            classify_distribution(60, 100),
+            ComplexityDistribution::Concentrated
+        );
+        // Edge case: exactly 51%
+        assert_eq!(
+            classify_distribution(51, 100),
+            ComplexityDistribution::Concentrated
+        );
+    }
+
+    #[test]
+    fn test_classify_distribution_mixed() {
+        // Max function has 30% of complexity
+        assert_eq!(
+            classify_distribution(30, 100),
+            ComplexityDistribution::Mixed
+        );
+        // Edge case: exactly 50%
+        assert_eq!(
+            classify_distribution(50, 100),
+            ComplexityDistribution::Mixed
+        );
+        // Edge case: just above 20%
+        assert_eq!(
+            classify_distribution(21, 100),
+            ComplexityDistribution::Mixed
+        );
+    }
+
+    #[test]
+    fn test_classify_distribution_distributed() {
+        // Max function has only 10% of complexity
+        assert_eq!(
+            classify_distribution(10, 100),
+            ComplexityDistribution::Distributed
+        );
+        // Edge case: exactly 20%
+        assert_eq!(
+            classify_distribution(20, 100),
+            ComplexityDistribution::Distributed
+        );
+        // Zero total should be Distributed
+        assert_eq!(
+            classify_distribution(0, 0),
+            ComplexityDistribution::Distributed
+        );
+    }
+
+    #[test]
+    fn test_aggregate_distribution_metrics() {
+        // Create items with varied complexity to test distribution calculation
+        let members = vec![
+            create_test_item("file.rs", 5, 10, 2, 50), // Low complexity
+            create_test_item("file.rs", 8, 15, 3, 100), // Medium complexity
+            create_test_item("file.rs", 12, 20, 4, 75), // Medium complexity
+            create_test_item("file.rs", 6, 12, 2, 60), // Low complexity
+            create_test_item("file.rs", 7, 14, 3, 80), // Low complexity
+        ];
+        let member_refs: Vec<_> = members.iter().collect();
+
+        let dist = aggregate_distribution_metrics(&member_refs);
+
+        // Total: 5+8+12+6+7 = 38, max = 12
+        // Ratio: 12/38 = 0.316 -> Mixed
+        assert_eq!(dist.function_count, 5);
+        assert_eq!(dist.max_complexity, 12);
+        assert!((dist.avg_complexity - 7.6).abs() < 0.01); // 38/5 = 7.6
+        assert_eq!(dist.median_complexity, 7); // sorted: 5,6,7,8,12 -> median = 7
+        assert_eq!(dist.exceeding_threshold, 0); // none exceed 15
+        assert_eq!(dist.distribution, ComplexityDistribution::Mixed);
+        assert_eq!(dist.production_loc, 365); // 50+100+75+60+80
+    }
+
+    #[test]
+    fn test_aggregate_distribution_metrics_distributed_file() {
+        // Create items simulating a well-structured file with many small functions
+        let mut members = Vec::new();
+        for i in 0..30 {
+            // 30 functions with complexity 3-7 (average 5)
+            members.push(create_test_item("file.rs", 3 + (i % 5), 10, 2, 20));
+        }
+        let member_refs: Vec<_> = members.iter().collect();
+
+        let dist = aggregate_distribution_metrics(&member_refs);
+
+        // Total: 30 functions with avg complexity 5 = total ~150
+        // Max complexity = 7 (3 + 4)
+        // Ratio: 7/~150 = ~0.047 -> Distributed
+        assert_eq!(dist.function_count, 30);
+        assert_eq!(dist.max_complexity, 7); // max of 3,4,5,6,7
+        assert_eq!(dist.exceeding_threshold, 0);
+        assert_eq!(dist.distribution, ComplexityDistribution::Distributed);
+    }
+
+    #[test]
+    fn test_aggregate_distribution_metrics_concentrated_file() {
+        // Create items simulating a god function dominating the file
+        let members = vec![
+            create_test_item("file.rs", 60, 100, 5, 500), // God function
+            create_test_item("file.rs", 5, 10, 2, 30),    // Small helper
+            create_test_item("file.rs", 5, 10, 2, 30),    // Small helper
+        ];
+        let member_refs: Vec<_> = members.iter().collect();
+
+        let dist = aggregate_distribution_metrics(&member_refs);
+
+        // Total: 60+5+5 = 70, max = 60
+        // Ratio: 60/70 = 0.857 -> Concentrated
+        assert_eq!(dist.function_count, 3);
+        assert_eq!(dist.max_complexity, 60);
+        assert_eq!(dist.exceeding_threshold, 1); // 60 exceeds 15
+        assert_eq!(dist.distribution, ComplexityDistribution::Concentrated);
+    }
+
+    #[test]
+    fn test_aggregate_distribution_metrics_from_raw() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "prod_func1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 10,
+                cognitive: 15,
+                nesting: 2,
+                length: 100,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+                entropy_analysis: None,
+            },
+            FunctionMetrics {
+                name: "prod_func2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 50,
+                cyclomatic: 8,
+                cognitive: 12,
+                nesting: 1,
+                length: 50,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+                entropy_analysis: None,
+            },
+            FunctionMetrics {
+                name: "test_something".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 100,
+                cyclomatic: 5,
+                cognitive: 8,
+                nesting: 1,
+                length: 200, // Test function with more LOC
+                is_test: true,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: true,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+                entropy_analysis: None,
+            },
+        ];
+
+        let dist = aggregate_distribution_metrics_from_raw(&functions);
+
+        // Should only count production functions (2 functions)
+        assert_eq!(dist.function_count, 2);
+        // Total complexity from production: 10+8 = 18, max = 10
+        assert_eq!(dist.max_complexity, 10);
+        assert!((dist.avg_complexity - 9.0).abs() < 0.01); // 18/2 = 9.0
+                                                           // Production LOC: 100 + 50 = 150
+        assert_eq!(dist.production_loc, 150);
+        // Test LOC: 200
+        assert_eq!(dist.test_loc, 200);
+        // Ratio: 10/18 = 0.556 -> Concentrated
+        assert_eq!(dist.distribution, ComplexityDistribution::Concentrated);
+    }
+
+    #[test]
+    fn test_distributed_file_gets_correct_classification() {
+        // Real-world scenario: 30 small functions (like overflow.rs example)
+        let mut functions = Vec::new();
+        for i in 0..30 {
+            functions.push(FunctionMetrics {
+                name: format!("func_{}", i),
+                file: PathBuf::from("overflow.rs"),
+                line: i * 20 + 1,
+                cyclomatic: 5 + (i as u32 % 4), // 5, 6, 7, 8, 5, 6, ...
+                cognitive: 4 + (i as u32 % 3),
+                nesting: 2,
+                length: 20, // ~20 lines each
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+                entropy_analysis: None,
+            });
+        }
+
+        let dist = aggregate_distribution_metrics_from_raw(&functions);
+
+        // Should be classified as Distributed (well-structured file)
+        assert_eq!(dist.function_count, 30);
+        assert_eq!(dist.max_complexity, 8); // max of 5,6,7,8
+        assert_eq!(dist.distribution, ComplexityDistribution::Distributed);
+        assert_eq!(dist.production_loc, 600); // 30 * 20
+    }
+
+    #[test]
+    fn test_complexity_distribution_display_names() {
+        assert_eq!(
+            ComplexityDistribution::Concentrated.display_name(),
+            "Concentrated"
+        );
+        assert_eq!(ComplexityDistribution::Mixed.display_name(), "Mixed");
+        assert_eq!(
+            ComplexityDistribution::Distributed.display_name(),
+            "Distributed"
+        );
+    }
+
+    #[test]
+    fn test_complexity_distribution_explanations() {
+        assert!(ComplexityDistribution::Concentrated
+            .classification_explanation()
+            .contains("god function"));
+        assert!(ComplexityDistribution::Mixed
+            .classification_explanation()
+            .contains("review"));
+        assert!(ComplexityDistribution::Distributed
+            .classification_explanation()
+            .contains("Well-Structured"));
+    }
+
+    #[test]
+    fn test_aggregate_god_object_metrics_includes_distribution() {
+        let members = vec![
+            create_test_item("file.rs", 10, 20, 2, 100),
+            create_test_item("file.rs", 8, 15, 3, 80),
+        ];
+        let member_refs: Vec<_> = members.iter().collect();
+
+        let metrics = aggregate_god_object_metrics(&member_refs);
+
+        assert!(metrics.distribution_metrics.is_some());
+        let dist = metrics.distribution_metrics.unwrap();
+        assert_eq!(dist.function_count, 2);
+        assert_eq!(dist.max_complexity, 10);
+    }
+
+    #[test]
+    fn test_aggregate_from_raw_metrics_includes_distribution() {
+        let functions = vec![FunctionMetrics {
+            name: "func1".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 10,
+            cognitive: 15,
+            nesting: 2,
+            length: 100,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        }];
+
+        let metrics = aggregate_from_raw_metrics(&functions);
+
+        assert!(metrics.distribution_metrics.is_some());
+        let dist = metrics.distribution_metrics.unwrap();
+        assert_eq!(dist.function_count, 1);
+        assert_eq!(dist.max_complexity, 10);
+        assert_eq!(dist.production_loc, 100);
     }
 }

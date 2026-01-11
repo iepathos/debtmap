@@ -363,12 +363,44 @@ pub mod format {
     pub fn file_metrics(m: &crate::output::unified::FileMetricsOutput) -> String {
         let mut out = String::new();
         writeln!(out, "#### Metrics").unwrap();
-        writeln!(out, "- Lines: {}", m.lines).unwrap();
-        writeln!(out, "- Functions: {}", m.functions).unwrap();
+        writeln!(out, "- Total Cyclomatic Complexity: {}", m.total_complexity).unwrap();
+
+        // Show distribution metrics if available (Spec 268)
+        if let Some(ref dist) = m.distribution {
+            writeln!(
+                out,
+                "- Complexity Distribution: {} (max: {}, avg: {:.1}, median: {})",
+                dist.distribution_type,
+                dist.max_function_complexity,
+                dist.avg_function_complexity,
+                dist.median_complexity
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "- Functions: {} total, {} exceeding threshold",
+                dist.function_count, dist.exceeding_threshold
+            )
+            .unwrap();
+            writeln!(out, "- Production LOC: {}", dist.production_loc).unwrap();
+            if dist.test_loc > 0 {
+                writeln!(out, "- Test LOC: {}", dist.test_loc).unwrap();
+            }
+            writeln!(
+                out,
+                "- Distribution Classification: {}",
+                dist.classification_explanation
+            )
+            .unwrap();
+        } else {
+            // Fallback to basic metrics when distribution not available
+            writeln!(out, "- Lines: {}", m.lines).unwrap();
+            writeln!(out, "- Functions: {}", m.functions).unwrap();
+            writeln!(out, "- Average Complexity: {:.1}", m.avg_complexity).unwrap();
+            writeln!(out, "- Max Complexity: {}", m.max_complexity).unwrap();
+        }
+
         writeln!(out, "- Classes: {}", m.classes).unwrap();
-        writeln!(out, "- Average Complexity: {:.1}", m.avg_complexity).unwrap();
-        writeln!(out, "- Max Complexity: {}", m.max_complexity).unwrap();
-        writeln!(out, "- Total Complexity: {}", m.total_complexity).unwrap();
         writeln!(out, "- Coverage: {:.0}%", m.coverage * 100.0).unwrap();
         writeln!(out, "- Uncovered Lines: {}", m.uncovered_lines).unwrap();
         out

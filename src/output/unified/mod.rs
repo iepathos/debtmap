@@ -39,7 +39,10 @@ pub use coupling::{
 };
 pub use dedup::deduplicate_items;
 pub use dependencies::{Dependencies, PurityAnalysis, RecommendationOutput};
-pub use file_item::{FileDebtItemOutput, FileImpactOutput, FileMetricsOutput, FileScoringDetails};
+pub use file_item::{
+    DistributionMetricsOutput, FileDebtItemOutput, FileImpactOutput, FileMetricsOutput,
+    FileScoringDetails,
+};
 pub use format::{round_ratio, round_score};
 pub use func_item::{
     AdjustedComplexity, ContextSuggestionOutput, FileRangeOutput, FunctionDebtItemOutput,
@@ -236,6 +239,7 @@ mod proptest_tests {
                 total_complexity,
                 coverage: round_ratio(coverage),
                 uncovered_lines,
+                distribution: None, // Spec 268: optional distribution metrics
             }
         }
     }

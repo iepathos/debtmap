@@ -241,6 +241,61 @@ pub fn normalize_complexity(cyclomatic: u32, cognitive: u32) -> f64 {
     }
 }
 
+// =============================================================================
+// Distribution-Aware Scoring (Spec 268)
+// =============================================================================
+
+/// Complexity distribution classification for file-scope items.
+///
+/// Imported from god_object_aggregation module but defined locally
+/// for scoring to avoid circular dependencies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComplexityDistributionType {
+    /// Max complexity > 50% of total - likely contains god function(s)
+    Concentrated,
+    /// Max complexity 20-50% of total - needs investigation
+    Mixed,
+    /// Max complexity < 20% of total - well-structured file
+    Distributed,
+}
+
+/// Calculate distribution-aware complexity factor for file-scope items (Spec 268).
+///
+/// This function applies dampening to the complexity factor based on how
+/// complexity is distributed across functions:
+/// - Distributed files (many small functions) get a 60% reduction
+/// - Mixed files get a 30% reduction
+/// - Concentrated files (god functions) maintain full score
+///
+/// Additionally, the max function complexity is considered:
+/// - If no single function exceeds 15 complexity, extra dampening is applied
+/// - This prevents well-structured files from being flagged as high priority
+pub fn calculate_file_scope_complexity_factor(
+    total_complexity: u32,
+    distribution: ComplexityDistributionType,
+    max_function_complexity: u32,
+) -> f64 {
+    let base_factor = calculate_complexity_factor(total_complexity as f64);
+
+    // Apply dampening based on distribution
+    let distribution_dampening = match distribution {
+        ComplexityDistributionType::Distributed => 0.4, // 60% reduction
+        ComplexityDistributionType::Mixed => 0.7,       // 30% reduction
+        ComplexityDistributionType::Concentrated => 1.0, // No reduction
+    };
+
+    // Also consider if max function is actually complex
+    let max_function_dampening = if max_function_complexity < 15 {
+        0.5 // No single function is concerning
+    } else if max_function_complexity < 30 {
+        0.75 // Some concern but not severe
+    } else {
+        1.0 // At least one god function exists
+    };
+
+    base_factor * distribution_dampening * max_function_dampening
+}
+
 /// Generate visualization data for score distribution.
 /// Since normalization was removed (spec 261), scores are now identity
 /// (negative values floored to 0, no upper bound).
@@ -592,5 +647,102 @@ mod tests {
         assert!(display.contains("16.7"));
         assert!(display.contains("45.0"));
         assert!(display.contains("critical")); // 16.7 is in the "critical" range (>15)
+    }
+
+    // =========================================================================
+    // Tests for Distribution-Aware Scoring (Spec 268)
+    // =========================================================================
+
+    #[test]
+    fn test_file_scope_complexity_factor_concentrated() {
+        // Concentrated distribution with high max complexity should not be dampened
+        let factor = calculate_file_scope_complexity_factor(
+            100,
+            ComplexityDistributionType::Concentrated,
+            60,
+        );
+        let base_factor = calculate_complexity_factor(100.0);
+
+        // Should be equal to base factor (no dampening)
+        assert!((factor - base_factor).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_file_scope_complexity_factor_distributed() {
+        // Distributed file with low max complexity should be heavily dampened
+        let factor = calculate_file_scope_complexity_factor(
+            100,
+            ComplexityDistributionType::Distributed,
+            8, // Low max complexity
+        );
+        let base_factor = calculate_complexity_factor(100.0);
+
+        // Should be 40% * 50% = 20% of base factor
+        let expected = base_factor * 0.4 * 0.5;
+        assert!((factor - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_file_scope_complexity_factor_mixed() {
+        // Mixed distribution
+        let factor = calculate_file_scope_complexity_factor(
+            100,
+            ComplexityDistributionType::Mixed,
+            25, // Moderate max complexity
+        );
+        let base_factor = calculate_complexity_factor(100.0);
+
+        // Should be 70% * 75% = 52.5% of base factor
+        let expected = base_factor * 0.7 * 0.75;
+        assert!((factor - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_distributed_file_gets_significantly_lower_score() {
+        // Simulate the overflow.rs scenario from the spec
+        // Total complexity 182, but distributed across 30 small functions
+        let distributed_factor = calculate_file_scope_complexity_factor(
+            182,
+            ComplexityDistributionType::Distributed,
+            12, // Max function complexity
+        );
+
+        // Compare to concentrated file with same total
+        let concentrated_factor = calculate_file_scope_complexity_factor(
+            182,
+            ComplexityDistributionType::Concentrated,
+            182, // One giant function
+        );
+
+        // Distributed should be significantly lower
+        assert!(
+            distributed_factor < concentrated_factor * 0.5,
+            "Distributed score ({}) should be less than half of concentrated score ({})",
+            distributed_factor,
+            concentrated_factor
+        );
+    }
+
+    #[test]
+    fn test_max_function_complexity_affects_dampening() {
+        // Same distribution but different max function complexity
+        let low_max = calculate_file_scope_complexity_factor(
+            100,
+            ComplexityDistributionType::Mixed,
+            10, // Low max
+        );
+        let high_max = calculate_file_scope_complexity_factor(
+            100,
+            ComplexityDistributionType::Mixed,
+            50, // High max
+        );
+
+        // Higher max should result in higher score
+        assert!(
+            high_max > low_max,
+            "High max ({}) should be higher than low max ({})",
+            high_max,
+            low_max
+        );
     }
 }

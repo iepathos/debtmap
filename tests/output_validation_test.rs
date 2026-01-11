@@ -195,6 +195,7 @@ fn test_file_item_required_fields_and_ranges() {
             total_complexity: 212,
             coverage: 0.65,
             uncovered_lines: 175,
+            distribution: None,
         },
         god_object_indicators: None,
         dependencies: None,
