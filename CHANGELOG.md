@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Result: Production blast radius now correctly excludes test callers
     - Example: overflow.rs went from 129 (90+39) to 55 (16+39) after filtering 74 test callers
 
+- **Score Dampening for Well-Tested Stable Cores** (Spec 269)
+  - Fixed coupling classification threshold from `< 0.3` to `<= 0.35`
+    - Instability of 0.3023 displays as "0.30" but failed strict `< 0.3` check
+    - Now correctly classifies stable modules with borderline instability
+  - Applied score dampening for WellTestedCore classification in god objects
+    - Well-tested stable cores (instability <= 0.35, 70%+ test callers) now get 80% score reduction
+    - These foundations should not appear as priority debt items
+  - Result: Well-tested stable files no longer flagged as high-priority debt
+    - Example: overflow.rs (74 test / 16 production callers) now scores 10 (Low) instead of 50 (High)
+
 ## [0.11.0] - 2025-12-20
 
 ### Added
