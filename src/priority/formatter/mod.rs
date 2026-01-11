@@ -121,6 +121,12 @@ fn format_truncated_list(items: &[String], max: usize) -> String {
 /// Get the display label for a coupling classification
 fn coupling_classification_label(classification: &CouplingClassification) -> &'static str {
     match classification {
+        // Spec 269: Architecture-aware classifications
+        CouplingClassification::WellTestedCore => "well-tested core",
+        CouplingClassification::StableFoundation => "stable foundation",
+        CouplingClassification::UnstableHighCoupling => "unstable high coupling",
+        CouplingClassification::ArchitecturalHub => "architectural hub",
+        // Existing classifications
         CouplingClassification::StableCore => "stable core",
         CouplingClassification::UtilityModule => "utility",
         CouplingClassification::LeafModule => "leaf",

@@ -95,6 +95,10 @@ fn create_test_item(
         file_line_count: None,
         responsibility_category: None,
         context_suggestion: None,
+        // Spec 267: Production/test caller separation
+        upstream_production_callers: vec![],
+        upstream_test_callers: vec![],
+        production_blast_radius: 0,
     }
 }
 

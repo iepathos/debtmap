@@ -182,6 +182,30 @@ pub mod format {
         }
         if let Some(ref class) = deps.coupling_classification {
             writeln!(out, "- Coupling Classification: {}", class).unwrap();
+
+            // Spec 269: Add architectural insight for stable-by-design modules
+            let architectural_insight = match class.as_str() {
+                "Well-Tested Core" | "well_tested_core" => {
+                    Some("Stable foundation with high test coverage - not actual debt")
+                }
+                "Stable Foundation" | "stable_foundation" => {
+                    Some("Intentionally stable module - many callers is by design")
+                }
+                "Stable Core" | "stable_core" => {
+                    Some("Stable dependency - high callers indicates good architecture")
+                }
+                "Unstable High Coupling" | "unstable_high_coupling" => {
+                    Some("Actual architectural debt - unstable module with many dependents")
+                }
+                "Architectural Hub" | "architectural_hub" => {
+                    Some("Central connector - review for potential refactoring opportunities")
+                }
+                _ => None,
+            };
+
+            if let Some(insight) = architectural_insight {
+                writeln!(out, "- Architectural Insight: {}", insight).unwrap();
+            }
         }
         if let Some(inst) = deps.instability {
             writeln!(out, "- Instability: {:.2} (I=Ce/(Ca+Ce))", inst).unwrap();
