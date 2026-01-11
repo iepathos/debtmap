@@ -86,12 +86,7 @@ impl GraphBuilder {
         item_fn: &ItemFn,
         module_path: String,
     ) -> FunctionId {
-        let is_test = item_fn.attrs.iter().any(|attr| {
-            attr.path().is_ident("test")
-                || attr.path().is_ident("tokio::test")
-                || attr.path().is_ident("actix_rt::test")
-        });
-
+        let is_test = Self::has_test_attribute(&item_fn.attrs);
         let is_async = item_fn.sig.asyncness.is_some();
 
         self.add_function(name, line, is_test, is_async, module_path)
@@ -105,15 +100,45 @@ impl GraphBuilder {
         impl_fn: &ImplItemFn,
         module_path: String,
     ) -> FunctionId {
-        let is_test = impl_fn.attrs.iter().any(|attr| {
-            attr.path().is_ident("test")
-                || attr.path().is_ident("tokio::test")
-                || attr.path().is_ident("actix_rt::test")
-        });
-
+        let is_test = Self::has_test_attribute(&impl_fn.attrs);
         let is_async = impl_fn.sig.asyncness.is_some();
 
         self.add_function(name, line, is_test, is_async, module_path)
+    }
+
+    /// Check if a function has a test attribute.
+    ///
+    /// Detects:
+    /// - `#[test]` - standard Rust test
+    /// - `#[tokio::test]` - async tokio test
+    /// - `#[actix_rt::test]` - actix runtime test
+    /// - `#[rstest]` - rstest parameterized test
+    /// - `#[test_case]` - test_case attribute
+    fn has_test_attribute(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            let path = attr.path();
+
+            // Check single ident: #[test], #[rstest], #[test_case]
+            if path.is_ident("test") || path.is_ident("rstest") || path.is_ident("test_case") {
+                return true;
+            }
+
+            // Check path-based attributes: #[tokio::test], #[actix_rt::test]
+            let segments: Vec<String> = path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect();
+
+            if segments.len() == 2 {
+                let first = segments[0].as_str();
+                let second = segments[1].as_str();
+                return (first == "tokio" && second == "test")
+                    || (first == "actix_rt" && second == "test");
+            }
+
+            false
+        })
     }
 
     /// Add a call edge to the graph
@@ -284,5 +309,143 @@ mod tests {
         assert!(GraphBuilder::needs_special_handling(ExprCategory::Async));
         assert!(GraphBuilder::needs_special_handling(ExprCategory::Await));
         assert!(!GraphBuilder::needs_special_handling(ExprCategory::Regular));
+    }
+
+    // Unit tests for test function detection (Spec 267)
+
+    #[test]
+    fn test_detect_basic_test_attribute() {
+        use syn::parse_quote;
+
+        let test_fn: ItemFn = parse_quote! {
+            #[test]
+            fn my_test() {
+                assert!(true);
+            }
+        };
+
+        assert!(
+            GraphBuilder::has_test_attribute(&test_fn.attrs),
+            "#[test] attribute should be detected"
+        );
+    }
+
+    #[test]
+    fn test_detect_production_function() {
+        use syn::parse_quote;
+
+        let prod_fn: ItemFn = parse_quote! {
+            fn production_function() {
+                println!("hello");
+            }
+        };
+
+        assert!(
+            !GraphBuilder::has_test_attribute(&prod_fn.attrs),
+            "Function without #[test] should NOT be detected as test"
+        );
+    }
+
+    #[test]
+    fn test_detect_tokio_test_attribute() {
+        use syn::parse_quote;
+
+        let tokio_test_fn: ItemFn = parse_quote! {
+            #[tokio::test]
+            async fn async_test() {
+                assert!(true);
+            }
+        };
+
+        assert!(
+            GraphBuilder::has_test_attribute(&tokio_test_fn.attrs),
+            "#[tokio::test] attribute should be detected"
+        );
+    }
+
+    #[test]
+    fn test_detect_actix_test_attribute() {
+        use syn::parse_quote;
+
+        let actix_test_fn: ItemFn = parse_quote! {
+            #[actix_rt::test]
+            async fn actix_test() {
+                assert!(true);
+            }
+        };
+
+        assert!(
+            GraphBuilder::has_test_attribute(&actix_test_fn.attrs),
+            "#[actix_rt::test] attribute should be detected"
+        );
+    }
+
+    #[test]
+    fn test_detect_rstest_attribute() {
+        use syn::parse_quote;
+
+        let rstest_fn: ItemFn = parse_quote! {
+            #[rstest]
+            fn parameterized_test() {
+                assert!(true);
+            }
+        };
+
+        assert!(
+            GraphBuilder::has_test_attribute(&rstest_fn.attrs),
+            "#[rstest] attribute should be detected"
+        );
+    }
+
+    #[test]
+    fn test_detect_test_case_attribute() {
+        use syn::parse_quote;
+
+        let test_case_fn: ItemFn = parse_quote! {
+            #[test_case]
+            fn test_case_test() {
+                assert!(true);
+            }
+        };
+
+        assert!(
+            GraphBuilder::has_test_attribute(&test_case_fn.attrs),
+            "#[test_case] attribute should be detected"
+        );
+    }
+
+    #[test]
+    fn test_helper_function_without_test_attr_not_detected() {
+        use syn::parse_quote;
+
+        // Helper functions in test modules don't have #[test]
+        let helper_fn: ItemFn = parse_quote! {
+            fn create_test_fixture() -> i32 {
+                42
+            }
+        };
+
+        assert!(
+            !GraphBuilder::has_test_attribute(&helper_fn.attrs),
+            "Helper functions without #[test] should NOT be detected as tests"
+        );
+    }
+
+    #[test]
+    fn test_function_with_other_attributes_not_detected() {
+        use syn::parse_quote;
+
+        let other_fn: ItemFn = parse_quote! {
+            #[inline]
+            #[must_use]
+            fn some_function() -> i32 {
+                42
+            }
+        };
+
+        assert!(
+            !GraphBuilder::has_test_attribute(&other_fn.attrs),
+            "Function with non-test attributes should NOT be detected as test"
+        );
     }
 }
