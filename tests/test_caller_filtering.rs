@@ -7,7 +7,6 @@
 ///
 /// A function with 90 callers where 85 are tests is NOT high-risk - it's well-tested code.
 /// This integration tests the full classification pipeline.
-
 use debtmap::priority::caller_classification::{
     classify_caller, classify_callers, CallerType, ClassifiedCallers,
 };
@@ -101,7 +100,8 @@ fn test_scoring_uses_production_count_only() {
 
     // Verify we're using production count (1), not total count (10)
     assert_eq!(
-        scoring_dependency_count, 1,
+        scoring_dependency_count,
+        1,
         "Scoring should use production count (1), not total count ({})",
         classified.total_count()
     );
