@@ -139,10 +139,37 @@ pub mod format {
     pub fn dependencies(deps: &Dependencies) -> String {
         let mut out = String::new();
         writeln!(out, "#### Dependencies").unwrap();
-        writeln!(out, "- Upstream Callers: {}", deps.upstream_count).unwrap();
+
+        // Spec 267: Show both production and test caller counts
+        if deps.production_upstream_count > 0 || deps.test_upstream_count > 0 {
+            // Show detailed breakdown when we have the data
+            writeln!(
+                out,
+                "- Upstream Callers: {} ({} production, {} test)",
+                deps.upstream_count, deps.production_upstream_count, deps.test_upstream_count
+            )
+            .unwrap();
+        } else {
+            // Fallback to simple count for backward compatibility
+            writeln!(out, "- Upstream Callers: {}", deps.upstream_count).unwrap();
+        }
         writeln!(out, "- Downstream Callees: {}", deps.downstream_count).unwrap();
 
-        if deps.blast_radius > 0 {
+        // Spec 267: Show production-only blast radius
+        if deps.production_blast_radius > 0 {
+            let impact = match deps.production_blast_radius {
+                r if r >= 20 => "critical",
+                r if r >= 10 => "high",
+                _ => "moderate",
+            };
+            writeln!(
+                out,
+                "- Production Blast Radius: {} ({})",
+                deps.production_blast_radius, impact
+            )
+            .unwrap();
+        } else if deps.blast_radius > 0 {
+            // Fallback to legacy blast radius
             let impact = match deps.blast_radius {
                 r if r >= 20 => "critical",
                 r if r >= 10 => "high",
@@ -160,7 +187,17 @@ pub mod format {
             writeln!(out, "- Instability: {:.2} (I=Ce/(Ca+Ce))", inst).unwrap();
         }
 
-        format_caller_list(&mut out, "Top Callers", &deps.upstream_callers);
+        // Spec 267: Show production and test callers separately
+        format_caller_list(
+            &mut out,
+            "Production Callers",
+            &deps.upstream_production_callers,
+        );
+        format_caller_list(&mut out, "Test Callers", &deps.upstream_test_callers);
+        // Fallback to legacy callers if new fields are empty
+        if deps.upstream_production_callers.is_empty() && deps.upstream_test_callers.is_empty() {
+            format_caller_list(&mut out, "Top Callers", &deps.upstream_callers);
+        }
         format_caller_list(&mut out, "Top Callees", &deps.downstream_callees);
         out
     }
@@ -907,6 +944,12 @@ mod tests {
                 critical_path: true,
                 coupling_classification: Some("Hub".to_string()),
                 instability: Some(0.6),
+                // Spec 267: Production/test caller separation
+                upstream_production_callers: vec!["caller1".to_string()],
+                upstream_test_callers: vec!["caller2".to_string()],
+                production_upstream_count: 1,
+                test_upstream_count: 1,
+                production_blast_radius: 13,
             },
             recommendation: RecommendationOutput {
                 action: "Refactor".to_string(),
@@ -958,10 +1001,11 @@ mod tests {
             "Should show transitive coverage"
         );
 
-        // Check new dependency fields
+        // Check new dependency fields (Spec 267: Production Blast Radius)
         assert!(
-            markdown.contains("Blast Radius: 20 (critical)"),
-            "Should show blast radius"
+            markdown.contains("Production Blast Radius: 13 (high)"),
+            "Should show production blast radius: {}",
+            markdown
         );
         assert!(
             markdown.contains("Critical Path: Yes"),

@@ -83,6 +83,11 @@ pub fn create_god_object_debt_item(
         downstream_dependencies: aggregated_metrics.downstream_dependencies,
         upstream_callers: aggregated_metrics.unique_upstream_callers,
         downstream_callees: aggregated_metrics.unique_downstream_callees,
+        // Spec 267: Caller classification not available for god objects yet
+        upstream_production_callers: vec![],
+        upstream_test_callers: vec![],
+        production_blast_radius: aggregated_metrics.upstream_dependencies
+            + aggregated_metrics.downstream_dependencies,
         nesting_depth: aggregated_metrics.max_nesting_depth,
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,

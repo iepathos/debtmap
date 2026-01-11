@@ -232,6 +232,13 @@ pub fn create_unified_debt_item_enhanced(
     let responsibility_category =
         crate::organization::god_object::analyze_function_responsibility(&func.name);
 
+    // Spec 267: Classify callers into production and test
+    let classified = crate::priority::caller_classification::classify_callers(
+        upstream_caller_names.iter(),
+        Some(call_graph),
+    );
+    let production_blast_radius = classified.production_count + downstream_callee_names.len();
+
     let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -248,6 +255,10 @@ pub fn create_unified_debt_item_enhanced(
         downstream_dependencies: downstream_callee_names.len(),
         upstream_callers: upstream_caller_names,
         downstream_callees: downstream_callee_names,
+        // Spec 267: Separated production and test callers
+        upstream_production_callers: classified.production,
+        upstream_test_callers: classified.test,
+        production_blast_radius,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
@@ -430,12 +441,17 @@ fn calculate_coverage_data(
 }
 
 // Pure function: Extract dependency metrics (spec 205: public for FunctionScoringContext)
+// Spec 267: Now includes production/test caller separation
 #[derive(Clone)]
 pub(crate) struct DependencyMetrics {
     upstream_count: usize,
     downstream_count: usize,
     upstream_names: Vec<String>,
     downstream_names: Vec<String>,
+    // Spec 267: Separated production and test callers
+    production_upstream_names: Vec<String>,
+    test_upstream_names: Vec<String>,
+    production_blast_radius: usize,
 }
 
 fn extract_dependency_metrics(
@@ -443,6 +459,8 @@ fn extract_dependency_metrics(
     func_id: &FunctionId,
     call_graph: &CallGraph,
 ) -> DependencyMetrics {
+    use crate::priority::caller_classification::{classify_callers, ClassifiedCallers};
+
     // Use pre-populated call graph data from FunctionMetrics if available
     let (upstream_names, downstream_names) =
         if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
@@ -460,11 +478,21 @@ fn extract_dependency_metrics(
             )
         };
 
+    // Spec 267: Classify callers into production and test
+    let classified: ClassifiedCallers = classify_callers(upstream_names.iter(), Some(call_graph));
+
+    // Spec 267: Production blast radius = production_upstream_count + downstream_count
+    let production_blast_radius = classified.production_count + downstream_names.len();
+
     DependencyMetrics {
         upstream_count: upstream_names.len(),
         downstream_count: downstream_names.len(),
         upstream_names,
         downstream_names,
+        // Spec 267: Separated callers
+        production_upstream_names: classified.production,
+        test_upstream_names: classified.test,
+        production_blast_radius,
     }
 }
 
@@ -564,6 +592,10 @@ fn build_unified_debt_item_from_context(
         downstream_dependencies: ctx.deps.downstream_count,
         upstream_callers: ctx.deps.upstream_names.clone(),
         downstream_callees: ctx.deps.downstream_names.clone(),
+        // Spec 267: Separated production and test callers
+        upstream_production_callers: ctx.deps.production_upstream_names.clone(),
+        upstream_test_callers: ctx.deps.test_upstream_names.clone(),
+        production_blast_radius: ctx.deps.production_blast_radius,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
@@ -832,6 +864,15 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     // Look up file line count from cache (spec 195: O(1) lookup instead of file read)
     let file_line_count = get_file_line_count(&func.file, file_line_counts);
 
+    // Spec 267: Classify callers into production and test
+    let classified = crate::priority::caller_classification::classify_callers(
+        upstream_caller_names.iter(),
+        Some(call_graph),
+    );
+    let production_blast_radius = classified.production_count + downstream_callee_names.len();
+    let production_callers = classified.production.clone();
+    let test_callers = classified.test.clone();
+
     // Create one UnifiedDebtItem per debt type (spec 228)
     debt_types
         .into_iter()
@@ -865,6 +906,10 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 downstream_dependencies: downstream_callee_names.len(),
                 upstream_callers: upstream_caller_names.clone(),
                 downstream_callees: downstream_callee_names.clone(),
+                // Spec 267: Separated production and test callers
+                upstream_production_callers: production_callers.clone(),
+                upstream_test_callers: test_callers.clone(),
+                production_blast_radius,
                 nesting_depth: func.nesting,
                 function_length: func.length,
                 cyclomatic_complexity: func.cyclomatic,

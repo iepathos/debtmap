@@ -1,4 +1,5 @@
 pub mod call_graph;
+pub mod caller_classification;
 pub mod classification;
 pub mod complexity_patterns;
 pub mod context;
@@ -913,6 +914,9 @@ mod tests {
             downstream_dependencies: 0,
             upstream_callers: vec![],
             downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
             nesting_depth: 1,
             function_length: 10,
             cyclomatic_complexity: cyclomatic,
