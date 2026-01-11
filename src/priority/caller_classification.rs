@@ -113,10 +113,18 @@ pub fn classify_caller(caller: &str, call_graph: Option<&CallGraph>) -> CallerTy
 /// This is used when we only have a function name without file context.
 /// It searches all functions in the call graph with the given name and returns
 /// true if any of them is marked as a test function.
+///
+/// Handles module-qualified names: call graph may store `test::my_func` but
+/// caller string may just be `my_func`. We match if:
+/// - Exact match: `func_id.name == name`
+/// - Suffix match: `func_id.name` ends with `::name` (e.g., `test::my_func` matches `my_func`)
 fn is_test_function_by_name(name: &str, call_graph: &CallGraph) -> bool {
-    call_graph
-        .get_all_functions()
-        .any(|func_id| func_id.name == name && call_graph.is_test_function(func_id))
+    let suffix_pattern = format!("::{}", name);
+    call_graph.get_all_functions().any(|func_id| {
+        let matches =
+            func_id.name == name || func_id.name.ends_with(&suffix_pattern);
+        matches && call_graph.is_test_function(func_id)
+    })
 }
 
 /// Parse a caller string into a FunctionId for call graph lookup.
@@ -668,6 +676,72 @@ mod tests {
             classify_caller(caller, Some(&call_graph)),
             CallerType::Production,
             "Production functions should remain Production even with path mismatch"
+        );
+    }
+
+    #[test]
+    fn test_module_qualified_name_matching() {
+        use std::path::PathBuf;
+
+        // Simulate real scenario: call graph stores functions with module prefix
+        // (e.g., "test::my_func") but caller strings only have the base name ("my_func")
+        let mut call_graph = CallGraph::new();
+
+        // Call graph stores function with module-qualified name: "test::short_array_not_reflowed"
+        let test_fn = FunctionId::new(
+            PathBuf::from("./src/formatting/overflow.rs"),
+            "test::short_array_not_reflowed".to_string(), // Module-qualified
+            650,
+        );
+        call_graph.add_function(
+            test_fn.clone(),
+            false, // not entry point
+            true,  // IS A TEST
+            3,
+            15,
+        );
+
+        // Caller string only has base name (as appears in debt item output)
+        let caller = "overflow.rs:short_array_not_reflowed";
+
+        // The fix: is_test_function_by_name now matches suffix after "::"
+        assert_eq!(
+            classify_caller(caller, Some(&call_graph)),
+            CallerType::Test,
+            "Module-qualified name (test::func) should match base name (func)"
+        );
+    }
+
+    #[test]
+    fn test_is_test_function_by_name_with_module_prefix() {
+        use std::path::PathBuf;
+
+        let mut call_graph = CallGraph::new();
+
+        // Function with module prefix in name
+        let test_fn = FunctionId::new(
+            PathBuf::from("overflow.rs"),
+            "test::vertical_stays_when_too_wide".to_string(),
+            1241,
+        );
+        call_graph.add_function(
+            test_fn.clone(),
+            false,
+            true, // IS A TEST
+            5,
+            10,
+        );
+
+        // Should match by suffix
+        assert!(
+            is_test_function_by_name("vertical_stays_when_too_wide", &call_graph),
+            "Should match 'test::vertical_stays_when_too_wide' when searching for 'vertical_stays_when_too_wide'"
+        );
+
+        // Should also match exact name
+        assert!(
+            is_test_function_by_name("test::vertical_stays_when_too_wide", &call_graph),
+            "Should match exact name"
         );
     }
 }
