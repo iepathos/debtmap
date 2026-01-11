@@ -208,6 +208,11 @@ impl FunctionDebtItemOutput {
                 };
                 let coupling_classification =
                     derive_coupling_classification(upstream, downstream, instability);
+
+                // Spec 267: Include production/test caller separation
+                let production_count = item.upstream_production_callers.len();
+                let test_count = item.upstream_test_callers.len();
+
                 Dependencies {
                     upstream_count: upstream,
                     downstream_count: downstream,
@@ -217,6 +222,12 @@ impl FunctionDebtItemOutput {
                     critical_path,
                     coupling_classification,
                     instability,
+                    // Spec 267: Production/test caller separation
+                    upstream_production_callers: item.upstream_production_callers.clone(),
+                    upstream_test_callers: item.upstream_test_callers.clone(),
+                    production_upstream_count: production_count,
+                    test_upstream_count: test_count,
+                    production_blast_radius: item.production_blast_radius,
                 }
             },
             recommendation: RecommendationOutput {
@@ -643,6 +654,9 @@ mod tests {
                 downstream_count: 0,
                 upstream_callers: vec![],
                 downstream_callees: vec![],
+                upstream_production_callers: vec![],
+                upstream_test_callers: vec![],
+                production_blast_radius: 0,
                 ..Default::default()
             },
             recommendation: RecommendationOutput {

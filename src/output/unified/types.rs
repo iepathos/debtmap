@@ -177,6 +177,9 @@ mod tests {
                 downstream_count: 0,
                 upstream_callers: vec![],
                 downstream_callees: vec![],
+                upstream_production_callers: vec![],
+                upstream_test_callers: vec![],
+                production_blast_radius: 0,
                 ..Default::default()
             },
             recommendation: RecommendationOutput {

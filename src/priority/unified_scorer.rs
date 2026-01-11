@@ -156,6 +156,16 @@ pub struct UnifiedDebtItem {
     pub downstream_dependencies: usize,
     pub upstream_callers: Vec<String>, // List of function names that call this function
     pub downstream_callees: Vec<String>, // List of functions that this function calls
+    // Spec 267: Separate production vs test callers for accurate blast radius
+    /// Production upstream callers (excludes test functions)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upstream_production_callers: Vec<String>,
+    /// Test upstream callers (test functions, test helpers, mocks, fixtures)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upstream_test_callers: Vec<String>,
+    /// Production-only blast radius for scoring (Spec 267)
+    #[serde(default)]
+    pub production_blast_radius: usize,
     pub nesting_depth: u32,
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
@@ -398,8 +408,12 @@ pub fn calculate_unified_priority_with_role(
 
     // Calculate complexity and dependency factors
     let complexity_factor = calculate_complexity_factor(raw_complexity);
-    let upstream_count = call_graph.get_callers(func_id).len();
-    let dependency_factor = calculate_dependency_factor(upstream_count);
+
+    // Spec 267: Use production callers only for scoring
+    // Test callers don't increase change risk, so they shouldn't inflate the dependency factor
+    let upstream_callers = call_graph.get_callers(func_id);
+    let production_upstream_count = count_production_callers(&upstream_callers, call_graph);
+    let dependency_factor = calculate_dependency_factor(production_upstream_count);
 
     // Get role-based values
     let role_multiplier = calculate_role_multiplier(role, raw_complexity);
@@ -813,6 +827,26 @@ fn normalize_complexity(
     // Simple weighted sum - no complex normalization
     // Result feeds into calculate_complexity_factor which divides by 2 and clamps to 0-10
     raw_cyclomatic * cyc_weight + adjusted_cognitive * cog_weight
+}
+
+/// Count production callers from a list of function IDs (Spec 267).
+///
+/// Uses the call graph to check if each caller is a test function,
+/// then falls back to heuristics if call graph data is unavailable.
+fn count_production_callers(callers: &[FunctionId], call_graph: &CallGraph) -> usize {
+    use crate::priority::caller_classification::{classify_caller, CallerType};
+
+    callers
+        .iter()
+        .filter(|caller| {
+            // Check if caller is a test function via call graph
+            if call_graph.is_test_function(caller) {
+                return false;
+            }
+            // Fallback to heuristics for name-based detection
+            classify_caller(&caller.name, Some(call_graph)) == CallerType::Production
+        })
+        .count()
 }
 
 // Pure functions for scoring calculation (spec 68)

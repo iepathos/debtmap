@@ -26,6 +26,23 @@ pub struct Dependencies {
     /// Instability metric: Ce/(Ca+Ce) where Ce=downstream, Ca=upstream (0.0-1.0)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instability: Option<f64>,
+    // Spec 267: Separate test vs production callers for accurate blast radius
+    /// Production upstream callers (excludes test functions)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upstream_production_callers: Vec<String>,
+    /// Test upstream callers (test functions, test helpers, mocks, fixtures)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upstream_test_callers: Vec<String>,
+    /// Count of production upstream callers (Spec 267)
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub production_upstream_count: usize,
+    /// Count of test upstream callers (Spec 267)
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub test_upstream_count: usize,
+    /// Production-only blast radius: production_upstream_count + downstream_count (Spec 267)
+    /// This is the true change risk metric - test callers don't increase change risk.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub production_blast_radius: usize,
 }
 
 fn is_zero(val: &usize) -> bool {

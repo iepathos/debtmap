@@ -117,6 +117,9 @@ fn test_function_item_required_fields_and_ranges() {
             downstream_count: 3,
             upstream_callers: vec![],
             downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
             ..Default::default()
         },
         recommendation: RecommendationOutput {
@@ -295,6 +298,9 @@ fn test_priority_matches_score_thresholds() {
                 downstream_count: 0,
                 upstream_callers: vec![],
                 downstream_callees: vec![],
+                upstream_production_callers: vec![],
+                upstream_test_callers: vec![],
+                production_blast_radius: 0,
                 ..Default::default()
             },
             recommendation: RecommendationOutput {
@@ -360,6 +366,9 @@ fn test_no_floating_point_noise_in_serialized_output() {
             downstream_count: 0,
             upstream_callers: vec![],
             downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
             ..Default::default()
         },
         recommendation: RecommendationOutput {
@@ -465,6 +474,9 @@ fn test_unified_debt_item_tagged_serialization() {
             downstream_count: 0,
             upstream_callers: vec![],
             downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
             ..Default::default()
         },
         recommendation: RecommendationOutput {
