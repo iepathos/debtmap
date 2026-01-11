@@ -2,7 +2,7 @@
 name = "debtmap"
 version = "0.12.1"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.89"
 authors = ["Glen Baker <iepathos@gmail.com>"]
 description = "Code complexity and technical debt analyzer"
 license = "MIT"
