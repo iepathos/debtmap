@@ -206,12 +206,18 @@ impl FunctionDebtItemOutput {
                 } else {
                     None
                 };
-                let coupling_classification =
-                    derive_coupling_classification(upstream, downstream, instability);
 
                 // Spec 267: Include production/test caller separation
                 let production_count = item.upstream_production_callers.len();
                 let test_count = item.upstream_test_callers.len();
+
+                // Spec 269: Use production callers for coupling classification
+                let coupling_classification = derive_coupling_classification(
+                    production_count,
+                    test_count,
+                    downstream,
+                    instability,
+                );
 
                 Dependencies {
                     upstream_count: upstream,
@@ -304,45 +310,60 @@ impl FunctionDebtItemOutput {
     }
 }
 
-/// Derive coupling classification based on upstream/downstream dependencies
+/// Derive coupling classification based on dependency patterns (Spec 269).
 ///
-/// Classifications based on dependency patterns:
-/// - "Leaf Module": No downstream dependencies (stable, pure consumer)
-/// - "Stable Core": High upstream, low instability (heavily depended upon)
-/// - "Hub": High upstream and downstream (central integration point)
-/// - "Connector": Balanced upstream/downstream (mediator)
+/// Classifications based on Clean Architecture's Stable Dependencies Principle:
+/// - "Well-Tested Core": Stable + mostly test callers (>70% test ratio)
+/// - "Stable Core": High production callers, low instability (foundation)
+/// - "Hub": High production callers and downstream (integration point)
+/// - "Connector": Balanced dependencies (mediator)
+/// - "Leaf Module": No downstream, only consumes
 /// - None: Low dependency counts, no significant classification
 fn derive_coupling_classification(
-    upstream: usize,
+    production_callers: usize,
+    test_callers: usize,
     downstream: usize,
     instability: Option<f64>,
 ) -> Option<String> {
-    let blast_radius = upstream + downstream;
+    let total_callers = production_callers + test_callers;
+    let blast_radius = production_callers + downstream;
 
     // Low dependency counts - no meaningful classification
-    if blast_radius < 3 {
+    if blast_radius < 3 && total_callers < 3 {
         return None;
     }
 
     // Leaf module: no downstream, only consumes
-    if downstream == 0 && upstream > 0 {
+    if downstream == 0 && total_callers > 0 {
         return Some("Leaf Module".to_string());
     }
 
     let inst = instability.unwrap_or(0.5);
+    let test_ratio = if total_callers > 0 {
+        test_callers as f64 / total_callers as f64
+    } else {
+        0.0
+    };
 
-    // Stable core: high upstream (many callers), low instability
-    if upstream >= 5 && inst < 0.3 {
+    // Well-tested core: stable + mostly test callers (Spec 269)
+    // This is intentional architecture, not debt
+    // Use <= 0.35 threshold because displayed "0.30" may actually be 0.302...
+    if inst <= 0.35 && total_callers > 5 && test_ratio > 0.7 {
+        return Some("Well-Tested Core".to_string());
+    }
+
+    // Stable core: high production callers, low instability
+    if production_callers >= 5 && inst <= 0.35 {
         return Some("Stable Core".to_string());
     }
 
-    // Hub: high both upstream and downstream
-    if upstream >= 5 && downstream >= 5 {
+    // Hub: high production callers and downstream
+    if production_callers >= 5 && downstream >= 5 {
         return Some("Hub".to_string());
     }
 
     // Connector: moderate dependencies in both directions
-    if upstream >= 2 && downstream >= 2 {
+    if production_callers >= 2 && downstream >= 2 {
         return Some("Connector".to_string());
     }
 
