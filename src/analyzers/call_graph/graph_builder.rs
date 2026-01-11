@@ -124,11 +124,7 @@ impl GraphBuilder {
             }
 
             // Check path-based attributes: #[tokio::test], #[actix_rt::test]
-            let segments: Vec<String> = path
-                .segments
-                .iter()
-                .map(|s| s.ident.to_string())
-                .collect();
+            let segments: Vec<String> = path.segments.iter().map(|s| s.ident.to_string()).collect();
 
             if segments.len() == 2 {
                 let first = segments[0].as_str();

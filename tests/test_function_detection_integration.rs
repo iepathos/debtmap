@@ -6,7 +6,8 @@ use std::path::PathBuf;
 
 #[test]
 fn test_detect_test_functions_in_cargo_cargofmt() {
-    let overflow_path = PathBuf::from("/Users/glen/memento-mori/cargo-cargofmt/src/formatting/overflow.rs");
+    let overflow_path =
+        PathBuf::from("/Users/glen/memento-mori/cargo-cargofmt/src/formatting/overflow.rs");
 
     // Skip test if file doesn't exist (for CI)
     if !overflow_path.exists() {
@@ -47,7 +48,8 @@ fn test_detect_test_functions_in_cargo_cargofmt() {
     }
 
     // Also count total test functions detected
-    let total_tests: usize = graph.get_all_functions()
+    let total_tests: usize = graph
+        .get_all_functions()
         .filter(|func| graph.is_test_function(func))
         .count();
 
@@ -59,7 +61,11 @@ fn test_detect_test_functions_in_cargo_cargofmt() {
 
     // List first 10 test functions
     println!("\nFirst 10 detected test functions:");
-    for func in graph.get_all_functions().filter(|f| graph.is_test_function(f)).take(10) {
+    for func in graph
+        .get_all_functions()
+        .filter(|f| graph.is_test_function(f))
+        .take(10)
+    {
         println!("  - {}", func.name);
     }
 

@@ -121,8 +121,7 @@ pub fn classify_caller(caller: &str, call_graph: Option<&CallGraph>) -> CallerTy
 fn is_test_function_by_name(name: &str, call_graph: &CallGraph) -> bool {
     let suffix_pattern = format!("::{}", name);
     call_graph.get_all_functions().any(|func_id| {
-        let matches =
-            func_id.name == name || func_id.name.ends_with(&suffix_pattern);
+        let matches = func_id.name == name || func_id.name.ends_with(&suffix_pattern);
         matches && call_graph.is_test_function(func_id)
     })
 }
@@ -217,8 +216,8 @@ pub fn classify_by_heuristics(caller: &str) -> CallerType {
         "/test/",
         "::tests::",
         "::test::",
-        ":test:",   // Single-colon variant for test module
-        ":tests:",  // Single-colon variant for tests module
+        ":test:",  // Single-colon variant for test module
+        ":tests:", // Single-colon variant for tests module
     ];
 
     for pattern in path_patterns {
@@ -525,10 +524,7 @@ mod tests {
         assert!(func_id.is_some());
         let id = func_id.unwrap();
         assert_eq!(id.name, "inline_table_containing_array");
-        assert_eq!(
-            id.file.to_string_lossy(),
-            "overflow.rs"
-        );
+        assert_eq!(id.file.to_string_lossy(), "overflow.rs");
     }
 
     #[test]
