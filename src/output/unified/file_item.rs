@@ -109,6 +109,7 @@ impl FileDebtItemOutput {
                 total_complexity: item.metrics.total_complexity,
                 coverage: rounded_coverage,
                 uncovered_lines: item.metrics.uncovered_lines,
+                distribution: None, // Populated separately when distribution metrics are available
             },
             god_object_indicators: item.metrics.god_object_analysis.clone().map(|a| a.into()),
             dependencies,
@@ -144,6 +145,32 @@ pub struct FileMetricsOutput {
     pub total_complexity: u32,
     pub coverage: f64,
     pub uncovered_lines: usize,
+    /// Distribution metrics for complexity analysis (Spec 268)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub distribution: Option<DistributionMetricsOutput>,
+}
+
+/// Distribution metrics for file-scope complexity analysis (Spec 268)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistributionMetricsOutput {
+    /// Number of functions in the file
+    pub function_count: usize,
+    /// Highest cyclomatic complexity among all functions
+    pub max_function_complexity: u32,
+    /// Average cyclomatic complexity per function
+    pub avg_function_complexity: f64,
+    /// Median cyclomatic complexity (robust to outliers)
+    pub median_complexity: u32,
+    /// Number of functions exceeding the complexity threshold (15)
+    pub exceeding_threshold: usize,
+    /// Classification: "Concentrated", "Mixed", or "Distributed"
+    pub distribution_type: String,
+    /// Human-readable explanation of the classification
+    pub classification_explanation: String,
+    /// Production code lines (excluding test modules)
+    pub production_loc: usize,
+    /// Test code lines (inside #[cfg(test)] modules)
+    pub test_loc: usize,
 }
 
 /// File impact metrics
@@ -210,6 +237,7 @@ mod tests {
                 total_complexity: 212,
                 coverage: 0.65,
                 uncovered_lines: 175,
+                distribution: None,
             },
             god_object_indicators: None,
             dependencies: None,
