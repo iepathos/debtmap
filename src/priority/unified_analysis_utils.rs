@@ -100,7 +100,14 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
 
         self.stats.total_items_processed += 1;
 
-        // God objects bypass filters as they represent critical architectural issues (spec 207)
+        // Items with score 0.0 are "non-debt" and should always be filtered out,
+        // regardless of item type (including god objects)
+        if item.unified_score.final_score <= 0.0 {
+            self.stats.filtered_by_score += 1;
+            return;
+        }
+
+        // God objects bypass other filters as they represent critical architectural issues (spec 207)
         let is_god_object = item
             .god_object_indicators
             .as_ref()
@@ -217,5 +224,177 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
                 }
             })
             .collect();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::organization::{
+        DetectionType, GodObjectAnalysis, GodObjectConfidence, SplitAnalysisMethod,
+    };
+    use crate::priority::call_graph::CallGraph;
+    use crate::priority::{
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
+    };
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    fn create_god_object_item(score: f64) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                function: "[file-scope]".to_string(),
+                line: 1,
+            },
+            debt_type: DebtType::GodObject {
+                methods: 50,
+                fields: Some(20),
+                responsibilities: 10,
+                god_object_score: 85.0,
+                lines: 500,
+            },
+            unified_score: UnifiedScore {
+                final_score: score,
+                complexity_factor: 0.0,
+                coverage_factor: 0.0,
+                dependency_factor: 0.0,
+                role_multiplier: 1.0,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            cyclomatic_complexity: 65,
+            cognitive_complexity: 6,
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Split".to_string(),
+                rationale: "God object".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 0,
+            function_length: 500,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: Some(GodObjectAnalysis {
+                is_god_object: true,
+                method_count: 50,
+                weighted_method_count: None,
+                field_count: 20,
+                responsibility_count: 10,
+                lines_of_code: 500,
+                complexity_sum: 100,
+                god_object_score: 85.0,
+                recommended_splits: vec![],
+                confidence: GodObjectConfidence::Probable,
+                responsibilities: vec!["data".to_string()],
+                responsibility_method_counts: HashMap::new(),
+                purity_distribution: None,
+                module_structure: None,
+                detection_type: DetectionType::GodFile,
+                struct_name: None,
+                struct_line: None,
+                struct_location: None,
+                visibility_breakdown: None,
+                domain_count: 1,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: SplitAnalysisMethod::None,
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+                aggregated_entropy: None,
+                aggregated_error_swallowing_count: None,
+                aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
+                anti_pattern_report: None,
+                complexity_metrics: None,
+                trait_method_summary: None,
+            }),
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        }
+    }
+
+    #[test]
+    fn test_god_object_with_zero_score_is_filtered() {
+        // Bug reproduction: god objects with score 0.0 should NOT be added
+        // because score 0.0 means "this is not debt"
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create a god object with score 0.0 (marked as "not debt")
+        let zero_score_god_object = create_god_object_item(0.0);
+
+        analysis.add_item(zero_score_god_object);
+
+        // The item should NOT be added because score 0.0 means "not debt"
+        assert_eq!(
+            analysis.items.len(),
+            0,
+            "God object with score 0.0 should be filtered out (score 0.0 = not debt)"
+        );
+    }
+
+    #[test]
+    fn test_god_object_with_positive_score_is_included() {
+        // God objects with positive scores should still be included
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create a god object with a positive score
+        let god_object = create_god_object_item(50.0);
+
+        analysis.add_item(god_object);
+
+        // The item SHOULD be added because it has a positive score
+        assert_eq!(
+            analysis.items.len(),
+            1,
+            "God object with positive score should be included"
+        );
     }
 }
