@@ -79,7 +79,8 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
             }
 
             // Filter out items below score threshold (spec 193)
-            if item.unified_score.final_score < min_score {
+            // Items with score 0.0 are "non-debt" and should always be excluded
+            if item.unified_score.final_score <= 0.0 || item.unified_score.final_score < min_score {
                 continue;
             }
 
@@ -89,7 +90,8 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
         // Add file items (files are always T1 if they're god objects)
         for item in &self.file_items {
             // Apply score filtering to file items as well (spec 193)
-            if item.score < min_score {
+            // Items with score 0.0 are "non-debt" and should always be excluded
+            if item.score <= 0.0 || item.score < min_score {
                 continue;
             }
 

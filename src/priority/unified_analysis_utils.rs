@@ -78,7 +78,8 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
         let min_score = crate::config::get_minimum_debt_score();
 
         // Filter out items below minimum thresholds
-        if item.score < min_score {
+        // Items with score 0.0 are "non-debt" and should always be excluded
+        if item.score <= 0.0 || item.score < min_score {
             return;
         }
 
