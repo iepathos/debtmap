@@ -40,8 +40,16 @@ pub fn filter_items(items: Vec<ViewItem>, config: &ViewConfig) -> (Vec<ViewItem>
 }
 
 /// Checks if item passes score threshold.
+///
+/// Items with score 0.0 are always filtered out as they represent
+/// "non-debt" items (trivial, well-tested functions).
 pub fn passes_score_threshold(item: &ViewItem, threshold: f64) -> bool {
-    item.score() >= threshold
+    let score = item.score();
+    // Score 0.0 means "not debt" - always exclude
+    if score <= 0.0 {
+        return false;
+    }
+    score >= threshold
 }
 
 /// Checks if item passes tier filter.

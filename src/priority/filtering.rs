@@ -235,7 +235,14 @@ fn tier_passes(tier: RecommendationTier, config: &FilterConfig) -> bool {
 }
 
 /// Checks if score passes threshold (pure).
+///
+/// Items with score 0.0 are always filtered out as they represent
+/// "non-debt" items (trivial, well-tested functions).
 fn score_passes(score: f64, threshold: f64) -> bool {
+    // Score 0.0 means "not debt" - always exclude
+    if score <= 0.0 {
+        return false;
+    }
     score >= threshold
 }
 
@@ -304,6 +311,19 @@ mod tests {
         assert!(score_passes(3.0, 3.0));
         assert!(!score_passes(2.9, 3.0));
         assert!(!score_passes(0.0, 3.0));
+    }
+
+    #[test]
+    fn test_zero_score_always_filtered() {
+        // Items with score 0.0 represent "non-debt" and should always be filtered
+        // even when threshold is 0.0 (which is used for JSON output)
+        assert!(!score_passes(0.0, 0.0));
+        assert!(!score_passes(0.0, 3.0));
+        assert!(!score_passes(-1.0, 0.0)); // Negative scores also excluded
+
+        // But positive scores above threshold still pass
+        assert!(score_passes(0.1, 0.0));
+        assert!(score_passes(1.0, 0.0));
     }
 
     // Helper function for creating test debt items
