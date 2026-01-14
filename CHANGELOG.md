@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.12.1] - 2025-01-11
+## [0.12.0] - 2026-01-13
 
 ### Fixed
+
+- **Zero-Score Filtering** - Items with zero score are now properly excluded from results
+  - God objects with zero score no longer appear in output
+  - All query types now correctly exclude zero-score items
+  - Prevents noise from non-actionable debt items
+
+- **Compare Command Input Types** - Fixed input parsing to use output format types
+  - Compare command now correctly parses JSON input files
+  - Improved type consistency between output and input formats
 
 - **Test Caller Filtering for Production Blast Radius** (Spec 267)
   - Fixed path-based test attribute detection (`#[tokio::test]`, `#[actix_rt::test]`)
@@ -36,6 +45,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - These foundations should not appear as priority debt items
   - Result: Well-tested stable files no longer flagged as high-priority debt
     - Example: overflow.rs (74 test / 16 production callers) now scores 10 (Low) instead of 50 (High)
+
+- **Dependency Compatibility**
+  - Set minimum tokio version to 1.21 for `JoinSet` support
+  - Ensures compatibility with async runtime features
+
+### Changed
+
+- **MSRV Bump to 1.89** - Updated minimum supported Rust version to match toolchain
+  - Aligns with current stable Rust features
+  - Enables use of newer language features
+
+### Infrastructure
+
+- Updated `actions/setup-python` from v5 to v6
+- Updated `github/codeql-action` from v3 to v4
 
 ## [0.11.0] - 2025-12-20
 
