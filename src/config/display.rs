@@ -118,36 +118,6 @@ fn default_god_object_enabled() -> bool {
     true
 }
 
-/// Output configuration for evidence display (spec 148)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputConfig {
-    /// Evidence verbosity level for multi-signal classification
-    #[serde(default)]
-    pub evidence_verbosity: EvidenceVerbosity,
-
-    /// Minimum confidence for showing warning (0.0-1.0)
-    #[serde(default = "default_min_confidence_warning")]
-    pub min_confidence_warning: f64,
-
-    /// Signal filters for evidence display
-    #[serde(default)]
-    pub signal_filters: SignalFilterConfig,
-}
-
-impl Default for OutputConfig {
-    fn default() -> Self {
-        Self {
-            evidence_verbosity: EvidenceVerbosity::default(),
-            min_confidence_warning: default_min_confidence_warning(),
-            signal_filters: SignalFilterConfig::default(),
-        }
-    }
-}
-
-fn default_min_confidence_warning() -> f64 {
-    0.80
-}
-
 /// Signal filtering configuration for evidence display (spec 148)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignalFilterConfig {
