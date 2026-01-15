@@ -167,40 +167,60 @@ pub struct FileSnapshot {
     pub content: String,
 }
 
+/// Check if a path has a Rust file extension
+fn is_rust_file(path: &Path) -> bool {
+    path.extension().and_then(|s| s.to_str()) == Some("rs")
+}
+
+/// Parse a single file into a FileSnapshot (I/O boundary)
+fn parse_file_snapshot(path: &Path) -> Result<FileSnapshot, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+
+    // Note: DO NOT reset SourceMap here - ASTs are stored in FileSnapshot
+    // and span references must remain valid for later analysis.
+    let ast = syn::parse_file(&content)
+        .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
+
+    Ok(FileSnapshot {
+        path: path.to_path_buf(),
+        ast,
+        content,
+    })
+}
+
+/// Collect Rust files from a directory, returning paths and skip count
+fn collect_rust_file_paths(root: &Path) -> (Vec<PathBuf>, usize) {
+    let mut paths = Vec::new();
+    let mut skipped_count = 0;
+
+    for entry in walkdir::WalkDir::new(root).into_iter() {
+        match entry {
+            Ok(e) if is_rust_file(e.path()) => {
+                paths.push(e.path().to_path_buf());
+            }
+            Ok(_) => {} // Not a Rust file, skip silently
+            Err(err) => {
+                if skipped_count < 10 {
+                    eprintln!("Warning: Skipping directory entry: {}", err);
+                }
+                skipped_count += 1;
+            }
+        }
+    }
+
+    (paths, skipped_count)
+}
+
 impl CodebaseSnapshot {
     /// Create snapshot of entire codebase
     pub fn from_directory(root: &Path) -> Result<Self, String> {
-        let mut files = Vec::new();
+        let (paths, skipped_count) = collect_rust_file_paths(root);
 
-        let mut skipped_count = 0;
-        for entry in walkdir::WalkDir::new(root)
-            .into_iter()
-            .filter_map(|e| match e {
-                Ok(entry) => Some(entry),
-                Err(err) => {
-                    if skipped_count < 10 {
-                        eprintln!("Warning: Skipping directory entry: {}", err);
-                    }
-                    skipped_count += 1;
-                    None
-                }
-            })
-            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("rs"))
-        {
-            let content = std::fs::read_to_string(entry.path())
-                .map_err(|e| format!("Failed to read {}: {}", entry.path().display(), e))?;
-
-            // Note: DO NOT reset SourceMap here - ASTs are stored in FileSnapshot
-            // and span references must remain valid for later analysis.
-            let ast = syn::parse_file(&content)
-                .map_err(|e| format!("Failed to parse {}: {}", entry.path().display(), e))?;
-
-            files.push(FileSnapshot {
-                path: entry.path().to_path_buf(),
-                ast,
-                content,
-            });
-        }
+        let files = paths
+            .iter()
+            .map(|p| parse_file_snapshot(p))
+            .collect::<Result<Vec<_>, _>>()?;
 
         if skipped_count > 10 {
             eprintln!(
@@ -711,6 +731,127 @@ fn extract_method_signatures(ast: &syn::File) -> Vec<MethodSignature> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    // Tests for pure helper: is_rust_file
+    #[test]
+    fn test_is_rust_file_with_rs_extension() {
+        assert!(is_rust_file(Path::new("src/main.rs")));
+        assert!(is_rust_file(Path::new("lib.rs")));
+        assert!(is_rust_file(Path::new("/absolute/path/to/module.rs")));
+    }
+
+    #[test]
+    fn test_is_rust_file_with_non_rs_extensions() {
+        assert!(!is_rust_file(Path::new("src/main.py")));
+        assert!(!is_rust_file(Path::new("README.md")));
+        assert!(!is_rust_file(Path::new("Cargo.toml")));
+        assert!(!is_rust_file(Path::new("script.js")));
+    }
+
+    #[test]
+    fn test_is_rust_file_with_no_extension() {
+        assert!(!is_rust_file(Path::new("Makefile")));
+        assert!(!is_rust_file(Path::new("src/bin/tool")));
+    }
+
+    #[test]
+    fn test_is_rust_file_with_rs_in_name_but_different_extension() {
+        assert!(!is_rust_file(Path::new("parsers.txt")));
+        assert!(!is_rust_file(Path::new("test_rs.py")));
+    }
+
+    // Tests for from_directory
+    #[test]
+    fn test_from_directory_with_valid_rust_files() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let src_dir = temp_dir.path().join("src");
+        std::fs::create_dir(&src_dir).expect("Failed to create src dir");
+
+        // Create valid Rust files
+        let mut file1 = std::fs::File::create(src_dir.join("lib.rs")).unwrap();
+        writeln!(file1, "pub fn hello() {{ }}").unwrap();
+
+        let mut file2 = std::fs::File::create(src_dir.join("utils.rs")).unwrap();
+        writeln!(file2, "pub fn helper() {{ }}").unwrap();
+
+        let snapshot = CodebaseSnapshot::from_directory(temp_dir.path()).unwrap();
+
+        assert_eq!(snapshot.files.len(), 2);
+        assert!(snapshot.files.iter().any(|f| f.path.ends_with("lib.rs")));
+        assert!(snapshot.files.iter().any(|f| f.path.ends_with("utils.rs")));
+    }
+
+    #[test]
+    fn test_from_directory_ignores_non_rust_files() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Create mixed files
+        let mut rs_file = std::fs::File::create(temp_dir.path().join("main.rs")).unwrap();
+        writeln!(rs_file, "fn main() {{ }}").unwrap();
+
+        let mut py_file = std::fs::File::create(temp_dir.path().join("script.py")).unwrap();
+        writeln!(py_file, "print('hello')").unwrap();
+
+        let mut md_file = std::fs::File::create(temp_dir.path().join("README.md")).unwrap();
+        writeln!(md_file, "# README").unwrap();
+
+        let snapshot = CodebaseSnapshot::from_directory(temp_dir.path()).unwrap();
+
+        assert_eq!(snapshot.files.len(), 1);
+        assert!(snapshot.files[0].path.ends_with("main.rs"));
+    }
+
+    #[test]
+    fn test_from_directory_with_empty_directory() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        let snapshot = CodebaseSnapshot::from_directory(temp_dir.path()).unwrap();
+
+        assert!(snapshot.files.is_empty());
+        assert_eq!(snapshot.root_path, temp_dir.path());
+    }
+
+    #[test]
+    fn test_from_directory_fails_on_invalid_rust_syntax() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        let mut bad_file = std::fs::File::create(temp_dir.path().join("bad.rs")).unwrap();
+        writeln!(bad_file, "fn incomplete(").unwrap();
+
+        let result = CodebaseSnapshot::from_directory(temp_dir.path());
+
+        match result {
+            Err(msg) => assert!(
+                msg.contains("Failed to parse"),
+                "Expected parse error, got: {}",
+                msg
+            ),
+            Ok(_) => panic!("Expected error for invalid syntax"),
+        }
+    }
+
+    // Tests for collect_rust_file_paths
+    #[test]
+    fn test_collect_rust_file_paths_nested_directories() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let nested = temp_dir.path().join("a").join("b").join("c");
+        std::fs::create_dir_all(&nested).expect("Failed to create nested dirs");
+
+        let mut f1 = std::fs::File::create(temp_dir.path().join("root.rs")).unwrap();
+        writeln!(f1, "fn root() {{ }}").unwrap();
+
+        let mut f2 = std::fs::File::create(nested.join("deep.rs")).unwrap();
+        writeln!(f2, "fn deep() {{ }}").unwrap();
+
+        let (paths, skipped) = collect_rust_file_paths(temp_dir.path());
+
+        assert_eq!(paths.len(), 2);
+        assert_eq!(skipped, 0);
+        assert!(paths.iter().any(|p| p.ends_with("root.rs")));
+        assert!(paths.iter().any(|p| p.ends_with("deep.rs")));
+    }
 
     fn create_test_snapshot(files: &[(&str, &str)]) -> CodebaseSnapshot {
         let file_snapshots: Vec<_> = files

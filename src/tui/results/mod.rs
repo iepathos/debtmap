@@ -42,7 +42,9 @@ pub mod view_mode;
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -52,6 +54,33 @@ use std::io;
 use crate::priority::view::PreparedDebtView;
 use crate::priority::UnifiedAnalysis;
 use app::ResultsApp;
+
+// ============================================================================
+// PURE HELPER FUNCTIONS
+// ============================================================================
+
+/// Check if a key event is the quit key (Ctrl+C).
+///
+/// This is a pure function that can be easily tested.
+#[inline]
+fn is_quit_key(key: &KeyEvent) -> bool {
+    key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)
+}
+
+/// Poll for a key event with the given timeout.
+///
+/// Returns `Ok(Some(key))` if a key event occurred, `Ok(None)` if timeout
+/// or non-key event, and propagates errors.
+fn poll_key_event(timeout_ms: u64) -> Result<Option<KeyEvent>> {
+    if !event::poll(std::time::Duration::from_millis(timeout_ms))? {
+        return Ok(None);
+    }
+
+    match event::read()? {
+        Event::Key(key) => Ok(Some(key)),
+        _ => Ok(None),
+    }
+}
 
 /// Results explorer TUI manager
 pub struct ResultsExplorer {
@@ -105,35 +134,39 @@ impl ResultsExplorer {
     /// Run the interactive TUI event loop
     pub fn run(&mut self) -> Result<()> {
         loop {
-            // Check if we need to force a full redraw (e.g., after external editor)
-            if self.app.take_needs_redraw() {
-                self.terminal.clear()?;
-            }
+            self.render_frame()?;
 
-            // Render current state
-            self.terminal.draw(|f| self.app.render(f))?;
-
-            // Handle input events
-            if event::poll(std::time::Duration::from_millis(100))? {
-                if let Event::Key(key) = event::read()? {
-                    // Handle Ctrl+C to quit
-                    if key.code == KeyCode::Char('c')
-                        && key.modifiers.contains(KeyModifiers::CONTROL)
-                    {
-                        break;
-                    }
-
-                    // Handle other keys
-                    if self.app.handle_key(key)? {
-                        break; // Exit requested
-                    }
-                }
+            if self.process_next_event()? {
+                break;
             }
         }
 
-        // Cleanup
-        self.cleanup()?;
+        self.cleanup()
+    }
+
+    /// Render a single frame, clearing if redraw requested.
+    fn render_frame(&mut self) -> Result<()> {
+        if self.app.take_needs_redraw() {
+            self.terminal.clear()?;
+        }
+        self.terminal.draw(|f| self.app.render(f))?;
         Ok(())
+    }
+
+    /// Process the next event from the terminal.
+    ///
+    /// Returns `Ok(true)` if the application should exit,
+    /// `Ok(false)` to continue the event loop.
+    fn process_next_event(&mut self) -> Result<bool> {
+        let Some(key) = poll_key_event(100)? else {
+            return Ok(false);
+        };
+
+        if is_quit_key(&key) {
+            return Ok(true);
+        }
+
+        self.app.handle_key(key)
     }
 
     /// Clean up and restore terminal
@@ -152,5 +185,54 @@ impl ResultsExplorer {
 impl Drop for ResultsExplorer {
     fn drop(&mut self) {
         let _ = self.cleanup();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyEventKind;
+
+    fn make_key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::NONE,
+        }
+    }
+
+    #[test]
+    fn is_quit_key_detects_ctrl_c() {
+        let key = make_key_event(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        assert!(is_quit_key(&key));
+    }
+
+    #[test]
+    fn is_quit_key_rejects_plain_c() {
+        let key = make_key_event(KeyCode::Char('c'), KeyModifiers::NONE);
+        assert!(!is_quit_key(&key));
+    }
+
+    #[test]
+    fn is_quit_key_rejects_other_keys_with_ctrl() {
+        let key = make_key_event(KeyCode::Char('q'), KeyModifiers::CONTROL);
+        assert!(!is_quit_key(&key));
+    }
+
+    #[test]
+    fn is_quit_key_rejects_escape() {
+        let key = make_key_event(KeyCode::Esc, KeyModifiers::NONE);
+        assert!(!is_quit_key(&key));
+    }
+
+    #[test]
+    fn is_quit_key_handles_ctrl_c_with_shift() {
+        // Ctrl+Shift+C should still be detected as quit (CONTROL is present)
+        let key = make_key_event(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        );
+        assert!(is_quit_key(&key));
     }
 }

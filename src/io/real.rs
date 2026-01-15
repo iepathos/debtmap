@@ -99,57 +99,135 @@ impl CoverageLoader for RealCoverageLoader {
     }
 }
 
-/// Parse LCOV format content into CoverageData.
+/// Represents a parsed LCOV line.
+#[derive(Debug, PartialEq)]
+enum LcovLine {
+    /// Source file declaration (SF:path)
+    SourceFile(std::path::PathBuf),
+    /// Line data (DA:line_number,hit_count)
+    LineData { line: usize, hits: u64 },
+    /// End of record marker
+    EndOfRecord,
+    /// Unknown or empty line (ignored)
+    Unknown,
+}
+
+/// Parse a single LCOV line into its structured representation.
 ///
-/// This is a pure function that parses LCOV content without I/O.
-fn parse_lcov_content(content: &str, source_path: &Path) -> Result<CoverageData, AnalysisError> {
-    let mut data = CoverageData::new();
-    let mut current_file: Option<std::path::PathBuf> = None;
-    let mut current_coverage: Option<FileCoverage> = None;
+/// This is a pure function with no side effects.
+fn parse_lcov_line(line: &str) -> LcovLine {
+    let line = line.trim();
 
-    for line in content.lines() {
-        let line = line.trim();
+    if let Some(sf) = line.strip_prefix("SF:") {
+        LcovLine::SourceFile(sf.into())
+    } else if let Some(da) = line.strip_prefix("DA:") {
+        parse_line_data(da)
+    } else if line == "end_of_record" {
+        LcovLine::EndOfRecord
+    } else {
+        LcovLine::Unknown
+    }
+}
 
-        if let Some(sf) = line.strip_prefix("SF:") {
-            // Source file
-            if let (Some(path), Some(coverage)) = (current_file.take(), current_coverage.take()) {
-                data.add_file_coverage(path, coverage);
-            }
-            current_file = Some(sf.into());
-            current_coverage = Some(FileCoverage::new());
-        } else if let Some(da) = line.strip_prefix("DA:") {
-            // Line data: DA:line_number,hit_count
-            if let Some(ref mut coverage) = current_coverage {
-                let parts: Vec<&str> = da.split(',').collect();
-                if parts.len() >= 2 {
-                    if let (Ok(line_num), Ok(hits)) =
-                        (parts[0].parse::<usize>(), parts[1].parse::<u64>())
-                    {
-                        coverage.add_line(line_num, hits);
-                    }
-                }
-            }
-        } else if line == "end_of_record" {
-            // End of file record
-            if let (Some(path), Some(coverage)) = (current_file.take(), current_coverage.take()) {
-                data.add_file_coverage(path, coverage);
-            }
+/// Parse DA (line data) format: "line_number,hit_count".
+fn parse_line_data(da: &str) -> LcovLine {
+    let mut parts = da.split(',');
+
+    let parsed = parts
+        .next()
+        .and_then(|line_str| line_str.parse::<usize>().ok())
+        .zip(
+            parts
+                .next()
+                .and_then(|hits_str| hits_str.parse::<u64>().ok()),
+        );
+
+    match parsed {
+        Some((line, hits)) => LcovLine::LineData { line, hits },
+        None => LcovLine::Unknown,
+    }
+}
+
+/// Parser state for LCOV content processing.
+struct LcovParserState {
+    data: CoverageData,
+    current_file: Option<std::path::PathBuf>,
+    current_coverage: Option<FileCoverage>,
+}
+
+impl LcovParserState {
+    fn new() -> Self {
+        Self {
+            data: CoverageData::new(),
+            current_file: None,
+            current_coverage: None,
         }
     }
 
-    // Handle last file if no end_of_record
-    if let (Some(path), Some(coverage)) = (current_file, current_coverage) {
-        data.add_file_coverage(path, coverage);
+    /// Process a single parsed line, returning updated state.
+    fn process(mut self, line: LcovLine) -> Self {
+        match line {
+            LcovLine::SourceFile(path) => {
+                self.finalize_current();
+                self.current_file = Some(path);
+                self.current_coverage = Some(FileCoverage::new());
+            }
+            LcovLine::LineData { line, hits } => {
+                if let Some(ref mut coverage) = self.current_coverage {
+                    coverage.add_line(line, hits);
+                }
+            }
+            LcovLine::EndOfRecord => {
+                self.finalize_current();
+            }
+            LcovLine::Unknown => {}
+        }
+        self
     }
 
-    // Check if we actually parsed anything
+    /// Finalize the current file record if one exists.
+    fn finalize_current(&mut self) {
+        if let (Some(path), Some(coverage)) =
+            (self.current_file.take(), self.current_coverage.take())
+        {
+            self.data.add_file_coverage(path, coverage);
+        }
+    }
+
+    /// Complete parsing and return the final coverage data.
+    fn finish(mut self) -> CoverageData {
+        self.finalize_current();
+        self.data
+    }
+}
+
+/// Parse LCOV format content into CoverageData.
+///
+/// This function uses a functional pipeline to parse LCOV content:
+/// 1. Parse each line into a structured representation
+/// 2. Fold over lines to accumulate coverage data
+fn parse_lcov_content(content: &str, source_path: &Path) -> Result<CoverageData, AnalysisError> {
+    let data = content
+        .lines()
+        .map(parse_lcov_line)
+        .fold(LcovParserState::new(), LcovParserState::process)
+        .finish();
+
+    validate_coverage_data(data, content, source_path)
+}
+
+/// Validate that parsed coverage data is not unexpectedly empty.
+fn validate_coverage_data(
+    data: CoverageData,
+    content: &str,
+    source_path: &Path,
+) -> Result<CoverageData, AnalysisError> {
     if data.files().next().is_none() && !content.is_empty() {
         return Err(AnalysisError::coverage_with_path(
             "No coverage data found in LCOV file",
             source_path,
         ));
     }
-
     Ok(data)
 }
 
@@ -335,5 +413,65 @@ end_of_record
         // Operations should not fail
         cache.invalidate("key1").unwrap();
         cache.clear().unwrap();
+    }
+
+    #[test]
+    fn test_parse_lcov_line_source_file() {
+        let line = parse_lcov_line("SF:src/main.rs");
+        assert_eq!(line, LcovLine::SourceFile("src/main.rs".into()));
+    }
+
+    #[test]
+    fn test_parse_lcov_line_line_data() {
+        let line = parse_lcov_line("DA:42,5");
+        assert_eq!(line, LcovLine::LineData { line: 42, hits: 5 });
+    }
+
+    #[test]
+    fn test_parse_lcov_line_end_of_record() {
+        let line = parse_lcov_line("end_of_record");
+        assert_eq!(line, LcovLine::EndOfRecord);
+    }
+
+    #[test]
+    fn test_parse_lcov_line_unknown() {
+        assert_eq!(parse_lcov_line(""), LcovLine::Unknown);
+        assert_eq!(parse_lcov_line("  "), LcovLine::Unknown);
+        assert_eq!(parse_lcov_line("# comment"), LcovLine::Unknown);
+        assert_eq!(parse_lcov_line("TN:test"), LcovLine::Unknown);
+    }
+
+    #[test]
+    fn test_parse_lcov_line_whitespace_handling() {
+        let line = parse_lcov_line("  SF:src/lib.rs  ");
+        assert_eq!(line, LcovLine::SourceFile("src/lib.rs".into()));
+    }
+
+    #[test]
+    fn test_parse_line_data_invalid() {
+        // Missing hit count
+        assert_eq!(parse_line_data("42"), LcovLine::Unknown);
+        // Non-numeric line
+        assert_eq!(parse_line_data("abc,5"), LcovLine::Unknown);
+        // Non-numeric hits
+        assert_eq!(parse_line_data("42,abc"), LcovLine::Unknown);
+        // Empty string
+        assert_eq!(parse_line_data(""), LcovLine::Unknown);
+    }
+
+    #[test]
+    fn test_parse_lcov_content_without_end_of_record() {
+        // Some LCOV generators don't include end_of_record for the last file
+        let lcov_content = "SF:src/main.rs\nDA:1,5\nDA:2,3";
+        let data = parse_lcov_content(lcov_content, Path::new("test.lcov")).unwrap();
+        let coverage = data.get_file_coverage(Path::new("src/main.rs")).unwrap();
+        assert!((coverage - 100.0).abs() < 0.1); // Both lines hit
+    }
+
+    #[test]
+    fn test_parse_lcov_content_invalid_format() {
+        // Non-empty content but no valid LCOV data
+        let result = parse_lcov_content("garbage\nmore garbage", Path::new("test.lcov"));
+        assert!(result.is_err());
     }
 }

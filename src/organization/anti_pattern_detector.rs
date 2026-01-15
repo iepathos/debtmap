@@ -565,53 +565,63 @@ pub fn is_primitive(type_name: &str) -> bool {
 // Display implementations for formatted output (Spec 183)
 use std::fmt;
 
+// Box drawing constants for consistent formatting
+const BOX_WIDTH: usize = 62;
+const BOX_TOP: &str = "╔══════════════════════════════════════════════════════════════╗";
+const BOX_BOTTOM: &str = "╚══════════════════════════════════════════════════════════════╝";
+const BOX_DIVIDER: &str = "╠══════════════════════════════════════════════════════════════╣";
+
+/// Format a box row with content padded to standard width
+fn format_box_row(content: &str, width: usize) -> String {
+    format!("║ {:<width$} ║", content, width = width)
+}
+
+/// Build the summary section lines for SplitQualityReport
+fn build_summary_lines(report: &SplitQualityReport) -> Vec<String> {
+    vec![
+        BOX_TOP.to_string(),
+        format_box_row("Split Quality Analysis", BOX_WIDTH),
+        BOX_DIVIDER.to_string(),
+        format_box_row(
+            &format!("Quality Score: {:.1}/100.0", report.quality_score),
+            BOX_WIDTH,
+        ),
+        format_box_row(&format!("Total Splits: {}", report.total_splits), BOX_WIDTH),
+        format_box_row(
+            &format!("Idiomatic Splits: {}", report.idiomatic_splits),
+            BOX_WIDTH,
+        ),
+        BOX_BOTTOM.to_string(),
+    ]
+}
+
+/// Build the anti-patterns header section
+fn build_anti_patterns_header(count: usize) -> Vec<String> {
+    vec![
+        String::new(),
+        BOX_TOP.to_string(),
+        format_box_row(&format!("Anti-Patterns Found ({count:<2})"), BOX_WIDTH),
+        BOX_BOTTOM.to_string(),
+    ]
+}
+
 impl fmt::Display for SplitQualityReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "╔══════════════════════════════════════════════════════════════╗"
-        )?;
-        writeln!(
-            f,
-            "║              Split Quality Analysis                          ║"
-        )?;
-        writeln!(
-            f,
-            "╠══════════════════════════════════════════════════════════════╣"
-        )?;
-        writeln!(
-            f,
-            "║ Quality Score: {:<46} ║",
-            format!("{:.1}/100.0", self.quality_score)
-        )?;
-        writeln!(f, "║ Total Splits: {:<47} ║", self.total_splits)?;
-        writeln!(f, "║ Idiomatic Splits: {:<43} ║", self.idiomatic_splits)?;
-        writeln!(
-            f,
-            "╚══════════════════════════════════════════════════════════════╝"
-        )?;
+        // Write summary section
+        for line in build_summary_lines(self) {
+            writeln!(f, "{line}")?;
+        }
 
+        // Write anti-patterns section if present
         if !self.anti_patterns.is_empty() {
-            writeln!(f)?;
-            writeln!(
-                f,
-                "╔══════════════════════════════════════════════════════════════╗"
-            )?;
-            writeln!(
-                f,
-                "║              Anti-Patterns Found ({:<2})                        ║",
-                self.anti_patterns.len()
-            )?;
-            writeln!(
-                f,
-                "╚══════════════════════════════════════════════════════════════╝"
-            )?;
-
+            for line in build_anti_patterns_header(self.anti_patterns.len()) {
+                writeln!(f, "{line}")?;
+            }
             for (i, pattern) in self.anti_patterns.iter().enumerate() {
                 if i > 0 {
                     writeln!(f)?;
                 }
-                write!(f, "{}", pattern)?;
+                write!(f, "{pattern}")?;
             }
         }
 
@@ -619,85 +629,108 @@ impl fmt::Display for SplitQualityReport {
     }
 }
 
+// Detail box constants for AntiPattern display
+const DETAIL_TOP: &str = "┌──────────────────────────────────────────────────────────────┐";
+const DETAIL_BOTTOM: &str = "└──────────────────────────────────────────────────────────────┘";
+const DETAIL_DIVIDER: &str = "├──────────────────────────────────────────────────────────────┤";
+const DETAIL_WIDTH: usize = 58;
+const DETAIL_INNER_WIDTH: usize = 56;
+
+/// Get display string for severity level
+fn severity_display(severity: &AntiPatternSeverity) -> &'static str {
+    match severity {
+        AntiPatternSeverity::Critical => "🔴 CRITICAL",
+        AntiPatternSeverity::High => "🟠 HIGH",
+        AntiPatternSeverity::Medium => "🟡 MEDIUM",
+        AntiPatternSeverity::Low => "🟢 LOW",
+    }
+}
+
+/// Get display name for pattern type
+fn pattern_type_display(pattern_type: &AntiPatternType) -> &'static str {
+    match pattern_type {
+        AntiPatternType::UtilitiesModule => "Utilities Module",
+        AntiPatternType::TechnicalGrouping => "Technical Grouping",
+        AntiPatternType::ParameterPassing => "Parameter Passing",
+        AntiPatternType::MixedDataTypes => "Mixed Data Types",
+        AntiPatternType::LackOfTypeOwnership => "Lack of Type Ownership",
+    }
+}
+
+/// Format a detail box row with content
+fn format_detail_row(content: &str, width: usize) -> String {
+    format!("│ {:<width$} │", content, width = width)
+}
+
+/// Format an indented detail row
+fn format_indented_row(content: &str, width: usize) -> String {
+    format!("│   {:<width$} │", content, width = width)
+}
+
+/// Build wrapped text section lines
+fn build_wrapped_section(header: &str, text: &str) -> Vec<String> {
+    let mut lines = vec![format_detail_row(header, BOX_WIDTH)];
+    for line in wrap_text(text, DETAIL_WIDTH) {
+        lines.push(format_indented_row(&line, DETAIL_WIDTH));
+    }
+    lines
+}
+
+/// Build affected methods section lines
+fn build_affected_methods_section(methods: &[String]) -> Vec<String> {
+    if methods.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines = vec![
+        DETAIL_DIVIDER.to_string(),
+        format_detail_row(
+            &format!("Affected Methods ({:<2}):", methods.len()),
+            BOX_WIDTH,
+        ),
+    ];
+
+    for method in methods.iter().take(5) {
+        lines.push(format_indented_row(
+            &format!("• {method}"),
+            DETAIL_INNER_WIDTH,
+        ));
+    }
+
+    if methods.len() > 5 {
+        lines.push(format_indented_row(
+            &format!("... and {} more", methods.len() - 5),
+            DETAIL_INNER_WIDTH,
+        ));
+    }
+
+    lines
+}
+
 impl fmt::Display for AntiPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let severity_str = match self.severity {
-            AntiPatternSeverity::Critical => "🔴 CRITICAL",
-            AntiPatternSeverity::High => "🟠 HIGH",
-            AntiPatternSeverity::Medium => "🟡 MEDIUM",
-            AntiPatternSeverity::Low => "🟢 LOW",
-        };
+        let severity = severity_display(&self.severity);
+        let pattern_name = pattern_type_display(&self.pattern_type);
 
-        let pattern_name = match self.pattern_type {
-            AntiPatternType::UtilitiesModule => "Utilities Module",
-            AntiPatternType::TechnicalGrouping => "Technical Grouping",
-            AntiPatternType::ParameterPassing => "Parameter Passing",
-            AntiPatternType::MixedDataTypes => "Mixed Data Types",
-            AntiPatternType::LackOfTypeOwnership => "Lack of Type Ownership",
-        };
+        // Build all lines as a vector for clean iteration
+        let mut lines = vec![
+            DETAIL_TOP.to_string(),
+            format!("│ {severity} - {pattern_name:<40} │"),
+            DETAIL_DIVIDER.to_string(),
+            format_detail_row(&format!("Location: {}", self.location), BOX_WIDTH),
+            DETAIL_DIVIDER.to_string(),
+        ];
 
-        writeln!(
-            f,
-            "┌──────────────────────────────────────────────────────────────┐"
-        )?;
-        writeln!(f, "│ {} - {:<40} │", severity_str, pattern_name)?;
-        writeln!(
-            f,
-            "├──────────────────────────────────────────────────────────────┤"
-        )?;
-        writeln!(f, "│ Location: {:<51} │", self.location)?;
-        writeln!(
-            f,
-            "├──────────────────────────────────────────────────────────────┤"
-        )?;
+        lines.extend(build_wrapped_section("Description:", &self.description));
+        lines.push(DETAIL_DIVIDER.to_string());
+        lines.extend(build_wrapped_section("Correction:", &self.correction));
+        lines.extend(build_affected_methods_section(&self.affected_methods));
+        lines.push(DETAIL_BOTTOM.to_string());
 
-        // Description - wrap text to fit width
-        writeln!(
-            f,
-            "│ Description:                                                 │"
-        )?;
-        for line in wrap_text(&self.description, 58) {
-            writeln!(f, "│   {:<58} │", line)?;
+        // Write all lines
+        for line in lines {
+            writeln!(f, "{line}")?;
         }
-
-        writeln!(
-            f,
-            "├──────────────────────────────────────────────────────────────┤"
-        )?;
-        writeln!(
-            f,
-            "│ Correction:                                                  │"
-        )?;
-        for line in wrap_text(&self.correction, 58) {
-            writeln!(f, "│   {:<58} │", line)?;
-        }
-
-        if !self.affected_methods.is_empty() {
-            writeln!(
-                f,
-                "├──────────────────────────────────────────────────────────────┤"
-            )?;
-            writeln!(
-                f,
-                "│ Affected Methods ({:<2}):                                     │",
-                self.affected_methods.len()
-            )?;
-            for method in self.affected_methods.iter().take(5) {
-                writeln!(f, "│   • {:<56} │", method)?;
-            }
-            if self.affected_methods.len() > 5 {
-                writeln!(
-                    f,
-                    "│   ... and {} more                                        │",
-                    self.affected_methods.len() - 5
-                )?;
-            }
-        }
-
-        writeln!(
-            f,
-            "└──────────────────────────────────────────────────────────────┘"
-        )?;
 
         Ok(())
     }
