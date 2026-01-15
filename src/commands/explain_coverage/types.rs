@@ -13,6 +13,15 @@ pub enum DebugFormat {
     Json,
 }
 
+impl From<crate::cli::DebugFormatArg> for DebugFormat {
+    fn from(format: crate::cli::DebugFormatArg) -> Self {
+        match format {
+            crate::cli::DebugFormatArg::Text => DebugFormat::Text,
+            crate::cli::DebugFormatArg::Json => DebugFormat::Json,
+        }
+    }
+}
+
 /// Configuration for the explain_coverage command.
 #[derive(Debug)]
 pub struct ExplainCoverageConfig {

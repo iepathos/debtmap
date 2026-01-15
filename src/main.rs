@@ -19,7 +19,51 @@ use debtmap::observability::{
     enable_profiling, extract_thread_panic_message, get_timing_report, init_tracing,
     install_panic_hook,
 };
+use std::path::PathBuf;
 use std::sync::Arc;
+
+/// Output profiling report to file or stderr.
+///
+/// This function handles the I/O for profiling output, keeping it separate from
+/// the main command dispatch logic.
+fn output_profiling_report(output_path: Option<PathBuf>) -> Result<()> {
+    let report = get_timing_report();
+    match output_path {
+        Some(path) => {
+            std::fs::write(&path, report.to_json())
+                .map_err(|e| anyhow::anyhow!("Failed to write profile output: {}", e))?;
+            eprintln!("Profiling data written to: {}", path.display());
+        }
+        None => {
+            eprintln!("{}", report.to_summary());
+        }
+    }
+    Ok(())
+}
+
+/// Extract the number of jobs from a command, defaulting to 0 for commands that don't support it.
+fn extract_jobs(command: &Commands) -> usize {
+    match command {
+        Commands::Analyze { jobs, .. } | Commands::Validate { jobs, .. } => *jobs,
+        _ => 0,
+    }
+}
+
+/// Parse CLI arguments, supporting ARGUMENTS environment variable for backward compatibility.
+///
+/// This is a pure function that encapsulates the CLI parsing logic.
+fn parse_cli() -> Cli {
+    if let Ok(args_str) = std::env::var("ARGUMENTS") {
+        let args: Vec<String> = args_str.split_whitespace().map(String::from).collect();
+        let mut full_args = vec![std::env::args()
+            .next()
+            .unwrap_or_else(|| "debtmap".to_string())];
+        full_args.extend(args);
+        Cli::parse_from(full_args)
+    } else {
+        Cli::parse()
+    }
+}
 
 fn main() -> Result<()> {
     // Install custom panic hook FIRST for structured crash reports (spec 207)
@@ -41,25 +85,10 @@ fn main() -> Result<()> {
 }
 
 fn main_inner() -> Result<()> {
-    // Support ARGUMENTS environment variable for backward compatibility
-    let cli = if let Ok(args_str) = std::env::var("ARGUMENTS") {
-        let args: Vec<String> = args_str.split_whitespace().map(String::from).collect();
-        let mut full_args = vec![std::env::args()
-            .next()
-            .unwrap_or_else(|| "debtmap".to_string())];
-        full_args.extend(args);
-        Cli::parse_from(full_args)
-    } else {
-        Cli::parse()
-    };
+    let cli = parse_cli();
 
     // Configure rayon thread pool early based on CLI arguments
-    let jobs = match &cli.command {
-        Commands::Analyze { jobs, .. } => *jobs,
-        Commands::Validate { jobs, .. } => *jobs,
-        _ => 0,
-    };
-    configure_thread_pool(get_worker_count(jobs));
+    configure_thread_pool(get_worker_count(extract_jobs(&cli.command)));
 
     // Handle --show-config-sources flag (spec 201)
     if cli.show_config_sources {
@@ -82,45 +111,15 @@ fn main_inner() -> Result<()> {
             profile_output,
             ..
         } => {
-            // Extract profiling options before moving command
-            let profiling_enabled = profile;
-            let profiling_output = profile_output;
-
-            // Enable profiling if requested (spec 001)
-            if profiling_enabled {
+            if profile {
                 enable_profiling();
             }
-
-            // Re-parse to get full command for handler
-            let cli = if let Ok(args_str) = std::env::var("ARGUMENTS") {
-                let args: Vec<String> = args_str.split_whitespace().map(String::from).collect();
-                let mut full_args = vec![std::env::args()
-                    .next()
-                    .unwrap_or_else(|| "debtmap".to_string())];
-                full_args.extend(args);
-                Cli::parse_from(full_args)
-            } else {
-                Cli::parse()
-            };
-
-            handle_analyze_command(cli.command)
+            // Re-parse to get full command for handler (profiling options consumed above)
+            handle_analyze_command(parse_cli().command)
                 .map_err(|e| anyhow::anyhow!("Analyze command failed: {}", e))?;
-
-            // Output profiling report if enabled
-            if profiling_enabled {
-                let report = get_timing_report();
-
-                if let Some(output_path) = profiling_output {
-                    // Write JSON to file
-                    std::fs::write(&output_path, report.to_json())
-                        .map_err(|e| anyhow::anyhow!("Failed to write profile output: {}", e))?;
-                    eprintln!("Profiling data written to: {}", output_path.display());
-                } else {
-                    // Print summary to stderr (works with TUI mode)
-                    eprintln!("{}", report.to_summary());
-                }
+            if profile {
+                output_profiling_report(profile_output)?;
             }
-
             Ok(())
         }
         Commands::Init { force } => {
@@ -162,23 +161,7 @@ fn main_inner() -> Result<()> {
                 output_path: output,
                 previous_validation,
                 threshold,
-                format: match format {
-                    debtmap::cli::OutputFormat::Json => {
-                        debtmap::commands::validate_improvement::OutputFormat::Json
-                    }
-                    debtmap::cli::OutputFormat::Markdown => {
-                        debtmap::commands::validate_improvement::OutputFormat::Markdown
-                    }
-                    debtmap::cli::OutputFormat::Terminal => {
-                        debtmap::commands::validate_improvement::OutputFormat::Terminal
-                    }
-                    debtmap::cli::OutputFormat::Html => {
-                        debtmap::commands::validate_improvement::OutputFormat::Terminal
-                    }
-                    debtmap::cli::OutputFormat::Dot => {
-                        debtmap::commands::validate_improvement::OutputFormat::Terminal
-                    }
-                },
+                format: format.into(),
                 quiet: quiet || is_automation_mode(),
             };
             debtmap::commands::validate_improvement::validate_improvement(config)?;
@@ -205,14 +188,7 @@ fn main_inner() -> Result<()> {
                 function_name,
                 file_path,
                 verbose,
-                format: match format {
-                    debtmap::cli::DebugFormatArg::Text => {
-                        debtmap::commands::explain_coverage::DebugFormat::Text
-                    }
-                    debtmap::cli::DebugFormatArg::Json => {
-                        debtmap::commands::explain_coverage::DebugFormat::Json
-                    }
-                },
+                format: format.into(),
             };
             debtmap::commands::explain_coverage::explain_coverage(config)?;
             Ok(())

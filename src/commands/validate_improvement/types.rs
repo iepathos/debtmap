@@ -15,6 +15,19 @@ pub enum OutputFormat {
     Markdown,
 }
 
+impl From<crate::cli::OutputFormat> for OutputFormat {
+    fn from(format: crate::cli::OutputFormat) -> Self {
+        match format {
+            crate::cli::OutputFormat::Json => OutputFormat::Json,
+            crate::cli::OutputFormat::Markdown => OutputFormat::Markdown,
+            // Terminal, Html, and Dot all map to Terminal for validation output
+            crate::cli::OutputFormat::Terminal
+            | crate::cli::OutputFormat::Html
+            | crate::cli::OutputFormat::Dot => OutputFormat::Terminal,
+        }
+    }
+}
+
 /// Configuration for validation.
 #[derive(Debug, Clone)]
 pub struct ValidateImprovementConfig {

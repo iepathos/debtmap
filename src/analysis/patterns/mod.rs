@@ -191,7 +191,10 @@ impl PatternDetector {
         patterns
     }
 
-    /// Find implementations of an interface across all files
+    /// Find implementations of an interface across all files.
+    ///
+    /// Uses functional iteration to find classes that inherit from the interface
+    /// and collect their method implementations.
     fn find_cross_file_implementations(
         &self,
         interface: &ClassDef,
@@ -199,38 +202,43 @@ impl PatternDetector {
         all_files: &[FileMetrics],
         context: &CrossModuleContext,
     ) -> Vec<Implementation> {
-        let mut implementations = Vec::new();
+        all_files
+            .iter()
+            .flat_map(|file_metrics| {
+                self.find_implementations_in_file(file_metrics, interface, interface_file, context)
+            })
+            .collect()
+    }
 
-        for file_metrics in all_files {
-            if let Some(classes) = &file_metrics.classes {
-                for class in classes {
-                    if self.inherits_from_interface(
-                        class,
-                        interface,
-                        &file_metrics.path,
-                        interface_file,
-                        context,
-                    ) {
-                        for method in &class.methods {
-                            if interface
-                                .methods
-                                .iter()
-                                .any(|m| m.name == method.name && m.is_abstract)
-                            {
-                                implementations.push(Implementation {
-                                    file: file_metrics.path.clone(),
-                                    class_name: Some(class.name.clone()),
-                                    function_name: method.name.clone(),
-                                    line: method.line,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        implementations
+    /// Find interface implementations within a single file.
+    fn find_implementations_in_file(
+        &self,
+        file_metrics: &FileMetrics,
+        interface: &ClassDef,
+        interface_file: &std::path::Path,
+        context: &CrossModuleContext,
+    ) -> Vec<Implementation> {
+        file_metrics
+            .classes
+            .as_ref()
+            .map(|classes| {
+                classes
+                    .iter()
+                    .filter(|class| {
+                        self.inherits_from_interface(
+                            class,
+                            interface,
+                            &file_metrics.path,
+                            interface_file,
+                            context,
+                        )
+                    })
+                    .flat_map(|class| {
+                        find_class_method_implementations(class, interface, &file_metrics.path)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Check if a class inherits from an interface (possibly in a different file)
@@ -255,6 +263,36 @@ impl Default for PatternDetector {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Check if a method name matches an abstract method in the interface.
+///
+/// This is a pure predicate function for filtering methods.
+fn implements_abstract_method(method_name: &str, interface: &ClassDef) -> bool {
+    interface
+        .methods
+        .iter()
+        .any(|m| m.name == method_name && m.is_abstract)
+}
+
+/// Find all method implementations in a class that implement abstract methods from an interface.
+///
+/// Returns an iterator of Implementation structs for matching methods.
+fn find_class_method_implementations<'a>(
+    class: &'a ClassDef,
+    interface: &'a ClassDef,
+    file_path: &'a std::path::Path,
+) -> impl Iterator<Item = Implementation> + 'a {
+    class
+        .methods
+        .iter()
+        .filter(move |method| implements_abstract_method(&method.name, interface))
+        .map(move |method| Implementation {
+            file: file_path.to_path_buf(),
+            class_name: Some(class.name.clone()),
+            function_name: method.name.clone(),
+            line: method.line,
+        })
 }
 
 /// Helper function to check if a class is an abstract base class
@@ -363,5 +401,169 @@ mod tests {
     fn test_pattern_detector_with_singleton() {
         let detector = PatternDetector::new();
         assert_eq!(detector.recognizers.len(), 7);
+    }
+
+    #[test]
+    fn test_implements_abstract_method_matches() {
+        let interface = ClassDef {
+            name: "Observer".to_string(),
+            base_classes: vec!["ABC".to_string()],
+            methods: vec![
+                MethodDef {
+                    name: "on_event".to_string(),
+                    is_abstract: true,
+                    decorators: vec![],
+                    overrides_base: false,
+                    line: 10,
+                },
+                MethodDef {
+                    name: "on_error".to_string(),
+                    is_abstract: true,
+                    decorators: vec![],
+                    overrides_base: false,
+                    line: 15,
+                },
+            ],
+            is_abstract: true,
+            decorators: vec![],
+            line: 5,
+        };
+
+        assert!(implements_abstract_method("on_event", &interface));
+        assert!(implements_abstract_method("on_error", &interface));
+    }
+
+    #[test]
+    fn test_implements_abstract_method_no_match() {
+        let interface = ClassDef {
+            name: "Observer".to_string(),
+            base_classes: vec!["ABC".to_string()],
+            methods: vec![MethodDef {
+                name: "on_event".to_string(),
+                is_abstract: true,
+                decorators: vec![],
+                overrides_base: false,
+                line: 10,
+            }],
+            is_abstract: true,
+            decorators: vec![],
+            line: 5,
+        };
+
+        assert!(!implements_abstract_method("other_method", &interface));
+    }
+
+    #[test]
+    fn test_implements_abstract_method_non_abstract_not_matched() {
+        let interface = ClassDef {
+            name: "Observer".to_string(),
+            base_classes: vec!["ABC".to_string()],
+            methods: vec![MethodDef {
+                name: "concrete_method".to_string(),
+                is_abstract: false,
+                decorators: vec![],
+                overrides_base: false,
+                line: 10,
+            }],
+            is_abstract: true,
+            decorators: vec![],
+            line: 5,
+        };
+
+        assert!(!implements_abstract_method("concrete_method", &interface));
+    }
+
+    #[test]
+    fn test_find_class_method_implementations() {
+        let interface = ClassDef {
+            name: "Observer".to_string(),
+            base_classes: vec!["ABC".to_string()],
+            methods: vec![MethodDef {
+                name: "on_event".to_string(),
+                is_abstract: true,
+                decorators: vec![],
+                overrides_base: false,
+                line: 10,
+            }],
+            is_abstract: true,
+            decorators: vec![],
+            line: 5,
+        };
+
+        let implementing_class = ClassDef {
+            name: "ConcreteObserver".to_string(),
+            base_classes: vec!["Observer".to_string()],
+            methods: vec![
+                MethodDef {
+                    name: "on_event".to_string(),
+                    is_abstract: false,
+                    decorators: vec![],
+                    overrides_base: true,
+                    line: 20,
+                },
+                MethodDef {
+                    name: "helper".to_string(),
+                    is_abstract: false,
+                    decorators: vec![],
+                    overrides_base: false,
+                    line: 25,
+                },
+            ],
+            is_abstract: false,
+            decorators: vec![],
+            line: 15,
+        };
+
+        let file_path = PathBuf::from("test.py");
+        let implementations: Vec<_> =
+            find_class_method_implementations(&implementing_class, &interface, &file_path)
+                .collect();
+
+        assert_eq!(implementations.len(), 1);
+        assert_eq!(implementations[0].function_name, "on_event");
+        assert_eq!(
+            implementations[0].class_name,
+            Some("ConcreteObserver".to_string())
+        );
+        assert_eq!(implementations[0].line, 20);
+    }
+
+    #[test]
+    fn test_find_class_method_implementations_empty() {
+        let interface = ClassDef {
+            name: "Observer".to_string(),
+            base_classes: vec!["ABC".to_string()],
+            methods: vec![MethodDef {
+                name: "on_event".to_string(),
+                is_abstract: true,
+                decorators: vec![],
+                overrides_base: false,
+                line: 10,
+            }],
+            is_abstract: true,
+            decorators: vec![],
+            line: 5,
+        };
+
+        let unrelated_class = ClassDef {
+            name: "Unrelated".to_string(),
+            base_classes: vec![],
+            methods: vec![MethodDef {
+                name: "do_something".to_string(),
+                is_abstract: false,
+                decorators: vec![],
+                overrides_base: false,
+                line: 20,
+            }],
+            is_abstract: false,
+            decorators: vec![],
+            line: 15,
+        };
+
+        let file_path = PathBuf::from("test.py");
+        let implementations: Vec<_> =
+            find_class_method_implementations(&unrelated_class, &interface, &file_path).collect();
+
+        assert!(implementations.is_empty());
     }
 }
