@@ -438,80 +438,73 @@ fn is_single_line_comment(trimmed: &str, language: LocLanguage) -> bool {
     false
 }
 
-/// Enter block comment and update state
+/// Scan bytes for comment markers and compute final nesting depth.
+///
+/// Returns the final depth after scanning. A depth of 0 means the comment closed.
+/// This is a pure function with no side effects.
+fn scan_comment_depth(
+    bytes: &[u8],
+    start_idx: usize,
+    initial_depth: usize,
+    language: LocLanguage,
+) -> usize {
+    let mut idx = start_idx;
+    let mut depth = initial_depth;
+
+    while idx < bytes.len() {
+        if let Some(marker) = detect_comment_marker(bytes, idx) {
+            match marker {
+                CommentMarker::Open if language == LocLanguage::Rust => depth += 1,
+                CommentMarker::Open => {}
+                CommentMarker::Close => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        return 0;
+                    }
+                }
+            }
+            idx += 2;
+        } else {
+            idx += 1;
+        }
+    }
+    depth
+}
+
+/// Comment marker type detected during scanning.
+enum CommentMarker {
+    Open,  // /*
+    Close, // */
+}
+
+/// Detect comment marker at position, returning marker type if found.
+fn detect_comment_marker(bytes: &[u8], idx: usize) -> Option<CommentMarker> {
+    if idx + 1 >= bytes.len() {
+        return None;
+    }
+    match (bytes[idx], bytes[idx + 1]) {
+        (b'/', b'*') => Some(CommentMarker::Open),
+        (b'*', b'/') => Some(CommentMarker::Close),
+        _ => None,
+    }
+}
+
+/// Enter block comment and update state.
 fn enter_block_comment(
     trimmed: &str,
     start_idx: usize,
     state: &mut CommentState,
     language: LocLanguage,
 ) {
-    // Start from after the first /*
-    let mut idx = start_idx + 2;
-    let bytes = trimmed.as_bytes();
-    let mut depth = 1;
-
-    while idx < bytes.len() {
-        if idx + 1 < bytes.len() {
-            // Check for nested /* in Rust
-            if bytes[idx] == b'/' && bytes[idx + 1] == b'*' {
-                if language == LocLanguage::Rust {
-                    depth += 1;
-                }
-                idx += 2;
-                continue;
-            }
-            // Check for closing */
-            if bytes[idx] == b'*' && bytes[idx + 1] == b'/' {
-                depth -= 1;
-                if depth == 0 {
-                    state.in_block_comment = false;
-                    state.block_depth = 0;
-                    return;
-                }
-                idx += 2;
-                continue;
-            }
-        }
-        idx += 1;
-    }
-
-    // Didn't find matching close - we're in a block comment
-    state.in_block_comment = true;
+    let depth = scan_comment_depth(trimmed.as_bytes(), start_idx + 2, 1, language);
+    state.in_block_comment = depth > 0;
     state.block_depth = depth;
 }
 
-/// Update block comment state when inside a block comment
+/// Update block comment state when inside a block comment.
 fn update_block_comment_state(trimmed: &str, state: &mut CommentState, language: LocLanguage) {
-    let bytes = trimmed.as_bytes();
-    let mut idx = 0;
-    let mut depth = state.block_depth;
-
-    while idx < bytes.len() {
-        if idx + 1 < bytes.len() {
-            // Check for nested /* in Rust
-            if bytes[idx] == b'/' && bytes[idx + 1] == b'*' {
-                if language == LocLanguage::Rust {
-                    depth += 1;
-                }
-                idx += 2;
-                continue;
-            }
-            // Check for closing */
-            if bytes[idx] == b'*' && bytes[idx + 1] == b'/' {
-                depth -= 1;
-                if depth == 0 {
-                    state.in_block_comment = false;
-                    state.block_depth = 0;
-                    return;
-                }
-                idx += 2;
-                continue;
-            }
-        }
-        idx += 1;
-    }
-
-    // Still in block comment
+    let depth = scan_comment_depth(trimmed.as_bytes(), 0, state.block_depth, language);
+    state.in_block_comment = depth > 0;
     state.block_depth = depth;
 }
 

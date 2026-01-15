@@ -233,71 +233,112 @@ pub(crate) fn format_score_breakdown_with_coverage(
     output
 }
 
+/// Extract coverage factor description based on coverage percentage and score.
+fn coverage_factor(
+    transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
+    coverage_factor_score: f64,
+    coverage_weight: f64,
+) -> Option<String> {
+    match transitive_coverage {
+        Some(trans_cov) => {
+            let pct = trans_cov.direct * 100.0;
+            if pct >= 95.0 {
+                Some(format!("Excellent coverage {:.1}%", pct))
+            } else if pct >= 80.0 {
+                Some(format!("Good coverage {:.1}%", pct))
+            } else if coverage_factor_score > 3.0 {
+                Some(format!(
+                    "Line coverage {:.1}% (weight: {:.0}%)",
+                    pct,
+                    coverage_weight * 100.0
+                ))
+            } else {
+                None
+            }
+        }
+        None if coverage_factor_score > 3.0 => Some(format!(
+            "No coverage data (weight: {:.0}%)",
+            coverage_weight * 100.0
+        )),
+        None => None,
+    }
+}
+
+/// Extract complexity factor description based on score threshold.
+fn complexity_factor(complexity_score: f64, complexity_weight: f64) -> Option<String> {
+    if complexity_score > 5.0 {
+        Some(format!(
+            "Complexity (weight: {:.0}%)",
+            complexity_weight * 100.0
+        ))
+    } else if complexity_score > 3.0 {
+        Some("Moderate complexity".to_string())
+    } else {
+        None
+    }
+}
+
+/// Extract dependency factor description based on score threshold.
+fn dependency_factor(dependency_score: f64, dependency_weight: f64) -> Option<String> {
+    if dependency_score > 5.0 {
+        Some(format!(
+            "Critical path (weight: {:.0}%)",
+            dependency_weight * 100.0
+        ))
+    } else {
+        None
+    }
+}
+
+/// Extract debt-type-specific factors.
+fn debt_type_factors(debt_type: &crate::priority::DebtType) -> Vec<String> {
+    match debt_type {
+        crate::priority::DebtType::NestedLoops { depth, .. } => {
+            vec![
+                "Complexity impact (High)".to_string(),
+                format!("{} level nested loops", depth),
+            ]
+        }
+        crate::priority::DebtType::BlockingIO { operation, .. } => {
+            vec![
+                "Resource management issue".to_string(),
+                format!("Blocking {}", operation),
+            ]
+        }
+        crate::priority::DebtType::AllocationInefficiency { pattern, .. } => {
+            vec![
+                "Resource management issue".to_string(),
+                format!("Allocation: {}", pattern),
+            ]
+        }
+        _ => vec![],
+    }
+}
+
 pub(crate) fn format_main_factors_with_coverage(
     unified_score: &crate::priority::UnifiedScore,
     debt_type: &crate::priority::DebtType,
     transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
 ) -> String {
     let weights = crate::config::get_scoring_weights();
-    let mut factors = vec![];
 
-    // Show coverage info - both good and bad coverage are important factors
-    if let Some(trans_cov) = transitive_coverage {
-        let coverage_pct = trans_cov.direct * 100.0;
-        if coverage_pct >= 95.0 {
-            factors.push(format!("Excellent coverage {:.1}%", coverage_pct));
-        } else if coverage_pct >= 80.0 {
-            factors.push(format!("Good coverage {:.1}%", coverage_pct));
-        } else if unified_score.coverage_factor > 3.0 {
-            factors.push(format!(
-                "Line coverage {:.1}% (weight: {:.0}%)",
-                coverage_pct,
-                weights.coverage * 100.0
-            ));
-        }
-    } else if unified_score.coverage_factor > 3.0 {
-        factors.push(format!(
-            "No coverage data (weight: {:.0}%)",
-            weights.coverage * 100.0
-        ));
-    }
-    if unified_score.complexity_factor > 5.0 {
-        factors.push(format!(
-            "Complexity (weight: {:.0}%)",
-            weights.complexity * 100.0
-        ));
-    } else if unified_score.complexity_factor > 3.0 {
-        factors.push("Moderate complexity".to_string());
-    }
+    let factors: Vec<String> = [
+        coverage_factor(
+            transitive_coverage,
+            unified_score.coverage_factor,
+            weights.coverage,
+        ),
+        complexity_factor(unified_score.complexity_factor, weights.complexity),
+        dependency_factor(unified_score.dependency_factor, weights.dependency),
+    ]
+    .into_iter()
+    .flatten()
+    .chain(debt_type_factors(debt_type))
+    .collect();
 
-    if unified_score.dependency_factor > 5.0 {
-        factors.push(format!(
-            "Critical path (weight: {:.0}%)",
-            weights.dependency * 100.0
-        ));
-    }
-    // Organization factor removed per spec 58 - redundant with complexity factor
-
-    // Add specific factors for various debt types
-    match debt_type {
-        crate::priority::DebtType::NestedLoops { depth, .. } => {
-            factors.push("Complexity impact (High)".to_string());
-            factors.push(format!("{} level nested loops", depth));
-        }
-        crate::priority::DebtType::BlockingIO { operation, .. } => {
-            factors.push("Resource management issue".to_string());
-            factors.push(format!("Blocking {}", operation));
-        }
-        crate::priority::DebtType::AllocationInefficiency { pattern, .. } => {
-            factors.push("Resource management issue".to_string());
-            factors.push(format!("Allocation: {}", pattern));
-        }
-        _ => {} // No additional factors for other debt types
-    }
-
-    if !factors.is_empty() {
-        format!("*Main factors: {}*\n", factors.join(", "))
-    } else {
+    if factors.is_empty() {
         String::new()
+    } else {
+        format!("*Main factors: {}*\n", factors.join(", "))
     }
 }
