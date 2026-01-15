@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-01-15
+
+### Fixed
+
+- **Duplicate Config Struct** - Removed duplicate `OutputConfig` struct definition
+
+### Internal (Refactoring)
+
+- **Complexity Reduction** - Reduced complexity across multiple modules
+  - Extracted pure helpers for complexity calculations
+  - Reduced complexity in `main_inner` and `find_cross_file_implementations`
+  - Fixed git context handling during refactoring
+- **Progress System** - Extracted progress helpers in unified_analysis module
+- **Pure Function Extraction** - Continued extracting pure helpers across modules for better testability
+
 ## [0.12.0] - 2026-01-13
 
 ### Fixed
