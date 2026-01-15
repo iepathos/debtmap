@@ -59,6 +59,69 @@ pub struct FileBlameCache {
 // Pure Functions (Testable Without Git)
 // =============================================================================
 
+// -----------------------------------------------------------------------------
+// Helper Functions for Blame Parsing (Pure, Testable)
+// -----------------------------------------------------------------------------
+
+/// Check if a line is a commit header (starts with 40 hex characters)
+fn is_commit_header(line: &str) -> bool {
+    line.len() >= 40 && line.chars().take(40).all(|c| c.is_ascii_hexdigit())
+}
+
+/// Parsed commit header from git blame porcelain format
+struct ParsedCommitHeader {
+    commit_hash: String,
+    line_number: usize,
+    is_new_block: bool,
+}
+
+/// Parse a commit header line into its components
+///
+/// Format: `<40-char-hash> <orig_line> <final_line> [<num_lines>]`
+/// - `num_lines` present indicates a new commit block (full metadata follows)
+/// - `num_lines` absent indicates a continuation line from the same commit
+fn parse_commit_header(line: &str) -> Option<ParsedCommitHeader> {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 3 {
+        return None;
+    }
+
+    let line_number = parts[2].parse::<usize>().ok()?;
+
+    Some(ParsedCommitHeader {
+        commit_hash: parts[0].to_string(),
+        line_number,
+        is_new_block: parts.len() >= 4,
+    })
+}
+
+/// Find author for a commit from existing results
+fn find_author_for_commit(
+    results: &HashMap<usize, BlameLineInfo>,
+    commit_hash: &str,
+) -> Option<String> {
+    results
+        .values()
+        .find(|info| info.commit_hash == commit_hash)
+        .map(|info| info.author.clone())
+}
+
+/// Resolve author for current line, using cached results as fallback
+fn resolve_author(
+    current_author: &Option<String>,
+    results: &HashMap<usize, BlameLineInfo>,
+    commit_hash: &str,
+) -> String {
+    current_author
+        .clone()
+        .or_else(|| find_author_for_commit(results, commit_hash))
+        .unwrap_or_default()
+}
+
+// -----------------------------------------------------------------------------
+// Main Parser
+// -----------------------------------------------------------------------------
+
 /// Parse git blame --porcelain output into line-indexed map
 ///
 /// Pure function - parses string input, returns HashMap.
@@ -95,58 +158,61 @@ pub fn parse_full_blame_output(blame_output: &str) -> HashMap<usize, BlameLineIn
     let mut current_line: Option<usize> = None;
 
     for line in blame_output.lines() {
-        // Check for commit header line: "<hash> <orig_line> <final_line> [<num_lines>]"
-        if line.len() >= 40 && line.chars().take(40).all(|c| c.is_ascii_hexdigit()) {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 3 {
-                let new_commit = parts[0].to_string();
-                // parts[2] is the final line number in the output
-                if let Ok(line_num) = parts[2].parse::<usize>() {
-                    current_line = Some(line_num);
-                }
-                // Reset author for new commit block (will be set if header follows)
-                // Don't reset if this is a continuation line from the same commit
-                if parts.len() >= 4 {
-                    // This is a new commit block (has num_lines), author header will follow
-                    current_author = None;
-                } else if current_commit.as_ref() != Some(&new_commit) {
-                    // Different commit but no full header - look up author from cache
-                    current_author = result
-                        .values()
-                        .find(|info: &&BlameLineInfo| info.commit_hash == new_commit)
-                        .map(|info| Some(info.author.clone()))
-                        .unwrap_or(None);
-                }
-                // Only update current_commit after we've done the comparison
-                current_commit = Some(new_commit);
+        if is_commit_header(line) {
+            if let Some(header) = parse_commit_header(line) {
+                current_line = Some(header.line_number);
+                current_author =
+                    resolve_author_for_header(&header, &current_commit, &current_author, &result);
+                current_commit = Some(header.commit_hash);
             }
         } else if let Some(author_name) = line.strip_prefix("author ") {
             current_author = Some(author_name.to_string());
         } else if line.starts_with('\t') {
-            // Content line - commit the blame info for this line
-            if let (Some(ref commit), Some(line_num)) = (&current_commit, current_line) {
-                // Use the author from the current commit block, or look up from previous entry
-                let author = current_author.clone().unwrap_or_else(|| {
-                    // For continuation lines, find the author from a previous line with same commit
-                    result
-                        .values()
-                        .find(|info: &&BlameLineInfo| info.commit_hash == *commit)
-                        .map(|info| info.author.clone())
-                        .unwrap_or_default()
-                });
-
-                result.insert(
-                    line_num,
-                    BlameLineInfo {
-                        author,
-                        commit_hash: commit.clone(),
-                    },
-                );
+            if let Some(entry) =
+                create_blame_entry(&current_commit, current_line, &current_author, &result)
+            {
+                result.insert(entry.0, entry.1);
             }
         }
     }
 
     result
+}
+
+/// Determine author for a commit header based on whether it's a new block or continuation
+fn resolve_author_for_header(
+    header: &ParsedCommitHeader,
+    current_commit: &Option<String>,
+    current_author: &Option<String>,
+    results: &HashMap<usize, BlameLineInfo>,
+) -> Option<String> {
+    if header.is_new_block {
+        None // Author header will follow
+    } else if current_commit.as_ref() != Some(&header.commit_hash) {
+        find_author_for_commit(results, &header.commit_hash)
+    } else {
+        current_author.clone()
+    }
+}
+
+/// Create a blame entry for a content line, returning (line_number, BlameLineInfo)
+fn create_blame_entry(
+    current_commit: &Option<String>,
+    current_line: Option<usize>,
+    current_author: &Option<String>,
+    results: &HashMap<usize, BlameLineInfo>,
+) -> Option<(usize, BlameLineInfo)> {
+    let commit = current_commit.as_ref()?;
+    let line_num = current_line?;
+    let author = resolve_author(current_author, results, commit);
+
+    Some((
+        line_num,
+        BlameLineInfo {
+            author,
+            commit_hash: commit.clone(),
+        },
+    ))
 }
 
 /// Extract unique authors for a line range from cached data

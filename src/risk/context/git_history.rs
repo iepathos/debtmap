@@ -72,10 +72,23 @@ impl GitHistoryProvider {
         })
     }
 
+    /// Convert a path to be relative to the repo root.
+    ///
+    /// Git stores paths relative to the repo root, so we need to strip the repo_root
+    /// prefix from absolute paths for lookups in batched history.
+    fn to_relative_path<'a>(&self, path: &'a Path) -> std::borrow::Cow<'a, Path> {
+        path.strip_prefix(&self.repo_root)
+            .map(std::borrow::Cow::Borrowed)
+            .unwrap_or_else(|_| std::borrow::Cow::Borrowed(path))
+    }
+
     /// Get file history from cache or fetch it (immutable, thread-safe)
     fn get_or_fetch_history(&self, path: &Path) -> Result<FileHistory> {
-        // Try cache first (lock-free read)
-        if let Some(cached) = self.cache.get(path) {
+        // Convert to relative path for git lookups (git stores relative paths)
+        let relative_path = self.to_relative_path(path);
+
+        // Try cache first (lock-free read) - use relative path for consistency
+        if let Some(cached) = self.cache.get(relative_path.as_ref()) {
             return Ok(cached.clone());
         }
 
@@ -89,7 +102,7 @@ impl GitHistoryProvider {
                 stability_score,
                 total_commits,
                 age_days,
-            )) = batched.calculate_metrics(path)
+            )) = batched.calculate_metrics(relative_path.as_ref())
             {
                 let history = FileHistory {
                     change_frequency,
@@ -101,14 +114,16 @@ impl GitHistoryProvider {
                     age_days,
                 };
                 // Cache for future lookups (lock-free write)
-                self.cache.insert(path.to_path_buf(), history.clone());
+                self.cache
+                    .insert(relative_path.into_owned(), history.clone());
                 return Ok(history);
             }
         }
 
         // Fallback to direct git queries (slow path)
-        let history = self.fetch_history_direct(path)?;
-        self.cache.insert(path.to_path_buf(), history.clone());
+        let history = self.fetch_history_direct(relative_path.as_ref())?;
+        self.cache
+            .insert(relative_path.into_owned(), history.clone());
         Ok(history)
     }
 
@@ -419,9 +434,12 @@ impl GitHistoryProvider {
     /// count only commits that modified that specific function.
     /// Uses cached `git blame` on current lines to identify contributors.
     fn gather_for_function(&self, target: &AnalysisTarget) -> Result<Context> {
+        // Convert to relative path for git commands (git expects paths relative to repo root)
+        let relative_path = self.to_relative_path(&target.file_path);
+
         let history = function_level::get_function_history(
             &self.repo_root,
-            &target.file_path,
+            relative_path.as_ref(),
             &target.function_name,
             target.line_range,
             &self.blame_cache,
@@ -729,6 +747,40 @@ mod tests {
         assert_eq!(history.total_commits, 2);
         assert_eq!(history.bug_fix_count, 1);
         assert_eq!(history.author_count, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_absolute_path_normalization() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create and commit a test file
+        let file_path = create_test_file(&repo_path, "test.rs", "fn main() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        let mut provider = GitHistoryProvider::new(repo_path.clone())?;
+
+        // Test with relative path
+        let history_relative = provider.analyze_file(Path::new("test.rs"))?;
+
+        // Test with absolute path (should produce same results)
+        let history_absolute = provider.analyze_file(&file_path)?;
+
+        // Both should return valid history with same commit count
+        assert_eq!(
+            history_relative.total_commits,
+            history_absolute.total_commits
+        );
+        assert_eq!(history_relative.author_count, history_absolute.author_count);
+        assert!(
+            history_relative.total_commits > 0,
+            "Should find commits with relative path"
+        );
+        assert!(
+            history_absolute.total_commits > 0,
+            "Should find commits with absolute path"
+        );
 
         Ok(())
     }

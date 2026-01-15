@@ -7,24 +7,31 @@ use crate::core::Priority;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
-/// Helper macro to hash enum variants with their fields.
+/// Unified macro to hash enum variant fields.
 ///
-/// This reduces the boilerplate in the Hash implementation by generating
-/// the match arms automatically. Each variant pattern is matched and its
-/// fields are hashed in order.
+/// Handles both regular Hash-implementing fields and f64 fields (via bit conversion).
+/// Use `@f64 field` for f64 values, regular identifiers for everything else.
 ///
-/// For f64 fields, use `@bits field` to hash via `.to_bits()`.
-macro_rules! hash_variant {
-    // Simple fields (implement Hash directly)
-    ($state:expr, $($field:ident),*) => {{
-        $($field.hash($state);)*
-    }};
-}
+/// # Examples
+/// ```ignore
+/// hash_fields!(state, name, age);                    // Regular fields
+/// hash_fields!(state, @f64 score, count);           // f64 + regular
+/// hash_fields!(state, a, @f64 b, c, @f64 d);        // Mixed order
+/// ```
+macro_rules! hash_fields {
+    // Base case: done
+    ($state:expr $(,)?) => {};
 
-/// Macro to hash f64 values via their bit representation.
-macro_rules! hash_f64 {
-    ($state:expr, $field:expr) => {{
+    // f64 field (marked with @f64)
+    ($state:expr, @f64 $field:expr $(, $($rest:tt)*)?) => {{
         $field.to_bits().hash($state);
+        hash_fields!($state $(, $($rest)*)?);
+    }};
+
+    // Regular field (implements Hash)
+    ($state:expr, $field:expr $(, $($rest:tt)*)?) => {{
+        $field.hash($state);
+        hash_fields!($state $(, $($rest)*)?);
     }};
 }
 
@@ -261,162 +268,173 @@ impl DebtType {
 impl Eq for DebtType {}
 
 // Custom Hash implementation that handles f64 fields by hashing their bit representations.
-// This implementation uses helper macros to reduce repetition while maintaining clarity.
+// Uses `hash_fields!` macro with `@f64` marker for float fields.
 impl Hash for DebtType {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // Always hash the discriminant first for type safety
         std::mem::discriminant(self).hash(state);
 
         match self {
-            // Simple string/option variants
-            DebtType::Todo { reason } => hash_variant!(state, reason),
-            DebtType::Fixme { reason } => hash_variant!(state, reason),
-            DebtType::CodeSmell { smell_type } => hash_variant!(state, smell_type),
-            DebtType::Dependency { dependency_type } => hash_variant!(state, dependency_type),
-            DebtType::ResourceManagement { issue_type } => hash_variant!(state, issue_type),
-            DebtType::CodeOrganization { issue_type } => hash_variant!(state, issue_type),
-            DebtType::TestQuality { issue_type } => hash_variant!(state, issue_type),
+            // Single Option<String> field variants
+            Self::Todo { reason }
+            | Self::Fixme { reason }
+            | Self::CodeSmell { smell_type: reason }
+            | Self::Dependency {
+                dependency_type: reason,
+            }
+            | Self::ResourceManagement { issue_type: reason }
+            | Self::CodeOrganization { issue_type: reason }
+            | Self::TestQuality { issue_type: reason } => hash_fields!(state, reason),
 
-            // Complexity variants (u32 pairs)
-            DebtType::Complexity {
+            // Complexity pair variants (cyclomatic, cognitive)
+            Self::Complexity {
                 cyclomatic,
                 cognitive,
-            } => hash_variant!(state, cyclomatic, cognitive),
-            DebtType::TestComplexity {
+            }
+            | Self::TestComplexity {
                 cyclomatic,
                 cognitive,
-            } => hash_variant!(state, cyclomatic, cognitive),
-            DebtType::ComplexityHotspot {
+            }
+            | Self::ComplexityHotspot {
                 cyclomatic,
                 cognitive,
-            } => hash_variant!(state, cyclomatic, cognitive),
+            } => {
+                hash_fields!(state, cyclomatic, cognitive)
+            }
 
-            // Variants with f64 fields (need bit conversion)
-            DebtType::TestingGap {
+            // Variants with f64 fields
+            Self::TestingGap {
                 coverage,
                 cyclomatic,
                 cognitive,
             } => {
-                hash_f64!(state, coverage);
-                hash_variant!(state, cyclomatic, cognitive);
+                hash_fields!(state, @f64 coverage, cyclomatic, cognitive)
             }
-            DebtType::Risk {
+            Self::Risk {
                 risk_score,
                 factors,
-            } => {
-                hash_f64!(state, risk_score);
-                hash_variant!(state, factors);
-            }
-            DebtType::TestDuplication {
+            } => hash_fields!(state, @f64 risk_score, factors),
+            Self::TestDuplication {
                 instances,
                 total_lines,
                 similarity,
             } => {
-                hash_variant!(state, instances, total_lines);
-                hash_f64!(state, similarity);
+                hash_fields!(state, instances, total_lines, @f64 similarity)
             }
-            DebtType::GodObject {
+            Self::GodObject {
                 methods,
                 fields,
                 responsibilities,
                 god_object_score,
                 lines,
             } => {
-                hash_variant!(state, methods, fields, responsibilities);
-                hash_f64!(state, god_object_score);
-                hash_variant!(state, lines);
+                hash_fields!(state, methods, fields, responsibilities, @f64 god_object_score, lines)
             }
-            DebtType::FeatureEnvy {
+            Self::FeatureEnvy {
                 external_class,
                 usage_ratio,
             } => {
-                hash_variant!(state, external_class);
-                hash_f64!(state, usage_ratio);
+                hash_fields!(state, external_class, @f64 usage_ratio)
             }
-            DebtType::AssertionComplexity {
+            Self::AssertionComplexity {
                 assertion_count,
                 complexity_score,
             } => {
-                hash_variant!(state, assertion_count);
-                hash_f64!(state, complexity_score);
+                hash_fields!(state, assertion_count, @f64 complexity_score)
             }
 
-            // Multi-field variants
-            DebtType::DeadCode {
+            // (String, Option<String>) variant
+            Self::ErrorSwallowing { pattern, context } => hash_fields!(state, pattern, context),
+
+            // (String, String) pair variants
+            Self::AllocationInefficiency { pattern, impact }
+            | Self::BlockingIO {
+                operation: pattern,
+                context: impact,
+            }
+            | Self::AsyncMisuse {
+                pattern,
+                performance_impact: impact,
+            }
+            | Self::ResourceLeak {
+                resource_type: pattern,
+                cleanup_missing: impact,
+            }
+            | Self::FlakyTestPattern {
+                pattern_type: pattern,
+                reliability_impact: impact,
+            }
+            | Self::SuboptimalDataStructure {
+                current_type: pattern,
+                recommended_type: impact,
+            }
+            | Self::PrimitiveObsession {
+                primitive_type: pattern,
+                domain_concept: impact,
+            }
+            | Self::CollectionInefficiency {
+                collection_type: pattern,
+                inefficiency_type: impact,
+            } => {
+                hash_fields!(state, pattern, impact)
+            }
+
+            // Remaining multi-field variants
+            Self::DeadCode {
                 visibility,
                 cyclomatic,
                 cognitive,
                 usage_hints,
-            } => hash_variant!(state, visibility, cyclomatic, cognitive, usage_hints),
-            DebtType::Duplication {
+            } => {
+                hash_fields!(state, visibility, cyclomatic, cognitive, usage_hints)
+            }
+            Self::Duplication {
                 instances,
                 total_lines,
-            } => hash_variant!(state, instances, total_lines),
-            DebtType::TestComplexityHotspot {
+            } => {
+                hash_fields!(state, instances, total_lines)
+            }
+            Self::TestComplexityHotspot {
                 cyclomatic,
                 cognitive,
                 threshold,
-            } => hash_variant!(state, cyclomatic, cognitive, threshold),
-            DebtType::TestTodo { priority, reason } => hash_variant!(state, priority, reason),
-            DebtType::ErrorSwallowing { pattern, context } => {
-                hash_variant!(state, pattern, context)
+            } => {
+                hash_fields!(state, cyclomatic, cognitive, threshold)
             }
-            DebtType::AllocationInefficiency { pattern, impact } => {
-                hash_variant!(state, pattern, impact)
-            }
-            DebtType::StringConcatenation {
+            Self::TestTodo { priority, reason } => hash_fields!(state, priority, reason),
+            Self::StringConcatenation {
                 loop_type,
                 iterations,
-            } => hash_variant!(state, loop_type, iterations),
-            DebtType::NestedLoops {
+            } => {
+                hash_fields!(state, loop_type, iterations)
+            }
+            Self::NestedLoops {
                 depth,
                 complexity_estimate,
-            } => hash_variant!(state, depth, complexity_estimate),
-            DebtType::BlockingIO { operation, context } => {
-                hash_variant!(state, operation, context)
+            } => {
+                hash_fields!(state, depth, complexity_estimate)
             }
-            DebtType::SuboptimalDataStructure {
-                current_type,
-                recommended_type,
-            } => hash_variant!(state, current_type, recommended_type),
-            DebtType::PrimitiveObsession {
-                primitive_type,
-                domain_concept,
-            } => hash_variant!(state, primitive_type, domain_concept),
-            DebtType::MagicValues { value, occurrences } => {
-                hash_variant!(state, value, occurrences)
-            }
-            DebtType::FlakyTestPattern {
-                pattern_type,
-                reliability_impact,
-            } => hash_variant!(state, pattern_type, reliability_impact),
-            DebtType::AsyncMisuse {
-                pattern,
-                performance_impact,
-            } => hash_variant!(state, pattern, performance_impact),
-            DebtType::ResourceLeak {
-                resource_type,
-                cleanup_missing,
-            } => hash_variant!(state, resource_type, cleanup_missing),
-            DebtType::CollectionInefficiency {
-                collection_type,
-                inefficiency_type,
-            } => hash_variant!(state, collection_type, inefficiency_type),
-            DebtType::ScatteredType {
+            Self::MagicValues { value, occurrences } => hash_fields!(state, value, occurrences),
+            Self::ScatteredType {
                 type_name,
                 total_methods,
                 file_count,
                 severity,
-            } => hash_variant!(state, type_name, total_methods, file_count, severity),
-            DebtType::OrphanedFunctions {
+            } => {
+                hash_fields!(state, type_name, total_methods, file_count, severity)
+            }
+            Self::OrphanedFunctions {
                 target_type,
                 function_count,
                 file_count,
-            } => hash_variant!(state, target_type, function_count, file_count),
-            DebtType::UtilitiesSprawl {
+            } => {
+                hash_fields!(state, target_type, function_count, file_count)
+            }
+            Self::UtilitiesSprawl {
                 function_count,
                 distinct_types,
-            } => hash_variant!(state, function_count, distinct_types),
+            } => {
+                hash_fields!(state, function_count, distinct_types)
+            }
         }
     }
 }
