@@ -24,18 +24,32 @@ pub struct ValidationAnalysisOptions {
     pub disable_context: Option<Vec<String>>,
 }
 
+/// Parse a parallel flag value.
+///
+/// Returns `true` if the value is "true" or "1".
+fn parse_parallel_flag(value: &str) -> bool {
+    value == "true" || value == "1"
+}
+
+/// Parse a jobs value.
+///
+/// Returns the parsed number, or 0 if invalid.
+fn parse_jobs_value(value: &str) -> usize {
+    value.parse::<usize>().unwrap_or(0)
+}
+
 /// Read parallel processing settings from environment.
 ///
 /// This reads DEBTMAP_PARALLEL and DEBTMAP_JOBS environment variables
 /// to determine parallel processing configuration.
 pub fn read_parallel_options_from_env() -> ValidationAnalysisOptions {
     let parallel = std::env::var("DEBTMAP_PARALLEL")
-        .map(|v| v == "true" || v == "1")
+        .map(|v| parse_parallel_flag(&v))
         .unwrap_or(false);
 
     let jobs = std::env::var("DEBTMAP_JOBS")
         .ok()
-        .and_then(|v| v.parse::<usize>().ok())
+        .map(|v| parse_jobs_value(&v))
         .unwrap_or(0);
 
     ValidationAnalysisOptions {
@@ -97,54 +111,34 @@ mod tests {
     }
 
     #[test]
-    fn test_read_parallel_options_not_set() {
-        // Clear env vars
-        std::env::remove_var("DEBTMAP_PARALLEL");
-        std::env::remove_var("DEBTMAP_JOBS");
-
-        let options = read_parallel_options_from_env();
-        assert!(!options.parallel);
-        assert_eq!(options.jobs, 0);
+    fn test_parse_parallel_flag_true() {
+        assert!(parse_parallel_flag("true"));
     }
 
     #[test]
-    fn test_read_parallel_options_enabled() {
-        // Test the parsing logic directly to avoid env var race conditions
-        // between parallel tests. The actual env var reading is tested
-        // implicitly by the integration tests.
-        let parallel_from_true = "true" == "true" || "true" == "1";
-        let parallel_from_1 = "1" == "true" || "1" == "1";
-        let jobs_from_valid: Option<usize> = "4".parse().ok();
-
-        assert!(parallel_from_true);
-        assert!(parallel_from_1);
-        assert_eq!(jobs_from_valid, Some(4));
+    fn test_parse_parallel_flag_1() {
+        assert!(parse_parallel_flag("1"));
     }
 
     #[test]
-    fn test_read_parallel_options_with_1() {
-        std::env::set_var("DEBTMAP_PARALLEL", "1");
-        std::env::remove_var("DEBTMAP_JOBS");
-
-        let options = read_parallel_options_from_env();
-        assert!(options.parallel);
-        assert_eq!(options.jobs, 0);
-
-        // Cleanup
-        std::env::remove_var("DEBTMAP_PARALLEL");
+    fn test_parse_parallel_flag_false() {
+        assert!(!parse_parallel_flag("false"));
+        assert!(!parse_parallel_flag("0"));
+        assert!(!parse_parallel_flag(""));
+        assert!(!parse_parallel_flag("yes"));
     }
 
     #[test]
-    fn test_read_parallel_options_invalid_jobs() {
-        std::env::set_var("DEBTMAP_PARALLEL", "true");
-        std::env::set_var("DEBTMAP_JOBS", "invalid");
+    fn test_parse_jobs_value_valid() {
+        assert_eq!(parse_jobs_value("4"), 4);
+        assert_eq!(parse_jobs_value("1"), 1);
+        assert_eq!(parse_jobs_value("16"), 16);
+    }
 
-        let options = read_parallel_options_from_env();
-        assert!(options.parallel);
-        assert_eq!(options.jobs, 0); // Falls back to 0
-
-        // Cleanup
-        std::env::remove_var("DEBTMAP_PARALLEL");
-        std::env::remove_var("DEBTMAP_JOBS");
+    #[test]
+    fn test_parse_jobs_value_invalid() {
+        assert_eq!(parse_jobs_value("invalid"), 0);
+        assert_eq!(parse_jobs_value(""), 0);
+        assert_eq!(parse_jobs_value("-1"), 0);
     }
 }
