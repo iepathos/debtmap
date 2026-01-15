@@ -695,6 +695,92 @@ fn emit_coverage_tip(no_coverage: bool, suppress: bool) {
     }
 }
 
+// ============================================================================
+// Call Graph Progress Helpers
+// ============================================================================
+
+/// Maps a `CallGraphPhase` to its corresponding TUI subtask index.
+///
+/// Returns `None` for phases that shouldn't be displayed (e.g., `DiscoveringFiles`
+/// is skipped because files are reused from stage 0).
+///
+/// Subtask indices for stage 1 (call graph building):
+/// - 0: Parse ASTs
+/// - 1: Extract calls
+/// - 2: Link modules
+#[inline]
+fn phase_to_subtask_index(phase: parallel_call_graph::CallGraphPhase) -> Option<usize> {
+    use crate::builders::parallel_call_graph::CallGraphPhase;
+    match phase {
+        CallGraphPhase::DiscoveringFiles => None,
+        CallGraphPhase::ParsingASTs => Some(0),
+        CallGraphPhase::ExtractingCalls => Some(1),
+        CallGraphPhase::LinkingModules => Some(2),
+    }
+}
+
+/// Converts raw progress counters to progress info tuple.
+///
+/// Returns `None` if total is 0 (no progress to report).
+#[inline]
+fn build_progress_info(current: usize, total: usize) -> Option<(usize, usize)> {
+    if total > 0 {
+        Some((current, total))
+    } else {
+        None
+    }
+}
+
+/// Updates TUI subtask status with proper phase transition handling.
+///
+/// Handles:
+/// - Marking the previous subtask as completed when transitioning to a new phase
+/// - Updating the current subtask as active with progress info
+fn update_tui_subtask(
+    manager: &crate::progress::ProgressManager,
+    last_subtask: &mut usize,
+    new_subtask: usize,
+    progress_info: Option<(usize, usize)>,
+) {
+    use crate::tui::app::StageStatus;
+    const CALL_GRAPH_STAGE: usize = 1;
+
+    // Mark previous subtask as completed if we moved to a new phase
+    if *last_subtask != usize::MAX && *last_subtask != new_subtask {
+        manager.tui_update_subtask(
+            CALL_GRAPH_STAGE,
+            *last_subtask,
+            StageStatus::Completed,
+            None,
+        );
+    }
+    *last_subtask = new_subtask;
+
+    manager.tui_update_subtask(
+        CALL_GRAPH_STAGE,
+        new_subtask,
+        StageStatus::Active,
+        progress_info,
+    );
+}
+
+/// Finalizes TUI progress by marking the last subtask as completed.
+fn finalize_tui_progress(last_subtask: usize) {
+    use crate::tui::app::StageStatus;
+    const CALL_GRAPH_STAGE: usize = 1;
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        if last_subtask != usize::MAX {
+            manager.tui_update_subtask(
+                CALL_GRAPH_STAGE,
+                last_subtask,
+                StageStatus::Completed,
+                None,
+            );
+        }
+    }
+}
+
 fn build_call_graph_with_progress(
     project_path: &Path,
     call_graph: &mut CallGraph,
@@ -702,13 +788,11 @@ fn build_call_graph_with_progress(
     _parallel: bool,
     rust_files: Option<&[PathBuf]>,
 ) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
-    use crate::builders::parallel_call_graph::CallGraphPhase;
     use crate::tui::app::StageStatus;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    const CALL_GRAPH_STAGE: usize = 1;
 
     let thread_count = if jobs == 0 { None } else { Some(jobs) };
-
-    // Track the last active subtask to mark it completed on phase transition
     let last_subtask = AtomicUsize::new(usize::MAX);
 
     let (graph, exclusions, used_funcs) =
@@ -718,45 +802,31 @@ fn build_call_graph_with_progress(
             thread_count,
             rust_files,
             |progress| {
-                // Map CallGraphPhase to TUI subtask index (stage 1)
-                // Note: DiscoveringFiles is skipped (files reused from stage 0)
-                // Subtasks: 0=parse ASTs, 1=extract calls, 2=link modules
-                let subtask_index = match progress.phase {
-                    CallGraphPhase::DiscoveringFiles => return, // Skip - not shown in TUI
-                    CallGraphPhase::ParsingASTs => 0,
-                    CallGraphPhase::ExtractingCalls => 1,
-                    CallGraphPhase::LinkingModules => 2,
+                let Some(subtask_index) = phase_to_subtask_index(progress.phase) else {
+                    return;
                 };
 
                 if let Some(manager) = crate::progress::ProgressManager::global() {
-                    // Mark previous subtask as completed if we moved to a new phase
                     let prev = last_subtask.swap(subtask_index, Ordering::Relaxed);
                     if prev != usize::MAX && prev != subtask_index {
-                        manager.tui_update_subtask(1, prev, StageStatus::Completed, None);
+                        manager.tui_update_subtask(
+                            CALL_GRAPH_STAGE,
+                            prev,
+                            StageStatus::Completed,
+                            None,
+                        );
                     }
-
-                    let progress_info = if progress.total > 0 {
-                        Some((progress.current, progress.total))
-                    } else {
-                        None
-                    };
                     manager.tui_update_subtask(
-                        1,
+                        CALL_GRAPH_STAGE,
                         subtask_index,
                         StageStatus::Active,
-                        progress_info,
+                        build_progress_info(progress.current, progress.total),
                     );
                 }
             },
         )?;
 
-    // Mark the last subtask as completed
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        let last = last_subtask.load(std::sync::atomic::Ordering::Relaxed);
-        if last != usize::MAX {
-            manager.tui_update_subtask(1, last, StageStatus::Completed, None);
-        }
-    }
+    finalize_tui_progress(last_subtask.load(Ordering::Relaxed));
 
     *call_graph = graph;
     Ok((exclusions, used_funcs))
@@ -769,11 +839,8 @@ fn build_call_graph_with_progress_sequential(
     show_macro_stats: bool,
     rust_files: Option<&[PathBuf]>,
 ) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
-    use crate::builders::parallel_call_graph::CallGraphPhase;
-    use crate::tui::app::StageStatus;
     use std::cell::Cell;
 
-    // Track the last active subtask to mark it completed on phase transition
     let last_subtask = Cell::new(usize::MAX);
 
     let result = call_graph::process_rust_files_for_call_graph_with_files(
@@ -783,41 +850,24 @@ fn build_call_graph_with_progress_sequential(
         show_macro_stats,
         rust_files,
         |progress| {
-            // Map CallGraphPhase to TUI subtask index (stage 1)
-            // Note: DiscoveringFiles is skipped (files reused from stage 0)
-            // Subtasks: 0=parse ASTs, 1=extract calls, 2=link modules
-            let subtask_index = match progress.phase {
-                CallGraphPhase::DiscoveringFiles => return, // Skip - not shown in TUI
-                CallGraphPhase::ParsingASTs => 0,
-                CallGraphPhase::ExtractingCalls => 1,
-                CallGraphPhase::LinkingModules => 2,
+            let Some(subtask_index) = phase_to_subtask_index(progress.phase) else {
+                return;
             };
 
-            if let Some(manager) = crate::progress::ProgressManager::global() {
-                // Mark previous subtask as completed if we moved to a new phase
-                let prev = last_subtask.replace(subtask_index);
-                if prev != usize::MAX && prev != subtask_index {
-                    manager.tui_update_subtask(1, prev, StageStatus::Completed, None);
-                }
-
-                let progress_info = if progress.total > 0 {
-                    Some((progress.current, progress.total))
-                } else {
-                    None
-                };
-                manager.tui_update_subtask(1, subtask_index, StageStatus::Active, progress_info);
+            if let Some(ref manager) = crate::progress::ProgressManager::global() {
+                let mut last = last_subtask.get();
+                update_tui_subtask(
+                    manager,
+                    &mut last,
+                    subtask_index,
+                    build_progress_info(progress.current, progress.total),
+                );
+                last_subtask.set(last);
             }
         },
     );
 
-    // Mark the last subtask as completed
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        let last = last_subtask.get();
-        if last != usize::MAX {
-            manager.tui_update_subtask(1, last, StageStatus::Completed, None);
-        }
-    }
-
+    finalize_tui_progress(last_subtask.get());
     result
 }
 
@@ -850,6 +900,7 @@ fn build_risk_analyzer(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::builders::parallel_call_graph::CallGraphPhase;
 
     #[test]
     fn test_analyze_file_git_context_returns_none_when_no_context() {
@@ -859,5 +910,40 @@ mod tests {
 
         let result = analyze_file_git_context(&file_path, &risk_analyzer, &project_root);
         assert!(result.is_none());
+    }
+
+    // Tests for pure helper functions
+    mod call_graph_progress_helpers {
+        use super::*;
+
+        #[test]
+        fn phase_to_subtask_index_maps_phases_correctly() {
+            assert_eq!(
+                phase_to_subtask_index(CallGraphPhase::DiscoveringFiles),
+                None
+            );
+            assert_eq!(phase_to_subtask_index(CallGraphPhase::ParsingASTs), Some(0));
+            assert_eq!(
+                phase_to_subtask_index(CallGraphPhase::ExtractingCalls),
+                Some(1)
+            );
+            assert_eq!(
+                phase_to_subtask_index(CallGraphPhase::LinkingModules),
+                Some(2)
+            );
+        }
+
+        #[test]
+        fn build_progress_info_returns_none_for_zero_total() {
+            assert_eq!(build_progress_info(0, 0), None);
+            assert_eq!(build_progress_info(5, 0), None);
+        }
+
+        #[test]
+        fn build_progress_info_returns_tuple_for_nonzero_total() {
+            assert_eq!(build_progress_info(0, 10), Some((0, 10)));
+            assert_eq!(build_progress_info(5, 10), Some((5, 10)));
+            assert_eq!(build_progress_info(10, 10), Some((10, 10)));
+        }
     }
 }
