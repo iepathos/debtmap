@@ -92,7 +92,7 @@ pub fn deduplicate_items(items: Vec<UnifiedDebtItemOutput>) -> Vec<UnifiedDebtIt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::output::unified::dependencies::{Dependencies, RecommendationOutput};
+    use crate::output::unified::dependencies::Dependencies;
     use crate::output::unified::file_item::{
         FileDebtItemOutput, FileImpactOutput, FileMetricsOutput,
     };
@@ -146,11 +146,6 @@ mod tests {
                 production_blast_radius: 0,
                 ..Default::default()
             },
-            recommendation: RecommendationOutput {
-                action: "Test action".to_string(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FunctionImpactOutput {
                 coverage_improvement: 0.0,
                 complexity_reduction: 0.0,
@@ -190,15 +185,11 @@ mod tests {
                 uncovered_lines: 150,
                 distribution: None,
             },
+            debt_type: None,
             god_object_indicators: None,
             dependencies: None,
             anti_patterns: None,
             cohesion: None,
-            recommendation: RecommendationOutput {
-                action: "Refactor file".to_string(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FileImpactOutput {
                 complexity_reduction: 10.0,
                 maintainability_improvement: 0.2,

@@ -2,7 +2,7 @@
 //!
 //! Provides `FunctionDebtItemOutput` struct and conversion from `UnifiedDebtItem`.
 
-use super::dependencies::{Dependencies, PurityAnalysis, RecommendationOutput};
+use super::dependencies::{Dependencies, PurityAnalysis};
 use super::format::{assert_ratio_invariants, assert_score_invariants};
 use super::format::{round_ratio, round_score};
 use super::location::UnifiedLocation;
@@ -59,7 +59,6 @@ pub struct FunctionDebtItemOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purity_analysis: Option<PurityAnalysis>,
     pub dependencies: Dependencies,
-    pub recommendation: RecommendationOutput,
     pub impact: FunctionImpactOutput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scoring_details: Option<FunctionScoringDetails>,
@@ -235,11 +234,6 @@ impl FunctionDebtItemOutput {
                     test_upstream_count: test_count,
                     production_blast_radius: item.production_blast_radius,
                 }
-            },
-            recommendation: RecommendationOutput {
-                action: item.recommendation.primary_action.clone(),
-                priority: None,
-                implementation_steps: item.recommendation.implementation_steps.clone(),
             },
             impact: FunctionImpactOutput {
                 coverage_improvement: round_ratio(item.expected_impact.coverage_improvement),
@@ -611,11 +605,6 @@ mod tests {
                 downstream_callees: vec!["callee1".to_string()],
                 ..Default::default()
             },
-            recommendation: RecommendationOutput {
-                action: "Add tests".to_string(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FunctionImpactOutput {
                 coverage_improvement: 0.2,
                 complexity_reduction: 0.1,
@@ -679,11 +668,6 @@ mod tests {
                 upstream_test_callers: vec![],
                 production_blast_radius: 0,
                 ..Default::default()
-            },
-            recommendation: RecommendationOutput {
-                action: "Add tests".to_string(),
-                priority: None,
-                implementation_steps: vec![],
             },
             impact: FunctionImpactOutput {
                 coverage_improvement: 0.2,

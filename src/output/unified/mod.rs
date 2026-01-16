@@ -39,7 +39,7 @@ pub use coupling::{
     classify_coupling_pattern, CouplingClassification, FileDependencies,
 };
 pub use dedup::deduplicate_items;
-pub use dependencies::{Dependencies, PurityAnalysis, RecommendationOutput};
+pub use dependencies::{Dependencies, PurityAnalysis};
 pub use file_item::{
     DistributionMetricsOutput, FileDebtItemOutput, FileImpactOutput, FileMetricsOutput,
     FileScoringDetails,

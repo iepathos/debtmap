@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debtmap Dashboard - Development</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #58a6ff;
+        }
+        .subtitle {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #8b949e;
+            font-size: 0.9rem;
+        }
+        h2 {
+            color: #8b949e;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .description {
+            color: #6e7681;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+
+        /* Data loader */
+        .data-loader {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .data-loader button {
+            padding: 10px 20px;
+            background: #238636;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .data-loader button:hover {
+            background: #2ea043;
+        }
+        .data-loader button.secondary {
+            background: #21262d;
+            border: 1px solid #30363d;
+        }
+        .data-loader button.secondary:hover {
+            background: #30363d;
+        }
+        .data-loader input[type="file"] {
+            display: none;
+        }
+        .data-loader .status {
+            color: #8b949e;
+            font-size: 12px;
+        }
+        .data-loader .status.loaded {
+            color: #3fb950;
+        }
+        .data-loader .status.error {
+            color: #f85149;
+        }
+
+        /* Summary cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid;
+        }
+        .summary-card.critical { border-left-color: #f85149; }
+        .summary-card.high { border-left-color: #f0883e; }
+        .summary-card.medium { border-left-color: #d29922; }
+        .summary-card.low { border-left-color: #238636; }
+        .summary-card.info { border-left-color: #58a6ff; }
+        .summary-card .label {
+            font-size: 12px;
+            color: #8b949e;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .summary-card .value {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        .summary-card.critical .value { color: #f85149; }
+        .summary-card.high .value { color: #f0883e; }
+        .summary-card.medium .value { color: #d29922; }
+        .summary-card.low .value { color: #238636; }
+        .summary-card.info .value { color: #58a6ff; }
+
+        /* Grid layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .viz-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .viz-card.full-width {
+            grid-column: span 2;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .control-label {
+            color: #8b949e;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .toggle-group {
+            display: flex;
+            background: #21262d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .toggle-btn {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .toggle-btn.active {
+            background: #58a6ff;
+            color: #fff;
+        }
+        .toggle-btn:hover:not(.active) {
+            background: #30363d;
+        }
+        select {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            max-width: 400px;
+            z-index: 1000;
+        }
+        .tooltip strong { color: #58a6ff; }
+        .tooltip .value { color: #7ee787; }
+        .tooltip .warning { color: #f85149; }
+        .tooltip .info { color: #79c0ff; }
+        .tooltip .muted { color: #6e7681; }
+        .tooltip-divider {
+            border-top: 1px solid #30363d;
+            margin: 8px 0;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        /* Axes and chart elements */
+        .axis text {
+            fill: #8b949e;
+            font-size: 11px;
+        }
+        .axis line, .axis path {
+            stroke: #30363d;
+        }
+        .grid-line {
+            stroke: #21262d;
+            stroke-dasharray: 2,2;
+        }
+        .quadrant-label {
+            fill: #484f58;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Stats */
+        .stat-box {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #21262d;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 10px;
+        }
+        .stat-box .label { color: #8b949e; }
+        .stat-box .value { color: #7ee787; font-weight: 600; }
+        .stat-box.warning .value { color: #f85149; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b949e;
+        }
+        .empty-state h3 {
+            color: #c9d1d9;
+            margin-bottom: 10px;
+        }
+
+        /* Table styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .data-table th {
+            background: #21262d;
+            padding: 10px;
+            text-align: left;
+            color: #8b949e;
+            text-transform: uppercase;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .data-table th:hover {
+            background: #30363d;
+        }
+        .data-table td {
+            padding: 10px;
+            border-bottom: 1px solid #21262d;
+        }
+        .data-table tr:hover {
+            background: #21262d;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .badge.critical { background: #f8514920; color: #f85149; }
+        .badge.high { background: #f0883e20; color: #f0883e; }
+        .badge.medium { background: #d2992220; color: #d29922; }
+        .badge.low { background: #23863620; color: #238636; }
+    </style>
+</head>
+<body>
+    <h1>Debtmap Dashboard</h1>
+    <p class="subtitle">Technical Debt Visualization - Development Mode</p>
+
+    <!-- Data Loader -->
+    <div class="data-loader">
+        <button onclick="document.getElementById('file-input').click()">Load JSON File</button>
+        <input type="file" id="file-input" accept=".json" onchange="loadFromFile(event)">
+        <button class="secondary" onclick="loadDefaultJson()">Load ../debtmap.json</button>
+        <button class="secondary" onclick="reloadData()">Reload</button>
+        <span class="status" id="load-status">No data loaded</span>
+    </div>
+
+    <!-- Summary Cards (shown after data load) -->
+    <div id="summary-section" style="display: none;">
+        <div class="summary-grid" id="summary-grid"></div>
+    </div>
+
+    <!-- Main visualization grid -->
+    <div id="main-content" style="display: none;">
+        <div class="grid">
+            <!-- Risk Quadrant -->
+            <div class="viz-card full-width">
+                <h2>1. Risk Quadrant - Complexity vs Coverage</h2>
+                <p class="description">Functions plotted by complexity (Y) vs test coverage (X). Size = debt score, Color = priority.</p>
+                <div class="controls">
+                    <div class="control-group">
+                        <span class="control-label">Y-Axis:</span>
+                        <select id="y-axis-select" onchange="renderRiskQuadrant()">
+                            <option value="adjusted">Entropy-Adjusted Cognitive</option>
+                            <option value="cognitive">Cognitive Complexity</option>
+                            <option value="cyclomatic">Cyclomatic Complexity</option>
+                            <option value="score">Debt Score</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">Color:</span>
+                        <select id="color-select" onchange="renderRiskQuadrant()">
+                            <option value="priority">Priority</option>
+                            <option value="role">Function Role</option>
+                            <option value="category">Category</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="stats-bar" style="margin-bottom: 10px;">
+                    <span class="stat-box warning"><span class="label">Critical: </span><span class="value" id="stat-critical">0</span></span>
+                    <span class="stat-box"><span class="label">High: </span><span class="value" id="stat-high">0</span></span>
+                    <span class="stat-box"><span class="label">Avg Score: </span><span class="value" id="stat-avg">0</span></span>
+                </div>
+                <div id="risk-quadrant"></div>
+                <div class="legend" id="risk-legend"></div>
+            </div>
+
+            <!-- Top Debt Items Table -->
+            <div class="viz-card full-width">
+                <h2>2. Top Debt Items</h2>
+                <p class="description">Highest priority items requiring attention. Click headers to sort.</p>
+                <div id="debt-table-container"></div>
+            </div>
+
+            <!-- Inter-Module Call Flow -->
+            <div class="viz-card full-width">
+                <h2>3. Inter-Module Call Flow</h2>
+                <p class="description">Chord diagram showing debt distribution and relationships between modules.</p>
+                <div id="chord-diagram"></div>
+            </div>
+
+            <!-- Risk Profile Radar -->
+            <div class="viz-card">
+                <h2>4. Risk Profile Radar</h2>
+                <p class="description">Multi-dimensional comparison of top files across complexity, coverage, and debt metrics.</p>
+                <div id="risk-radar"></div>
+                <div class="legend" id="radar-legend"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state">
+        <h3>No Data Loaded</h3>
+        <p>Load a debtmap.json file to visualize the data</p>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Global state
+        let rawData = null;
+        let transformedData = null;
+        const tooltip = d3.select("#tooltip");
+
+        // Color schemes
+        const priorityColors = {
+            critical: "#f85149",
+            high: "#f0883e",
+            medium: "#d29922",
+            low: "#238636"
+        };
+
+        const roleColors = {
+            PureLogic: "#3fb950",
+            EntryPoint: "#f0883e",
+            IOWrapper: "#a371f7",
+            Unknown: "#8b949e"
+        };
+
+        const categoryColors = d3.scaleOrdinal(d3.schemeTableau10);
+
+        // ========================================
+        // DATA LOADING
+        // ========================================
+
+        function loadFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    rawData = JSON.parse(e.target.result);
+                    processAndRender();
+                    updateStatus(`Loaded: ${file.name}`, 'loaded');
+                } catch (err) {
+                    updateStatus(`Error: ${err.message}`, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function loadDefaultJson() {
+            updateStatus('Loading...', '');
+            try {
+                // Add cache-busting parameter to force fresh fetch
+                const response = await fetch(`../debtmap.json?t=${Date.now()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                rawData = await response.json();
+                processAndRender();
+                updateStatus('Loaded: debtmap.json', 'loaded');
+            } catch (err) {
+                updateStatus(`Error: ${err.message}. Try using a local server.`, 'error');
+            }
+        }
+
+        function reloadData() {
+            // Re-fetch the JSON file instead of just re-rendering cached data
+            loadDefaultJson();
+        }
+
+        function updateStatus(msg, className) {
+            const status = document.getElementById('load-status');
+            status.textContent = msg;
+            status.className = 'status ' + className;
+        }
+
+        // ========================================
+        // DATA TRANSFORMATION
+        // ========================================
+
+        function processAndRender() {
+            if (!rawData) return;
+
+            transformedData = transformData(rawData);
+
+            // Show UI
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('summary-section').style.display = 'block';
+            document.getElementById('main-content').style.display = 'block';
+
+            // Render all visualizations
+            renderSummary();
+            renderRiskQuadrant();
+            renderDebtTable();
+            renderChordDiagram();
+            renderRiskRadar();
+        }
+
+        function transformData(data) {
+            const isUnified = data.format_version !== undefined;
+
+            if (isUnified) {
+                return transformUnifiedFormat(data);
+            } else {
+                return transformLegacyFormat(data);
+            }
+        }
+
+        function transformUnifiedFormat(data) {
+            const items = data.items || [];
+            const summary = data.summary || {};
+
+            // First, build a file coverage map from File-type items
+            const fileCoverage = {};
+            items
+                .filter(item => item.type === 'File')
+                .forEach(item => {
+                    const file = item.location?.file || '';
+                    if (item.metrics?.coverage !== undefined) {
+                        fileCoverage[file] = item.metrics.coverage;
+                    }
+                });
+
+            // Extract function-level items
+            const functions = items
+                .filter(item => item.type === 'Function')
+                .map(item => {
+                    const file = item.location?.file || '';
+                    // Get coverage from file-level data, default to 0
+                    const coverage = fileCoverage[file] !== undefined ? fileCoverage[file] : 0;
+
+                    return {
+                        name: item.location?.function || 'unknown',
+                        file: file,
+                        line: item.location?.line || 0,
+                        score: item.score || 0,
+                        priority: (item.priority || 'medium').toLowerCase(),
+                        category: item.category || 'Unknown',
+                        role: item.function_role || 'Unknown',
+                        cyclomatic: item.metrics?.cyclomatic_complexity || 0,
+                        cognitive: item.metrics?.cognitive_complexity || 0,
+                        adjusted: item.metrics?.entropy_adjusted_cognitive || item.metrics?.cognitive_complexity || 0,
+                        nesting: item.metrics?.nesting_depth || 0,
+                        length: item.metrics?.length || 0,
+                        entropy: item.metrics?.entropy_score || null,
+                        coverage: coverage,
+                        debtType: Object.keys(item.debt_type || {})[0] || 'Unknown'
+                    };
+                });
+
+            // Extract file-level items
+            const files = items
+                .filter(item => item.type === 'File')
+                .map(item => ({
+                    file: item.location?.file || '',
+                    score: item.score || 0,
+                    priority: (item.priority || 'medium').toLowerCase(),
+                    category: item.category || 'Unknown',
+                    coverage: item.metrics?.coverage || 0,
+                    lines: item.metrics?.lines || 0,
+                    godObjectIndicators: item.god_object_indicators || null,
+                    debtType: Object.keys(item.debt_type || {})[0] || 'Unknown'
+                }));
+
+            // Aggregate file scores
+            const fileScores = {};
+            [...functions, ...files].forEach(item => {
+                const file = item.file.replace(/^\.\//, '');
+                if (!fileScores[file]) {
+                    fileScores[file] = { totalScore: 0, count: 0, critical: 0, high: 0 };
+                }
+                fileScores[file].totalScore += item.score;
+                fileScores[file].count++;
+                if (item.priority === 'critical') fileScores[file].critical++;
+                if (item.priority === 'high') fileScores[file].high++;
+            });
+
+            // Category counts
+            const categories = {};
+            items.forEach(item => {
+                const cat = item.category || 'Unknown';
+                categories[cat] = (categories[cat] || 0) + 1;
+            });
+
+            return {
+                summary: {
+                    totalItems: summary.total_items || items.length,
+                    totalScore: summary.total_debt_score || 0,
+                    debtDensity: summary.debt_density || 0,
+                    totalLoc: summary.total_loc || 0,
+                    critical: summary.score_distribution?.critical || 0,
+                    high: summary.score_distribution?.high || 0,
+                    medium: summary.score_distribution?.medium || 0,
+                    low: summary.score_distribution?.low || 0
+                },
+                functions,
+                files,
+                fileScores,
+                categories,
+                allItems: items
+            };
+        }
+
+        function transformLegacyFormat(data) {
+            // Handle older format if needed
+            const items = data.technical_debt?.items || [];
+            return {
+                summary: {
+                    totalItems: items.length,
+                    totalScore: items.reduce((sum, i) => sum + (i.score || 0), 0),
+                    debtDensity: 0,
+                    totalLoc: 0,
+                    critical: items.filter(i => i.priority === 'Critical').length,
+                    high: items.filter(i => i.priority === 'High').length,
+                    medium: items.filter(i => i.priority === 'Medium').length,
+                    low: items.filter(i => i.priority === 'Low').length
+                },
+                functions: [],
+                files: [],
+                fileScores: {},
+                categories: {},
+                allItems: items
+            };
+        }
+
+        // ========================================
+        // SUMMARY CARDS
+        // ========================================
+
+        function renderSummary() {
+            const grid = document.getElementById('summary-grid');
+            const s = transformedData.summary;
+
+            grid.innerHTML = `
+                <div class="summary-card info">
+                    <div class="label">Total Items</div>
+                    <div class="value">${s.totalItems.toLocaleString()}</div>
+                </div>
+                <div class="summary-card info">
+                    <div class="label">Total Debt Score</div>
+                    <div class="value">${Math.round(s.totalScore).toLocaleString()}</div>
+                </div>
+                <div class="summary-card critical">
+                    <div class="label">Critical</div>
+                    <div class="value">${s.critical}</div>
+                </div>
+                <div class="summary-card high">
+                    <div class="label">High</div>
+                    <div class="value">${s.high}</div>
+                </div>
+                <div class="summary-card medium">
+                    <div class="label">Medium</div>
+                    <div class="value">${s.medium}</div>
+                </div>
+                <div class="summary-card low">
+                    <div class="label">Low</div>
+                    <div class="value">${s.low}</div>
+                </div>
+                <div class="summary-card info">
+                    <div class="label">Debt Density</div>
+                    <div class="value">${s.debtDensity.toFixed(1)}</div>
+                </div>
+                <div class="summary-card info">
+                    <div class="label">Total LOC</div>
+                    <div class="value">${s.totalLoc.toLocaleString()}</div>
+                </div>
+            `;
+        }
+
+        // ========================================
+        // RISK QUADRANT
+        // ========================================
+
+        function renderRiskQuadrant() {
+            const container = d3.select("#risk-quadrant");
+            container.selectAll("*").remove();
+
+            const yField = document.getElementById("y-axis-select").value;
+            const colorField = document.getElementById("color-select").value;
+
+            const data = transformedData.functions.filter(d => d[yField] > 0);
+
+            if (data.length === 0) {
+                container.append("div")
+                    .attr("class", "empty-state")
+                    .html("<p>No function data available</p>");
+                return;
+            }
+
+            // Update stats
+            const critical = data.filter(d => d.priority === 'critical').length;
+            const high = data.filter(d => d.priority === 'high').length;
+            const avgScore = d3.mean(data, d => d.score) || 0;
+
+            document.getElementById('stat-critical').textContent = critical;
+            document.getElementById('stat-high').textContent = high;
+            document.getElementById('stat-avg').textContent = avgScore.toFixed(1);
+
+            const width = 1100, height = 500;
+            const margin = { top: 30, right: 40, bottom: 60, left: 70 };
+            const innerWidth = width - margin.left - margin.right;
+            const innerHeight = height - margin.top - margin.bottom;
+
+            const svg = container.append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .attr("width", "100%");
+
+            const g = svg.append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Scales
+            const xScale = d3.scaleLinear()
+                .domain([0, 1])
+                .range([0, innerWidth]);
+
+            const yMax = d3.max(data, d => d[yField]) * 1.1;
+            const yScale = d3.scaleLinear()
+                .domain([0, yMax])
+                .range([innerHeight, 0]);
+
+            const sizeScale = d3.scaleSqrt()
+                .domain([0, d3.max(data, d => d.score)])
+                .range([4, 30]);
+
+            // Color function
+            const getColor = (d) => {
+                if (colorField === 'priority') return priorityColors[d.priority] || '#8b949e';
+                if (colorField === 'role') return roleColors[d.role] || '#8b949e';
+                return categoryColors(d.category);
+            };
+
+            // Quadrant backgrounds
+            const coverageThreshold = 0.5;
+            const complexityThreshold = yMax * 0.4;
+
+            g.append("rect")
+                .attr("x", 0).attr("y", 0)
+                .attr("width", xScale(coverageThreshold))
+                .attr("height", yScale(complexityThreshold))
+                .attr("fill", "#f8514915");
+
+            g.append("rect")
+                .attr("x", xScale(coverageThreshold)).attr("y", yScale(complexityThreshold))
+                .attr("width", innerWidth - xScale(coverageThreshold))
+                .attr("height", innerHeight - yScale(complexityThreshold))
+                .attr("fill", "#23863615");
+
+            // Quadrant labels
+            g.append("text").attr("class", "quadrant-label")
+                .attr("x", xScale(0.25)).attr("y", 20)
+                .attr("text-anchor", "middle").text("HIGH RISK");
+            g.append("text").attr("class", "quadrant-label")
+                .attr("x", xScale(0.75)).attr("y", innerHeight - 10)
+                .attr("text-anchor", "middle").text("HEALTHY");
+
+            // Axes
+            g.append("g").attr("class", "axis")
+                .attr("transform", `translate(0,${innerHeight})`)
+                .call(d3.axisBottom(xScale).tickFormat(d3.format(".0%")));
+
+            g.append("g").attr("class", "axis")
+                .call(d3.axisLeft(yScale));
+
+            // Axis labels
+            svg.append("text")
+                .attr("x", width/2).attr("y", height - 10)
+                .attr("text-anchor", "middle").attr("fill", "#8b949e").attr("font-size", 12)
+                .text("Test Coverage");
+
+            const yLabels = {
+                cognitive: "Cognitive Complexity",
+                cyclomatic: "Cyclomatic Complexity",
+                adjusted: "Entropy-Adjusted Cognitive",
+                score: "Debt Score"
+            };
+
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("x", -height/2).attr("y", 18)
+                .attr("text-anchor", "middle").attr("fill", "#8b949e").attr("font-size", 12)
+                .text(yLabels[yField]);
+
+            // Points
+            g.selectAll("circle")
+                .data(data)
+                .join("circle")
+                .attr("cx", d => xScale(d.coverage))
+                .attr("cy", d => yScale(d[yField]))
+                .attr("r", d => sizeScale(d.score))
+                .attr("fill", getColor)
+                .attr("opacity", 0.75)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 1.5)
+                .on("mouseover", function(event, d) {
+                    d3.select(this).attr("opacity", 1).attr("stroke-width", 3);
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${d.name}</strong><br/>
+                               <span class="info">${d.file}:${d.line}</span><br/>
+                               <div class="tooltip-divider"></div>
+                               Cognitive: <span class="value">${d.cognitive}</span><br/>
+                               Cyclomatic: <span class="value">${d.cyclomatic}</span><br/>
+                               Nesting: <span class="value">${d.nesting}</span><br/>
+                               Score: <span class="value">${d.score.toFixed(1)}</span><br/>
+                               Priority: <span style="color:${priorityColors[d.priority]}">${d.priority.toUpperCase()}</span><br/>
+                               Role: ${d.role}<br/>
+                               Category: ${d.category}`);
+                })
+                .on("mousemove", function(event) {
+                    tooltip.style("left", (event.pageX + 15) + "px")
+                           .style("top", (event.pageY - 15) + "px");
+                })
+                .on("mouseout", function() {
+                    d3.select(this).attr("opacity", 0.75).attr("stroke-width", 1.5);
+                    tooltip.style("opacity", 0);
+                });
+
+            // Update legend
+            updateLegend(colorField);
+        }
+
+        function updateLegend(colorField) {
+            const legend = d3.select("#risk-legend");
+            legend.selectAll("*").remove();
+
+            let items = [];
+            if (colorField === 'priority') {
+                items = Object.entries(priorityColors).map(([k, v]) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), color: v }));
+            } else if (colorField === 'role') {
+                items = Object.entries(roleColors).map(([k, v]) => ({ label: k, color: v }));
+            } else {
+                const cats = [...new Set(transformedData.functions.map(d => d.category))];
+                items = cats.map(c => ({ label: c, color: categoryColors(c) }));
+            }
+
+            items.forEach(item => {
+                legend.append("div")
+                    .attr("class", "legend-item")
+                    .html(`<div class="legend-color" style="background:${item.color}"></div>${item.label}`);
+            });
+        }
+
+        // ========================================
+        // DEBT TABLE
+        // ========================================
+
+        function renderDebtTable() {
+            const container = document.getElementById('debt-table-container');
+            const items = transformedData.allItems
+                .sort((a, b) => (b.score || 0) - (a.score || 0))
+                .slice(0, 50);
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No items to display</p></div>';
+                return;
+            }
+
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Location</th>
+                            <th>Type</th>
+                            <th>Category</th>
+                            <th>Score</th>
+                            <th>Priority</th>
+                            <th>Debt Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            items.forEach(item => {
+                const loc = item.location?.file || '';
+                const func = item.location?.function || '';
+                const line = item.location?.line || '';
+                const displayLoc = func ? `${func}` : loc.split('/').pop();
+                const fullLoc = `${loc}${line ? ':' + line : ''}`;
+                const priority = (item.priority || 'medium').toLowerCase();
+                const debtType = Object.keys(item.debt_type || {})[0] || '-';
+
+                html += `
+                    <tr>
+                        <td title="${fullLoc}"><code>${displayLoc}</code></td>
+                        <td>${item.type || '-'}</td>
+                        <td>${item.category || '-'}</td>
+                        <td><strong>${(item.score || 0).toFixed(1)}</strong></td>
+                        <td><span class="badge ${priority}">${priority}</span></td>
+                        <td>${debtType}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // ========================================
+        // CHORD DIAGRAM (Inter-Module Call Flow)
+        // ========================================
+
+        function renderChordDiagram() {
+            const container = d3.select("#chord-diagram");
+            container.selectAll("*").remove();
+
+            // Build module-to-module debt flow matrix
+            const moduleMap = new Map();
+            transformedData.functions.forEach(fn => {
+                const parts = fn.file.split('/');
+                const moduleParts = parts.filter(p => p && p !== '.' && p !== 'src');
+                const moduleName = moduleParts.length > 1 ? moduleParts[0] : 'root';
+
+                if (!moduleMap.has(moduleName)) {
+                    moduleMap.set(moduleName, { score: 0, count: 0 });
+                }
+                moduleMap.get(moduleName).score += fn.score;
+                moduleMap.get(moduleName).count++;
+            });
+
+            const modules = Array.from(moduleMap.entries())
+                .filter(([_, v]) => v.count > 0)
+                .sort((a, b) => b[1].score - a[1].score)
+                .slice(0, 10);
+
+            if (modules.length < 2) {
+                container.append("div").attr("class", "empty-state")
+                    .html("<p>Not enough modules for chord diagram</p>");
+                return;
+            }
+
+            const names = modules.map(m => m[0]);
+            const n = names.length;
+
+            // Create a synthetic flow matrix based on debt distribution
+            // Higher debt modules are assumed to have more inter-dependencies
+            const matrix = [];
+            for (let i = 0; i < n; i++) {
+                const row = [];
+                for (let j = 0; j < n; j++) {
+                    if (i === j) {
+                        row.push(modules[i][1].score * 0.3); // Self-debt
+                    } else {
+                        // Cross-module flow proportional to geometric mean of scores
+                        const flow = Math.sqrt(modules[i][1].score * modules[j][1].score) * 0.1;
+                        row.push(flow);
+                    }
+                }
+                matrix.push(row);
+            }
+
+            const width = 600, height = 600;
+            const innerRadius = Math.min(width, height) * 0.35;
+            const outerRadius = innerRadius + 20;
+
+            const svg = container.append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .attr("width", "100%")
+                .append("g")
+                .attr("transform", `translate(${width/2},${height/2})`);
+
+            const chord = d3.chord()
+                .padAngle(0.05)
+                .sortSubgroups(d3.descending);
+
+            const chords = chord(matrix);
+
+            const arc = d3.arc()
+                .innerRadius(innerRadius)
+                .outerRadius(outerRadius);
+
+            const ribbon = d3.ribbon()
+                .radius(innerRadius);
+
+            const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+            // Draw arcs (module segments)
+            const group = svg.append("g")
+                .selectAll("g")
+                .data(chords.groups)
+                .join("g");
+
+            group.append("path")
+                .attr("fill", d => color(d.index))
+                .attr("stroke", "#fff")
+                .attr("d", arc)
+                .on("mouseover", function(event, d) {
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${names[d.index]}</strong><br/>
+                               Debt Score: <span class="value">${modules[d.index][1].score.toFixed(1)}</span><br/>
+                               Functions: <span class="value">${modules[d.index][1].count}</span>`);
+                })
+                .on("mousemove", function(event) {
+                    tooltip.style("left", (event.pageX + 15) + "px")
+                           .style("top", (event.pageY - 15) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                });
+
+            group.append("text")
+                .each(d => { d.angle = (d.startAngle + d.endAngle) / 2; })
+                .attr("dy", "0.35em")
+                .attr("transform", d => `
+                    rotate(${(d.angle * 180 / Math.PI - 90)})
+                    translate(${outerRadius + 10})
+                    ${d.angle > Math.PI ? "rotate(180)" : ""}
+                `)
+                .attr("text-anchor", d => d.angle > Math.PI ? "end" : null)
+                .attr("fill", "#c9d1d9")
+                .attr("font-size", "11px")
+                .text(d => names[d.index]);
+
+            // Draw ribbons (flows between modules)
+            svg.append("g")
+                .attr("fill-opacity", 0.65)
+                .selectAll("path")
+                .data(chords)
+                .join("path")
+                .attr("d", ribbon)
+                .attr("fill", d => color(d.source.index))
+                .attr("stroke", "#21262d")
+                .on("mouseover", function(event, d) {
+                    d3.select(this).attr("fill-opacity", 1);
+                    tooltip.style("opacity", 1)
+                        .html(`<strong>${names[d.source.index]} ↔ ${names[d.target.index]}</strong><br/>
+                               Flow: <span class="value">${d.source.value.toFixed(1)}</span>`);
+                })
+                .on("mousemove", function(event) {
+                    tooltip.style("left", (event.pageX + 15) + "px")
+                           .style("top", (event.pageY - 15) + "px");
+                })
+                .on("mouseout", function() {
+                    d3.select(this).attr("fill-opacity", 0.65);
+                    tooltip.style("opacity", 0);
+                });
+        }
+
+        // ========================================
+        // RISK PROFILE RADAR
+        // ========================================
+
+        function renderRiskRadar() {
+            const container = d3.select("#risk-radar");
+            container.selectAll("*").remove();
+            const legend = d3.select("#radar-legend");
+            legend.selectAll("*").remove();
+
+            // Get top files by debt score for comparison
+            const fileData = Object.entries(transformedData.fileScores)
+                .map(([file, stats]) => {
+                    const shortName = file.split('/').pop() || file;
+                    // Calculate averages from functions in this file
+                    const fileFuncs = transformedData.functions.filter(f =>
+                        f.file.replace(/^\.\//, '') === file.replace(/^\.\//, '')
+                    );
+                    const avgCognitive = d3.mean(fileFuncs, f => f.cognitive) || 0;
+                    const avgCyclomatic = d3.mean(fileFuncs, f => f.cyclomatic) || 0;
+                    const avgNesting = d3.mean(fileFuncs, f => f.nesting) || 0;
+                    const avgCoverage = d3.mean(fileFuncs, f => f.coverage) || 0;
+
+                    return {
+                        name: shortName,
+                        fullPath: file,
+                        score: stats.totalScore,
+                        count: stats.count,
+                        cognitive: avgCognitive,
+                        cyclomatic: avgCyclomatic,
+                        nesting: avgNesting,
+                        coverage: avgCoverage,
+                        critical: stats.critical
+                    };
+                })
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5);
+
+            if (fileData.length === 0) {
+                container.append("div").attr("class", "empty-state")
+                    .html("<p>No file data available</p>");
+                return;
+            }
+
+            // Define radar dimensions
+            const dimensions = [
+                { name: "Cognitive", key: "cognitive", max: 50 },
+                { name: "Cyclomatic", key: "cyclomatic", max: 30 },
+                { name: "Nesting", key: "nesting", max: 10 },
+                { name: "Debt Score", key: "score", max: d3.max(fileData, d => d.score) || 100 },
+                { name: "Issues", key: "count", max: d3.max(fileData, d => d.count) || 20 }
+            ];
+
+            const width = 400, height = 400;
+            const radius = Math.min(width, height) / 2 - 50;
+            const angleSlice = Math.PI * 2 / dimensions.length;
+
+            const svg = container.append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .attr("width", "100%")
+                .append("g")
+                .attr("transform", `translate(${width/2},${height/2})`);
+
+            // Draw concentric circles
+            const levels = 5;
+            for (let i = 0; i < levels; i++) {
+                const r = radius * (i + 1) / levels;
+                svg.append("circle")
+                    .attr("r", r)
+                    .attr("fill", "none")
+                    .attr("stroke", "#30363d")
+                    .attr("stroke-dasharray", "2,2");
+            }
+
+            // Draw axis lines and labels
+            dimensions.forEach((dim, i) => {
+                const angle = angleSlice * i - Math.PI / 2;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+
+                svg.append("line")
+                    .attr("x1", 0).attr("y1", 0)
+                    .attr("x2", x).attr("y2", y)
+                    .attr("stroke", "#30363d");
+
+                svg.append("text")
+                    .attr("x", Math.cos(angle) * (radius + 20))
+                    .attr("y", Math.sin(angle) * (radius + 20))
+                    .attr("text-anchor", "middle")
+                    .attr("dy", "0.35em")
+                    .attr("fill", "#8b949e")
+                    .attr("font-size", "10px")
+                    .text(dim.name);
+            });
+
+            const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+            // Draw radar polygons for each file
+            fileData.forEach((file, fileIdx) => {
+                const points = dimensions.map((dim, i) => {
+                    const value = Math.min(file[dim.key] / dim.max, 1); // Normalize to 0-1
+                    const angle = angleSlice * i - Math.PI / 2;
+                    return {
+                        x: Math.cos(angle) * radius * value,
+                        y: Math.sin(angle) * radius * value
+                    };
+                });
+
+                const lineGenerator = d3.lineRadial()
+                    .radius((d, i) => {
+                        const dim = dimensions[i];
+                        return radius * Math.min(file[dim.key] / dim.max, 1);
+                    })
+                    .angle((d, i) => angleSlice * i);
+
+                svg.append("path")
+                    .datum(dimensions)
+                    .attr("d", lineGenerator)
+                    .attr("fill", color(fileIdx))
+                    .attr("fill-opacity", 0.15)
+                    .attr("stroke", color(fileIdx))
+                    .attr("stroke-width", 2)
+                    .on("mouseover", function(event) {
+                        d3.select(this).attr("fill-opacity", 0.4);
+                        tooltip.style("opacity", 1)
+                            .html(`<strong>${file.name}</strong><br/>
+                                   <span class="muted">${file.fullPath}</span><br/>
+                                   <div class="tooltip-divider"></div>
+                                   Cognitive: <span class="value">${file.cognitive.toFixed(1)}</span><br/>
+                                   Cyclomatic: <span class="value">${file.cyclomatic.toFixed(1)}</span><br/>
+                                   Debt Score: <span class="warning">${file.score.toFixed(1)}</span>`);
+                    })
+                    .on("mousemove", function(event) {
+                        tooltip.style("left", (event.pageX + 15) + "px")
+                               .style("top", (event.pageY - 15) + "px");
+                    })
+                    .on("mouseout", function() {
+                        d3.select(this).attr("fill-opacity", 0.15);
+                        tooltip.style("opacity", 0);
+                    });
+            });
+
+            // Update legend
+            fileData.forEach((file, i) => {
+                legend.append("div")
+                    .attr("class", "legend-item")
+                    .html(`<div class="legend-color" style="background:${color(i)}"></div>${file.name}`);
+            });
+        }
+
+        // ========================================
+        // AUTO-LOAD ON STARTUP
+        // ========================================
+
+        // Try to auto-load if running from a server
+        if (window.location.protocol !== 'file:') {
+            loadDefaultJson();
+        }
+    </script>
+</body>
+</html>

@@ -5,12 +5,11 @@
 use super::anti_patterns::{build_anti_patterns, AntiPatternOutput};
 use super::cohesion::CohesionOutput;
 use super::coupling::{build_file_dependencies, FileDependencies};
-use super::dependencies::RecommendationOutput;
 use super::format::{assert_ratio_invariants, assert_score_invariants};
 use super::format::{round_ratio, round_score};
 use super::location::UnifiedLocation;
 use super::priority::{assert_priority_invariants, Priority};
-use crate::priority::FileDebtItem;
+use crate::priority::{DebtType, FileDebtItem};
 use serde::{Deserialize, Serialize};
 
 /// File-level debt item in unified format
@@ -21,6 +20,9 @@ pub struct FileDebtItemOutput {
     pub priority: Priority,
     pub location: UnifiedLocation,
     pub metrics: FileMetricsOutput,
+    /// Debt type classification for file-level issues
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debt_type: Option<DebtType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub god_object_indicators: Option<crate::priority::GodObjectIndicators>,
     /// File-level dependency metrics (spec 201)
@@ -32,7 +34,6 @@ pub struct FileDebtItemOutput {
     /// File-level cohesion metrics (spec 198)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cohesion: Option<CohesionOutput>,
-    pub recommendation: RecommendationOutput,
     pub impact: FileImpactOutput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scoring_details: Option<FileScoringDetails>,
@@ -90,6 +91,9 @@ impl FileDebtItemOutput {
             c
         });
 
+        // Derive debt type from file metrics
+        let debt_type = derive_file_debt_type(item);
+
         FileDebtItemOutput {
             score: rounded_score,
             category: categorize_file_debt(item),
@@ -111,15 +115,11 @@ impl FileDebtItemOutput {
                 uncovered_lines: item.metrics.uncovered_lines,
                 distribution: None, // Populated separately when distribution metrics are available
             },
+            debt_type,
             god_object_indicators: item.metrics.god_object_analysis.clone().map(|a| a.into()),
             dependencies,
             anti_patterns,
             cohesion,
-            recommendation: RecommendationOutput {
-                action: item.recommendation.clone(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FileImpactOutput {
                 complexity_reduction: round_ratio(item.impact.complexity_reduction),
                 maintainability_improvement: round_ratio(item.impact.maintainability_improvement),
@@ -195,6 +195,32 @@ fn categorize_file_debt(_item: &FileDebtItem) -> String {
     "Architecture".to_string()
 }
 
+/// Derive the debt type for a file based on its metrics.
+///
+/// Returns GodObject if god object analysis indicates it's a god object,
+/// otherwise returns None.
+fn derive_file_debt_type(item: &FileDebtItem) -> Option<DebtType> {
+    // Check if this file has god object analysis and is classified as a god object
+    if let Some(ref analysis) = item.metrics.god_object_analysis {
+        if analysis.is_god_object {
+            return Some(DebtType::GodObject {
+                methods: analysis.method_count as u32,
+                fields: if analysis.field_count > 0 {
+                    Some(analysis.field_count as u32)
+                } else {
+                    None
+                },
+                responsibilities: analysis.responsibility_count as u32,
+                god_object_score: analysis.god_object_score,
+                lines: analysis.lines_of_code as u32,
+            });
+        }
+    }
+
+    // No specific debt type identified for this file
+    None
+}
+
 fn calculate_file_scoring_details(item: &FileDebtItem) -> FileScoringDetails {
     // Simplified scoring calculation - actual implementation may vary
     let file_size_score = (item.metrics.total_lines as f64 / 100.0).min(50.0);
@@ -239,6 +265,13 @@ mod tests {
                 uncovered_lines: 175,
                 distribution: None,
             },
+            debt_type: Some(DebtType::GodObject {
+                methods: 25,
+                fields: None,
+                responsibilities: 5,
+                god_object_score: 75.25,
+                lines: 500,
+            }),
             god_object_indicators: None,
             dependencies: None,
             anti_patterns: None,
@@ -249,11 +282,6 @@ mod tests {
                 classification: CohesionClassification::Medium,
                 functions_analyzed: 25,
             }),
-            recommendation: RecommendationOutput {
-                action: "Split file".to_string(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FileImpactOutput {
                 complexity_reduction: 0.3,
                 maintainability_improvement: 0.4,

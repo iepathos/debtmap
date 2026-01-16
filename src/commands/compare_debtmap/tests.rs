@@ -17,7 +17,7 @@ use super::types::{
 };
 use crate::output::unified::{
     Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput, Priority,
-    RecommendationOutput, UnifiedDebtItemOutput, UnifiedLocation,
+    UnifiedDebtItemOutput, UnifiedLocation,
 };
 use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::{DebtType, ImpactMetrics};
@@ -106,11 +106,6 @@ fn create_function_item(
         function_role: FunctionRole::Unknown,
         purity_analysis: None,
         dependencies: Dependencies::default(),
-        recommendation: RecommendationOutput {
-            action: "Refactor".to_string(),
-            priority: None,
-            implementation_steps: vec![],
-        },
         impact: FunctionImpactOutput {
             complexity_reduction: 0.0,
             coverage_improvement: 0.0,

@@ -6,8 +6,7 @@
 use debtmap::output::unified::{
     CohesionClassification, CohesionOutput, Dependencies, FileDebtItemOutput, FileImpactOutput,
     FileMetricsOutput, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-    Priority, PurityAnalysis, RecommendationOutput, UnifiedDebtItemOutput, UnifiedLocation,
-    UnifiedOutput,
+    Priority, PurityAnalysis, UnifiedDebtItemOutput, UnifiedLocation, UnifiedOutput,
 };
 use debtmap::priority::{DebtType, FunctionRole};
 use serde_json::Value;
@@ -122,11 +121,6 @@ fn test_function_item_required_fields_and_ranges() {
             production_blast_radius: 0,
             ..Default::default()
         },
-        recommendation: RecommendationOutput {
-            action: "Add tests".to_string(),
-            priority: None,
-            implementation_steps: vec![],
-        },
         impact: FunctionImpactOutput {
             coverage_improvement: 0.2,
             complexity_reduction: 0.1,
@@ -200,6 +194,7 @@ fn test_file_item_required_fields_and_ranges() {
             uncovered_lines: 175,
             distribution: None,
         },
+        debt_type: None,
         god_object_indicators: None,
         dependencies: None,
         anti_patterns: None,
@@ -210,11 +205,6 @@ fn test_file_item_required_fields_and_ranges() {
             classification: CohesionClassification::Medium,
             functions_analyzed: 25,
         }),
-        recommendation: RecommendationOutput {
-            action: "Split file".to_string(),
-            priority: None,
-            implementation_steps: vec![],
-        },
         impact: FileImpactOutput {
             complexity_reduction: 0.3,
             maintainability_improvement: 0.4,
@@ -304,11 +294,6 @@ fn test_priority_matches_score_thresholds() {
                 production_blast_radius: 0,
                 ..Default::default()
             },
-            recommendation: RecommendationOutput {
-                action: "".to_string(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FunctionImpactOutput {
                 coverage_improvement: 0.0,
                 complexity_reduction: 0.0,
@@ -371,11 +356,6 @@ fn test_no_floating_point_noise_in_serialized_output() {
             upstream_test_callers: vec![],
             production_blast_radius: 0,
             ..Default::default()
-        },
-        recommendation: RecommendationOutput {
-            action: "Add tests".to_string(),
-            priority: None,
-            implementation_steps: vec![],
         },
         impact: FunctionImpactOutput {
             coverage_improvement: 0.2,
@@ -479,11 +459,6 @@ fn test_unified_debt_item_tagged_serialization() {
             upstream_test_callers: vec![],
             production_blast_radius: 0,
             ..Default::default()
-        },
-        recommendation: RecommendationOutput {
-            action: "".to_string(),
-            priority: None,
-            implementation_steps: vec![],
         },
         impact: FunctionImpactOutput {
             coverage_improvement: 0.0,

@@ -61,13 +61,3 @@ pub struct PurityAnalysis {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side_effects: Option<Vec<String>>,
 }
-
-/// Recommendation output
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecommendationOutput {
-    pub action: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub priority: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub implementation_steps: Vec<String>,
-}

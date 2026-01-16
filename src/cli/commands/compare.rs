@@ -146,9 +146,9 @@ fn output_to_internal_function(
         },
         function_role: output.function_role,
         recommendation: ActionableRecommendation {
-            primary_action: output.recommendation.action.clone(),
+            primary_action: String::new(),
             rationale: String::new(),
-            implementation_steps: output.recommendation.implementation_steps.clone(),
+            implementation_steps: vec![],
             related_items: vec![],
             steps: None,
             estimated_effort_hours: None,
@@ -237,7 +237,7 @@ fn output_to_internal_file(
             crate::output::unified::Priority::Medium => 3,
             crate::output::unified::Priority::Low => 4,
         },
-        recommendation: output.recommendation.action.clone(),
+        recommendation: String::new(),
         impact: FileImpact {
             complexity_reduction: 0.0,
             maintainability_improvement: 0.0,

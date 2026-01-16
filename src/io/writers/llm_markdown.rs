@@ -922,7 +922,7 @@ mod tests {
     fn test_llm_markdown_outputs_new_dependency_fields() {
         use crate::output::unified::{
             Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-            Priority, RecommendationOutput, UnifiedLocation,
+            Priority, UnifiedLocation,
         };
         use crate::priority::{DebtType, FunctionRole};
 
@@ -974,11 +974,6 @@ mod tests {
                 production_upstream_count: 1,
                 test_upstream_count: 1,
                 production_blast_radius: 13,
-            },
-            recommendation: RecommendationOutput {
-                action: "Refactor".to_string(),
-                priority: None,
-                implementation_steps: vec![],
             },
             impact: FunctionImpactOutput {
                 coverage_improvement: 0.1,
@@ -1049,7 +1044,7 @@ mod tests {
     fn test_llm_markdown_outputs_enhanced_scoring() {
         use crate::output::unified::{
             Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-            FunctionScoringDetails, Priority, RecommendationOutput, UnifiedLocation,
+            FunctionScoringDetails, Priority, UnifiedLocation,
         };
         use crate::priority::{DebtType, FunctionRole};
 
@@ -1081,11 +1076,6 @@ mod tests {
             function_role: FunctionRole::Unknown,
             purity_analysis: None,
             dependencies: Dependencies::default(),
-            recommendation: RecommendationOutput {
-                action: "Refactor".to_string(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FunctionImpactOutput {
                 coverage_improvement: 0.1,
                 complexity_reduction: 0.2,
@@ -1153,7 +1143,7 @@ mod tests {
     fn test_llm_markdown_outputs_git_history() {
         use crate::output::unified::{
             Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-            GitHistoryOutput, Priority, RecommendationOutput, UnifiedLocation,
+            GitHistoryOutput, Priority, UnifiedLocation,
         };
         use crate::priority::{DebtType, FunctionRole};
 
@@ -1185,11 +1175,6 @@ mod tests {
             function_role: FunctionRole::Unknown,
             purity_analysis: None,
             dependencies: Dependencies::default(),
-            recommendation: RecommendationOutput {
-                action: "Refactor".to_string(),
-                priority: None,
-                implementation_steps: vec![],
-            },
             impact: FunctionImpactOutput {
                 coverage_improvement: 0.1,
                 complexity_reduction: 0.2,
