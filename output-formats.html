@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a84da0e9.js";
+            window.path_to_searchindex_js = "searchindex-372b4d5e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2efaaad0.js"></script>
+        <script src="toc-ebd6ab1f.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -190,20 +190,19 @@ debtmap analyze . --format json
 # Markdown output - documentation and reports
 debtmap analyze . --format markdown
 
-# HTML output - interactive web dashboard
-debtmap analyze . --format html
-
 # DOT output - Graphviz dependency visualization
 debtmap analyze . --format dot
 </code></pre>
 <p>Available formats:</p>
 <ul>
 <li><strong>terminal</strong> (default): Interactive output with colors, emoji, and formatting</li>
-<li><strong>json</strong>: Structured data for programmatic processing</li>
+<li><strong>json</strong>: Structured data for programmatic processing and the <a href="https://iepathos.github.io/debtmap/dashboard/">online dashboard</a></li>
 <li><strong>markdown</strong>: Reports suitable for documentation and PR comments</li>
-<li><strong>html</strong>: Web-viewable HTML reports with interactive dashboard</li>
 <li><strong>dot</strong>: Graphviz DOT format for dependency graph visualization</li>
 </ul>
+<blockquote>
+<p><strong>Tip</strong>: For visual exploration, generate JSON and use the <a href="https://iepathos.github.io/debtmap/dashboard/">online dashboard</a> - see the <a href="dashboard.html">Visual Dashboard</a> guide for details.</p>
+</blockquote>
 <h3 id="writing-to-files"><a class="header" href="#writing-to-files">Writing to Files</a></h3>
 <p>By default, output goes to stdout. Use <code>-o</code> or <code>--output</code> to write to a file:</p>
 <pre><code class="language-bash"># Write JSON to file
@@ -970,83 +969,28 @@ pandoc report.md -o report.html --standalone --css style.css
 # Convert to PDF
 pandoc report.md -o report.pdf --pdf-engine=xelatex
 </code></pre>
-<h2 id="html-output"><a class="header" href="#html-output">HTML Output</a></h2>
-<p>HTML format generates an interactive web dashboard with visual metrics and navigation. This format is ideal for viewing analysis results in a browser and sharing reports with stakeholders.</p>
-<p><strong>Source:</strong> <code>src/io/writers/html.rs</code>, <code>src/cli.rs:492</code></p>
-<h3 id="basic-usage-2"><a class="header" href="#basic-usage-2">Basic Usage</a></h3>
-<pre><code class="language-bash"># Generate HTML dashboard
-debtmap analyze . --format html
+<h2 id="visual-dashboard"><a class="header" href="#visual-dashboard">Visual Dashboard</a></h2>
+<p>For interactive visualization of your analysis results, use the <strong><a href="https://iepathos.github.io/debtmap/dashboard/">online dashboard</a></strong>.</p>
+<h3 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h3>
+<pre><code class="language-bash"># Generate JSON output
+debtmap analyze . --format json -o debtmap.json --lcov coverage.lcov --context
 
-# Save to file
-debtmap analyze . --format html -o dashboard.html
-
-# Open in browser
-debtmap analyze . --format html -o dashboard.html &amp;&amp; open dashboard.html
+# Visit https://iepathos.github.io/debtmap/dashboard/
+# Click "Load JSON File" and select your debtmap.json
 </code></pre>
+<p>The dashboard runs entirely in your browser - your data never leaves your machine.</p>
 <h3 id="dashboard-features"><a class="header" href="#dashboard-features">Dashboard Features</a></h3>
-<p>The HTML output provides an interactive dashboard with:</p>
-<ol>
-<li><strong>Executive Summary</strong> - High-level metrics with visual indicators</li>
-<li><strong>Debt Score Dashboard</strong> - Priority distribution (Critical, High, Medium, Low)</li>
-<li><strong>Complexity Metrics</strong> - Average complexity and function counts</li>
-<li><strong>Debt Density</strong> - Technical debt per function ratio</li>
-<li><strong>Interactive Data</strong> - Full analysis results embedded as JSON</li>
-</ol>
-<h3 id="dashboard-structure"><a class="header" href="#dashboard-structure">Dashboard Structure</a></h3>
-<p>The HTML dashboard uses an embedded template (<code>src/io/writers/templates/dashboard.html</code>) that includes:</p>
 <ul>
-<li><strong>Metrics Cards</strong> - Visual representation of key metrics</li>
-<li><strong>Priority Breakdown</strong> - Count of items by priority level</li>
-<li><strong>Health Indicators</strong> - Color-coded status based on thresholds</li>
-<li><strong>Raw Data Access</strong> - Complete JSON analysis results in the page</li>
+<li><strong>Risk Quadrant</strong> - Functions plotted by complexity vs coverage gap</li>
+<li><strong>Top Debt Items</strong> - Sortable table of highest priority issues</li>
+<li><strong>Module Flow</strong> - Chord diagram showing debt relationships</li>
+<li><strong>Risk Radar</strong> - Multi-dimensional comparison of top files</li>
 </ul>
-<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
-<p>When you generate an HTML dashboard, it displays:</p>
-<pre><code>┌─────────────────────────────────────┐
-│     Debtmap Analysis Dashboard      │
-├─────────────────────────────────────┤
-│                                     │
-│  Total Items: 156                   │
-│  Critical: 5  High: 12              │
-│  Medium: 45   Low: 94               │
-│                                     │
-│  Total Functions: 287               │
-│  Avg Complexity: 6.3                │
-│  Debt Density: 0.54                 │
-│                                     │
-└─────────────────────────────────────┘
-</code></pre>
-<h3 id="when-to-use-html-format"><a class="header" href="#when-to-use-html-format">When to Use HTML Format</a></h3>
-<p><strong>Use HTML Format When:</strong></p>
-<ul>
-<li>Sharing reports with non-technical stakeholders</li>
-<li>Creating dashboards for team visibility</li>
-<li>Generating reports for management review</li>
-<li>Viewing analysis results in a browser</li>
-<li>Embedding reports in internal documentation sites</li>
-<li>Publishing analysis results to a web server</li>
-</ul>
-<p><strong>HTML vs Markdown:</strong></p>
-<ul>
-<li><strong>HTML</strong>: Interactive, visual dashboard with embedded data</li>
-<li><strong>Markdown</strong>: Text-based, suitable for conversion to multiple formats</li>
-<li><strong>HTML</strong>: Better for standalone viewing in browsers</li>
-<li><strong>Markdown</strong>: Better for version control and text processing</li>
-</ul>
-<h3 id="customization"><a class="header" href="#customization">Customization</a></h3>
-<p>The HTML output uses a built-in template. For custom styling, you can:</p>
-<ol>
-<li>Generate the HTML file</li>
-<li>Extract and modify the CSS within the file</li>
-<li>Serve with custom stylesheets</li>
-</ol>
-<blockquote>
-<p><strong>Note:</strong> Direct template customization requires modifying <code>src/io/writers/templates/dashboard.html</code> in the debtmap source code.</p>
-</blockquote>
+<p>See the <a href="dashboard.html">Visual Dashboard</a> guide for complete documentation.</p>
 <h2 id="dot-output"><a class="header" href="#dot-output">DOT Output</a></h2>
 <p>DOT format generates Graphviz-compatible output for visualizing file dependencies and technical debt as a graph. This is useful for understanding code architecture and identifying coupling patterns.</p>
 <p><strong>Source:</strong> <code>src/io/writers/dot.rs</code> (Spec 204)</p>
-<h3 id="basic-usage-3"><a class="header" href="#basic-usage-3">Basic Usage</a></h3>
+<h3 id="basic-usage-2"><a class="header" href="#basic-usage-2">Basic Usage</a></h3>
 <pre><code class="language-bash"># Generate DOT output for dependency visualization
 debtmap analyze . --format dot
 
@@ -1081,7 +1025,7 @@ xdot deps.dot
 <li><strong>Tooltips</strong> - Hover for detailed metrics (score, functions, lines, coupling)</li>
 <li><strong>Legend</strong> - Built-in legend explains the color coding</li>
 </ol>
-<h3 id="example-output-1"><a class="header" href="#example-output-1">Example Output</a></h3>
+<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
 <pre><code class="language-dot">digraph debtmap {
   rankdir=TB;
   node [shape=box, style=filled, fontname="Helvetica"];
@@ -1555,7 +1499,7 @@ fi
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="tui-guide.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="dashboard.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -1569,7 +1513,7 @@ fi
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="tui-guide.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="dashboard.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

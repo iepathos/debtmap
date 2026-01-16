@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a84da0e9.js";
+            window.path_to_searchindex_js = "searchindex-372b4d5e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2efaaad0.js"></script>
+        <script src="toc-ebd6ab1f.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -184,7 +184,7 @@
 <ul>
 <li>✅ Target location tracking with intelligent fuzzy matching</li>
 <li>✅ Detailed improvement percentage calculations (per-item)</li>
-<li>✅ Multiple output formats (JSON, Markdown, Terminal, HTML)</li>
+<li>✅ Multiple output formats (JSON, Markdown, Terminal)</li>
 <li>✅ Implementation plan parsing for target extraction</li>
 <li>✅ Four match strategies (Exact, FunctionLevel, ApproximateName, FileLevel)</li>
 <li>✅ Resolved items tracking (debt eliminated)</li>
@@ -222,7 +222,7 @@
 <tr><td><code>--output FILE</code></td><td>No</td><td>Output file path (default: stdout)</td></tr>
 <tr><td><code>--plan FILE</code></td><td>No</td><td>Implementation plan to extract target location</td></tr>
 <tr><td><code>--target-location LOCATION</code></td><td>No</td><td>Manual target location (format: <code>file:function:line</code>)</td></tr>
-<tr><td><code>--format FORMAT</code></td><td>No</td><td>Output format: <code>json</code>, <code>markdown</code>, <code>terminal</code>, or <code>html</code> (default: json)</td></tr>
+<tr><td><code>--format FORMAT</code></td><td>No</td><td>Output format: <code>json</code>, <code>markdown</code>, or <code>terminal</code> (default: json)</td></tr>
 </tbody>
 </table>
 </div>
@@ -584,17 +584,6 @@ fi
 <li>Formatted tables for metrics</li>
 <li>Human-readable summaries</li>
 <li>Easy scanning of results</li>
-</ul>
-<h3 id="html-format"><a class="header" href="#html-format">HTML Format</a></h3>
-<p>Generate HTML reports with structured styling:</p>
-<pre><code class="language-bash">debtmap compare --before before.json --after after.json --format html
-</code></pre>
-<p><strong>Implementation</strong>: src/io/writers/html.rs</p>
-<p>The HTML format is suitable for:</p>
-<ul>
-<li>Web-based dashboards</li>
-<li>Archived reports</li>
-<li>Integration with documentation sites</li>
 </ul>
 <h2 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h2>
 <h3 id="github-actions-example"><a class="header" href="#github-actions-example">GitHub Actions Example</a></h3>
@@ -1062,7 +1051,7 @@ debtmap compare \
 <li>✅ Detect regressions (new critical items with score ≥ 60.0)</li>
 <li>✅ Track resolved items and improvements (≥30% score reduction, auto-detected)</li>
 <li>✅ Detailed per-item improvement metrics with before/after scores</li>
-<li>✅ Multiple output formats (JSON, Markdown, Terminal, HTML)</li>
+<li>✅ Multiple output formats (JSON, Markdown, Terminal)</li>
 <li>✅ Implementation plan parsing for target extraction (via <code>--plan</code> flag)</li>
 <li>✅ Project-wide health metrics and debt trends</li>
 <li>✅ Automate quality gates in CI/CD pipelines</li>
