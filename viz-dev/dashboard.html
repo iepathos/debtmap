@@ -336,8 +336,8 @@
         <div class="grid">
             <!-- Risk Quadrant -->
             <div class="viz-card full-width">
-                <h2>1. Risk Quadrant - Complexity vs Coverage</h2>
-                <p class="description">Functions plotted by complexity (Y) vs test coverage (X). Size = debt score, Color = priority.</p>
+                <h2>1. Risk Quadrant - Complexity vs Coverage Gap</h2>
+                <p class="description">Functions plotted by complexity (Y) vs coverage gap (X). Right side = untested, top = complex. Color = priority.</p>
                 <div class="controls">
                     <div class="control-group">
                         <span class="control-label">Y-Axis:</span>
@@ -354,6 +354,14 @@
                             <option value="priority">Priority</option>
                             <option value="role">Function Role</option>
                             <option value="category">Category</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">Size:</span>
+                        <select id="size-select" onchange="renderRiskQuadrant()">
+                            <option value="score">Debt Score</option>
+                            <option value="churn">Churn (if available)</option>
+                            <option value="fixed">Fixed Size</option>
                         </select>
                     </div>
                 </div>
@@ -403,6 +411,45 @@
         let rawData = null;
         let transformedData = null;
         const tooltip = d3.select("#tooltip");
+
+        // Smart tooltip positioning to prevent edge cutoff
+        function positionTooltip(event) {
+            const tooltipNode = tooltip.node();
+            const tooltipRect = tooltipNode.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            const padding = 15; // Distance from cursor
+            const edgeMargin = 10; // Minimum distance from viewport edge
+
+            let left = event.pageX + padding;
+            let top = event.pageY - padding;
+
+            // Check right edge overflow
+            if (left + tooltipRect.width + edgeMargin > viewportWidth + window.scrollX) {
+                // Position to the left of cursor instead
+                left = event.pageX - tooltipRect.width - padding;
+            }
+
+            // Check left edge (in case we flipped and it's now too far left)
+            if (left < window.scrollX + edgeMargin) {
+                left = window.scrollX + edgeMargin;
+            }
+
+            // Check bottom edge overflow
+            if (top + tooltipRect.height + edgeMargin > viewportHeight + window.scrollY) {
+                // Position above the cursor instead
+                top = event.pageY - tooltipRect.height - padding;
+            }
+
+            // Check top edge (in case we flipped and it's now too far up)
+            if (top < window.scrollY + edgeMargin) {
+                top = window.scrollY + edgeMargin;
+            }
+
+            tooltip.style("left", left + "px")
+                   .style("top", top + "px");
+        }
 
         // Color schemes
         const priorityColors = {
@@ -522,6 +569,9 @@
                     // Get coverage from file-level data, default to 0
                     const coverage = fileCoverage[file] !== undefined ? fileCoverage[file] : 0;
 
+                    // Extract git history if available
+                    const gitHistory = item.git_history || null;
+
                     return {
                         name: item.location?.function || 'unknown',
                         file: file,
@@ -537,7 +587,14 @@
                         length: item.metrics?.length || 0,
                         entropy: item.metrics?.entropy_score || null,
                         coverage: coverage,
-                        debtType: Object.keys(item.debt_type || {})[0] || 'Unknown'
+                        debtType: Object.keys(item.debt_type || {})[0] || 'Unknown',
+                        // Git history fields
+                        churn: gitHistory?.change_frequency || 0,
+                        bugDensity: gitHistory?.bug_density || 0,
+                        ageDays: gitHistory?.age_days || null,
+                        authorCount: gitHistory?.author_count || null,
+                        stability: gitHistory?.stability || null,
+                        hasGitHistory: gitHistory !== null
                     };
                 });
 
@@ -670,6 +727,7 @@
 
             const yField = document.getElementById("y-axis-select").value;
             const colorField = document.getElementById("color-select").value;
+            const sizeField = document.getElementById("size-select").value;
 
             const data = transformedData.functions.filter(d => d[yField] > 0);
 
@@ -679,6 +737,9 @@
                     .html("<p>No function data available</p>");
                 return;
             }
+
+            // Check if churn data is available
+            const hasChurnData = data.some(d => d.hasGitHistory && d.churn > 0);
 
             // Update stats
             const critical = data.filter(d => d.priority === 'critical').length;
@@ -711,9 +772,31 @@
                 .domain([0, yMax])
                 .range([innerHeight, 0]);
 
-            const sizeScale = d3.scaleSqrt()
-                .domain([0, d3.max(data, d => d.score)])
-                .range([4, 30]);
+            // Size scale based on selection
+            let sizeScale;
+            if (sizeField === 'churn' && hasChurnData) {
+                const maxChurn = d3.max(data, d => d.churn) || 1;
+                sizeScale = d3.scaleSqrt()
+                    .domain([0, maxChurn])
+                    .range([4, 30]);
+            } else if (sizeField === 'fixed') {
+                sizeScale = () => 8; // Fixed size
+            } else {
+                // Default to score
+                sizeScale = d3.scaleSqrt()
+                    .domain([0, d3.max(data, d => d.score)])
+                    .range([4, 30]);
+            }
+
+            // Get size value based on selection
+            const getSize = (d) => {
+                if (sizeField === 'churn' && hasChurnData) {
+                    return sizeScale(d.churn);
+                } else if (sizeField === 'fixed') {
+                    return 8;
+                }
+                return sizeScale(d.score);
+            };
 
             // Color function
             const getColor = (d) => {
@@ -722,28 +805,31 @@
                 return categoryColors(d.category);
             };
 
-            // Quadrant backgrounds
-            const coverageThreshold = 0.5;
+            // Quadrant backgrounds - X is now coverage gap (0 = well tested, 1 = no tests)
+            // Danger zone: top-right (high complexity + low coverage)
+            const coverageGapThreshold = 0.5;
             const complexityThreshold = yMax * 0.4;
 
+            // High risk zone: right side (high coverage gap) + top (high complexity)
             g.append("rect")
-                .attr("x", 0).attr("y", 0)
-                .attr("width", xScale(coverageThreshold))
+                .attr("x", xScale(coverageGapThreshold)).attr("y", 0)
+                .attr("width", innerWidth - xScale(coverageGapThreshold))
                 .attr("height", yScale(complexityThreshold))
                 .attr("fill", "#f8514915");
 
+            // Healthy zone: left side (low coverage gap) + bottom (low complexity)
             g.append("rect")
-                .attr("x", xScale(coverageThreshold)).attr("y", yScale(complexityThreshold))
-                .attr("width", innerWidth - xScale(coverageThreshold))
+                .attr("x", 0).attr("y", yScale(complexityThreshold))
+                .attr("width", xScale(coverageGapThreshold))
                 .attr("height", innerHeight - yScale(complexityThreshold))
                 .attr("fill", "#23863615");
 
             // Quadrant labels
             g.append("text").attr("class", "quadrant-label")
-                .attr("x", xScale(0.25)).attr("y", 20)
+                .attr("x", xScale(0.75)).attr("y", 20)
                 .attr("text-anchor", "middle").text("HIGH RISK");
             g.append("text").attr("class", "quadrant-label")
-                .attr("x", xScale(0.75)).attr("y", innerHeight - 10)
+                .attr("x", xScale(0.25)).attr("y", innerHeight - 10)
                 .attr("text-anchor", "middle").text("HEALTHY");
 
             // Axes
@@ -758,7 +844,7 @@
             svg.append("text")
                 .attr("x", width/2).attr("y", height - 10)
                 .attr("text-anchor", "middle").attr("fill", "#8b949e").attr("font-size", 12)
-                .text("Test Coverage");
+                .text("Coverage Gap (← tested | untested →)");
 
             const yLabels = {
                 cognitive: "Cognitive Complexity",
@@ -773,34 +859,47 @@
                 .attr("text-anchor", "middle").attr("fill", "#8b949e").attr("font-size", 12)
                 .text(yLabels[yField]);
 
-            // Points
+            // Points - X position uses coverage gap (1 - coverage)
             g.selectAll("circle")
                 .data(data)
                 .join("circle")
-                .attr("cx", d => xScale(d.coverage))
+                .attr("cx", d => xScale(1 - d.coverage))
                 .attr("cy", d => yScale(d[yField]))
-                .attr("r", d => sizeScale(d.score))
+                .attr("r", d => getSize(d))
                 .attr("fill", getColor)
                 .attr("opacity", 0.75)
                 .attr("stroke", "#fff")
                 .attr("stroke-width", 1.5)
                 .on("mouseover", function(event, d) {
                     d3.select(this).attr("opacity", 1).attr("stroke-width", 3);
-                    tooltip.style("opacity", 1)
-                        .html(`<strong>${d.name}</strong><br/>
+                    // Build tooltip HTML with optional churn section
+                    const coverageGap = ((1 - d.coverage) * 100).toFixed(0);
+                    const coveragePct = (d.coverage * 100).toFixed(0);
+                    let html = `<strong>${d.name}</strong><br/>
                                <span class="info">${d.file}:${d.line}</span><br/>
                                <div class="tooltip-divider"></div>
+                               Coverage Gap: <span class="${coverageGap > 50 ? 'warning' : 'value'}">${coverageGap}%</span> <span class="muted">(${coveragePct}% covered)</span><br/>
                                Cognitive: <span class="value">${d.cognitive}</span><br/>
                                Cyclomatic: <span class="value">${d.cyclomatic}</span><br/>
                                Nesting: <span class="value">${d.nesting}</span><br/>
                                Score: <span class="value">${d.score.toFixed(1)}</span><br/>
                                Priority: <span style="color:${priorityColors[d.priority]}">${d.priority.toUpperCase()}</span><br/>
                                Role: ${d.role}<br/>
-                               Category: ${d.category}`);
+                               Category: ${d.category}`;
+
+                    // Add git history info if available
+                    if (d.hasGitHistory) {
+                        html += `<div class="tooltip-divider"></div>
+                               <span class="muted">Git History:</span><br/>
+                               Churn: <span class="value">${d.churn.toFixed(2)}</span> changes/mo<br/>
+                               Bug Density: <span class="${d.bugDensity > 0.2 ? 'warning' : 'value'}">${(d.bugDensity * 100).toFixed(0)}%</span><br/>
+                               Stability: <span class="value">${d.stability || 'Unknown'}</span>`;
+                    }
+
+                    tooltip.style("opacity", 1).html(html);
                 })
                 .on("mousemove", function(event) {
-                    tooltip.style("left", (event.pageX + 15) + "px")
-                           .style("top", (event.pageY - 15) + "px");
+                    positionTooltip(event);
                 })
                 .on("mouseout", function() {
                     d3.select(this).attr("opacity", 0.75).attr("stroke-width", 1.5);
@@ -809,6 +908,17 @@
 
             // Update legend
             updateLegend(colorField);
+
+            // Show notice if churn selected but no data
+            if (sizeField === 'churn' && !hasChurnData) {
+                g.append("text")
+                    .attr("x", innerWidth / 2)
+                    .attr("y", innerHeight - 20)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#f0883e")
+                    .attr("font-size", "12px")
+                    .text("⚠ No churn data available - run with --context to enable git history");
+            }
         }
 
         function updateLegend(colorField) {
@@ -982,8 +1092,7 @@
                                Functions: <span class="value">${modules[d.index][1].count}</span>`);
                 })
                 .on("mousemove", function(event) {
-                    tooltip.style("left", (event.pageX + 15) + "px")
-                           .style("top", (event.pageY - 15) + "px");
+                    positionTooltip(event);
                 })
                 .on("mouseout", function() {
                     tooltip.style("opacity", 0);
@@ -1018,8 +1127,7 @@
                                Flow: <span class="value">${d.source.value.toFixed(1)}</span>`);
                 })
                 .on("mousemove", function(event) {
-                    tooltip.style("left", (event.pageX + 15) + "px")
-                           .style("top", (event.pageY - 15) + "px");
+                    positionTooltip(event);
                 })
                 .on("mouseout", function() {
                     d3.select(this).attr("fill-opacity", 0.65);
@@ -1160,8 +1268,7 @@
                                    Debt Score: <span class="warning">${file.score.toFixed(1)}</span>`);
                     })
                     .on("mousemove", function(event) {
-                        tooltip.style("left", (event.pageX + 15) + "px")
-                               .style("top", (event.pageY - 15) + "px");
+                        positionTooltip(event);
                     })
                     .on("mouseout", function() {
                         d3.select(this).attr("fill-opacity", 0.15);
