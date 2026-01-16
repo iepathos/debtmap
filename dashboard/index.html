@@ -321,9 +321,7 @@
     <div class="data-loader">
         <button onclick="document.getElementById('file-input').click()">Load JSON File</button>
         <input type="file" id="file-input" accept=".json" onchange="loadFromFile(event)">
-        <button class="secondary" onclick="loadDefaultJson()">Load ../debtmap.json</button>
-        <button class="secondary" onclick="reloadData()">Reload</button>
-        <span class="status" id="load-status">No data loaded</span>
+        <span class="status" id="load-status">No file loaded</span>
     </div>
 
     <!-- Summary Cards (shown after data load) -->
@@ -487,25 +485,6 @@
                 }
             };
             reader.readAsText(file);
-        }
-
-        async function loadDefaultJson() {
-            updateStatus('Loading...', '');
-            try {
-                // Add cache-busting parameter to force fresh fetch
-                const response = await fetch(`../debtmap.json?t=${Date.now()}`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                rawData = await response.json();
-                processAndRender();
-                updateStatus('Loaded: debtmap.json', 'loaded');
-            } catch (err) {
-                updateStatus(`Error: ${err.message}. Try using a local server.`, 'error');
-            }
-        }
-
-        function reloadData() {
-            // Re-fetch the JSON file instead of just re-rendering cached data
-            loadDefaultJson();
         }
 
         function updateStatus(msg, className) {
