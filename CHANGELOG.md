@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-01-16
+
+### Added
+
+- **Visual Dashboard** - Interactive D3.js dashboard for exploring analysis results
+  - Risk Quadrant visualization plotting functions by complexity vs coverage gap
+  - Churn-based bubble sizing shows frequently changed code
+  - Top Debt Items sortable table
+  - Module Flow chord diagram
+  - Risk Radar multi-dimensional comparison
+  - Hosted at https://iepathos.github.io/debtmap/dashboard/
+  - Also available locally via `viz-dev/dashboard.html`
+
+- **File-Level debt_type** - File items now include `debt_type` field in JSON output
+  - Enables consistent filtering across function and file items
+
+- **Smart Tooltip Positioning** - Dashboard tooltips now stay within viewport bounds
+
+### Changed
+
+- **Removed `--format html` output** - Use the online dashboard with JSON output instead
+  - Generate JSON: `debtmap analyze . --format json -o debtmap.json`
+  - Load in dashboard: https://iepathos.github.io/debtmap/dashboard/
+  - All processing happens client-side for privacy
+
+### Fixed
+
+- **Test Race Condition** - Fixed validation test race condition
+- **Dashboard Auto-load** - Dashboard no longer tries to auto-fetch on startup
+
+### Internal
+
+- Extracted tests and helpers in priority module
+- Deployed dashboard to GitHub Pages via docs workflow
+
 ## [0.12.1] - 2026-01-15
 
 ### Fixed
