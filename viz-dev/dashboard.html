@@ -1283,15 +1283,6 @@
                     .html(`<div class="legend-color" style="background:${color(i)}"></div>${file.name}`);
             });
         }
-
-        // ========================================
-        // AUTO-LOAD ON STARTUP
-        // ========================================
-
-        // Try to auto-load if running from a server
-        if (window.location.protocol !== 'file:') {
-            loadDefaultJson();
-        }
     </script>
 </body>
 </html>
