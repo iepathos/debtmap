@@ -5,11 +5,13 @@ on:
     branches: [main, master]
     paths:
       - 'book/**'
+      - 'viz-dev/**'
       - '.github/workflows/deploy-docs.yml'
   pull_request:
     branches: [main, master]
     paths:
       - 'book/**'
+      - 'viz-dev/**'
       - '.github/workflows/deploy-docs.yml'
 
 # Cancel in-progress runs when new commits are pushed
@@ -33,6 +35,11 @@ jobs:
 
       - name: Build book
         run: mdbook build book
+
+      - name: Copy dashboard to output
+        run: |
+          mkdir -p book/book/dashboard
+          cp viz-dev/dashboard.html book/book/dashboard/index.html
 
       - name: Deploy to GitHub Pages
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
