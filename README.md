@@ -111,6 +111,8 @@ debtmap analyze . --format json -o debtmap.json --lcov coverage.lcov --context
 open https://iepathos.github.io/debtmap/dashboard/
 ```
 
+**Local development**: If you have the repo cloned, open `viz-dev/dashboard.html` directly in your browser.
+
 The dashboard provides:
 - **Risk Quadrant** - Functions plotted by complexity vs coverage gap
 - **Top Debt Items** - Sortable table of highest priority issues
