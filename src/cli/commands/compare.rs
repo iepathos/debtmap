@@ -45,7 +45,6 @@ pub fn handle_compare_command(
     let output_str = match format {
         OutputFormat::Json => serde_json::to_string_pretty(&comparison)?,
         OutputFormat::Markdown => format_comparison_markdown(&comparison),
-        OutputFormat::Html => format_comparison_markdown(&comparison),
         OutputFormat::Dot => {
             // DOT format not applicable for comparison, use terminal
             print_comparison_terminal(&comparison);

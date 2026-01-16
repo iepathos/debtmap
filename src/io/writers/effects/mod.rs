@@ -55,14 +55,13 @@ pub use config::{OutputConfig, OutputConfigBuilder, OutputFormat, OutputResult};
 
 // Pure rendering functions
 pub use render::{
-    render_html, render_json, render_markdown, render_risk_json, render_risk_markdown,
-    render_terminal,
+    render_json, render_markdown, render_risk_json, render_risk_markdown, render_terminal,
 };
 
 // Single-format effect writers
 pub use writers::{
-    write_html_effect, write_json_effect, write_markdown_effect, write_risk_json_effect,
-    write_risk_markdown_effect, write_risk_terminal_effect, write_terminal_effect,
+    write_json_effect, write_markdown_effect, write_risk_json_effect, write_risk_markdown_effect,
+    write_risk_terminal_effect, write_terminal_effect,
 };
 
 // Composition utilities

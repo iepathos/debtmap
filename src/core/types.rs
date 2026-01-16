@@ -202,7 +202,6 @@ pub enum OutputFormat {
     Json,
     Markdown,
     Terminal,
-    Html,
 }
 
 /// Configurable thresholds

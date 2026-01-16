@@ -130,17 +130,6 @@ mod tests {
     }
 
     #[test]
-    fn should_use_tui_disabled_for_html_format() {
-        assert!(!should_use_tui(
-            false,
-            OutputFormat::Html,
-            &None,
-            true,
-            false
-        ));
-    }
-
-    #[test]
     fn should_use_tui_disabled_when_output_file_specified() {
         let output = Some(PathBuf::from("output.json"));
         assert!(!should_use_tui(

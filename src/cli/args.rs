@@ -577,7 +577,6 @@ pub enum OutputFormat {
     /// Markdown format with comprehensive analysis (uses LLM-optimized writer)
     Markdown,
     Terminal,
-    Html,
     /// Graphviz DOT format for dependency visualization
     Dot,
 }
@@ -608,7 +607,6 @@ impl From<OutputFormat> for crate::io::output::OutputFormat {
             OutputFormat::Json => crate::io::output::OutputFormat::Json,
             OutputFormat::Markdown => crate::io::output::OutputFormat::Markdown,
             OutputFormat::Terminal => crate::io::output::OutputFormat::Terminal,
-            OutputFormat::Html => crate::io::output::OutputFormat::Html,
             OutputFormat::Dot => crate::io::output::OutputFormat::Dot,
         }
     }

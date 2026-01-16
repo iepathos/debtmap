@@ -7,7 +7,7 @@ The `compare` command enables you to track technical debt changes over time by c
 **All Features Available Now**:
 - ✅ Target location tracking with intelligent fuzzy matching
 - ✅ Detailed improvement percentage calculations (per-item)
-- ✅ Multiple output formats (JSON, Markdown, Terminal, HTML)
+- ✅ Multiple output formats (JSON, Markdown, Terminal)
 - ✅ Implementation plan parsing for target extraction
 - ✅ Four match strategies (Exact, FunctionLevel, ApproximateName, FileLevel)
 - ✅ Resolved items tracking (debt eliminated)
@@ -47,7 +47,7 @@ debtmap compare \
 | `--output FILE` | No | Output file path (default: stdout) |
 | `--plan FILE` | No | Implementation plan to extract target location |
 | `--target-location LOCATION` | No | Manual target location (format: `file:function:line`) |
-| `--format FORMAT` | No | Output format: `json`, `markdown`, `terminal`, or `html` (default: json) |
+| `--format FORMAT` | No | Output format: `json`, `markdown`, or `terminal` (default: json) |
 
 All comparison features are available now, including target location tracking, fuzzy matching, and multiple output formats.
 
@@ -463,21 +463,6 @@ The terminal format provides:
 - Formatted tables for metrics
 - Human-readable summaries
 - Easy scanning of results
-
-### HTML Format
-
-Generate HTML reports with structured styling:
-
-```bash
-debtmap compare --before before.json --after after.json --format html
-```
-
-**Implementation**: src/io/writers/html.rs
-
-The HTML format is suitable for:
-- Web-based dashboards
-- Archived reports
-- Integration with documentation sites
 
 ## CI/CD Integration
 
@@ -993,7 +978,7 @@ The compare command provides validation for refactoring efforts:
 - ✅ Detect regressions (new critical items with score ≥ 60.0)
 - ✅ Track resolved items and improvements (≥30% score reduction, auto-detected)
 - ✅ Detailed per-item improvement metrics with before/after scores
-- ✅ Multiple output formats (JSON, Markdown, Terminal, HTML)
+- ✅ Multiple output formats (JSON, Markdown, Terminal)
 - ✅ Implementation plan parsing for target extraction (via `--plan` flag)
 - ✅ Project-wide health metrics and debt trends
 - ✅ Automate quality gates in CI/CD pipelines

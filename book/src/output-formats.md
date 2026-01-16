@@ -16,19 +16,17 @@ debtmap analyze . --format json
 # Markdown output - documentation and reports
 debtmap analyze . --format markdown
 
-# HTML output - interactive web dashboard
-debtmap analyze . --format html
-
 # DOT output - Graphviz dependency visualization
 debtmap analyze . --format dot
 ```
 
 Available formats:
 - **terminal** (default): Interactive output with colors, emoji, and formatting
-- **json**: Structured data for programmatic processing
+- **json**: Structured data for programmatic processing and the [online dashboard](https://iepathos.github.io/debtmap/dashboard/)
 - **markdown**: Reports suitable for documentation and PR comments
-- **html**: Web-viewable HTML reports with interactive dashboard
 - **dot**: Graphviz DOT format for dependency graph visualization
+
+> **Tip**: For visual exploration, generate JSON and use the [online dashboard](https://iepathos.github.io/debtmap/dashboard/) - see the [Visual Dashboard](dashboard.md) guide for details.
 
 ### Writing to Files
 
@@ -828,89 +826,30 @@ pandoc report.md -o report.html --standalone --css style.css
 pandoc report.md -o report.pdf --pdf-engine=xelatex
 ```
 
-## HTML Output
+## Visual Dashboard
 
-HTML format generates an interactive web dashboard with visual metrics and navigation. This format is ideal for viewing analysis results in a browser and sharing reports with stakeholders.
+For interactive visualization of your analysis results, use the **[online dashboard](https://iepathos.github.io/debtmap/dashboard/)**.
 
-**Source:** `src/io/writers/html.rs`, `src/cli.rs:492`
-
-### Basic Usage
+### Quick Start
 
 ```bash
-# Generate HTML dashboard
-debtmap analyze . --format html
+# Generate JSON output
+debtmap analyze . --format json -o debtmap.json --lcov coverage.lcov --context
 
-# Save to file
-debtmap analyze . --format html -o dashboard.html
-
-# Open in browser
-debtmap analyze . --format html -o dashboard.html && open dashboard.html
+# Visit https://iepathos.github.io/debtmap/dashboard/
+# Click "Load JSON File" and select your debtmap.json
 ```
+
+The dashboard runs entirely in your browser - your data never leaves your machine.
 
 ### Dashboard Features
 
-The HTML output provides an interactive dashboard with:
+- **Risk Quadrant** - Functions plotted by complexity vs coverage gap
+- **Top Debt Items** - Sortable table of highest priority issues
+- **Module Flow** - Chord diagram showing debt relationships
+- **Risk Radar** - Multi-dimensional comparison of top files
 
-1. **Executive Summary** - High-level metrics with visual indicators
-2. **Debt Score Dashboard** - Priority distribution (Critical, High, Medium, Low)
-3. **Complexity Metrics** - Average complexity and function counts
-4. **Debt Density** - Technical debt per function ratio
-5. **Interactive Data** - Full analysis results embedded as JSON
-
-### Dashboard Structure
-
-The HTML dashboard uses an embedded template (`src/io/writers/templates/dashboard.html`) that includes:
-
-- **Metrics Cards** - Visual representation of key metrics
-- **Priority Breakdown** - Count of items by priority level
-- **Health Indicators** - Color-coded status based on thresholds
-- **Raw Data Access** - Complete JSON analysis results in the page
-
-### Example Output
-
-When you generate an HTML dashboard, it displays:
-
-```
-┌─────────────────────────────────────┐
-│     Debtmap Analysis Dashboard      │
-├─────────────────────────────────────┤
-│                                     │
-│  Total Items: 156                   │
-│  Critical: 5  High: 12              │
-│  Medium: 45   Low: 94               │
-│                                     │
-│  Total Functions: 287               │
-│  Avg Complexity: 6.3                │
-│  Debt Density: 0.54                 │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-### When to Use HTML Format
-
-**Use HTML Format When:**
-- Sharing reports with non-technical stakeholders
-- Creating dashboards for team visibility
-- Generating reports for management review
-- Viewing analysis results in a browser
-- Embedding reports in internal documentation sites
-- Publishing analysis results to a web server
-
-**HTML vs Markdown:**
-- **HTML**: Interactive, visual dashboard with embedded data
-- **Markdown**: Text-based, suitable for conversion to multiple formats
-- **HTML**: Better for standalone viewing in browsers
-- **Markdown**: Better for version control and text processing
-
-### Customization
-
-The HTML output uses a built-in template. For custom styling, you can:
-
-1. Generate the HTML file
-2. Extract and modify the CSS within the file
-3. Serve with custom stylesheets
-
-> **Note:** Direct template customization requires modifying `src/io/writers/templates/dashboard.html` in the debtmap source code.
+See the [Visual Dashboard](dashboard.md) guide for complete documentation.
 
 ## DOT Output
 

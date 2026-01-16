@@ -9,10 +9,8 @@ use crate::env::RealEnv;
 use stillwater::effect::prelude::*;
 
 use super::config::{OutputConfig, OutputFormat, OutputResult};
-use super::render::{render_html, render_json, render_markdown, render_terminal};
-use super::writers::{
-    write_html_effect, write_json_effect, write_markdown_effect, write_terminal_effect,
-};
+use super::render::{render_json, render_markdown, render_terminal};
+use super::writers::{write_json_effect, write_markdown_effect, write_terminal_effect};
 
 // ============================================================================
 // Composed Output Effects
@@ -52,10 +50,6 @@ pub fn write_multi_format_effect(
         effects.push(write_json_effect(results.clone(), json_path.clone()));
     }
 
-    if let Some(ref html_path) = config.html_path {
-        effects.push(write_html_effect(results.clone(), html_path.clone()));
-    }
-
     if config.terminal_output {
         effects.push(write_terminal_effect(results));
     }
@@ -88,7 +82,6 @@ pub fn render_to_string_effect(
     effect_from_fn(move |_env: &RealEnv| match format {
         OutputFormat::Markdown => render_markdown(&results),
         OutputFormat::Json => render_json(&results),
-        OutputFormat::Html => render_html(&results),
         OutputFormat::Terminal => render_terminal(&results),
     })
 }

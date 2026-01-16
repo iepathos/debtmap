@@ -99,6 +99,26 @@ debtmap analyze . --format json
 debtmap analyze . --format terminal
 ```
 
+## Visual Dashboard
+
+Explore your results interactively with the **[Online Dashboard](https://iepathos.github.io/debtmap/dashboard/)**:
+
+```bash
+# Generate JSON output
+debtmap analyze . --format json -o debtmap.json --lcov coverage.lcov --context
+
+# Open dashboard and load your JSON file
+open https://iepathos.github.io/debtmap/dashboard/
+```
+
+The dashboard provides:
+- **Risk Quadrant** - Functions plotted by complexity vs coverage gap
+- **Top Debt Items** - Sortable table of highest priority issues
+- **Module Flow** - Chord diagram showing debt relationships
+- **Risk Radar** - Multi-dimensional comparison of top files
+
+All processing happens client-side - your data never leaves your browser.
+
 ## With Coverage Data
 
 ```bash
@@ -135,6 +155,7 @@ jobs:
 
 Quick links:
 - [Getting Started](https://iepathos.github.io/debtmap/getting-started.html)
+- [Visual Dashboard](https://iepathos.github.io/debtmap/dashboard/)
 - [LLM Integration](https://iepathos.github.io/debtmap/llm-integration.html)
 - [Configuration](https://iepathos.github.io/debtmap/configuration.html)
 - [Metrics Reference](https://iepathos.github.io/debtmap/metrics-reference.html)

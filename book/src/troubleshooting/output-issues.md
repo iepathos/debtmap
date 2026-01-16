@@ -16,14 +16,15 @@ debtmap analyze . --format json
 # Markdown format (comprehensive analysis with LLM-optimized structure)
 debtmap analyze . --format markdown
 
-# HTML format (for web display)
-debtmap analyze . --format html
-
 # DOT format (Graphviz dependency visualization)
 debtmap analyze . --format dot
+
+# Visual Dashboard (for interactive visualizations)
+# Generate JSON and use the online dashboard: https://iepathos.github.io/debtmap/dashboard/
+debtmap analyze . --format json -o debtmap.json
 ```
 
-**Source:** src/cli/args.rs:573-583 (OutputFormat enum)
+**Source:** src/cli/args.rs (OutputFormat enum)
 
 ## JSON Format
 

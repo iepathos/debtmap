@@ -1,5 +1,5 @@
 use crate::core::{AnalysisResults, FunctionMetrics};
-use crate::io::writers::{HtmlWriter, JsonWriter, LlmMarkdownWriter, TerminalWriter};
+use crate::io::writers::{JsonWriter, LlmMarkdownWriter, TerminalWriter};
 use crate::risk::RiskInsight;
 use std::io;
 
@@ -9,7 +9,6 @@ pub enum OutputFormat {
     /// Markdown format with comprehensive analysis (uses LLM-optimized writer)
     Markdown,
     Terminal,
-    Html,
     /// Graphviz DOT format for dependency visualization (Spec 204)
     Dot,
 }
@@ -25,7 +24,6 @@ pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
         // Markdown now uses LLM-optimized writer for comprehensive output (Spec 008)
         OutputFormat::Markdown => Box::new(LlmMarkdownWriter::new(io::stdout())),
         OutputFormat::Terminal => Box::new(TerminalWriter::default()),
-        OutputFormat::Html => Box::new(HtmlWriter::new(io::stdout())),
         // DOT format is handled separately via the output module, not through OutputWriter trait
         // Fall back to terminal for legacy code paths that use create_writer
         OutputFormat::Dot => Box::new(TerminalWriter::default()),

@@ -9,7 +9,6 @@ pub mod pattern_formatter;
 pub mod terminal;
 pub mod unified;
 
-use crate::io::output::OutputWriter;
 use crate::io::view_formatters;
 use crate::priority::tiers::TierConfig;
 use crate::priority::view::{PreparedDebtView, SortCriteria, ViewConfig};
@@ -233,7 +232,7 @@ pub fn output_unified_priorities_with_summary(
     output_file: Option<PathBuf>,
     output_format: Option<crate::cli::OutputFormat>,
     formatting_config: FormattingConfig,
-    results: &AnalysisResults,
+    _results: &AnalysisResults,
     show_filter_stats: bool,
 ) -> Result<()> {
     match output_format {
@@ -257,22 +256,6 @@ pub fn output_unified_priorities_with_summary(
                 include_scoring_details,
             )
         }
-        Some(crate::cli::OutputFormat::Html) => match output_file {
-            Some(path) => {
-                let file = std::fs::File::create(&path)?;
-                let mut writer =
-                    io::writers::HtmlWriter::with_unified_analysis(file, analysis.clone());
-                writer.write_results(results)?;
-                Ok(())
-            }
-            None => {
-                let stdout = std::io::stdout();
-                let mut writer =
-                    io::writers::HtmlWriter::with_unified_analysis(stdout, analysis.clone());
-                writer.write_results(results)?;
-                Ok(())
-            }
-        },
         Some(crate::cli::OutputFormat::Dot) => {
             // DOT format for Graphviz visualization (Spec 204)
             dot::output_dot_default(&analysis, output_file)

@@ -19,9 +19,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use super::config::OutputResult;
-use super::render::{
-    render_html, render_json, render_markdown, render_risk_json, render_risk_markdown,
-};
+use super::render::{render_json, render_markdown, render_risk_json, render_risk_markdown};
 
 // ============================================================================
 // Effect-Based Writers
@@ -133,33 +131,6 @@ pub fn write_risk_json_effect(
         Ok(OutputResult {
             destination: path_display,
             bytes_written: content.len(),
-            duration: start.elapsed(),
-        })
-    })
-}
-
-/// Write analysis results to HTML report as an Effect.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let effect = write_html_effect(results, "report.html".into());
-/// run_effect(effect, config)?;
-/// ```
-pub fn write_html_effect(results: AnalysisResults, path: PathBuf) -> AnalysisEffect<OutputResult> {
-    let path_display = path.display().to_string();
-    effect_from_fn(move |env: &RealEnv| {
-        let start = Instant::now();
-
-        let html = render_html(&results)?;
-
-        env.file_system().write(&path, &html).map_err(|e| {
-            AnalysisError::io_with_path(format!("Failed to write HTML: {}", e.message()), &path)
-        })?;
-
-        Ok(OutputResult {
-            destination: path_display,
-            bytes_written: html.len(),
             duration: start.elapsed(),
         })
     })
@@ -325,18 +296,5 @@ mod tests {
         let content = std::fs::read_to_string(&path).unwrap();
         // Should be valid JSON
         let _: serde_json::Value = serde_json::from_str(&content).unwrap();
-    }
-
-    #[test]
-    fn test_write_html_effect() {
-        let temp_dir = TempDir::new().unwrap();
-        let path = temp_dir.path().join("report.html");
-        let results = create_test_results();
-
-        let effect = write_html_effect(results, path.clone());
-        let output_result = run_effect(effect, DebtmapConfig::default()).unwrap();
-
-        assert!(path.exists());
-        assert!(output_result.bytes_written > 0);
     }
 }

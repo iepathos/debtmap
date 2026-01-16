@@ -12,7 +12,7 @@
 use crate::core::AnalysisResults;
 use crate::errors::AnalysisError;
 use crate::io::output::OutputWriter;
-use crate::io::writers::{HtmlWriter, JsonWriter, MarkdownWriter};
+use crate::io::writers::{JsonWriter, MarkdownWriter};
 use crate::risk::RiskInsight;
 
 // ============================================================================
@@ -55,19 +55,6 @@ pub fn render_json(results: &AnalysisResults) -> Result<String, AnalysisError> {
 pub fn render_risk_json(insights: &RiskInsight) -> Result<String, AnalysisError> {
     serde_json::to_string_pretty(insights)
         .map_err(|e| AnalysisError::other(format!("Failed to render risk JSON: {}", e)))
-}
-
-/// Pure function to render analysis results to HTML string.
-///
-/// This is a pure transformation with no I/O.
-pub fn render_html(results: &AnalysisResults) -> Result<String, AnalysisError> {
-    let mut buffer = Vec::new();
-    let mut writer = HtmlWriter::new(&mut buffer);
-    writer
-        .write_results(results)
-        .map_err(|e| AnalysisError::other(format!("Failed to render HTML: {}", e)))?;
-    String::from_utf8(buffer)
-        .map_err(|e| AnalysisError::other(format!("Invalid UTF-8 in HTML output: {}", e)))
 }
 
 /// Pure function to render terminal output string.
@@ -190,15 +177,6 @@ mod tests {
         assert!(json.contains("TODO: Implement feature"));
     }
 
-    #[test]
-    fn test_render_html_pure() {
-        let results = create_test_results();
-        let html = render_html(&results).unwrap();
-
-        // HTML should contain some HTML structure
-        assert!(html.contains("<") || html.contains("{"));
-    }
-
     /// Test that pure rendering functions produce content that can be stored
     /// in DebtmapTestEnv's mock file system and read back correctly.
     #[test]
@@ -209,7 +187,6 @@ mod tests {
         // Render content using pure functions
         let markdown_content = render_markdown(&results).unwrap();
         let json_content = render_json(&results).unwrap();
-        let html_content = render_html(&results).unwrap();
 
         // Write to mock file system
         env.file_system()
@@ -217,9 +194,6 @@ mod tests {
             .unwrap();
         env.file_system()
             .write(Path::new("report.json"), &json_content)
-            .unwrap();
-        env.file_system()
-            .write(Path::new("report.html"), &html_content)
             .unwrap();
 
         // Verify content through mock file system
@@ -236,12 +210,6 @@ mod tests {
             .unwrap();
         let _: serde_json::Value = serde_json::from_str(&read_json).unwrap();
         assert!(read_json.contains("test_func"));
-
-        let read_html = env
-            .file_system()
-            .read_to_string(Path::new("report.html"))
-            .unwrap();
-        assert_eq!(read_html, html_content);
     }
 
     /// Test render functions work correctly with mock environment's file operations.

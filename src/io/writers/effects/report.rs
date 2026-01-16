@@ -14,9 +14,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use super::config::{OutputConfig, OutputResult};
-use super::render::{
-    render_html, render_json, render_markdown, render_risk_json, render_risk_markdown,
-};
+use super::render::{render_json, render_markdown, render_risk_json, render_risk_markdown};
 
 // ============================================================================
 // Report Configuration
@@ -70,12 +68,6 @@ impl ReportConfigBuilder {
     /// Set JSON output path.
     pub fn json(mut self, path: impl Into<PathBuf>) -> Self {
         self.config.output.json_path = Some(path.into());
-        self
-    }
-
-    /// Set HTML output path.
-    pub fn html(mut self, path: impl Into<PathBuf>) -> Self {
-        self.config.output.html_path = Some(path.into());
         self
     }
 
@@ -189,21 +181,6 @@ pub fn write_analysis_report_effect(
             })?;
             outputs.push(OutputResult {
                 destination: json_path.display().to_string(),
-                bytes_written: content.len(),
-                duration: start.elapsed(),
-            });
-        }
-
-        if let Some(ref html_path) = config.output.html_path {
-            let content = render_html(&results)?;
-            env.file_system().write(html_path, &content).map_err(|e| {
-                AnalysisError::io_with_path(
-                    format!("Failed to write HTML: {}", e.message()),
-                    html_path,
-                )
-            })?;
-            outputs.push(OutputResult {
-                destination: html_path.display().to_string(),
                 bytes_written: content.len(),
                 duration: start.elapsed(),
             });
@@ -359,7 +336,6 @@ mod tests {
         let config = ReportConfig::builder()
             .markdown("report.md")
             .json("report.json")
-            .html("report.html")
             .terminal(false)
             .risk_markdown("risk.md")
             .risk_json("risk.json")
@@ -370,7 +346,6 @@ mod tests {
             Some(PathBuf::from("report.md"))
         );
         assert_eq!(config.output.json_path, Some(PathBuf::from("report.json")));
-        assert_eq!(config.output.html_path, Some(PathBuf::from("report.html")));
         assert!(!config.output.terminal_output);
         assert_eq!(config.risk_markdown_path, Some(PathBuf::from("risk.md")));
         assert_eq!(config.risk_json_path, Some(PathBuf::from("risk.json")));
@@ -438,17 +413,15 @@ mod tests {
         let config = ReportConfig::builder()
             .markdown(temp_dir.path().join("report.md"))
             .json(temp_dir.path().join("report.json"))
-            .html(temp_dir.path().join("report.html"))
             .build();
 
         let effect = write_analysis_report_effect(results, config);
         let report_result = run_effect(effect, DebtmapConfig::default()).unwrap();
 
-        // Verify all three outputs
-        assert_eq!(report_result.outputs.len(), 3);
+        // Verify both outputs
+        assert_eq!(report_result.outputs.len(), 2);
         assert!(temp_dir.path().join("report.md").exists());
         assert!(temp_dir.path().join("report.json").exists());
-        assert!(temp_dir.path().join("report.html").exists());
     }
 
     /// Verify rendered content can be round-tripped through mock file system.
@@ -492,7 +465,7 @@ mod tests {
     /// Test that the mock environment correctly tracks multiple output files.
     #[test]
     fn test_mock_env_multi_file_tracking() {
-        use super::super::render::{render_html, render_json, render_markdown};
+        use super::super::render::{render_json, render_markdown};
 
         let results = create_test_results();
         let env = DebtmapTestEnv::new();
@@ -501,7 +474,6 @@ mod tests {
         let formats = vec![
             ("report.md", render_markdown(&results).unwrap()),
             ("report.json", render_json(&results).unwrap()),
-            ("report.html", render_html(&results).unwrap()),
         ];
 
         for (path, content) in &formats {
@@ -509,7 +481,7 @@ mod tests {
         }
 
         // Verify all files tracked
-        assert_eq!(env.file_paths().len(), 3);
+        assert_eq!(env.file_paths().len(), 2);
         for (path, expected_content) in &formats {
             let content = env.file_system().read_to_string(Path::new(path)).unwrap();
             assert_eq!(&content, expected_content);

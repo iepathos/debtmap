@@ -4,7 +4,7 @@
 
 ### Understanding Output Formats
 
-Debtmap provides four output formats:
+Debtmap provides three output formats:
 
 **Terminal** (default): Human-readable with colors and tables
 ```bash
@@ -21,12 +21,9 @@ debtmap analyze . --format json --output report.json
 debtmap analyze . --format markdown --output report.md
 ```
 
-**HTML**: Interactive dashboard with visualizations
-```bash
-debtmap analyze . --format html --output report.html
-```
+**Visual Dashboard**: For interactive visualizations, generate JSON and use the [online dashboard](https://iepathos.github.io/debtmap/dashboard/).
 
-**Source:** Output formats defined in src/io/writers/ (html.rs, markdown.rs, terminal.rs, json.rs)
+**Source:** Output formats defined in src/io/writers/ (markdown.rs, terminal.rs, json.rs)
 
 ### JSON Structure
 
@@ -892,4 +889,4 @@ Architectural issue - split before adding features.
 - [Complexity Metrics](complexity-metrics.md) - Detailed explanation of cyclomatic, cognitive, and entropy metrics
 - [Risk Scoring](risk-scoring.md) - How debt scores and risk assessments are calculated
 - [CLI Reference](../cli-reference.md) - Complete command-line options for output formats and filtering
-- [Output Formats](../output-formats.md) - Detailed documentation of JSON, Markdown, and HTML output
+- [Output Formats](../output-formats.md) - Detailed documentation of JSON, Markdown, and Terminal output

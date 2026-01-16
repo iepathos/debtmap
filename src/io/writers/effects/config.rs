@@ -21,9 +21,6 @@ pub struct OutputConfig {
     /// Path for JSON output (if any).
     pub json_path: Option<PathBuf>,
 
-    /// Path for HTML output (if any).
-    pub html_path: Option<PathBuf>,
-
     /// Whether to output to terminal.
     pub terminal_output: bool,
 }
@@ -36,10 +33,7 @@ impl OutputConfig {
 
     /// Check if any output is configured.
     pub fn has_output(&self) -> bool {
-        self.markdown_path.is_some()
-            || self.json_path.is_some()
-            || self.html_path.is_some()
-            || self.terminal_output
+        self.markdown_path.is_some() || self.json_path.is_some() || self.terminal_output
     }
 }
 
@@ -59,12 +53,6 @@ impl OutputConfigBuilder {
     /// Set JSON output path.
     pub fn json(mut self, path: impl Into<PathBuf>) -> Self {
         self.config.json_path = Some(path.into());
-        self
-    }
-
-    /// Set HTML output path.
-    pub fn html(mut self, path: impl Into<PathBuf>) -> Self {
-        self.config.html_path = Some(path.into());
         self
     }
 
@@ -108,8 +96,6 @@ pub enum OutputFormat {
     Markdown,
     /// JSON format
     Json,
-    /// HTML format
-    Html,
     /// Terminal format (may lose colors)
     Terminal,
 }
@@ -123,13 +109,11 @@ mod tests {
         let config = OutputConfig::builder()
             .markdown("report.md")
             .json("report.json")
-            .html("report.html")
             .terminal(true)
             .build();
 
         assert_eq!(config.markdown_path, Some(PathBuf::from("report.md")));
         assert_eq!(config.json_path, Some(PathBuf::from("report.json")));
-        assert_eq!(config.html_path, Some(PathBuf::from("report.html")));
         assert!(config.terminal_output);
         assert!(config.has_output());
     }
