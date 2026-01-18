@@ -794,4 +794,486 @@ mod tests {
         // Clean up
         std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
     }
+
+    // ============================================================
+    // Tests for get_tiered_display
+    // ============================================================
+
+    use crate::priority::debt_types::FunctionVisibility;
+    use crate::priority::semantic_classifier::FunctionRole;
+    use crate::priority::CallGraph;
+
+    /// Create a test UnifiedDebtItem with specified score and debt type
+    fn create_test_unified_item(name: &str, score: f64, debt_type: DebtType) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                function: name.to_string(),
+                line: 1,
+            },
+            debt_type,
+            unified_score: UnifiedScore {
+                complexity_factor: 5.0,
+                coverage_factor: 5.0,
+                dependency_factor: 5.0,
+                role_multiplier: 1.0,
+                final_score: score,
+                base_score: Some(score),
+                exponential_factor: Some(1.0),
+                risk_boost: Some(1.0),
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 10,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        }
+    }
+
+    /// Create an empty UnifiedAnalysis for testing
+    fn create_empty_analysis() -> UnifiedAnalysis {
+        UnifiedAnalysis::new(CallGraph::new())
+    }
+
+    /// Create a UnifiedAnalysis with the given items
+    fn create_analysis_with_items(items: Vec<UnifiedDebtItem>) -> UnifiedAnalysis {
+        let mut analysis = create_empty_analysis();
+        for item in items {
+            analysis.items.push_back(item);
+        }
+        analysis
+    }
+
+    #[test]
+    fn test_get_tiered_display_empty_analysis() {
+        let analysis = create_empty_analysis();
+        let display = analysis.get_tiered_display(10);
+
+        assert!(display.critical.is_empty());
+        assert!(display.high.is_empty());
+        assert!(display.moderate.is_empty());
+        assert!(display.low.is_empty());
+    }
+
+    #[test]
+    fn test_get_tiered_display_single_critical_item() {
+        // Score >= 90.0 goes to Critical tier
+        let item = create_test_unified_item(
+            "critical_func",
+            92.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 50,
+                cognitive: 60,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item]);
+        let display = analysis.get_tiered_display(10);
+
+        assert_eq!(display.critical.len(), 1);
+        assert!(display.high.is_empty());
+        assert!(display.moderate.is_empty());
+        assert!(display.low.is_empty());
+
+        assert_eq!(display.critical[0].items.len(), 1);
+        assert_eq!(display.critical[0].debt_type, "High Complexity Functions");
+    }
+
+    #[test]
+    fn test_get_tiered_display_single_high_item() {
+        // Score 70.0-89.9 goes to High tier
+        let item = create_test_unified_item(
+            "high_func",
+            75.0,
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item]);
+        let display = analysis.get_tiered_display(10);
+
+        assert!(display.critical.is_empty());
+        assert_eq!(display.high.len(), 1);
+        assert!(display.moderate.is_empty());
+        assert!(display.low.is_empty());
+
+        assert_eq!(display.high[0].debt_type, "Untested Complex Functions");
+    }
+
+    #[test]
+    fn test_get_tiered_display_single_moderate_item() {
+        // Score 50.0-69.9 goes to Moderate tier
+        let item = create_test_unified_item(
+            "moderate_func",
+            55.0,
+            DebtType::Duplication {
+                instances: 2,
+                total_lines: 50,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item]);
+        let display = analysis.get_tiered_display(10);
+
+        assert!(display.critical.is_empty());
+        assert!(display.high.is_empty());
+        assert_eq!(display.moderate.len(), 1);
+        assert!(display.low.is_empty());
+
+        assert_eq!(display.moderate[0].debt_type, "Code Duplication");
+    }
+
+    #[test]
+    fn test_get_tiered_display_single_low_item() {
+        // Score < 50.0 goes to Low tier
+        let item = create_test_unified_item(
+            "low_func",
+            30.0,
+            DebtType::DeadCode {
+                visibility: FunctionVisibility::Public,
+                cyclomatic: 5,
+                cognitive: 5,
+                usage_hints: vec![],
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item]);
+        let display = analysis.get_tiered_display(10);
+
+        assert!(display.critical.is_empty());
+        assert!(display.high.is_empty());
+        assert!(display.moderate.is_empty());
+        assert_eq!(display.low.len(), 1);
+
+        assert_eq!(display.low[0].debt_type, "Dead Code");
+    }
+
+    #[test]
+    fn test_get_tiered_display_groups_similar_items() {
+        // Two items with same debt type should be grouped
+        let item1 = create_test_unified_item(
+            "func1",
+            55.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+        );
+        let item2 = create_test_unified_item(
+            "func2",
+            52.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 18,
+                cognitive: 22,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item1, item2]);
+        let display = analysis.get_tiered_display(10);
+
+        // Both should be in Moderate tier (scores 50-69)
+        assert_eq!(display.moderate.len(), 1); // Grouped together
+        assert_eq!(display.moderate[0].items.len(), 2);
+        assert_eq!(display.moderate[0].debt_type, "High Complexity Functions");
+
+        // Should have batch action for multiple items
+        assert!(display.moderate[0].batch_action.is_some());
+        assert!(display.moderate[0]
+            .batch_action
+            .as_ref()
+            .unwrap()
+            .contains("2"));
+    }
+
+    #[test]
+    fn test_get_tiered_display_critical_items_not_grouped() {
+        // Items with score >= 95.0 should NOT be grouped (is_critical_item)
+        let item1 = create_test_unified_item(
+            "critical1",
+            96.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 100,
+                cognitive: 120,
+            },
+        );
+        let item2 = create_test_unified_item(
+            "critical2",
+            97.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 110,
+                cognitive: 130,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item1, item2]);
+        let display = analysis.get_tiered_display(10);
+
+        // Both should be separate groups in Critical tier
+        assert_eq!(display.critical.len(), 2);
+        assert_eq!(display.critical[0].items.len(), 1);
+        assert_eq!(display.critical[1].items.len(), 1);
+    }
+
+    #[test]
+    fn test_get_tiered_display_god_objects_not_grouped() {
+        // God objects should NOT be grouped regardless of score
+        let item1 = create_test_unified_item(
+            "god1",
+            75.0,
+            DebtType::GodObject {
+                methods: 50,
+                fields: Some(30),
+                responsibilities: 5,
+                god_object_score: 85.0,
+                lines: 2000,
+            },
+        );
+        let item2 = create_test_unified_item(
+            "god2",
+            72.0,
+            DebtType::GodObject {
+                methods: 45,
+                fields: Some(25),
+                responsibilities: 4,
+                god_object_score: 80.0,
+                lines: 1800,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item1, item2]);
+        let display = analysis.get_tiered_display(10);
+
+        // Both should be separate groups in High tier
+        assert_eq!(display.high.len(), 2);
+        assert_eq!(display.high[0].items.len(), 1);
+        assert_eq!(display.high[1].items.len(), 1);
+    }
+
+    #[test]
+    fn test_get_tiered_display_sorting_within_tier() {
+        // Groups should be sorted by total score within each tier
+        let item1 = create_test_unified_item(
+            "low_score",
+            52.0,
+            DebtType::DeadCode {
+                visibility: FunctionVisibility::Public,
+                cyclomatic: 5,
+                cognitive: 5,
+                usage_hints: vec![],
+            },
+        );
+        let item2 = create_test_unified_item(
+            "high_score",
+            68.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 30,
+                cognitive: 35,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item1, item2]);
+        let display = analysis.get_tiered_display(10);
+
+        // Both in Moderate tier, but sorted by score
+        assert_eq!(display.moderate.len(), 2);
+
+        // Higher score group should come first
+        let first_total: f64 = display.moderate[0].items.iter().map(|i| i.score()).sum();
+        let second_total: f64 = display.moderate[1].items.iter().map(|i| i.score()).sum();
+        assert!(first_total >= second_total);
+    }
+
+    #[test]
+    fn test_get_tiered_display_items_across_all_tiers() {
+        // Create items for each tier
+        let critical = create_test_unified_item(
+            "critical",
+            92.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 50,
+                cognitive: 60,
+            },
+        );
+        let high = create_test_unified_item(
+            "high",
+            75.0,
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+        );
+        let moderate = create_test_unified_item(
+            "moderate",
+            55.0,
+            DebtType::Duplication {
+                instances: 2,
+                total_lines: 50,
+            },
+        );
+        let low = create_test_unified_item(
+            "low",
+            30.0,
+            DebtType::DeadCode {
+                visibility: FunctionVisibility::Public,
+                cyclomatic: 5,
+                cognitive: 5,
+                usage_hints: vec![],
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![critical, high, moderate, low]);
+        let display = analysis.get_tiered_display(10);
+
+        assert_eq!(display.critical.len(), 1);
+        assert_eq!(display.high.len(), 1);
+        assert_eq!(display.moderate.len(), 1);
+        assert_eq!(display.low.len(), 1);
+    }
+
+    #[test]
+    fn test_get_tiered_display_respects_limit() {
+        // Create more items than the limit
+        let items: Vec<UnifiedDebtItem> = (0..10)
+            .map(|i| {
+                create_test_unified_item(
+                    &format!("func_{}", i),
+                    90.0 + (i as f64 * 0.5), // All critical tier
+                    DebtType::ComplexityHotspot {
+                        cyclomatic: 50 + i,
+                        cognitive: 60 + i,
+                    },
+                )
+            })
+            .collect();
+
+        let analysis = create_analysis_with_items(items);
+        let display = analysis.get_tiered_display(5);
+
+        // Should only show 5 items total
+        let total_items: usize = display
+            .critical
+            .iter()
+            .chain(display.high.iter())
+            .chain(display.moderate.iter())
+            .chain(display.low.iter())
+            .map(|g| g.items.len())
+            .sum();
+
+        assert_eq!(total_items, 5);
+    }
+
+    #[test]
+    fn test_get_tiered_display_batch_actions() {
+        // Create multiple items of each type to test batch action generation
+        let items: Vec<UnifiedDebtItem> = (0..3)
+            .map(|i| {
+                create_test_unified_item(
+                    &format!("untested_{}", i),
+                    55.0 + (i as f64),
+                    DebtType::TestingGap {
+                        coverage: 0.0,
+                        cyclomatic: 10 + i,
+                        cognitive: 15 + i,
+                    },
+                )
+            })
+            .collect();
+
+        let analysis = create_analysis_with_items(items);
+        let display = analysis.get_tiered_display(10);
+
+        // Find the "Untested Complex Functions" group
+        let untested_group = display
+            .moderate
+            .iter()
+            .find(|g| g.debt_type == "Untested Complex Functions");
+
+        assert!(untested_group.is_some());
+        let group = untested_group.unwrap();
+        assert_eq!(group.items.len(), 3);
+        assert!(group.batch_action.is_some());
+        assert!(group.batch_action.as_ref().unwrap().contains("3"));
+        assert!(group
+            .batch_action
+            .as_ref()
+            .unwrap()
+            .contains("test coverage"));
+    }
+
+    #[test]
+    fn test_get_tiered_display_no_batch_action_for_single_item() {
+        let item = create_test_unified_item(
+            "single",
+            55.0,
+            DebtType::Duplication {
+                instances: 2,
+                total_lines: 50,
+            },
+        );
+
+        let analysis = create_analysis_with_items(vec![item]);
+        let display = analysis.get_tiered_display(10);
+
+        // Single item should not have batch action
+        assert_eq!(display.moderate.len(), 1);
+        assert!(display.moderate[0].batch_action.is_none());
+    }
 }

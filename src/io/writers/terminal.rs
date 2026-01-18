@@ -3,7 +3,7 @@ use crate::debt::total_debt_score;
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::io::output::OutputWriter;
 use crate::io::writers::pattern_display::extract_pattern_info;
-use crate::refactoring::{ComplexityLevel, PatternRecognitionEngine};
+use crate::refactoring::ComplexityLevel;
 use crate::risk::{RiskDistribution, RiskInsight};
 use colored::*;
 
@@ -263,50 +263,73 @@ fn format_refactoring_guidance(cyclomatic: u32) -> Option<Vec<String>> {
     Some(lines)
 }
 
-fn print_complexity_hotspots(results: &AnalysisResults) {
-    if results.complexity.metrics.is_empty() {
-        return;
+/// Format a single complexity hotspot entry as lines.
+///
+/// # Pure Function
+/// Returns formatted lines for one function's complexity information.
+fn format_hotspot_entry(index: usize, func: &FunctionMetrics) -> Vec<String> {
+    let mut lines = Vec::with_capacity(6);
+
+    lines.push(format!(
+        "  {}. {}:{} {}() - Cyclomatic: {}, Cognitive: {}",
+        index,
+        func.file.display(),
+        func.line,
+        func.name,
+        func.cyclomatic,
+        func.cognitive
+    ));
+
+    if let Some(pattern_info) = extract_pattern_info(func) {
+        lines.push(format!("     {}", pattern_info.format_terminal()));
     }
 
-    println!("[WARN] {} (Top 5)", "COMPLEXITY HOTSPOTS".bold());
-    println!("───────────────────────────────────────────");
-    let top_complex = get_top_complex_functions(&results.complexity.metrics, 5);
+    if let Some(ref entropy_analysis) = func.entropy_analysis {
+        if let Some(entropy_lines) = format_entropy_info(entropy_analysis) {
+            lines.extend(entropy_lines);
+        }
+    }
 
-    let _refactoring_engine = PatternRecognitionEngine::new();
+    if let Some(guidance_lines) = format_refactoring_guidance(func.cyclomatic) {
+        lines.extend(guidance_lines);
+    }
 
+    lines
+}
+
+/// Format complexity hotspots section as lines.
+///
+/// # Pure Function
+/// Returns all formatted lines for the complexity hotspots section,
+/// or None if there are no metrics to display.
+fn format_complexity_hotspots(metrics: &[FunctionMetrics], top_n: usize) -> Option<Vec<String>> {
+    if metrics.is_empty() {
+        return None;
+    }
+
+    let mut lines = Vec::with_capacity(top_n * 6 + 3);
+    lines.push(format!(
+        "[WARN] {} (Top {})",
+        "COMPLEXITY HOTSPOTS".bold(),
+        top_n
+    ));
+    lines.push("───────────────────────────────────────────".to_string());
+
+    let top_complex = get_top_complex_functions(metrics, top_n);
     for (i, func) in top_complex.iter().enumerate() {
-        println!(
-            "  {}. {}:{} {}() - Cyclomatic: {}, Cognitive: {}",
-            i + 1,
-            func.file.display(),
-            func.line,
-            func.name,
-            func.cyclomatic,
-            func.cognitive
-        );
-
-        // Display pattern information if available
-        if let Some(pattern_info) = extract_pattern_info(func) {
-            println!("     {}", pattern_info.format_terminal());
-        }
-
-        // Display entropy information if available
-        if let Some(ref entropy_analysis) = func.entropy_analysis {
-            if let Some(entropy_lines) = format_entropy_info(entropy_analysis) {
-                for line in entropy_lines {
-                    println!("{line}");
-                }
-            }
-        }
-
-        // Generate refactoring guidance for high complexity functions
-        if let Some(guidance_lines) = format_refactoring_guidance(func.cyclomatic) {
-            for line in guidance_lines {
-                println!("{line}");
-            }
-        }
+        lines.extend(format_hotspot_entry(i + 1, func));
     }
-    println!();
+
+    Some(lines)
+}
+
+fn print_complexity_hotspots(results: &AnalysisResults) {
+    if let Some(lines) = format_complexity_hotspots(&results.complexity.metrics, 5) {
+        for line in lines {
+            println!("{line}");
+        }
+        println!();
+    }
 }
 
 fn get_top_complex_functions(metrics: &[FunctionMetrics], count: usize) -> Vec<&FunctionMetrics> {
@@ -699,5 +722,159 @@ mod tests {
 
         let lines = result.unwrap();
         assert!(!lines.is_empty());
+    }
+
+    // Phase 4: Tests for complexity hotspot formatting functions
+
+    fn create_test_function_metrics(
+        name: &str,
+        cyclomatic: u32,
+        cognitive: u32,
+    ) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("src/test.rs"),
+            line: 42,
+            cyclomatic,
+            cognitive,
+            nesting: 2,
+            length: 20,
+            is_test: false,
+            visibility: Some("pub".to_string()),
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(true),
+            purity_confidence: Some(0.9),
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        }
+    }
+
+    #[test]
+    fn test_format_hotspot_entry_basic() {
+        let func = create_test_function_metrics("my_function", 8, 12);
+        let lines = format_hotspot_entry(1, &func);
+
+        assert!(!lines.is_empty());
+        assert!(lines[0].contains("1."));
+        assert!(lines[0].contains("src/test.rs:42"));
+        assert!(lines[0].contains("my_function()"));
+        assert!(lines[0].contains("Cyclomatic: 8"));
+        assert!(lines[0].contains("Cognitive: 12"));
+    }
+
+    #[test]
+    fn test_format_hotspot_entry_with_high_complexity() {
+        let func = create_test_function_metrics("complex_func", 15, 25);
+        let lines = format_hotspot_entry(3, &func);
+
+        assert!(lines.len() > 1);
+        // Should include refactoring guidance for high complexity
+        assert!(lines.iter().any(|l| l.contains("pure functions")));
+    }
+
+    #[test]
+    fn test_format_hotspot_entry_with_entropy_analysis() {
+        let mut func = create_test_function_metrics("entropy_func", 10, 15);
+        func.entropy_analysis = Some(create_entropy_analysis_with_dampening());
+
+        let lines = format_hotspot_entry(2, &func);
+
+        // Should include entropy information
+        assert!(lines.iter().any(|l| l.contains("Entropy:")));
+        assert!(lines.iter().any(|l| l.contains("Dampening:")));
+    }
+
+    #[test]
+    fn test_format_hotspot_entry_low_complexity_no_guidance() {
+        let func = create_test_function_metrics("simple_func", 3, 4);
+        let lines = format_hotspot_entry(1, &func);
+
+        // Should only have the header line, no guidance
+        assert_eq!(lines.len(), 1);
+    }
+
+    #[test]
+    fn test_format_complexity_hotspots_empty_metrics() {
+        let result = format_complexity_hotspots(&[], 5);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_format_complexity_hotspots_single_function() {
+        let metrics = vec![create_test_function_metrics("single_func", 12, 18)];
+        let result = format_complexity_hotspots(&metrics, 5);
+
+        assert!(result.is_some());
+        let lines = result.unwrap();
+
+        // Should have header and at least one entry
+        assert!(lines[0].contains("COMPLEXITY HOTSPOTS"));
+        assert!(lines[1].contains("───"));
+        assert!(lines.iter().any(|l| l.contains("single_func")));
+    }
+
+    #[test]
+    fn test_format_complexity_hotspots_respects_top_n() {
+        let metrics = vec![
+            create_test_function_metrics("func1", 20, 30),
+            create_test_function_metrics("func2", 15, 25),
+            create_test_function_metrics("func3", 10, 20),
+            create_test_function_metrics("func4", 5, 10),
+            create_test_function_metrics("func5", 3, 5),
+        ];
+
+        let result = format_complexity_hotspots(&metrics, 3);
+        assert!(result.is_some());
+        let lines = result.unwrap();
+
+        // Header says "Top 3"
+        assert!(lines[0].contains("Top 3"));
+
+        // Should have the top 3 most complex functions
+        assert!(lines.iter().any(|l| l.contains("func1")));
+        assert!(lines.iter().any(|l| l.contains("func2")));
+        assert!(lines.iter().any(|l| l.contains("func3")));
+
+        // Should NOT have the less complex functions
+        assert!(!lines.iter().any(|l| l.contains("func4")));
+        assert!(!lines.iter().any(|l| l.contains("func5")));
+    }
+
+    #[test]
+    fn test_format_complexity_hotspots_sorts_by_max_complexity() {
+        let metrics = vec![
+            create_test_function_metrics("low_cyclo_high_cog", 5, 25),
+            create_test_function_metrics("high_cyclo_low_cog", 25, 5),
+            create_test_function_metrics("medium", 10, 10),
+        ];
+
+        let result = format_complexity_hotspots(&metrics, 3);
+        assert!(result.is_some());
+        let lines = result.unwrap();
+
+        // Find the indices of each function in the output
+        let find_func_order =
+            |name: &str| -> Option<usize> { lines.iter().position(|l| l.contains(name)) };
+
+        let high_cyclo_pos = find_func_order("high_cyclo_low_cog");
+        let low_cyclo_pos = find_func_order("low_cyclo_high_cog");
+        let medium_pos = find_func_order("medium");
+
+        // Both 25-complexity functions should come before the 10-complexity one
+        assert!(high_cyclo_pos.unwrap() < medium_pos.unwrap());
+        assert!(low_cyclo_pos.unwrap() < medium_pos.unwrap());
     }
 }

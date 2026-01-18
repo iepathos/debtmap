@@ -159,6 +159,202 @@ impl Default for DebugConfig {
     }
 }
 
+// === Pure formatting functions ===
+
+/// Format the report header
+fn format_header() -> String {
+    "Call Graph Debug Report\n════════════════════════════════════════\n\n".to_string()
+}
+
+/// Format resolution statistics section
+fn format_statistics(stats: &ResolutionStatistics) -> String {
+    format!(
+        "RESOLUTION STATISTICS\n\
+         \x20 Total Attempts:    {}\n\
+         \x20 Resolved:          {} ({:.1}%)\n\
+         \x20 Failed:            {} ({:.1}%)\n\n",
+        stats.total_attempts,
+        stats.resolved,
+        stats.success_rate(),
+        stats.failed,
+        100.0 - stats.success_rate()
+    )
+}
+
+/// Format strategy breakdown section
+fn format_strategy_breakdown(by_strategy: &HashMap<ResolutionStrategy, StrategyStats>) -> String {
+    if by_strategy.is_empty() {
+        return String::new();
+    }
+
+    let strategy_lines: String = by_strategy
+        .iter()
+        .map(|(strategy, stats)| {
+            let success_rate = if stats.attempts > 0 {
+                (stats.successes as f64 / stats.attempts as f64) * 100.0
+            } else {
+                0.0
+            };
+            format!(
+                "    {:?}: {} attempts ({:.1}% success)\n",
+                strategy, stats.attempts, success_rate
+            )
+        })
+        .collect();
+
+    format!("  By Strategy:\n{}\n", strategy_lines)
+}
+
+/// Format timing percentiles section
+fn format_timing(percentiles: &Percentiles, show_timing: bool) -> String {
+    if !show_timing {
+        return String::new();
+    }
+
+    format!(
+        "  Resolution Time:\n\
+         \x20   p50: {:.2}ms\n\
+         \x20   p95: {:.2}ms\n\
+         \x20   p99: {:.2}ms\n\n",
+        percentiles.p50.as_secs_f64() * 1000.0,
+        percentiles.p95.as_secs_f64() * 1000.0,
+        percentiles.p99.as_secs_f64() * 1000.0
+    )
+}
+
+/// Format a single failure reason
+fn format_failure_reason(reason: &FailureReason, max_candidates: usize) -> String {
+    match reason {
+        FailureReason::NoCandidates => "No candidates\n".to_string(),
+        FailureReason::Ambiguous(candidates) => {
+            let candidate_lines: String = candidates
+                .iter()
+                .take(max_candidates)
+                .map(|c| {
+                    format!(
+                        "          \u{2022} {} ({}:{})\n",
+                        c.name,
+                        c.file.display(),
+                        c.line
+                    )
+                })
+                .collect();
+            format!(
+                "Found {} candidates (ambiguous)\n{}",
+                candidates.len(),
+                candidate_lines
+            )
+        }
+        FailureReason::FilteredOut(reason) => format!("Filtered out: {}\n", reason),
+        FailureReason::NotApplicable => "Not applicable\n".to_string(),
+    }
+}
+
+/// Format a single strategy attempt
+fn format_strategy_attempt(
+    strategy_attempt: &StrategyAttempt,
+    idx: usize,
+    max_candidates: usize,
+) -> String {
+    let prefix = format!(
+        "       {}. {:?} \u{2192} ",
+        idx + 1,
+        strategy_attempt.strategy
+    );
+    let result = match &strategy_attempt.failure_reason {
+        Some(reason) => format_failure_reason(reason, max_candidates),
+        None => format!("Found {} candidates\n", strategy_attempt.candidates.len()),
+    };
+    format!("{}{}", prefix, result)
+}
+
+/// Format a single failed resolution attempt
+fn format_single_failure(attempt: &ResolutionAttempt, idx: usize, max_candidates: usize) -> String {
+    let header = format!(
+        "  {}. {}\n\
+         \x20    Called from: {}\n\
+         \x20    Location: {}:{}\n\n\
+         \x20    Strategy Attempts:\n",
+        idx + 1,
+        attempt.callee_name,
+        attempt.caller.name,
+        attempt.caller.file.display(),
+        attempt.caller.line
+    );
+
+    let attempts: String = attempt
+        .strategy_attempts
+        .iter()
+        .enumerate()
+        .map(|(i, sa)| format_strategy_attempt(sa, i, max_candidates))
+        .collect();
+
+    format!("{}{}\n", header, attempts)
+}
+
+/// Format failed resolutions section
+fn format_failed_resolutions(failures: &[&ResolutionAttempt], max_candidates: usize) -> String {
+    if failures.is_empty() {
+        return String::new();
+    }
+
+    const MAX_DISPLAYED: usize = 20;
+    let header = format!("[ERROR] FAILED RESOLUTIONS ({} total)\n\n", failures.len());
+
+    let items: String = failures
+        .iter()
+        .enumerate()
+        .take(MAX_DISPLAYED)
+        .map(|(idx, attempt)| format_single_failure(attempt, idx, max_candidates))
+        .collect();
+
+    let overflow = if failures.len() > MAX_DISPLAYED {
+        format!(
+            "  ... and {} more failed resolutions\n\n",
+            failures.len() - MAX_DISPLAYED
+        )
+    } else {
+        String::new()
+    };
+
+    format!("{}{}{}", header, items, overflow)
+}
+
+/// Format recommendations section
+fn format_recommendations(stats: &ResolutionStatistics) -> String {
+    let success_rate = stats.success_rate();
+    let rate_assessment = if success_rate >= 95.0 {
+        format!(
+            "  \u{2022} {:.1}% resolution rate is excellent (target: >95%)\n",
+            success_rate
+        )
+    } else if success_rate >= 85.0 {
+        format!(
+            "  \u{2022} {:.1}% resolution rate is good (target: >95%)\n",
+            success_rate
+        )
+    } else {
+        format!(
+            "  \u{2022} {:.1}% resolution rate needs improvement (target: >95%)\n",
+            success_rate
+        )
+    };
+
+    let failed_investigation = if stats.failed > 0 {
+        format!(
+            "  \u{2022} Investigate {} failed resolutions for patterns\n",
+            stats.failed
+        )
+    } else {
+        String::new()
+    };
+
+    format!(
+        "\u{1F4C8} RECOMMENDATIONS\n{}{}",
+        rate_assessment, failed_investigation
+    )
+}
+
 /// Debug information collector for call graph resolution
 pub struct CallGraphDebugger {
     /// All resolution attempts (successful and failed)
@@ -256,167 +452,16 @@ impl CallGraphDebugger {
 
     /// Generate text format debug report
     fn generate_text_report(&self) -> String {
-        let mut output = String::new();
-
-        // Header
-        output.push_str("Call Graph Debug Report\n");
-        output.push_str("════════════════════════════════════════\n\n");
-
-        // Statistics
-        output.push_str("RESOLUTION STATISTICS\n");
-        output.push_str(&format!(
-            "  Total Attempts:    {}\n",
-            self.stats.total_attempts
-        ));
-        output.push_str(&format!(
-            "  Resolved:          {} ({:.1}%)\n",
-            self.stats.resolved,
-            self.stats.success_rate()
-        ));
-        output.push_str(&format!(
-            "  Failed:            {} ({:.1}%)\n",
-            self.stats.failed,
-            100.0 - self.stats.success_rate()
-        ));
-        output.push('\n');
-
-        // Strategy breakdown
-        if !self.stats.by_strategy.is_empty() {
-            output.push_str("  By Strategy:\n");
-            for (strategy, stats) in &self.stats.by_strategy {
-                let success_rate = if stats.attempts > 0 {
-                    (stats.successes as f64 / stats.attempts as f64) * 100.0
-                } else {
-                    0.0
-                };
-                output.push_str(&format!(
-                    "    {:?}: {} attempts ({:.1}% success)\n",
-                    strategy, stats.attempts, success_rate
-                ));
-            }
-            output.push('\n');
-        }
-
-        // Timing information
-        if self.config.show_timing {
-            output.push_str("  Resolution Time:\n");
-            output.push_str(&format!(
-                "    p50: {:.2}ms\n",
-                self.stats.time_percentiles.p50.as_secs_f64() * 1000.0
-            ));
-            output.push_str(&format!(
-                "    p95: {:.2}ms\n",
-                self.stats.time_percentiles.p95.as_secs_f64() * 1000.0
-            ));
-            output.push_str(&format!(
-                "    p99: {:.2}ms\n",
-                self.stats.time_percentiles.p99.as_secs_f64() * 1000.0
-            ));
-            output.push('\n');
-        }
-
-        // Failed resolutions
         let failures = self.failed_resolutions();
-        if !failures.is_empty() {
-            output.push_str(&format!(
-                "[ERROR] FAILED RESOLUTIONS ({} total)\n\n",
-                failures.len()
-            ));
-
-            for (idx, attempt) in failures.iter().enumerate().take(20) {
-                // Limit to 20 for readability
-                output.push_str(&format!("  {}. {}\n", idx + 1, attempt.callee_name));
-                output.push_str(&format!("     Called from: {}\n", attempt.caller.name));
-                output.push_str(&format!(
-                    "     Location: {}:{}\n",
-                    attempt.caller.file.display(),
-                    attempt.caller.line
-                ));
-                output.push_str("\n     Strategy Attempts:\n");
-
-                for (strategy_idx, strategy_attempt) in attempt.strategy_attempts.iter().enumerate()
-                {
-                    output.push_str(&format!(
-                        "       {}. {:?} → ",
-                        strategy_idx + 1,
-                        strategy_attempt.strategy
-                    ));
-
-                    if let Some(reason) = &strategy_attempt.failure_reason {
-                        match reason {
-                            FailureReason::NoCandidates => {
-                                output.push_str("No candidates\n");
-                            }
-                            FailureReason::Ambiguous(candidates) => {
-                                output.push_str(&format!(
-                                    "Found {} candidates (ambiguous)\n",
-                                    candidates.len()
-                                ));
-                                for candidate in
-                                    candidates.iter().take(self.config.max_candidates_shown)
-                                {
-                                    output.push_str(&format!(
-                                        "          • {} ({}:{})\n",
-                                        candidate.name,
-                                        candidate.file.display(),
-                                        candidate.line
-                                    ));
-                                }
-                            }
-                            FailureReason::FilteredOut(reason) => {
-                                output.push_str(&format!("Filtered out: {}\n", reason));
-                            }
-                            FailureReason::NotApplicable => {
-                                output.push_str("Not applicable\n");
-                            }
-                        }
-                    } else {
-                        output.push_str(&format!(
-                            "Found {} candidates\n",
-                            strategy_attempt.candidates.len()
-                        ));
-                    }
-                }
-
-                output.push('\n');
-            }
-
-            if failures.len() > 20 {
-                output.push_str(&format!(
-                    "  ... and {} more failed resolutions\n\n",
-                    failures.len() - 20
-                ));
-            }
-        }
-
-        // Recommendations
-        output.push_str("📈 RECOMMENDATIONS\n");
-        let success_rate = self.stats.success_rate();
-        if success_rate >= 95.0 {
-            output.push_str(&format!(
-                "  • {:.1}% resolution rate is excellent (target: >95%)\n",
-                success_rate
-            ));
-        } else if success_rate >= 85.0 {
-            output.push_str(&format!(
-                "  • {:.1}% resolution rate is good (target: >95%)\n",
-                success_rate
-            ));
-        } else {
-            output.push_str(&format!(
-                "  • {:.1}% resolution rate needs improvement (target: >95%)\n",
-                success_rate
-            ));
-        }
-
-        if self.stats.failed > 0 {
-            output.push_str(&format!(
-                "  • Investigate {} failed resolutions for patterns\n",
-                self.stats.failed
-            ));
-        }
-
-        output
+        [
+            format_header(),
+            format_statistics(&self.stats),
+            format_strategy_breakdown(&self.stats.by_strategy),
+            format_timing(&self.stats.time_percentiles, self.config.show_timing),
+            format_failed_resolutions(&failures, self.config.max_candidates_shown),
+            format_recommendations(&self.stats),
+        ]
+        .concat()
     }
 
     /// Generate JSON format debug report

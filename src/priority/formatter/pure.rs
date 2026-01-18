@@ -22,14 +22,16 @@
 //! assert_eq!(formatted.rank, 1);
 //! ```
 
-use super::context::create_format_context;
+use super::context::{create_format_context, FormatContext};
 use super::sections::generate_formatted_sections;
 use crate::formatting::FormattingConfig;
-use crate::priority::classification::Severity;
+use crate::priority::classification::{CoverageLevel, Severity};
+use crate::priority::detected_pattern::DetectedPattern;
 use crate::priority::formatted_output::{
-    CoverageTag, FormattedPriorityItem, FormattedSection, SeverityInfo,
+    ContextProviderInfo, CoverageTag, FormattedPriorityItem, FormattedSection, SeverityInfo,
 };
 use crate::priority::UnifiedDebtItem;
+use crate::risk::context::{ContextDetails, ContextualRisk};
 
 /// Pure function: transforms debt item → formatted output.
 ///
@@ -79,13 +81,47 @@ pub fn format_priority_item(
 ) -> FormattedPriorityItem {
     let context = create_format_context(rank, item, has_coverage_data);
     let sections_data = generate_formatted_sections(&context);
-
     let severity = Severity::from_score(item.unified_score.final_score);
-    let mut sections = Vec::new();
 
-    // Header section
-    sections.push(FormattedSection::Header {
+    let sections = build_all_sections(&context, &sections_data, item);
+
+    FormattedPriorityItem {
         rank,
+        score: context.score,
+        severity,
+        sections,
+    }
+}
+
+/// Build all sections from context and sections data.
+fn build_all_sections(
+    context: &FormatContext,
+    sections_data: &super::sections::FormattedSections,
+    item: &UnifiedDebtItem,
+) -> Vec<FormattedSection> {
+    let mut sections = vec![
+        build_header_section(context),
+        build_location_section(context),
+    ];
+
+    sections.extend(build_context_dampening_section(context));
+    sections.push(build_action_section(context));
+    sections.push(build_impact_section(context));
+    sections.extend(build_evidence_section(sections_data));
+    sections.extend(build_complexity_section(context));
+    sections.extend(build_pattern_section(&context.pattern_info));
+    sections.extend(build_coverage_section(&context.coverage_info));
+    sections.extend(build_contextual_risk_section(&item.contextual_risk));
+    sections.extend(build_dependencies_section(context));
+    sections.extend(build_debt_specific_section(sections_data));
+    sections.push(build_rationale_section(context));
+
+    sections
+}
+
+fn build_header_section(context: &FormatContext) -> FormattedSection {
+    FormattedSection::Header {
+        rank: context.rank,
         score: context.score,
         coverage_tag: context.coverage_info.as_ref().map(|cov| CoverageTag {
             text: cov.tag.clone(),
@@ -95,169 +131,185 @@ pub fn format_priority_item(
             label: context.severity_info.label.clone(),
             color: context.severity_info.color,
         },
-    });
+    }
+}
 
-    // Location section
-    sections.push(FormattedSection::Location {
+fn build_location_section(context: &FormatContext) -> FormattedSection {
+    FormattedSection::Location {
         file: context.location_info.file.clone(),
         line: context.location_info.line,
         function: context.location_info.function.clone(),
-    });
-
-    // Context dampening section (optional, spec 191)
-    if let Some(ref context_info) = context.context_info {
-        let dampening_percentage = ((1.0 - context_info.multiplier) * 100.0) as i32;
-        sections.push(FormattedSection::ContextDampening {
-            description: context_info.description.clone(),
-            dampening_percentage,
-        });
     }
+}
 
-    // Action section
-    sections.push(FormattedSection::Action {
+fn build_context_dampening_section(context: &FormatContext) -> Option<FormattedSection> {
+    context
+        .context_info
+        .as_ref()
+        .map(|info| FormattedSection::ContextDampening {
+            description: info.description.clone(),
+            dampening_percentage: ((1.0 - info.multiplier) * 100.0) as i32,
+        })
+}
+
+fn build_action_section(context: &FormatContext) -> FormattedSection {
+    FormattedSection::Action {
         action: context.action.clone(),
-    });
+    }
+}
 
-    // Impact section
-    sections.push(FormattedSection::Impact {
+fn build_impact_section(context: &FormatContext) -> FormattedSection {
+    FormattedSection::Impact {
         complexity_reduction: context.impact.complexity_reduction as u32,
         risk_reduction: context.impact.risk_reduction,
-    });
-
-    // Evidence section (if available)
-    if let Some(ref evidence) = sections_data.evidence {
-        sections.push(FormattedSection::Evidence {
-            text: evidence.clone(),
-        });
     }
+}
 
-    // Complexity section (if available and has complexity)
-    if context.complexity_info.has_complexity {
-        sections.push(FormattedSection::Complexity {
-            cyclomatic: context.complexity_info.cyclomatic,
-            cognitive: context.complexity_info.cognitive,
-            nesting: context.complexity_info.nesting,
-            entropy: context
-                .complexity_info
-                .entropy_analysis
-                .as_ref()
-                .map(|e| e.entropy_score),
-        });
+fn build_evidence_section(
+    sections_data: &super::sections::FormattedSections,
+) -> Option<FormattedSection> {
+    sections_data
+        .evidence
+        .as_ref()
+        .map(|text| FormattedSection::Evidence { text: text.clone() })
+}
+
+fn build_complexity_section(context: &FormatContext) -> Option<FormattedSection> {
+    if !context.complexity_info.has_complexity {
+        return None;
     }
+    Some(FormattedSection::Complexity {
+        cyclomatic: context.complexity_info.cyclomatic,
+        cognitive: context.complexity_info.cognitive,
+        nesting: context.complexity_info.nesting,
+        entropy: context
+            .complexity_info
+            .entropy_analysis
+            .as_ref()
+            .map(|e| e.entropy_score),
+    })
+}
 
-    // Pattern section (if detected, spec 204: read from stored result)
-    if let Some(ref pattern) = context.pattern_info {
-        let metrics: Vec<(String, String)> = pattern
-            .display_metrics()
-            .iter()
-            .filter_map(|metric| {
-                let parts: Vec<&str> = metric.split(": ").collect();
-                if parts.len() == 2 {
-                    Some((parts[0].to_string(), parts[1].to_string()))
-                } else {
-                    None
-                }
-            })
-            .collect();
+/// Parse pattern display metrics into key-value pairs.
+fn parse_pattern_metrics(pattern: &DetectedPattern) -> Vec<(String, String)> {
+    pattern
+        .display_metrics()
+        .iter()
+        .filter_map(|metric| {
+            metric
+                .split_once(": ")
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+        })
+        .collect()
+}
 
-        sections.push(FormattedSection::Pattern {
+fn build_pattern_section(pattern_info: &Option<DetectedPattern>) -> Option<FormattedSection> {
+    pattern_info
+        .as_ref()
+        .map(|pattern| FormattedSection::Pattern {
             pattern_type: pattern.type_name().to_string(),
             icon: pattern.icon().to_string(),
-            metrics,
+            metrics: parse_pattern_metrics(pattern),
             confidence: pattern.confidence,
-        });
+        })
+}
+
+fn build_coverage_section(
+    coverage_info: &Option<super::context::CoverageInfo>,
+) -> Option<FormattedSection> {
+    coverage_info
+        .as_ref()
+        .and_then(|info| info.coverage_percentage)
+        .map(|percentage| FormattedSection::Coverage {
+            percentage,
+            level: CoverageLevel::from_percentage(percentage),
+            details: Some(format!("{:.1}%", percentage)),
+        })
+}
+
+/// Calculate risk multiplier from base and contextual risk.
+fn calculate_risk_multiplier(base_risk: f64, contextual_risk: f64) -> f64 {
+    if base_risk > 0.1 {
+        contextual_risk / base_risk
+    } else {
+        1.0
     }
+}
 
-    // Coverage section (if available)
-    if let Some(ref coverage_info) = context.coverage_info {
-        if let Some(percentage) = coverage_info.coverage_percentage {
-            use crate::priority::classification::CoverageLevel;
-            let level = CoverageLevel::from_percentage(percentage);
-            sections.push(FormattedSection::Coverage {
-                percentage,
-                level,
-                details: Some(format!("{:.1}%", percentage)),
-            });
-        }
+/// Format historical context details into a display string.
+fn format_historical_details(details: &ContextDetails) -> Option<String> {
+    match details {
+        ContextDetails::Historical {
+            change_frequency,
+            bug_density,
+            age_days,
+            author_count,
+        } => Some(format!(
+            "changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {}",
+            change_frequency,
+            bug_density * 100.0,
+            age_days,
+            author_count
+        )),
+        _ => None,
     }
+}
 
-    // Contextual risk section (if available, spec 202)
-    if let Some(ref ctx_risk) = item.contextual_risk {
-        use crate::priority::formatted_output::ContextProviderInfo;
-        use crate::risk::context::ContextDetails;
+/// Build provider info from a context.
+fn build_provider_info(ctx: &crate::risk::context::Context) -> ContextProviderInfo {
+    ContextProviderInfo {
+        name: ctx.provider.clone(),
+        contribution: ctx.contribution,
+        weight: ctx.weight,
+        impact: ctx.contribution * ctx.weight,
+        details: format_historical_details(&ctx.details),
+    }
+}
 
-        let multiplier = if ctx_risk.base_risk > 0.1 {
-            ctx_risk.contextual_risk / ctx_risk.base_risk
-        } else {
-            1.0
-        };
-
-        let providers: Vec<ContextProviderInfo> = ctx_risk
+fn build_contextual_risk_section(
+    contextual_risk: &Option<ContextualRisk>,
+) -> Option<FormattedSection> {
+    contextual_risk.as_ref().map(|risk| {
+        let providers: Vec<ContextProviderInfo> = risk
             .contexts
             .iter()
             .filter(|ctx| ctx.contribution > 0.05)
-            .map(|ctx| {
-                let details = match &ctx.details {
-                    ContextDetails::Historical {
-                        change_frequency,
-                        bug_density,
-                        age_days,
-                        author_count,
-                    } => Some(format!(
-                        "changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {}",
-                        change_frequency,
-                        bug_density * 100.0,
-                        age_days,
-                        author_count
-                    )),
-                    _ => None,
-                };
-
-                ContextProviderInfo {
-                    name: ctx.provider.clone(),
-                    contribution: ctx.contribution,
-                    weight: ctx.weight,
-                    impact: ctx.contribution * ctx.weight,
-                    details,
-                }
-            })
+            .map(build_provider_info)
             .collect();
 
-        sections.push(FormattedSection::ContextualRisk {
-            base_risk: ctx_risk.base_risk,
-            contextual_risk: ctx_risk.contextual_risk,
-            multiplier,
+        FormattedSection::ContextualRisk {
+            base_risk: risk.base_risk,
+            contextual_risk: risk.contextual_risk,
+            multiplier: calculate_risk_multiplier(risk.base_risk, risk.contextual_risk),
             providers,
-        });
-    }
+        }
+    })
+}
 
-    // Dependencies section (if has dependencies)
-    if context.dependency_info.has_dependencies {
-        sections.push(FormattedSection::Dependencies {
-            upstream: context.dependency_info.upstream,
-            downstream: context.dependency_info.downstream,
-            callers: context.dependency_info.upstream_callers.clone(),
-            callees: context.dependency_info.downstream_callees.clone(),
-        });
+fn build_dependencies_section(context: &FormatContext) -> Option<FormattedSection> {
+    if !context.dependency_info.has_dependencies {
+        return None;
     }
+    Some(FormattedSection::Dependencies {
+        upstream: context.dependency_info.upstream,
+        downstream: context.dependency_info.downstream,
+        callers: context.dependency_info.upstream_callers.clone(),
+        callees: context.dependency_info.downstream_callees.clone(),
+    })
+}
 
-    // Debt-specific section (if available)
-    if let Some(ref debt_specific) = sections_data.debt_specific {
-        sections.push(FormattedSection::DebtSpecific {
-            text: debt_specific.clone(),
-        });
-    }
+fn build_debt_specific_section(
+    sections_data: &super::sections::FormattedSections,
+) -> Option<FormattedSection> {
+    sections_data
+        .debt_specific
+        .as_ref()
+        .map(|text| FormattedSection::DebtSpecific { text: text.clone() })
+}
 
-    // Rationale section
-    sections.push(FormattedSection::Rationale {
+fn build_rationale_section(context: &FormatContext) -> FormattedSection {
+    FormattedSection::Rationale {
         text: context.rationale.clone(),
-    });
-
-    FormattedPriorityItem {
-        rank,
-        score: context.score,
-        severity,
-        sections,
     }
 }
 

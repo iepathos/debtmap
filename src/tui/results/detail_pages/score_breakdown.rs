@@ -688,14 +688,45 @@ pub fn build_orchestration_section(
     lines
 }
 
-/// Build score calculation summary (pure)
-pub fn build_calculation_summary_section(
-    item: &UnifiedDebtItem,
-    theme: &Theme,
-    width: u16,
-) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
+// ============================================================================
+// Calculation Context and Supporting Types
+// ============================================================================
 
+/// Context for score calculation display, consolidating all extracted state upfront.
+/// This eliminates repeated field access and makes the calculation logic clearer.
+struct CalculationContext {
+    /// Whether this is a DebtType::GodObject item
+    is_god_object_item: bool,
+    /// Whether the item has god object multiplier applied (from indicators)
+    has_god_object: bool,
+    /// God object multiplier if applicable
+    god_multiplier: Option<f64>,
+    /// Role multiplier
+    role: f64,
+    /// Purity factor
+    purity: f64,
+    /// Pattern factor
+    pattern: f64,
+    /// Refactorability factor
+    refactor: f64,
+    /// Context multiplier
+    context: f64,
+    /// Structural multiplier
+    struct_mult: f64,
+    /// Whether coverage data is available
+    has_coverage_data: bool,
+    /// Base score (before exponential scaling)
+    base_score: f64,
+    /// Exponential factor
+    exponent: f64,
+    /// Risk boost
+    risk_boost: f64,
+    /// Final score
+    final_score: f64,
+}
+
+/// Collect all calculation context from a debt item (pure function).
+fn collect_calculation_context(item: &UnifiedDebtItem) -> CalculationContext {
     // Check if god object multiplier was applied
     let has_god_object = matches!(&item.debt_type, DebtType::GodObject { .. })
         || item
@@ -705,7 +736,7 @@ pub fn build_calculation_summary_section(
             .unwrap_or(false);
 
     // Get god object multiplier if applicable
-    let god_mult = if has_god_object {
+    let god_multiplier = if has_god_object {
         let go_score = match &item.debt_type {
             DebtType::GodObject {
                 god_object_score, ..
@@ -727,27 +758,9 @@ pub fn build_calculation_summary_section(
     let pattern = item.unified_score.pattern_factor.unwrap_or(1.0);
     let refactor = item.unified_score.refactorability_factor.unwrap_or(1.0);
     let context = item.context_multiplier.unwrap_or(1.0);
-    let entropy = item
-        .entropy_analysis
-        .as_ref()
-        .map(|e| e.dampening_factor)
-        .unwrap_or(1.0);
 
-    // Build multiplier product (for potential future use)
-    let _total_mult = role * purity * pattern * refactor * context * entropy;
-
-    // Use stored has_coverage_data flag - matches what the scorer actually used
-    let has_coverage_data = item.unified_score.has_coverage_data;
-
-    // Check if this is a god object item
-    let is_god_object_item = matches!(item.debt_type, DebtType::GodObject { .. });
-
-    add_section_header(&mut lines, "score formula (simplified)", theme);
-
-    // Use the stored structural multiplier from the actual scorer (not recalculated)
-    // This ensures the display matches what the scorer actually used
+    // Use the stored structural multiplier from the actual scorer
     let struct_mult = item.unified_score.structural_multiplier.unwrap_or_else(|| {
-        // Fallback: recalculate if not stored
         if item.cyclomatic_complexity == 0 {
             1.0
         } else {
@@ -763,450 +776,493 @@ pub fn build_calculation_summary_section(
         }
     });
 
-    if is_god_object_item {
-        // God object scoring formula - show complete pipeline
-        add_label_value(
-            &mut lines,
-            "formula",
-            "M × F × R × S × 20 × violations × adjustments".to_string(),
-            theme,
-            width,
-        );
+    CalculationContext {
+        is_god_object_item: matches!(item.debt_type, DebtType::GodObject { .. }),
+        has_god_object,
+        god_multiplier,
+        role,
+        purity,
+        pattern,
+        refactor,
+        context,
+        struct_mult,
+        has_coverage_data: item.unified_score.has_coverage_data,
+        base_score: item.unified_score.base_score.unwrap_or(0.0),
+        exponent: item.unified_score.exponential_factor.unwrap_or(1.0),
+        risk_boost: item.unified_score.risk_boost.unwrap_or(1.0),
+        final_score: item.unified_score.final_score,
+    }
+}
+
+// ============================================================================
+// Formula Display Functions (Pure)
+// ============================================================================
+
+/// Build god object formula display lines (pure, static content).
+fn build_god_object_formula_lines(theme: &Theme, width: u16) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    add_label_value(
+        &mut lines,
+        "formula",
+        "M × F × R × S × 20 × violations × adjustments".to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "where",
+        "M=methods/20, F=fields/15, R=resp/3, S=lines/1000".to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "adjustments",
+        "entropy dampening, complexity weight, functional bonus".to_string(),
+        theme,
+        width,
+    );
+    add_label_value(
+        &mut lines,
+        "note",
+        "factors capped at 3.0, uses weighted methods if available".to_string(),
+        theme,
+        width,
+    );
+
+    lines
+}
+
+/// Build regular function formula display lines (pure).
+fn build_regular_formula_lines(
+    ctx: &CalculationContext,
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    // Determine formula based on coverage and god object status
+    let formula = if ctx.has_coverage_data {
+        if ctx.has_god_object {
+            "(C×5 + D×2.5) × cov × role × struct × god"
+        } else {
+            "(C×5 + D×2.5) × cov × role × struct"
+        }
+    } else if ctx.has_god_object {
+        "(C×5 + D×2.5) × role × struct × god"
+    } else {
+        "(C×5 + D×2.5) × role × struct"
+    };
+    add_label_value(&mut lines, "formula", formula.to_string(), theme, width);
+
+    // Show variable legend - use raw complexity for god objects
+    let c_display = if let Some(gm) = ctx.god_multiplier {
+        item.unified_score.complexity_factor / gm
+    } else {
+        item.unified_score.complexity_factor
+    };
+
+    if ctx.has_coverage_data {
         add_label_value(
             &mut lines,
             "where",
-            "M=methods/20, F=fields/15, R=resp/3, S=lines/1000".to_string(),
-            theme,
-            width,
-        );
-        add_label_value(
-            &mut lines,
-            "adjustments",
-            "entropy dampening, complexity weight, functional bonus".to_string(),
-            theme,
-            width,
-        );
-        add_label_value(
-            &mut lines,
-            "note",
-            "factors capped at 3.0, uses weighted methods if available".to_string(),
+            format!(
+                "C={:.1}, D={:.1}, cov={:.2}, role={:.2}, struct={:.2}",
+                c_display,
+                item.unified_score.dependency_factor,
+                item.unified_score.coverage_factor / 10.0,
+                ctx.role,
+                ctx.struct_mult
+            ),
             theme,
             width,
         );
     } else {
-        // Regular function scoring formula
-        // Both coverage and no-coverage paths use same weighted base: (C×5 + D×2.5)
-        // With coverage: the base is multiplied by coverage_multiplier (1.0 - coverage%)
-        let formula = if has_coverage_data {
-            if has_god_object {
-                "(C×5 + D×2.5) × cov × role × struct × god"
-            } else {
-                "(C×5 + D×2.5) × cov × role × struct"
-            }
-        } else {
-            // No coverage data: raw weighted sum
-            if has_god_object {
-                "(C×5 + D×2.5) × role × struct × god"
-            } else {
-                "(C×5 + D×2.5) × role × struct"
-            }
-        };
-        add_label_value(&mut lines, "formula", formula.to_string(), theme, width);
-
-        // Show variable legend - use raw complexity for god objects
-        let c_display = if let Some(gm) = god_mult {
-            item.unified_score.complexity_factor / gm
-        } else {
-            item.unified_score.complexity_factor
-        };
-
-        if has_coverage_data {
-            // coverage_factor is 0-10 scale where 10 = 0% coverage (100% gap)
-            // Divide by 10 to get 0-1 multiplier (higher = less coverage = higher score)
-            add_label_value(
-                &mut lines,
-                "where",
-                format!(
-                    "C={:.1}, D={:.1}, cov={:.2}, role={:.2}, struct={:.2}",
-                    c_display,
-                    item.unified_score.dependency_factor,
-                    item.unified_score.coverage_factor / 10.0,
-                    role,
-                    struct_mult
-                ),
-                theme,
-                width,
-            );
-        } else {
-            add_label_value(
-                &mut lines,
-                "where",
-                format!(
-                    "C={:.1}, D={:.1}, role={:.2}, struct={:.2}",
-                    c_display, item.unified_score.dependency_factor, role, struct_mult
-                ),
-                theme,
-                width,
-            );
-        }
-
-        // Show other multipliers (purity, pattern, refactor, context)
-        // Note: entropy is NOT included here for regular functions because it's
-        // already applied to cognitive complexity, not as a final score multiplier
-        let other_mults: Vec<String> = [
-            (purity, "purity"),
-            (pattern, "pattern"),
-            (refactor, "refactor"),
-            (context, "context"),
-        ]
-        .iter()
-        .filter(|(v, _)| (*v - 1.0).abs() > 0.01)
-        .map(|(v, name)| format!("{}={:.2}", name, v))
-        .collect();
-
-        if !other_mults.is_empty() {
-            add_label_value(
-                &mut lines,
-                "other mults",
-                other_mults.join(", "),
-                theme,
-                width,
-            );
-        }
-
-        if let Some(gm) = god_mult {
-            add_label_value(
-                &mut lines,
-                "god_mult",
-                format!("{:.2} (3.0 + score/50)", gm),
-                theme,
-                width,
-            );
-        }
+        add_label_value(
+            &mut lines,
+            "where",
+            format!(
+                "C={:.1}, D={:.1}, role={:.2}, struct={:.2}",
+                c_display, item.unified_score.dependency_factor, ctx.role, ctx.struct_mult
+            ),
+            theme,
+            width,
+        );
     }
 
-    add_blank_line(&mut lines);
+    // Show other multipliers (purity, pattern, refactor, context)
+    let other_mults: Vec<String> = [
+        (ctx.purity, "purity"),
+        (ctx.pattern, "pattern"),
+        (ctx.refactor, "refactor"),
+        (ctx.context, "context"),
+    ]
+    .iter()
+    .filter(|(v, _)| (*v - 1.0).abs() > 0.01)
+    .map(|(v, name)| format!("{}={:.2}", name, v))
+    .collect();
 
-    // Show actual calculation with step-by-step breakdown
-    add_section_header(&mut lines, "calculation steps", theme);
+    if !other_mults.is_empty() {
+        add_label_value(
+            &mut lines,
+            "other mults",
+            other_mults.join(", "),
+            theme,
+            width,
+        );
+    }
 
-    // Use the stored base_score (score before exponential scaling)
+    if let Some(gm) = ctx.god_multiplier {
+        add_label_value(
+            &mut lines,
+            "god_mult",
+            format!("{:.2} (3.0 + score/50)", gm),
+            theme,
+            width,
+        );
+    }
+
+    lines
+}
+
+// ============================================================================
+// Calculation Step Builders (Pure)
+// ============================================================================
+
+/// Build god object calculation steps (pure).
+/// Returns (next_step_num, current_value, lines).
+fn build_god_object_calculation_steps(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> (usize, f64, Vec<Line<'static>>) {
+    let mut lines = Vec::new();
     let stored_base = item.unified_score.base_score.unwrap_or(0.0);
-    let exponent = item.unified_score.exponential_factor.unwrap_or(1.0);
-    let risk_boost = item.unified_score.risk_boost.unwrap_or(1.0);
-    let final_score = item.unified_score.final_score;
 
-    // Check if this is a god object - god objects use god_object_score directly as base
-    let is_god_object_item = matches!(item.debt_type, DebtType::GodObject { .. });
+    let go_score = match &item.debt_type {
+        DebtType::GodObject {
+            god_object_score, ..
+        } => *god_object_score,
+        _ => stored_base,
+    };
 
-    let base_score = stored_base;
-
-    let (mut step_num, mut current_value) = if is_god_object_item {
-        // God object items: show detailed factor breakdown
-        let go_score = match &item.debt_type {
+    // Get raw metrics from god_object_indicators or DebtType
+    let (methods, fields, responsibilities, lines_of_code): (usize, usize, usize, usize) =
+        match &item.debt_type {
             DebtType::GodObject {
-                god_object_score, ..
-            } => *god_object_score,
-            _ => stored_base,
+                methods,
+                fields,
+                responsibilities,
+                lines: loc,
+                ..
+            } => (
+                *methods as usize,
+                fields.unwrap_or(0) as usize,
+                *responsibilities as usize,
+                *loc as usize,
+            ),
+            _ => {
+                if let Some(ref indicators) = item.god_object_indicators {
+                    (
+                        indicators.method_count,
+                        indicators.field_count,
+                        indicators.responsibility_count,
+                        indicators.lines_of_code,
+                    )
+                } else {
+                    (0, 0, 0, 0)
+                }
+            }
         };
 
-        // Get raw metrics from god_object_indicators or DebtType
-        let (methods, fields, responsibilities, lines_of_code): (usize, usize, usize, usize) =
-            match &item.debt_type {
-                DebtType::GodObject {
-                    methods,
-                    fields,
-                    responsibilities,
-                    lines,
-                    ..
-                } => (
-                    *methods as usize,
-                    fields.unwrap_or(0) as usize,
-                    *responsibilities as usize,
-                    *lines as usize,
-                ),
-                _ => {
-                    if let Some(ref indicators) = item.god_object_indicators {
-                        (
-                            indicators.method_count,
-                            indicators.field_count,
-                            indicators.responsibility_count,
-                            indicators.lines_of_code,
-                        )
-                    } else {
-                        (0, 0, 0, 0)
-                    }
-                }
-            };
+    // Use default thresholds (Rust defaults)
+    let max_methods = 20_usize;
+    let max_fields = 15_usize;
+    let max_lines = 1000_usize;
 
-        // Use default thresholds (Rust defaults)
-        let max_methods = 20_usize;
-        let max_fields = 15_usize;
-        let max_lines = 1000_usize;
+    // Get weighted method count if available
+    let weighted_methods = item
+        .god_object_indicators
+        .as_ref()
+        .and_then(|g| g.weighted_method_count);
 
-        // Get weighted method count if available - this is what the scorer actually uses
-        let weighted_methods = item
-            .god_object_indicators
-            .as_ref()
-            .and_then(|g| g.weighted_method_count);
+    // Calculate factors (capped at 3.0)
+    let effective_methods = weighted_methods.unwrap_or(methods as f64);
+    let method_factor = (effective_methods / max_methods as f64).min(3.0);
+    let field_factor = (fields as f64 / max_fields as f64).min(3.0);
+    let resp_factor = (responsibilities as f64 / 3.0).min(3.0);
+    let size_factor = (lines_of_code as f64 / max_lines as f64).min(3.0);
 
-        // Calculate factors (capped at 3.0)
-        // Use weighted method count when available
-        let effective_methods = weighted_methods.unwrap_or(methods as f64);
-        let method_factor = (effective_methods / max_methods as f64).min(3.0);
-        let field_factor = (fields as f64 / max_fields as f64).min(3.0);
-        let resp_factor = (responsibilities as f64 / 3.0).min(3.0);
-        let size_factor = (lines_of_code as f64 / max_lines as f64).min(3.0);
+    // Count violations
+    let mut violations = Vec::new();
+    if effective_methods > max_methods as f64 {
+        violations.push(format!(
+            "methods {:.0} > {}",
+            effective_methods, max_methods
+        ));
+    }
+    if fields > max_fields {
+        violations.push(format!("fields {} > {}", fields, max_fields));
+    }
+    if responsibilities > 5 {
+        violations.push(format!("responsibilities {} > 5", responsibilities));
+    }
+    if lines_of_code > max_lines {
+        violations.push(format!("lines {} > {}", lines_of_code, max_lines));
+    }
 
-        // Count violations (based on effective/weighted counts)
-        let mut violations = Vec::new();
-        if effective_methods > max_methods as f64 {
-            violations.push(format!(
-                "methods {:.0} > {}",
-                effective_methods, max_methods
-            ));
-        }
-        if fields > max_fields {
-            violations.push(format!("fields {} > {}", fields, max_fields));
-        }
-        if responsibilities > 5 {
-            violations.push(format!("responsibilities {} > 5", responsibilities));
-        }
-        if lines_of_code > max_lines {
-            violations.push(format!("lines {} > {}", lines_of_code, max_lines));
-        }
-
-        // Step 1: Method factor - show weighted if different from raw
-        let method_display = if let Some(w) = weighted_methods {
-            if (w - methods as f64).abs() > 0.1 {
-                format!(
-                    "{:.2} = {:.1} / {} (raw {} → weighted)",
-                    method_factor, w, max_methods, methods
-                )
-            } else {
-                format!(
-                    "{:.2} = {} / {} (max 3.0)",
-                    method_factor, methods, max_methods
-                )
-            }
+    // Step 1: Method factor
+    let method_display = if let Some(w) = weighted_methods {
+        if (w - methods as f64).abs() > 0.1 {
+            format!(
+                "{:.2} = {:.1} / {} (raw {} → weighted)",
+                method_factor, w, max_methods, methods
+            )
         } else {
             format!(
                 "{:.2} = {} / {} (max 3.0)",
                 method_factor, methods, max_methods
             )
-        };
-        add_label_value(&mut lines, "1. method factor", method_display, theme, width);
-
-        // Step 2: Field factor
-        add_label_value(
-            &mut lines,
-            "2. field factor",
-            format!(
-                "{:.2} = {} / {} (max 3.0)",
-                field_factor, fields, max_fields
-            ),
-            theme,
-            width,
-        );
-
-        // Step 3: Responsibility factor
-        add_label_value(
-            &mut lines,
-            "3. responsibility factor",
-            format!("{:.2} = {} / 3 (max 3.0)", resp_factor, responsibilities),
-            theme,
-            width,
-        );
-
-        // Step 4: Size factor
-        add_label_value(
-            &mut lines,
-            "4. size factor",
-            format!(
-                "{:.2} = {} / {} (max 3.0)",
-                size_factor, lines_of_code, max_lines
-            ),
-            theme,
-            width,
-        );
-
-        // Step 5: Base product
-        let base_product = method_factor * field_factor * resp_factor * size_factor;
-        add_label_value(
-            &mut lines,
-            "5. base product",
-            format!(
-                "{:.2} = {:.2} × {:.2} × {:.2} × {:.2}",
-                base_product, method_factor, field_factor, resp_factor, size_factor
-            ),
-            theme,
-            width,
-        );
-
-        // Step 6: Violations
-        let violation_count = violations.len();
-        let violation_detail = if violations.is_empty() {
-            "none".to_string()
-        } else {
-            violations.join(", ")
-        };
-        add_label_value(
-            &mut lines,
-            "6. violations",
-            format!("{} ({})", violation_count, violation_detail),
-            theme,
-            width,
-        );
-
-        // Step 7: Scaling
-        let mut step_num = 7_usize;
-        let scaled_score = if violation_count > 0 {
-            base_product * 20.0 * violation_count as f64
-        } else {
-            base_product * 10.0
-        };
-        let scaling_detail = if violation_count > 0 {
-            format!(
-                "{:.2} × 20 × {} = {:.2}",
-                base_product, violation_count, scaled_score
-            )
-        } else {
-            format!("{:.2} × 10 = {:.2}", base_product, scaled_score)
-        };
-        add_label_value(
-            &mut lines,
-            &format!("{}. scaling", step_num),
-            scaling_detail,
-            theme,
-            width,
-        );
-        step_num += 1;
-        let mut current = scaled_score;
-
-        // Show entropy dampening if applied (affects god object score)
-        let entropy_damp = item.entropy_analysis.as_ref().map(|e| e.dampening_factor);
-        if let Some(entropy_damp) = entropy_damp {
-            if (entropy_damp - 1.0).abs() > 0.01 {
-                let after_entropy = current * entropy_damp;
-                add_label_value(
-                    &mut lines,
-                    &format!("{}. × entropy", step_num),
-                    format!(
-                        "{:.2} × {:.2} = {:.2} (dampening)",
-                        current, entropy_damp, after_entropy
-                    ),
-                    theme,
-                    width,
-                );
-                current = after_entropy;
-                step_num += 1;
-            }
         }
-
-        // Show combined adjustments if there's a significant gap after entropy
-        // This accounts for: complexity factor (spec 211) + functional bonus (spec 213)
-        let diff = (current - go_score).abs();
-        if diff > 1.0 && current > 0.0 {
-            let adjustment_factor = go_score / current;
-            if (adjustment_factor - 1.0).abs() > 0.01 {
-                // Describe the adjustment based on whether it increases or decreases score
-                let adjustment_desc = if adjustment_factor > 1.0 {
-                    "complexity weight" // Score increased due to method complexity
-                } else {
-                    "functional bonus" // Score decreased due to pure methods
-                };
-                add_label_value(
-                    &mut lines,
-                    &format!("{}. × {}", step_num, adjustment_desc),
-                    format!(
-                        "{:.2} × {:.2} = {:.2}",
-                        current, adjustment_factor, go_score
-                    ),
-                    theme,
-                    width,
-                );
-                step_num += 1;
-            }
-        }
-
-        // Final god object score
-        add_label_value(
-            &mut lines,
-            &format!("{}. god object score", step_num),
-            format!("{:.2}", go_score),
-            theme,
-            width,
-        );
-
-        (step_num + 1, go_score)
     } else {
-        // Regular function items: use complexity/dependency formula
-        // The actual formula is: (C×5 + D×2.5) × coverage_multiplier
-        // where C and D are 0-10 scale factors
-        let c = item.unified_score.complexity_factor;
-        let d = item.unified_score.dependency_factor;
+        format!(
+            "{:.2} = {} / {} (max 3.0)",
+            method_factor, methods, max_methods
+        )
+    };
+    add_label_value(&mut lines, "1. method factor", method_display, theme, width);
 
-        // Step 1: Base score from formula
-        // Both paths use the same weighted base: (C×5 + D×2.5)
-        // With coverage: multiplied by coverage_multiplier (1.0 - coverage%)
-        // Without coverage: raw weighted sum
-        let weighted_base = (c * 5.0) + (d * 2.5);
+    // Step 2: Field factor
+    add_label_value(
+        &mut lines,
+        "2. field factor",
+        format!(
+            "{:.2} = {} / {} (max 3.0)",
+            field_factor, fields, max_fields
+        ),
+        theme,
+        width,
+    );
 
-        let (displayed_base, formula_detail) = if has_coverage_data {
-            // coverage_factor is 0-10 scale where 10 = 0% coverage (100% gap)
-            // Convert to multiplier: coverage_factor/10 gives us the coverage gap (0-1)
-            let cov_mult = item.unified_score.coverage_factor / 10.0;
-            let base_with_cov = weighted_base * cov_mult;
-            (
-                base_with_cov,
-                format!(
-                    "{:.2} = (C×5 + D×2.5) × cov = ({:.1}×5 + {:.1}×2.5) × {:.2}",
-                    base_with_cov, c, d, cov_mult
-                ),
-            )
-        } else {
-            (
-                weighted_base,
-                format!(
-                    "{:.2} = C×5 + D×2.5 = {:.1}×5 + {:.1}×2.5",
-                    weighted_base, c, d
-                ),
-            )
-        };
-        add_label_value(&mut lines, "1. weighted base", formula_detail, theme, width);
+    // Step 3: Responsibility factor
+    add_label_value(
+        &mut lines,
+        "3. responsibility factor",
+        format!("{:.2} = {} / 3 (max 3.0)", resp_factor, responsibilities),
+        theme,
+        width,
+    );
 
-        // Step 2: After role adjustment
-        let after_role = displayed_base * role;
-        let mut next_step = 2_usize;
-        if (role - 1.0).abs() > 0.01 {
+    // Step 4: Size factor
+    add_label_value(
+        &mut lines,
+        "4. size factor",
+        format!(
+            "{:.2} = {} / {} (max 3.0)",
+            size_factor, lines_of_code, max_lines
+        ),
+        theme,
+        width,
+    );
+
+    // Step 5: Base product
+    let base_product = method_factor * field_factor * resp_factor * size_factor;
+    add_label_value(
+        &mut lines,
+        "5. base product",
+        format!(
+            "{:.2} = {:.2} × {:.2} × {:.2} × {:.2}",
+            base_product, method_factor, field_factor, resp_factor, size_factor
+        ),
+        theme,
+        width,
+    );
+
+    // Step 6: Violations
+    let violation_count = violations.len();
+    let violation_detail = if violations.is_empty() {
+        "none".to_string()
+    } else {
+        violations.join(", ")
+    };
+    add_label_value(
+        &mut lines,
+        "6. violations",
+        format!("{} ({})", violation_count, violation_detail),
+        theme,
+        width,
+    );
+
+    // Step 7: Scaling
+    let mut step_num = 7_usize;
+    let scaled_score = if violation_count > 0 {
+        base_product * 20.0 * violation_count as f64
+    } else {
+        base_product * 10.0
+    };
+    let scaling_detail = if violation_count > 0 {
+        format!(
+            "{:.2} × 20 × {} = {:.2}",
+            base_product, violation_count, scaled_score
+        )
+    } else {
+        format!("{:.2} × 10 = {:.2}", base_product, scaled_score)
+    };
+    add_label_value(
+        &mut lines,
+        &format!("{}. scaling", step_num),
+        scaling_detail,
+        theme,
+        width,
+    );
+    step_num += 1;
+    let mut current = scaled_score;
+
+    // Show entropy dampening if applied
+    let entropy_damp = item.entropy_analysis.as_ref().map(|e| e.dampening_factor);
+    if let Some(entropy_damp) = entropy_damp {
+        if (entropy_damp - 1.0).abs() > 0.01 {
+            let after_entropy = current * entropy_damp;
             add_label_value(
                 &mut lines,
-                "2. × role",
-                format!("{:.2} × {:.2} = {:.2}", displayed_base, role, after_role),
+                &format!("{}. × entropy", step_num),
+                format!(
+                    "{:.2} × {:.2} = {:.2} (dampening)",
+                    current, entropy_damp, after_entropy
+                ),
                 theme,
                 width,
             );
-            next_step = 3;
+            current = after_entropy;
+            step_num += 1;
         }
+    }
 
-        // Step 3: After structural adjustment
-        let after_struct = after_role * struct_mult;
-        if (struct_mult - 1.0).abs() > 0.01 {
+    // Show combined adjustments if there's a significant gap after entropy
+    let diff = (current - go_score).abs();
+    if diff > 1.0 && current > 0.0 {
+        let adjustment_factor = go_score / current;
+        if (adjustment_factor - 1.0).abs() > 0.01 {
+            let adjustment_desc = if adjustment_factor > 1.0 {
+                "complexity weight"
+            } else {
+                "functional bonus"
+            };
             add_label_value(
                 &mut lines,
-                &format!("{}. × struct", next_step),
+                &format!("{}. × {}", step_num, adjustment_desc),
                 format!(
                     "{:.2} × {:.2} = {:.2}",
-                    after_role, struct_mult, after_struct
+                    current, adjustment_factor, go_score
                 ),
                 theme,
                 width,
             );
-            next_step += 1;
+            step_num += 1;
         }
+    }
 
-        (next_step, after_struct)
+    // Final god object score
+    add_label_value(
+        &mut lines,
+        &format!("{}. god object score", step_num),
+        format!("{:.2}", go_score),
+        theme,
+        width,
+    );
+
+    (step_num + 1, go_score, lines)
+}
+
+/// Build regular function calculation steps (pure).
+/// Returns (next_step_num, current_value, lines).
+fn build_regular_calculation_steps(
+    ctx: &CalculationContext,
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> (usize, f64, Vec<Line<'static>>) {
+    let mut lines = Vec::new();
+
+    let c = item.unified_score.complexity_factor;
+    let d = item.unified_score.dependency_factor;
+
+    // Both paths use the same weighted base: (C×5 + D×2.5)
+    let weighted_base = (c * 5.0) + (d * 2.5);
+
+    let (displayed_base, formula_detail) = if ctx.has_coverage_data {
+        let cov_mult = item.unified_score.coverage_factor / 10.0;
+        let base_with_cov = weighted_base * cov_mult;
+        (
+            base_with_cov,
+            format!(
+                "{:.2} = (C×5 + D×2.5) × cov = ({:.1}×5 + {:.1}×2.5) × {:.2}",
+                base_with_cov, c, d, cov_mult
+            ),
+        )
+    } else {
+        (
+            weighted_base,
+            format!(
+                "{:.2} = C×5 + D×2.5 = {:.1}×5 + {:.1}×2.5",
+                weighted_base, c, d
+            ),
+        )
     };
+    add_label_value(&mut lines, "1. weighted base", formula_detail, theme, width);
+
+    // Step 2: After role adjustment
+    let after_role = displayed_base * ctx.role;
+    let mut next_step = 2_usize;
+    if (ctx.role - 1.0).abs() > 0.01 {
+        add_label_value(
+            &mut lines,
+            "2. × role",
+            format!(
+                "{:.2} × {:.2} = {:.2}",
+                displayed_base, ctx.role, after_role
+            ),
+            theme,
+            width,
+        );
+        next_step = 3;
+    }
+
+    // Step 3: After structural adjustment
+    let after_struct = after_role * ctx.struct_mult;
+    if (ctx.struct_mult - 1.0).abs() > 0.01 {
+        add_label_value(
+            &mut lines,
+            &format!("{}. × struct", next_step),
+            format!(
+                "{:.2} × {:.2} = {:.2}",
+                after_role, ctx.struct_mult, after_struct
+            ),
+            theme,
+            width,
+        );
+        next_step += 1;
+    }
+
+    (next_step, after_struct, lines)
+}
+
+// ============================================================================
+// Adjustment Step Builder (Pure)
+// ============================================================================
+
+/// Build post-calculation adjustment steps (pure).
+fn build_adjustment_steps(
+    item: &UnifiedDebtItem,
+    ctx: &CalculationContext,
+    mut step_num: usize,
+    mut current_value: f64,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
 
     // Check for orchestration adjustment (spec 110)
     if let Some(adj) = &item.unified_score.adjustment_applied {
@@ -1230,7 +1286,7 @@ pub fn build_calculation_summary_section(
         }
     }
 
-    // Check for context multiplier (spec 191) - examples, tests, benchmarks get dampened
+    // Check for context multiplier (spec 191)
     if let Some(ctx_mult) = item.context_multiplier {
         if (ctx_mult - 1.0).abs() > 0.01 {
             let ctx_type_name = item
@@ -1254,11 +1310,10 @@ pub fn build_calculation_summary_section(
         }
     }
 
-    // Step 4+: Show debt adjustment if applied (spec 260)
+    // Show debt adjustment if applied (spec 260)
     if let Some(debt) = &item.unified_score.debt_adjustment {
         if debt.total.abs() > 0.01 {
             let after_debt = current_value + debt.total;
-            // Show breakdown of debt components
             let components: Vec<String> = [
                 (debt.testing, "test"),
                 (debt.resource, "res"),
@@ -1288,11 +1343,9 @@ pub fn build_calculation_summary_section(
         }
     }
 
-    // Step: Show contextual risk multiplier if applied (spec 255, spec 260)
-    // Use pre_contextual_score for accurate display when available
+    // Show contextual risk multiplier if applied (spec 255, spec 260)
     if let Some(risk_mult) = item.unified_score.contextual_risk_multiplier {
         if (risk_mult - 1.0).abs() > 0.001 {
-            // Use stored pre_contextual_score if available, otherwise use calculated value
             let pre_ctx = item
                 .unified_score
                 .pre_contextual_score
@@ -1314,29 +1367,21 @@ pub fn build_calculation_summary_section(
     }
 
     // Handle any remaining gap between calculated value and stored base_score
-    // Only show adjustment if it actually explains the final score
-    // Skip if the adjustment would be confusing (e.g., showing base_score when final_score differs)
-    let gap_to_base = (base_score - current_value).abs();
-    let gap_to_final = (final_score - current_value).abs();
-
-    // Only show adjustment if base_score is close to final_score (within 5%)
-    // Otherwise the adjustment step would be misleading
-    let base_close_to_final = (base_score - final_score).abs() < final_score * 0.05;
+    let gap_to_base = (ctx.base_score - current_value).abs();
+    let gap_to_final = (ctx.final_score - current_value).abs();
+    let base_close_to_final = (ctx.base_score - ctx.final_score).abs() < ctx.final_score * 0.05;
 
     if gap_to_base > 0.5 && base_close_to_final {
         let pre_norm = item.unified_score.pre_normalization_score;
 
-        if base_score > current_value && current_value > 0.0 {
-            let diff = base_score - current_value;
-
-            // Check if pre_normalization exists (indicates adjustment occurred)
+        if ctx.base_score > current_value && current_value > 0.0 {
+            let diff = ctx.base_score - current_value;
             let explanation = if let Some(pn) = pre_norm {
-                format!("{:.2} → {:.2} → {:.2}", current_value, pn, base_score)
+                format!("{:.2} → {:.2} → {:.2}", current_value, pn, ctx.base_score)
             } else {
-                // Residual adjustment from combined factors
                 format!(
                     "{:.2} + {:.2} = {:.2} (combined adjustments)",
-                    current_value, diff, base_score
+                    current_value, diff, ctx.base_score
                 )
             };
             add_label_value(
@@ -1346,12 +1391,11 @@ pub fn build_calculation_summary_section(
                 theme,
                 width,
             );
-        } else if base_score < current_value {
-            // Value decreased - show as adjusted
+        } else if ctx.base_score < current_value {
             add_label_value(
                 &mut lines,
                 &format!("{}. adjusted", step_num),
-                format!("{:.2} → {:.2}", current_value, base_score),
+                format!("{:.2} → {:.2}", current_value, ctx.base_score),
                 theme,
                 width,
             );
@@ -1359,32 +1403,31 @@ pub fn build_calculation_summary_section(
             add_label_value(
                 &mut lines,
                 &format!("{}. normalized", step_num),
-                format!("{:.2} → {:.2}", current_value, base_score),
+                format!("{:.2} → {:.2}", current_value, ctx.base_score),
                 theme,
                 width,
             );
         }
     } else if gap_to_final > 0.5 && gap_to_base > 0.5 {
-        // There's a significant gap we can't explain - show it transparently
         add_label_value(
             &mut lines,
             &format!("{}. final adjustments", step_num),
-            format!("{:.2} → {:.2}", current_value, final_score),
+            format!("{:.2} → {:.2}", current_value, ctx.final_score),
             theme,
             width,
         );
     }
 
     // Track running value for exponential and boost
-    let mut current = base_score;
+    let mut current = ctx.base_score;
 
     // Show exponential scaling if applied
-    if (exponent - 1.0).abs() > 0.01 {
-        let after_exp = current.powf(exponent);
+    if (ctx.exponent - 1.0).abs() > 0.01 {
+        let after_exp = current.powf(ctx.exponent);
         add_label_value(
             &mut lines,
             "exponential",
-            format!("{:.2}^{:.2} = {:.2}", current, exponent, after_exp),
+            format!("{:.2}^{:.2} = {:.2}", current, ctx.exponent, after_exp),
             theme,
             width,
         );
@@ -1392,29 +1435,75 @@ pub fn build_calculation_summary_section(
     }
 
     // Show risk boost if applied
-    if (risk_boost - 1.0).abs() > 0.01 {
-        let after_boost = current * risk_boost;
+    if (ctx.risk_boost - 1.0).abs() > 0.01 {
+        let after_boost = current * ctx.risk_boost;
         add_label_value(
             &mut lines,
             "risk boost",
-            format!("{:.2} × {:.2} = {:.2}", current, risk_boost, after_boost),
+            format!(
+                "{:.2} × {:.2} = {:.2}",
+                current, ctx.risk_boost, after_boost
+            ),
             theme,
             width,
         );
-        current = after_boost;
     }
-
-    // Note: god_mult is already included in base_score, shown in god object impact section
-    let _ = current; // Suppress unused warning - value tracked for completeness
 
     // Final score
     add_label_value(
         &mut lines,
         "final",
-        format!("{:.1}", final_score),
+        format!("{:.1}", ctx.final_score),
         theme,
         width,
     );
+
+    lines
+}
+
+/// Build score calculation summary (pure).
+///
+/// This function orchestrates the display of score calculation details by composing
+/// smaller, focused helper functions. The refactored structure:
+/// - `collect_calculation_context`: Extracts all state upfront
+/// - `build_god_object_formula_lines` / `build_regular_formula_lines`: Formula display
+/// - `build_god_object_calculation_steps` / `build_regular_calculation_steps`: Step details
+/// - `build_adjustment_steps`: Post-calculation adjustments and final score
+pub fn build_calculation_summary_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let ctx = collect_calculation_context(item);
+    let mut lines = Vec::new();
+
+    // Formula section
+    add_section_header(&mut lines, "score formula (simplified)", theme);
+    if ctx.is_god_object_item {
+        lines.extend(build_god_object_formula_lines(theme, width));
+    } else {
+        lines.extend(build_regular_formula_lines(&ctx, item, theme, width));
+    }
+    add_blank_line(&mut lines);
+
+    // Calculation steps section
+    add_section_header(&mut lines, "calculation steps", theme);
+    let (step_num, current_value, step_lines) = if ctx.is_god_object_item {
+        build_god_object_calculation_steps(item, theme, width)
+    } else {
+        build_regular_calculation_steps(&ctx, item, theme, width)
+    };
+    lines.extend(step_lines);
+
+    // Adjustments and final score
+    lines.extend(build_adjustment_steps(
+        item,
+        &ctx,
+        step_num,
+        current_value,
+        theme,
+        width,
+    ));
 
     add_blank_line(&mut lines);
     lines

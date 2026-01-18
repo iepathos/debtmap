@@ -455,6 +455,36 @@ pub fn aggregate_dependency_metrics_from_raw(
     )
 }
 
+/// Compute weighted average from (value, weight) pairs.
+/// Pure function: returns None if total weight is zero.
+fn compute_weighted_average<I>(iter: I) -> Option<f64>
+where
+    I: Iterator<Item = (f64, usize)>,
+{
+    let (sum, total_weight) = iter.fold((0.0, 0usize), |(sum, total), (value, weight)| {
+        (sum + value * (weight as f64), total + weight)
+    });
+    (total_weight > 0).then(|| sum / total_weight as f64)
+}
+
+/// Sum complexity values from entropy data.
+fn sum_complexity(entropy_data: &[(&EntropyAnalysis, usize)]) -> (u32, u32) {
+    entropy_data.iter().fold((0, 0), |(orig, adj), (e, _)| {
+        (orig + e.original_complexity, adj + e.adjusted_complexity)
+    })
+}
+
+/// Aggregate reasoning strings, deduplicating and limiting to top 5.
+fn aggregate_reasoning(entropy_data: &[(&EntropyAnalysis, usize)]) -> Vec<String> {
+    let mut reasoning: Vec<String> = entropy_data
+        .iter()
+        .flat_map(|(e, _)| e.reasoning.iter().cloned())
+        .collect();
+    reasoning.dedup();
+    reasoning.truncate(5);
+    reasoning
+}
+
 /// Aggregate entropy analysis from member UnifiedDebtItems (Spec 218).
 ///
 /// Returns weighted average entropy metrics based on function length.
@@ -469,56 +499,26 @@ pub fn aggregate_entropy_metrics(members: &[&UnifiedDebtItem]) -> Option<Entropy
         return None;
     }
 
-    let total_length: usize = entropy_data.iter().map(|(_, len)| len).sum();
-    if total_length == 0 {
-        return None;
-    }
+    let weighted_entropy =
+        compute_weighted_average(entropy_data.iter().map(|(e, len)| (e.entropy_score, *len)))?;
+    let weighted_repetition = compute_weighted_average(
+        entropy_data
+            .iter()
+            .map(|(e, len)| (e.pattern_repetition, *len)),
+    )?;
+    let weighted_branch_similarity = compute_weighted_average(
+        entropy_data
+            .iter()
+            .map(|(e, len)| (e.branch_similarity, *len)),
+    )?;
+    let weighted_dampening = compute_weighted_average(
+        entropy_data
+            .iter()
+            .map(|(e, len)| (e.dampening_factor, *len)),
+    )?;
 
-    // Weighted average of entropy scores
-    let weighted_entropy = entropy_data
-        .iter()
-        .map(|(e, len)| e.entropy_score * (*len as f64))
-        .sum::<f64>()
-        / total_length as f64;
-
-    // Weighted average of pattern repetition
-    let weighted_repetition = entropy_data
-        .iter()
-        .map(|(e, len)| e.pattern_repetition * (*len as f64))
-        .sum::<f64>()
-        / total_length as f64;
-
-    // Weighted average of branch similarity
-    let weighted_branch_similarity = entropy_data
-        .iter()
-        .map(|(e, len)| e.branch_similarity * (*len as f64))
-        .sum::<f64>()
-        / total_length as f64;
-
-    // Weighted average of dampening factor
-    let weighted_dampening = entropy_data
-        .iter()
-        .map(|(e, len)| e.dampening_factor * (*len as f64))
-        .sum::<f64>()
-        / total_length as f64;
-
-    // Sum original complexity across all members
-    let total_original: u32 = entropy_data
-        .iter()
-        .map(|(e, _)| e.original_complexity)
-        .sum();
-    let total_adjusted: u32 = entropy_data
-        .iter()
-        .map(|(e, _)| e.adjusted_complexity)
-        .sum();
-
-    // Aggregate reasoning from all members
-    let mut reasoning: Vec<String> = entropy_data
-        .iter()
-        .flat_map(|(e, _)| e.reasoning.iter().cloned())
-        .collect();
-    reasoning.dedup();
-    reasoning.truncate(5); // Limit to top 5 reasons
+    let (total_original, total_adjusted) = sum_complexity(&entropy_data);
+    let reasoning = aggregate_reasoning(&entropy_data);
 
     Some(EntropyAnalysis {
         entropy_score: weighted_entropy,
