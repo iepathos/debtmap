@@ -57,7 +57,6 @@ pub use types::{
     UnifiedOutput,
 };
 
-use crate::priority::UnifiedAnalysisQueries;
 use std::collections::HashMap;
 
 /// Convert analysis results to unified output format
@@ -65,8 +64,20 @@ pub fn convert_to_unified_format(
     analysis: &crate::priority::UnifiedAnalysis,
     include_scoring_details: bool,
 ) -> UnifiedOutput {
-    // Get all debt items sorted by score
-    let all_items = analysis.get_top_mixed_priorities(usize::MAX);
+    // Get all debt items WITHOUT filtering (matches TUI behavior)
+    // Previously used get_top_mixed_priorities() which filtered T4 items,
+    // causing dashboard to show different results than TUI
+    let all_items: im::Vector<crate::priority::DebtItem> = analysis
+        .items
+        .iter()
+        .map(|item| crate::priority::DebtItem::Function(Box::new(item.clone())))
+        .chain(
+            analysis
+                .file_items
+                .iter()
+                .map(|item| crate::priority::DebtItem::File(Box::new(item.clone()))),
+        )
+        .collect();
 
     // Convert to unified format with call graph for cohesion calculation (spec 198)
     let unified_items: Vec<UnifiedDebtItemOutput> = all_items
@@ -84,7 +95,14 @@ pub fn convert_to_unified_format(
         .collect();
 
     // Deduplicate items before calculating summary statistics (spec 231)
-    let unified_items = deduplicate_items(unified_items);
+    let mut unified_items = deduplicate_items(unified_items);
+
+    // Sort items by score descending (highest score first)
+    unified_items.sort_by(|a, b| {
+        b.score()
+            .partial_cmp(&a.score())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Calculate summary statistics from deduplicated items
     let mut file_count = 0;

@@ -311,6 +311,13 @@
         .badge.high { background: #f0883e20; color: #f0883e; }
         .badge.medium { background: #d2992220; color: #d29922; }
         .badge.low { background: #23863620; color: #238636; }
+        .badge.muted { background: #30363d; color: #8b949e; font-weight: normal; }
+        /* Score severity colors (matching TUI) */
+        .score-critical { color: #f85149; }
+        .score-high { color: #f0883e; }
+        .score-medium { color: #d29922; }
+        .score-low { color: #238636; }
+        .metrics { font-family: monospace; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -525,9 +532,125 @@
             }
         }
 
+        // Group items by location (file + function + line) like TUI does
+        // TUI only groups Function items, not File items
+        function groupByLocation(items) {
+            const groups = new Map();
+
+            // Filter to Function items only (like TUI's UnifiedDebtItem)
+            // Also exclude impl-block level items that TUI doesn't show
+            // These are identified by: function name is PascalCase (struct name)
+            // and has very high LOC (>500) indicating whole-impl analysis
+            const functionItems = items.filter(item => {
+                if (item.type !== 'Function') return false;
+
+                const func = item.location?.function || '';
+                const loc = item.metrics?.length || 0;
+
+                // Exclude [file-scope] items
+                if (func === '[file-scope]') return false;
+
+                // Exclude impl-block level god objects (PascalCase name + huge LOC)
+                // These are struct/impl analyses, not individual functions
+                const isPascalCase = /^[A-Z][a-zA-Z0-9]*$/.test(func);
+                const isHugeLoc = loc > 500;
+                if (isPascalCase && isHugeLoc) {
+                    console.log(`Excluding impl-block item: ${func} (LOC: ${loc})`);
+                    return false;
+                }
+
+                return true;
+            });
+
+            // Debug: log first 10 items to verify data structure
+            console.log('First 10 function items:', functionItems.slice(0, 10).map(i => ({
+                file: i.location?.file,
+                func: i.location?.function,
+                line: i.location?.line,
+                score: i.score
+            })));
+
+            functionItems.forEach(item => {
+                const file = item.location?.file || '';
+                const func = item.location?.function || '';
+                // Use 'null' string if line is missing to avoid grouping different items
+                const line = item.location?.line !== undefined && item.location?.line !== null
+                    ? item.location.line
+                    : 'null';
+                const key = `${file}|${func}|${line}`;
+
+                if (!groups.has(key)) {
+                    groups.set(key, {
+                        file: file,
+                        function: func,
+                        line: typeof line === 'number' ? line : 0,
+                        items: [],
+                        combinedScore: 0,
+                        maxSeverity: 'low',
+                        // Aggregated metrics (max values like TUI)
+                        cognitive: 0,
+                        cyclomatic: 0,
+                        nesting: 0,
+                        length: 0,
+                        coverage: null,
+                        debtTypes: new Set()
+                    });
+                }
+
+                const group = groups.get(key);
+                group.items.push(item);
+                group.combinedScore += item.score || 0;
+
+                // Track max metrics
+                const metrics = item.metrics || {};
+                group.cognitive = Math.max(group.cognitive, metrics.cognitive_complexity || 0);
+                group.cyclomatic = Math.max(group.cyclomatic, metrics.cyclomatic_complexity || 0);
+                group.nesting = Math.max(group.nesting, metrics.nesting_depth || 0);
+                group.length = Math.max(group.length, metrics.length || 0);
+
+                // Coverage from first item that has it
+                if (group.coverage === null && metrics.coverage !== undefined) {
+                    group.coverage = metrics.coverage;
+                }
+
+                // Track debt types
+                const debtType = Object.keys(item.debt_type || {})[0];
+                if (debtType) group.debtTypes.add(debtType);
+
+                // Update max severity
+                const priority = (item.priority || 'low').toLowerCase();
+                const severityRank = { critical: 4, high: 3, medium: 2, low: 1 };
+                if ((severityRank[priority] || 0) > (severityRank[group.maxSeverity] || 0)) {
+                    group.maxSeverity = priority;
+                }
+            });
+
+            // Convert to array and sort by combined score descending
+            const result = Array.from(groups.values())
+                .map(g => ({
+                    ...g,
+                    debtTypes: Array.from(g.debtTypes),
+                    itemCount: g.items.length
+                }))
+                .sort((a, b) => b.combinedScore - a.combinedScore);
+
+            // Debug: log top 5 groups
+            console.log('Top 5 location groups:', result.slice(0, 5).map(g => ({
+                location: `${g.file.split('/').pop()}::${g.function}`,
+                line: g.line,
+                combinedScore: g.combinedScore.toFixed(1),
+                itemCount: g.itemCount
+            })));
+
+            return result;
+        }
+
         function transformUnifiedFormat(data) {
             const items = data.items || [];
             const summary = data.summary || {};
+
+            // Group items by location like TUI does
+            const locationGroups = groupByLocation(items);
 
             // First, build a file coverage map from File-type items
             const fileCoverage = {};
@@ -626,13 +749,15 @@
                 files,
                 fileScores,
                 categories,
-                allItems: items
+                allItems: items,
+                locationGroups  // Grouped by location like TUI
             };
         }
 
         function transformLegacyFormat(data) {
             // Handle older format if needed
             const items = data.technical_debt?.items || [];
+            const locationGroups = groupByLocation(items);
             return {
                 summary: {
                     totalItems: items.length,
@@ -648,7 +773,8 @@
                 files: [],
                 fileScores: {},
                 categories: {},
-                allItems: items
+                allItems: items,
+                locationGroups
             };
         }
 
@@ -922,16 +1048,15 @@
         }
 
         // ========================================
-        // DEBT TABLE
+        // DEBT TABLE (grouped by location like TUI)
         // ========================================
 
         function renderDebtTable() {
             const container = document.getElementById('debt-table-container');
-            const items = transformedData.allItems
-                .sort((a, b) => (b.score || 0) - (a.score || 0))
-                .slice(0, 50);
+            // Use location groups (already sorted by combined score)
+            const groups = (transformedData.locationGroups || []).slice(0, 50);
 
-            if (items.length === 0) {
+            if (groups.length === 0) {
                 container.innerHTML = '<div class="empty-state"><p>No items to display</p></div>';
                 return;
             }
@@ -940,34 +1065,58 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>#</th>
                             <th>Location</th>
-                            <th>Type</th>
-                            <th>Category</th>
                             <th>Score</th>
-                            <th>Priority</th>
-                            <th>Debt Type</th>
+                            <th>Severity</th>
+                            <th>Metrics</th>
+                            <th>Debt Types</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
 
-            items.forEach(item => {
-                const loc = item.location?.file || '';
-                const func = item.location?.function || '';
-                const line = item.location?.line || '';
-                const displayLoc = func ? `${func}` : loc.split('/').pop();
-                const fullLoc = `${loc}${line ? ':' + line : ''}`;
-                const priority = (item.priority || 'medium').toLowerCase();
-                const debtType = Object.keys(item.debt_type || {})[0] || '-';
+            groups.forEach((group, index) => {
+                // Format location as filename::function (like TUI)
+                const fileName = group.file.split('/').pop() || group.file;
+                const funcName = group.function || '';
+                // For file-scope items, show just filename
+                const displayLoc = (funcName && funcName !== '[file-scope]')
+                    ? `${fileName}::${funcName}`
+                    : fileName;
+                const fullLoc = `${group.file}:${group.line}`;
+
+                // Item count badge (like TUI)
+                const badge = group.itemCount > 1
+                    ? `<span class="badge muted">${group.itemCount} items</span>`
+                    : '';
+
+                // Metrics summary (like TUI)
+                const metricParts = [];
+                if (group.coverage !== null) {
+                    metricParts.push(`Cov:${(group.coverage * 100).toFixed(0)}%`);
+                }
+                if (group.cognitive > 0) metricParts.push(`Cog:${group.cognitive}`);
+                if (group.nesting > 0) metricParts.push(`Nest:${group.nesting}`);
+                if (group.length > 0) metricParts.push(`LOC:${group.length}`);
+                const metricsStr = metricParts.length > 0 ? metricParts.join(' ') : '-';
+
+                // Debt types
+                const debtTypesStr = group.debtTypes.length > 0
+                    ? group.debtTypes.join(', ')
+                    : '-';
 
                 html += `
                     <tr>
-                        <td title="${fullLoc}"><code>${displayLoc}</code></td>
-                        <td>${item.type || '-'}</td>
-                        <td>${item.category || '-'}</td>
-                        <td><strong>${(item.score || 0).toFixed(1)}</strong></td>
-                        <td><span class="badge ${priority}">${priority}</span></td>
-                        <td>${debtType}</td>
+                        <td class="muted">#${index + 1}</td>
+                        <td title="${fullLoc}">
+                            <code>${displayLoc}</code>
+                            ${badge}
+                        </td>
+                        <td><strong class="score-${group.maxSeverity}">${group.combinedScore.toFixed(1)}</strong></td>
+                        <td><span class="badge ${group.maxSeverity}">${group.maxSeverity}</span></td>
+                        <td class="metrics muted">${metricsStr}</td>
+                        <td>${debtTypesStr}</td>
                     </tr>
                 `;
             });

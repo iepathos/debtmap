@@ -178,6 +178,14 @@ pub fn perform_unified_analysis_with_options(
         }
         data
     };
+
+    // Update TUI with coverage percentage
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        let coverage_percent =
+            core::phases::coverage::calculate_coverage_percent(coverage_data.as_ref());
+        manager.tui_update_coverage(coverage_percent);
+    }
+
     emit_coverage_tip(coverage_data.is_none(), suppress_coverage_tip);
 
     let coverage_time = coverage_start.elapsed();

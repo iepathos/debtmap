@@ -198,7 +198,7 @@ fn categorize_file_debt(_item: &FileDebtItem) -> String {
 /// Derive the debt type for a file based on its metrics.
 ///
 /// Returns GodObject if god object analysis indicates it's a god object,
-/// otherwise returns None.
+/// or if raw metrics exceed god object thresholds.
 fn derive_file_debt_type(item: &FileDebtItem) -> Option<DebtType> {
     // Check if this file has god object analysis and is classified as a god object
     if let Some(ref analysis) = item.metrics.god_object_analysis {
@@ -215,6 +215,22 @@ fn derive_file_debt_type(item: &FileDebtItem) -> Option<DebtType> {
                 lines: analysis.lines_of_code as u32,
             });
         }
+    }
+
+    // Fallback: infer god object from raw metrics if thresholds exceeded
+    // Same thresholds used in file_analysis.rs for consistency
+    let is_large_file = item.metrics.total_lines > 2000;
+    let has_many_functions = item.metrics.function_count > 50;
+
+    if is_large_file || has_many_functions {
+        let god_object_score = (item.metrics.function_count as f64 / 50.0).min(2.0) * 100.0;
+        return Some(DebtType::GodObject {
+            methods: item.metrics.function_count as u32,
+            fields: None,
+            responsibilities: 0,
+            god_object_score,
+            lines: item.metrics.total_lines as u32,
+        });
     }
 
     // No specific debt type identified for this file
