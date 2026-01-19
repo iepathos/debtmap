@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Dashboard Display Consistency** - Dashboard now matches TUI behavior for debt item display
+- **TUI Context Page Alignment** - Fixed "context to read" label alignment to start at column 0 like other section headers
 
 ### Internal
 

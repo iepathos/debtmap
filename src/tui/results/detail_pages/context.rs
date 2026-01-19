@@ -42,8 +42,8 @@ fn build_context_header(
         (context.completeness_confidence * 100.0) as u32
     );
 
-    // Align with add_label_value: 2 indent + label padded to 24 + 4 gap = value at column 28
-    let padded_label = format!("{:24}", "  context to read");
+    // Page title at column 0 (like section headers), value at column 28
+    let padded_label = format!("{:24}", "context to read");
     lines.push(Line::from(vec![
         Span::styled(padded_label, Style::default().fg(theme.muted)),
         Span::raw("    "),
