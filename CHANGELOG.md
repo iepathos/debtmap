@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-01-19
+
+### Fixed
+
+- **Dashboard Display Consistency** - Dashboard now matches TUI behavior for debt item display
+
+### Internal
+
+- Extracted pure functions from modules for improved testability and maintainability
+
 ## [0.13.0] - 2026-01-16
 
 ### Added
