@@ -386,6 +386,8 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::raw("  |  "),
         Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
         Span::raw(":Nav  "),
+        Span::styled("→/l", Style::default().fg(theme.accent())),
+        Span::raw(":Details  "),
         Span::styled("/", Style::default().fg(theme.accent())),
         Span::raw(":Search  "),
         Span::styled("s", Style::default().fg(theme.accent())),

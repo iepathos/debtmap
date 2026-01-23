@@ -121,7 +121,8 @@ pub fn determine_list_action(key: KeyEvent, ctx: ListActionContext) -> Option<Li
         KeyCode::PageDown => Some(ListAction::PageDown),
 
         // Detail view - guarded: requires items and selection
-        KeyCode::Enter => {
+        // Enter, Right arrow, and 'l' all open detail view (vim-style navigation)
+        KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
             if ctx.has_items && ctx.has_selection {
                 Some(ListAction::EnterDetail)
             } else {
@@ -312,6 +313,34 @@ mod tests {
     }
 
     #[test]
+    fn enter_detail_with_right_arrow() {
+        // Right arrow should also enter detail view (vim-style navigation)
+        let with_sel = ListActionContext::with_selection();
+        assert_eq!(
+            determine_list_action(key(KeyCode::Right), with_sel),
+            Some(ListAction::EnterDetail)
+        );
+
+        // Without selection - no action
+        let empty = ListActionContext::empty();
+        assert_eq!(determine_list_action(key(KeyCode::Right), empty), None);
+    }
+
+    #[test]
+    fn enter_detail_with_l_key() {
+        // 'l' should also enter detail view (vim-style navigation)
+        let with_sel = ListActionContext::with_selection();
+        assert_eq!(
+            determine_list_action(key(KeyCode::Char('l')), with_sel),
+            Some(ListAction::EnterDetail)
+        );
+
+        // Without selection - no action
+        let empty = ListActionContext::empty();
+        assert_eq!(determine_list_action(key(KeyCode::Char('l')), empty), None);
+    }
+
+    #[test]
     fn enter_search_with_slash() {
         let ctx = ListActionContext::with_selection();
         assert_eq!(
@@ -463,6 +492,7 @@ mod property_tests {
             Just(KeyCode::Char('k')),
             Just(KeyCode::Char('j')),
             Just(KeyCode::Char('g')),
+            Just(KeyCode::Char('l')),
             Just(KeyCode::Char('/')),
             Just(KeyCode::Char('s')),
             Just(KeyCode::Char('f')),
@@ -472,6 +502,8 @@ mod property_tests {
             Just(KeyCode::Char('o')),
             Just(KeyCode::Up),
             Just(KeyCode::Down),
+            Just(KeyCode::Left),
+            Just(KeyCode::Right),
             Just(KeyCode::Home),
             Just(KeyCode::End),
             Just(KeyCode::PageUp),
@@ -507,16 +539,19 @@ mod property_tests {
             prop_assert_eq!(determine_list_action(down_key, ctx), Some(ListAction::MoveDown));
         }
 
-        /// Property: Enter requires both items and selection.
+        /// Property: Detail view keys (Enter, Right, 'l') require both items and selection.
         #[test]
-        fn enter_requires_items_and_selection(ctx in context_strategy()) {
-            let key = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
-            let result = determine_list_action(key, ctx);
+        fn detail_keys_require_items_and_selection(ctx in context_strategy()) {
+            // All three keys should behave identically
+            for code in [KeyCode::Enter, KeyCode::Right, KeyCode::Char('l')] {
+                let key = KeyEvent::new(code, KeyModifiers::NONE);
+                let result = determine_list_action(key, ctx);
 
-            if ctx.has_items && ctx.has_selection {
-                prop_assert_eq!(result, Some(ListAction::EnterDetail));
-            } else {
-                prop_assert_eq!(result, None);
+                if ctx.has_items && ctx.has_selection {
+                    prop_assert_eq!(result, Some(ListAction::EnterDetail));
+                } else {
+                    prop_assert_eq!(result, None);
+                }
             }
         }
 

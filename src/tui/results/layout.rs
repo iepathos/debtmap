@@ -44,7 +44,7 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
         Line::from("  g           Go to top"),
         Line::from("  G           Go to bottom"),
         Line::from("  PgUp/PgDn   Page up/down"),
-        Line::from("  Enter       View details"),
+        Line::from("  Enter/l/→   View details"),
         Line::from("  Esc         Back/Cancel"),
         Line::from(""),
         Line::from(vec![Span::styled(
