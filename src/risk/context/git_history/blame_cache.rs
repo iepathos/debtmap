@@ -1,9 +1,7 @@
 //! File-level git blame cache for efficient author lookups
 //!
 //! This module implements a per-file blame cache that dramatically reduces
-//! git subprocess calls. Instead of calling `git blame -L start,end` for
-//! each function in a file, we call `git blame --porcelain` once per file
-//! and cache the results.
+//! git operations. Uses git2 library for reliable blame operations.
 //!
 //! # Architecture (Stillwater Philosophy)
 //!
@@ -14,18 +12,19 @@
 //!   - No side effects
 //!   - Deterministic output for given input
 //!
-//! - **I/O boundary**: `FileBlameCache::get_or_fetch`, `fetch_file_blame`
-//!   - Single git blame call per file
+//! - **I/O boundary**: `FileBlameCache::get_or_fetch`
+//!   - Single git2 blame call per file
 //!   - Thread-safe caching with DashMap
 //!
 //! # Performance
 //!
 //! For a file with N functions:
 //! - **Before**: N subprocess calls to `git blame -L`
-//! - **After**: 1 subprocess call to `git blame --porcelain`
+//! - **After**: 1 git2 blame call per file (cached)
 //!
 //! This provides a 10x+ reduction in blame-related overhead for typical files.
 
+use super::git2_provider::Git2Repository;
 use anyhow::{Context as _, Result};
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
@@ -47,12 +46,15 @@ pub struct BlameLineInfo {
 ///
 /// Provides thread-safe, lock-free caching of git blame output per file.
 /// Uses DashMap for concurrent access from parallel analysis with rayon.
+/// Primary implementation uses git2 library for reliable blame operations.
 pub struct FileBlameCache {
     /// Maps file_path -> (line_number -> blame info)
     /// Line numbers are 1-indexed (matching git blame output)
     cache: DashMap<PathBuf, HashMap<usize, BlameLineInfo>>,
     /// Root path of the git repository
     repo_root: PathBuf,
+    /// Whether git2 is available for blame operations
+    use_git2: bool,
 }
 
 // =============================================================================
@@ -247,17 +249,19 @@ impl FileBlameCache {
     ///
     /// # Arguments
     /// * `repo_root` - Path to the git repository root
-    pub fn new(repo_root: PathBuf) -> Self {
+    /// * `git2_repo` - Optional reference to git2 repository (enables git2 blame)
+    pub fn new(repo_root: PathBuf, git2_repo: Option<&Git2Repository>) -> Self {
         Self {
             cache: DashMap::new(),
             repo_root,
+            use_git2: git2_repo.is_some(),
         }
     }
 
     /// Get or fetch blame data for entire file (I/O boundary)
     ///
     /// Uses lock-free read for cache hits. On cache miss, fetches the
-    /// complete blame output and parses it into the cache.
+    /// complete blame output using git2 or subprocess.
     ///
     /// # Arguments
     /// * `file_path` - Path to the file (relative to repo root)
@@ -270,11 +274,14 @@ impl FileBlameCache {
             return Ok(cached.clone());
         }
 
-        // I/O: Single git blame call for entire file
-        let blame_output = self.fetch_file_blame(file_path)?;
-
-        // Pure: Parse the output
-        let blame_data = parse_full_blame_output(&blame_output);
+        // Fetch blame data using git2 (creates fresh repo instance for thread safety)
+        let blame_data = if self.use_git2 {
+            self.fetch_file_blame_git2(file_path)?
+        } else {
+            // Fallback to subprocess
+            let blame_output = self.fetch_file_blame_subprocess(file_path)?;
+            parse_full_blame_output(&blame_output)
+        };
 
         // Cache for future lookups
         self.cache
@@ -283,11 +290,35 @@ impl FileBlameCache {
         Ok(blame_data)
     }
 
-    /// Fetch complete blame for a file (I/O)
+    /// Fetch blame using git2 library
+    fn fetch_file_blame_git2(&self, file_path: &Path) -> Result<HashMap<usize, BlameLineInfo>> {
+        // Create a fresh Git2Repository for thread safety
+        let repo = Git2Repository::open(&self.repo_root)?;
+        let blame_data = repo.blame_file(file_path)?;
+
+        // Convert git2_provider::BlameLineInfo to our BlameLineInfo
+        let result: HashMap<usize, BlameLineInfo> = blame_data
+            .lines
+            .into_iter()
+            .map(|(line, info)| {
+                (
+                    line,
+                    BlameLineInfo {
+                        author: info.author,
+                        commit_hash: info.commit_hash,
+                    },
+                )
+            })
+            .collect();
+
+        Ok(result)
+    }
+
+    /// Fetch complete blame for a file using subprocess (fallback)
     ///
     /// Runs `git blame --porcelain <file>` to get the full blame output.
     /// Returns empty string for untracked or binary files.
-    fn fetch_file_blame(&self, file_path: &Path) -> Result<String> {
+    fn fetch_file_blame_subprocess(&self, file_path: &Path) -> Result<String> {
         let output = Command::new("git")
             .args(["blame", "--porcelain", &file_path.to_string_lossy()])
             .current_dir(&self.repo_root)

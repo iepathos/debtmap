@@ -1,3 +1,4 @@
+use super::git2_provider::{CommitStats, Git2Repository};
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use std::collections::{HashMap, HashSet};
@@ -106,13 +107,46 @@ pub struct BatchedGitHistory {
 }
 
 impl BatchedGitHistory {
+    /// Create a new batched git history using git2 library
+    /// This is the primary constructor - uses git2 for reliable path handling
+    pub fn new_with_git2(repo: &Git2Repository) -> Result<Self> {
+        let commits = repo.all_commits_with_stats()?;
+        let file_histories = Self::build_file_maps_from_git2(commits);
+        Ok(Self { file_histories })
+    }
+
     /// Create a new batched git history by fetching all data upfront
-    /// This is the "imperative shell" - all I/O happens here
+    /// This is the fallback constructor using subprocess calls
+    #[allow(dead_code)]
     pub fn new(repo_root: &Path) -> Result<Self> {
         let raw_log = Self::fetch_git_log(repo_root)?;
         let commits = Self::parse_log(&raw_log)?;
         let file_histories = Self::build_file_maps(commits);
         Ok(Self { file_histories })
+    }
+
+    /// Build file history maps from git2 commit stats
+    fn build_file_maps_from_git2(commits: Vec<CommitStats>) -> HashMap<PathBuf, FileHistoryData> {
+        let mut file_histories: HashMap<PathBuf, FileHistoryData> = HashMap::new();
+
+        for commit in commits {
+            // Create a CommitInfo from git2 CommitStats for reuse of existing logic
+            let commit_info = CommitInfo {
+                hash: commit.hash.to_string(),
+                date: commit.date,
+                message: commit.message.clone(),
+                author: commit.author_email.clone(),
+                files: vec![], // Files are handled separately
+            };
+
+            for file_stat in &commit.files {
+                let history = file_histories.entry(file_stat.path.clone()).or_default();
+                let file_churn = file_stat.additions + file_stat.deletions;
+                history.add_commit(&commit_info, file_churn);
+            }
+        }
+
+        file_histories
     }
 
     /// I/O boundary: Fetch comprehensive git log with all commit data
