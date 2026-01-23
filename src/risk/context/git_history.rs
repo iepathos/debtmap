@@ -1,15 +1,15 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 
 mod batched;
 mod blame_cache;
 mod function_level;
+pub mod git2_provider;
 
 /// File history information from Git
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,47 +28,56 @@ pub struct GitHistoryProvider {
     repo_root: PathBuf,
     cache: Arc<DashMap<PathBuf, FileHistory>>,
     batched_history: Option<batched::BatchedGitHistory>,
-    /// Cache for file-level git blame data (reduces N subprocess calls to 1 per file)
+    /// Cache for file-level git blame data (uses git2 library)
     blame_cache: blame_cache::FileBlameCache,
+    /// Git2 repository wrapper for reliable git operations
+    git2_repo: Option<git2_provider::Git2Repository>,
 }
 
 impl GitHistoryProvider {
     pub fn new(repo_root: PathBuf) -> Result<Self> {
-        // Verify this is a git repository
-        let output = Command::new("git")
-            .arg("rev-parse")
-            .arg("--git-dir")
-            .current_dir(&repo_root)
-            .output()
-            .context("Failed to verify git repository")?;
-
-        if !output.status.success() {
-            anyhow::bail!("Not a git repository: {}", repo_root.display());
-        }
-
-        // Create batched history (fetch all git data upfront)
-        let batched_history = match batched::BatchedGitHistory::new(&repo_root) {
-            Ok(history) => {
-                log::debug!("Batched git history loaded successfully");
-                Some(history)
+        // Use git2 to verify this is a git repository (more reliable path handling)
+        let git2_repo = match git2_provider::Git2Repository::open(&repo_root) {
+            Ok(repo) => {
+                log::debug!(
+                    "git2 repository opened successfully at {}",
+                    repo_root.display()
+                );
+                Some(repo)
             }
             Err(e) => {
-                log::warn!(
-                    "Failed to load batched git history, will fall back to direct queries: {}",
-                    e
-                );
-                None
+                anyhow::bail!("Not a git repository: {} ({})", repo_root.display(), e);
             }
         };
 
-        // Create blame cache for efficient per-file blame lookups
-        let blame_cache = blame_cache::FileBlameCache::new(repo_root.clone());
+        // Create batched history using git2 (fetch all git data upfront)
+        let batched_history = if let Some(ref repo) = git2_repo {
+            match batched::BatchedGitHistory::new_with_git2(repo) {
+                Ok(history) => {
+                    log::debug!("Batched git history loaded successfully via git2");
+                    Some(history)
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Failed to load batched git history via git2, will fall back to direct queries: {}",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Create blame cache for efficient per-file blame lookups (now uses git2)
+        let blame_cache = blame_cache::FileBlameCache::new(repo_root.clone(), git2_repo.as_ref());
 
         Ok(Self {
             repo_root,
             cache: Arc::new(DashMap::new()),
             batched_history,
             blame_cache,
+            git2_repo,
         })
     }
 
@@ -127,244 +136,59 @@ impl GitHistoryProvider {
         Ok(history)
     }
 
-    /// Fetch file history directly via git commands (fallback when batched fails)
+    /// Fetch file history directly via git2 (fallback when batched fails)
     fn fetch_history_direct(&self, path: &Path) -> Result<FileHistory> {
-        Ok(FileHistory {
-            change_frequency: self.calculate_churn_rate(path)?,
-            bug_fix_count: self.count_bug_fixes(path)?,
-            last_modified: self.get_last_modified(path)?,
-            author_count: self.count_unique_authors(path)?,
-            stability_score: self.calculate_stability(path)?,
-            total_commits: self.count_commits(path)?,
-            age_days: self.get_file_age_days(path)?,
-        })
-    }
+        if let Some(ref repo) = self.git2_repo {
+            // Use git2 for reliable path handling
+            let total_commits = repo.count_file_commits(path)?;
+            let age_days = repo.file_age_days(path)?;
+            let bug_fix_count = repo.count_bug_fixes(path)?;
+            let author_count = repo.file_authors(path)?.len();
+            let last_modified = repo.file_last_modified(path)?;
 
-    /// Legacy mutable API - kept for backward compatibility
-    pub fn analyze_file(&mut self, path: &Path) -> Result<FileHistory> {
-        self.get_or_fetch_history(path)
-    }
-
-    fn calculate_churn_rate(&self, path: &Path) -> Result<f64> {
-        let commits = self.count_commits(path)?;
-        let age_days = self.get_file_age_days(path)?;
-
-        if age_days > 0 {
-            Ok((commits as f64) / (age_days as f64) * 30.0) // Monthly rate
-        } else {
-            Ok(0.0)
-        }
-    }
-
-    fn count_commits(&self, path: &Path) -> Result<usize> {
-        let output = Command::new("git")
-            .args([
-                "rev-list",
-                "--count",
-                "HEAD",
-                "--",
-                path.to_str().unwrap_or(""),
-            ])
-            .current_dir(&self.repo_root)
-            .output()
-            .context("Failed to count commits")?;
-
-        if output.status.success() {
-            let count_str = String::from_utf8_lossy(&output.stdout);
-            Ok(count_str.trim().parse().unwrap_or(0))
-        } else {
-            Ok(0)
-        }
-    }
-
-    /// Counts bug fix commits for a file using word boundary matching
-    /// to reduce false positives from substring matches like "prefix" or "debug".
-    ///
-    /// Matches patterns:
-    /// - `\bfix\b`, `\bfixes\b`, `\bfixed\b`, `\bfixing\b` (matches "fix" but not "prefix")
-    /// - `\bbug\b` (matches "bug" but not "debug")
-    /// - `\bhotfix\b` (emergency fixes)
-    ///
-    /// Excludes non-bug commits via `is_excluded_commit` filter:
-    /// - Styling commits (style:, formatting, linting)
-    /// - Maintenance (chore:, whitespace, typo)
-    /// - Documentation (docs:)
-    /// - Tests (test:)
-    /// - Refactoring without bug mentions
-    fn count_bug_fixes(&self, path: &Path) -> Result<usize> {
-        let output = Command::new("git")
-            .args([
-                "log",
-                "--oneline",
-                "--grep=\\bfix\\b",
-                "--grep=\\bfixes\\b",
-                "--grep=\\bfixed\\b",
-                "--grep=\\bfixing\\b",
-                "--grep=\\bbug\\b",
-                "--grep=\\bhotfix\\b",
-                "-i", // Case-insensitive matching
-                "--",
-                path.to_str().unwrap_or(""),
-            ])
-            .current_dir(&self.repo_root)
-            .output()
-            .context("Failed to count bug fixes")?;
-
-        if output.status.success() {
-            let lines = String::from_utf8_lossy(&output.stdout);
-            let count = lines
-                .lines()
-                .filter(|line| !Self::is_excluded_commit(line))
-                .count();
-            Ok(count)
-        } else {
-            Ok(0)
-        }
-    }
-
-    /// Determines if a commit message indicates a non-bug change that should
-    /// be excluded from bug fix counting.
-    ///
-    /// Excludes:
-    /// - Conventional commit types: style, chore, docs, test
-    /// - Maintenance keywords: formatting, linting, whitespace, typo
-    /// - Refactoring without bug mentions
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// assert!(is_excluded_commit("style: apply formatting fixes"));  // Excluded
-    /// assert!(is_excluded_commit("chore: update dependencies"));     // Excluded
-    /// assert!(!is_excluded_commit("fix: resolve login bug"));        // Not excluded
-    /// assert!(!is_excluded_commit("refactor: fix memory leak"));     // Not excluded (mentions fix)
-    /// ```
-    fn is_excluded_commit(commit_line: &str) -> bool {
-        let lowercase = commit_line.to_lowercase();
-
-        // Conventional commit type exclusions
-        if lowercase.contains("style:")
-            || lowercase.contains("chore:")
-            || lowercase.contains("docs:")
-            || lowercase.contains("test:")
-        {
-            return true;
-        }
-
-        // Maintenance keyword exclusions
-        let exclusion_keywords = ["formatting", "linting", "whitespace", "typo"];
-
-        for keyword in &exclusion_keywords {
-            if lowercase.contains(keyword) {
-                return true;
-            }
-        }
-
-        // Refactoring exclusion (unless it mentions bug-related keywords)
-        // Check for standalone words that indicate actual bug fixes
-        if lowercase.contains("refactor:") {
-            let words: Vec<&str> = lowercase.split(|c: char| !c.is_alphanumeric()).collect();
-
-            let has_bug_keyword = words.iter().any(|&word| {
-                matches!(
-                    word,
-                    "bug" | "fix" | "fixes" | "fixed" | "fixing" | "issue" | "hotfix"
-                )
-            });
-
-            // Exclude refactor commits that don't mention bug-related keywords
-            if !has_bug_keyword {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    fn get_last_modified(&self, path: &Path) -> Result<Option<DateTime<Utc>>> {
-        let output = Command::new("git")
-            .args([
-                "log",
-                "-1",
-                "--format=%cI",
-                "--",
-                path.to_str().unwrap_or(""),
-            ])
-            .current_dir(&self.repo_root)
-            .output()
-            .context("Failed to get last modified date")?;
-
-        if output.status.success() {
-            let date_str = String::from_utf8_lossy(&output.stdout);
-            let date_str = date_str.trim();
-            if !date_str.is_empty() {
-                match DateTime::parse_from_rfc3339(date_str) {
-                    Ok(dt) => Ok(Some(dt.with_timezone(&Utc))),
-                    Err(_) => Ok(None),
-                }
+            let change_frequency = if age_days > 0 {
+                (total_commits as f64) / (age_days as f64) * 30.0
             } else {
-                Ok(None)
-            }
+                0.0
+            };
+
+            let stability_score =
+                self.calculate_stability_from_values(age_days, total_commits, bug_fix_count);
+
+            Ok(FileHistory {
+                change_frequency,
+                bug_fix_count,
+                last_modified,
+                author_count,
+                stability_score,
+                total_commits,
+                age_days,
+            })
         } else {
-            Ok(None)
+            // Fallback to default values if git2 is not available
+            log::warn!("git2 not available, returning default history");
+            Ok(FileHistory {
+                change_frequency: 0.0,
+                bug_fix_count: 0,
+                last_modified: None,
+                author_count: 0,
+                stability_score: 1.0,
+                total_commits: 0,
+                age_days: 0,
+            })
         }
     }
 
-    fn count_unique_authors(&self, path: &Path) -> Result<usize> {
-        let output = Command::new("git")
-            .args(["log", "--format=%ae", "--", path.to_str().unwrap_or("")])
-            .current_dir(&self.repo_root)
-            .output()
-            .context("Failed to count authors")?;
-
-        if output.status.success() {
-            let authors = String::from_utf8_lossy(&output.stdout);
-            let unique_authors: std::collections::HashSet<_> = authors.lines().collect();
-            Ok(unique_authors.len())
-        } else {
-            Ok(0)
-        }
-    }
-
-    fn get_file_age_days(&self, path: &Path) -> Result<u32> {
-        let output = Command::new("git")
-            .args([
-                "log",
-                "--reverse",
-                "--format=%cI",
-                "--",
-                path.to_str().unwrap_or(""),
-            ])
-            .current_dir(&self.repo_root)
-            .output()
-            .context("Failed to get file age")?;
-
-        if output.status.success() {
-            let dates = String::from_utf8_lossy(&output.stdout);
-            if let Some(first_line) = dates.lines().next() {
-                if let Ok(first_date) = DateTime::parse_from_rfc3339(first_line.trim()) {
-                    let now = Utc::now();
-                    let age = now.signed_duration_since(first_date.with_timezone(&Utc));
-                    return Ok(age.num_days().max(0) as u32);
-                }
-            }
-        }
-
-        Ok(0)
-    }
-
-    fn calculate_stability(&self, path: &Path) -> Result<f64> {
-        let age_days = self.get_file_age_days(path)?;
-        let commits = self.count_commits(path)?;
-        let bug_fixes = self.count_bug_fixes(path)?;
-
+    /// Calculate stability score from pre-computed values
+    fn calculate_stability_from_values(
+        &self,
+        age_days: u32,
+        commits: usize,
+        bug_fixes: usize,
+    ) -> f64 {
         if commits == 0 {
-            return Ok(1.0); // New file, assume stable
+            return 1.0; // New file, assume stable
         }
-
-        // Stability factors:
-        // - Lower churn rate is more stable
-        // - Fewer bug fixes relative to commits is more stable
-        // - Older files with fewer recent changes are more stable
 
         let churn_factor = if age_days > 0 {
             let monthly_churn = (commits as f64) / (age_days as f64) * 30.0;
@@ -374,10 +198,14 @@ impl GitHistoryProvider {
         };
 
         let bug_factor = 1.0 - (bug_fixes as f64 / commits as f64).min(1.0);
-        let age_factor = (age_days as f64 / 365.0).min(1.0); // Max out at 1 year
+        let age_factor = (age_days as f64 / 365.0).min(1.0);
 
-        // Weighted average
-        Ok((churn_factor * 0.4 + bug_factor * 0.4 + age_factor * 0.2).min(1.0))
+        (churn_factor * 0.4 + bug_factor * 0.4 + age_factor * 0.2).min(1.0)
+    }
+
+    /// Legacy mutable API - kept for backward compatibility
+    pub fn analyze_file(&mut self, path: &Path) -> Result<FileHistory> {
+        self.get_or_fetch_history(path)
     }
 }
 
@@ -591,6 +419,7 @@ enum StabilityStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
     use tempfile::TempDir;
 
     fn setup_test_repo() -> Result<(TempDir, PathBuf)> {
@@ -658,61 +487,33 @@ mod tests {
     }
 
     #[test]
-    fn test_is_excluded_commit() {
-        // Should exclude: conventional commit types
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "style: apply formatting fixes"
-        ));
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "chore: update dependencies"
-        ));
-        assert!(GitHistoryProvider::is_excluded_commit("docs: fix typo"));
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "test: add unit tests"
-        ));
+    fn test_is_bug_fix_message() {
+        use git2_provider::is_bug_fix_message;
 
-        // Should exclude: maintenance keywords
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "refactor: improve prefix handling"
-        ));
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "8c45a3c5 style: apply automated formatting"
-        ));
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "apply linting rules"
-        ));
-        assert!(GitHistoryProvider::is_excluded_commit("remove whitespace"));
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "fix: correct typo in documentation"
-        ));
+        // Should match: genuine bug fixes
+        assert!(is_bug_fix_message("fix: resolve login bug"));
+        assert!(is_bug_fix_message("Fixed the payment issue"));
+        assert!(is_bug_fix_message("Bug fix for issue #123"));
+        assert!(is_bug_fix_message("hotfix: urgent fix"));
 
-        // Should NOT exclude: genuine bug fixes
-        assert!(!GitHistoryProvider::is_excluded_commit(
-            "fix: resolve login bug"
-        ));
-        assert!(!GitHistoryProvider::is_excluded_commit(
-            "Fixed the payment issue"
-        ));
-        assert!(!GitHistoryProvider::is_excluded_commit(
-            "Bug fix for issue #123"
-        ));
-        assert!(!GitHistoryProvider::is_excluded_commit(
-            "hotfix: urgent fix"
-        ));
+        // Should NOT match: conventional commit type exclusions
+        assert!(!is_bug_fix_message("style: apply formatting fixes"));
+        assert!(!is_bug_fix_message("chore: update dependencies"));
+        assert!(!is_bug_fix_message("docs: fix typo"));
+        assert!(!is_bug_fix_message("test: add unit tests"));
 
-        // Should NOT exclude: refactor that mentions bug/issue
-        assert!(!GitHistoryProvider::is_excluded_commit(
-            "refactor: fix memory leak"
-        ));
-        assert!(!GitHistoryProvider::is_excluded_commit(
-            "refactor: resolve issue #456"
-        ));
+        // Should NOT match: maintenance keywords
+        assert!(!is_bug_fix_message("refactor: improve prefix handling"));
+        assert!(!is_bug_fix_message("apply linting rules"));
+        assert!(!is_bug_fix_message("remove whitespace"));
+        assert!(!is_bug_fix_message("fix: correct typo in documentation"));
+
+        // Should match: refactor that mentions fix
+        assert!(is_bug_fix_message("refactor: fix memory leak"));
 
         // Edge cases: case insensitivity
-        assert!(GitHistoryProvider::is_excluded_commit(
-            "STYLE: Apply Formatting"
-        ));
-        assert!(!GitHistoryProvider::is_excluded_commit("FIX: Resolve Bug"));
+        assert!(!is_bug_fix_message("STYLE: Apply Formatting"));
+        assert!(is_bug_fix_message("FIX: Resolve Bug"));
     }
 
     #[test]
@@ -1370,7 +1171,7 @@ fn other_func() {
 
         // Get function-level history for my_func
         // Use line range (1, 10) to cover the function for git blame
-        let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone());
+        let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone(), None);
         let history = function_level::get_function_history(
             &repo_path,
             Path::new("test.rs"),
@@ -1423,7 +1224,7 @@ fn other_func() {
             "feat: improve my_func",
         )?;
 
-        let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone());
+        let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone(), None);
         let history = function_level::get_function_history(
             &repo_path,
             Path::new("test.rs"),

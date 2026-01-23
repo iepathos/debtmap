@@ -15,9 +15,9 @@
 //! # Architecture
 //!
 //! Following the Stillwater philosophy of "pure core, imperative shell":
-//! - Pure functions for parsing git output (easily testable without git)
-//! - I/O wrapper functions for running git commands
-//! - Function-level metrics calculation
+//! - Uses git2 library for reliable git operations
+//! - Pure functions for metrics calculation (easily testable)
+//! - I/O isolated to git2 wrapper calls
 
 use super::batched::is_bug_fix;
 use super::blame_cache::FileBlameCache;
@@ -157,17 +157,18 @@ pub fn filter_bug_fix_commits(commits: &[CommitInfo]) -> Vec<&CommitInfo> {
 // I/O Wrapper Functions (Imperative Shell)
 // =============================================================================
 
-/// Get function history from git (I/O Shell)
+/// Get function history from git
 ///
-/// This is the imperative shell that orchestrates git commands.
-/// Falls back to default (empty) history if function is not found.
+/// Uses subprocess calls for pickaxe search (-S and -G flags) which
+/// provide accurate function-level modification tracking.
+/// git2 library doesn't have direct support for these specialized searches.
 ///
 /// # Arguments
 /// * `repo_root` - Path to the git repository root
 /// * `file_path` - Path to the file containing the function
 /// * `function_name` - Name of the function to analyze
 /// * `line_range` - (start, end) line numbers of the function for git blame
-/// * `blame_cache` - Cache for file-level git blame data (reduces N calls to 1 per file)
+/// * `blame_cache` - Cache for file-level git blame data
 pub fn get_function_history(
     repo_root: &Path,
     file_path: &Path,
@@ -177,6 +178,21 @@ pub fn get_function_history(
 ) -> Result<FunctionHistory> {
     time_span!("git_function_history");
 
+    // Use subprocess for pickaxe search - git2 doesn't support -S/-G flags
+    get_function_history_subprocess(repo_root, file_path, function_name, line_range, blame_cache)
+}
+
+/// Get function history using subprocess calls
+///
+/// Uses git's -S (pickaxe) and -G (regex) flags for accurate
+/// function-level modification tracking.
+fn get_function_history_subprocess(
+    repo_root: &Path,
+    file_path: &Path,
+    function_name: &str,
+    line_range: (usize, usize),
+    blame_cache: &FileBlameCache,
+) -> Result<FunctionHistory> {
     // I/O: Find introduction commit
     let intro_output = run_git_log_introduction(repo_root, file_path, function_name)?;
     let intro_commit = parse_introduction_commit(&intro_output);

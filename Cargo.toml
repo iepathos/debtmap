@@ -122,6 +122,9 @@ env_logger = "0.11"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Git operations
+git2 = "0.20"
+
 # Graph algorithms for taint analysis
 petgraph = "0.8"
 lazy_static = "1.5.0"
