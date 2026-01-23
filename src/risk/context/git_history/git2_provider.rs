@@ -375,12 +375,7 @@ impl Git2Repository {
             .filter_map(|oid| oid.ok())
             .filter_map(|oid| repo.find_commit(oid).ok())
             .filter(|commit| self.commit_touches_file(&repo, commit, &relative_path))
-            .filter(|commit| {
-                commit
-                    .message()
-                    .map(is_bug_fix_message)
-                    .unwrap_or(false)
-            })
+            .filter(|commit| commit.message().map(is_bug_fix_message).unwrap_or(false))
             .count();
 
         Ok(count)
