@@ -7,18 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.13.1] - 2026-01-19
-
-### Fixed
-
-- **Dashboard Display Consistency** - Dashboard now matches TUI behavior for debt item display
-- **TUI Context Page Alignment** - Fixed "context to read" label alignment to start at column 0 like other section headers
-
-### Internal
-
-- Extracted pure functions from modules for improved testability and maintainability
-
-## [0.13.0] - 2026-01-16
+## [0.13.0] - 2026-01-24
 
 ### Added
 
@@ -45,11 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Dashboard Display Consistency** - Dashboard now matches TUI behavior for debt item display
+- **TUI Context Page Alignment** - Fixed "context to read" label alignment to start at column 0 like other section headers
 - **Test Race Condition** - Fixed validation test race condition
 - **Dashboard Auto-load** - Dashboard no longer tries to auto-fetch on startup
 
 ### Internal
 
+- Extracted pure functions from modules for improved testability and maintainability
 - Extracted tests and helpers in priority module
 - Deployed dashboard to GitHub Pages via docs workflow
 
