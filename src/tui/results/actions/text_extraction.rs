@@ -315,19 +315,8 @@ pub fn extract_item_as_llm_markdown(item: &UnifiedDebtItem) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::formatter_verbosity::git_history::classify_stability;
     use ratatui::text::Span;
-
-    // Test helper functions (moved from main module to avoid unused warnings)
-
-    fn classify_stability(change_frequency: f64) -> &'static str {
-        if change_frequency < 1.0 {
-            "Stable"
-        } else if change_frequency < 5.0 {
-            "Moderately Unstable"
-        } else {
-            "Highly Unstable"
-        }
-    }
 
     fn entropy_description(score: f64) -> &'static str {
         if score < 0.3 {

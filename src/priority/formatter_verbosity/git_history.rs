@@ -12,14 +12,19 @@ use std::fmt::Write;
 // Pure Classification Functions (Stillwater "still" core)
 // ============================================================================
 
-/// Pure function to classify change frequency stability
+/// Pure function to classify change frequency stability.
+///
+/// Thresholds:
+/// - < 1.0 changes/month = "Stable"
+/// - < 5.0 changes/month = "Moderately Unstable"
+/// - >= 5.0 changes/month = "Highly Unstable"
 pub fn classify_stability(change_frequency: f64) -> &'static str {
-    if change_frequency > 5.0 {
-        "highly unstable"
-    } else if change_frequency > 2.0 {
-        "moderately unstable"
+    if change_frequency < 1.0 {
+        "Stable"
+    } else if change_frequency < 5.0 {
+        "Moderately Unstable"
     } else {
-        "stable"
+        "Highly Unstable"
     }
 }
 
@@ -213,14 +218,21 @@ mod tests {
 
     #[test]
     fn test_classify_stability() {
-        assert_eq!(classify_stability(10.0), "highly unstable");
-        assert_eq!(classify_stability(5.1), "highly unstable");
-        assert_eq!(classify_stability(5.0), "moderately unstable");
-        assert_eq!(classify_stability(3.0), "moderately unstable");
-        assert_eq!(classify_stability(2.1), "moderately unstable");
-        assert_eq!(classify_stability(2.0), "stable");
-        assert_eq!(classify_stability(1.0), "stable");
-        assert_eq!(classify_stability(0.0), "stable");
+        // Highly Unstable: >= 5.0 changes/month
+        assert_eq!(classify_stability(10.0), "Highly Unstable");
+        assert_eq!(classify_stability(5.1), "Highly Unstable");
+        assert_eq!(classify_stability(5.0), "Highly Unstable");
+
+        // Moderately Unstable: >= 1.0 and < 5.0 changes/month
+        assert_eq!(classify_stability(4.9), "Moderately Unstable");
+        assert_eq!(classify_stability(3.0), "Moderately Unstable");
+        assert_eq!(classify_stability(2.0), "Moderately Unstable");
+        assert_eq!(classify_stability(1.0), "Moderately Unstable");
+
+        // Stable: < 1.0 changes/month
+        assert_eq!(classify_stability(0.99), "Stable");
+        assert_eq!(classify_stability(0.5), "Stable");
+        assert_eq!(classify_stability(0.0), "Stable");
     }
 
     #[test]

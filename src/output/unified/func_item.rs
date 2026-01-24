@@ -530,7 +530,8 @@ impl GitHistoryOutput {
                     author_count,
                 } = git_context.details
                 {
-                    let stability = classify_stability(change_frequency, bug_density, age_days);
+                    let stability =
+                        derive_stability_classification(change_frequency, bug_density, age_days);
                     Some(GitHistoryOutput {
                         change_frequency: round_ratio(change_frequency),
                         bug_density: round_ratio(bug_density),
@@ -545,8 +546,18 @@ impl GitHistoryOutput {
     }
 }
 
-/// Classify stability based on change patterns
-fn classify_stability(change_frequency: f64, bug_density: f64, age_days: u32) -> String {
+/// Derive a rich stability classification based on multiple factors.
+///
+/// This is a multi-factor classification used for JSON output that considers
+/// change frequency, bug density, and file age together for more nuanced labels.
+///
+/// For simple single-factor stability classification, use
+/// `crate::priority::formatter_verbosity::git_history::classify_stability`.
+fn derive_stability_classification(
+    change_frequency: f64,
+    bug_density: f64,
+    age_days: u32,
+) -> String {
     if change_frequency > 5.0 && bug_density > 0.3 {
         "Highly Unstable".to_string()
     } else if change_frequency > 2.0 {

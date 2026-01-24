@@ -1,6 +1,7 @@
 //! Git Context page (Page 3) - Git history and risk analysis.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
+use crate::priority::formatter_verbosity::git_history::classify_stability;
 use crate::priority::UnifiedDebtItem;
 use crate::risk::context::ContextDetails;
 use crate::tui::results::app::ResultsApp;
@@ -156,13 +157,328 @@ pub fn render(
     frame.render_widget(paragraph, area);
 }
 
-/// Classify stability based on change frequency
-fn classify_stability(change_frequency: f64) -> &'static str {
-    if change_frequency < 1.0 {
-        "Stable"
-    } else if change_frequency < 5.0 {
-        "Moderately Unstable"
-    } else {
-        "Highly Unstable"
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::debt_types::DebtType;
+    use crate::priority::semantic_classifier::FunctionRole;
+    use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
+    use crate::priority::{ActionableRecommendation, ImpactMetrics};
+    use crate::risk::context::{Context, ContextDetails, ContextualRisk};
+    use crate::tui::theme::Theme;
+    use std::path::PathBuf;
+
+    fn create_test_item_with_git_context(
+        change_frequency: f64,
+        bug_density: f64,
+        age_days: u32,
+        author_count: usize,
+    ) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                function: "test_fn".to_string(),
+                line: 1,
+            },
+            debt_type: DebtType::Complexity {
+                cyclomatic: 10,
+                cognitive: 15,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 5.0,
+                coverage_factor: 5.0,
+                dependency_factor: 5.0,
+                role_multiplier: 1.0,
+                final_score: 50.0,
+                base_score: Some(50.0),
+                exponential_factor: Some(1.0),
+                risk_boost: Some(1.0),
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 100,
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 15,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: Some(ContextualRisk {
+                base_risk: 10.0,
+                contextual_risk: 25.0,
+                contexts: vec![Context {
+                    provider: "git_history".to_string(),
+                    contribution: 15.0,
+                    weight: 1.5,
+                    details: ContextDetails::Historical {
+                        change_frequency,
+                        bug_density,
+                        age_days,
+                        author_count,
+                    },
+                }],
+                explanation: "Test explanation".to_string(),
+            }),
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        }
+    }
+
+    fn create_test_item_without_context() -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                function: "test_fn".to_string(),
+                line: 1,
+            },
+            debt_type: DebtType::Complexity {
+                cyclomatic: 5,
+                cognitive: 8,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 5.0,
+                coverage_factor: 5.0,
+                dependency_factor: 5.0,
+                role_multiplier: 1.0,
+                final_score: 30.0,
+                base_score: Some(30.0),
+                exponential_factor: Some(1.0),
+                risk_boost: Some(1.0),
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 50,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 8,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        }
+    }
+
+    #[test]
+    fn test_build_page_lines_with_git_context() {
+        let theme = Theme::default();
+        let item = create_test_item_with_git_context(2.5, 0.15, 100, 3);
+
+        let lines = build_page_lines(&item, &theme, 80);
+
+        // Convert lines to string for easier assertion
+        let text: String = lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|s| s.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            text.contains("2.50 changes/month"),
+            "Should show change frequency"
+        );
+        assert!(
+            text.contains("Moderately Unstable"),
+            "Should classify as moderately unstable"
+        );
+        assert!(text.contains("15.0%"), "Should show bug density percentage");
+        assert!(text.contains("100 days"), "Should show age in days");
+        assert!(text.contains("3"), "Should show author count");
+    }
+
+    #[test]
+    fn test_build_page_lines_stability_thresholds() {
+        let theme = Theme::default();
+
+        // Test stable threshold (< 1.0)
+        let stable_item = create_test_item_with_git_context(0.5, 0.0, 365, 1);
+        let stable_lines = build_page_lines(&stable_item, &theme, 80);
+        let stable_text: String = stable_lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
+            .collect();
+        assert!(stable_text.contains("Stable"), "< 1.0 should be Stable");
+
+        // Test moderately unstable threshold (>= 1.0 and < 5.0)
+        let mod_item = create_test_item_with_git_context(3.0, 0.0, 100, 2);
+        let mod_lines = build_page_lines(&mod_item, &theme, 80);
+        let mod_text: String = mod_lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
+            .collect();
+        assert!(
+            mod_text.contains("Moderately Unstable"),
+            ">= 1.0 and < 5.0 should be Moderately Unstable"
+        );
+
+        // Test highly unstable threshold (>= 5.0)
+        let unstable_item = create_test_item_with_git_context(7.0, 0.5, 30, 5);
+        let unstable_lines = build_page_lines(&unstable_item, &theme, 80);
+        let unstable_text: String = unstable_lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
+            .collect();
+        assert!(
+            unstable_text.contains("Highly Unstable"),
+            ">= 5.0 should be Highly Unstable"
+        );
+    }
+
+    #[test]
+    fn test_build_page_lines_risk_multiplier() {
+        let theme = Theme::default();
+        let item = create_test_item_with_git_context(2.0, 0.1, 50, 2);
+
+        let lines = build_page_lines(&item, &theme, 80);
+        let text: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
+            .collect();
+
+        // base_risk=10.0, contextual_risk=25.0, multiplier should be 2.5x
+        assert!(text.contains("10.0"), "Should show base risk");
+        assert!(text.contains("25.0"), "Should show contextual risk");
+        assert!(text.contains("2.50x"), "Should show 2.5x multiplier");
+    }
+
+    #[test]
+    fn test_build_page_lines_no_context() {
+        let theme = Theme::default();
+        let item = create_test_item_without_context();
+
+        let lines = build_page_lines(&item, &theme, 80);
+        let text: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
+            .collect();
+
+        assert!(
+            text.contains("No git context data available"),
+            "Should show no data message"
+        );
+    }
+
+    #[test]
+    fn test_build_page_lines_zero_base_risk() {
+        let theme = Theme::default();
+        let mut item = create_test_item_with_git_context(1.0, 0.0, 10, 1);
+
+        // Set base_risk to 0 to test division protection
+        if let Some(ref mut risk) = item.contextual_risk {
+            risk.base_risk = 0.0;
+            risk.contextual_risk = 10.0;
+        }
+
+        let lines = build_page_lines(&item, &theme, 80);
+        let text: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
+            .collect();
+
+        // Should show 1.00x multiplier (fallback for zero base risk)
+        assert!(
+            text.contains("1.00x"),
+            "Should show 1.0x multiplier when base_risk is 0"
+        );
     }
 }
