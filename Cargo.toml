@@ -123,7 +123,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Git operations
-git2 = "0.20"
+git2 = { version = "0.20", features = ["vendored-openssl"] }
 
 # Graph algorithms for taint analysis
 petgraph = "0.8"

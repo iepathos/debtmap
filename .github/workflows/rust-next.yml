@@ -40,10 +40,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
-
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -71,9 +67,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable

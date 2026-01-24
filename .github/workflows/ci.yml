@@ -33,10 +33,6 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Install system dependencies (Linux)
-      if: runner.os == 'Linux'
-      run: sudo apt-get update && sudo apt-get install -y libssl-dev
-
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
@@ -95,9 +91,6 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libssl-dev
-
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -133,9 +126,6 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libssl-dev
-
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
@@ -154,9 +144,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-
-    - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
     - name: Install Rust stable
       uses: dtolnay/rust-toolchain@stable
@@ -179,9 +166,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-
-    - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
