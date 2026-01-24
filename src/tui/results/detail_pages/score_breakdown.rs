@@ -928,17 +928,63 @@ fn build_regular_formula_lines(
 }
 
 // ============================================================================
-// Calculation Step Builders (Pure)
+// God Object Calculation Types (Pure Data)
 // ============================================================================
 
-/// Build god object calculation steps (pure).
-/// Returns (next_step_num, current_value, lines).
-fn build_god_object_calculation_steps(
-    item: &UnifiedDebtItem,
-    theme: &Theme,
-    width: u16,
-) -> (usize, f64, Vec<Line<'static>>) {
-    let mut lines = Vec::new();
+/// Raw metrics extracted from a god object item (pure data).
+#[derive(Debug, Clone)]
+struct GodObjectMetrics {
+    methods: usize,
+    fields: usize,
+    responsibilities: usize,
+    lines_of_code: usize,
+    weighted_methods: Option<f64>,
+    go_score: f64,
+    entropy_damp: Option<f64>,
+}
+
+/// Thresholds for god object detection (pure data).
+#[derive(Debug, Clone, Copy)]
+struct GodObjectThresholds {
+    max_methods: usize,
+    max_fields: usize,
+    max_lines: usize,
+    max_responsibilities: usize,
+}
+
+impl Default for GodObjectThresholds {
+    fn default() -> Self {
+        Self {
+            max_methods: 20,
+            max_fields: 15,
+            max_lines: 1000,
+            max_responsibilities: 5,
+        }
+    }
+}
+
+/// Calculated factors for god object scoring (pure data).
+#[derive(Debug, Clone, Copy)]
+struct GodObjectFactors {
+    method_factor: f64,
+    field_factor: f64,
+    resp_factor: f64,
+    size_factor: f64,
+}
+
+impl GodObjectFactors {
+    /// Calculate the base product of all factors (pure).
+    fn base_product(&self) -> f64 {
+        self.method_factor * self.field_factor * self.resp_factor * self.size_factor
+    }
+}
+
+// ============================================================================
+// God Object Extraction Functions (Pure)
+// ============================================================================
+
+/// Extract god object metrics from a debt item (pure).
+fn extract_god_object_metrics(item: &UnifiedDebtItem) -> GodObjectMetrics {
     let stored_base = item.unified_score.base_score.unwrap_or(0.0);
 
     let go_score = match &item.debt_type {
@@ -948,89 +994,127 @@ fn build_god_object_calculation_steps(
         _ => stored_base,
     };
 
-    // Get raw metrics from god_object_indicators or DebtType
-    let (methods, fields, responsibilities, lines_of_code): (usize, usize, usize, usize) =
-        match &item.debt_type {
-            DebtType::GodObject {
-                methods,
-                fields,
-                responsibilities,
-                lines: loc,
-                ..
-            } => (
-                *methods as usize,
-                fields.unwrap_or(0) as usize,
-                *responsibilities as usize,
-                *loc as usize,
-            ),
-            _ => {
-                if let Some(ref indicators) = item.god_object_indicators {
-                    (
-                        indicators.method_count,
-                        indicators.field_count,
-                        indicators.responsibility_count,
-                        indicators.lines_of_code,
-                    )
-                } else {
-                    (0, 0, 0, 0)
-                }
-            }
-        };
+    let (methods, fields, responsibilities, lines_of_code) = match &item.debt_type {
+        DebtType::GodObject {
+            methods,
+            fields,
+            responsibilities,
+            lines: loc,
+            ..
+        } => (
+            *methods as usize,
+            fields.unwrap_or(0) as usize,
+            *responsibilities as usize,
+            *loc as usize,
+        ),
+        _ => item
+            .god_object_indicators
+            .as_ref()
+            .map(|ind| {
+                (
+                    ind.method_count,
+                    ind.field_count,
+                    ind.responsibility_count,
+                    ind.lines_of_code,
+                )
+            })
+            .unwrap_or((0, 0, 0, 0)),
+    };
 
-    // Use default thresholds (Rust defaults)
-    let max_methods = 20_usize;
-    let max_fields = 15_usize;
-    let max_lines = 1000_usize;
-
-    // Get weighted method count if available
     let weighted_methods = item
         .god_object_indicators
         .as_ref()
         .and_then(|g| g.weighted_method_count);
 
-    // Calculate factors (capped at 3.0)
-    let effective_methods = weighted_methods.unwrap_or(methods as f64);
-    let method_factor = (effective_methods / max_methods as f64).min(3.0);
-    let field_factor = (fields as f64 / max_fields as f64).min(3.0);
-    let resp_factor = (responsibilities as f64 / 3.0).min(3.0);
-    let size_factor = (lines_of_code as f64 / max_lines as f64).min(3.0);
+    let entropy_damp = item.entropy_analysis.as_ref().map(|e| e.dampening_factor);
 
-    // Count violations
-    let mut violations = Vec::new();
-    if effective_methods > max_methods as f64 {
-        violations.push(format!(
-            "methods {:.0} > {}",
-            effective_methods, max_methods
-        ));
+    GodObjectMetrics {
+        methods,
+        fields,
+        responsibilities,
+        lines_of_code,
+        weighted_methods,
+        go_score,
+        entropy_damp,
     }
-    if fields > max_fields {
-        violations.push(format!("fields {} > {}", fields, max_fields));
+}
+
+/// Calculate god object factors from metrics (pure).
+fn calculate_god_object_factors(
+    metrics: &GodObjectMetrics,
+    thresholds: &GodObjectThresholds,
+) -> GodObjectFactors {
+    let effective_methods = metrics.weighted_methods.unwrap_or(metrics.methods as f64);
+
+    GodObjectFactors {
+        method_factor: (effective_methods / thresholds.max_methods as f64).min(3.0),
+        field_factor: (metrics.fields as f64 / thresholds.max_fields as f64).min(3.0),
+        resp_factor: (metrics.responsibilities as f64 / 3.0).min(3.0),
+        size_factor: (metrics.lines_of_code as f64 / thresholds.max_lines as f64).min(3.0),
     }
-    if responsibilities > 5 {
-        violations.push(format!("responsibilities {} > 5", responsibilities));
-    }
-    if lines_of_code > max_lines {
-        violations.push(format!("lines {} > {}", lines_of_code, max_lines));
-    }
+}
+
+/// Build list of threshold violations (pure).
+fn build_god_object_violations(
+    metrics: &GodObjectMetrics,
+    thresholds: &GodObjectThresholds,
+) -> Vec<String> {
+    let effective_methods = metrics.weighted_methods.unwrap_or(metrics.methods as f64);
+
+    [
+        (
+            effective_methods > thresholds.max_methods as f64,
+            format!(
+                "methods {:.0} > {}",
+                effective_methods, thresholds.max_methods
+            ),
+        ),
+        (
+            metrics.fields > thresholds.max_fields,
+            format!("fields {} > {}", metrics.fields, thresholds.max_fields),
+        ),
+        (
+            metrics.responsibilities > thresholds.max_responsibilities,
+            format!(
+                "responsibilities {} > {}",
+                metrics.responsibilities, thresholds.max_responsibilities
+            ),
+        ),
+        (
+            metrics.lines_of_code > thresholds.max_lines,
+            format!("lines {} > {}", metrics.lines_of_code, thresholds.max_lines),
+        ),
+    ]
+    .into_iter()
+    .filter(|(violated, _)| *violated)
+    .map(|(_, msg)| msg)
+    .collect()
+}
+
+// ============================================================================
+// God Object Step Display Builders (Pure)
+// ============================================================================
+
+/// Build factor display lines for god object calculation (pure).
+fn build_god_object_factor_lines(
+    metrics: &GodObjectMetrics,
+    factors: &GodObjectFactors,
+    thresholds: &GodObjectThresholds,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
 
     // Step 1: Method factor
-    let method_display = if let Some(w) = weighted_methods {
-        if (w - methods as f64).abs() > 0.1 {
-            format!(
-                "{:.2} = {:.1} / {} (raw {} → weighted)",
-                method_factor, w, max_methods, methods
-            )
-        } else {
-            format!(
-                "{:.2} = {} / {} (max 3.0)",
-                method_factor, methods, max_methods
-            )
-        }
-    } else {
-        format!(
+    let method_display = match metrics.weighted_methods {
+        Some(w) if (w - metrics.methods as f64).abs() > 0.1 => format!(
+            "{:.2} = {:.1} / {} (raw {} → weighted)",
+            factors.method_factor, w, thresholds.max_methods, metrics.methods
+        ),
+        _ => format!(
             "{:.2} = {} / {} (max 3.0)",
-            method_factor, methods, max_methods
-        )
+            factors.method_factor, metrics.methods, thresholds.max_methods
+        ),
     };
     add_label_value(&mut lines, "1. method factor", method_display, theme, width);
 
@@ -1040,7 +1124,7 @@ fn build_god_object_calculation_steps(
         "2. field factor",
         format!(
             "{:.2} = {} / {} (max 3.0)",
-            field_factor, fields, max_fields
+            factors.field_factor, metrics.fields, thresholds.max_fields
         ),
         theme,
         width,
@@ -1050,7 +1134,10 @@ fn build_god_object_calculation_steps(
     add_label_value(
         &mut lines,
         "3. responsibility factor",
-        format!("{:.2} = {} / 3 (max 3.0)", resp_factor, responsibilities),
+        format!(
+            "{:.2} = {} / 3 (max 3.0)",
+            factors.resp_factor, metrics.responsibilities
+        ),
         theme,
         width,
     );
@@ -1061,27 +1148,45 @@ fn build_god_object_calculation_steps(
         "4. size factor",
         format!(
             "{:.2} = {} / {} (max 3.0)",
-            size_factor, lines_of_code, max_lines
+            factors.size_factor, metrics.lines_of_code, thresholds.max_lines
         ),
         theme,
         width,
     );
 
     // Step 5: Base product
-    let base_product = method_factor * field_factor * resp_factor * size_factor;
+    let base_product = factors.base_product();
     add_label_value(
         &mut lines,
         "5. base product",
         format!(
             "{:.2} = {:.2} × {:.2} × {:.2} × {:.2}",
-            base_product, method_factor, field_factor, resp_factor, size_factor
+            base_product,
+            factors.method_factor,
+            factors.field_factor,
+            factors.resp_factor,
+            factors.size_factor
         ),
         theme,
         width,
     );
 
-    // Step 6: Violations
+    lines
+}
+
+/// Build violation and scaling lines (pure).
+/// Returns (scaled_score, step_number_after, lines).
+fn build_god_object_scaling_lines(
+    factors: &GodObjectFactors,
+    violations: &[String],
+    theme: &Theme,
+    width: u16,
+) -> (f64, usize, Vec<Line<'static>>) {
+    let mut lines = Vec::new();
+    let base_product = factors.base_product();
     let violation_count = violations.len();
+
+    // Step 6: Violations
     let violation_detail = if violations.is_empty() {
         "none".to_string()
     } else {
@@ -1096,7 +1201,6 @@ fn build_god_object_calculation_steps(
     );
 
     // Step 7: Scaling
-    let mut step_num = 7_usize;
     let scaled_score = if violation_count > 0 {
         base_product * 20.0 * violation_count as f64
     } else {
@@ -1110,19 +1214,24 @@ fn build_god_object_calculation_steps(
     } else {
         format!("{:.2} × 10 = {:.2}", base_product, scaled_score)
     };
-    add_label_value(
-        &mut lines,
-        &format!("{}. scaling", step_num),
-        scaling_detail,
-        theme,
-        width,
-    );
-    step_num += 1;
-    let mut current = scaled_score;
+    add_label_value(&mut lines, "7. scaling", scaling_detail, theme, width);
 
-    // Show entropy dampening if applied
-    let entropy_damp = item.entropy_analysis.as_ref().map(|e| e.dampening_factor);
-    if let Some(entropy_damp) = entropy_damp {
+    (scaled_score, 8, lines)
+}
+
+/// Build adjustment lines after scaling (pure).
+/// Returns (final_step_num, final_value, lines).
+fn build_god_object_adjustment_lines(
+    metrics: &GodObjectMetrics,
+    mut current: f64,
+    mut step_num: usize,
+    theme: &Theme,
+    width: u16,
+) -> (usize, f64, Vec<Line<'static>>) {
+    let mut lines = Vec::new();
+
+    // Entropy dampening
+    if let Some(entropy_damp) = metrics.entropy_damp {
         if (entropy_damp - 1.0).abs() > 0.01 {
             let after_entropy = current * entropy_damp;
             add_label_value(
@@ -1140,10 +1249,10 @@ fn build_god_object_calculation_steps(
         }
     }
 
-    // Show combined adjustments if there's a significant gap after entropy
-    let diff = (current - go_score).abs();
+    // Combined adjustments for remaining gap
+    let diff = (current - metrics.go_score).abs();
     if diff > 1.0 && current > 0.0 {
-        let adjustment_factor = go_score / current;
+        let adjustment_factor = metrics.go_score / current;
         if (adjustment_factor - 1.0).abs() > 0.01 {
             let adjustment_desc = if adjustment_factor > 1.0 {
                 "complexity weight"
@@ -1155,7 +1264,7 @@ fn build_god_object_calculation_steps(
                 &format!("{}. × {}", step_num, adjustment_desc),
                 format!(
                     "{:.2} × {:.2} = {:.2}",
-                    current, adjustment_factor, go_score
+                    current, adjustment_factor, metrics.go_score
                 ),
                 theme,
                 width,
@@ -1168,12 +1277,49 @@ fn build_god_object_calculation_steps(
     add_label_value(
         &mut lines,
         &format!("{}. god object score", step_num),
-        format!("{:.2}", go_score),
+        format!("{:.2}", metrics.go_score),
         theme,
         width,
     );
 
-    (step_num + 1, go_score, lines)
+    (step_num + 1, metrics.go_score, lines)
+}
+
+// ============================================================================
+// Calculation Step Builders (Pure)
+// ============================================================================
+
+/// Build god object calculation steps (pure).
+/// Returns (next_step_num, current_value, lines).
+///
+/// This function composes several pure helper functions:
+/// - `extract_god_object_metrics`: Extract raw data
+/// - `calculate_god_object_factors`: Compute scoring factors
+/// - `build_god_object_violations`: Identify threshold violations
+/// - `build_god_object_factor_lines`: Display factor steps
+/// - `build_god_object_scaling_lines`: Display scaling steps
+/// - `build_god_object_adjustment_lines`: Display final adjustments
+fn build_god_object_calculation_steps(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> (usize, f64, Vec<Line<'static>>) {
+    let metrics = extract_god_object_metrics(item);
+    let thresholds = GodObjectThresholds::default();
+    let factors = calculate_god_object_factors(&metrics, &thresholds);
+    let violations = build_god_object_violations(&metrics, &thresholds);
+
+    let mut lines = build_god_object_factor_lines(&metrics, &factors, &thresholds, theme, width);
+
+    let (scaled_score, step_num, scaling_lines) =
+        build_god_object_scaling_lines(&factors, &violations, theme, width);
+    lines.extend(scaling_lines);
+
+    let (final_step, final_value, adjustment_lines) =
+        build_god_object_adjustment_lines(&metrics, scaled_score, step_num, theme, width);
+    lines.extend(adjustment_lines);
+
+    (final_step, final_value, lines)
 }
 
 /// Build regular function calculation steps (pure).
