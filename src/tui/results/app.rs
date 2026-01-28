@@ -14,6 +14,7 @@ use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::Frame;
+use std::time::{Duration, Instant};
 
 use super::{
     detail_view, layout, list_state::ListState, list_view, nav_state, navigation,
@@ -45,7 +46,7 @@ pub struct ResultsApp {
     // UI state (minimal, stays here)
     terminal_size: (u16, u16),
     needs_redraw: bool,
-    status_message: Option<String>,
+    status_message: Option<(String, Instant)>,
 }
 
 impl ResultsApp {
@@ -227,19 +228,36 @@ impl ResultsApp {
         needs
     }
 
-    /// Set status message to display temporarily
+    /// How long status messages remain visible before auto-dismissal.
+    const STATUS_MESSAGE_DURATION: Duration = Duration::from_secs(3);
+
+    /// Set status message to display temporarily (auto-dismisses after 3 seconds).
     pub fn set_status_message(&mut self, message: String) {
-        self.status_message = Some(message);
+        self.status_message = Some((message, Instant::now()));
     }
 
-    /// Get current status message
+    /// Get current status message if it hasn't expired.
     pub fn status_message(&self) -> Option<&str> {
-        self.status_message.as_deref()
+        self.status_message
+            .as_ref()
+            .filter(|(_, created)| created.elapsed() < Self::STATUS_MESSAGE_DURATION)
+            .map(|(msg, _)| msg.as_str())
     }
 
-    /// Clear status message
+    /// Clear status message.
     pub fn clear_status_message(&mut self) {
         self.status_message = None;
+    }
+
+    /// Expire status message if its display duration has elapsed.
+    pub fn expire_status_message(&mut self) {
+        if self
+            .status_message
+            .as_ref()
+            .is_some_and(|(_, created)| created.elapsed() >= Self::STATUS_MESSAGE_DURATION)
+        {
+            self.status_message = None;
+        }
     }
 
     // ========================================================================

@@ -64,6 +64,7 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
                 .add_modifier(Modifier::UNDERLINED),
         )]),
         Line::from("  c           Copy file path to clipboard"),
+        Line::from("  C           Copy item as LLM markdown"),
         Line::from("  e           Open in $EDITOR"),
         Line::from("  o           Open at line number"),
         Line::from(""),
@@ -73,12 +74,13 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
                 .fg(theme.accent())
                 .add_modifier(Modifier::UNDERLINED),
         )]),
-        Line::from("  ←→/hl       Page left/right"),
+        Line::from("  ←/h         Back to list"),
+        Line::from("  Tab/→/l     Next page"),
+        Line::from("  BackTab     Previous page"),
         Line::from("  1-8         Jump to page"),
         Line::from("  ↑↓/jk       Next/prev item"),
         Line::from("  c           Copy page content"),
         Line::from("  C           Copy item as LLM markdown"),
-        Line::from("  Esc         Back to list"),
         Line::from(""),
         Line::from(vec![Span::styled(
             "General",

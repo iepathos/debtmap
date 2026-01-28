@@ -57,6 +57,9 @@ pub enum ListAction {
     /// Copy file path to clipboard.
     CopyPath,
 
+    /// Copy complete item as LLM-optimized markdown to clipboard.
+    CopyItemAsLlm,
+
     /// Open selected file in editor.
     OpenInEditor,
 }
@@ -146,6 +149,15 @@ pub fn determine_list_action(key: KeyEvent, ctx: ListActionContext) -> Option<Li
         KeyCode::Char('c') => {
             if ctx.has_selection {
                 Some(ListAction::CopyPath)
+            } else {
+                None
+            }
+        }
+
+        // Copy item as LLM-optimized markdown - requires selection
+        KeyCode::Char('C') => {
+            if ctx.has_selection {
+                Some(ListAction::CopyItemAsLlm)
             } else {
                 None
             }
@@ -395,6 +407,20 @@ mod tests {
     }
 
     #[test]
+    fn copy_item_as_llm_requires_selection() {
+        // Without selection
+        let empty = ListActionContext::empty();
+        assert_eq!(determine_list_action(key(KeyCode::Char('C')), empty), None);
+
+        // With selection
+        let with_sel = ListActionContext::with_selection();
+        assert_eq!(
+            determine_list_action(key(KeyCode::Char('C')), with_sel),
+            Some(ListAction::CopyItemAsLlm)
+        );
+    }
+
+    #[test]
     fn open_in_editor_with_e_requires_selection() {
         // Without selection
         let empty = ListActionContext::empty();
@@ -498,6 +524,7 @@ mod property_tests {
             Just(KeyCode::Char('f')),
             Just(KeyCode::Char('?')),
             Just(KeyCode::Char('c')),
+            Just(KeyCode::Char('C')),
             Just(KeyCode::Char('e')),
             Just(KeyCode::Char('o')),
             Just(KeyCode::Up),

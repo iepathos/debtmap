@@ -101,12 +101,15 @@ pub fn page_from_digit(c: char) -> Option<DetailPage> {
 /// * `None` - Key has no action in detail view
 pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<DetailAction> {
     match key.code {
-        // Back navigation - escape or 'q' returns to previous view
-        KeyCode::Esc | KeyCode::Char('q') => Some(DetailAction::NavigateBack),
+        // Back navigation - escape, 'q', left arrow, or 'h' returns to previous view
+        // h/Left mirrors l/Right entering detail view from list (vim-style navigation)
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Left | KeyCode::Char('h') => {
+            Some(DetailAction::NavigateBack)
+        }
 
-        // Page navigation - Tab/arrows cycle through available pages
+        // Page navigation - Tab cycles through available pages
         KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => Some(DetailAction::NextPage),
-        KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => Some(DetailAction::PrevPage),
+        KeyCode::BackTab => Some(DetailAction::PrevPage),
 
         // Direct page jump - number keys (1-8) jump to specific pages
         KeyCode::Char(c @ '1'..='8') => page_from_digit(c).map(DetailAction::JumpToPage),
@@ -201,20 +204,20 @@ mod tests {
     }
 
     #[test]
-    fn left_arrow_goes_to_prev_page() {
+    fn left_arrow_navigates_back() {
         let ctx = DetailActionContext::new(DetailPage::Context);
         assert_eq!(
             classify_detail_key(key(KeyCode::Left), ctx),
-            Some(DetailAction::PrevPage)
+            Some(DetailAction::NavigateBack)
         );
     }
 
     #[test]
-    fn h_goes_to_prev_page() {
+    fn h_navigates_back() {
         let ctx = DetailActionContext::new(DetailPage::Context);
         assert_eq!(
             classify_detail_key(key(KeyCode::Char('h')), ctx),
-            Some(DetailAction::PrevPage)
+            Some(DetailAction::NavigateBack)
         );
     }
 
@@ -439,6 +442,18 @@ mod tests {
                 page
             );
             assert_eq!(
+                classify_detail_key(key(KeyCode::Left), ctx),
+                Some(DetailAction::NavigateBack),
+                "Left should navigate back on {:?}",
+                page
+            );
+            assert_eq!(
+                classify_detail_key(key(KeyCode::Char('h')), ctx),
+                Some(DetailAction::NavigateBack),
+                "'h' should navigate back on {:?}",
+                page
+            );
+            assert_eq!(
                 classify_detail_key(key(KeyCode::Tab), ctx),
                 Some(DetailAction::NextPage),
                 "Tab should work on {:?}",
@@ -510,10 +525,14 @@ mod property_tests {
             let ctx = DetailActionContext::new(page);
 
             let esc = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
+            let left = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
+            let h = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE);
             let tab = KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE);
             let backtab = KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE);
 
             prop_assert_eq!(classify_detail_key(esc, ctx), Some(DetailAction::NavigateBack));
+            prop_assert_eq!(classify_detail_key(left, ctx), Some(DetailAction::NavigateBack));
+            prop_assert_eq!(classify_detail_key(h, ctx), Some(DetailAction::NavigateBack));
             prop_assert_eq!(classify_detail_key(tab, ctx), Some(DetailAction::NextPage));
             prop_assert_eq!(classify_detail_key(backtab, ctx), Some(DetailAction::PrevPage));
         }

@@ -134,6 +134,7 @@ impl ResultsExplorer {
     /// Run the interactive TUI event loop
     pub fn run(&mut self) -> Result<()> {
         loop {
+            self.app.expire_status_message();
             self.render_frame()?;
 
             if self.process_next_event()? {

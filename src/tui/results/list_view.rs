@@ -369,7 +369,7 @@ fn format_grouped_item(
     ListItem::new(line).style(style)
 }
 
-/// Render footer with navigation hints
+/// Render footer with navigation hints and status message
 fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     let position_text = if app.item_count() > 0 {
         format!(
@@ -381,13 +381,15 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         "0 items".to_string()
     };
 
-    let footer_text = Line::from(vec![
+    let shortcuts_line = Line::from(vec![
         Span::styled(position_text, Style::default().fg(theme.muted)),
         Span::raw("  |  "),
         Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
         Span::raw(":Nav  "),
         Span::styled("→/l", Style::default().fg(theme.accent())),
         Span::raw(":Details  "),
+        Span::styled("C", Style::default().fg(theme.accent())),
+        Span::raw(":LLM Copy  "),
         Span::styled("/", Style::default().fg(theme.accent())),
         Span::raw(":Search  "),
         Span::styled("s", Style::default().fg(theme.accent())),
@@ -400,12 +402,29 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::raw(":Quit"),
     ]);
 
+    // If there's a status message, show it on first line, shortcuts on second line
+    let lines = if let Some(status) = app.status_message() {
+        let status_color = if status.starts_with('✓') {
+            theme.success()
+        } else {
+            theme.warning()
+        };
+
+        vec![
+            Line::from(vec![Span::styled(
+                status,
+                Style::default().fg(status_color),
+            )]),
+            shortcuts_line,
+        ]
+    } else {
+        vec![shortcuts_line]
+    };
+
     // Apply horizontal margin per DESIGN.md
     let footer_area = apply_horizontal_margin(area);
 
-    let footer = Paragraph::new(footer_text)
-        .block(Block::default().borders(Borders::TOP))
-        .style(Style::default());
+    let footer = Paragraph::new(lines).block(Block::default().borders(Borders::TOP));
 
     frame.render_widget(footer, footer_area);
 }
