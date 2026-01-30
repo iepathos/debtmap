@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.13.1] - 2026-01-30
 
+### Fixed
+
+- **Git Context** - Fix zero git metrics when analyzing from subdirectories
+  - GitHistoryProvider now uses git2's canonical workdir as repo_root
+  - Path resolution handles symlinks (e.g., macOS /var → /private/var)
+  - Fixes change frequency, bug density, age, and author metrics
+
 ### Changed
 
 - **Dependencies** - Updated Cargo.lock with latest dependency versions
