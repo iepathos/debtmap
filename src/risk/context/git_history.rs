@@ -50,6 +50,13 @@ impl GitHistoryProvider {
             }
         };
 
+        // Use the git2 repository's workdir as the canonical repo_root
+        // This ensures path lookups match what git stores (relative to .git parent)
+        let canonical_repo_root = git2_repo
+            .as_ref()
+            .map(|r| r.repo_path().to_path_buf())
+            .unwrap_or(repo_root);
+
         // Create batched history using git2 (fetch all git data upfront)
         let batched_history = if let Some(ref repo) = git2_repo {
             match batched::BatchedGitHistory::new_with_git2(repo) {
@@ -70,10 +77,11 @@ impl GitHistoryProvider {
         };
 
         // Create blame cache for efficient per-file blame lookups (now uses git2)
-        let blame_cache = blame_cache::FileBlameCache::new(repo_root.clone(), git2_repo.as_ref());
+        let blame_cache =
+            blame_cache::FileBlameCache::new(canonical_repo_root.clone(), git2_repo.as_ref());
 
         Ok(Self {
-            repo_root,
+            repo_root: canonical_repo_root,
             cache: Arc::new(DashMap::new()),
             batched_history,
             blame_cache,
@@ -85,10 +93,28 @@ impl GitHistoryProvider {
     ///
     /// Git stores paths relative to the repo root, so we need to strip the repo_root
     /// prefix from absolute paths for lookups in batched history.
+    ///
+    /// Handles symlink resolution (e.g., macOS /var -> /private/var) by canonicalizing
+    /// both paths before comparison when the initial strip fails.
     fn to_relative_path<'a>(&self, path: &'a Path) -> std::borrow::Cow<'a, Path> {
-        path.strip_prefix(&self.repo_root)
-            .map(std::borrow::Cow::Borrowed)
-            .unwrap_or_else(|_| std::borrow::Cow::Borrowed(path))
+        // Fast path: try direct strip_prefix first
+        if let Ok(rel) = path.strip_prefix(&self.repo_root) {
+            return std::borrow::Cow::Borrowed(rel);
+        }
+
+        // Slow path: canonicalize both paths to resolve symlinks (e.g., /var -> /private/var)
+        if path.is_absolute() {
+            if let (Ok(canonical_path), Ok(canonical_root)) =
+                (path.canonicalize(), self.repo_root.canonicalize())
+            {
+                if let Ok(rel) = canonical_path.strip_prefix(&canonical_root) {
+                    return std::borrow::Cow::Owned(rel.to_path_buf());
+                }
+            }
+        }
+
+        // Return original path if no stripping was possible
+        std::borrow::Cow::Borrowed(path)
     }
 
     /// Get file history from cache or fetch it (immutable, thread-safe)
