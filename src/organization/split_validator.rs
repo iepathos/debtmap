@@ -667,4 +667,73 @@ mod tests {
         split.cohesion_score = Some(0.5);
         assert!(config.has_sufficient_cohesion(&split));
     }
+
+    #[test]
+    fn test_balanced_distribution_single_split() {
+        // Edge case: less than 2 splits returns immediately
+        let config = SplitSizeConfig::default();
+        let splits = vec![make_split("only_one", 50, vec![], "test")];
+
+        let balanced = ensure_balanced_distribution(splits.clone(), &config);
+
+        assert_eq!(balanced.len(), 1);
+        assert_eq!(balanced[0].suggested_name, "only_one");
+    }
+
+    #[test]
+    fn test_balanced_distribution_empty() {
+        // Edge case: empty splits returns empty
+        let config = SplitSizeConfig::default();
+        let splits: Vec<ModuleSplit> = vec![];
+
+        let balanced = ensure_balanced_distribution(splits, &config);
+
+        assert!(balanced.is_empty());
+    }
+
+    #[test]
+    fn test_balanced_distribution_already_balanced() {
+        // When splits are already balanced, no changes needed
+        let config = SplitSizeConfig::default();
+        let splits = vec![
+            make_split("split_a", 30, vec![], "test"),
+            make_split("split_b", 25, vec![], "test"),
+        ];
+
+        let balanced = ensure_balanced_distribution(splits, &config);
+
+        // Should remain as 2 splits since ratio is within threshold
+        assert_eq!(balanced.len(), 2);
+    }
+
+    #[test]
+    fn test_balanced_distribution_unsplittable_large() {
+        // Large split with too few methods can't be subdivided
+        let config = SplitSizeConfig::default();
+        // Create splits where one is large by count but has <20 methods to move
+        let splits = vec![
+            make_split("unsplittable", 15, vec![], "test"), // method_count < 20
+            make_split("tiny", 5, vec![], "test"),
+        ];
+
+        let balanced = ensure_balanced_distribution(splits, &config);
+
+        // Can't split further since method_count < 20 threshold in split_into_two
+        assert_eq!(balanced.len(), 2);
+    }
+
+    #[test]
+    fn test_balanced_distribution_with_zero_size() {
+        // Edge case: one split has zero methods
+        let config = SplitSizeConfig::default();
+        let splits = vec![
+            make_split("normal", 50, vec![], "test"),
+            make_split("empty", 0, vec![], "test"),
+        ];
+
+        let balanced = ensure_balanced_distribution(splits, &config);
+
+        // min_size == 0 triggers early exit
+        assert_eq!(balanced.len(), 2);
+    }
 }
