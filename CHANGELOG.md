@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-02-06
+
+### Added
+
+- **LLM Integration Resources**
+  - Added `llms.txt` following the emerging standard for LLM-friendly documentation
+  - Added `debtmap-analyst` Claude skill for AI-assisted code analysis
+  - Skill includes debtmap usage guidance and Rust/FP refactoring patterns
+
+### Changed
+
+- **Dependencies** - Updated Cargo.lock with latest dependency versions
+  - trybuild: 1.0.114 → 1.0.115
+
+### Internal
+
+- Consolidated typos configuration into `_typos.toml` with cleaner formatting
+- Added file exclusions for `*.lock` and `target/` directory in typos config
+
 ## [0.13.1] - 2026-01-30
 
 ### Fixed
