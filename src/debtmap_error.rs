@@ -1116,8 +1116,7 @@ mod tests {
 
         #[test]
         fn test_from_json() {
-            let json_err: serde_json::Error =
-                serde_json::from_str::<i32>("not json").unwrap_err();
+            let json_err: serde_json::Error = serde_json::from_str::<i32>("not json").unwrap_err();
             let core_err = CoreError::Json(json_err);
             let err: DebtmapError = core_err.into();
             assert_eq!(err.category(), "Parse");

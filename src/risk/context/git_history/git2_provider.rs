@@ -892,12 +892,7 @@ mod tests {
         let (_temp, repo_path) = setup_test_repo()?;
 
         // Create file with initial content - we use a zero OID to get ALL commits
-        create_and_commit_file(
-            &repo_path,
-            "test.rs",
-            "let marker = 0;",
-            "Initial",
-        )?;
+        create_and_commit_file(&repo_path, "test.rs", "let marker = 0;", "Initial")?;
 
         // First modification changes the marker line
         create_and_commit_file(
@@ -920,8 +915,7 @@ mod tests {
         // Use a pattern that matches the changed line in all commits
         // Pass a zero OID that won't match any commit, so we get all modifications
         let zero_oid = git2::Oid::zero();
-        let modifications =
-            repo.find_modifications(Path::new("test.rs"), "marker", zero_oid)?;
+        let modifications = repo.find_modifications(Path::new("test.rs"), "marker", zero_oid)?;
 
         // All three commits change a line containing "marker"
         assert_eq!(modifications.len(), 3, "Expected 3 modifications");
@@ -992,8 +986,7 @@ mod tests {
 
         // When we pass the latest OID as after_commit, revwalk should immediately
         // hit the break condition and return no results
-        let modifications =
-            repo.find_modifications(Path::new("test.rs"), r"let x", latest_oid)?;
+        let modifications = repo.find_modifications(Path::new("test.rs"), r"let x", latest_oid)?;
 
         // Should find nothing since we stop at the first commit we encounter
         assert!(
@@ -1002,7 +995,8 @@ mod tests {
         );
 
         // Verify with zero OID we get all commits
-        let all_mods = repo.find_modifications(Path::new("test.rs"), r"let x", git2::Oid::zero())?;
+        let all_mods =
+            repo.find_modifications(Path::new("test.rs"), r"let x", git2::Oid::zero())?;
         assert_eq!(all_mods.len(), 4, "Should find all 4 commits with zero OID");
 
         Ok(())

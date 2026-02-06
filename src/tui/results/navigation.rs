@@ -425,3 +425,508 @@ fn ensure_valid_page(app: &mut ResultsApp) {
     );
     app.nav_mut().detail_page = new_page;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::call_graph::CallGraph;
+    use crate::priority::semantic_classifier::FunctionRole;
+    use crate::priority::unified_scorer::{Location, UnifiedScore};
+    use crate::priority::{
+        ActionableRecommendation, DebtType, ImpactMetrics, UnifiedAnalysis, UnifiedDebtItem,
+    };
+
+    /// Create a test UnifiedDebtItem with minimal required fields.
+    fn create_test_item(file: &str, function: &str, line: usize) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: file.into(),
+                function: function.into(),
+                line,
+            },
+            debt_type: DebtType::Complexity {
+                cyclomatic: 5,
+                cognitive: 3,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 0.0,
+                coverage_factor: 10.0,
+                dependency_factor: 0.0,
+                role_multiplier: 1.0,
+                final_score: 50.0,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".into(),
+                rationale: "Test".into(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                risk_reduction: 0.0,
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+            },
+            transitive_coverage: None,
+            file_context: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 3,
+            is_pure: Some(false),
+            purity_confidence: Some(0.0),
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        }
+    }
+
+    /// Create a test ResultsApp with the given number of items.
+    fn create_test_app(item_count: usize) -> ResultsApp {
+        let mut analysis = UnifiedAnalysis::new(CallGraph::new());
+        for i in 0..item_count {
+            analysis.items.push_back(create_test_item(
+                &format!("test_{}.rs", i),
+                &format!("fn_{}", i),
+                i + 1,
+            ));
+        }
+        ResultsApp::new(analysis)
+    }
+
+    // ============================================================================
+    // execute_list_action tests
+    // ============================================================================
+
+    #[test]
+    fn test_execute_list_action_quit_returns_true() {
+        let mut app = create_test_app(5);
+        let result = execute_list_action(&mut app, ListAction::Quit).unwrap();
+        assert!(result, "Quit action should return true");
+    }
+
+    #[test]
+    fn test_execute_list_action_move_down_increments_selection() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.list().selected_index(), 0);
+
+        execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        assert_eq!(app.list().selected_index(), 1);
+
+        execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        assert_eq!(app.list().selected_index(), 2);
+    }
+
+    #[test]
+    fn test_execute_list_action_move_up_decrements_selection() {
+        let mut app = create_test_app(5);
+        // Move down first
+        execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        assert_eq!(app.list().selected_index(), 2);
+
+        execute_list_action(&mut app, ListAction::MoveUp).unwrap();
+        assert_eq!(app.list().selected_index(), 1);
+    }
+
+    #[test]
+    fn test_execute_list_action_move_up_at_top_stays_at_zero() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.list().selected_index(), 0);
+
+        execute_list_action(&mut app, ListAction::MoveUp).unwrap();
+        assert_eq!(app.list().selected_index(), 0);
+    }
+
+    #[test]
+    fn test_execute_list_action_move_down_at_bottom_stays_at_last() {
+        let mut app = create_test_app(3);
+        // Move to last
+        execute_list_action(&mut app, ListAction::JumpToBottom).unwrap();
+        let last_idx = app.list().selected_index();
+
+        execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        assert_eq!(app.list().selected_index(), last_idx);
+    }
+
+    #[test]
+    fn test_execute_list_action_jump_to_top() {
+        let mut app = create_test_app(5);
+        // Move down first
+        execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        assert_eq!(app.list().selected_index(), 2);
+
+        execute_list_action(&mut app, ListAction::JumpToTop).unwrap();
+        assert_eq!(app.list().selected_index(), 0);
+        assert_eq!(app.list().scroll_offset(), 0);
+    }
+
+    #[test]
+    fn test_execute_list_action_jump_to_bottom() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.list().selected_index(), 0);
+
+        execute_list_action(&mut app, ListAction::JumpToBottom).unwrap();
+        // Items are grouped, so we get the actual item count
+        let expected_last = app.item_count().saturating_sub(1);
+        assert_eq!(app.list().selected_index(), expected_last);
+    }
+
+    #[test]
+    fn test_execute_list_action_page_down() {
+        let mut app = create_test_app(50);
+        assert_eq!(app.list().selected_index(), 0);
+
+        execute_list_action(&mut app, ListAction::PageDown).unwrap();
+        // Page size is 20, so should move to 20
+        assert_eq!(app.list().selected_index(), 20);
+    }
+
+    #[test]
+    fn test_execute_list_action_page_up() {
+        let mut app = create_test_app(50);
+        // Move to position 25
+        for _ in 0..25 {
+            execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        }
+        assert_eq!(app.list().selected_index(), 25);
+
+        execute_list_action(&mut app, ListAction::PageUp).unwrap();
+        // Page size is 20, so should move to 5
+        assert_eq!(app.list().selected_index(), 5);
+    }
+
+    #[test]
+    fn test_execute_list_action_enter_detail_changes_view_mode() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        execute_list_action(&mut app, ListAction::EnterDetail).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::Detail);
+    }
+
+    #[test]
+    fn test_execute_list_action_enter_search_changes_view_mode() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        execute_list_action(&mut app, ListAction::EnterSearch).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::Search);
+    }
+
+    #[test]
+    fn test_execute_list_action_open_sort_menu_changes_view_mode() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        execute_list_action(&mut app, ListAction::OpenSortMenu).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::SortMenu);
+    }
+
+    #[test]
+    fn test_execute_list_action_open_filter_menu_changes_view_mode() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        execute_list_action(&mut app, ListAction::OpenFilterMenu).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::FilterMenu);
+    }
+
+    #[test]
+    fn test_execute_list_action_show_help_changes_view_mode() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        execute_list_action(&mut app, ListAction::ShowHelp).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::Help);
+    }
+
+    #[test]
+    fn test_execute_list_action_non_quit_returns_false() {
+        let mut app = create_test_app(5);
+
+        let actions = [
+            ListAction::MoveUp,
+            ListAction::MoveDown,
+            ListAction::JumpToTop,
+            ListAction::JumpToBottom,
+            ListAction::PageUp,
+            ListAction::PageDown,
+            ListAction::EnterDetail,
+            ListAction::EnterSearch,
+            ListAction::OpenSortMenu,
+            ListAction::OpenFilterMenu,
+            ListAction::ShowHelp,
+        ];
+
+        for action in actions {
+            let result = execute_list_action(&mut app, action).unwrap();
+            assert!(!result, "Action {:?} should return false", action);
+            // Reset to list view for next iteration
+            app.nav_mut().view_mode = ViewMode::List;
+        }
+    }
+
+    #[test]
+    fn test_execute_list_action_on_empty_list() {
+        let mut app = create_test_app(0);
+        assert_eq!(app.item_count(), 0);
+
+        // Navigation should not panic on empty list
+        let result = execute_list_action(&mut app, ListAction::MoveDown).unwrap();
+        assert!(!result);
+
+        let result = execute_list_action(&mut app, ListAction::MoveUp).unwrap();
+        assert!(!result);
+
+        let result = execute_list_action(&mut app, ListAction::JumpToTop).unwrap();
+        assert!(!result);
+
+        let result = execute_list_action(&mut app, ListAction::JumpToBottom).unwrap();
+        assert!(!result);
+    }
+
+    // ============================================================================
+    // execute_detail_action tests
+    // ============================================================================
+
+    #[test]
+    fn test_execute_detail_action_navigate_back_returns_to_list() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+        assert_eq!(app.nav().view_mode, ViewMode::Detail);
+
+        execute_detail_action(&mut app, DetailAction::NavigateBack).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+    }
+
+    #[test]
+    fn test_execute_detail_action_move_selection_changes_index() {
+        let mut app = create_test_app(10);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+        assert_eq!(app.list().selected_index(), 0);
+
+        execute_detail_action(&mut app, DetailAction::MoveSelection(1)).unwrap();
+        assert_eq!(app.list().selected_index(), 1);
+
+        execute_detail_action(&mut app, DetailAction::MoveSelection(1)).unwrap();
+        assert_eq!(app.list().selected_index(), 2);
+
+        execute_detail_action(&mut app, DetailAction::MoveSelection(-1)).unwrap();
+        assert_eq!(app.list().selected_index(), 1);
+    }
+
+    #[test]
+    fn test_execute_detail_action_show_help_from_detail() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+        assert_eq!(app.nav().view_mode, ViewMode::Detail);
+
+        execute_detail_action(&mut app, DetailAction::ShowHelp).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::Help);
+    }
+
+    #[test]
+    fn test_execute_detail_action_non_quit_returns_false() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let actions = [
+            DetailAction::NavigateBack,
+            DetailAction::MoveSelection(1),
+            DetailAction::ShowHelp,
+        ];
+
+        for action in actions {
+            let result = execute_detail_action(&mut app, action).unwrap();
+            assert!(!result, "Action {:?} should return false", action);
+            // Reset view for next iteration
+            app.nav_mut().view_mode = ViewMode::Detail;
+        }
+    }
+
+    // ============================================================================
+    // move_selection tests
+    // ============================================================================
+
+    #[test]
+    fn test_move_selection_positive_delta() {
+        let mut app = create_test_app(10);
+        assert_eq!(app.list().selected_index(), 0);
+
+        move_selection(&mut app, 3);
+        assert_eq!(app.list().selected_index(), 3);
+    }
+
+    #[test]
+    fn test_move_selection_negative_delta() {
+        let mut app = create_test_app(10);
+        move_selection(&mut app, 5);
+        assert_eq!(app.list().selected_index(), 5);
+
+        move_selection(&mut app, -2);
+        assert_eq!(app.list().selected_index(), 3);
+    }
+
+    #[test]
+    fn test_move_selection_clamps_at_zero() {
+        let mut app = create_test_app(10);
+        assert_eq!(app.list().selected_index(), 0);
+
+        move_selection(&mut app, -5);
+        assert_eq!(app.list().selected_index(), 0);
+    }
+
+    #[test]
+    fn test_move_selection_clamps_at_max() {
+        let mut app = create_test_app(5);
+        let max_idx = app.item_count().saturating_sub(1);
+
+        move_selection(&mut app, 100);
+        assert_eq!(app.list().selected_index(), max_idx);
+    }
+
+    #[test]
+    fn test_move_selection_empty_list_no_panic() {
+        let mut app = create_test_app(0);
+        // Should not panic
+        move_selection(&mut app, 1);
+        move_selection(&mut app, -1);
+    }
+
+    // ============================================================================
+    // navigate_back tests
+    // ============================================================================
+
+    #[test]
+    fn test_navigate_back_with_history() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+        assert_eq!(app.nav().view_mode, ViewMode::Detail);
+
+        navigate_back(&mut app);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+    }
+
+    #[test]
+    fn test_navigate_back_without_history_at_root() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        navigate_back(&mut app);
+        // Should stay at list
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+    }
+
+    #[test]
+    fn test_navigate_back_without_history_not_at_root() {
+        let mut app = create_test_app(5);
+        // Set view mode directly without history
+        app.nav_mut().view_mode = ViewMode::Detail;
+
+        navigate_back(&mut app);
+        // Should go back to List since no history
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+    }
+
+    // ============================================================================
+    // handle_key integration tests
+    // ============================================================================
+
+    #[test]
+    fn test_handle_key_q_quits_from_list() {
+        let mut app = create_test_app(5);
+        let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+
+        let result = handle_key(&mut app, key).unwrap();
+        assert!(result, "'q' should quit the application");
+    }
+
+    #[test]
+    fn test_handle_key_navigation_in_list_view() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+        assert_eq!(app.list().selected_index(), 0);
+
+        // Press 'j' to move down
+        let j_key = KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE);
+        handle_key(&mut app, j_key).unwrap();
+        assert_eq!(app.list().selected_index(), 1);
+
+        // Press 'k' to move up
+        let k_key = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE);
+        handle_key(&mut app, k_key).unwrap();
+        assert_eq!(app.list().selected_index(), 0);
+    }
+
+    #[test]
+    fn test_handle_key_enter_to_detail_view() {
+        let mut app = create_test_app(5);
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        let enter_key = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        handle_key(&mut app, enter_key).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::Detail);
+    }
+
+    #[test]
+    fn test_handle_key_esc_from_detail_returns_to_list() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let esc_key = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
+        handle_key(&mut app, esc_key).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+    }
+
+    #[test]
+    fn test_handle_key_any_key_exits_help() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Help);
+        assert_eq!(app.nav().view_mode, ViewMode::Help);
+
+        let key = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE);
+        handle_key(&mut app, key).unwrap();
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+    }
+}
