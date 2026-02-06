@@ -1009,4 +1009,131 @@ mod tests {
         let anyhow_err: anyhow::Error = err.into();
         assert!(anyhow_err.to_string().contains("I/O error"));
     }
+
+    // Tests for From<crate::core::errors::Error>
+    mod from_core_error {
+        use super::*;
+        use crate::core::errors::Error as CoreError;
+
+        #[test]
+        fn test_from_filesystem_with_source() {
+            let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file missing");
+            let core_err = CoreError::FileSystem {
+                message: "Custom message".to_string(),
+                path: Some(PathBuf::from("/test/path")),
+                source: Some(io_err),
+            };
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "I/O");
+            assert_eq!(err.path(), Some(&PathBuf::from("/test/path")));
+        }
+
+        #[test]
+        fn test_from_filesystem_without_source() {
+            let core_err = CoreError::FileSystem {
+                message: "No source".to_string(),
+                path: Some(PathBuf::from("/another/path")),
+                source: None,
+            };
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "I/O");
+        }
+
+        #[test]
+        fn test_from_parse() {
+            let core_err = CoreError::Parse {
+                file: PathBuf::from("test.rs"),
+                line: 42,
+                column: 10,
+                message: "Unexpected token".to_string(),
+            };
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Parse");
+        }
+
+        #[test]
+        fn test_from_analysis() {
+            let core_err = CoreError::Analysis("Analysis failed".to_string());
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Analysis");
+        }
+
+        #[test]
+        fn test_from_configuration() {
+            let core_err = CoreError::Configuration("Bad config".to_string());
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Config");
+        }
+
+        #[test]
+        fn test_from_unsupported() {
+            let core_err = CoreError::Unsupported("Feature X".to_string());
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Parse");
+        }
+
+        #[test]
+        fn test_from_validation() {
+            let core_err = CoreError::Validation("Invalid input".to_string());
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Validation");
+        }
+
+        #[test]
+        fn test_from_dependency() {
+            let core_err = CoreError::Dependency("Missing dep".to_string());
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Analysis");
+            assert!(err.to_string().contains("Dependency error"));
+        }
+
+        #[test]
+        fn test_from_concurrency() {
+            let core_err = CoreError::Concurrency("Race condition".to_string());
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Analysis");
+            assert!(err.to_string().contains("Concurrency error"));
+        }
+
+        #[test]
+        fn test_from_with_context() {
+            let core_err = CoreError::WithContext {
+                context: "Processing file".to_string(),
+                message: "Failed".to_string(),
+            };
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Analysis");
+            assert!(err.to_string().contains("Processing file"));
+        }
+
+        #[test]
+        fn test_from_io() {
+            let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+            let core_err = CoreError::Io(io_err);
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "I/O");
+        }
+
+        #[test]
+        fn test_from_json() {
+            let json_err: serde_json::Error =
+                serde_json::from_str::<i32>("not json").unwrap_err();
+            let core_err = CoreError::Json(json_err);
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Parse");
+            assert!(err.to_string().contains("JSON error"));
+        }
+
+        #[test]
+        fn test_from_pattern() {
+            let pattern_err = glob::PatternError {
+                pos: 5,
+                msg: "invalid pattern",
+            };
+            let core_err = CoreError::Pattern(pattern_err);
+            let err: DebtmapError = core_err.into();
+            assert_eq!(err.category(), "Config");
+            assert!(err.to_string().contains("Pattern error"));
+        }
+    }
 }
