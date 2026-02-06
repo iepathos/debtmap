@@ -877,4 +877,180 @@ mod tests {
         assert_eq!(bug_fixes, 2);
         Ok(())
     }
+
+    fn get_head_oid(repo_path: &Path) -> Result<git2::Oid> {
+        let output = Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(repo_path)
+            .output()?;
+        let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(git2::Oid::from_str(&hash)?)
+    }
+
+    #[test]
+    fn test_find_modifications_finds_commits_modifying_pattern() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create file with initial content - we use a zero OID to get ALL commits
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "let marker = 0;",
+            "Initial",
+        )?;
+
+        // First modification changes the marker line
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "let marker = 1;",
+            "First modification",
+        )?;
+
+        // Second modification changes the marker line again
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "let marker = 2;",
+            "Second modification",
+        )?;
+
+        let repo = Git2Repository::open(&repo_path)?;
+
+        // Use a pattern that matches the changed line in all commits
+        // Pass a zero OID that won't match any commit, so we get all modifications
+        let zero_oid = git2::Oid::zero();
+        let modifications =
+            repo.find_modifications(Path::new("test.rs"), "marker", zero_oid)?;
+
+        // All three commits change a line containing "marker"
+        assert_eq!(modifications.len(), 3, "Expected 3 modifications");
+
+        // Verify all commit messages are present
+        let messages: Vec<_> = modifications.iter().map(|m| m.message.as_str()).collect();
+        assert!(
+            messages.iter().any(|m| m.contains("Initial")),
+            "Should include Initial"
+        );
+        assert!(
+            messages.iter().any(|m| m.contains("First modification")),
+            "Should include First modification"
+        );
+        assert!(
+            messages.iter().any(|m| m.contains("Second modification")),
+            "Should include Second modification"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_modifications_returns_empty_when_pattern_not_in_diff() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create file with stable pattern and a placeholder line
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn stable_pattern() {}\n// placeholder",
+            "Initial",
+        )?;
+
+        // Change only the placeholder, not the stable_pattern line
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn stable_pattern() {}\n// changed placeholder",
+            "Modify placeholder only",
+        )?;
+
+        let repo = Git2Repository::open(&repo_path)?;
+        let zero_oid = git2::Oid::zero();
+
+        // Search for a pattern that was never in any diff
+        let untouched_modifications =
+            repo.find_modifications(Path::new("test.rs"), "xyz_never_exists", zero_oid)?;
+
+        assert!(
+            untouched_modifications.is_empty(),
+            "Expected no modifications for pattern that was never in the diff"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_modifications_stops_at_specified_commit() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create commits with pattern changes
+        create_and_commit_file(&repo_path, "test.rs", "let x = 1;", "v1")?;
+        create_and_commit_file(&repo_path, "test.rs", "let x = 2;", "v2")?;
+        create_and_commit_file(&repo_path, "test.rs", "let x = 3;", "v3")?;
+        create_and_commit_file(&repo_path, "test.rs", "let x = 4;", "v4")?;
+        let latest_oid = get_head_oid(&repo_path)?;
+
+        let repo = Git2Repository::open(&repo_path)?;
+
+        // When we pass the latest OID as after_commit, revwalk should immediately
+        // hit the break condition and return no results
+        let modifications =
+            repo.find_modifications(Path::new("test.rs"), r"let x", latest_oid)?;
+
+        // Should find nothing since we stop at the first commit we encounter
+        assert!(
+            modifications.is_empty(),
+            "Expected no modifications when stopping at latest commit"
+        );
+
+        // Verify with zero OID we get all commits
+        let all_mods = repo.find_modifications(Path::new("test.rs"), r"let x", git2::Oid::zero())?;
+        assert_eq!(all_mods.len(), 4, "Should find all 4 commits with zero OID");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_introduction_finds_first_occurrence() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create file without the pattern
+        create_and_commit_file(&repo_path, "test.rs", "fn other() {}", "Initial")?;
+
+        // Add the pattern we're looking for
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn other() {}\nfn special_marker() {}",
+            "Add marker",
+        )?;
+        let expected_oid = get_head_oid(&repo_path)?;
+
+        // Modify after introduction
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn other() {}\nfn special_marker() { updated }",
+            "Update",
+        )?;
+
+        let repo = Git2Repository::open(&repo_path)?;
+        let result = repo.find_introduction(Path::new("test.rs"), "special_marker")?;
+
+        assert!(result.is_some());
+        let (oid, _date) = result.unwrap();
+        assert_eq!(oid, expected_oid);
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_introduction_returns_none_when_not_found() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        create_and_commit_file(&repo_path, "test.rs", "fn main() {}", "Initial")?;
+
+        let repo = Git2Repository::open(&repo_path)?;
+        let result = repo.find_introduction(Path::new("test.rs"), "nonexistent_pattern")?;
+
+        assert!(result.is_none());
+        Ok(())
+    }
 }
