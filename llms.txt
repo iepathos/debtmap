@@ -1,0 +1,109 @@
+# Debtmap
+
+> Debtmap is a code complexity and technical debt analyzer for Rust, Python, JavaScript, and TypeScript codebases. It identifies complexity patterns, coverage gaps, and architectural issues, outputting prioritized recommendations with context for AI-assisted remediation.
+
+Debtmap uses a unified 0-10 priority scoring system that considers cyclomatic complexity, cognitive complexity, test coverage, and call graph analysis. It detects 35+ debt types across testing, architecture, performance, and code quality categories.
+
+## Quick Start
+
+Generate coverage and run analysis with markdown output optimized for LLM consumption:
+
+```bash
+cargo llvm-cov --lcov --output-path lcov.info
+debtmap analyze . --lcov lcov.info --context --format markdown --top 5
+```
+
+For analysis without coverage data:
+
+```bash
+debtmap analyze . --format markdown --top 5
+```
+
+## Commands
+
+- [analyze](book/src/cli/analyze.md): Primary analysis command with complexity metrics, debt detection, and prioritized recommendations
+- [validate](book/src/cli/validate.md): CI/CD threshold enforcement, returns non-zero exit code if thresholds exceeded
+- [compare](book/src/cli/compare.md): Compare before/after JSON snapshots to track improvements
+- [init](book/src/cli/init.md): Create `.debtmap.toml` configuration file
+
+## Key Options for AI Workflows
+
+The `analyze` command supports these options for LLM integration:
+
+- `--format markdown`: Structured output with executive summary, prioritized items, and context suggestions
+- `--format json`: Complete metrics for programmatic processing
+- `--lcov <FILE>`: LCOV coverage file for risk-aware prioritization
+- `--context`: Include caller, callee, test, and type context for each debt item
+- `--top N`: Limit to top N priority items
+- `--min-priority <TIER>`: Filter by priority tier (critical, high, medium, low)
+- `--summary`: Compact health dashboard view
+
+## Priority Scoring
+
+Scores range from 0-10:
+
+- 9-10 Critical: High complexity with poor coverage, fix immediately
+- 7-8.9 High: Significant impact, fix soon
+- 5-6.9 Medium: Plan to address
+- 3-4.9 Low: Address when convenient
+- 0-2.9 Minimal: Monitor only
+
+## Debt Categories
+
+- **Testing**: Coverage gaps, complex tests, assertion density
+- **Architecture**: God objects, feature envy, scattered types
+- **Performance**: Nested loops, blocking I/O, allocation inefficiency
+- **Code Quality**: Complexity hotspots, dead code, magic values
+
+## Documentation
+
+- [User Guide](book/src/user-guide/index.md): Getting started and common workflows
+- [CLI Reference](book/src/cli/index.md): Complete command documentation
+- [Output Formats](book/src/output-formats/index.md): Markdown, JSON, terminal, DOT, HTML formats
+- [Configuration](book/src/configuration/index.md): `.debtmap.toml` options and thresholds
+- [Metrics Reference](book/src/metrics/index.md): Complexity metrics and scoring algorithms
+- [Debt Types](book/src/debt-types/index.md): All 35+ detected debt patterns
+
+## Optional
+
+### Example Workflows
+
+Fix top priority item with coverage:
+
+```bash
+cargo llvm-cov --lcov --output-path lcov.info
+debtmap analyze . --lcov lcov.info --context --format markdown --top 1
+# Fix the identified issue
+debtmap analyze . --lcov lcov.info --format markdown --top 1
+```
+
+Track improvements over time:
+
+```bash
+debtmap analyze . --format json --output before.json
+# Make changes
+debtmap analyze . --format json --output after.json
+debtmap compare --before before.json --after after.json
+```
+
+CI/CD validation:
+
+```bash
+debtmap validate . --config .debtmap.toml
+```
+
+### Context Suggestions
+
+With `--context`, each debt item includes related code:
+
+- **Primary**: The problematic function or file
+- **Caller**: Functions that call it (usage patterns)
+- **Callee**: Functions it calls (dependencies)
+- **Test**: Related test files (expected behavior)
+- **Type**: Associated struct/enum definitions
+
+### Language Support
+
+- Rust: Full AST-based analysis with comprehensive debt detection
+- Python: File detection (analysis planned)
+- JavaScript/TypeScript: File detection (analysis planned)
