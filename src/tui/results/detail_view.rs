@@ -62,7 +62,7 @@ pub fn render(frame: &mut Frame, app: &ResultsApp) {
                 &theme,
             ),
             DetailPage::Responsibilities => {
-                detail_pages::responsibilities::render(frame, item, content_area, &theme)
+                detail_pages::responsibilities::render(frame, app, item, content_area, &theme)
             }
         }
     } else {
@@ -140,9 +140,26 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     frame.render_widget(header, header_area);
 }
 
-/// Render footer with action hints and status message
+/// Render footer with condensed action hints and status message.
+///
+/// Uses a minimal footer with essential hints only.
+/// Full keybindings are available via `?` help overlay.
 fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
-    // If there's a status message, show it on first line, shortcuts on second line
+    // Condensed shortcuts - essential actions only, `?` for full help
+    let shortcuts = Line::from(vec![
+        Span::styled("←", Style::default().fg(theme.accent())),
+        Span::raw(":Back  "),
+        Span::styled("Tab", Style::default().fg(theme.accent())),
+        Span::raw(":Pages  "),
+        Span::styled("j/k", Style::default().fg(theme.accent())),
+        Span::raw(":Items  "),
+        Span::styled("^D/^U", Style::default().fg(theme.accent())),
+        Span::raw(":Scroll  "),
+        Span::styled("?", Style::default().fg(theme.accent())),
+        Span::raw(":Help"),
+    ]);
+
+    // If there's a status message, show it on first line, shortcuts on second
     let lines = if let Some(status) = app.status_message() {
         let status_color = if status.starts_with('✓') {
             theme.success()
@@ -155,40 +172,10 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
                 status,
                 Style::default().fg(status_color),
             )]),
-            Line::from(vec![
-                Span::styled("←/h", Style::default().fg(theme.accent())),
-                Span::raw(": Back  "),
-                Span::styled("Tab/→/l", Style::default().fg(theme.accent())),
-                Span::raw(": Pages  "),
-                Span::styled("1-8", Style::default().fg(theme.accent())),
-                Span::raw(": Jump  "),
-                Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
-                Span::raw(": Items  "),
-                Span::styled("c/C", Style::default().fg(theme.accent())),
-                Span::raw(": Copy  "),
-                Span::styled("e", Style::default().fg(theme.accent())),
-                Span::raw(": Edit  "),
-                Span::styled("?", Style::default().fg(theme.accent())),
-                Span::raw(": Help"),
-            ]),
+            shortcuts,
         ]
     } else {
-        vec![Line::from(vec![
-            Span::styled("←/h", Style::default().fg(theme.accent())),
-            Span::raw(": Back  "),
-            Span::styled("Tab/→/l", Style::default().fg(theme.accent())),
-            Span::raw(": Pages  "),
-            Span::styled("1-8", Style::default().fg(theme.accent())),
-            Span::raw(": Jump  "),
-            Span::styled("↑↓/jk", Style::default().fg(theme.accent())),
-            Span::raw(": Items  "),
-            Span::styled("c/C", Style::default().fg(theme.accent())),
-            Span::raw(": Copy  "),
-            Span::styled("e", Style::default().fg(theme.accent())),
-            Span::raw(": Edit  "),
-            Span::styled("?", Style::default().fg(theme.accent())),
-            Span::raw(": Help"),
-        ])]
+        vec![shortcuts]
     };
 
     // Apply horizontal margin per DESIGN.md

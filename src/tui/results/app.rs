@@ -147,6 +147,15 @@ impl ResultsApp {
         &mut self.nav
     }
 
+    /// Get detail view scroll offset for rendering.
+    ///
+    /// Returns (vertical_offset, horizontal_offset) tuple for use with
+    /// `Paragraph::scroll()`.
+    pub fn detail_scroll_offset(&self) -> (u16, u16) {
+        let offset = self.nav.detail_scroll.offset();
+        (offset.y, offset.x)
+    }
+
     // ========================================================================
     // COORDINATION METHODS
     // ========================================================================

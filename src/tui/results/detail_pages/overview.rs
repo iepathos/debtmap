@@ -429,10 +429,11 @@ pub fn render(
     .flatten()
     .collect();
 
-    // I/O boundary: render the widget
+    // I/O boundary: render the widget with scroll support
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll(app.detail_scroll_offset());
 
     frame.render_widget(paragraph, area);
 }

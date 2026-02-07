@@ -170,6 +170,8 @@ fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<b
                 &app.analysis().data_flow_graph,
             );
             app.nav_mut().detail_page = new_page;
+            // Reset scroll when changing pages
+            app.nav_mut().reset_detail_scroll();
         }
 
         DetailAction::PrevPage => {
@@ -179,6 +181,8 @@ fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<b
                 &app.analysis().data_flow_graph,
             );
             app.nav_mut().detail_page = new_page;
+            // Reset scroll when changing pages
+            app.nav_mut().reset_detail_scroll();
         }
 
         DetailAction::JumpToPage(page) => {
@@ -188,12 +192,55 @@ fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<b
                 &app.analysis().data_flow_graph,
             ) {
                 app.nav_mut().detail_page = page;
+                // Reset scroll when changing pages
+                app.nav_mut().reset_detail_scroll();
             }
         }
 
         DetailAction::MoveSelection(delta) => {
             move_selection(app, delta as isize);
             ensure_valid_page(app);
+            // Reset scroll when changing items
+            app.nav_mut().reset_detail_scroll();
+        }
+
+        // Content scrolling actions
+        DetailAction::ScrollUp => {
+            app.nav_mut().detail_scroll.scroll_up();
+        }
+
+        DetailAction::ScrollDown => {
+            app.nav_mut().detail_scroll.scroll_down();
+        }
+
+        DetailAction::ScrollHalfPageUp => {
+            // Scroll up by half page (approximated by repeated scroll_up)
+            for _ in 0..10 {
+                app.nav_mut().detail_scroll.scroll_up();
+            }
+        }
+
+        DetailAction::ScrollHalfPageDown => {
+            // Scroll down by half page (approximated by repeated scroll_down)
+            for _ in 0..10 {
+                app.nav_mut().detail_scroll.scroll_down();
+            }
+        }
+
+        DetailAction::ScrollPageUp => {
+            app.nav_mut().detail_scroll.scroll_page_up();
+        }
+
+        DetailAction::ScrollPageDown => {
+            app.nav_mut().detail_scroll.scroll_page_down();
+        }
+
+        DetailAction::ScrollToTop => {
+            app.nav_mut().detail_scroll.scroll_to_top();
+        }
+
+        DetailAction::ScrollToBottom => {
+            app.nav_mut().detail_scroll.scroll_to_bottom();
         }
 
         DetailAction::CopyPage => {

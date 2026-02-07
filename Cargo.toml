@@ -129,6 +129,7 @@ git2 = { version = "0.20", features = ["vendored-openssl"] }
 petgraph = "0.8"
 lazy_static = "1.5.0"
 html-escape = "0.2.13"
+tui-scrollview = "0.6.2"
 
 [dev-dependencies]
 # Dependency analysis tools

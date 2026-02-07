@@ -4,6 +4,7 @@
 //! - Explicit state transitions via a transition table
 //! - Pure guard functions for conditional navigation
 //! - Navigation history for proper back navigation
+//! - Detail view scroll state for content scrolling
 //!
 //! Navigation action functions are in the `nav_actions` module.
 //!
@@ -29,6 +30,7 @@
 //! ```
 
 use super::{detail_page::DetailPage, view_mode::ViewMode};
+use tui_scrollview::ScrollViewState;
 
 // Re-export navigation actions for backwards compatibility
 pub use super::nav_actions::{
@@ -88,6 +90,10 @@ pub struct NavigationState {
 
     /// Navigation history for back navigation.
     pub history: Vec<ViewMode>,
+
+    /// Scroll state for detail view content.
+    /// Reset when changing items or pages.
+    pub detail_scroll: ScrollViewState,
 }
 
 impl Default for NavigationState {
@@ -103,7 +109,16 @@ impl NavigationState {
             view_mode: ViewMode::List,
             detail_page: DetailPage::Overview,
             history: vec![],
+            detail_scroll: ScrollViewState::new(),
         }
+    }
+
+    /// Reset detail scroll position to top.
+    ///
+    /// Call this when changing items or detail pages to start
+    /// viewing from the beginning.
+    pub fn reset_detail_scroll(&mut self) {
+        self.detail_scroll = ScrollViewState::new();
     }
 
     /// Push current view mode to history before transitioning.

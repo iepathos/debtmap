@@ -12,7 +12,7 @@
 //! - Reduced cyclomatic complexity in the event handler
 
 use super::detail_page::DetailPage;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Actions that can be triggered from detail view.
 ///
@@ -35,6 +35,30 @@ pub enum DetailAction {
     /// Move selection up or down in the list.
     /// Positive values move down, negative values move up.
     MoveSelection(i32),
+
+    /// Scroll content up by one line.
+    ScrollUp,
+
+    /// Scroll content down by one line.
+    ScrollDown,
+
+    /// Scroll content up by half a page.
+    ScrollHalfPageUp,
+
+    /// Scroll content down by half a page.
+    ScrollHalfPageDown,
+
+    /// Scroll content up by a full page.
+    ScrollPageUp,
+
+    /// Scroll content down by a full page.
+    ScrollPageDown,
+
+    /// Scroll to the top of the content.
+    ScrollToTop,
+
+    /// Scroll to the bottom of the content.
+    ScrollToBottom,
 
     /// Copy current page content.
     CopyPage,
@@ -92,6 +116,29 @@ pub fn page_from_digit(c: char) -> Option<DetailPage> {
 /// inputs (key event and context) and returns an optional action.
 /// No side effects, no mutations, fully testable.
 ///
+/// # Key Bindings
+///
+/// ## Navigation
+/// - `Esc`, `q`, `←`, `h`: Back to list
+/// - `Tab`, `→`, `l`: Next page
+/// - `BackTab`: Previous page
+/// - `1-8`: Jump to page
+/// - `↑/↓`, `j/k`: Previous/next item
+///
+/// ## Content Scrolling
+/// - `Ctrl+U`: Scroll up half page
+/// - `Ctrl+D`: Scroll down half page
+/// - `Ctrl+B`, `PgUp`: Scroll up full page
+/// - `Ctrl+F`, `PgDn`: Scroll down full page
+/// - `g`: Scroll to top
+/// - `G`: Scroll to bottom
+///
+/// ## Actions
+/// - `c`: Copy page content
+/// - `C`: Copy item as LLM markdown
+/// - `e`, `o`: Open in editor
+/// - `?`: Help
+///
 /// # Arguments
 /// * `key` - The key event to process
 /// * `ctx` - Context about current state (for context-sensitive bindings)
@@ -100,6 +147,8 @@ pub fn page_from_digit(c: char) -> Option<DetailPage> {
 /// * `Some(action)` - The action to execute
 /// * `None` - Key has no action in detail view
 pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<DetailAction> {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+
     match key.code {
         // Back navigation - escape, 'q', left arrow, or 'h' returns to previous view
         // h/Left mirrors l/Right entering detail view from list (vim-style navigation)
@@ -114,12 +163,26 @@ pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<D
         // Direct page jump - number keys (1-8) jump to specific pages
         KeyCode::Char(c @ '1'..='8') => page_from_digit(c).map(DetailAction::JumpToPage),
 
-        // Item navigation - up/down moves through the list
-        KeyCode::Down | KeyCode::Char('j') => Some(DetailAction::MoveSelection(1)),
-        KeyCode::Up | KeyCode::Char('k') => Some(DetailAction::MoveSelection(-1)),
+        // Item navigation - up/down moves through the list (without Ctrl)
+        KeyCode::Down | KeyCode::Char('j') if !ctrl => Some(DetailAction::MoveSelection(1)),
+        KeyCode::Up | KeyCode::Char('k') if !ctrl => Some(DetailAction::MoveSelection(-1)),
+
+        // Content scrolling - Ctrl+D/U for half page (vim-style)
+        KeyCode::Char('d') if ctrl => Some(DetailAction::ScrollHalfPageDown),
+        KeyCode::Char('u') if ctrl => Some(DetailAction::ScrollHalfPageUp),
+
+        // Content scrolling - Ctrl+F/B or PgDn/PgUp for full page
+        KeyCode::Char('f') if ctrl => Some(DetailAction::ScrollPageDown),
+        KeyCode::Char('b') if ctrl => Some(DetailAction::ScrollPageUp),
+        KeyCode::PageDown => Some(DetailAction::ScrollPageDown),
+        KeyCode::PageUp => Some(DetailAction::ScrollPageUp),
+
+        // Content scrolling - g/G for top/bottom (vim-style)
+        KeyCode::Char('g') => Some(DetailAction::ScrollToTop),
+        KeyCode::Char('G') => Some(DetailAction::ScrollToBottom),
 
         // Copy current page content
-        KeyCode::Char('c') => Some(DetailAction::CopyPage),
+        KeyCode::Char('c') if !ctrl => Some(DetailAction::CopyPage),
 
         // Copy complete item as LLM-optimized markdown
         KeyCode::Char('C') => Some(DetailAction::CopyItemAsLlm),

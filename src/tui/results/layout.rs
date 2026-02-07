@@ -63,10 +63,9 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
                 .fg(theme.accent())
                 .add_modifier(Modifier::UNDERLINED),
         )]),
-        Line::from("  c           Copy file path to clipboard"),
+        Line::from("  c           Copy path / page content"),
         Line::from("  C           Copy item as LLM markdown"),
-        Line::from("  e           Open in $EDITOR"),
-        Line::from("  o           Open at line number"),
+        Line::from("  e/o         Open in editor"),
         Line::from(""),
         Line::from(vec![Span::styled(
             "Detail View",
@@ -79,8 +78,17 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
         Line::from("  BackTab     Previous page"),
         Line::from("  1-8         Jump to page"),
         Line::from("  ↑↓/jk       Next/prev item"),
-        Line::from("  c           Copy page content"),
-        Line::from("  C           Copy item as LLM markdown"),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "Content Scrolling (Detail View)",
+            Style::default()
+                .fg(theme.accent())
+                .add_modifier(Modifier::UNDERLINED),
+        )]),
+        Line::from("  Ctrl+D/U    Scroll half page down/up"),
+        Line::from("  Ctrl+F/B    Scroll full page down/up"),
+        Line::from("  PgDn/PgUp   Scroll full page"),
+        Line::from("  g/G         Jump to top/bottom"),
         Line::from(""),
         Line::from(vec![Span::styled(
             "General",

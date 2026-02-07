@@ -1906,10 +1906,11 @@ pub fn render(
     // Always show first item (grouping is always on, no cycling)
     let lines = build_page_lines_with_context(item, &location_items, 0, theme, area.width);
 
-    // I/O boundary: render the widget
+    // I/O boundary: render the widget with scroll support
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll(app.detail_scroll_offset());
 
     frame.render_widget(paragraph, area);
 }

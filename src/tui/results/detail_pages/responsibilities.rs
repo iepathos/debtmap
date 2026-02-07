@@ -7,6 +7,7 @@
 
 use super::components::{add_label_value, add_section_header};
 use crate::priority::UnifiedDebtItem;
+use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
     layout::Rect,
@@ -41,12 +42,19 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
 }
 
 /// Render responsibilities page showing responsibility information
-pub fn render(frame: &mut Frame, item: &UnifiedDebtItem, area: Rect, theme: &Theme) {
+pub fn render(
+    frame: &mut Frame,
+    app: &ResultsApp,
+    item: &UnifiedDebtItem,
+    area: Rect,
+    theme: &Theme,
+) {
     let lines = build_page_lines(item, theme, area.width);
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll(app.detail_scroll_offset());
 
     frame.render_widget(paragraph, area);
 }

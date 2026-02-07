@@ -203,7 +203,7 @@ pub fn build_page_lines(
 /// Render data flow page showing data flow analysis
 pub fn render(
     frame: &mut Frame,
-    _app: &ResultsApp,
+    app: &ResultsApp,
     item: &UnifiedDebtItem,
     data_flow: &DataFlowGraph,
     area: Rect,
@@ -213,7 +213,8 @@ pub fn render(
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll(app.detail_scroll_offset());
 
     frame.render_widget(paragraph, area);
 }

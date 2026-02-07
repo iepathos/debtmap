@@ -152,7 +152,7 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
 /// Render context page showing AI context suggestions.
 pub fn render(
     frame: &mut Frame,
-    _app: &ResultsApp,
+    app: &ResultsApp,
     item: &UnifiedDebtItem,
     area: Rect,
     theme: &Theme,
@@ -161,7 +161,8 @@ pub fn render(
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().borders(Borders::NONE))
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll(app.detail_scroll_offset());
 
     frame.render_widget(paragraph, area);
 }
