@@ -195,3 +195,111 @@ fn main_inner() -> Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use debtmap::cli::Cli;
+    use tempfile::tempdir;
+
+    /// Helper to parse CLI args and extract the command
+    fn parse_command(args: &[&str]) -> Commands {
+        let mut full_args = vec!["debtmap"];
+        full_args.extend(args);
+        Cli::parse_from(full_args).command
+    }
+
+    #[test]
+    fn test_extract_jobs_from_analyze_command_default() {
+        let cmd = parse_command(&["analyze", "."]);
+        // Default jobs is 0
+        assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_analyze_command_custom() {
+        let cmd = parse_command(&["analyze", ".", "--jobs", "8"]);
+        assert_eq!(extract_jobs(&cmd), 8);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_analyze_command_short_flag() {
+        let cmd = parse_command(&["analyze", ".", "-j", "4"]);
+        assert_eq!(extract_jobs(&cmd), 4);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_validate_command_default() {
+        let cmd = parse_command(&["validate", "."]);
+        // Default jobs is 0
+        assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_validate_command_custom() {
+        let cmd = parse_command(&["validate", ".", "--jobs", "16"]);
+        assert_eq!(extract_jobs(&cmd), 16);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_init_command() {
+        let cmd = parse_command(&["init"]);
+        assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_compare_command() {
+        let cmd = parse_command(&["compare", "--before", "a.json", "--after", "b.json"]);
+        assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_validate_improvement_command() {
+        let cmd = parse_command(&["validate-improvement", "--comparison", "comp.json"]);
+        assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_diagnose_coverage_command() {
+        let cmd = parse_command(&["diagnose-coverage", "lcov.info"]);
+        assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn test_extract_jobs_from_explain_coverage_command() {
+        let cmd = parse_command(&[
+            "explain-coverage",
+            ".",
+            "--coverage-file",
+            "lcov.info",
+            "--function",
+            "test_func",
+        ]);
+        assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn test_output_profiling_report_to_file() {
+        let dir = tempdir().unwrap();
+        let output_path = dir.path().join("profile.json");
+
+        let result = output_profiling_report(Some(output_path.clone()));
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        let content = std::fs::read_to_string(&output_path).unwrap();
+        // JSON output should contain opening brace or timing data
+        assert!(
+            content.contains("{") || content.contains("timing"),
+            "Expected JSON output, got: {}",
+            content
+        );
+    }
+
+    #[test]
+    fn test_output_profiling_report_to_stderr() {
+        // This just verifies no panic occurs when outputting to stderr
+        let result = output_profiling_report(None);
+        assert!(result.is_ok());
+    }
+}

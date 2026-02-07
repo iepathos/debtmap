@@ -832,6 +832,130 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_execute_detail_action_scroll_up() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        // Scroll down first to have something to scroll up from
+        app.nav_mut().detail_scroll.scroll_down();
+        app.nav_mut().detail_scroll.scroll_down();
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollUp).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_scroll_down() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollDown).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_scroll_half_page_up() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        // Scroll down first
+        for _ in 0..20 {
+            app.nav_mut().detail_scroll.scroll_down();
+        }
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollHalfPageUp).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_scroll_half_page_down() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollHalfPageDown).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_scroll_page_up() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollPageUp).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_scroll_page_down() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollPageDown).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_scroll_to_top() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        // Scroll down first
+        for _ in 0..10 {
+            app.nav_mut().detail_scroll.scroll_down();
+        }
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollToTop).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_scroll_to_bottom() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let result = execute_detail_action(&mut app, DetailAction::ScrollToBottom).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_next_page() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        let result = execute_detail_action(&mut app, DetailAction::NextPage).unwrap();
+        assert!(!result);
+        // Page should have changed (or stayed if no next page available)
+        // Just verify no crash
+    }
+
+    #[test]
+    fn test_execute_detail_action_prev_page() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        // First move to a page that isn't the first
+        execute_detail_action(&mut app, DetailAction::NextPage).unwrap();
+
+        let result = execute_detail_action(&mut app, DetailAction::PrevPage).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_jump_to_page() {
+        use crate::tui::results::detail_page::DetailPage;
+
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        // Jump to a specific page
+        let result =
+            execute_detail_action(&mut app, DetailAction::JumpToPage(DetailPage::Overview))
+                .unwrap();
+        assert!(!result);
+        assert_eq!(app.nav().detail_page, DetailPage::Overview);
+    }
+
     // ============================================================================
     // move_selection tests
     // ============================================================================

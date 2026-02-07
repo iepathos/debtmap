@@ -4,7 +4,9 @@
 //! actual code quality issues (complexity + coverage gaps) over pure file size concerns.
 
 use debtmap::core::FunctionMetrics;
-use debtmap::priority::scoring::rebalanced::{DebtScore, ScoreWeights};
+use debtmap::priority::scoring::rebalanced::{
+    DebtScore, ScoreComponents, ScoreWeights, ScoringRationale, Severity,
+};
 use debtmap::priority::DebtType;
 use std::path::PathBuf;
 
@@ -296,6 +298,221 @@ fn test_score_normalization_range() {
             score.total
         );
     }
+}
+
+#[test]
+fn test_scoring_rationale_display_with_all_sections() {
+    // Create a complex function that will generate all sections of the rationale
+    let complex_func = create_test_function("complex_untested", 50, 80, 200);
+    let score = DebtScore::calculate(
+        &complex_func,
+        &DebtType::TestingGap {
+            coverage: 0.1, // Very low coverage to trigger coverage gap
+            cyclomatic: 50,
+            cognitive: 80,
+        },
+        &ScoreWeights::default(),
+    );
+
+    // Convert rationale to string using Display trait
+    let rationale_str = format!("{}", score.rationale);
+
+    // Verify the output contains the expected sections
+    assert!(
+        rationale_str.contains("Primary factors:"),
+        "Display output should contain 'Primary factors:' section"
+    );
+    assert!(
+        rationale_str.contains("Bonuses:"),
+        "Display output should contain 'Bonuses:' section for complex untested code"
+    );
+
+    // Verify formatting includes the dash prefix
+    assert!(
+        rationale_str.contains("    - "),
+        "Each item should be prefixed with '    - '"
+    );
+}
+
+#[test]
+fn test_scoring_rationale_display_with_empty_sections() {
+    // Create rationale with empty vectors
+    let empty_rationale = ScoringRationale {
+        primary_factors: vec![],
+        bonuses: vec![],
+        context_adjustments: vec![],
+    };
+
+    let output = format!("{}", empty_rationale);
+
+    // Empty rationale should produce empty output
+    assert!(
+        output.is_empty(),
+        "Empty rationale should produce empty output, got: {:?}",
+        output
+    );
+}
+
+#[test]
+fn test_scoring_rationale_display_primary_factors_only() {
+    let rationale = ScoringRationale {
+        primary_factors: vec![
+            "High complexity (+45.0)".to_string(),
+            "Coverage gap (+35.0)".to_string(),
+        ],
+        bonuses: vec![],
+        context_adjustments: vec![],
+    };
+
+    let output = format!("{}", rationale);
+
+    assert!(output.contains("Primary factors:"));
+    assert!(output.contains("High complexity (+45.0)"));
+    assert!(output.contains("Coverage gap (+35.0)"));
+    assert!(!output.contains("Bonuses:"));
+    assert!(!output.contains("Context adjustments:"));
+}
+
+#[test]
+fn test_scoring_rationale_display_context_adjustments() {
+    let rationale = ScoringRationale {
+        primary_factors: vec!["Some factor".to_string()],
+        bonuses: vec![],
+        context_adjustments: vec!["Size de-emphasized (weight: 0.3)".to_string()],
+    };
+
+    let output = format!("{}", rationale);
+
+    assert!(output.contains("Context adjustments:"));
+    assert!(output.contains("Size de-emphasized"));
+}
+
+#[test]
+fn test_severity_display() {
+    assert_eq!(format!("{}", Severity::Critical), "CRITICAL");
+    assert_eq!(format!("{}", Severity::High), "HIGH");
+    assert_eq!(format!("{}", Severity::Medium), "MEDIUM");
+    assert_eq!(format!("{}", Severity::Low), "LOW");
+}
+
+#[test]
+fn test_score_components_weighted_total() {
+    let components = ScoreComponents {
+        complexity_score: 50.0,
+        coverage_score: 40.0,
+        structural_score: 30.0,
+        size_score: 15.0,
+        smell_score: 20.0,
+    };
+
+    let weights = ScoreWeights::balanced();
+    let total = components.weighted_total(&weights);
+
+    // Verify total is in valid range
+    assert!(
+        (0.0..=200.0).contains(&total),
+        "Weighted total should be normalized to 0-200 range, got {:.1}",
+        total
+    );
+
+    // Verify calculation is correct
+    // raw = 50×1.0 + 40×1.0 + 30×0.8 + 15×0.3 + 20×0.6 = 50 + 40 + 24 + 4.5 + 12 = 130.5
+    // normalized = (130.5 / 237.0) × 200.0 ≈ 110.1
+    let expected = (130.5 / 237.0) * 200.0;
+    assert!(
+        (total - expected).abs() < 0.1,
+        "Expected {:.1}, got {:.1}",
+        expected,
+        total
+    );
+}
+
+#[test]
+fn test_scoring_rationale_explain() {
+    // Create components that trigger various conditions
+    let components = ScoreComponents {
+        complexity_score: 50.0, // > 40.0 triggers primary factor
+        coverage_score: 35.0,   // > 30.0 triggers primary factor, > 20.0 triggers bonus
+        structural_score: 40.0, // > 30.0 triggers primary factor
+        size_score: 5.0,        // < 10.0 and > 0.0 triggers context adjustment
+        smell_score: 25.0,      // > 20.0 triggers bonus
+    };
+
+    let weights = ScoreWeights::default(); // size_weight < 0.5 triggers another adjustment
+    let rationale = ScoringRationale::explain(&components, &weights);
+
+    // Verify primary factors are detected
+    assert!(
+        !rationale.primary_factors.is_empty(),
+        "Should have primary factors for high complexity"
+    );
+    assert!(
+        rationale
+            .primary_factors
+            .iter()
+            .any(|f| f.contains("complexity")),
+        "Should detect high complexity"
+    );
+    assert!(
+        rationale
+            .primary_factors
+            .iter()
+            .any(|f| f.contains("coverage")),
+        "Should detect coverage gap"
+    );
+    assert!(
+        rationale
+            .primary_factors
+            .iter()
+            .any(|f| f.contains("Structural")),
+        "Should detect structural issues"
+    );
+
+    // Verify bonuses
+    assert!(
+        !rationale.bonuses.is_empty(),
+        "Should have bonuses for complex + untested code"
+    );
+    assert!(
+        rationale
+            .bonuses
+            .iter()
+            .any(|b| b.contains("Complex + untested")),
+        "Should have complex + untested bonus"
+    );
+    assert!(
+        rationale.bonuses.iter().any(|b| b.contains("smells")),
+        "Should detect code smells"
+    );
+
+    // Verify context adjustments
+    assert!(
+        !rationale.context_adjustments.is_empty(),
+        "Should have context adjustments"
+    );
+}
+
+#[test]
+fn test_score_weights_from_preset() {
+    // Test valid presets
+    assert!(ScoreWeights::from_preset("balanced").is_some());
+    assert!(ScoreWeights::from_preset("quality-focused").is_some());
+    assert!(ScoreWeights::from_preset("quality_focused").is_some());
+    assert!(ScoreWeights::from_preset("quality").is_some());
+    assert!(ScoreWeights::from_preset("size-focused").is_some());
+    assert!(ScoreWeights::from_preset("size_focused").is_some());
+    assert!(ScoreWeights::from_preset("legacy").is_some());
+    assert!(ScoreWeights::from_preset("test-coverage").is_some());
+    assert!(ScoreWeights::from_preset("test_coverage").is_some());
+    assert!(ScoreWeights::from_preset("testing").is_some());
+
+    // Test case insensitivity
+    assert!(ScoreWeights::from_preset("BALANCED").is_some());
+    assert!(ScoreWeights::from_preset("Quality-Focused").is_some());
+
+    // Test invalid preset
+    assert!(ScoreWeights::from_preset("invalid").is_none());
+    assert!(ScoreWeights::from_preset("").is_none());
 }
 
 // Helper function to create test function metrics
