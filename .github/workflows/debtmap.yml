@@ -71,10 +71,10 @@ jobs:
     - name: Run debtmap validation with coverage
       run: |
         if [ -f "target/coverage/lcov.info" ]; then
-          ./target/release/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
+          ./target/release/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json --context
         else
           echo "Warning: LCOV file not found, running validation without coverage data"
-          ./target/release/debtmap validate . --format json --output debtmap-report.json
+          ./target/release/debtmap validate . --format json --output debtmap-report.json --context
         fi
 
     - name: Upload debtmap report and coverage
