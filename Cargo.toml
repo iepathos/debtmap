@@ -103,11 +103,13 @@ indicatif = { version = "0.18", features = ["rayon"] }
 # TUI framework
 ratatui = "0.28"
 crossterm = "0.29"
-# time is a transitive dep of ratatui-widgets; minimum 0.3.9 for Date::replace_day
-time = "0.3.9"
+# time is a transitive dep of ratatui-widgets; minimum 0.3.37 for Month::length
+time = "0.3.37"
+# libc is a transitive dep; minimum 0.2 for modern Rust compatibility
+libc = "0.2"
 unicode-width = "0.2"
 num_cpus = "1.16"
-arboard = "3.3"  # Clipboard access (cross-platform)
+arboard = "3.5"  # Clipboard access (cross-platform); 3.5+ uses objc2 without libc 0.1
 fuzzy-matcher = "0.3"  # Fuzzy search for results explorer
 
 # Date/time
@@ -126,6 +128,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Git operations
 git2 = { version = "0.20", features = ["vendored-openssl"] }
+# openssl-sys/openssl-src are transitive deps; minimum 0.9.93 uses OpenSSL 3.x with Apple Silicon support
+openssl-sys = "0.9.93"
+openssl-src = "300"
 
 # Graph algorithms for taint analysis
 petgraph = "0.8"
