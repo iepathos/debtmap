@@ -402,7 +402,7 @@ impl TierGroups {
 }
 
 /// Sort groups by total score (descending).
-fn sort_groups_by_score(groups: &mut Vec<DisplayGroup>) {
+fn sort_groups_by_score(groups: &mut [DisplayGroup]) {
     groups.sort_by(|a, b| {
         let a_score: f64 = a.items.iter().map(|i| i.score()).sum();
         let b_score: f64 = b.items.iter().map(|i| i.score()).sum();

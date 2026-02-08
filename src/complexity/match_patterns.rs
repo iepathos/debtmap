@@ -169,7 +169,10 @@ impl MatchExpressionRecognizer {
 
     /// Check if all arms in a match expression have simple bodies
     fn all_arms_simple(&self, match_expr: &ExprMatch) -> bool {
-        match_expr.arms.iter().all(|arm| self.is_simple_arm(&arm.body))
+        match_expr
+            .arms
+            .iter()
+            .all(|arm| self.is_simple_arm(&arm.body))
     }
 
     /// Analyze a direct expression for match pattern info with configurable minimum arms
