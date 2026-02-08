@@ -119,9 +119,9 @@ pub fn page_from_digit(c: char) -> Option<DetailPage> {
 /// # Key Bindings
 ///
 /// ## Navigation
-/// - `Esc`, `q`, `←`, `h`: Back to list
-/// - `Tab`, `→`, `l`: Next page
-/// - `BackTab`: Previous page
+/// - `Esc`, `q`, `h`, `Backspace`: Back to list
+/// - `→`, `Tab`, `l`: Next page
+/// - `←`, `BackTab`: Previous page
 /// - `1-8`: Jump to page
 /// - `↑/↓`, `j/k`: Previous/next item
 ///
@@ -150,15 +150,14 @@ pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<D
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 
     match key.code {
-        // Back navigation - escape, 'q', left arrow, or 'h' returns to previous view
-        // h/Left mirrors l/Right entering detail view from list (vim-style navigation)
-        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Left | KeyCode::Char('h') => {
+        // Back navigation - escape, 'q', 'h', or Backspace returns to previous view
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('h') | KeyCode::Backspace => {
             Some(DetailAction::NavigateBack)
         }
 
-        // Page navigation - Tab cycles through available pages
+        // Page navigation - left/right arrows and Tab cycle through pages
         KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => Some(DetailAction::NextPage),
-        KeyCode::BackTab => Some(DetailAction::PrevPage),
+        KeyCode::BackTab | KeyCode::Left => Some(DetailAction::PrevPage),
 
         // Direct page jump - number keys (1-8) jump to specific pages
         KeyCode::Char(c @ '1'..='8') => page_from_digit(c).map(DetailAction::JumpToPage),
@@ -267,10 +266,19 @@ mod tests {
     }
 
     #[test]
-    fn left_arrow_navigates_back() {
+    fn left_arrow_goes_to_prev_page() {
         let ctx = DetailActionContext::new(DetailPage::Context);
         assert_eq!(
             classify_detail_key(key(KeyCode::Left), ctx),
+            Some(DetailAction::PrevPage)
+        );
+    }
+
+    #[test]
+    fn backspace_navigates_back() {
+        let ctx = DetailActionContext::new(DetailPage::Context);
+        assert_eq!(
+            classify_detail_key(key(KeyCode::Backspace), ctx),
             Some(DetailAction::NavigateBack)
         );
     }
@@ -505,9 +513,9 @@ mod tests {
                 page
             );
             assert_eq!(
-                classify_detail_key(key(KeyCode::Left), ctx),
+                classify_detail_key(key(KeyCode::Backspace), ctx),
                 Some(DetailAction::NavigateBack),
-                "Left should navigate back on {:?}",
+                "Backspace should navigate back on {:?}",
                 page
             );
             assert_eq!(
@@ -523,9 +531,21 @@ mod tests {
                 page
             );
             assert_eq!(
+                classify_detail_key(key(KeyCode::Right), ctx),
+                Some(DetailAction::NextPage),
+                "Right should go to next page on {:?}",
+                page
+            );
+            assert_eq!(
                 classify_detail_key(key(KeyCode::BackTab), ctx),
                 Some(DetailAction::PrevPage),
                 "BackTab should work on {:?}",
+                page
+            );
+            assert_eq!(
+                classify_detail_key(key(KeyCode::Left), ctx),
+                Some(DetailAction::PrevPage),
+                "Left should go to prev page on {:?}",
                 page
             );
         }
@@ -555,6 +575,7 @@ mod property_tests {
         prop_oneof![
             Just(KeyCode::Esc),
             Just(KeyCode::Char('q')),
+            Just(KeyCode::Backspace),
             Just(KeyCode::Tab),
             Just(KeyCode::BackTab),
             Just(KeyCode::Right),
@@ -588,16 +609,20 @@ mod property_tests {
             let ctx = DetailActionContext::new(page);
 
             let esc = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
-            let left = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
+            let backspace = KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE);
             let h = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE);
             let tab = KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE);
+            let right = KeyEvent::new(KeyCode::Right, KeyModifiers::NONE);
             let backtab = KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE);
+            let left = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
 
             prop_assert_eq!(classify_detail_key(esc, ctx), Some(DetailAction::NavigateBack));
-            prop_assert_eq!(classify_detail_key(left, ctx), Some(DetailAction::NavigateBack));
+            prop_assert_eq!(classify_detail_key(backspace, ctx), Some(DetailAction::NavigateBack));
             prop_assert_eq!(classify_detail_key(h, ctx), Some(DetailAction::NavigateBack));
             prop_assert_eq!(classify_detail_key(tab, ctx), Some(DetailAction::NextPage));
+            prop_assert_eq!(classify_detail_key(right, ctx), Some(DetailAction::NextPage));
             prop_assert_eq!(classify_detail_key(backtab, ctx), Some(DetailAction::PrevPage));
+            prop_assert_eq!(classify_detail_key(left, ctx), Some(DetailAction::PrevPage));
         }
 
         /// Property: Movement keys are always available.

@@ -73,9 +73,9 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
                 .fg(theme.accent())
                 .add_modifier(Modifier::UNDERLINED),
         )]),
-        Line::from("  ←/h         Back to list"),
-        Line::from("  Tab/→/l     Next page"),
-        Line::from("  BackTab     Previous page"),
+        Line::from("  Esc/q/h/⌫   Back to list"),
+        Line::from("  ←/BackTab   Previous page"),
+        Line::from("  →/Tab/l     Next page"),
         Line::from("  1-8         Jump to page"),
         Line::from("  ↑↓/jk       Next/prev item"),
         Line::from(""),
