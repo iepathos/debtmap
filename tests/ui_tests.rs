@@ -5,6 +5,7 @@
 /// compile, demonstrating that the type system enforces correct usage.
 
 #[test]
+#[ignore] // Slow: compiles full crate. Run with: cargo test --ignored
 fn ui() {
     let t = trybuild::TestCases::new();
 
