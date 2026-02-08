@@ -3,7 +3,7 @@
 //! Pure functions for building function and file metrics.
 
 use crate::core::{
-    ComplexityMetrics, Dependency, DebtItem, FileMetrics, FunctionMetrics, Language,
+    ComplexityMetrics, DebtItem, Dependency, FileMetrics, FunctionMetrics, Language,
 };
 use std::path::PathBuf;
 

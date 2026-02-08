@@ -175,10 +175,7 @@ mod tests {
     #[test]
     fn test_extract_visibility() {
         let vis: syn::Visibility = parse_quote! { pub };
-        assert_eq!(
-            metadata::extract_visibility(&vis),
-            Some("pub".to_string())
-        );
+        assert_eq!(metadata::extract_visibility(&vis), Some("pub".to_string()));
 
         let vis: syn::Visibility = parse_quote! { pub(crate) };
         assert_eq!(

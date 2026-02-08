@@ -5,9 +5,7 @@
 
 use dashmap::DashMap;
 use std::sync::Arc;
-use syn::{
-    visit::Visit, Block, Expr, ExprClosure, ExprMethodCall, ItemFn, Local, Pat, Stmt,
-};
+use syn::{visit::Visit, Block, Expr, ExprClosure, ExprMethodCall, ItemFn, Local, Pat, Stmt};
 
 use super::confidence::{calculate_confidence_score, ConfidenceParams};
 use super::constants::ITERATOR_METHODS;

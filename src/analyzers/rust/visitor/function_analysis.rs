@@ -31,8 +31,7 @@ pub fn create_function_analysis_data(
     enable_rust_patterns: bool,
 ) -> FunctionAnalysisData {
     let metadata = extract_function_metadata(name, item_fn);
-    let complexity_metrics =
-        calculate_complexity_metrics(&item_fn.block, item_fn, file_ast);
+    let complexity_metrics = calculate_complexity_metrics(&item_fn.block, item_fn, file_ast);
     let enhanced_analysis = perform_enhanced_analysis(&item_fn.block);
     let role = classify_function_role(name, metadata.is_test);
 
@@ -104,14 +103,14 @@ pub fn build_function_metrics(
     );
 
     // Phase 3: Functional composition analysis (spec 111)
-    let composition_metrics =
-        analyze_functional_composition(enable_functional_analysis, item_fn);
+    let composition_metrics = analyze_functional_composition(enable_functional_analysis, item_fn);
 
     // Phase 4: Pattern signal detection (specs 179, 180)
     let signals = detect_pattern_signals(block, &context.name);
 
     // Phase 5: Build language-specific data (spec 146)
-    let language_specific = build_language_specific(context, item_fn, &signals, enable_rust_patterns);
+    let language_specific =
+        build_language_specific(context, item_fn, &signals, enable_rust_patterns);
 
     // Phase 6: Error swallowing detection
     let (error_count, error_patterns) = detect_error_swallowing_in_function(block);

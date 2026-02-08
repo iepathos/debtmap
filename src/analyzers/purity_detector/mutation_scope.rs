@@ -109,7 +109,10 @@ mod tests {
         scope.add_local_var("x".to_string());
 
         let expr: Expr = parse_quote!(x);
-        assert_eq!(determine_mutation_scope(&expr, &scope), MutationScope::Local);
+        assert_eq!(
+            determine_mutation_scope(&expr, &scope),
+            MutationScope::Local
+        );
     }
 
     #[test]

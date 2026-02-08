@@ -136,9 +136,7 @@ mod tests {
 
     #[test]
     fn test_transmute_is_pure() {
-        let block: Block = parse_quote!({
-            std::mem::transmute(x)
-        });
+        let block: Block = parse_quote!({ std::mem::transmute(x) });
         let ops = classify_unsafe_operations(&block);
         assert!(ops.contains(&UnsafeOp::Transmute));
 
@@ -149,9 +147,7 @@ mod tests {
 
     #[test]
     fn test_pointer_read_is_pure() {
-        let block: Block = parse_quote!({
-            ptr.read()
-        });
+        let block: Block = parse_quote!({ ptr.read() });
         let ops = classify_unsafe_operations(&block);
         assert!(ops.contains(&UnsafeOp::RawPointerRead));
 
@@ -162,9 +158,7 @@ mod tests {
 
     #[test]
     fn test_pointer_write_is_impure() {
-        let block: Block = parse_quote!({
-            ptr.write(value)
-        });
+        let block: Block = parse_quote!({ ptr.write(value) });
         let ops = classify_unsafe_operations(&block);
         assert!(ops.contains(&UnsafeOp::RawPointerWrite));
 
@@ -175,9 +169,7 @@ mod tests {
 
     #[test]
     fn test_pointer_arithmetic_is_pure() {
-        let block: Block = parse_quote!({
-            ptr.offset(1)
-        });
+        let block: Block = parse_quote!({ ptr.offset(1) });
         let ops = classify_unsafe_operations(&block);
         assert!(ops.contains(&UnsafeOp::PointerArithmetic));
 

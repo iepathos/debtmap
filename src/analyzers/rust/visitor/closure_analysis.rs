@@ -3,14 +3,14 @@
 //! Functions for analyzing closures within functions.
 
 use crate::analyzers::rust::types::ClosureComplexityMetrics;
+use crate::analyzers::rust_complexity_calculation;
 use crate::complexity::cyclomatic::calculate_cyclomatic;
+use crate::complexity::entropy_core::EntropyScore;
 use crate::complexity::pure_mapping_patterns::{
     calculate_adjusted_complexity, MappingPatternConfig, MappingPatternDetector,
 };
-use crate::complexity::entropy_core::EntropyScore;
 use crate::config::get_entropy_config;
 use crate::core::FunctionMetrics;
-use crate::analyzers::rust_complexity_calculation;
 use std::path::PathBuf;
 
 /// Convert closure body to a block for analysis
@@ -54,8 +54,7 @@ pub fn build_closure_metrics(
     // Detect pure mapping patterns for closures (spec 118)
     let function_body = quote::quote!(#block).to_string();
     let mapping_detector = MappingPatternDetector::new(MappingPatternConfig::default());
-    let mapping_result =
-        mapping_detector.analyze_function(&function_body, complexity.cyclomatic);
+    let mapping_result = mapping_detector.analyze_function(&function_body, complexity.cyclomatic);
 
     let adjusted_complexity = if mapping_result.is_pure_mapping {
         Some(calculate_adjusted_complexity(
