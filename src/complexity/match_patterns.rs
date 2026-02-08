@@ -166,39 +166,35 @@ impl MatchExpressionRecognizer {
             PatternType::SimpleComparison
         }
     }
+
+    /// Check if all arms in a match expression have simple bodies
+    fn all_arms_simple(&self, match_expr: &ExprMatch) -> bool {
+        match_expr.arms.iter().all(|arm| self.is_simple_arm(&arm.body))
+    }
+
+    /// Analyze a direct expression for match pattern info with configurable minimum arms
+    pub fn analyze_expr(&self, expr: &Expr, min_arms: usize) -> Option<PatternMatchInfo> {
+        let match_expr = match expr {
+            Expr::Match(m) => m,
+            _ => return None,
+        };
+
+        if match_expr.arms.len() < min_arms || !self.all_arms_simple(match_expr) {
+            return None;
+        }
+
+        Some(PatternMatchInfo {
+            variable_name: "match_expr".to_string(),
+            condition_count: match_expr.arms.len(),
+            has_default: self.has_wildcard_arm(match_expr),
+            pattern_type: self.determine_pattern_type(match_expr),
+        })
+    }
 }
 
 /// Helper function to detect match expressions directly
 pub fn detect_match_expression(expr: &Expr) -> Option<PatternMatchInfo> {
-    if let Expr::Match(match_expr) = expr {
-        let recognizer = MatchExpressionRecognizer::new();
-
-        // Check if all arms are simple
-        let simple_arms = match_expr
-            .arms
-            .iter()
-            .all(|arm| recognizer.is_simple_arm(&arm.body));
-
-        if simple_arms && match_expr.arms.len() >= 2 {
-            // Determine pattern type
-            let pattern_type = if recognizer.detect_enum_matching(match_expr) {
-                PatternType::EnumMatching
-            } else if recognizer.detect_string_matching(match_expr) {
-                PatternType::StringMatching
-            } else {
-                PatternType::SimpleComparison
-            };
-
-            return Some(PatternMatchInfo {
-                variable_name: "match_expr".to_string(),
-                condition_count: match_expr.arms.len(),
-                has_default: recognizer.has_wildcard_arm(match_expr),
-                pattern_type,
-            });
-        }
-    }
-
-    None
+    MatchExpressionRecognizer::new().analyze_expr(expr, 2)
 }
 
 #[cfg(test)]
