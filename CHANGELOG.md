@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-02-08
+
+### Added
+
+- **TUI Content Scrolling** - Detail view now supports scrolling through content with arrow keys
+  - Enables viewing long debt item details without truncation
+
+### Fixed
+
+- **TUI Navigation** - Arrow keys now correctly navigate pages in detail view
+- **Windows CI Builds** - Install OpenSSL via vcpkg for Windows build compatibility
+- **Dependency Compatibility** - Added minimum `time` version constraint for CI stability
+
+### Changed
+
+- **Dependencies** - Updated Cargo.lock with latest dependency versions
+  - memchr: 2.7.6 → 2.8.0
+  - Updated various dependency version constraints
+
+### Internal (Refactoring)
+
+- **God Object Analyzer** - Split god object files into focused modules
+- **Complexity Analysis** - Extracted pure functions from `detect_match_expression`
+- **General Refactoring** - Extracted pure functions with improved test coverage
+
+### Testing
+
+- Added comprehensive tests for `is_function_used_by_pattern`
+- Added coverage for scoring, main CLI, and TUI navigation
+- Added edge case tests for `ensure_balanced_distribution`
+- Added coverage for TUI actions and navigation
+- Added tests for `From<CoreError>` implementation
+- Added coverage for git search functionality
+- Ignored slow trybuild UI test by default for faster CI
+
+### Infrastructure
+
+- Added `--context` flag to debtmap validate commands in CI
+- Applied cargo fmt formatting
+
 ## [0.13.2] - 2026-02-06
 
 ### Added
