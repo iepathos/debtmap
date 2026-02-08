@@ -316,43 +316,69 @@ fn merge_splits(
     calculate_split_cohesion(target)
 }
 
+/// Check if distribution is balanced (ratio within threshold or contains zero-size split)
+fn is_distribution_balanced(splits: &[ModuleSplit], config: &SplitSizeConfig) -> bool {
+    let (min_size, max_size) = splits
+        .iter()
+        .map(|s| s.method_count)
+        .fold((usize::MAX, 0), |(min, max), count| {
+            (min.min(count), max.max(count))
+        });
+
+    min_size == 0 || max_size as f64 / min_size as f64 <= config.max_size_ratio
+}
+
+/// Find the index of the largest split by method count
+fn find_largest_split_idx(splits: &[ModuleSplit]) -> Option<usize> {
+    splits
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, s)| s.method_count)
+        .map(|(idx, _)| idx)
+}
+
+/// Result of a single rebalancing attempt
+enum RebalanceResult {
+    /// Successfully rebalanced the splits
+    Rebalanced(Vec<ModuleSplit>),
+    /// Cannot rebalance further, return original splits unchanged
+    CannotRebalance(Vec<ModuleSplit>),
+}
+
+/// Attempt a single rebalancing step: split the largest cluster if possible
+fn try_rebalance_once(mut splits: Vec<ModuleSplit>) -> RebalanceResult {
+    let Some(idx) = find_largest_split_idx(&splits) else {
+        return RebalanceResult::CannotRebalance(splits);
+    };
+
+    let Some(sub_splits) = split_into_two(&splits[idx]) else {
+        return RebalanceResult::CannotRebalance(splits);
+    };
+
+    splits.remove(idx);
+    splits.extend(sub_splits);
+    RebalanceResult::Rebalanced(splits)
+}
+
 /// Ensure balanced distribution of split sizes
 fn ensure_balanced_distribution(
     mut splits: Vec<ModuleSplit>,
     config: &SplitSizeConfig,
 ) -> Vec<ModuleSplit> {
+    const MAX_ITERATIONS: usize = 10;
+
     if splits.len() < 2 {
         return splits;
     }
 
-    // Iterate until distribution is balanced
-    for _ in 0..10 {
-        // Max 10 iterations to prevent infinite loops
-        let sizes: Vec<_> = splits.iter().map(|s| s.method_count).collect();
-        let max_size = *sizes.iter().max().unwrap_or(&0);
-        let min_size = *sizes.iter().min().unwrap_or(&0);
-
-        if min_size == 0 || max_size as f64 / min_size as f64 <= config.max_size_ratio {
-            break; // Distribution is balanced
+    for _ in 0..MAX_ITERATIONS {
+        if is_distribution_balanced(&splits, config) {
+            return splits;
         }
 
-        // Find largest split
-        let largest_idx = splits
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, s)| s.method_count)
-            .map(|(idx, _)| idx);
-
-        if let Some(idx) = largest_idx {
-            // Try to split the largest cluster
-            if let Some(sub_splits) = split_into_two(&splits[idx]) {
-                splits.remove(idx);
-                splits.extend(sub_splits);
-            } else {
-                break; // Can't split further
-            }
-        } else {
-            break;
+        match try_rebalance_once(splits) {
+            RebalanceResult::Rebalanced(rebalanced) => splits = rebalanced,
+            RebalanceResult::CannotRebalance(unchanged) => return unchanged,
         }
     }
 

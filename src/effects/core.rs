@@ -1478,4 +1478,173 @@ mod tests {
         assert_eq!(retry_config.max_retries, 5);
         assert_eq!(retry_config.base_delay_ms, 200);
     }
+
+    #[tokio::test]
+    async fn test_with_retry_stops_on_timeout() {
+        // Configure with high max_retries but very short timeout
+        // This exercises the timeout path in should_retry
+        let config = RetryConfig {
+            max_retries: 100,
+            base_delay_ms: 50,
+            timeout_seconds: 0,
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect: AnalysisEffect<String> = with_retry(
+            move || {
+                attempt_clone.fetch_add(1, Ordering::SeqCst);
+                effect_fail(AnalysisError::io("Resource busy"))
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_err());
+        // With timeout of 0 seconds, should fail immediately after first attempt
+        // since elapsed time will exceed the 0-second timeout
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_with_constant_strategy() {
+        use crate::config::retry::RetryStrategy;
+
+        let config = RetryConfig {
+            max_retries: 3,
+            base_delay_ms: 5,
+            strategy: RetryStrategy::Constant,
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect = with_retry(
+            move || {
+                let count = attempt_clone.fetch_add(1, Ordering::SeqCst);
+                if count < 2 {
+                    effect_fail(AnalysisError::io("Resource busy"))
+                } else {
+                    effect_pure("success with constant strategy".to_string())
+                }
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success with constant strategy");
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_with_linear_strategy() {
+        use crate::config::retry::RetryStrategy;
+
+        let config = RetryConfig {
+            max_retries: 3,
+            base_delay_ms: 5,
+            strategy: RetryStrategy::Linear,
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect = with_retry(
+            move || {
+                let count = attempt_clone.fetch_add(1, Ordering::SeqCst);
+                if count < 1 {
+                    effect_fail(AnalysisError::io("Resource busy"))
+                } else {
+                    effect_pure("success with linear strategy".to_string())
+                }
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success with linear strategy");
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_with_fibonacci_strategy() {
+        use crate::config::retry::RetryStrategy;
+
+        let config = RetryConfig {
+            max_retries: 3,
+            base_delay_ms: 5,
+            strategy: RetryStrategy::Fibonacci,
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect = with_retry(
+            move || {
+                let count = attempt_clone.fetch_add(1, Ordering::SeqCst);
+                if count < 1 {
+                    effect_fail(AnalysisError::io("Resource busy"))
+                } else {
+                    effect_pure("success with fibonacci strategy".to_string())
+                }
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success with fibonacci strategy");
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_with_jitter() {
+        let config = RetryConfig {
+            max_retries: 3,
+            base_delay_ms: 5,
+            jitter_factor: 0.5,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect = with_retry(
+            move || {
+                let count = attempt_clone.fetch_add(1, Ordering::SeqCst);
+                if count < 1 {
+                    effect_fail(AnalysisError::io("Resource busy"))
+                } else {
+                    effect_pure("success with jitter".to_string())
+                }
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success with jitter");
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 2);
+    }
 }

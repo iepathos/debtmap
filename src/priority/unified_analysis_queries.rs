@@ -176,90 +176,22 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
 
     fn get_tiered_display(&self, limit: usize) -> TieredDisplay {
         let all_items = self.get_top_mixed_priorities(limit);
+        let (critical_items, groupable_items) = partition_by_criticality(all_items);
 
-        let mut critical_groups: Vec<DisplayGroup> = Vec::new();
-        let mut high_groups: Vec<DisplayGroup> = Vec::new();
-        let mut moderate_groups: Vec<DisplayGroup> = Vec::new();
-        let mut low_groups: Vec<DisplayGroup> = Vec::new();
+        let mut tier_groups = TierGroups::default();
 
-        // Group items by tier and debt type
-        let mut tier_groups: HashMap<(Tier, String), Vec<DebtItem>> = HashMap::new();
-
-        for item in all_items {
-            let tier = Tier::from_score(item.score());
-            let debt_type = get_debt_type_key(&item);
-
-            // Never group god objects or architectural issues
-            if is_critical_item(&item) {
-                // Add as individual group
-                let group = DisplayGroup {
-                    tier: tier.clone(),
-                    debt_type: debt_type.clone(),
-                    items: vec![item],
-                    batch_action: None,
-                };
-
-                match tier {
-                    Tier::Critical => critical_groups.push(group),
-                    Tier::High => high_groups.push(group),
-                    Tier::Moderate => moderate_groups.push(group),
-                    Tier::Low => low_groups.push(group),
-                }
-            } else {
-                // Group similar items
-                tier_groups.entry((tier, debt_type)).or_default().push(item);
-            }
+        // Add critical items as individual groups
+        for item in critical_items {
+            tier_groups.add_group(create_critical_item_group(item));
         }
 
-        // Create display groups for grouped items
-        for ((tier, debt_type), items) in tier_groups {
-            if items.is_empty() {
-                continue;
-            }
-
-            let batch_action = if items.len() > 1 {
-                Some(generate_batch_action(&debt_type, items.len()))
-            } else {
-                None
-            };
-
-            let group = DisplayGroup {
-                tier: tier.clone(),
-                debt_type,
-                items,
-                batch_action,
-            };
-
-            match tier {
-                Tier::Critical => critical_groups.push(group),
-                Tier::High => high_groups.push(group),
-                Tier::Moderate => moderate_groups.push(group),
-                Tier::Low => low_groups.push(group),
-            }
+        // Group similar items by tier and debt type
+        let grouped = group_items_by_tier_and_type(groupable_items);
+        for ((tier, debt_type), items) in grouped {
+            tier_groups.add_group(create_grouped_display_group(tier, debt_type, items));
         }
 
-        // Sort groups within each tier by total score
-        let sort_groups = |groups: &mut Vec<DisplayGroup>| {
-            groups.sort_by(|a, b| {
-                let a_score: f64 = a.items.iter().map(|i| i.score()).sum();
-                let b_score: f64 = b.items.iter().map(|i| i.score()).sum();
-                b_score
-                    .partial_cmp(&a_score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        };
-
-        sort_groups(&mut critical_groups);
-        sort_groups(&mut high_groups);
-        sort_groups(&mut moderate_groups);
-        sort_groups(&mut low_groups);
-
-        TieredDisplay {
-            critical: critical_groups,
-            high: high_groups,
-            moderate: moderate_groups,
-            low: low_groups,
-        }
+        tier_groups.into_tiered_display()
     }
 
     fn get_categorized_debt(&self, limit: usize) -> CategorizedDebt {
@@ -430,6 +362,101 @@ fn build_category_summary(category: DebtCategory, items: Vec<DebtItem>) -> Categ
         average_severity,
         top_items,
     }
+}
+
+/// Mutable container for collecting display groups by tier.
+/// Used internally during tiered display construction.
+#[derive(Default)]
+struct TierGroups {
+    critical: Vec<DisplayGroup>,
+    high: Vec<DisplayGroup>,
+    moderate: Vec<DisplayGroup>,
+    low: Vec<DisplayGroup>,
+}
+
+impl TierGroups {
+    /// Add a group to the appropriate tier bucket.
+    fn add_group(&mut self, group: DisplayGroup) {
+        match group.tier {
+            Tier::Critical => self.critical.push(group),
+            Tier::High => self.high.push(group),
+            Tier::Moderate => self.moderate.push(group),
+            Tier::Low => self.low.push(group),
+        }
+    }
+
+    /// Convert into a TieredDisplay after sorting groups within each tier.
+    fn into_tiered_display(mut self) -> TieredDisplay {
+        sort_groups_by_score(&mut self.critical);
+        sort_groups_by_score(&mut self.high);
+        sort_groups_by_score(&mut self.moderate);
+        sort_groups_by_score(&mut self.low);
+
+        TieredDisplay {
+            critical: self.critical,
+            high: self.high,
+            moderate: self.moderate,
+            low: self.low,
+        }
+    }
+}
+
+/// Sort groups by total score (descending).
+fn sort_groups_by_score(groups: &mut Vec<DisplayGroup>) {
+    groups.sort_by(|a, b| {
+        let a_score: f64 = a.items.iter().map(|i| i.score()).sum();
+        let b_score: f64 = b.items.iter().map(|i| i.score()).sum();
+        b_score
+            .partial_cmp(&a_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
+/// Create a DisplayGroup for a single critical item.
+fn create_critical_item_group(item: DebtItem) -> DisplayGroup {
+    let tier = Tier::from_score(item.score());
+    let debt_type = get_debt_type_key(&item);
+    DisplayGroup {
+        tier,
+        debt_type,
+        items: vec![item],
+        batch_action: None,
+    }
+}
+
+/// Create a DisplayGroup from a collection of similar items.
+fn create_grouped_display_group(
+    tier: Tier,
+    debt_type: String,
+    items: Vec<DebtItem>,
+) -> DisplayGroup {
+    let batch_action = if items.len() > 1 {
+        Some(generate_batch_action(&debt_type, items.len()))
+    } else {
+        None
+    };
+    DisplayGroup {
+        tier,
+        debt_type,
+        items,
+        batch_action,
+    }
+}
+
+/// Partition items into critical (ungroupable) and groupable items.
+fn partition_by_criticality(items: im::Vector<DebtItem>) -> (Vec<DebtItem>, Vec<DebtItem>) {
+    items.into_iter().partition(is_critical_item)
+}
+
+/// Group items by their tier and debt type key.
+fn group_items_by_tier_and_type(items: Vec<DebtItem>) -> HashMap<(Tier, String), Vec<DebtItem>> {
+    let mut groups: HashMap<(Tier, String), Vec<DebtItem>> = HashMap::new();
+    for item in items {
+        let tier = Tier::from_score(item.score());
+        let debt_type = get_debt_type_key(&item);
+        groups.entry((tier, debt_type)).or_default().push(item);
+    }
+    groups
 }
 
 /// Get a descriptive key for the debt type
@@ -1275,5 +1302,277 @@ mod tests {
         // Single item should not have batch action
         assert_eq!(display.moderate.len(), 1);
         assert!(display.moderate[0].batch_action.is_none());
+    }
+
+    // Tests for extracted helper functions
+
+    #[test]
+    fn test_partition_by_criticality_separates_critical_items() {
+        let critical = create_test_unified_item(
+            "critical",
+            96.0, // >= 95.0 makes it critical
+            DebtType::ComplexityHotspot {
+                cyclomatic: 50,
+                cognitive: 60,
+            },
+        );
+        let normal = create_test_unified_item(
+            "normal",
+            60.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+        );
+
+        let items: im::Vector<DebtItem> = vec![
+            DebtItem::Function(Box::new(critical)),
+            DebtItem::Function(Box::new(normal)),
+        ]
+        .into_iter()
+        .collect();
+
+        let (critical_items, groupable_items) = super::partition_by_criticality(items);
+
+        assert_eq!(critical_items.len(), 1);
+        assert_eq!(groupable_items.len(), 1);
+        assert_eq!(critical_items[0].score(), 96.0);
+        assert_eq!(groupable_items[0].score(), 60.0);
+    }
+
+    #[test]
+    fn test_partition_by_criticality_god_objects_always_critical() {
+        let god_object = create_test_unified_item(
+            "god_object",
+            50.0, // Low score, but god object type makes it critical
+            DebtType::GodObject {
+                methods: 100,
+                fields: Some(50),
+                responsibilities: 10,
+                god_object_score: 85.0,
+                lines: 2000,
+            },
+        );
+
+        let items: im::Vector<DebtItem> = vec![DebtItem::Function(Box::new(god_object))]
+            .into_iter()
+            .collect();
+
+        let (critical_items, groupable_items) = super::partition_by_criticality(items);
+
+        assert_eq!(critical_items.len(), 1);
+        assert_eq!(groupable_items.len(), 0);
+    }
+
+    #[test]
+    fn test_group_items_by_tier_and_type_groups_correctly() {
+        let item1 = create_test_unified_item(
+            "func1",
+            75.0, // High tier
+            DebtType::ComplexityHotspot {
+                cyclomatic: 30,
+                cognitive: 35,
+            },
+        );
+        let item2 = create_test_unified_item(
+            "func2",
+            78.0, // High tier
+            DebtType::ComplexityHotspot {
+                cyclomatic: 32,
+                cognitive: 38,
+            },
+        );
+        let item3 = create_test_unified_item(
+            "func3",
+            55.0, // Moderate tier
+            DebtType::TestingGap {
+                coverage: 0.2,
+                cyclomatic: 15,
+                cognitive: 18,
+            },
+        );
+
+        let items = vec![
+            DebtItem::Function(Box::new(item1)),
+            DebtItem::Function(Box::new(item2)),
+            DebtItem::Function(Box::new(item3)),
+        ];
+
+        let groups = super::group_items_by_tier_and_type(items);
+
+        // Should have 2 groups: High/ComplexityHotspot and Moderate/TestingGap
+        assert_eq!(groups.len(), 2);
+
+        let high_complexity_key = (Tier::High, "High Complexity Functions".to_string());
+        assert!(groups.contains_key(&high_complexity_key));
+        assert_eq!(groups[&high_complexity_key].len(), 2);
+
+        let moderate_testing_key = (Tier::Moderate, "Untested Complex Functions".to_string());
+        assert!(groups.contains_key(&moderate_testing_key));
+        assert_eq!(groups[&moderate_testing_key].len(), 1);
+    }
+
+    #[test]
+    fn test_sort_groups_by_score_descending() {
+        let item1 = create_test_unified_item(
+            "low",
+            30.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 10,
+                cognitive: 12,
+            },
+        );
+        let item2 = create_test_unified_item(
+            "high",
+            80.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 40,
+                cognitive: 50,
+            },
+        );
+
+        let mut groups = vec![
+            DisplayGroup {
+                tier: Tier::Low,
+                debt_type: "Low Score".to_string(),
+                items: vec![DebtItem::Function(Box::new(item1))],
+                batch_action: None,
+            },
+            DisplayGroup {
+                tier: Tier::High,
+                debt_type: "High Score".to_string(),
+                items: vec![DebtItem::Function(Box::new(item2))],
+                batch_action: None,
+            },
+        ];
+
+        super::sort_groups_by_score(&mut groups);
+
+        // Higher score should be first
+        assert_eq!(groups[0].debt_type, "High Score");
+        assert_eq!(groups[1].debt_type, "Low Score");
+    }
+
+    #[test]
+    fn test_create_critical_item_group_single_item_no_batch() {
+        let item = create_test_unified_item(
+            "critical",
+            96.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 50,
+                cognitive: 60,
+            },
+        );
+
+        let group = super::create_critical_item_group(DebtItem::Function(Box::new(item)));
+
+        assert_eq!(group.items.len(), 1);
+        assert!(group.batch_action.is_none());
+        assert_eq!(group.tier, Tier::Critical);
+    }
+
+    #[test]
+    fn test_create_grouped_display_group_with_batch_action() {
+        let item1 = create_test_unified_item(
+            "func1",
+            75.0,
+            DebtType::TestingGap {
+                coverage: 0.1,
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+        );
+        let item2 = create_test_unified_item(
+            "func2",
+            72.0,
+            DebtType::TestingGap {
+                coverage: 0.2,
+                cyclomatic: 18,
+                cognitive: 22,
+            },
+        );
+
+        let items = vec![
+            DebtItem::Function(Box::new(item1)),
+            DebtItem::Function(Box::new(item2)),
+        ];
+
+        let group = super::create_grouped_display_group(
+            Tier::High,
+            "Untested Complex Functions".to_string(),
+            items,
+        );
+
+        assert_eq!(group.items.len(), 2);
+        assert!(group.batch_action.is_some());
+        assert_eq!(
+            group.batch_action.unwrap(),
+            "Add test coverage for 2 complex functions"
+        );
+    }
+
+    #[test]
+    fn test_create_grouped_display_group_single_item_no_batch() {
+        let item = create_test_unified_item(
+            "func1",
+            75.0,
+            DebtType::TestingGap {
+                coverage: 0.1,
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+        );
+
+        let items = vec![DebtItem::Function(Box::new(item))];
+
+        let group = super::create_grouped_display_group(
+            Tier::High,
+            "Untested Complex Functions".to_string(),
+            items,
+        );
+
+        assert_eq!(group.items.len(), 1);
+        assert!(group.batch_action.is_none());
+    }
+
+    #[test]
+    fn test_tier_groups_into_tiered_display_sorts_all_tiers() {
+        let critical_item = create_test_unified_item(
+            "critical",
+            92.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 45,
+                cognitive: 55,
+            },
+        );
+        let high_item = create_test_unified_item(
+            "high",
+            75.0,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 30,
+                cognitive: 35,
+            },
+        );
+
+        let mut tier_groups = super::TierGroups::default();
+        tier_groups.add_group(DisplayGroup {
+            tier: Tier::Critical,
+            debt_type: "Test".to_string(),
+            items: vec![DebtItem::Function(Box::new(critical_item))],
+            batch_action: None,
+        });
+        tier_groups.add_group(DisplayGroup {
+            tier: Tier::High,
+            debt_type: "Test".to_string(),
+            items: vec![DebtItem::Function(Box::new(high_item))],
+            batch_action: None,
+        });
+
+        let display = tier_groups.into_tiered_display();
+
+        assert_eq!(display.critical.len(), 1);
+        assert_eq!(display.high.len(), 1);
+        assert_eq!(display.moderate.len(), 0);
+        assert_eq!(display.low.len(), 0);
     }
 }

@@ -408,6 +408,43 @@ fn build_analysis_results(
 /// 200 files * ~50KB avg = ~10MB per batch, well under the 4GB limit.
 const EXTRACTION_BATCH_SIZE: usize = 200;
 
+/// Filter paths to include only Rust source files.
+fn filter_rust_files(files: &[PathBuf]) -> Vec<PathBuf> {
+    files
+        .iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "rs"))
+        .cloned()
+        .collect()
+}
+
+/// Read file contents in parallel (I/O operation).
+fn read_file_contents(paths: &[PathBuf]) -> Vec<(PathBuf, String)> {
+    paths
+        .par_iter()
+        .filter_map(|path| {
+            std::fs::read_to_string(path)
+                .ok()
+                .map(|content| (path.clone(), content))
+        })
+        .collect()
+}
+
+/// Collect successful extraction results into a HashMap.
+fn collect_extraction_results(
+    results: Vec<(PathBuf, anyhow::Result<ExtractedFileData>)>,
+) -> HashMap<PathBuf, ExtractedFileData> {
+    results
+        .into_iter()
+        .filter_map(|(path, result)| match result {
+            Ok(data) => Some((path, data)),
+            Err(e) => {
+                log::warn!("Failed to extract {}: {}", path.display(), e);
+                None
+            }
+        })
+        .collect()
+}
+
 /// Extract all data from files in a single pass (I/O).
 ///
 /// Processes files in batches to prevent proc-macro2 SourceMap overflow.
@@ -419,48 +456,107 @@ const EXTRACTION_BATCH_SIZE: usize = 200;
 /// file discovery. It parses each file exactly once and extracts all data
 /// needed by downstream analysis phases.
 pub fn extract_all_files(files: &[PathBuf]) -> HashMap<PathBuf, ExtractedFileData> {
-    let mut extracted = HashMap::with_capacity(files.len());
-
-    // Filter to Rust files only (extraction is Rust-specific)
-    let rust_files: Vec<_> = files
-        .iter()
-        .filter(|p| p.extension().map(|e| e == "rs").unwrap_or(false))
-        .cloned()
-        .collect();
-
+    let rust_files = filter_rust_files(files);
     if rust_files.is_empty() {
-        return extracted;
+        return HashMap::new();
     }
 
-    for batch in rust_files.chunks(EXTRACTION_BATCH_SIZE) {
-        // Read file contents in parallel (I/O bound)
-        let contents: Vec<_> = batch
-            .par_iter()
-            .filter_map(|path| {
-                std::fs::read_to_string(path)
-                    .ok()
-                    .map(|content| (path.clone(), content))
-            })
-            .collect();
-
-        // Extract data from each file
-        for (path, content) in contents {
-            match UnifiedFileExtractor::extract(&path, &content) {
-                Ok(data) => {
-                    extracted.insert(path, data);
-                }
-                Err(e) => {
-                    log::warn!("Failed to extract {}: {}", path.display(), e);
-                }
-            }
-        }
-
-        // Reset SourceMap after each batch to prevent overflow
-        crate::core::parsing::reset_span_locations();
-    }
-
-    extracted
+    let contents = read_file_contents(&rust_files);
+    let results = UnifiedFileExtractor::extract_batch(&contents, EXTRACTION_BATCH_SIZE);
+    collect_extraction_results(results)
 }
 
 // Note: Metrics conversion from extracted data moved to extraction adapters (spec 214).
 // Use crate::extraction::adapters::metrics for converting ExtractedFileData to FunctionMetrics.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn filter_rust_files_includes_only_rs_extension() {
+        let files = vec![
+            PathBuf::from("src/main.rs"),
+            PathBuf::from("src/lib.py"),
+            PathBuf::from("README.md"),
+            PathBuf::from("src/utils.rs"),
+        ];
+
+        let result = filter_rust_files(&files);
+
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&PathBuf::from("src/main.rs")));
+        assert!(result.contains(&PathBuf::from("src/utils.rs")));
+    }
+
+    #[test]
+    fn filter_rust_files_handles_empty_input() {
+        let files: Vec<PathBuf> = vec![];
+        let result = filter_rust_files(&files);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn filter_rust_files_handles_no_rust_files() {
+        let files = vec![
+            PathBuf::from("src/main.py"),
+            PathBuf::from("README.md"),
+            PathBuf::from("Cargo.toml"),
+        ];
+
+        let result = filter_rust_files(&files);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn filter_rust_files_handles_files_without_extension() {
+        let files = vec![
+            PathBuf::from("Makefile"),
+            PathBuf::from("src/main.rs"),
+            PathBuf::from(".gitignore"),
+        ];
+
+        let result = filter_rust_files(&files);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], PathBuf::from("src/main.rs"));
+    }
+
+    #[test]
+    fn collect_extraction_results_filters_errors() {
+        let data = ExtractedFileData::empty(PathBuf::from("test.rs"));
+        let results = vec![
+            (PathBuf::from("good.rs"), Ok(data)),
+            (PathBuf::from("bad.rs"), Err(anyhow::anyhow!("parse error"))),
+        ];
+
+        let collected = collect_extraction_results(results);
+
+        assert_eq!(collected.len(), 1);
+        assert!(collected.contains_key(&PathBuf::from("good.rs")));
+        assert!(!collected.contains_key(&PathBuf::from("bad.rs")));
+    }
+
+    #[test]
+    fn collect_extraction_results_handles_all_errors() {
+        let results = vec![
+            (
+                PathBuf::from("bad1.rs"),
+                Err(anyhow::anyhow!("parse error")),
+            ),
+            (
+                PathBuf::from("bad2.rs"),
+                Err(anyhow::anyhow!("syntax error")),
+            ),
+        ];
+
+        let collected = collect_extraction_results(results);
+        assert!(collected.is_empty());
+    }
+
+    #[test]
+    fn collect_extraction_results_handles_empty_input() {
+        let results: Vec<(PathBuf, anyhow::Result<ExtractedFileData>)> = vec![];
+        let collected = collect_extraction_results(results);
+        assert!(collected.is_empty());
+    }
+}
