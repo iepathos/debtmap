@@ -20,7 +20,8 @@
 
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, TimeZone, Utc};
-use git2::{BlameOptions, DiffOptions, Repository, Sort};
+use git2::{BlameOptions, DiffOptions, Oid, Repository, Sort};
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -215,24 +216,103 @@ impl Git2Repository {
     /// This is the main entry point for BatchedGitHistory, replacing the
     /// subprocess call to `git log --all --numstat`.
     ///
+    /// Uses parallel processing with rayon for better performance on
+    /// repositories with many commits.
+    ///
     /// # Returns
     /// * Vector of CommitStats with file change information
     pub fn all_commits_with_stats(&self) -> Result<Vec<CommitStats>> {
-        let repo = self.open_repo()?;
-        let mut commits = Vec::new();
+        // Phase 1: Collect all OIDs (sequential - revwalk can't be parallelized)
+        let oids: Vec<Oid> = {
+            let repo = self.open_repo()?;
+            let mut revwalk = repo.revwalk()?;
+            revwalk.push_head()?;
+            revwalk.set_sorting(Sort::TIME)?;
+            revwalk.filter_map(|r| r.ok()).collect()
+        };
 
-        let mut revwalk = repo.revwalk()?;
-        revwalk.push_head()?;
-        revwalk.set_sorting(Sort::TIME)?;
+        // Phase 2: Process commits in parallel
+        // Each thread opens its own Repository (git2::Repository isn't Send)
+        let repo_path = self.repo_path.clone();
+        let commits: Vec<CommitStats> = oids
+            .into_par_iter()
+            .filter_map(|oid| {
+                let repo = Repository::open(&repo_path).ok()?;
+                let commit = repo.find_commit(oid).ok()?;
+                Self::commit_to_stats_static(&repo, &commit).ok().flatten()
+            })
+            .collect();
 
-        for oid in revwalk.filter_map(|r| r.ok()) {
-            let commit = repo.find_commit(oid)?;
-            if let Some(stats) = self.commit_to_stats(&repo, &commit)? {
-                commits.push(stats);
+        Ok(commits)
+    }
+
+    /// Static version of commit_to_stats for use in parallel contexts
+    fn commit_to_stats_static(
+        repo: &Repository,
+        commit: &git2::Commit,
+    ) -> Result<Option<CommitStats>> {
+        let parent = commit.parents().next();
+        let parent_tree = parent.and_then(|p| p.tree().ok());
+        let tree = commit.tree()?;
+
+        let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)?;
+
+        // Count additions/deletions per file in a single pass
+        let mut file_stats: HashMap<PathBuf, (usize, usize)> = HashMap::new();
+
+        // First pass: register all files from deltas
+        for i in 0..diff.deltas().count() {
+            if let Some(delta) = diff.get_delta(i) {
+                if let Some(path) = delta.new_file().path() {
+                    file_stats.entry(path.to_path_buf()).or_insert((0, 0));
+                }
             }
         }
 
-        Ok(commits)
+        // Second pass: count lines using foreach (single diff traversal)
+        diff.foreach(
+            &mut |_, _| true,
+            None,
+            None,
+            Some(&mut |delta, _hunk, line| {
+                if let Some(path) = delta.new_file().path() {
+                    let entry = file_stats.entry(path.to_path_buf()).or_insert((0, 0));
+                    match line.origin() {
+                        '+' => entry.0 += 1,
+                        '-' => entry.1 += 1,
+                        _ => {}
+                    }
+                }
+                true
+            }),
+        )?;
+
+        if file_stats.is_empty() {
+            return Ok(None);
+        }
+
+        let files: Vec<FileStats> = file_stats
+            .into_iter()
+            .map(|(path, (additions, deletions))| FileStats {
+                path,
+                additions,
+                deletions,
+            })
+            .collect();
+
+        let time = commit.time();
+        let date = Utc
+            .timestamp_opt(time.seconds(), 0)
+            .single()
+            .unwrap_or_else(Utc::now);
+
+        Ok(Some(CommitStats {
+            hash: commit.id(),
+            date,
+            message: commit.message().unwrap_or("").to_string(),
+            author_email: commit.author().email().unwrap_or("").to_string(),
+            files,
+        }))
     }
 
     /// Get blame information for a file
@@ -425,79 +505,6 @@ impl Git2Repository {
             };
 
         diff.deltas().count() > 0
-    }
-
-    /// Convert a commit to CommitStats with file information
-    ///
-    /// Uses diff.foreach() to count additions/deletions in a single pass,
-    /// avoiding O(N) separate diff operations per file.
-    fn commit_to_stats(
-        &self,
-        repo: &Repository,
-        commit: &git2::Commit,
-    ) -> Result<Option<CommitStats>> {
-        let parent = commit.parents().next();
-        let parent_tree = parent.and_then(|p| p.tree().ok());
-        let tree = commit.tree()?;
-
-        let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)?;
-
-        // Count additions/deletions per file in a single pass
-        let mut file_stats: HashMap<PathBuf, (usize, usize)> = HashMap::new();
-
-        // First pass: register all files from deltas
-        for i in 0..diff.deltas().count() {
-            if let Some(delta) = diff.get_delta(i) {
-                if let Some(path) = delta.new_file().path() {
-                    file_stats.entry(path.to_path_buf()).or_insert((0, 0));
-                }
-            }
-        }
-
-        // Second pass: count lines using foreach (single diff traversal)
-        diff.foreach(
-            &mut |_, _| true, // file callback
-            None,             // binary callback
-            None,             // hunk callback
-            Some(&mut |delta, _hunk, line| {
-                if let Some(path) = delta.new_file().path() {
-                    let entry = file_stats.entry(path.to_path_buf()).or_insert((0, 0));
-                    match line.origin() {
-                        '+' => entry.0 += 1, // addition
-                        '-' => entry.1 += 1, // deletion
-                        _ => {}
-                    }
-                }
-                true
-            }),
-        )?;
-
-        if file_stats.is_empty() {
-            return Ok(None);
-        }
-
-        let files: Vec<FileStats> = file_stats
-            .into_iter()
-            .map(|(path, (additions, deletions))| FileStats {
-                path,
-                additions,
-                deletions,
-            })
-            .collect();
-
-        let time = commit.time();
-        let date = Utc
-            .timestamp_opt(time.seconds(), 0)
-            .single()
-            .unwrap_or_else(Utc::now);
-
-        Ok(Some(CommitStats {
-            hash: commit.id(),
-            date,
-            message: commit.message().unwrap_or("").to_string(),
-            author_email: commit.author().email().unwrap_or("").to_string(),
-            files,
-        }))
     }
 
     /// Convert commit to basic stats (without file details)
