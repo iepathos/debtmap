@@ -428,6 +428,9 @@ impl Git2Repository {
     }
 
     /// Convert a commit to CommitStats with file information
+    ///
+    /// Uses diff.foreach() to count additions/deletions in a single pass,
+    /// avoiding O(N) separate diff operations per file.
     fn commit_to_stats(
         &self,
         repo: &Repository,
@@ -439,27 +442,48 @@ impl Git2Repository {
 
         let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)?;
 
-        let mut files = Vec::new();
-        let stats = diff.stats()?;
+        // Count additions/deletions per file in a single pass
+        let mut file_stats: HashMap<PathBuf, (usize, usize)> = HashMap::new();
 
+        // First pass: register all files from deltas
         for i in 0..diff.deltas().count() {
             if let Some(delta) = diff.get_delta(i) {
                 if let Some(path) = delta.new_file().path() {
-                    // Get per-file stats
-                    let (adds, dels) =
-                        self.get_file_diff_stats(repo, parent_tree.as_ref(), &tree, path)?;
-                    files.push(FileStats {
-                        path: path.to_path_buf(),
-                        additions: adds,
-                        deletions: dels,
-                    });
+                    file_stats.entry(path.to_path_buf()).or_insert((0, 0));
                 }
             }
         }
 
-        if files.is_empty() && stats.files_changed() == 0 {
+        // Second pass: count lines using foreach (single diff traversal)
+        diff.foreach(
+            &mut |_, _| true, // file callback
+            None,             // binary callback
+            None,             // hunk callback
+            Some(&mut |delta, _hunk, line| {
+                if let Some(path) = delta.new_file().path() {
+                    let entry = file_stats.entry(path.to_path_buf()).or_insert((0, 0));
+                    match line.origin() {
+                        '+' => entry.0 += 1, // addition
+                        '-' => entry.1 += 1, // deletion
+                        _ => {}
+                    }
+                }
+                true
+            }),
+        )?;
+
+        if file_stats.is_empty() {
             return Ok(None);
         }
+
+        let files: Vec<FileStats> = file_stats
+            .into_iter()
+            .map(|(path, (additions, deletions))| FileStats {
+                path,
+                additions,
+                deletions,
+            })
+            .collect();
 
         let time = commit.time();
         let date = Utc
@@ -474,23 +498,6 @@ impl Git2Repository {
             author_email: commit.author().email().unwrap_or("").to_string(),
             files,
         }))
-    }
-
-    /// Get addition/deletion counts for a specific file in a diff
-    fn get_file_diff_stats(
-        &self,
-        repo: &Repository,
-        parent_tree: Option<&git2::Tree>,
-        tree: &git2::Tree,
-        file_path: &Path,
-    ) -> Result<(usize, usize)> {
-        let mut diff_opts = DiffOptions::new();
-        diff_opts.pathspec(file_path.to_string_lossy().as_ref());
-
-        let diff = repo.diff_tree_to_tree(parent_tree, Some(tree), Some(&mut diff_opts))?;
-
-        let stats = diff.stats()?;
-        Ok((stats.insertions(), stats.deletions()))
     }
 
     /// Convert commit to basic stats (without file details)
