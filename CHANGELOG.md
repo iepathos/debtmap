@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-02-08
+
+### Performance
+
+- **Git Commit Processing** - Parallelize commit processing with rayon for faster analysis
+- **Git Diff Stats** - Use `diff.foreach()` for O(N) stats calculation instead of O(N²)
+
+### Fixed
+
+- **Windows Release Builds** - Install OpenSSL via vcpkg for Windows release workflow
+
+### Documentation
+
+- **LLMs.txt** - Fixed inaccurate language and scoring claims
+
 ## [0.13.3] - 2026-02-08
 
 ### Added

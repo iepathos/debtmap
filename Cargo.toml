@@ -1,6 +1,6 @@
 [package]
 name = "debtmap"
-version = "0.13.3"
+version = "0.13.4"
 edition = "2021"
 rust-version = "1.89"
 authors = ["Glen Baker <iepathos@gmail.com>"]
