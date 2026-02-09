@@ -176,6 +176,91 @@ pub fn create_unified_analysis(
     unified
 }
 
+/// Check if a file should be processed based on score and god object status.
+fn should_process_file(score: f64, has_god_object: bool) -> bool {
+    score > 50.0 || has_god_object
+}
+
+/// Context for god object processing.
+struct GodObjectProcessingContext<'a> {
+    coverage_data: Option<&'a LcovData>,
+    risk_analyzer: Option<&'a RiskAnalyzer>,
+    call_graph: &'a CallGraph,
+}
+
+/// Result of god object processing.
+struct GodObjectProcessingResult {
+    enriched_analysis: crate::organization::GodObjectAnalysis,
+    debt_item: crate::priority::UnifiedDebtItem,
+}
+
+/// Process god object analysis and create enriched data (pure except for git context).
+fn process_god_object(
+    processed: &file_analysis::ProcessedFileData,
+    god_analysis: &crate::organization::GodObjectAnalysis,
+    ctx: &GodObjectProcessingContext<'_>,
+) -> GodObjectProcessingResult {
+    use crate::priority::context::{generate_context_suggestion, ContextConfig};
+    use crate::priority::god_object_aggregation::{
+        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
+    };
+
+    // Aggregate metrics from raw functions (pure)
+    let mut aggregated_metrics = aggregate_from_raw_metrics(&processed.raw_functions);
+
+    // Aggregate coverage
+    if let Some(lcov) = ctx.coverage_data {
+        aggregated_metrics.weighted_coverage =
+            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
+    }
+
+    // Analyze file git context
+    if let Some(analyzer) = ctx.risk_analyzer {
+        aggregated_metrics.aggregated_contextual_risk = god_object::analyze_file_git_context(
+            &processed.file_path,
+            analyzer,
+            &processed.project_root,
+        );
+    }
+
+    // Enrich god analysis with aggregates (pure)
+    let enriched_analysis =
+        god_object::enrich_god_analysis_with_aggregates(god_analysis, &aggregated_metrics);
+
+    // Create god object debt item (pure)
+    let mut debt_item = god_object::create_god_object_debt_item(
+        &processed.file_path,
+        &processed.file_metrics,
+        &enriched_analysis,
+        aggregated_metrics,
+        ctx.coverage_data,
+        Some(ctx.call_graph),
+    );
+
+    // Generate context suggestion for AI agents (spec 263)
+    let context_config = ContextConfig::default();
+    debt_item.context_suggestion =
+        generate_context_suggestion(&debt_item, ctx.call_graph, &context_config);
+
+    GodObjectProcessingResult {
+        enriched_analysis,
+        debt_item,
+    }
+}
+
+/// Update god object indicators for items in the same file.
+fn update_god_indicators_for_file(
+    items: &mut im::Vector<crate::priority::UnifiedDebtItem>,
+    file_path: &std::path::PathBuf,
+    enriched_analysis: &crate::organization::GodObjectAnalysis,
+) {
+    for item in items.iter_mut() {
+        if item.location.file == *file_path {
+            item.god_object_indicators = Some(enriched_analysis.clone());
+        }
+    }
+}
+
 /// Process file-level analysis (orchestrates pure functions).
 fn process_file_analysis(
     unified: &mut UnifiedAnalysis,
@@ -186,25 +271,17 @@ fn process_file_analysis(
     project_path: &Path,
     call_graph: &CallGraph,
 ) {
-    use crate::metrics::loc_counter::LocCounter;
-
-    // Group functions by file (pure)
     let file_groups = file_analysis::group_functions_by_file(metrics);
+    register_file_loc_counts(unified, &file_groups);
 
-    // Register analyzed files for LOC calculation
-    let loc_counter = LocCounter::default();
-    for file_path in file_groups.keys() {
-        if let Ok(loc_count) = loc_counter.count_file(file_path) {
-            unified.register_analyzed_file(file_path.clone(), loc_count.physical_lines);
-        }
-    }
+    let god_ctx = GodObjectProcessingContext {
+        coverage_data,
+        risk_analyzer,
+        call_graph,
+    };
 
-    // Process each file
     for (file_path, functions) in file_groups {
-        // Read file content (I/O at boundary)
         let file_content = std::fs::read_to_string(&file_path).ok();
-
-        // Process file metrics (pure)
         let processed = file_analysis::process_file_metrics(
             file_path.clone(),
             functions,
@@ -214,82 +291,46 @@ fn process_file_analysis(
             project_path,
         );
 
-        // Check score threshold
         let score = processed.file_metrics.calculate_score();
         let has_god_object = processed
             .god_analysis
             .as_ref()
             .is_some_and(|a| a.is_god_object);
 
-        if score > 50.0 || has_god_object {
-            // Process god object if present AND it's actually a god object
-            // Spec 206: The cohesion gate may have filtered out god objects, so
-            // we must check is_god_object even when god_analysis exists
-            if let Some(god_analysis) = &processed.god_analysis {
-                if god_analysis.is_god_object {
-                    // Aggregate metrics from raw functions (pure)
-                    use crate::priority::god_object_aggregation::{
-                        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
-                    };
+        if !should_process_file(score, has_god_object) {
+            continue;
+        }
 
-                    let mut aggregated_metrics =
-                        aggregate_from_raw_metrics(&processed.raw_functions);
-
-                    // Aggregate coverage
-                    if let Some(lcov) = coverage_data {
-                        aggregated_metrics.weighted_coverage =
-                            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
-                    }
-
-                    // Analyze file git context
-                    if let Some(analyzer) = risk_analyzer {
-                        aggregated_metrics.aggregated_contextual_risk =
-                            god_object::analyze_file_git_context(
-                                &processed.file_path,
-                                analyzer,
-                                &processed.project_root,
-                            );
-                    }
-
-                    // Enrich god analysis with aggregates (pure)
-                    let enriched_god_analysis = god_object::enrich_god_analysis_with_aggregates(
-                        god_analysis,
-                        &aggregated_metrics,
-                    );
-
-                    // Update function god indicators
-                    for item in unified.items.iter_mut() {
-                        if item.location.file == processed.file_path {
-                            item.god_object_indicators = Some(enriched_god_analysis.clone());
-                        }
-                    }
-
-                    // Create god object debt item (pure)
-                    let mut god_item = god_object::create_god_object_debt_item(
-                        &processed.file_path,
-                        &processed.file_metrics,
-                        &enriched_god_analysis,
-                        aggregated_metrics,
-                        coverage_data,
-                        Some(call_graph),
-                    );
-
-                    // Generate context suggestion for AI agents (spec 263)
-                    use crate::priority::context::{generate_context_suggestion, ContextConfig};
-                    let context_config = ContextConfig::default();
-                    god_item.context_suggestion =
-                        generate_context_suggestion(&god_item, call_graph, &context_config);
-
-                    unified.add_item(god_item);
-                }
-            }
-
-            // Create file debt item (pure)
-            let file_item = file_analysis::create_file_debt_item(
-                processed.file_metrics,
-                Some(&processed.file_context),
+        // Process god object if present (spec 206: check is_god_object even when god_analysis exists)
+        if let Some(god_analysis) = processed.god_analysis.as_ref().filter(|a| a.is_god_object) {
+            let result = process_god_object(&processed, god_analysis, &god_ctx);
+            update_god_indicators_for_file(
+                &mut unified.items,
+                &processed.file_path,
+                &result.enriched_analysis,
             );
-            unified.add_file_item(file_item);
+            unified.add_item(result.debt_item);
+        }
+
+        let file_item = file_analysis::create_file_debt_item(
+            processed.file_metrics,
+            Some(&processed.file_context),
+        );
+        unified.add_file_item(file_item);
+    }
+}
+
+/// Register LOC counts for analyzed files.
+fn register_file_loc_counts(
+    unified: &mut UnifiedAnalysis,
+    file_groups: &std::collections::HashMap<std::path::PathBuf, Vec<FunctionMetrics>>,
+) {
+    use crate::metrics::loc_counter::LocCounter;
+
+    let loc_counter = LocCounter::default();
+    for file_path in file_groups.keys() {
+        if let Ok(loc_count) = loc_counter.count_file(file_path) {
+            unified.register_analyzed_file(file_path.clone(), loc_count.physical_lines);
         }
     }
 }
@@ -302,5 +343,31 @@ mod tests {
     fn test_analysis_timings_default() {
         let timings = AnalysisTimings::default();
         assert_eq!(timings.total, Duration::from_secs(0));
+    }
+
+    #[test]
+    fn test_should_process_file_high_score() {
+        assert!(should_process_file(60.0, false));
+        assert!(should_process_file(51.0, false));
+    }
+
+    #[test]
+    fn test_should_process_file_low_score() {
+        assert!(!should_process_file(50.0, false));
+        assert!(!should_process_file(30.0, false));
+    }
+
+    #[test]
+    fn test_should_process_file_with_god_object() {
+        assert!(should_process_file(30.0, true));
+        assert!(should_process_file(0.0, true));
+    }
+
+    #[test]
+    fn test_should_process_file_boundary() {
+        // Exactly 50.0 should NOT be processed (> 50.0 required)
+        assert!(!should_process_file(50.0, false));
+        // Just above threshold should be processed
+        assert!(should_process_file(50.1, false));
     }
 }
