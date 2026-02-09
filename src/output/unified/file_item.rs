@@ -61,12 +61,6 @@ impl FileDebtItemOutput {
     #[inline]
     pub fn assert_invariants(&self) {}
 
-    /// Convert from FileDebtItem without cohesion data
-    #[allow(dead_code)]
-    pub fn from_file_item(item: &FileDebtItem, include_scoring_details: bool) -> Self {
-        Self::from_file_item_with_cohesion(item, include_scoring_details, None)
-    }
-
     pub fn from_file_item_with_cohesion(
         item: &FileDebtItem,
         include_scoring_details: bool,

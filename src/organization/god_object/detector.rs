@@ -21,81 +21,6 @@ use super::classifier::group_methods_by_responsibility;
 use crate::common::UnifiedLocationExtractor;
 use crate::organization::ResponsibilityGroup;
 use crate::organization::{MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector};
-use std::collections::HashSet;
-
-// Import clustering types for improved responsibility detection
-use crate::organization::clustering::{CallGraphProvider, FieldAccessProvider};
-
-/// Adapter for call graph adjacency matrix to CallGraphProvider trait.
-/// This will be used in future phases when composing pure functions.
-#[allow(dead_code)]
-struct CallGraphAdapter {
-    adjacency: std::collections::BTreeMap<(String, String), usize>,
-}
-
-#[allow(dead_code)]
-impl CallGraphAdapter {
-    fn from_adjacency_matrix(
-        adjacency: std::collections::HashMap<(String, String), usize>,
-    ) -> Self {
-        // Convert HashMap to BTreeMap for deterministic iteration order
-        Self {
-            adjacency: adjacency.into_iter().collect(),
-        }
-    }
-}
-
-impl CallGraphProvider for CallGraphAdapter {
-    fn call_count(&self, from: &str, to: &str) -> usize {
-        *self
-            .adjacency
-            .get(&(from.to_string(), to.to_string()))
-            .unwrap_or(&0)
-    }
-
-    fn callees(&self, method: &str) -> HashSet<String> {
-        // BTreeMap provides deterministic iteration order
-        self.adjacency
-            .keys()
-            .filter(|(caller, _)| caller == method)
-            .map(|(_, callee)| callee.clone())
-            .collect()
-    }
-
-    fn callers(&self, method: &str) -> HashSet<String> {
-        // BTreeMap provides deterministic iteration order
-        self.adjacency
-            .keys()
-            .filter(|(_, callee)| callee == method)
-            .map(|(caller, _)| caller.clone())
-            .collect()
-    }
-}
-
-/// Adapter for FieldAccessTracker to FieldAccessProvider trait.
-/// This will be used in future phases when composing pure functions.
-#[allow(dead_code)]
-struct FieldAccessAdapter<'a> {
-    tracker: &'a crate::organization::FieldAccessTracker,
-}
-
-#[allow(dead_code)]
-impl<'a> FieldAccessAdapter<'a> {
-    fn new(tracker: &'a crate::organization::FieldAccessTracker) -> Self {
-        Self { tracker }
-    }
-}
-
-impl<'a> FieldAccessProvider for FieldAccessAdapter<'a> {
-    fn fields_accessed_by(&self, method: &str) -> HashSet<String> {
-        self.tracker.fields_for_method(method).unwrap_or_default()
-    }
-
-    fn writes_to_field(&self, method: &str, field: &str) -> bool {
-        self.tracker.method_writes_to_field(method, field)
-    }
-}
-
 /// God object detector that orchestrates analysis.
 ///
 /// ## Usage
@@ -114,8 +39,6 @@ pub struct GodObjectDetector {
     pub(crate) max_fields: usize,
     pub(crate) max_responsibilities: usize,
     pub(crate) location_extractor: Option<UnifiedLocationExtractor>,
-    #[allow(dead_code)]
-    pub(crate) source_content: Option<String>,
 }
 
 impl Default for GodObjectDetector {
@@ -125,7 +48,6 @@ impl Default for GodObjectDetector {
             max_fields: 10,
             max_responsibilities: 3,
             location_extractor: None,
-            source_content: None,
         }
     }
 }
@@ -143,7 +65,6 @@ impl GodObjectDetector {
             max_fields: 10,
             max_responsibilities: 3,
             location_extractor: Some(UnifiedLocationExtractor::new(source_content)),
-            source_content: Some(source_content.to_string()),
         }
     }
 
@@ -256,7 +177,6 @@ mod tests {
     fn test_detector_with_source_content() {
         let content = "struct Foo {}";
         let detector = GodObjectDetector::with_source_content(content);
-        assert!(detector.source_content.is_some());
         assert!(detector.location_extractor.is_some());
     }
 

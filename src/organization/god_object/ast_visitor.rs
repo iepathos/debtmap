@@ -5,7 +5,7 @@
 
 use crate::common::{SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
-use crate::organization::{FunctionComplexityInfo, PurityLevel};
+use crate::organization::FunctionComplexityInfo;
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -18,35 +18,10 @@ pub struct TypeAnalysis {
     pub fields: Vec<String>,
     /// Field type names for domain context extraction (Spec 208)
     pub field_types: Vec<String>,
-    pub responsibilities: Vec<Responsibility>,
     pub trait_implementations: usize,
     pub location: SourceLocation,
     /// Locations of impl blocks associated with this type (Spec 207)
     pub impl_locations: Vec<SourceLocation>,
-}
-
-/// Represents a logical responsibility or concern within a type
-pub struct Responsibility {
-    #[allow(dead_code)]
-    pub name: String,
-    #[allow(dead_code)]
-    pub methods: Vec<String>,
-    #[allow(dead_code)]
-    pub fields: Vec<String>,
-    #[allow(dead_code)]
-    pub cohesion_score: f64,
-}
-
-/// Represents weighted contribution of a function to god object score
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct FunctionWeight {
-    pub name: String,
-    pub complexity: u32,
-    pub purity_level: PurityLevel,
-    pub complexity_weight: f64,
-    pub purity_weight: f64,
-    pub total_weight: f64,
 }
 
 /// Detailed information about a module-level function for multi-signal analysis
@@ -392,7 +367,6 @@ impl<'ast> Visit<'ast> for TypeVisitor {
                 methods: Vec::new(),
                 fields,
                 field_types,
-                responsibilities: Vec::new(),
                 trait_implementations: 0,
                 location,
                 impl_locations: Vec::new(),

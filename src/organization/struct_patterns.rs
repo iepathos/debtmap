@@ -79,7 +79,6 @@ pub struct PatternAnalysis {
 ///     methods: vec!["strict".into(), "balanced".into(), "lenient".into()],
 ///     fields: vec![],
 ///     field_types: vec![],
-///     responsibilities: vec![],
 ///     trait_implementations: 0,
 ///     location: SourceLocation {
 ///         line: 1,
@@ -333,7 +332,6 @@ mod tests {
             methods: methods.into_iter().map(String::from).collect(),
             fields: vec![],
             field_types: vec![],
-            responsibilities: vec![],
             trait_implementations: 0,
             location: SourceLocation {
                 line: 1,

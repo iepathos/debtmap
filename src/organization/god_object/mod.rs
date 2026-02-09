@@ -45,10 +45,7 @@ pub mod traits; // Spec 217: Trait-Mandated Method Detection
 // - recommender
 
 // Re-exports for public API
-pub use ast_visitor::{
-    FunctionParameter, FunctionWeight, ModuleFunctionInfo, Responsibility, TypeAnalysis,
-    TypeVisitor,
-};
+pub use ast_visitor::{FunctionParameter, ModuleFunctionInfo, TypeAnalysis, TypeVisitor};
 pub use classifier::{
     analyze_function_responsibility, calculate_domain_cohesion, calculate_struct_ratio,
     classify_struct_domain, count_distinct_domains, determine_confidence, extract_domain_from_name,

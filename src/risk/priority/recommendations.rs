@@ -1,5 +1,4 @@
 use super::{module_detection::ModuleType, TestTarget};
-use crate::core::ComplexityMetrics;
 
 pub struct RationaleBuilder;
 
@@ -61,44 +60,6 @@ impl RationaleBuilder {
     }
 }
 
-#[allow(dead_code)]
-pub fn describe_coverage_status(target: &TestTarget) -> &'static str {
-    match (target.current_coverage, &target.module_type) {
-        (0.0, ModuleType::EntryPoint) => "Critical entry point with NO test coverage",
-        (0.0, ModuleType::Core) => "Core module completely untested",
-        (0.0, ModuleType::Api) => "API handler with zero coverage",
-        (0.0, ModuleType::IO) => "I/O module without any tests",
-        (0.0, _) => "Module has no test coverage",
-        (c, _) if c < 30.0 => "Poorly tested",
-        (c, _) if c < 60.0 => "Moderately tested",
-        _ => "Well tested",
-    }
-}
-
-#[allow(dead_code)]
-pub fn describe_complexity(metrics: &ComplexityMetrics) -> &'static str {
-    use std::cmp::max;
-    let max_complexity = max(
-        metrics.cyclomatic_complexity / 2,
-        metrics.cognitive_complexity / 4,
-    );
-
-    match max_complexity {
-        0..=2 => "simple",
-        3..=5 => "moderately complex",
-        6..=10 => "highly complex",
-        _ => "extremely complex",
-    }
-}
-
-#[allow(dead_code)]
-pub fn describe_impact(dependents: &[String]) -> String {
-    match dependents.len() {
-        0 => String::new(),
-        1..=5 => format!(" - affects {} other modules", dependents.len()),
-        n => format!(" - critical dependency for {n} modules"),
-    }
-}
 
 pub fn generate_enhanced_rationale_v2(target: &TestTarget, _roi: &crate::risk::roi::ROI) -> String {
     let coverage_str = RationaleBuilder::coverage_description(target.current_coverage);
@@ -121,23 +82,6 @@ pub fn generate_enhanced_rationale_v2(target: &TestTarget, _roi: &crate::risk::r
     )
 }
 
-#[allow(dead_code)]
-pub fn generate_enhanced_rationale(target: &TestTarget, roi: &super::ROI) -> String {
-    let coverage_status = describe_coverage_status(target);
-    let complexity_desc = describe_complexity(&target.complexity);
-    let impact_desc = describe_impact(&target.dependents);
-
-    format!(
-        "{} - {} code (cyclo={}, cognitive={}){}. ROI: {:.1}x with {:.1}% risk reduction",
-        coverage_status,
-        complexity_desc,
-        target.complexity.cyclomatic_complexity,
-        target.complexity.cognitive_complexity,
-        impact_desc,
-        roi.value,
-        roi.risk_reduction
-    )
-}
 
 #[derive(Clone, Debug)]
 pub struct TestRecommendation {
@@ -189,6 +133,35 @@ mod tests {
     use crate::core::ComplexityMetrics;
     use crate::risk::priority::module_detection::ModuleType;
     use crate::risk::priority::TestTarget;
+
+    // Test-only helper functions
+    fn describe_coverage_status(target: &TestTarget) -> &'static str {
+        match (target.current_coverage, &target.module_type) {
+            (0.0, ModuleType::EntryPoint) => "Critical entry point with NO test coverage",
+            (0.0, ModuleType::Core) => "Core module completely untested",
+            (0.0, ModuleType::Api) => "API handler with zero coverage",
+            (0.0, ModuleType::IO) => "I/O module without any tests",
+            (0.0, _) => "Module has no test coverage",
+            (c, _) if c < 30.0 => "Poorly tested",
+            (c, _) if c < 60.0 => "Moderately tested",
+            _ => "Well tested",
+        }
+    }
+
+    fn describe_complexity(metrics: &ComplexityMetrics) -> &'static str {
+        use std::cmp::max;
+        let max_complexity = max(
+            metrics.cyclomatic_complexity / 2,
+            metrics.cognitive_complexity / 4,
+        );
+
+        match max_complexity {
+            0..=2 => "simple",
+            3..=5 => "moderately complex",
+            6..=10 => "highly complex",
+            _ => "extremely complex",
+        }
+    }
 
     #[test]
     fn test_module_description_entry_point_with_coverage() {
