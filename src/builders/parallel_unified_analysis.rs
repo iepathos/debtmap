@@ -264,7 +264,8 @@ impl OptimizedTestDetector {
         let is_test_only = self.is_reachable_only_from_tests(func_id);
 
         // Cache the result
-        self.reachability_cache.insert(func_id.clone(), is_test_only);
+        self.reachability_cache
+            .insert(func_id.clone(), is_test_only);
 
         is_test_only
     }

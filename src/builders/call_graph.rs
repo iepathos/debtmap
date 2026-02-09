@@ -112,8 +112,12 @@ where
         parse_rust_files(rust_files, total_files, &mut progress_callback);
 
     // Phase 3: Extract and analyze calls
-    let enhanced_builder =
-        analyze_workspace_calls(call_graph, &workspace_files, &expanded_files, &mut progress_callback)?;
+    let enhanced_builder = analyze_workspace_calls(
+        call_graph,
+        &workspace_files,
+        &expanded_files,
+        &mut progress_callback,
+    )?;
 
     // Phase 4: Finalize and merge
     let result = finalize_call_graph(call_graph, enhanced_builder, &mut progress_callback)?;
@@ -148,12 +152,9 @@ where
     });
 
     let config = config::get_config();
-    let discovered_files = io::walker::find_project_files_with_config(
-        project_path,
-        vec![Language::Rust],
-        config,
-    )
-    .context("Failed to find Rust files for call graph")?;
+    let discovered_files =
+        io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
+            .context("Failed to find Rust files for call graph")?;
 
     log::info!("Discovered {} Rust files", discovered_files.len());
 
@@ -194,7 +195,12 @@ where
             expanded_files.push(expanded);
         }
 
-        report_progress_throttled(idx + 1, total_files, CallGraphPhase::ParsingASTs, progress_callback);
+        report_progress_throttled(
+            idx + 1,
+            total_files,
+            CallGraphPhase::ParsingASTs,
+            progress_callback,
+        );
     }
 
     (workspace_files, expanded_files)
@@ -299,8 +305,7 @@ fn report_progress_throttled<F>(
     total: usize,
     phase: CallGraphPhase,
     progress_callback: &mut F,
-)
-where
+) where
     F: FnMut(CallGraphProgress),
 {
     if current % 10 == 0 || current == total {
