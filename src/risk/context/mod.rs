@@ -61,6 +61,8 @@ pub enum ContextDetails {
         bug_density: f64,
         age_days: u32,
         author_count: usize,
+        /// Total number of commits touching this file/function
+        total_commits: u32,
     },
     Business {
         priority: Priority,

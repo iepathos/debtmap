@@ -1192,6 +1192,7 @@ mod tests {
                 bug_density: 0.25,
                 age_days: 180,
                 author_count: 4,
+                total_commits: 21,
                 stability: "Frequently Changed".to_string(),
             }),
         };

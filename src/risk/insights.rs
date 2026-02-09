@@ -100,6 +100,7 @@ fn format_context_contributions(ctx_risk: &super::context::ContextualRisk) -> St
                     bug_density,
                     age_days,
                     author_count,
+                    ..
                 } = &context.details
                 {
                     output.push_str(&format!(

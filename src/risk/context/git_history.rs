@@ -270,6 +270,7 @@ impl ContextProvider for GitHistoryProvider {
                 bug_density,
                 age_days,
                 author_count,
+                total_commits: _,
             } => self.explain_historical_context(
                 *change_frequency,
                 *bug_density,
@@ -311,6 +312,7 @@ impl GitHistoryProvider {
                 bug_density: history.bug_density(),
                 age_days: history.age_days(),
                 author_count: history.authors.len(),
+                total_commits: history.total_commits as u32,
             },
         })
     }
@@ -334,6 +336,7 @@ impl GitHistoryProvider {
                 bug_density,
                 age_days: history.age_days,
                 author_count: history.author_count,
+                total_commits: history.total_commits as u32,
             },
         })
     }

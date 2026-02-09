@@ -510,6 +510,8 @@ pub struct GitHistoryOutput {
     pub age_days: u32,
     /// Number of unique authors who have modified this code
     pub author_count: usize,
+    /// Total number of commits touching this code
+    pub total_commits: u32,
     /// Stability classification based on churn and bug patterns
     pub stability: String,
 }
@@ -528,6 +530,7 @@ impl GitHistoryOutput {
                     bug_density,
                     age_days,
                     author_count,
+                    total_commits,
                 } = git_context.details
                 {
                     let stability =
@@ -537,6 +540,7 @@ impl GitHistoryOutput {
                         bug_density: round_ratio(bug_density),
                         age_days,
                         author_count,
+                        total_commits,
                         stability,
                     })
                 } else {

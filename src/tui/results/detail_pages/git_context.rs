@@ -33,17 +33,25 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
                 bug_density,
                 age_days,
                 author_count,
+                total_commits,
             } = &ctx.details
             {
                 // Change Patterns section
                 add_section_header(&mut lines, "change patterns", theme);
-                add_label_value(
-                    &mut lines,
-                    "frequency",
-                    format!("{:.2} changes/month", change_frequency),
-                    theme,
-                    width,
-                );
+
+                // Show commits and frequency together for clarity
+                // "N commits (X.XX/month)" makes it clear what the frequency represents
+                let frequency_display = if *total_commits == 0 {
+                    "0 commits".to_string()
+                } else {
+                    format!(
+                        "{} commit{} ({:.2}/month)",
+                        total_commits,
+                        if *total_commits == 1 { "" } else { "s" },
+                        change_frequency
+                    )
+                };
+                add_label_value(&mut lines, "activity", frequency_display, theme, width);
 
                 let stability = classify_stability(*change_frequency);
                 add_label_value(&mut lines, "stability", stability.to_string(), theme, width);
@@ -175,6 +183,23 @@ mod tests {
         age_days: u32,
         author_count: usize,
     ) -> UnifiedDebtItem {
+        create_test_item_with_git_context_and_commits(
+            change_frequency,
+            bug_density,
+            age_days,
+            author_count,
+            // Derive reasonable default: commits = frequency * age_days / 30
+            ((change_frequency * age_days as f64 / 30.0).round() as u32).max(1),
+        )
+    }
+
+    fn create_test_item_with_git_context_and_commits(
+        change_frequency: f64,
+        bug_density: f64,
+        age_days: u32,
+        author_count: usize,
+        total_commits: u32,
+    ) -> UnifiedDebtItem {
         UnifiedDebtItem {
             location: Location {
                 file: PathBuf::from("test.rs"),
@@ -259,6 +284,7 @@ mod tests {
                         bug_density,
                         age_days,
                         author_count,
+                        total_commits,
                     },
                 }],
                 explanation: "Test explanation".to_string(),
@@ -374,9 +400,11 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
 
+        // New format shows "N commits (X.XX/month)" for clarity
         assert!(
-            text.contains("2.50 changes/month"),
-            "Should show change frequency"
+            text.contains("commits") && text.contains("2.50/month"),
+            "Should show commits with frequency: got {}",
+            text
         );
         assert!(
             text.contains("Moderately Unstable"),

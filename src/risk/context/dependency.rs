@@ -547,6 +547,7 @@ mod tests {
                 bug_density: 0.1,
                 age_days: 365,
                 author_count: 3,
+                total_commits: 10,
             },
         };
 

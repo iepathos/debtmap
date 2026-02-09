@@ -72,6 +72,7 @@ impl GitHistoryData {
                     bug_density,
                     age_days,
                     author_count,
+                    ..
                 } = git_context.details
                 {
                     Some(GitHistoryData {

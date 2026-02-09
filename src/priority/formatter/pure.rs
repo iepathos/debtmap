@@ -244,6 +244,7 @@ fn format_historical_details(details: &ContextDetails) -> Option<String> {
             bug_density,
             age_days,
             author_count,
+            ..
         } => Some(format!(
             "changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {}",
             change_frequency,
