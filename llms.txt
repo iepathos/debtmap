@@ -1,6 +1,6 @@
 # Debtmap
 
-> Debtmap is a code complexity and technical debt analyzer for Rust, Python, JavaScript, and TypeScript codebases. It identifies complexity patterns, coverage gaps, and architectural issues, outputting prioritized recommendations with context for AI-assisted remediation.
+> Debtmap is a code complexity and technical debt analyzer for Rust codebases. It identifies complexity patterns, coverage gaps, and architectural issues, outputting prioritized recommendations with context for AI-assisted remediation.
 
 Debtmap uses a unified 0-10 priority scoring system that considers cyclomatic complexity, cognitive complexity, test coverage, and call graph analysis. It detects 35+ debt types across testing, architecture, performance, and code quality categories.
 
@@ -42,11 +42,10 @@ The `analyze` command supports these options for LLM integration:
 
 Scores range from 0-10:
 
-- 9-10 Critical: High complexity with poor coverage, fix immediately
-- 7-8.9 High: Significant impact, fix soon
-- 5-6.9 Medium: Plan to address
-- 3-4.9 Low: Address when convenient
-- 0-2.9 Minimal: Monitor only
+- 8-10 Critical: Immediate action required
+- 6-7.9 High: Address soon
+- 4-5.9 Medium: Moderate priority
+- 0-3.9 Low: Nice-to-have improvements
 
 ## Debt Categories
 
@@ -105,5 +104,3 @@ With `--context`, each debt item includes related code:
 ### Language Support
 
 - Rust: Full AST-based analysis with comprehensive debt detection
-- Python: File detection (analysis planned)
-- JavaScript/TypeScript: File detection (analysis planned)
