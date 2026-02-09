@@ -86,6 +86,18 @@ impl FunctionHistory {
             .map(|d| Utc::now().signed_duration_since(d).num_days().max(0) as u32)
             .unwrap_or(0)
     }
+
+    /// Total commits including the introduction commit.
+    ///
+    /// For display purposes - shows the true number of commits touching this function.
+    /// Use `total_commits` for churn calculations (modifications after introduction).
+    pub fn total_commits_including_introduction(&self) -> usize {
+        if self.introduction_commit.is_some() {
+            self.total_commits + 1
+        } else {
+            self.total_commits
+        }
+    }
 }
 
 // =============================================================================

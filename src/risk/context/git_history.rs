@@ -312,7 +312,8 @@ impl GitHistoryProvider {
                 bug_density: history.bug_density(),
                 age_days: history.age_days(),
                 author_count: history.authors.len(),
-                total_commits: history.total_commits as u32,
+                // Use total including introduction for display (not just modifications)
+                total_commits: history.total_commits_including_introduction() as u32,
             },
         })
     }

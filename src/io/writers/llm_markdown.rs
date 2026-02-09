@@ -392,10 +392,16 @@ pub mod format {
         let g = git?;
         let mut out = String::new();
         writeln!(out, "#### Git History").unwrap();
+        // Show commits with frequency for clarity
+        let commit_label = if g.total_commits == 1 {
+            "commit"
+        } else {
+            "commits"
+        };
         writeln!(
             out,
-            "- Change Frequency: {:.2} changes/month",
-            g.change_frequency
+            "- Change Frequency: {} {} ({:.2}/month)",
+            g.total_commits, commit_label, g.change_frequency
         )
         .unwrap();
         writeln!(out, "- Bug Density: {:.0}%", g.bug_density * 100.0).unwrap();
@@ -1209,8 +1215,8 @@ mod tests {
             markdown
         );
         assert!(
-            markdown.contains("Change Frequency: 3.50 changes/month"),
-            "Should show change frequency: {}",
+            markdown.contains("Change Frequency: 21 commits (3.50/month)"),
+            "Should show change frequency with commits: {}",
             markdown
         );
         assert!(
