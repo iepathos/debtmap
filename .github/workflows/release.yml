@@ -116,6 +116,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y musl-tools pkg-config
 
+    - name: Install OpenSSL (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        echo "Installing OpenSSL via vcpkg..."
+        vcpkg integrate install
+        vcpkg install openssl:x64-windows-static-md
+        $opensslDir = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md"
+        echo "OPENSSL_DIR=$opensslDir" >> $env:GITHUB_ENV
+        echo "OPENSSL_LIB_DIR=$opensslDir\lib" >> $env:GITHUB_ENV
+        echo "OPENSSL_INCLUDE_DIR=$opensslDir\include" >> $env:GITHUB_ENV
+
     - name: Build release binary
       run: cargo build --release --target ${{ matrix.target }}
       env:
