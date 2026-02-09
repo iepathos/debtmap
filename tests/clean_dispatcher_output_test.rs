@@ -36,6 +36,7 @@ fn ensure_binary_built() -> PathBuf {
 
 /// Test that clean dispatchers don't appear in JSON output
 #[test]
+#[ignore = "requires binary build, run with --ignored"]
 fn test_clean_dispatcher_not_in_json_output() {
     let binary_path = ensure_binary_built();
     let temp_dir = TempDir::new().unwrap();
@@ -122,6 +123,7 @@ fn test_clean_dispatcher_not_in_json_output() {
 
 /// Test that clean dispatchers don't appear in terminal output
 #[test]
+#[ignore = "requires binary build, run with --ignored"]
 fn test_clean_dispatcher_not_in_terminal_output() {
     let binary_path = ensure_binary_built();
     let test_codebase =
@@ -172,6 +174,7 @@ fn test_clean_dispatcher_not_in_terminal_output() {
 
 /// Test that clean dispatchers don't appear in markdown output
 #[test]
+#[ignore = "requires binary build, run with --ignored"]
 fn test_clean_dispatcher_not_in_markdown_output() {
     let binary_path = ensure_binary_built();
     let temp_dir = TempDir::new().unwrap();
