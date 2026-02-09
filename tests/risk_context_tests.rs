@@ -204,6 +204,7 @@ fn test_context_map_add_and_get() {
             age_days: 100,
             author_count: 3,
             total_commits: 5,
+            bug_fix_count: 0,
         },
     };
 

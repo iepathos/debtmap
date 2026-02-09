@@ -63,6 +63,8 @@ pub enum ContextDetails {
         author_count: usize,
         /// Total number of commits touching this file/function
         total_commits: u32,
+        /// Number of commits that were bug fixes
+        bug_fix_count: u32,
     },
     Business {
         priority: Priority,

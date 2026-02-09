@@ -404,7 +404,22 @@ pub mod format {
             g.total_commits, commit_label, g.change_frequency
         )
         .unwrap();
-        writeln!(out, "- Bug Density: {:.0}%", g.bug_density * 100.0).unwrap();
+        // Show fix rate as "N fixes / M changes" for clarity
+        let changes = g.total_commits.saturating_sub(1);
+        if changes == 0 {
+            writeln!(out, "- Bug Density: 0%").unwrap();
+        } else {
+            writeln!(
+                out,
+                "- Bug Density: {:.0}% ({} fix{} / {} change{})",
+                g.bug_density * 100.0,
+                g.bug_fix_count,
+                if g.bug_fix_count == 1 { "" } else { "es" },
+                changes,
+                if changes == 1 { "" } else { "s" }
+            )
+            .unwrap();
+        }
         writeln!(out, "- Age: {} days", g.age_days).unwrap();
         writeln!(out, "- Authors: {}", g.author_count).unwrap();
         writeln!(out, "- Stability: {}", g.stability).unwrap();
@@ -1199,6 +1214,7 @@ mod tests {
                 age_days: 180,
                 author_count: 4,
                 total_commits: 21,
+                bug_fix_count: 5,
                 stability: "Frequently Changed".to_string(),
             }),
         };
@@ -1220,8 +1236,8 @@ mod tests {
             markdown
         );
         assert!(
-            markdown.contains("Bug Density: 25%"),
-            "Should show bug density: {}",
+            markdown.contains("Bug Density: 25% (5 fixes / 20 changes)"),
+            "Should show bug density with fix counts: {}",
             markdown
         );
         assert!(

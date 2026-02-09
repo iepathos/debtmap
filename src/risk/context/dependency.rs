@@ -548,6 +548,7 @@ mod tests {
                 age_days: 365,
                 author_count: 3,
                 total_commits: 10,
+                bug_fix_count: 1,
             },
         };
 

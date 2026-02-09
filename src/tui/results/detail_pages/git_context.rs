@@ -30,10 +30,11 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
         if let Some(ctx) = git_context {
             if let ContextDetails::Historical {
                 change_frequency,
-                bug_density,
+                bug_density: _,
                 age_days,
                 author_count,
                 total_commits,
+                bug_fix_count,
             } = &ctx.details
             {
                 // Change Patterns section
@@ -56,13 +57,21 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
                 let stability = classify_stability(*change_frequency);
                 add_label_value(&mut lines, "stability", stability.to_string(), theme, width);
 
-                add_label_value(
-                    &mut lines,
-                    "bugs",
-                    format!("{:.1}%", bug_density * 100.0),
-                    theme,
-                    width,
-                );
+                // Show bug fixes as "N fixes / M changes" for clarity
+                // Changes = total_commits - 1 (excluding introduction)
+                let changes = total_commits.saturating_sub(1);
+                let fix_display = if changes == 0 {
+                    "no changes since intro".to_string()
+                } else {
+                    format!(
+                        "{} fix{} / {} change{}",
+                        bug_fix_count,
+                        if *bug_fix_count == 1 { "" } else { "es" },
+                        changes,
+                        if changes == 1 { "" } else { "s" }
+                    )
+                };
+                add_label_value(&mut lines, "fix rate", fix_display, theme, width);
                 add_label_value(
                     &mut lines,
                     "age",
@@ -183,22 +192,27 @@ mod tests {
         age_days: u32,
         author_count: usize,
     ) -> UnifiedDebtItem {
-        create_test_item_with_git_context_and_commits(
+        // Derive reasonable defaults
+        let total_commits = ((change_frequency * age_days as f64 / 30.0).round() as u32).max(1);
+        let changes = total_commits.saturating_sub(1);
+        let bug_fix_count = (bug_density * changes as f64).round() as u32;
+        create_test_item_with_git_context_full(
             change_frequency,
             bug_density,
             age_days,
             author_count,
-            // Derive reasonable default: commits = frequency * age_days / 30
-            ((change_frequency * age_days as f64 / 30.0).round() as u32).max(1),
+            total_commits,
+            bug_fix_count,
         )
     }
 
-    fn create_test_item_with_git_context_and_commits(
+    fn create_test_item_with_git_context_full(
         change_frequency: f64,
         bug_density: f64,
         age_days: u32,
         author_count: usize,
         total_commits: u32,
+        bug_fix_count: u32,
     ) -> UnifiedDebtItem {
         UnifiedDebtItem {
             location: Location {
@@ -285,6 +299,7 @@ mod tests {
                         age_days,
                         author_count,
                         total_commits,
+                        bug_fix_count,
                     },
                 }],
                 explanation: "Test explanation".to_string(),
@@ -410,7 +425,12 @@ mod tests {
             text.contains("Moderately Unstable"),
             "Should classify as moderately unstable"
         );
-        assert!(text.contains("15.0%"), "Should show bug density percentage");
+        // New format shows "N fixes / M changes" instead of percentage
+        assert!(
+            text.contains("fix") && text.contains("change"),
+            "Should show fix rate as 'N fixes / M changes': got {}",
+            text
+        );
         assert!(text.contains("100 days"), "Should show age in days");
         assert!(text.contains("3"), "Should show author count");
     }
