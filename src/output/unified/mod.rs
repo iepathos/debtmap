@@ -59,15 +59,25 @@ pub use types::{
 
 use std::collections::HashMap;
 
-/// Convert analysis results to unified output format
-pub fn convert_to_unified_format(
+/// Statistics accumulated from iterating over unified debt items
+#[derive(Debug, Default)]
+struct ItemStatistics {
+    file_count: usize,
+    function_count: usize,
+    category_counts: HashMap<String, usize>,
+    score_distribution: ScoreDistribution,
+    total_debt_score: f64,
+    cohesion_scores: Vec<f64>,
+    high_cohesion_count: usize,
+    medium_cohesion_count: usize,
+    low_cohesion_count: usize,
+}
+
+/// Collect all debt items from unified analysis (pure function)
+fn collect_all_items(
     analysis: &crate::priority::UnifiedAnalysis,
-    include_scoring_details: bool,
-) -> UnifiedOutput {
-    // Get all debt items WITHOUT filtering (matches TUI behavior)
-    // Previously used get_top_mixed_priorities() which filtered T4 items,
-    // causing dashboard to show different results than TUI
-    let all_items: im::Vector<crate::priority::DebtItem> = analysis
+) -> im::Vector<crate::priority::DebtItem> {
+    analysis
         .items
         .iter()
         .map(|item| crate::priority::DebtItem::Function(Box::new(item.clone())))
@@ -77,106 +87,125 @@ pub fn convert_to_unified_format(
                 .iter()
                 .map(|item| crate::priority::DebtItem::File(Box::new(item.clone()))),
         )
-        .collect();
+        .collect()
+}
 
-    // Convert to unified format with call graph for cohesion calculation (spec 198)
-    let unified_items: Vec<UnifiedDebtItemOutput> = all_items
+/// Convert items to unified format with invariant validation (pure function)
+fn convert_items(
+    items: &im::Vector<crate::priority::DebtItem>,
+    include_scoring_details: bool,
+    call_graph: &crate::priority::CallGraph,
+) -> Vec<UnifiedDebtItemOutput> {
+    items
         .iter()
         .map(|item| {
             let output = UnifiedDebtItemOutput::from_debt_item_with_call_graph(
                 item,
                 include_scoring_details,
-                Some(&analysis.call_graph),
+                Some(call_graph),
             );
-            // Assert invariants in debug builds (spec 230)
             output.assert_invariants();
             output
         })
-        .collect();
+        .collect()
+}
 
-    // Deduplicate items before calculating summary statistics (spec 231)
-    let mut unified_items = deduplicate_items(unified_items);
-
-    // Sort items by score descending (highest score first)
-    unified_items.sort_by(|a, b| {
+/// Sort items by score descending (pure function returning new vector)
+fn sort_by_score_descending(mut items: Vec<UnifiedDebtItemOutput>) -> Vec<UnifiedDebtItemOutput> {
+    items.sort_by(|a, b| {
         b.score()
             .partial_cmp(&a.score())
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+    items
+}
 
-    // Calculate summary statistics from deduplicated items
-    let mut file_count = 0;
-    let mut function_count = 0;
-    let mut category_counts: HashMap<String, usize> = HashMap::new();
-    let mut score_dist = ScoreDistribution {
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-    };
-
-    // Calculate total debt score from deduplicated items (spec 231)
-    let total_debt_score: f64 = unified_items.iter().map(|item| item.score()).sum();
-
-    // Cohesion summary statistics (spec 198)
-    let mut cohesion_scores: Vec<f64> = Vec::new();
-    let mut high_cohesion_count = 0;
-    let mut medium_cohesion_count = 0;
-    let mut low_cohesion_count = 0;
-
-    for item in &unified_items {
-        match item {
-            UnifiedDebtItemOutput::File(f) => {
-                file_count += 1;
-                *category_counts.entry(f.category.clone()).or_insert(0) += 1;
-                match f.priority {
-                    Priority::Critical => score_dist.critical += 1,
-                    Priority::High => score_dist.high += 1,
-                    Priority::Medium => score_dist.medium += 1,
-                    Priority::Low => score_dist.low += 1,
-                }
-                // Collect cohesion stats (spec 198)
-                if let Some(ref cohesion) = f.cohesion {
-                    cohesion_scores.push(cohesion.score);
-                    match cohesion.classification {
-                        CohesionClassification::High => high_cohesion_count += 1,
-                        CohesionClassification::Medium => medium_cohesion_count += 1,
-                        CohesionClassification::Low => low_cohesion_count += 1,
-                    }
-                }
-            }
-            UnifiedDebtItemOutput::Function(f) => {
-                function_count += 1;
-                *category_counts.entry(f.category.clone()).or_insert(0) += 1;
-                match f.priority {
-                    Priority::Critical => score_dist.critical += 1,
-                    Priority::High => score_dist.high += 1,
-                    Priority::Medium => score_dist.medium += 1,
-                    Priority::Low => score_dist.low += 1,
-                }
-            }
+/// Update statistics for a file item (helper for fold)
+fn accumulate_file_stats(
+    mut stats: ItemStatistics,
+    f: &file_item::FileDebtItemOutput,
+) -> ItemStatistics {
+    stats.file_count += 1;
+    *stats.category_counts.entry(f.category.clone()).or_insert(0) += 1;
+    match f.priority {
+        Priority::Critical => stats.score_distribution.critical += 1,
+        Priority::High => stats.score_distribution.high += 1,
+        Priority::Medium => stats.score_distribution.medium += 1,
+        Priority::Low => stats.score_distribution.low += 1,
+    }
+    if let Some(ref cohesion) = f.cohesion {
+        stats.cohesion_scores.push(cohesion.score);
+        match cohesion.classification {
+            CohesionClassification::High => stats.high_cohesion_count += 1,
+            CohesionClassification::Medium => stats.medium_cohesion_count += 1,
+            CohesionClassification::Low => stats.low_cohesion_count += 1,
         }
     }
+    stats
+}
 
-    // Build cohesion summary with rounding (spec 198, 230)
-    let cohesion_summary = if !cohesion_scores.is_empty() {
-        let average = cohesion_scores.iter().sum::<f64>() / cohesion_scores.len() as f64;
+/// Update statistics for a function item (helper for fold)
+fn accumulate_function_stats(
+    mut stats: ItemStatistics,
+    f: &func_item::FunctionDebtItemOutput,
+) -> ItemStatistics {
+    stats.function_count += 1;
+    *stats.category_counts.entry(f.category.clone()).or_insert(0) += 1;
+    match f.priority {
+        Priority::Critical => stats.score_distribution.critical += 1,
+        Priority::High => stats.score_distribution.high += 1,
+        Priority::Medium => stats.score_distribution.medium += 1,
+        Priority::Low => stats.score_distribution.low += 1,
+    }
+    stats
+}
+
+/// Calculate all summary statistics from unified items (pure function)
+fn calculate_item_statistics(items: &[UnifiedDebtItemOutput]) -> ItemStatistics {
+    items
+        .iter()
+        .fold(ItemStatistics::default(), |mut stats, item| {
+            stats.total_debt_score += item.score();
+            match item {
+                UnifiedDebtItemOutput::File(f) => accumulate_file_stats(stats, f),
+                UnifiedDebtItemOutput::Function(f) => accumulate_function_stats(stats, f),
+            }
+        })
+}
+
+/// Build cohesion summary from statistics (pure function)
+fn build_cohesion_summary_from_stats(stats: &ItemStatistics) -> Option<CohesionSummary> {
+    if stats.cohesion_scores.is_empty() {
+        None
+    } else {
+        let average =
+            stats.cohesion_scores.iter().sum::<f64>() / stats.cohesion_scores.len() as f64;
         Some(CohesionSummary {
             average: round_ratio(average),
-            high_cohesion_files: high_cohesion_count,
-            medium_cohesion_files: medium_cohesion_count,
-            low_cohesion_files: low_cohesion_count,
+            high_cohesion_files: stats.high_cohesion_count,
+            medium_cohesion_files: stats.medium_cohesion_count,
+            low_cohesion_files: stats.low_cohesion_count,
         })
-    } else {
-        None
-    };
+    }
+}
 
-    // Recalculate debt density from filtered items, with rounding (spec 230)
-    let debt_density = if analysis.total_lines_of_code > 0 {
-        round_score((total_debt_score / analysis.total_lines_of_code as f64) * 1000.0)
+/// Calculate debt density from total score and LOC (pure function)
+fn calculate_debt_density(total_debt_score: f64, total_loc: usize) -> f64 {
+    if total_loc > 0 {
+        round_score((total_debt_score / total_loc as f64) * 1000.0)
     } else {
         0.0
-    };
+    }
+}
+
+/// Build the final UnifiedOutput from items and statistics (pure function)
+fn build_unified_output(
+    items: Vec<UnifiedDebtItemOutput>,
+    stats: ItemStatistics,
+    total_loc: usize,
+) -> UnifiedOutput {
+    let debt_density = calculate_debt_density(stats.total_debt_score, total_loc);
+    let cohesion_summary = build_cohesion_summary_from_stats(&stats);
 
     UnifiedOutput {
         format_version: "3.0".to_string(),
@@ -187,20 +216,40 @@ pub fn convert_to_unified_format(
             analysis_type: "unified".to_string(),
         },
         summary: DebtSummary {
-            total_items: unified_items.len(),
-            total_debt_score: round_score(total_debt_score),
+            total_items: items.len(),
+            total_debt_score: round_score(stats.total_debt_score),
             debt_density,
-            total_loc: analysis.total_lines_of_code,
+            total_loc,
             by_type: TypeBreakdown {
-                file: file_count,
-                function: function_count,
+                file: stats.file_count,
+                function: stats.function_count,
             },
-            by_category: category_counts,
-            score_distribution: score_dist,
+            by_category: stats.category_counts,
+            score_distribution: stats.score_distribution,
             cohesion: cohesion_summary,
         },
-        items: unified_items,
+        items,
     }
+}
+
+/// Convert analysis results to unified output format
+///
+/// This is the main entry point that orchestrates the conversion pipeline:
+/// 1. Collect all items from analysis
+/// 2. Convert to unified format with invariant validation
+/// 3. Deduplicate and sort by score
+/// 4. Calculate summary statistics
+/// 5. Build final output
+pub fn convert_to_unified_format(
+    analysis: &crate::priority::UnifiedAnalysis,
+    include_scoring_details: bool,
+) -> UnifiedOutput {
+    let all_items = collect_all_items(analysis);
+    let unified_items = convert_items(&all_items, include_scoring_details, &analysis.call_graph);
+    let deduplicated = deduplicate_items(unified_items);
+    let sorted_items = sort_by_score_descending(deduplicated);
+    let stats = calculate_item_statistics(&sorted_items);
+    build_unified_output(sorted_items, stats, analysis.total_lines_of_code)
 }
 
 // ============================================================================

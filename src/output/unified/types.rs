@@ -53,7 +53,7 @@ pub struct TypeBreakdown {
 }
 
 /// Distribution of items by score range
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ScoreDistribution {
     pub critical: usize, // >= 100
     pub high: usize,     // >= 50

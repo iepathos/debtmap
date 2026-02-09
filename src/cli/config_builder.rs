@@ -20,7 +20,6 @@ pub struct PathConfig {
     pub min_problematic: Option<usize>,
 }
 
-
 /// Analysis thresholds configuration
 #[derive(Debug, Clone)]
 pub struct ThresholdConfig {
@@ -29,7 +28,6 @@ pub struct ThresholdConfig {
     pub preset: Option<ThresholdPreset>,
     pub public_api_threshold: f32,
 }
-
 
 /// Feature flags for analysis options
 #[derive(Debug, Clone)]
@@ -50,7 +48,6 @@ pub struct AnalysisFeatureConfig {
     pub validate_loc: bool,
     pub validate_call_graph: bool,
 }
-
 
 /// Display and output formatting configuration
 #[derive(Debug, Clone)]

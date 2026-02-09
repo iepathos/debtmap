@@ -60,7 +60,6 @@ impl RationaleBuilder {
     }
 }
 
-
 pub fn generate_enhanced_rationale_v2(target: &TestTarget, _roi: &crate::risk::roi::ROI) -> String {
     let coverage_str = RationaleBuilder::coverage_description(target.current_coverage);
     let complexity_desc =
@@ -81,7 +80,6 @@ pub fn generate_enhanced_rationale_v2(target: &TestTarget, _roi: &crate::risk::r
         "{module_desc} with {coverage_str}\n            {complexity_desc} code ({complexity_str}){effort_desc}{roi_desc}"
     )
 }
-
 
 #[derive(Clone, Debug)]
 pub struct TestRecommendation {
