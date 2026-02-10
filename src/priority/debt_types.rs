@@ -267,8 +267,26 @@ impl DebtType {
 // Custom Eq implementation that handles f64 fields by comparing their bit representations
 impl Eq for DebtType {}
 
-// Custom Hash implementation that handles f64 fields by hashing their bit representations.
-// Uses `hash_fields!` macro with `@f64` marker for float fields.
+/// Custom Hash implementation that handles f64 fields by hashing their bit representations.
+///
+/// # Design Notes
+///
+/// This function has high cyclomatic complexity due to matching on all 33 enum variants.
+/// This is intentional structural complexity that cannot be reduced without sacrificing:
+/// - Type safety (each variant's fields must be explicitly destructured)
+/// - Correctness (f64 fields require bit conversion via `@f64` marker)
+/// - Exhaustive matching (compiler ensures all variants are handled)
+///
+/// The complexity is mitigated by:
+/// - Using the `hash_fields!` macro to reduce repetition
+/// - Grouping similar variants with or-patterns where field types match
+/// - Comprehensive test coverage for all variant groups
+///
+/// Variant groups:
+/// - `Option<String>` single field: 7 variants
+/// - `(u32, u32)` pairs: 4 variants (Complexity, TestComplexity, ComplexityHotspot, Duplication)
+/// - `(String, String)` pairs: 8 variants
+/// - Remaining unique structures: handled individually
 impl Hash for DebtType {
     fn hash<H: Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
@@ -285,20 +303,24 @@ impl Hash for DebtType {
             | Self::CodeOrganization { issue_type: reason }
             | Self::TestQuality { issue_type: reason } => hash_fields!(state, reason),
 
-            // Complexity pair variants (cyclomatic, cognitive)
+            // (u32, u32) pair variants - bound to common names for grouping
             Self::Complexity {
-                cyclomatic,
-                cognitive,
+                cyclomatic: a,
+                cognitive: b,
             }
             | Self::TestComplexity {
-                cyclomatic,
-                cognitive,
+                cyclomatic: a,
+                cognitive: b,
             }
             | Self::ComplexityHotspot {
-                cyclomatic,
-                cognitive,
+                cyclomatic: a,
+                cognitive: b,
+            }
+            | Self::Duplication {
+                instances: a,
+                total_lines: b,
             } => {
-                hash_fields!(state, cyclomatic, cognitive)
+                hash_fields!(state, a, b)
             }
 
             // Variants with f64 fields
@@ -386,12 +408,6 @@ impl Hash for DebtType {
                 usage_hints,
             } => {
                 hash_fields!(state, visibility, cyclomatic, cognitive, usage_hints)
-            }
-            Self::Duplication {
-                instances,
-                total_lines,
-            } => {
-                hash_fields!(state, instances, total_lines)
             }
             Self::TestComplexityHotspot {
                 cyclomatic,
@@ -535,6 +551,346 @@ mod tests {
         for variant in variants {
             let display = variant.to_string();
             assert!(!display.is_empty(), "Empty display for {:?}", variant);
+        }
+    }
+
+    // Helper function to compute hash for DebtType
+    fn compute_hash(debt: &DebtType) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        let mut hasher = DefaultHasher::new();
+        debt.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn hash_option_string_variants_consistent() {
+        // All Option<String> field variants should hash consistently
+        let variants = [
+            DebtType::Todo {
+                reason: Some("test".into()),
+            },
+            DebtType::Fixme {
+                reason: Some("test".into()),
+            },
+            DebtType::CodeSmell {
+                smell_type: Some("test".into()),
+            },
+            DebtType::Dependency {
+                dependency_type: Some("test".into()),
+            },
+            DebtType::ResourceManagement {
+                issue_type: Some("test".into()),
+            },
+            DebtType::CodeOrganization {
+                issue_type: Some("test".into()),
+            },
+            DebtType::TestQuality {
+                issue_type: Some("test".into()),
+            },
+        ];
+
+        // Each variant should hash consistently with itself
+        for variant in &variants {
+            assert_eq!(compute_hash(variant), compute_hash(&variant.clone()));
+        }
+
+        // Different variants with same field value should have different hashes (discriminant matters)
+        let todo = &variants[0];
+        let fixme = &variants[1];
+        assert_ne!(compute_hash(todo), compute_hash(fixme));
+    }
+
+    #[test]
+    fn hash_u32_pair_variants_consistent() {
+        // (u32, u32) pair variants should hash consistently
+        let complexity = DebtType::Complexity {
+            cyclomatic: 10,
+            cognitive: 5,
+        };
+        let test_complexity = DebtType::TestComplexity {
+            cyclomatic: 10,
+            cognitive: 5,
+        };
+        let duplication = DebtType::Duplication {
+            instances: 10,
+            total_lines: 5,
+        };
+
+        // Each should hash consistently
+        assert_eq!(compute_hash(&complexity), compute_hash(&complexity.clone()));
+        assert_eq!(
+            compute_hash(&test_complexity),
+            compute_hash(&test_complexity.clone())
+        );
+        assert_eq!(
+            compute_hash(&duplication),
+            compute_hash(&duplication.clone())
+        );
+
+        // Different variants should have different hashes even with same field values
+        assert_ne!(compute_hash(&complexity), compute_hash(&test_complexity));
+        assert_ne!(compute_hash(&complexity), compute_hash(&duplication));
+    }
+
+    #[test]
+    fn hash_string_pair_variants_consistent() {
+        // (String, String) pair variants should hash consistently
+        let variants = [
+            DebtType::AllocationInefficiency {
+                pattern: "a".into(),
+                impact: "b".into(),
+            },
+            DebtType::BlockingIO {
+                operation: "a".into(),
+                context: "b".into(),
+            },
+            DebtType::AsyncMisuse {
+                pattern: "a".into(),
+                performance_impact: "b".into(),
+            },
+            DebtType::ResourceLeak {
+                resource_type: "a".into(),
+                cleanup_missing: "b".into(),
+            },
+            DebtType::FlakyTestPattern {
+                pattern_type: "a".into(),
+                reliability_impact: "b".into(),
+            },
+            DebtType::SuboptimalDataStructure {
+                current_type: "a".into(),
+                recommended_type: "b".into(),
+            },
+            DebtType::PrimitiveObsession {
+                primitive_type: "a".into(),
+                domain_concept: "b".into(),
+            },
+            DebtType::CollectionInefficiency {
+                collection_type: "a".into(),
+                inefficiency_type: "b".into(),
+            },
+        ];
+
+        // Each should hash consistently
+        for variant in &variants {
+            assert_eq!(compute_hash(variant), compute_hash(&variant.clone()));
+        }
+
+        // Different variants with same field values should have different hashes
+        assert_ne!(compute_hash(&variants[0]), compute_hash(&variants[1]));
+    }
+
+    #[test]
+    fn hash_f64_variants_consistent() {
+        // Variants with f64 fields should hash consistently
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.75,
+            cyclomatic: 10,
+            cognitive: 5,
+        };
+        let risk = DebtType::Risk {
+            risk_score: 0.85,
+            factors: vec!["factor1".into()],
+        };
+        let test_duplication = DebtType::TestDuplication {
+            instances: 3,
+            total_lines: 100,
+            similarity: 0.9,
+        };
+        let god_object = DebtType::GodObject {
+            methods: 50,
+            fields: Some(30),
+            responsibilities: 5,
+            god_object_score: 85.5,
+            lines: 2000,
+        };
+        let feature_envy = DebtType::FeatureEnvy {
+            external_class: "OtherClass".into(),
+            usage_ratio: 0.6,
+        };
+        let assertion_complexity = DebtType::AssertionComplexity {
+            assertion_count: 15,
+            complexity_score: 3.5,
+        };
+
+        // Each should hash consistently
+        assert_eq!(
+            compute_hash(&testing_gap),
+            compute_hash(&testing_gap.clone())
+        );
+        assert_eq!(compute_hash(&risk), compute_hash(&risk.clone()));
+        assert_eq!(
+            compute_hash(&test_duplication),
+            compute_hash(&test_duplication.clone())
+        );
+        assert_eq!(compute_hash(&god_object), compute_hash(&god_object.clone()));
+        assert_eq!(
+            compute_hash(&feature_envy),
+            compute_hash(&feature_envy.clone())
+        );
+        assert_eq!(
+            compute_hash(&assertion_complexity),
+            compute_hash(&assertion_complexity.clone())
+        );
+    }
+
+    #[test]
+    fn hash_f64_different_values_different_hashes() {
+        let risk1 = DebtType::Risk {
+            risk_score: 0.5,
+            factors: vec![],
+        };
+        let risk2 = DebtType::Risk {
+            risk_score: 0.6,
+            factors: vec![],
+        };
+        assert_ne!(compute_hash(&risk1), compute_hash(&risk2));
+    }
+
+    #[test]
+    fn hash_remaining_variants_consistent() {
+        // Test remaining multi-field variants
+        let dead_code = DebtType::DeadCode {
+            visibility: FunctionVisibility::Private,
+            cyclomatic: 5,
+            cognitive: 3,
+            usage_hints: vec!["unused".into()],
+        };
+        let test_complexity_hotspot = DebtType::TestComplexityHotspot {
+            cyclomatic: 20,
+            cognitive: 15,
+            threshold: 10,
+        };
+        let test_todo = DebtType::TestTodo {
+            priority: Priority::High,
+            reason: Some("fix later".into()),
+        };
+        let string_concat = DebtType::StringConcatenation {
+            loop_type: "for".into(),
+            iterations: Some(100),
+        };
+        let nested_loops = DebtType::NestedLoops {
+            depth: 3,
+            complexity_estimate: "O(n^3)".into(),
+        };
+        let magic_values = DebtType::MagicValues {
+            value: "42".into(),
+            occurrences: 5,
+        };
+        let scattered_type = DebtType::ScatteredType {
+            type_name: "User".into(),
+            total_methods: 20,
+            file_count: 5,
+            severity: "high".into(),
+        };
+        let orphaned = DebtType::OrphanedFunctions {
+            target_type: "Parser".into(),
+            function_count: 10,
+            file_count: 3,
+        };
+        let utilities_sprawl = DebtType::UtilitiesSprawl {
+            function_count: 50,
+            distinct_types: 10,
+        };
+        let error_swallowing = DebtType::ErrorSwallowing {
+            pattern: "unwrap()".into(),
+            context: Some("in main".into()),
+        };
+
+        // Each should hash consistently
+        let variants: Vec<&DebtType> = vec![
+            &dead_code,
+            &test_complexity_hotspot,
+            &test_todo,
+            &string_concat,
+            &nested_loops,
+            &magic_values,
+            &scattered_type,
+            &orphaned,
+            &utilities_sprawl,
+            &error_swallowing,
+        ];
+
+        for variant in variants {
+            assert_eq!(
+                compute_hash(variant),
+                compute_hash(&variant.clone()),
+                "Hash inconsistent for {:?}",
+                variant
+            );
+        }
+    }
+
+    #[test]
+    fn hash_in_hashset_works() {
+        use std::collections::HashSet;
+
+        let mut set = HashSet::new();
+        set.insert(DebtType::Todo {
+            reason: Some("test".into()),
+        });
+        set.insert(DebtType::Complexity {
+            cyclomatic: 10,
+            cognitive: 5,
+        });
+        set.insert(DebtType::Risk {
+            risk_score: 0.75,
+            factors: vec!["a".into()],
+        });
+
+        assert_eq!(set.len(), 3);
+
+        // Duplicate should not increase size
+        set.insert(DebtType::Todo {
+            reason: Some("test".into()),
+        });
+        assert_eq!(set.len(), 3);
+
+        // Different value should increase size
+        set.insert(DebtType::Todo {
+            reason: Some("different".into()),
+        });
+        assert_eq!(set.len(), 4);
+    }
+
+    #[test]
+    fn hash_eq_consistency() {
+        // Verify that equal values have equal hashes (required by Hash contract)
+        let pairs: Vec<(DebtType, DebtType)> = vec![
+            (
+                DebtType::Risk {
+                    risk_score: 0.5,
+                    factors: vec!["a".into()],
+                },
+                DebtType::Risk {
+                    risk_score: 0.5,
+                    factors: vec!["a".into()],
+                },
+            ),
+            (
+                DebtType::GodObject {
+                    methods: 10,
+                    fields: Some(5),
+                    responsibilities: 3,
+                    god_object_score: 75.5,
+                    lines: 500,
+                },
+                DebtType::GodObject {
+                    methods: 10,
+                    fields: Some(5),
+                    responsibilities: 3,
+                    god_object_score: 75.5,
+                    lines: 500,
+                },
+            ),
+        ];
+
+        for (a, b) in pairs {
+            assert_eq!(a, b, "Values should be equal");
+            assert_eq!(
+                compute_hash(&a),
+                compute_hash(&b),
+                "Equal values must have equal hashes"
+            );
         }
     }
 }
