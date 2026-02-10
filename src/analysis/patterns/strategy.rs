@@ -10,6 +10,63 @@ use super::{
 };
 use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
 
+/// Extract class and method names from a qualified function name (e.g., "ClassName.method_name")
+fn parse_qualified_name(name: &str) -> Option<(&str, &str)> {
+    let mut parts = name.split('.');
+    let class_name = parts.next()?;
+    let method_name = parts.next()?;
+    Some((class_name, method_name))
+}
+
+/// Check if a class has an abstract method with the given name
+fn has_abstract_method(class: &ClassDef, method_name: &str) -> bool {
+    class
+        .methods
+        .iter()
+        .any(|m| m.name == method_name && m.is_abstract)
+}
+
+/// Find the first strategy base class that the given class extends and has an abstract method
+fn find_strategy_base<'a>(
+    class: &ClassDef,
+    method_name: &str,
+    classes: &'a [ClassDef],
+    is_strategy: impl Fn(&ClassDef) -> bool,
+) -> Option<&'a ClassDef> {
+    class.base_classes.iter().find_map(|base_name| {
+        classes
+            .iter()
+            .find(|c| &c.name == base_name)
+            .filter(|base| is_strategy(base))
+            .filter(|base| has_abstract_method(base, method_name))
+    })
+}
+
+/// Create a PatternInstance for a detected strategy implementation
+fn make_strategy_instance(
+    base_name: &str,
+    class_name: &str,
+    function: &FunctionMetrics,
+    file_path: &std::path::Path,
+) -> PatternInstance {
+    PatternInstance {
+        pattern_type: PatternType::Strategy,
+        confidence: 0.8,
+        base_class: Some(base_name.to_string()),
+        implementations: vec![Implementation {
+            file: file_path.to_path_buf(),
+            class_name: Some(class_name.to_string()),
+            function_name: function.name.clone(),
+            line: function.line,
+        }],
+        usage_sites: Vec::new(),
+        reasoning: format!(
+            "Implements strategy method {} from {}",
+            function.name, base_name
+        ),
+    }
+}
+
 pub struct StrategyPatternRecognizer;
 
 impl StrategyPatternRecognizer {
@@ -132,48 +189,20 @@ impl PatternRecognizer for StrategyPatternRecognizer {
         function: &FunctionMetrics,
         file_metrics: &FileMetrics,
     ) -> Option<PatternInstance> {
-        // Extract class name and method name from function name (e.g., "ClassName.method_name")
-        let mut parts = function.name.split('.');
-        let class_name = parts.next()?;
-        let method_name = parts.next()?;
+        let (class_name, method_name) = parse_qualified_name(&function.name)?;
+        let classes = file_metrics.classes.as_ref()?;
+        let class = classes.iter().find(|c| c.name == class_name)?;
 
-        if let Some(classes) = &file_metrics.classes {
-            let class = classes.iter().find(|c| c.name == class_name)?;
+        let strategy_base = find_strategy_base(class, method_name, classes, |c| {
+            self.is_strategy_interface(c)
+        })?;
 
-            // Check if class implements a strategy interface
-            for base_name in &class.base_classes {
-                if let Some(base_class) = classes.iter().find(|c| &c.name == base_name) {
-                    if self.is_strategy_interface(base_class) {
-                        // Check if function implements an abstract method
-                        let implements_abstract = base_class
-                            .methods
-                            .iter()
-                            .any(|m| m.name == method_name && m.is_abstract);
-
-                        if implements_abstract {
-                            return Some(PatternInstance {
-                                pattern_type: PatternType::Strategy,
-                                confidence: 0.8,
-                                base_class: Some(base_name.clone()),
-                                implementations: vec![Implementation {
-                                    file: file_metrics.path.clone(),
-                                    class_name: Some(class_name.to_string()),
-                                    function_name: function.name.clone(),
-                                    line: function.line,
-                                }],
-                                usage_sites: Vec::new(),
-                                reasoning: format!(
-                                    "Implements strategy method {} from {}",
-                                    function.name, base_name
-                                ),
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        None
+        Some(make_strategy_instance(
+            &strategy_base.name,
+            class_name,
+            function,
+            &file_metrics.path,
+        ))
     }
 }
 
