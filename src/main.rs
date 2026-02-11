@@ -10,36 +10,13 @@
 use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{
-    configure_thread_pool, get_worker_count, handle_analyze_command, handle_compare_command,
-    handle_explain_coverage_command, handle_validate_command, handle_validate_improvement_command,
-    show_config_sources, Cli, Commands, MAIN_STACK_SIZE,
+    configure_thread_pool, get_worker_count, handle_analyze_command_with_profiling,
+    handle_compare_command, handle_explain_coverage_command, handle_validate_command,
+    handle_validate_improvement_command, show_config_sources, Cli, Commands, MAIN_STACK_SIZE,
 };
 use debtmap::di::create_app_container;
-use debtmap::observability::{
-    enable_profiling, extract_thread_panic_message, get_timing_report, init_tracing,
-    install_panic_hook,
-};
-use std::path::PathBuf;
+use debtmap::observability::{extract_thread_panic_message, init_tracing, install_panic_hook};
 use std::sync::Arc;
-
-/// Output profiling report to file or stderr.
-///
-/// This function handles the I/O for profiling output, keeping it separate from
-/// the main command dispatch logic.
-fn output_profiling_report(output_path: Option<PathBuf>) -> Result<()> {
-    let report = get_timing_report();
-    match output_path {
-        Some(path) => {
-            std::fs::write(&path, report.to_json())
-                .map_err(|e| anyhow::anyhow!("Failed to write profile output: {}", e))?;
-            eprintln!("Profiling data written to: {}", path.display());
-        }
-        None => {
-            eprintln!("{}", report.to_summary());
-        }
-    }
-    Ok(())
-}
 
 /// Extract the number of jobs from a command, defaulting to 0 for commands that don't support it.
 fn extract_jobs(command: &Commands) -> usize {
@@ -106,20 +83,9 @@ fn main_inner() -> Result<()> {
 
     // Dispatch to command handlers
     match cli.command {
-        Commands::Analyze {
-            profile,
-            profile_output,
-            ..
-        } => {
-            if profile {
-                enable_profiling();
-            }
-            // Re-parse to get full command for handler (profiling options consumed above)
-            handle_analyze_command(parse_cli().command)
+        command @ Commands::Analyze { .. } => {
+            handle_analyze_command_with_profiling(command)
                 .map_err(|e| anyhow::anyhow!("Analyze command failed: {}", e))?;
-            if profile {
-                output_profiling_report(profile_output)?;
-            }
             Ok(())
         }
         Commands::Init { force } => {
@@ -170,7 +136,6 @@ fn main_inner() -> Result<()> {
 mod tests {
     use super::*;
     use debtmap::cli::Cli;
-    use tempfile::tempdir;
 
     /// Helper to parse CLI args and extract the command
     fn parse_command(args: &[&str]) -> Commands {
@@ -246,30 +211,5 @@ mod tests {
             "test_func",
         ]);
         assert_eq!(extract_jobs(&cmd), 0);
-    }
-
-    #[test]
-    fn test_output_profiling_report_to_file() {
-        let dir = tempdir().unwrap();
-        let output_path = dir.path().join("profile.json");
-
-        let result = output_profiling_report(Some(output_path.clone()));
-        assert!(result.is_ok());
-        assert!(output_path.exists());
-
-        let content = std::fs::read_to_string(&output_path).unwrap();
-        // JSON output should contain opening brace or timing data
-        assert!(
-            content.contains("{") || content.contains("timing"),
-            "Expected JSON output, got: {}",
-            content
-        );
-    }
-
-    #[test]
-    fn test_output_profiling_report_to_stderr() {
-        // This just verifies no panic occurs when outputting to stderr
-        let result = output_profiling_report(None);
-        assert!(result.is_ok());
     }
 }
