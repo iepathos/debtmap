@@ -88,7 +88,10 @@ mod tests {
         assert!(result.is_ok());
 
         let config = result.unwrap();
-        assert_eq!(config.comparison_path, PathBuf::from("/test/comparison.json"));
+        assert_eq!(
+            config.comparison_path,
+            PathBuf::from("/test/comparison.json")
+        );
         assert_eq!(config.output_path, PathBuf::from("/test/output.json"));
         assert_eq!(
             config.previous_validation,

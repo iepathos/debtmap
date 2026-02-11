@@ -72,28 +72,17 @@ impl ResultsApp {
         mut analysis: UnifiedAnalysis,
     ) -> Self {
         // Extract items from PreparedDebtView into UnifiedAnalysis
+        // Uses ViewItem's as_function/as_file accessors for idiomatic extraction
         let prepared_items: im::Vector<UnifiedDebtItem> = view
             .items
             .iter()
-            .filter_map(|item| {
-                if let crate::priority::view::ViewItem::Function(func) = item {
-                    Some((**func).clone())
-                } else {
-                    None
-                }
-            })
+            .filter_map(|item| item.as_function().cloned())
             .collect();
 
         let file_items: im::Vector<crate::priority::FileDebtItem> = view
             .items
             .iter()
-            .filter_map(|item| {
-                if let crate::priority::view::ViewItem::File(file) = item {
-                    Some((**file).clone())
-                } else {
-                    None
-                }
-            })
+            .filter_map(|item| item.as_file().cloned())
             .collect();
 
         // Update analysis with prepared items
@@ -315,5 +304,288 @@ impl ResultsApp {
     /// Clear filters (coordinates query with analysis).
     pub fn clear_filters(&mut self) {
         self.query.clear_filters(&self.analysis);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::CallGraph;
+
+    fn create_test_analysis() -> UnifiedAnalysis {
+        let call_graph = CallGraph::new();
+        UnifiedAnalysis::new(call_graph)
+    }
+
+    #[test]
+    fn test_results_app_new() {
+        let analysis = create_test_analysis();
+        let app = ResultsApp::new(analysis);
+
+        assert_eq!(app.terminal_size(), (80, 24));
+        assert!(!app.has_items());
+        assert!(!app.has_selection());
+    }
+
+    #[test]
+    fn test_status_message_lifecycle() {
+        let analysis = create_test_analysis();
+        let mut app = ResultsApp::new(analysis);
+
+        // Initially no message
+        assert!(app.status_message().is_none());
+
+        // Set a message
+        app.set_status_message("Test message".to_string());
+        assert_eq!(app.status_message(), Some("Test message"));
+
+        // Clear the message
+        app.clear_status_message();
+        assert!(app.status_message().is_none());
+    }
+
+    #[test]
+    fn test_redraw_flag() {
+        let analysis = create_test_analysis();
+        let mut app = ResultsApp::new(analysis);
+
+        // Initially no redraw needed
+        assert!(!app.take_needs_redraw());
+
+        // Request redraw
+        app.request_redraw();
+        assert!(app.take_needs_redraw());
+
+        // Flag should be cleared after taking
+        assert!(!app.take_needs_redraw());
+    }
+
+    #[test]
+    fn test_state_accessors() {
+        let analysis = create_test_analysis();
+        let mut app = ResultsApp::new(analysis);
+
+        // Test list accessor
+        assert_eq!(app.list().selected_index(), 0);
+
+        // Test query accessor
+        assert!(app.query().filtered_indices().is_empty());
+
+        // Test nav accessor
+        assert_eq!(app.nav().view_mode, ViewMode::List);
+
+        // Test mutable accessors work
+        let _ = app.list_mut();
+        let _ = app.query_mut();
+        let _ = app.nav_mut();
+    }
+
+    #[test]
+    fn test_count_display_empty() {
+        let analysis = create_test_analysis();
+        let app = ResultsApp::new(analysis);
+
+        let display = app.count_display();
+        assert!(display.contains("0 locations"));
+        assert!(display.contains("0 issues"));
+    }
+
+    #[test]
+    fn test_detail_scroll_offset() {
+        let analysis = create_test_analysis();
+        let app = ResultsApp::new(analysis);
+
+        let (y, x) = app.detail_scroll_offset();
+        assert_eq!(y, 0);
+        assert_eq!(x, 0);
+    }
+
+    #[test]
+    fn test_get_coverage_returns_none_without_coverage() {
+        // Create a minimal item using the testkit pattern
+        use crate::priority::{
+            ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
+        };
+        use std::path::PathBuf;
+
+        let item = UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                function: "test_fn".to_string(),
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 50.0,
+                coverage_factor: 80.0,
+                dependency_factor: 50.0,
+                role_multiplier: 2.0,
+                final_score: 50.0,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Fix".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 100.0,
+                risk_reduction: 10.0,
+                coverage_improvement: 100.0,
+                lines_reduction: 500,
+            },
+            transitive_coverage: None,
+            file_context: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 5,
+            is_pure: Some(true),
+            purity_confidence: Some(1.0),
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        };
+
+        assert_eq!(get_coverage(&item), None);
+    }
+
+    #[test]
+    fn test_get_coverage_returns_direct_coverage() {
+        use crate::priority::{
+            ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location,
+            TransitiveCoverage, UnifiedScore,
+        };
+        use std::path::PathBuf;
+
+        let item = UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                function: "test_fn".to_string(),
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 50.0,
+                coverage_factor: 80.0,
+                dependency_factor: 50.0,
+                role_multiplier: 2.0,
+                final_score: 50.0,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: true,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Fix".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 100.0,
+                risk_reduction: 10.0,
+                coverage_improvement: 100.0,
+                lines_reduction: 500,
+            },
+            transitive_coverage: Some(TransitiveCoverage {
+                direct: 75.5,
+                transitive: 80.0,
+                propagated_from: vec![],
+                uncovered_lines: vec![],
+            }),
+            file_context: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 5,
+            is_pure: Some(true),
+            purity_confidence: Some(1.0),
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        };
+
+        assert_eq!(get_coverage(&item), Some(75.5));
     }
 }

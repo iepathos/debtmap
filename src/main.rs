@@ -11,8 +11,8 @@ use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{
     configure_thread_pool, get_worker_count, handle_analyze_command, handle_compare_command,
-    handle_explain_coverage_command, handle_validate_command,
-    handle_validate_improvement_command, show_config_sources, Cli, Commands, MAIN_STACK_SIZE,
+    handle_explain_coverage_command, handle_validate_command, handle_validate_improvement_command,
+    show_config_sources, Cli, Commands, MAIN_STACK_SIZE,
 };
 use debtmap::di::create_app_container;
 use debtmap::observability::{
