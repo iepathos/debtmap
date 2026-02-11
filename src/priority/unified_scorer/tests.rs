@@ -319,7 +319,8 @@ fn create_zero_coverage_data(func: &FunctionMetrics) -> LcovData {
 
 #[test]
 fn test_entry_point_coverage_adjustment() {
-    // Spec 110: Entry points with 0% coverage should score lower than pure logic with 0% coverage
+    // BUG-001 fix: Entry points have higher multiplier (1.3) than pure logic (0.7)
+    // So entry points should score HIGHER than pure logic with same complexity
     let entry_point = create_entry_point_function(17, 17);
     let pure_logic = create_pure_logic_function(17, 17);
 
@@ -331,10 +332,11 @@ fn test_entry_point_coverage_adjustment() {
         calculate_unified_priority(&entry_point, &call_graph, Some(&entry_lcov), None);
     let logic_score = calculate_unified_priority(&pure_logic, &call_graph, Some(&logic_lcov), None);
 
-    // Entry point should score LOWER due to 0.6x coverage weight multiplier
+    // Entry point should score HIGHER due to 1.3 multiplier vs pure logic 0.7
+    // (Entry points need integration tests, so higher priority)
     assert!(
-        entry_score.final_score < logic_score.final_score,
-        "Entry point (score: {}) should score lower than pure logic (score: {}) with same complexity and 0% coverage",
+        entry_score.final_score > logic_score.final_score,
+        "Entry point (score: {}) should score higher than pure logic (score: {}) - entry points need testing",
         entry_score.final_score,
         logic_score.final_score
     );
@@ -412,8 +414,8 @@ fn test_complex_entry_point_still_flagged() {
 
 #[test]
 fn test_io_wrapper_role_multiplier_not_clamped() {
-    // Spec 119: IOWrapper role multiplier (0.5) should not be clamped to 0.8
-    // with new default clamp range [0.3, 1.8]
+    // BUG-001 fix: IOWrapper role multiplier is now 1.2 (I/O is hard to test)
+    // This is higher than PureLogic (0.7) because I/O functions need more test attention
     let mut io_wrapper = create_test_metrics();
     io_wrapper.name = "write_output".to_string();
     io_wrapper.cyclomatic = 16;
@@ -426,30 +428,25 @@ fn test_io_wrapper_role_multiplier_not_clamped() {
 
     let score = calculate_unified_priority(&io_wrapper, &call_graph, Some(&lcov), None);
 
-    // With the new clamp range [0.3, 1.8], the 0.5 multiplier should be applied
-    // for IOWrapper functions (detected by name pattern or classifier)
-    // Expected base score for cyclo=16, 0% coverage is around 22.0
-    // With 0.5 multiplier: 22.0 * 0.5 = 11.0
-    // With role-specific coverage weight (0.5x), the score should be even lower (~8-11)
+    // IOWrapper now has 1.2 multiplier (I/O is hard to test, needs attention)
+    // This means IOWrapper scores HIGHER than pure logic, not lower
     assert!(
-        score.final_score < 20.0,
-        "IOWrapper should score relatively low. Score: {}",
+        score.final_score > 10.0,
+        "IOWrapper should have elevated score due to I/O testing difficulty. Score: {}",
         score.final_score
     );
 
-    // Verify role multiplier was applied (should be 0.5 or close for IOWrapper)
+    // Verify role multiplier was applied (should be 1.2 for IOWrapper now)
     assert!(
-        score.role_multiplier <= 0.8,
-        "Role multiplier for IOWrapper should be <=0.8, got: {}",
+        score.role_multiplier >= 1.0,
+        "Role multiplier for IOWrapper should be >=1.0 (I/O is hard to test), got: {}",
         score.role_multiplier
     );
 }
 
 #[test]
 fn test_entry_point_role_multiplier_not_clamped() {
-    // Spec 119: EntryPoint role multiplier (1.5) should not be clamped to 1.2
-    // with new default clamp range [0.3, 1.8]
-    // Spec 121: With cognitive-weighted scoring, actual scores will differ
+    // BUG-001 fix: EntryPoint role multiplier is now 1.3 (entry points need integration tests)
     let entry_point = create_entry_point_function(15, 18);
 
     let call_graph = CallGraph::new();
@@ -457,24 +454,25 @@ fn test_entry_point_role_multiplier_not_clamped() {
 
     let score = calculate_unified_priority(&entry_point, &call_graph, Some(&lcov), None);
 
-    // Verify role multiplier was applied
+    // Verify role multiplier was applied (now 1.3, not 1.5)
     assert!(
-        (score.role_multiplier - 1.5).abs() < 0.01,
-        "Role multiplier should be 1.5 for EntryPoint, got: {}",
+        (score.role_multiplier - 1.3).abs() < 0.01,
+        "Role multiplier should be 1.3 for EntryPoint, got: {}",
         score.role_multiplier
     );
 
-    // EntryPoint with 1.5x multiplier and 0% coverage should score reasonably
+    // EntryPoint with 1.3x multiplier and 0% coverage should score reasonably
     assert!(
         score.final_score > 2.0,
-        "EntryPoint with 1.5x multiplier should have elevated score. Score: {}",
+        "EntryPoint with 1.3x multiplier should have elevated score. Score: {}",
         score.final_score
     );
 }
 
 #[test]
 fn test_io_wrapper_coverage_weight_reduced() {
-    // Spec 119: IOWrapper functions should have reduced coverage weight (0.5x)
+    // BUG-001 fix: IOWrapper now has 1.2 multiplier (I/O is hard to test)
+    // Coverage weight is still reduced (0.5x) but role multiplier is increased
     let mut io_wrapper = create_test_metrics();
     io_wrapper.name = "format_output".to_string();
     io_wrapper.file = PathBuf::from("src/io/formatter.rs");
@@ -488,20 +486,18 @@ fn test_io_wrapper_coverage_weight_reduced() {
 
     let score = calculate_unified_priority(&io_wrapper, &call_graph, Some(&lcov), None);
 
-    // With 0% coverage, 0.5x coverage weight, and 0.5x role multiplier,
-    // the score should be significantly lower than a PureLogic function
-    // with same complexity
+    // With 0% coverage, 0.5x coverage weight, and 1.2x role multiplier,
+    // the score should be moderate - coverage weight reduction is offset by role multiplier
     assert!(
-        score.final_score < 15.0,
-        "IOWrapper with reduced coverage weight should score low. Score: {}",
+        score.final_score > 5.0,
+        "IOWrapper should have a meaningful score. Score: {}",
         score.final_score
     );
 }
 
 #[test]
 fn test_pure_logic_coverage_weight_unchanged() {
-    // Spec 119: PureLogic functions should maintain 1.0x coverage weight
-    // Spec 121: With cognitive-weighted scoring, scores will be adjusted
+    // BUG-001 fix: PureLogic now has 0.7 multiplier (pure functions are easy to test)
     let pure_logic = create_pure_logic_function(12, 14);
 
     let call_graph = CallGraph::new();
@@ -509,17 +505,17 @@ fn test_pure_logic_coverage_weight_unchanged() {
 
     let score = calculate_unified_priority(&pure_logic, &call_graph, Some(&lcov), None);
 
-    // PureLogic with 0% coverage should score reasonably
+    // PureLogic with 0% coverage should score reasonably (but lower than I/O)
     assert!(
         score.final_score > 2.0,
         "PureLogic with 0% coverage should score reasonably. Score: {}",
         score.final_score
     );
 
-    // Role multiplier for PureLogic with complexity > 5 should be 1.3
+    // Role multiplier for PureLogic is now 0.7 (pure functions are easy to test)
     assert!(
-        score.role_multiplier >= 1.0,
-        "Role multiplier for PureLogic should be >= 1.0, got: {}",
+        score.role_multiplier < 1.0,
+        "Role multiplier for PureLogic should be < 1.0 (pure is easy to test), got: {}",
         score.role_multiplier
     );
 }

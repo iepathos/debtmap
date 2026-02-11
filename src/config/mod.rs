@@ -394,7 +394,8 @@ interface_weight = 0.15
     #[test]
     fn test_role_multipliers_default() {
         let multipliers = RoleMultipliers::default();
-        assert_eq!(multipliers.pure_logic, 1.2);
+        // BUG-001 fix: PureLogic now 0.7 (was 1.2) - pure functions are easier to test
+        assert_eq!(multipliers.pure_logic, 0.7);
         assert_eq!(multipliers.orchestrator, 0.8);
         assert_eq!(multipliers.io_wrapper, 0.7);
         assert_eq!(multipliers.entry_point, 0.9);
@@ -610,7 +611,8 @@ interface_weight = 0.15
     #[test]
     fn test_get_role_multipliers() {
         let multipliers = get_role_multipliers();
-        assert_eq!(multipliers.pure_logic, 1.2);
+        // BUG-001 fix: PureLogic now 0.7 (was 1.2) - pure functions are easier to test
+        assert_eq!(multipliers.pure_logic, 0.7);
         assert_eq!(multipliers.orchestrator, 0.8);
     }
 
@@ -641,7 +643,8 @@ interface_weight = 0.15
 
     #[test]
     fn test_default_multiplier_functions() {
-        assert_eq!(default_pure_logic_multiplier(), 1.2);
+        // BUG-001 fix: PureLogic now 0.7 (was 1.2) - pure functions are easier to test
+        assert_eq!(default_pure_logic_multiplier(), 0.7);
         assert_eq!(default_orchestrator_multiplier(), 0.8);
         assert_eq!(default_io_wrapper_multiplier(), 0.7);
         assert_eq!(default_entry_point_multiplier(), 0.9);

@@ -635,15 +635,17 @@ fn calculate_structural_quality_multiplier(nesting: u32, cyclomatic: u32) -> f64
 /// Calculate the role multiplier based on function role and complexity.
 ///
 /// Different roles have different impacts on technical debt priority.
-fn calculate_role_multiplier(role: FunctionRole, raw_complexity: f64) -> f64 {
+/// Pure functions are easier to test and refactor, so they get REDUCED priority.
+/// I/O functions are harder to test, so they get INCREASED priority.
+/// (BUG-001 fix: inverted PureLogic multiplier)
+fn calculate_role_multiplier(role: FunctionRole, _raw_complexity: f64) -> f64 {
     match role {
-        FunctionRole::EntryPoint => 1.5,
-        FunctionRole::PureLogic if raw_complexity > 5.0 => 1.3, // Complex core logic
-        FunctionRole::PureLogic => 1.0,
-        FunctionRole::Orchestrator => 0.8,
-        FunctionRole::IOWrapper => 0.5,
-        FunctionRole::PatternMatch => 0.6,
-        FunctionRole::Debug => 0.3,
+        FunctionRole::EntryPoint => 1.3,   // Entry points need integration tests
+        FunctionRole::PureLogic => 0.7,    // Pure functions are easy to test, reduce priority
+        FunctionRole::Orchestrator => 0.8, // Orchestrators delegate, moderate priority
+        FunctionRole::IOWrapper => 1.2,    // I/O is hard to test, increase priority
+        FunctionRole::PatternMatch => 0.6, // Pattern matching is straightforward
+        FunctionRole::Debug => 0.3,        // Debug functions rarely need tests
         _ => 1.0,
     }
 }

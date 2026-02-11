@@ -305,7 +305,7 @@ impl RoleMultipliers {
 }
 
 pub fn default_pure_logic_multiplier() -> f64 {
-    1.2 // Prioritized but not extreme (was 1.5)
+    0.7 // Pure functions are easier to test, decrease priority (BUG-001 fix)
 }
 
 pub fn default_orchestrator_multiplier() -> f64 {

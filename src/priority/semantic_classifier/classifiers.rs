@@ -387,33 +387,53 @@ pub(crate) fn delegates_to_tested_functions(
 
 fn contains_io_patterns(func: &FunctionMetrics) -> bool {
     // Check for I/O related patterns in function name or content
+    // BUG-001 fix: Added missing async/process I/O patterns
     let io_keywords = vec![
+        // File and stream I/O
         "read",
         "write",
         "file",
         "socket",
-        "http",
-        "request",
-        "response",
         "stream",
         "buffer",
         "stdin",
         "stdout",
         "stderr",
+        "bufreader",
+        "bufwriter",
+        // Network I/O
+        "http",
+        "request",
+        "response",
+        // Process I/O (BUG-001: was missing)
+        "spawn",
+        "command",
+        "process",
+        "child",
+        "exec",
+        // Async I/O (BUG-001: was missing)
+        "timeout",
+        "async",
+        "await",
+        "tokio",
+        "future",
+        // Console I/O
         "print",
         "input",
         "output",
         "display",
-        // Note: "format" removed - string formatting is not I/O
+        // Serialization
         "json",
         "serialize",
         "deserialize",
         "emit",
         "render",
+        // Persistence
         "save",
         "load",
         "export",
         "import",
+        // Logging
         "log",
         "trace",
         "debug",

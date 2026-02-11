@@ -40,7 +40,15 @@ pub fn classify_function_role(
     // Use a functional approach with classification rules
     // Note: AST is not available at this level, so we pass None
     // Full AST-based detection will be integrated when threading syn::ItemFn
-    classify_by_rules(func, func_id, call_graph, None).unwrap_or(FunctionRole::PureLogic)
+    classify_by_rules(func, func_id, call_graph, None).unwrap_or_else(|| {
+        // BUG-001 fix: Use purity analysis to prevent impure I/O functions from being
+        // classified as PureLogic. If function is impure, classify as Unknown instead.
+        if is_impure_function(func) {
+            FunctionRole::Unknown
+        } else {
+            FunctionRole::PureLogic
+        }
+    })
 }
 
 // Pure function that applies classification rules in order
@@ -116,6 +124,24 @@ fn classify_by_rules(
 // Pure function to check if a function is an entry point
 fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
     call_graph.is_entry_point(func_id) || is_entry_point_by_name(&func_id.name)
+}
+
+/// Check if a function is impure based on purity analysis (BUG-001 fix).
+///
+/// Used to prevent impure functions from being classified as PureLogic.
+/// A function is considered impure if:
+/// - `purity_level` is `Some(Impure)`
+/// - `is_pure` is `Some(false)` (legacy field)
+fn is_impure_function(func: &FunctionMetrics) -> bool {
+    use crate::core::PurityLevel;
+
+    // Check new purity_level field first
+    if let Some(level) = func.purity_level {
+        return level == PurityLevel::Impure;
+    }
+
+    // Fallback to legacy is_pure field
+    func.is_pure == Some(false)
 }
 
 /// Detect simple accessor/getter methods (spec 125)
@@ -326,8 +352,8 @@ mod tests {
 
     #[test]
     fn test_role_multipliers() {
-        // Test with updated configuration values (spec 63)
-        assert_eq!(get_role_multiplier(FunctionRole::PureLogic), 1.2);
+        // Test with updated configuration values (BUG-001 fix: PureLogic now 0.7)
+        assert_eq!(get_role_multiplier(FunctionRole::PureLogic), 0.7);
         assert_eq!(get_role_multiplier(FunctionRole::Orchestrator), 0.8);
         assert_eq!(get_role_multiplier(FunctionRole::IOWrapper), 0.7);
         assert_eq!(get_role_multiplier(FunctionRole::EntryPoint), 0.9);
