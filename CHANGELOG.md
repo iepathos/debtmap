@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-02-11
+
+### Fixed
+
+- **Role Multiplier Inversion** - Corrected multipliers for accurate debt prioritization
+  - PureLogic: 1.2 → 0.7 (pure functions are easier to test, lower priority)
+  - IOWrapper: 0.5 → 1.2 (I/O is harder to test, higher priority)
+  - EntryPoint: 1.5 → 1.3 (entry points need integration tests)
+
+- **I/O Pattern Detection** - Added missing patterns for function classification
+  - Process I/O: spawn, command, process, child, exec
+  - Async I/O: timeout, async, await, tokio, future
+  - Buffered I/O: bufreader, bufwriter
+
+- **Purity-Based Role Classification** - Impure functions no longer default to PureLogic
+  - Functions detected as impure now classified as Unknown (neutral multiplier)
+  - Prevents I/O orchestration functions from being misclassified
+
+### Added
+
+- **Function-Level Debt Suppression** - `debtmap:allow` annotation support
+  - Suppress specific functions from debt reports with inline comments
+  - Useful for intentionally complex functions or false positives
+
+### Testing
+
+- Added call graph tests for async and same-file call detection
+- Validates tokio::spawn closure call attribution
+
 ## [0.13.4] - 2026-02-08
 
 ### Performance
