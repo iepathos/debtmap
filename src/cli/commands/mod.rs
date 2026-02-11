@@ -9,7 +9,7 @@ mod explain_coverage;
 mod validate;
 mod validate_improvement;
 
-pub use analyze::handle_analyze_command;
+pub use analyze::{handle_analyze_command, handle_analyze_command_with_profiling};
 pub use compare::handle_compare_command;
 pub use explain_coverage::handle_explain_coverage_command;
 pub use validate::handle_validate_command;

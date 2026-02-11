@@ -4,6 +4,9 @@
 //! including parameter extraction and configuration building.
 
 use crate::cli::args::Commands;
+use crate::observability::{enable_profiling, get_timing_report};
+use std::path::PathBuf;
+
 use crate::cli::config_builder::{
     build_debug_config, build_display_config, build_feature_config, build_language_config,
     build_path_config, build_performance_config, build_threshold_config, compute_multi_pass,
@@ -296,6 +299,58 @@ pub fn handle_analyze_command(command: Commands) -> Result<(), CliError> {
         .map_err(|e| CliError::Config(ConfigError::ValidationFailed(e.to_string())))
 }
 
+/// Handle the analyze command with profiling support.
+///
+/// This function extracts profiling flags from the command, enables profiling if requested,
+/// executes the analyze command, and outputs the profiling report. This consolidates
+/// the profiling concerns that were previously split between main_inner and the handler.
+pub fn handle_analyze_command_with_profiling(command: Commands) -> Result<(), CliError> {
+    let (profile, profile_output) = extract_profiling_options(&command);
+
+    if profile {
+        enable_profiling();
+    }
+
+    handle_analyze_command(command)?;
+
+    if profile {
+        output_profiling_report(profile_output)
+            .map_err(|e| CliError::InvalidCommand(e.to_string()))?;
+    }
+
+    Ok(())
+}
+
+/// Extract profiling options from the Analyze command variant.
+fn extract_profiling_options(command: &Commands) -> (bool, Option<PathBuf>) {
+    if let Commands::Analyze {
+        profile,
+        profile_output,
+        ..
+    } = command
+    {
+        (*profile, profile_output.clone())
+    } else {
+        (false, None)
+    }
+}
+
+/// Output profiling report to file or stderr.
+fn output_profiling_report(output_path: Option<PathBuf>) -> Result<()> {
+    let report = get_timing_report();
+    match output_path {
+        Some(path) => {
+            std::fs::write(&path, report.to_json())
+                .map_err(|e| anyhow::anyhow!("Failed to write profile output: {}", e))?;
+            eprintln!("Profiling data written to: {}", path.display());
+        }
+        None => {
+            eprintln!("{}", report.to_summary());
+        }
+    }
+    Ok(())
+}
+
 /// Build analyze configuration from grouped configuration structs (spec 204)
 fn build_analyze_config(
     p: PathConfig,
@@ -436,5 +491,83 @@ mod tests {
         assert!(cli_result.is_err());
         let error_msg = format!("{}", cli_result.unwrap_err());
         assert!(error_msg.contains("Command failed"));
+    }
+
+    #[test]
+    fn test_extract_profiling_options_from_analyze() {
+        use crate::cli::Cli;
+        use clap::Parser;
+
+        let cli = Cli::parse_from(["debtmap", "analyze", ".", "--profile"]);
+        let (profile, profile_output) = extract_profiling_options(&cli.command);
+        assert!(profile);
+        assert!(profile_output.is_none());
+    }
+
+    #[test]
+    fn test_extract_profiling_options_with_output() {
+        use crate::cli::Cli;
+        use clap::Parser;
+
+        let cli = Cli::parse_from([
+            "debtmap",
+            "analyze",
+            ".",
+            "--profile",
+            "--profile-output",
+            "output.json",
+        ]);
+        let (profile, profile_output) = extract_profiling_options(&cli.command);
+        assert!(profile);
+        assert_eq!(profile_output, Some(PathBuf::from("output.json")));
+    }
+
+    #[test]
+    fn test_extract_profiling_options_no_profile() {
+        use crate::cli::Cli;
+        use clap::Parser;
+
+        let cli = Cli::parse_from(["debtmap", "analyze", "."]);
+        let (profile, profile_output) = extract_profiling_options(&cli.command);
+        assert!(!profile);
+        assert!(profile_output.is_none());
+    }
+
+    #[test]
+    fn test_extract_profiling_options_non_analyze_command() {
+        use crate::cli::Cli;
+        use clap::Parser;
+
+        let cli = Cli::parse_from(["debtmap", "init"]);
+        let (profile, profile_output) = extract_profiling_options(&cli.command);
+        assert!(!profile);
+        assert!(profile_output.is_none());
+    }
+
+    #[test]
+    fn test_output_profiling_report_to_file() {
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let output_path = dir.path().join("profile.json");
+
+        let result = output_profiling_report(Some(output_path.clone()));
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        let content = std::fs::read_to_string(&output_path).unwrap();
+        // JSON output should contain opening brace or timing data
+        assert!(
+            content.contains("{") || content.contains("timing"),
+            "Expected JSON output, got: {}",
+            content
+        );
+    }
+
+    #[test]
+    fn test_output_profiling_report_to_stderr() {
+        // This just verifies no panic occurs when outputting to stderr
+        let result = output_profiling_report(None);
+        assert!(result.is_ok());
     }
 }
