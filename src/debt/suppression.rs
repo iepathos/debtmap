@@ -9,6 +9,10 @@ pub struct SuppressionContext {
     pub active_blocks: Vec<SuppressionBlock>,
     pub line_suppressions: HashMap<usize, SuppressionRule>,
     pub unclosed_blocks: Vec<UnclosedBlock>,
+    /// Function-level suppressions using `debtmap:allow[types] -- reason`
+    /// Maps the line number of the annotation to the suppression rule.
+    /// The suppression applies to the next function definition after this line.
+    pub function_allows: HashMap<usize, FunctionAllow>,
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +36,15 @@ pub struct UnclosedBlock {
     pub start_line: usize,
 }
 
+/// Function-level suppression using `debtmap:allow[types] -- reason`
+/// Applied to the function definition that follows the annotation.
+#[derive(Debug, Clone)]
+pub struct FunctionAllow {
+    pub debt_types: Vec<DebtType>,
+    pub reason: String,
+    pub annotation_line: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct SuppressionStats {
     pub total_suppressions: usize,
@@ -45,7 +58,45 @@ impl SuppressionContext {
             active_blocks: Vec::new(),
             line_suppressions: HashMap::new(),
             unclosed_blocks: Vec::new(),
+            function_allows: HashMap::new(),
         }
+    }
+
+    /// Check if a function starting at the given line is suppressed via `debtmap:allow`.
+    /// Looks for allow annotations in the lines immediately preceding the function.
+    pub fn is_function_allowed(&self, function_start_line: usize, debt_type: &DebtType) -> bool {
+        // Check up to 5 lines before the function for an allow annotation
+        // (to account for doc comments between the annotation and function)
+        for offset in 1..=5 {
+            if function_start_line < offset {
+                break;
+            }
+            let check_line = function_start_line - offset;
+            if let Some(allow) = self.function_allows.get(&check_line) {
+                return debt_type_matches(debt_type, &allow.debt_types);
+            }
+        }
+        false
+    }
+
+    /// Get the reason for a function-level suppression, if any.
+    pub fn get_function_allow_reason(
+        &self,
+        function_start_line: usize,
+        debt_type: &DebtType,
+    ) -> Option<&str> {
+        for offset in 1..=5 {
+            if function_start_line < offset {
+                break;
+            }
+            let check_line = function_start_line - offset;
+            if let Some(allow) = self.function_allows.get(&check_line) {
+                if debt_type_matches(debt_type, &allow.debt_types) {
+                    return Some(&allow.reason);
+                }
+            }
+        }
+        None
     }
 
     pub fn is_suppressed(&self, line: usize, debt_type: &DebtType) -> bool {
@@ -143,7 +194,15 @@ fn line_within_block(line: usize, block: &SuppressionBlock) -> bool {
 }
 
 fn debt_type_matches(debt_type: &DebtType, allowed_types: &[DebtType]) -> bool {
-    allowed_types.is_empty() || allowed_types.contains(debt_type)
+    // Empty allowed_types means wildcard - match all
+    if allowed_types.is_empty() {
+        return true;
+    }
+    // Compare by variant discriminant, ignoring field values
+    // This allows `testing` suppression to match any TestingGap regardless of metrics
+    allowed_types
+        .iter()
+        .any(|allowed| std::mem::discriminant(allowed) == std::mem::discriminant(debt_type))
 }
 
 struct SuppressionPatterns {
@@ -151,6 +210,8 @@ struct SuppressionPatterns {
     block_end: Regex,
     line: Regex,
     next_line: Regex,
+    /// Function-level allow: `debtmap:allow[types] -- reason` (reason required)
+    function_allow: Regex,
 }
 
 impl SuppressionPatterns {
@@ -171,6 +232,10 @@ impl SuppressionPatterns {
             next_line: Regex::new(&format!(
                 r"(?m)^\s*{escaped_prefix}\s*debtmap:ignore-next-line(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
             )).unwrap(),
+            // Function-level allow requires a reason (after --)
+            function_allow: Regex::new(&format!(
+                r"(?m)^\s*{escaped_prefix}\s*debtmap:allow\s*\[([\w,*]+)\]\s*--\s*(.+)$"
+            )).unwrap(),
         }
     }
 }
@@ -188,14 +253,18 @@ enum LineParseResult {
     BlockEnd(usize),
     NextLineSuppression(usize, Vec<DebtType>, Option<String>),
     LineSuppression(usize, Vec<DebtType>, Option<String>),
+    /// Function-level allow: (line, debt_types, reason)
+    FunctionAllowAnnotation(usize, Vec<DebtType>, String),
     None,
 }
 
 fn parse_line(line: &str, line_number: usize, patterns: &SuppressionPatterns) -> LineParseResult {
     // Try each pattern in order and return the first match
+    // Note: function_allow is tried before line suppression to avoid partial matches
     try_parse_block_start(line, line_number, patterns)
         .or_else(|| try_parse_block_end(line, line_number, patterns))
         .or_else(|| try_parse_next_line(line, line_number, patterns))
+        .or_else(|| try_parse_function_allow(line, line_number, patterns))
         .or_else(|| try_parse_line_suppression(line, line_number, patterns))
         .unwrap_or(LineParseResult::None)
 }
@@ -253,6 +322,23 @@ fn try_parse_line_suppression(
     })
 }
 
+fn try_parse_function_allow(
+    line: &str,
+    line_number: usize,
+    patterns: &SuppressionPatterns,
+) -> Option<LineParseResult> {
+    patterns.function_allow.captures(line).map(|captures| {
+        LineParseResult::FunctionAllowAnnotation(
+            line_number,
+            parse_debt_types(captures.get(1).map(|m| m.as_str())),
+            captures
+                .get(2)
+                .map(|m| m.as_str().trim().to_string())
+                .unwrap_or_default(),
+        )
+    })
+}
+
 fn process_parsed_line(
     result: LineParseResult,
     context: &mut SuppressionContext,
@@ -268,6 +354,16 @@ fn process_parsed_line(
         }
         LineSuppression(ln, types, reason) => {
             add_line_suppression(context, ln, types, reason, false)
+        }
+        FunctionAllowAnnotation(ln, types, reason) => {
+            context.function_allows.insert(
+                ln,
+                FunctionAllow {
+                    debt_types: types,
+                    reason,
+                    annotation_line: ln,
+                },
+            );
         }
         None => {}
     }
@@ -374,6 +470,31 @@ static DEBT_TYPE_MAP: Lazy<HashMap<&'static str, DebtType>> = Lazy::new(|| {
         "dependency",
         DebtType::Dependency {
             dependency_type: None,
+        },
+    );
+    // Testing/coverage debt types - for suppressing TestingGap items
+    map.insert(
+        "testing",
+        DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 0,
+            cognitive: 0,
+        },
+    );
+    map.insert(
+        "coverage",
+        DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 0,
+            cognitive: 0,
+        },
+    );
+    map.insert(
+        "untested",
+        DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 0,
+            cognitive: 0,
         },
     );
     map
@@ -577,5 +698,153 @@ mod tests {
         let unclosed = create_unclosed_blocks(open_blocks, file);
 
         assert!(unclosed.is_empty());
+    }
+
+    #[test]
+    fn test_testing_debt_type_suppression() {
+        let content = r#"
+// debtmap:ignore-start[testing]
+fn untested_function() {}
+// debtmap:ignore-end
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.25,
+            cyclomatic: 10,
+            cognitive: 15,
+        };
+        assert!(context.is_suppressed(3, &testing_gap));
+    }
+
+    #[test]
+    fn test_coverage_alias_suppression() {
+        let content = "fn foo() {} // debtmap:ignore[coverage]";
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 5,
+            cognitive: 8,
+        };
+        assert!(context.is_suppressed(1, &testing_gap));
+    }
+
+    #[test]
+    fn test_function_allow_basic() {
+        let content = r#"
+// debtmap:allow[testing] -- Orchestration function; callees are tested
+async fn run_loop() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        assert_eq!(context.function_allows.len(), 1);
+        let allow = context.function_allows.get(&2).unwrap();
+        assert_eq!(allow.reason, "Orchestration function; callees are tested");
+        assert!(!allow.debt_types.is_empty());
+    }
+
+    #[test]
+    fn test_function_allow_is_function_allowed() {
+        let content = r#"
+// debtmap:allow[testing] -- Pure logic extracted and tested
+async fn orchestration_function() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.25,
+            cyclomatic: 11,
+            cognitive: 19,
+        };
+        // Function starts at line 3, annotation is at line 2
+        assert!(context.is_function_allowed(3, &testing_gap));
+        // Different function at line 10 should not be allowed
+        assert!(!context.is_function_allowed(10, &testing_gap));
+    }
+
+    #[test]
+    fn test_function_allow_get_reason() {
+        let content = r#"
+// debtmap:allow[complexity,testing] -- State machine with exhaustive matching
+fn complex_match() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.5,
+            cyclomatic: 15,
+            cognitive: 20,
+        };
+        let reason = context.get_function_allow_reason(3, &testing_gap);
+        assert_eq!(reason, Some("State machine with exhaustive matching"));
+    }
+
+    #[test]
+    fn test_function_allow_requires_reason() {
+        // Without a reason, the pattern should not match
+        let content = r#"
+// debtmap:allow[testing]
+fn no_reason() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        // Should not parse without the required reason
+        assert!(context.function_allows.is_empty());
+    }
+
+    #[test]
+    fn test_function_allow_multiple_types() {
+        let content = r#"
+// debtmap:allow[testing,complexity] -- Async orchestration with inherent complexity
+async fn run_loop() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.25,
+            cyclomatic: 11,
+            cognitive: 19,
+        };
+        let complexity = DebtType::Complexity {
+            cyclomatic: 11,
+            cognitive: 19,
+        };
+
+        assert!(context.is_function_allowed(3, &testing_gap));
+        assert!(context.is_function_allowed(3, &complexity));
+    }
+
+    #[test]
+    fn test_function_allow_wildcard() {
+        let content = r#"
+// debtmap:allow[*] -- Legacy code pending refactor
+fn legacy_function() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 20,
+            cognitive: 30,
+        };
+        let complexity = DebtType::Complexity {
+            cyclomatic: 20,
+            cognitive: 30,
+        };
+        let todo = DebtType::Todo { reason: None };
+
+        // Wildcard should allow all debt types
+        assert!(context.is_function_allowed(3, &testing_gap));
+        assert!(context.is_function_allowed(3, &complexity));
+        assert!(context.is_function_allowed(3, &todo));
     }
 }

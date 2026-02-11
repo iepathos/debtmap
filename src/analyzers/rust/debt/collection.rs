@@ -54,7 +54,7 @@ pub fn collect_all_rust_debt_items(
     suppression_context: &SuppressionContext,
     enhanced_analysis: &[EnhancedFunctionAnalysis],
 ) -> Vec<DebtItem> {
-    [
+    let items: Vec<DebtItem> = [
         extract_debt_items_with_enhanced(file, path, threshold, functions, enhanced_analysis),
         find_todos_and_fixmes_with_suppression(source_content, path, Some(suppression_context)),
         find_code_smells_with_suppression(source_content, path, Some(suppression_context)),
@@ -74,7 +74,13 @@ pub fn collect_all_rust_debt_items(
     ]
     .into_iter()
     .flatten()
-    .collect()
+    .collect();
+
+    // Filter out items that are allowed by function-level debtmap:allow annotations
+    items
+        .into_iter()
+        .filter(|item| !suppression_context.is_function_allowed(item.line, &item.debt_type))
+        .collect()
 }
 
 /// Analyze Rust test quality
