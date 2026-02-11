@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Functions detected as impure now classified as Unknown (neutral multiplier)
   - Prevents I/O orchestration functions from being misclassified
 
+- **Context Test File References** - Only include existing files in context suggestions
+  - Filters out hypothetical `*_test.rs` paths that don't exist
+  - Prevents misleading references when tests are inline modules
+
+- **TUI Item Scores Header** - Fixed inconsistent header styling in detail view
+
 ### Added
 
 - **Function-Level Debt Suppression** - `debtmap:allow` annotation support
