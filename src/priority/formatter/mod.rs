@@ -388,4 +388,150 @@ mod tests {
             "highly coupled"
         );
     }
+
+    // === Tests for format_file_rationale ===
+
+    fn make_test_god_analysis(
+        is_god_object: bool,
+        method_count: usize,
+        responsibility_count: usize,
+        god_object_score: f64,
+    ) -> crate::organization::GodObjectAnalysis {
+        crate::organization::GodObjectAnalysis {
+            is_god_object,
+            method_count,
+            weighted_method_count: None,
+            field_count: 10,
+            responsibility_count,
+            lines_of_code: 500,
+            complexity_sum: 200,
+            god_object_score,
+            recommended_splits: Vec::new(),
+            confidence: crate::organization::GodObjectConfidence::Definite,
+            responsibilities: Vec::new(),
+            responsibility_method_counts: Default::default(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: crate::organization::DetectionType::GodClass,
+            struct_name: None,
+            struct_line: None,
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::organization::SplitAnalysisMethod::default(),
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        }
+    }
+
+    fn make_test_file_item(
+        god_analysis: Option<crate::organization::GodObjectAnalysis>,
+        total_complexity: u32,
+        total_lines: usize,
+        function_count: usize,
+        avg_complexity: f64,
+    ) -> crate::priority::FileDebtItem {
+        crate::priority::FileDebtItem {
+            metrics: crate::priority::FileDebtMetrics {
+                god_object_analysis: god_analysis,
+                total_complexity,
+                total_lines,
+                function_count,
+                avg_complexity,
+                ..Default::default()
+            },
+            score: 50.0,
+            priority_rank: 1,
+            recommendation: "Test recommendation".to_string(),
+            impact: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_format_file_rationale_god_object_high_responsibilities() {
+        let god_analysis = make_test_god_analysis(true, 30, 8, 75.0);
+        let item = make_test_file_item(Some(god_analysis), 100, 500, 30, 3.3);
+
+        let result = format_file_rationale(&item);
+
+        assert!(result.contains("8 distinct responsibilities"));
+        assert!(result.contains("30 methods"));
+        assert!(result.contains("Splitting by responsibility"));
+    }
+
+    #[test]
+    fn test_format_file_rationale_god_object_many_methods() {
+        let god_analysis = make_test_god_analysis(true, 60, 3, 80.0);
+        let item = make_test_file_item(Some(god_analysis), 200, 800, 60, 3.3);
+
+        let result = format_file_rationale(&item);
+
+        assert!(result.contains("60 methods"));
+        assert!(result.contains("3 responsibilities"));
+        assert!(result.contains("Extracting cohesive modules"));
+    }
+
+    #[test]
+    fn test_format_file_rationale_god_object_generic() {
+        let god_analysis = make_test_god_analysis(true, 20, 4, 65.5);
+        let item = make_test_file_item(Some(god_analysis), 100, 400, 20, 5.0);
+
+        let result = format_file_rationale(&item);
+
+        assert!(result.contains("god object characteristics"));
+        assert!(result.contains("score: 65.5"));
+    }
+
+    #[test]
+    fn test_format_file_rationale_not_god_object_skipped() {
+        let god_analysis = make_test_god_analysis(false, 10, 2, 20.0);
+        let item = make_test_file_item(Some(god_analysis), 100, 400, 10, 10.0);
+
+        let result = format_file_rationale(&item);
+
+        // Should fall through to default since is_god_object is false
+        assert!(result.contains("File-level refactoring"));
+    }
+
+    #[test]
+    fn test_format_file_rationale_high_complexity() {
+        let item = make_test_file_item(None, 600, 800, 50, 12.0);
+
+        let result = format_file_rationale(&item);
+
+        assert!(result.contains("High total complexity (600)"));
+        assert!(result.contains("50 functions"));
+        assert!(result.contains("avg: 12.0"));
+    }
+
+    #[test]
+    fn test_format_file_rationale_large_file() {
+        let item = make_test_file_item(None, 300, 1500, 40, 7.5);
+
+        let result = format_file_rationale(&item);
+
+        assert!(result.contains("Large file (1500 lines)"));
+        assert!(result.contains("40 functions"));
+    }
+
+    #[test]
+    fn test_format_file_rationale_default() {
+        let item = make_test_file_item(None, 100, 500, 20, 5.0);
+
+        let result = format_file_rationale(&item);
+
+        assert_eq!(
+            result,
+            "File-level refactoring will improve overall code organization and maintainability."
+        );
+    }
 }
