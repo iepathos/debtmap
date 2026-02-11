@@ -64,18 +64,14 @@ async fn invoke(child: &mut Child) -> Result<(), Error> {
 
     // invoke should call take_child_stdio
     assert!(
-        invoke_callees
-            .iter()
-            .any(|f| f.name == "take_child_stdio"),
+        invoke_callees.iter().any(|f| f.name == "take_child_stdio"),
         "invoke should call take_child_stdio. Found callees: {:?}",
         invoke_callees.iter().map(|f| &f.name).collect::<Vec<_>>()
     );
 
     // invoke should call parse_stream_json
     assert!(
-        invoke_callees
-            .iter()
-            .any(|f| f.name == "parse_stream_json"),
+        invoke_callees.iter().any(|f| f.name == "parse_stream_json"),
         "invoke should call parse_stream_json. Found callees: {:?}",
         invoke_callees.iter().map(|f| &f.name).collect::<Vec<_>>()
     );
@@ -137,9 +133,7 @@ async fn invoke() {
 
     // Calls inside tokio::spawn should be attributed to parent function
     assert!(
-        invoke_callees
-            .iter()
-            .any(|f| f.name == "parse_stream_json"),
+        invoke_callees.iter().any(|f| f.name == "parse_stream_json"),
         "invoke should detect parse_stream_json inside tokio::spawn. Found: {:?}",
         invoke_callees.iter().map(|f| &f.name).collect::<Vec<_>>()
     );
@@ -241,15 +235,11 @@ async fn invoke() {
 
     // Should detect all three same-file calls
     assert!(
-        invoke_callees
-            .iter()
-            .any(|f| f.name == "process_stdout"),
+        invoke_callees.iter().any(|f| f.name == "process_stdout"),
         "Should detect process_stdout in first spawn"
     );
     assert!(
-        invoke_callees
-            .iter()
-            .any(|f| f.name == "process_stderr"),
+        invoke_callees.iter().any(|f| f.name == "process_stderr"),
         "Should detect process_stderr in second spawn"
     );
     assert!(
