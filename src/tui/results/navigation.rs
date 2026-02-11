@@ -956,6 +956,91 @@ mod tests {
         assert_eq!(app.nav().detail_page, DetailPage::Overview);
     }
 
+    #[test]
+    fn test_execute_detail_action_copy_page_sets_status() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        // Ensure we have a selected item
+        assert!(app.selected_item().is_some());
+
+        // CopyPage should not return quit signal and should set status
+        let result = execute_detail_action(&mut app, DetailAction::CopyPage).unwrap();
+        assert!(!result);
+
+        // Status message should be set (either success or clipboard error)
+        let status = app.status_message();
+        assert!(status.is_some(), "CopyPage should set a status message");
+    }
+
+    #[test]
+    fn test_execute_detail_action_copy_page_with_no_selection() {
+        let mut app = create_test_app(0);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        // No items, so no selection
+        assert!(app.selected_item().is_none());
+
+        // Should not panic or error with no selection
+        let result = execute_detail_action(&mut app, DetailAction::CopyPage).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_copy_item_as_llm_sets_status() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        assert!(app.selected_item().is_some());
+
+        let result = execute_detail_action(&mut app, DetailAction::CopyItemAsLlm).unwrap();
+        assert!(!result);
+
+        // Status message should be set
+        let status = app.status_message();
+        assert!(
+            status.is_some(),
+            "CopyItemAsLlm should set a status message"
+        );
+    }
+
+    #[test]
+    fn test_execute_detail_action_copy_item_as_llm_with_no_selection() {
+        let mut app = create_test_app(0);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        assert!(app.selected_item().is_none());
+
+        let result = execute_detail_action(&mut app, DetailAction::CopyItemAsLlm).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    #[ignore] // Requires terminal in raw mode for editor suspension
+    fn test_execute_detail_action_open_in_editor() {
+        let mut app = create_test_app(5);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        assert!(app.selected_item().is_some());
+
+        // This test is ignored by default since it requires terminal context
+        // Run with --ignored to test editor integration manually
+        let result = execute_detail_action(&mut app, DetailAction::OpenInEditor).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_execute_detail_action_open_in_editor_with_no_selection() {
+        let mut app = create_test_app(0);
+        app.nav_mut().push_and_set_view(ViewMode::Detail);
+
+        assert!(app.selected_item().is_none());
+
+        // Should not panic or error with no selection
+        let result = execute_detail_action(&mut app, DetailAction::OpenInEditor).unwrap();
+        assert!(!result);
+    }
+
     // ============================================================================
     // move_selection tests
     // ============================================================================
