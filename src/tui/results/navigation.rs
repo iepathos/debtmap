@@ -1126,6 +1126,83 @@ mod tests {
     }
 
     // ============================================================================
+    // adjust_scroll tests
+    // ============================================================================
+
+    #[test]
+    fn test_adjust_scroll_selection_above_visible() {
+        let mut app = create_test_app(20);
+        // Set scroll to show items 10-19, but select item 5
+        app.list_mut().set_scroll_offset(10);
+        app.list_mut().set_selected_index(5, 20);
+
+        adjust_scroll(&mut app);
+
+        // Scroll should adjust to show selection
+        assert_eq!(app.list().scroll_offset(), 5);
+    }
+
+    #[test]
+    fn test_adjust_scroll_selection_below_visible() {
+        let mut app = create_test_app(50);
+        // Start at top with selection way below visible area
+        app.list_mut().set_scroll_offset(0);
+        app.list_mut().set_selected_index(40, 50);
+
+        adjust_scroll(&mut app);
+
+        // Scroll should adjust to show selection at bottom of visible area
+        assert!(app.list().scroll_offset() > 0);
+        assert!(app.list().scroll_offset() <= 40);
+    }
+
+    #[test]
+    fn test_adjust_scroll_selection_already_visible() {
+        let mut app = create_test_app(20);
+        // Selection is at 5, scroll at 0 - should be visible
+        app.list_mut().set_scroll_offset(0);
+        app.list_mut().set_selected_index(5, 20);
+
+        adjust_scroll(&mut app);
+
+        // Scroll should not change since selection is already visible
+        assert_eq!(app.list().scroll_offset(), 0);
+    }
+
+    // ============================================================================
+    // ensure_valid_page tests
+    // ============================================================================
+
+    #[test]
+    fn test_ensure_valid_page_keeps_valid_page() {
+        use crate::tui::results::detail_page::DetailPage;
+
+        let mut app = create_test_app(5);
+        // Overview page is always valid
+        app.nav_mut().detail_page = DetailPage::Overview;
+
+        ensure_valid_page(&mut app);
+
+        assert_eq!(app.nav().detail_page, DetailPage::Overview);
+    }
+
+    #[test]
+    fn test_ensure_valid_page_falls_back_for_unavailable_page() {
+        use crate::tui::results::detail_page::DetailPage;
+
+        let mut app = create_test_app(5);
+        // GitContext is only available when item has contextual_risk data
+        // Test items don't have this, so it should fall back
+        app.nav_mut().detail_page = DetailPage::GitContext;
+
+        ensure_valid_page(&mut app);
+
+        // Should fall back to Overview since GitContext not available
+        // (test items don't have contextual_risk data)
+        assert_eq!(app.nav().detail_page, DetailPage::Overview);
+    }
+
+    // ============================================================================
     // handle_key integration tests
     // ============================================================================
 
