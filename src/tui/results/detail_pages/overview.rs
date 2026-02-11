@@ -98,10 +98,7 @@ pub fn build_score_section(
 
         // Spec 267: Add individual item scores below combined
         add_blank_line(&mut lines);
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled("item scores".to_string(), Style::default().fg(theme.muted)),
-        ]));
+        add_section_header(&mut lines, "item scores", theme);
 
         for debt_item in location_items.iter() {
             let debt_name = format_debt_type_name(&debt_item.debt_type);
