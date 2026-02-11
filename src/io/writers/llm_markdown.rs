@@ -157,11 +157,7 @@ pub mod format {
 
         // Spec 267: Show production-only blast radius
         if deps.production_blast_radius > 0 {
-            let impact = match deps.production_blast_radius {
-                r if r >= 20 => "critical",
-                r if r >= 10 => "high",
-                _ => "moderate",
-            };
+            let impact = classify_blast_radius(deps.production_blast_radius);
             writeln!(
                 out,
                 "- Production Blast Radius: {} ({})",
@@ -170,11 +166,7 @@ pub mod format {
             .unwrap();
         } else if deps.blast_radius > 0 {
             // Fallback to legacy blast radius
-            let impact = match deps.blast_radius {
-                r if r >= 20 => "critical",
-                r if r >= 10 => "high",
-                _ => "moderate",
-            };
+            let impact = classify_blast_radius(deps.blast_radius);
             writeln!(out, "- Blast Radius: {} ({})", deps.blast_radius, impact).unwrap();
         }
         if deps.critical_path {
@@ -184,26 +176,7 @@ pub mod format {
             writeln!(out, "- Coupling Classification: {}", class).unwrap();
 
             // Spec 269: Add architectural insight for stable-by-design modules
-            let architectural_insight = match class.as_str() {
-                "Well-Tested Core" | "well_tested_core" => {
-                    Some("Stable foundation with high test coverage - not actual debt")
-                }
-                "Stable Foundation" | "stable_foundation" => {
-                    Some("Intentionally stable module - many callers is by design")
-                }
-                "Stable Core" | "stable_core" => {
-                    Some("Stable dependency - high callers indicates good architecture")
-                }
-                "Unstable High Coupling" | "unstable_high_coupling" => {
-                    Some("Actual architectural debt - unstable module with many dependents")
-                }
-                "Architectural Hub" | "architectural_hub" => {
-                    Some("Central connector - review for potential refactoring opportunities")
-                }
-                _ => None,
-            };
-
-            if let Some(insight) = architectural_insight {
+            if let Some(insight) = architectural_insight(class) {
                 writeln!(out, "- Architectural Insight: {}", insight).unwrap();
             }
         }
@@ -236,6 +209,39 @@ pub mod format {
         }
         if items.len() > 5 {
             writeln!(out, "  - (+{} more)", items.len() - 5).unwrap();
+        }
+    }
+
+    /// Classify blast radius into impact severity level.
+    /// Pure function for consistent classification across production and legacy paths.
+    pub(crate) fn classify_blast_radius(radius: usize) -> &'static str {
+        match radius {
+            r if r >= 20 => "critical",
+            r if r >= 10 => "high",
+            _ => "moderate",
+        }
+    }
+
+    /// Map coupling classification to architectural insight.
+    /// Returns None if the classification has no specific insight.
+    pub(crate) fn architectural_insight(classification: &str) -> Option<&'static str> {
+        match classification {
+            "Well-Tested Core" | "well_tested_core" => {
+                Some("Stable foundation with high test coverage - not actual debt")
+            }
+            "Stable Foundation" | "stable_foundation" => {
+                Some("Intentionally stable module - many callers is by design")
+            }
+            "Stable Core" | "stable_core" => {
+                Some("Stable dependency - high callers indicates good architecture")
+            }
+            "Unstable High Coupling" | "unstable_high_coupling" => {
+                Some("Actual architectural debt - unstable module with many dependents")
+            }
+            "Architectural Hub" | "architectural_hub" => {
+                Some("Central connector - review for potential refactoring opportunities")
+            }
+            _ => None,
         }
     }
 
@@ -1255,5 +1261,81 @@ mod tests {
             "Should show stability: {}",
             markdown
         );
+    }
+
+    #[test]
+    fn test_classify_blast_radius() {
+        // Critical threshold (>= 20)
+        assert_eq!(format::classify_blast_radius(20_usize), "critical");
+        assert_eq!(format::classify_blast_radius(25_usize), "critical");
+        assert_eq!(format::classify_blast_radius(100_usize), "critical");
+
+        // High threshold (>= 10, < 20)
+        assert_eq!(format::classify_blast_radius(10_usize), "high");
+        assert_eq!(format::classify_blast_radius(15_usize), "high");
+        assert_eq!(format::classify_blast_radius(19_usize), "high");
+
+        // Moderate (< 10)
+        assert_eq!(format::classify_blast_radius(0_usize), "moderate");
+        assert_eq!(format::classify_blast_radius(5_usize), "moderate");
+        assert_eq!(format::classify_blast_radius(9_usize), "moderate");
+    }
+
+    #[test]
+    fn test_architectural_insight() {
+        // Well-Tested Core variants
+        assert_eq!(
+            format::architectural_insight("Well-Tested Core"),
+            Some("Stable foundation with high test coverage - not actual debt")
+        );
+        assert_eq!(
+            format::architectural_insight("well_tested_core"),
+            Some("Stable foundation with high test coverage - not actual debt")
+        );
+
+        // Stable Foundation variants
+        assert_eq!(
+            format::architectural_insight("Stable Foundation"),
+            Some("Intentionally stable module - many callers is by design")
+        );
+        assert_eq!(
+            format::architectural_insight("stable_foundation"),
+            Some("Intentionally stable module - many callers is by design")
+        );
+
+        // Stable Core variants
+        assert_eq!(
+            format::architectural_insight("Stable Core"),
+            Some("Stable dependency - high callers indicates good architecture")
+        );
+        assert_eq!(
+            format::architectural_insight("stable_core"),
+            Some("Stable dependency - high callers indicates good architecture")
+        );
+
+        // Unstable High Coupling variants
+        assert_eq!(
+            format::architectural_insight("Unstable High Coupling"),
+            Some("Actual architectural debt - unstable module with many dependents")
+        );
+        assert_eq!(
+            format::architectural_insight("unstable_high_coupling"),
+            Some("Actual architectural debt - unstable module with many dependents")
+        );
+
+        // Architectural Hub variants
+        assert_eq!(
+            format::architectural_insight("Architectural Hub"),
+            Some("Central connector - review for potential refactoring opportunities")
+        );
+        assert_eq!(
+            format::architectural_insight("architectural_hub"),
+            Some("Central connector - review for potential refactoring opportunities")
+        );
+
+        // Unknown classifications
+        assert_eq!(format::architectural_insight("Unknown"), None);
+        assert_eq!(format::architectural_insight("SomeOtherClass"), None);
+        assert_eq!(format::architectural_insight(""), None);
     }
 }
