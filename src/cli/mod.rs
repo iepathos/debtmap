@@ -16,7 +16,10 @@ pub use args::{
     Cli, Commands, DebugFormatArg, FunctionalAnalysisProfile, OutputFormat, Priority,
     ThresholdPreset,
 };
-pub use commands::{handle_analyze_command, handle_compare_command, handle_validate_command};
+pub use commands::{
+    handle_analyze_command, handle_compare_command, handle_explain_coverage_command,
+    handle_validate_command, handle_validate_improvement_command,
+};
 pub use config_builder::{
     AnalysisFeatureConfig, DebugConfig, DisplayConfig, LanguageConfig, PathConfig,
     PerformanceConfig, ThresholdConfig,

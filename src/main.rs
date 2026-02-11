@@ -11,8 +11,8 @@ use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{
     configure_thread_pool, get_worker_count, handle_analyze_command, handle_compare_command,
-    handle_validate_command, is_automation_mode, show_config_sources, Cli, Commands,
-    MAIN_STACK_SIZE,
+    handle_explain_coverage_command, handle_validate_command,
+    handle_validate_improvement_command, show_config_sources, Cli, Commands, MAIN_STACK_SIZE,
 };
 use debtmap::di::create_app_container;
 use debtmap::observability::{
@@ -148,23 +148,8 @@ fn main_inner() -> Result<()> {
             )?;
             Ok(())
         }
-        Commands::ValidateImprovement {
-            comparison,
-            output,
-            previous_validation,
-            threshold,
-            format,
-            quiet,
-        } => {
-            let config = debtmap::commands::validate_improvement::ValidateImprovementConfig {
-                comparison_path: comparison,
-                output_path: output,
-                previous_validation,
-                threshold,
-                format: format.into(),
-                quiet: quiet || is_automation_mode(),
-            };
-            debtmap::commands::validate_improvement::validate_improvement(config)?;
+        command @ Commands::ValidateImprovement { .. } => {
+            handle_validate_improvement_command(command)?;
             Ok(())
         }
         Commands::DiagnoseCoverage {
@@ -174,23 +159,8 @@ fn main_inner() -> Result<()> {
             debtmap::commands::diagnose_coverage::diagnose_coverage_file(&coverage_file, &format)?;
             Ok(())
         }
-        Commands::ExplainCoverage {
-            path,
-            coverage_file,
-            function_name,
-            file_path,
-            verbose,
-            format,
-        } => {
-            let config = debtmap::commands::explain_coverage::ExplainCoverageConfig {
-                path,
-                coverage_file,
-                function_name,
-                file_path,
-                verbose,
-                format: format.into(),
-            };
-            debtmap::commands::explain_coverage::explain_coverage(config)?;
+        command @ Commands::ExplainCoverage { .. } => {
+            handle_explain_coverage_command(command)?;
             Ok(())
         }
     }
