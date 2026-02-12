@@ -10,8 +10,9 @@
 //! and passed to all threads via immutable references.
 
 use crate::analysis::ContextDetector;
-use crate::core::{DebtItem, FunctionMetrics};
+use crate::core::{DebtItem, FunctionMetrics, Language};
 use crate::data_flow::DataFlowGraph;
+use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
 use crate::priority::scoring::{debt_item, ContextRecommendationEngine};
@@ -99,6 +100,82 @@ pub fn build_file_line_count_cache(metrics: &[FunctionMetrics]) -> FileLineCount
                 .map(|count| ((*path).clone(), count.physical_lines))
         })
         .collect()
+}
+
+/// Cache of suppression contexts for each file (spec 215 extension).
+/// Key: file path, Value: SuppressionContext for that file
+pub type SuppressionContextCache = HashMap<PathBuf, SuppressionContext>;
+
+/// Build cache of suppression contexts for all unique files in metrics.
+///
+/// This is an I/O operation that reads each unique file once to parse
+/// `debtmap:allow` annotations. Should be called at the I/O boundary
+/// before pure debt item construction.
+///
+/// # Parallelism
+///
+/// Uses rayon's `par_iter()` for parallel file I/O.
+///
+/// # Purpose
+///
+/// Enables filtering of unified debt items based on function-level
+/// `debtmap:allow[types] -- reason` annotations. Without this, the
+/// unified analysis pipeline would ignore suppression annotations.
+pub fn build_suppression_context_cache(metrics: &[FunctionMetrics]) -> SuppressionContextCache {
+    // Collect unique file paths into a Vec for parallel iteration
+    let unique_files: Vec<&PathBuf> = metrics
+        .iter()
+        .map(|m| &m.file)
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    // Read files in parallel and parse suppression comments
+    unique_files
+        .par_iter()
+        .filter_map(|path| {
+            // Read file content
+            let content = std::fs::read_to_string(path).ok()?;
+
+            // Determine language from extension
+            let language = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| match ext {
+                    "rs" => Language::Rust,
+                    "py" | "pyw" => Language::Python,
+                    _ => Language::Rust, // Default to Rust
+                })
+                .unwrap_or(Language::Rust);
+
+            // Parse suppression comments
+            let context = parse_suppression_comments(&content, language, path);
+
+            // Only include files that have function-level allows
+            if context.function_allows.is_empty() {
+                None
+            } else {
+                Some(((*path).clone(), context))
+            }
+        })
+        .collect()
+}
+
+/// Check if a unified debt item should be suppressed based on annotations.
+///
+/// Returns true if the item should be filtered out (suppressed).
+fn is_item_suppressed(
+    item: &UnifiedDebtItem,
+    suppression_cache: &SuppressionContextCache,
+) -> bool {
+    // Look up suppression context for this file
+    if let Some(context) = suppression_cache.get(&item.location.file) {
+        // Convert priority::DebtType to core::DebtType for suppression check
+        // They are the same type (core re-exports priority), so this is a no-op
+        context.is_function_allowed(item.location.line, &item.debt_type)
+    } else {
+        false
+    }
 }
 
 /// Pure function to create function mappings from metrics.
@@ -221,8 +298,13 @@ pub fn process_metrics_to_debt_items(
     let context_detector = ContextDetector::global();
     let recommendation_engine = ContextRecommendationEngine::global();
 
+    // Build suppression context cache for function-level debtmap:allow annotations (spec 215)
+    // This enables filtering of unified debt items based on annotations like:
+    //   // debtmap:allow[testing] -- I/O orchestration function
+    let suppression_cache = build_suppression_context_cache(metrics);
+
     // Parallel processing with shared references - spec 196
-    metrics
+    let items: Vec<UnifiedDebtItem> = metrics
         .par_iter() // Parallel iteration with rayon
         .filter(|metric| should_process_metric(metric, call_graph, test_only_functions))
         .flat_map(|metric| {
@@ -241,6 +323,13 @@ pub fn process_metrics_to_debt_items(
                 recommendation_engine,
             )
         })
+        .collect();
+
+    // Filter out items that are suppressed via debtmap:allow annotations (spec 215)
+    // This ensures annotations like `// debtmap:allow[testing]` work in coverage mode
+    items
+        .into_iter()
+        .filter(|item| !is_item_suppressed(item, &suppression_cache))
         .collect()
 }
 
@@ -365,5 +454,144 @@ mod tests {
         assert_eq!(map.get("pure_fn"), Some(&true));
         assert_eq!(map.get("impure_fn"), Some(&false));
         assert_eq!(map.get("unknown_fn"), Some(&false)); // None defaults to false
+    }
+
+    #[test]
+    fn test_is_item_suppressed_with_allow_annotation() {
+        use crate::priority::DebtType;
+
+        // Create a suppression cache with a function allow annotation
+        let file_path = PathBuf::from("test.rs");
+        let content = r#"// debtmap:allow[testing] -- I/O orchestration function
+fn run() {}"#;
+
+        let context = parse_suppression_comments(content, Language::Rust, &file_path);
+        let mut cache = SuppressionContextCache::new();
+        cache.insert(file_path.clone(), context);
+
+        // Create a test item at line 2 (the function line)
+        let item = create_test_unified_item(file_path, "run", 2, DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 5,
+            cognitive: 10,
+        });
+
+        // The item should be suppressed because it has allow[testing] annotation
+        assert!(
+            is_item_suppressed(&item, &cache),
+            "Item with debtmap:allow[testing] should be suppressed"
+        );
+    }
+
+    #[test]
+    fn test_is_item_suppressed_without_annotation() {
+        use crate::priority::DebtType;
+
+        // Empty suppression cache (no annotations)
+        let cache = SuppressionContextCache::new();
+
+        let file_path = PathBuf::from("test.rs");
+        let item = create_test_unified_item(file_path, "run", 10, DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 5,
+            cognitive: 10,
+        });
+
+        // The item should NOT be suppressed because there's no annotation
+        assert!(
+            !is_item_suppressed(&item, &cache),
+            "Item without annotation should not be suppressed"
+        );
+    }
+
+    /// Helper function to create a minimal UnifiedDebtItem for testing
+    fn create_test_unified_item(
+        file: PathBuf,
+        function: &str,
+        line: usize,
+        debt_type: crate::priority::DebtType,
+    ) -> crate::priority::UnifiedDebtItem {
+        use crate::priority::{
+            semantic_classifier::FunctionRole, ActionableRecommendation, ImpactMetrics, Location,
+            UnifiedScore,
+        };
+
+        crate::priority::UnifiedDebtItem {
+            location: Location {
+                file,
+                function: function.to_string(),
+                line,
+            },
+            debt_type,
+            unified_score: UnifiedScore {
+                complexity_factor: 5.0,
+                coverage_factor: 5.0,
+                dependency_factor: 5.0,
+                role_multiplier: 1.0,
+                final_score: 50.0,
+                base_score: Some(50.0),
+                exponential_factor: Some(1.0),
+                risk_boost: Some(1.0),
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: Some(1.0),
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 10,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            context_suggestion: None,
+        }
     }
 }

@@ -1,6 +1,9 @@
 use crate::{
     analysis::ContextDetector,
     analyzers::FileAnalyzer,
+    builders::unified_analysis_phases::phases::scoring::{
+        build_suppression_context_cache, SuppressionContextCache,
+    },
     core::FunctionMetrics,
     data_flow::DataFlowGraph,
     extraction::ExtractedFileData,
@@ -23,6 +26,29 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug_span, warn};
+
+/// Filter out unified debt items that are suppressed via debtmap:allow annotations (spec 215).
+///
+/// This function checks each item against the suppression context cache and removes
+/// items whose functions have `debtmap:allow[type] -- reason` annotations.
+fn filter_suppressed_items(
+    items: Vec<UnifiedDebtItem>,
+    suppression_cache: &SuppressionContextCache,
+) -> Vec<UnifiedDebtItem> {
+    items
+        .into_iter()
+        .filter(|item| {
+            // Look up suppression context for this file
+            if let Some(context) = suppression_cache.get(&item.location.file) {
+                // Filter out if the function is allowed (suppressed)
+                !context.is_function_allowed(item.location.line, &item.debt_type)
+            } else {
+                // No suppression context for this file, keep the item
+                true
+            }
+        })
+        .collect()
+}
 
 // Pure functional transformations module
 mod transformations {
@@ -730,6 +756,11 @@ impl ParallelUnifiedAnalysisBuilder {
         // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
         let progress: Option<indicatif::ProgressBar> = None;
 
+        // Build suppression context cache for function-level debtmap:allow annotations (spec 215)
+        // This enables filtering of unified debt items based on annotations like:
+        //   // debtmap:allow[testing] -- I/O orchestration function
+        let suppression_cache = build_suppression_context_cache(metrics);
+
         // Pre-create shared detectors once to avoid per-metric regex compilation (spec 196)
         // These are Sync types that can be safely shared across threads
         let context_detector = ContextDetector::new();
@@ -778,7 +809,9 @@ impl ParallelUnifiedAnalysisBuilder {
             ));
         }
 
-        items
+        // Filter out items that are suppressed via debtmap:allow annotations (spec 215)
+        // This ensures annotations like `// debtmap:allow[testing]` work in coverage mode
+        filter_suppressed_items(items, &suppression_cache)
     }
 
     /// Process metrics through a functional pipeline
