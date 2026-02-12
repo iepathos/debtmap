@@ -216,34 +216,36 @@ struct SuppressionPatterns {
 
 impl SuppressionPatterns {
     fn new(language: Language) -> Self {
-        let comment_prefix = get_comment_prefix(language);
-        let escaped_prefix = regex::escape(comment_prefix);
+        let comment_prefix = get_comment_prefix_pattern(language);
 
         Self {
             block_start: Regex::new(&format!(
-                r"(?m)^\s*{escaped_prefix}\s*debtmap:ignore-start(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
+                r"(?m)^\s*{comment_prefix}\s*debtmap:ignore-start(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
             )).unwrap(),
             block_end: Regex::new(&format!(
-                r"(?m)^\s*{escaped_prefix}\s*debtmap:ignore-end\s*$"
+                r"(?m)^\s*{comment_prefix}\s*debtmap:ignore-end\s*$"
             )).unwrap(),
             line: Regex::new(&format!(
-                r"(?m){escaped_prefix}\s*debtmap:ignore(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
+                r"(?m){comment_prefix}\s*debtmap:ignore(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
             )).unwrap(),
             next_line: Regex::new(&format!(
-                r"(?m)^\s*{escaped_prefix}\s*debtmap:ignore-next-line(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
+                r"(?m)^\s*{comment_prefix}\s*debtmap:ignore-next-line(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
             )).unwrap(),
             // Function-level allow requires a reason (after --)
             function_allow: Regex::new(&format!(
-                r"(?m)^\s*{escaped_prefix}\s*debtmap:allow\s*\[([\w,*]+)\]\s*--\s*(.+)$"
+                r"(?m)^\s*{comment_prefix}\s*debtmap:allow\s*\[([\w,*]+)\]\s*--\s*(.+)$"
             )).unwrap(),
         }
     }
 }
 
-fn get_comment_prefix(language: Language) -> &'static str {
+/// Returns a regex pattern for matching comment prefixes.
+/// For Rust, matches both `//` and `///` (doc comments).
+fn get_comment_prefix_pattern(language: Language) -> &'static str {
     match language {
         Language::Python => "#",
-        Language::Rust => "//",
+        // Match both // and /// (doc comments)
+        Language::Rust => r"///?",
         _ => "//",
     }
 }
@@ -439,63 +441,80 @@ pub fn parse_suppression_comments(
     context
 }
 
-static DEBT_TYPE_MAP: Lazy<HashMap<&'static str, DebtType>> = Lazy::new(|| {
+/// Map of keyword to list of debt types it matches.
+/// Some keywords match multiple variants (e.g., "complexity" matches both Complexity and ComplexityHotspot).
+static DEBT_TYPE_MAP: Lazy<HashMap<&'static str, Vec<DebtType>>> = Lazy::new(|| {
     let mut map = HashMap::new();
-    map.insert("todo", DebtType::Todo { reason: None });
-    map.insert("fixme", DebtType::Fixme { reason: None });
-    map.insert("smell", DebtType::CodeSmell { smell_type: None });
-    map.insert("codesmell", DebtType::CodeSmell { smell_type: None });
+    map.insert("todo", vec![DebtType::Todo { reason: None }]);
+    map.insert("fixme", vec![DebtType::Fixme { reason: None }]);
+    map.insert("smell", vec![DebtType::CodeSmell { smell_type: None }]);
+    map.insert("codesmell", vec![DebtType::CodeSmell { smell_type: None }]);
     map.insert(
         "duplication",
-        DebtType::Duplication {
+        vec![DebtType::Duplication {
             instances: 0,
             total_lines: 0,
-        },
+        }],
     );
     map.insert(
         "duplicate",
-        DebtType::Duplication {
+        vec![DebtType::Duplication {
             instances: 0,
             total_lines: 0,
-        },
+        }],
     );
+    // "complexity" matches both Complexity (legacy) and ComplexityHotspot (priority-based)
     map.insert(
         "complexity",
-        DebtType::Complexity {
+        vec![
+            DebtType::Complexity {
+                cyclomatic: 0,
+                cognitive: 0,
+            },
+            DebtType::ComplexityHotspot {
+                cyclomatic: 0,
+                cognitive: 0,
+            },
+        ],
+    );
+    // Explicit alias for hotspot-only suppression
+    map.insert(
+        "hotspot",
+        vec![DebtType::ComplexityHotspot {
             cyclomatic: 0,
             cognitive: 0,
-        },
+        }],
     );
     map.insert(
         "dependency",
-        DebtType::Dependency {
+        vec![DebtType::Dependency {
             dependency_type: None,
-        },
+        }],
     );
     // Testing/coverage debt types - for suppressing TestingGap items
     map.insert(
         "testing",
-        DebtType::TestingGap {
+        vec![DebtType::TestingGap {
             coverage: 0.0,
             cyclomatic: 0,
             cognitive: 0,
-        },
+        }],
     );
     map.insert(
         "coverage",
-        DebtType::TestingGap {
+        vec![DebtType::TestingGap {
             coverage: 0.0,
             cyclomatic: 0,
             cognitive: 0,
-        },
+        }],
     );
     map.insert(
         "untested",
-        DebtType::TestingGap {
+        vec![DebtType::TestingGap {
             coverage: 0.0,
             cyclomatic: 0,
             cognitive: 0,
-        },
+        }],
     );
     map
 });
@@ -511,14 +530,18 @@ fn parse_debt_types(types_str: Option<&str>) -> Vec<DebtType> {
     }
 
     // Use a static mapping for type conversion
+    // Each keyword can map to multiple debt types, so we flatten the results
     types
         .split(',')
-        .filter_map(|t| parse_single_debt_type(t.trim()))
+        .flat_map(|t| parse_single_debt_type(t.trim()))
         .collect()
 }
 
-fn parse_single_debt_type(type_str: &str) -> Option<DebtType> {
-    DEBT_TYPE_MAP.get(type_str.to_lowercase().as_str()).cloned()
+fn parse_single_debt_type(type_str: &str) -> Vec<DebtType> {
+    DEBT_TYPE_MAP
+        .get(type_str.to_lowercase().as_str())
+        .cloned()
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -846,5 +869,53 @@ fn legacy_function() {}
         assert!(context.is_function_allowed(3, &testing_gap));
         assert!(context.is_function_allowed(3, &complexity));
         assert!(context.is_function_allowed(3, &todo));
+    }
+
+    #[test]
+    fn test_function_allow_doc_comment() {
+        // Test that /// doc comments are also recognized for allow annotations
+        let content = r#"
+    /// debtmap:allow[complexity,coverage] -- I/O shell function
+    async fn invoke() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 6,
+            cognitive: 28,
+        };
+        let complexity = DebtType::Complexity {
+            cyclomatic: 6,
+            cognitive: 28,
+        };
+
+        // Function starts at line 3, annotation is at line 2
+        assert!(context.is_function_allowed(3, &testing_gap));
+        assert!(context.is_function_allowed(3, &complexity));
+
+        // Check the reason was captured
+        let reason = context.get_function_allow_reason(3, &testing_gap);
+        assert_eq!(reason, Some("I/O shell function"));
+    }
+
+    #[test]
+    fn test_suppression_block_doc_comment() {
+        // Test that /// doc comments work for block suppressions too
+        let content = r#"
+/// debtmap:ignore-start[testing]
+fn untested() {}
+/// debtmap:ignore-end
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 5,
+            cognitive: 10,
+        };
+        assert!(context.is_suppressed(3, &testing_gap));
     }
 }

@@ -164,10 +164,7 @@ pub fn build_suppression_context_cache(metrics: &[FunctionMetrics]) -> Suppressi
 /// Check if a unified debt item should be suppressed based on annotations.
 ///
 /// Returns true if the item should be filtered out (suppressed).
-fn is_item_suppressed(
-    item: &UnifiedDebtItem,
-    suppression_cache: &SuppressionContextCache,
-) -> bool {
+fn is_item_suppressed(item: &UnifiedDebtItem, suppression_cache: &SuppressionContextCache) -> bool {
     // Look up suppression context for this file
     if let Some(context) = suppression_cache.get(&item.location.file) {
         // Convert priority::DebtType to core::DebtType for suppression check
@@ -470,11 +467,16 @@ fn run() {}"#;
         cache.insert(file_path.clone(), context);
 
         // Create a test item at line 2 (the function line)
-        let item = create_test_unified_item(file_path, "run", 2, DebtType::TestingGap {
-            coverage: 0.0,
-            cyclomatic: 5,
-            cognitive: 10,
-        });
+        let item = create_test_unified_item(
+            file_path,
+            "run",
+            2,
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 5,
+                cognitive: 10,
+            },
+        );
 
         // The item should be suppressed because it has allow[testing] annotation
         assert!(
@@ -491,11 +493,16 @@ fn run() {}"#;
         let cache = SuppressionContextCache::new();
 
         let file_path = PathBuf::from("test.rs");
-        let item = create_test_unified_item(file_path, "run", 10, DebtType::TestingGap {
-            coverage: 0.0,
-            cyclomatic: 5,
-            cognitive: 10,
-        });
+        let item = create_test_unified_item(
+            file_path,
+            "run",
+            10,
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 5,
+                cognitive: 10,
+            },
+        );
 
         // The item should NOT be suppressed because there's no annotation
         assert!(
