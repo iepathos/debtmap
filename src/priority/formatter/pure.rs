@@ -241,17 +241,24 @@ fn format_historical_details(details: &ContextDetails) -> Option<String> {
     match details {
         ContextDetails::Historical {
             change_frequency,
-            bug_density,
             age_days,
             author_count,
+            total_commits,
+            bug_fix_count,
             ..
-        } => Some(format!(
-            "changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {}",
-            change_frequency,
-            bug_density * 100.0,
-            age_days,
-            author_count
-        )),
+        } => {
+            // Match TUI format: "N commits (X.XX/mo), N fixes / M changes, Xd, N authors"
+            let changes = total_commits.saturating_sub(1);
+            let fix_rate = if changes == 0 {
+                "no changes".to_string()
+            } else {
+                format!("{} fix/{} chg", bug_fix_count, changes)
+            };
+            Some(format!(
+                "{} commits ({:.1}/mo), {}, {}d, {} authors",
+                total_commits, change_frequency, fix_rate, age_days, author_count
+            ))
+        }
         _ => None,
     }
 }

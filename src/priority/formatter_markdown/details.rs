@@ -3,7 +3,9 @@
 //! Handles detailed item formatting including score breakdowns,
 //! dependency information, and comprehensive item details
 
+use crate::priority::formatter_verbosity::git_history::classify_stability;
 use crate::priority::UnifiedDebtItem;
+use crate::risk::context::ContextDetails;
 use std::fmt::Write;
 
 use super::utilities::{
@@ -99,6 +101,11 @@ pub(crate) fn format_priority_item_markdown(
         }
     }
 
+    // Git Context (match TUI format)
+    if verbosity >= 1 {
+        format_git_context_section(output, item);
+    }
+
     // Rationale
     writeln!(output, "\n**Why:** {}", item.recommendation.rationale).unwrap();
 
@@ -108,6 +115,84 @@ pub(crate) fn format_priority_item_markdown(
             format_context_suggestion(output, context);
         }
     }
+}
+
+/// Format git context section for markdown output (matches TUI Page 5 format).
+fn format_git_context_section(output: &mut String, item: &UnifiedDebtItem) {
+    let Some(ref contextual_risk) = item.contextual_risk else {
+        return;
+    };
+
+    let git_context = contextual_risk
+        .contexts
+        .iter()
+        .find(|ctx| ctx.provider == "git_history");
+
+    let Some(ctx) = git_context else {
+        return;
+    };
+
+    let ContextDetails::Historical {
+        change_frequency,
+        bug_density: _,
+        age_days,
+        author_count,
+        total_commits,
+        bug_fix_count,
+    } = &ctx.details
+    else {
+        return;
+    };
+
+    writeln!(output, "\n#### Git Context").unwrap();
+
+    // Activity: "N commits (X.XX/month)" format
+    let activity = if *total_commits == 0 {
+        "0 commits".to_string()
+    } else {
+        format!(
+            "{} commit{} ({:.2}/month)",
+            total_commits,
+            if *total_commits == 1 { "" } else { "s" },
+            change_frequency
+        )
+    };
+    writeln!(output, "- **Activity:** {}", activity).unwrap();
+
+    // Stability classification
+    let stability = classify_stability(*change_frequency);
+    writeln!(output, "- **Stability:** {}", stability).unwrap();
+
+    // Fix rate: "N fixes / M changes" format
+    let changes = total_commits.saturating_sub(1);
+    let fix_rate = if changes == 0 {
+        "no changes since intro".to_string()
+    } else {
+        format!(
+            "{} fix{} / {} change{}",
+            bug_fix_count,
+            if *bug_fix_count == 1 { "" } else { "es" },
+            changes,
+            if changes == 1 { "" } else { "s" }
+        )
+    };
+    writeln!(output, "- **Fix Rate:** {}", fix_rate).unwrap();
+
+    writeln!(output, "- **Age:** {} days", age_days).unwrap();
+    writeln!(output, "- **Contributors:** {}", author_count).unwrap();
+
+    // Risk impact
+    let multiplier = if contextual_risk.base_risk > 0.0 {
+        contextual_risk.contextual_risk / contextual_risk.base_risk
+    } else {
+        1.0
+    };
+    writeln!(
+        output,
+        "- **Risk:** {:.1} → {:.1} ({:.2}x)",
+        contextual_risk.base_risk, contextual_risk.contextual_risk, multiplier
+    )
+    .unwrap();
 }
 
 /// Format context suggestion section for markdown output (spec 263).
