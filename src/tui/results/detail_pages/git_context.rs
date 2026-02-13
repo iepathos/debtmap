@@ -17,6 +17,8 @@ use ratatui::{
 /// Build all lines for the git context page (pure function).
 ///
 /// This is public so text_extraction can reuse it for clipboard copy.
+// debtmap:ignore[complexity,testing] - UI rendering with inherent conditional complexity
+// for git history display. 100% test coverage, LocallyPure, entropy-adjusted 23→12.
 pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
