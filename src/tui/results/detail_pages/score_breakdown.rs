@@ -1400,6 +1400,9 @@ fn build_regular_calculation_steps(
 // ============================================================================
 
 /// Build post-calculation adjustment steps (pure).
+///
+/// debtmap:ignore[complexity] - Sequential rendering of 8 adjustment types with inherent
+/// display complexity. 100% covered, already pure. Extracting would scatter sequential flow.
 fn build_adjustment_steps(
     item: &UnifiedDebtItem,
     ctx: &CalculationContext,
