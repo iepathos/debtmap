@@ -44,7 +44,7 @@ where
         match env.cache().get(&key) {
             Some(bytes) => {
                 // Try to deserialize the cached value
-                match bincode::deserialize(&bytes) {
+                match postcard::from_bytes(&bytes) {
                     Ok(value) => Ok(Some(value)),
                     Err(e) => {
                         eprintln!(
@@ -64,7 +64,7 @@ where
 
 /// Set a value in the cache as an Effect.
 ///
-/// The value is serialized using bincode for efficient storage.
+/// The value is serialized using postcard for efficient storage.
 ///
 /// # Type Parameters
 ///
@@ -84,7 +84,7 @@ where
     T: serde::Serialize + Send + 'static,
 {
     from_fn(move |env: &RealEnv| {
-        let bytes = bincode::serialize(&value).map_err(|e| {
+        let bytes = postcard::to_allocvec(&value).map_err(|e| {
             AnalysisError::other(format!(
                 "Failed to serialize cache value for '{}': {}",
                 key, e

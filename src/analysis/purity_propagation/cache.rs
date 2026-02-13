@@ -2,7 +2,7 @@
 //!
 //! This module provides persistent caching of purity propagation results to avoid
 //! re-analysis on subsequent runs. The cache uses xxHash64 for fast content hashing
-//! and bincode for efficient serialization.
+//! and postcard for efficient serialization.
 
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
@@ -13,7 +13,7 @@ use std::path::Path;
 use super::PurityResult;
 
 const CACHE_VERSION: u32 = 1;
-const CACHE_FILE: &str = ".debtmap/purity_cache.bincode";
+const CACHE_FILE: &str = ".debtmap/purity_cache.postcard";
 
 /// Persistent cache for purity propagation results
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,7 +59,7 @@ impl PurityCache {
         }
 
         let bytes = std::fs::read(&cache_path)?;
-        let cache: PurityCache = bincode::deserialize(&bytes)?;
+        let cache: PurityCache = postcard::from_bytes(&bytes)?;
 
         // Validate version
         if cache.version != CACHE_VERSION {
@@ -75,7 +75,7 @@ impl PurityCache {
         let cache_path = project_root.join(CACHE_FILE);
         std::fs::create_dir_all(cache_path.parent().unwrap())?;
 
-        let bytes = bincode::serialize(self)?;
+        let bytes = postcard::to_allocvec(self)?;
         std::fs::write(&cache_path, bytes)?;
 
         Ok(())
