@@ -101,7 +101,7 @@ comfy-table = "7.1"
 indicatif = { version = "0.18", features = ["rayon"] }
 
 # TUI framework
-ratatui = "0.28"
+ratatui = "0.30"
 crossterm = "0.29"
 # time is a transitive dep of ratatui-widgets; minimum 0.3.37 for Month::length
 time = "0.3.37"
