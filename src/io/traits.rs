@@ -218,7 +218,7 @@ impl FileCoverage {
 /// # Serialization
 ///
 /// Cache values must be serializable. The default implementation uses
-/// bincode for efficient binary serialization.
+/// postcard for efficient binary serialization.
 pub trait Cache: Send + Sync {
     /// Get a cached value by key.
     ///
