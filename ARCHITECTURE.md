@@ -4370,7 +4370,6 @@ Recommendation: Initialization is appropriately complex for field count
 - **quote**: Rust code generation utilities
 
 ### Development Dependencies
-- **cargo-modules**: Module dependency analysis and visualization
 - **proptest**: Property-based testing
 - **criterion**: Benchmarking framework
 - **tempfile**: Test file management

@@ -139,8 +139,6 @@ html-escape = "0.2.13"
 tui-scrollview = "0.6.2"
 
 [dev-dependencies]
-# Dependency analysis tools
-cargo-modules = "0.25"
 # Testing
 proptest = "1.4"
 pretty_assertions = "1.4"
