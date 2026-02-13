@@ -81,7 +81,7 @@ regex = "1.10"
 which = "8.0"
 
 # Error handling
-anyhow = "1.0"
+anyhow = "1.0.31"  # minimum for From<&str> impl
 thiserror = "2.0"
 
 # Effect composition and validation
@@ -103,6 +103,8 @@ indicatif = { version = "0.18", features = ["rayon"] }
 # TUI framework
 ratatui = "0.30"
 crossterm = "0.29"
+# instability is a transitive dep of ratatui; minimum 0.3.7 for trait item support
+instability = "0.3.7"
 # time is a transitive dep of ratatui-widgets; minimum 0.3.37 for Month::length
 time = "0.3.37"
 # libc is a transitive dep; minimum 0.2 for modern Rust compatibility
@@ -113,7 +115,7 @@ arboard = "3.5"  # Clipboard access (cross-platform); 3.5+ uses objc2 without li
 fuzzy-matcher = "0.3"  # Fuzzy search for results explorer
 
 # Date/time
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4.20", features = ["serde"] }  # minimum for stable error types
 
 # Path handling
 pathdiff = "0.2"
@@ -123,8 +125,8 @@ dirs = "6.0"
 # Logging and tracing
 log = "0.4"
 env_logger = "0.11"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 # Git operations
 git2 = { version = "0.20", features = ["vendored-openssl"] }
@@ -133,7 +135,7 @@ openssl-sys = "0.9.93"
 openssl-src = "300"
 
 # Graph algorithms for taint analysis
-petgraph = "0.8"
+petgraph = "0.8.1"  # minimum for stable node_indices API
 lazy_static = "1.5.0"
 html-escape = "0.2.13"
 tui-scrollview = "0.6.2"

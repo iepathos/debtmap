@@ -678,6 +678,7 @@ dependencies = [
  "im",
  "indicatif",
  "indoc",
+ "instability",
  "lazy_static",
  "lcov",
  "libc",
