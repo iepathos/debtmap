@@ -516,6 +516,27 @@ static DEBT_TYPE_MAP: Lazy<HashMap<&'static str, Vec<DebtType>>> = Lazy::new(|| 
             cognitive: 0,
         }],
     );
+    // God Object debt type - for suppressing file-level God Object detections
+    map.insert(
+        "god_object",
+        vec![DebtType::GodObject {
+            methods: 0,
+            fields: None,
+            responsibilities: 0,
+            god_object_score: 0.0,
+            lines: 0,
+        }],
+    );
+    map.insert(
+        "godobject",
+        vec![DebtType::GodObject {
+            methods: 0,
+            fields: None,
+            responsibilities: 0,
+            god_object_score: 0.0,
+            lines: 0,
+        }],
+    );
     map
 });
 
@@ -944,5 +965,74 @@ async fn run_command() {}
             reason,
             Some("I/O dispatcher with no extractable pure logic")
         );
+    }
+
+    #[test]
+    fn test_god_object_suppression() {
+        let content = r#"
+// debtmap:ignore-start[god_object]
+// Large file with many related functions
+fn function1() {}
+fn function2() {}
+// debtmap:ignore-end
+"#;
+        let file = PathBuf::from("classifier.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let god_object = DebtType::GodObject {
+            methods: 122,
+            fields: None,
+            responsibilities: 13,
+            god_object_score: 37.79,
+            lines: 3057,
+        };
+        assert!(context.is_suppressed(4, &god_object));
+        assert!(context.is_suppressed(5, &god_object));
+    }
+
+    #[test]
+    fn test_god_object_function_allow() {
+        // File-level annotation at the top of file
+        let content = r#"
+// debtmap:ignore[god_object] - Related pure classification functions for method analysis
+// Module documentation...
+"#;
+        let file = PathBuf::from("classifier.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let god_object = DebtType::GodObject {
+            methods: 122,
+            fields: None,
+            responsibilities: 13,
+            god_object_score: 37.79,
+            lines: 3057,
+        };
+
+        // Check the function allow works
+        assert!(context.is_function_allowed(3, &god_object));
+
+        // Check reason was captured
+        let reason = context.get_function_allow_reason(3, &god_object);
+        assert_eq!(
+            reason,
+            Some("Related pure classification functions for method analysis")
+        );
+    }
+
+    #[test]
+    fn test_godobject_alias() {
+        // Test that "godobject" (no underscore) also works
+        let content = "fn big_module() {} // debtmap:ignore[godobject]";
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let god_object = DebtType::GodObject {
+            methods: 50,
+            fields: Some(10),
+            responsibilities: 5,
+            god_object_score: 25.0,
+            lines: 1000,
+        };
+        assert!(context.is_suppressed(1, &god_object));
     }
 }
