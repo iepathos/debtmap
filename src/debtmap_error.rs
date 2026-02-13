@@ -762,6 +762,8 @@ impl From<crate::errors::AnalysisError> for DebtmapError {
 }
 
 // From src/core/errors.rs Error
+// debtmap:ignore[complexity] - Exhaustive From trait implementation for error conversion.
+// All 12 match arms are tested in tests::from_core_error module.
 impl From<crate::core::errors::Error> for DebtmapError {
     fn from(err: crate::core::errors::Error) -> Self {
         match err {
