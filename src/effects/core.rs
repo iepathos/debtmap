@@ -749,6 +749,7 @@ use std::time::Instant;
 /// ```text
 /// WARN Retrying operation (attempt 2/3): I/O error: Resource busy
 /// ```
+// debtmap:ignore[testing] - I/O orchestration function; pure logic (should_retry, delay_for_attempt, is_retryable) tested separately
 pub fn with_retry<T, F>(effect_factory: F, retry_config: RetryConfig) -> AnalysisEffect<T>
 where
     T: Send + 'static,
