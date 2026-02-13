@@ -76,7 +76,7 @@ pub fn collect_all_rust_debt_items(
     .flatten()
     .collect();
 
-    // Filter out items that are allowed by function-level debtmap:allow annotations
+    // Filter out items that are allowed by function-level debtmap:ignore annotations
     items
         .into_iter()
         .filter(|item| !suppression_context.is_function_allowed(item.line, &item.debt_type))

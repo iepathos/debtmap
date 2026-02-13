@@ -109,7 +109,7 @@ pub type SuppressionContextCache = HashMap<PathBuf, SuppressionContext>;
 /// Build cache of suppression contexts for all unique files in metrics.
 ///
 /// This is an I/O operation that reads each unique file once to parse
-/// `debtmap:allow` annotations. Should be called at the I/O boundary
+/// `debtmap:ignore` annotations. Should be called at the I/O boundary
 /// before pure debt item construction.
 ///
 /// # Parallelism
@@ -119,7 +119,7 @@ pub type SuppressionContextCache = HashMap<PathBuf, SuppressionContext>;
 /// # Purpose
 ///
 /// Enables filtering of unified debt items based on function-level
-/// `debtmap:allow[types] -- reason` annotations. Without this, the
+/// `debtmap:ignore[types] -- reason` annotations. Without this, the
 /// unified analysis pipeline would ignore suppression annotations.
 pub fn build_suppression_context_cache(metrics: &[FunctionMetrics]) -> SuppressionContextCache {
     // Collect unique file paths into a Vec for parallel iteration
@@ -295,9 +295,9 @@ pub fn process_metrics_to_debt_items(
     let context_detector = ContextDetector::global();
     let recommendation_engine = ContextRecommendationEngine::global();
 
-    // Build suppression context cache for function-level debtmap:allow annotations (spec 215)
+    // Build suppression context cache for function-level debtmap:ignore annotations (spec 215)
     // This enables filtering of unified debt items based on annotations like:
-    //   // debtmap:allow[testing] -- I/O orchestration function
+    //   // debtmap:ignore[testing] -- I/O orchestration function
     let suppression_cache = build_suppression_context_cache(metrics);
 
     // Parallel processing with shared references - spec 196
@@ -322,8 +322,8 @@ pub fn process_metrics_to_debt_items(
         })
         .collect();
 
-    // Filter out items that are suppressed via debtmap:allow annotations (spec 215)
-    // This ensures annotations like `// debtmap:allow[testing]` work in coverage mode
+    // Filter out items that are suppressed via debtmap:ignore annotations (spec 215)
+    // This ensures annotations like `// debtmap:ignore[testing]` work in coverage mode
     items
         .into_iter()
         .filter(|item| !is_item_suppressed(item, &suppression_cache))
@@ -459,7 +459,7 @@ mod tests {
 
         // Create a suppression cache with a function allow annotation
         let file_path = PathBuf::from("test.rs");
-        let content = r#"// debtmap:allow[testing] -- I/O orchestration function
+        let content = r#"// debtmap:ignore[testing] -- I/O orchestration function
 fn run() {}"#;
 
         let context = parse_suppression_comments(content, Language::Rust, &file_path);
@@ -481,7 +481,7 @@ fn run() {}"#;
         // The item should be suppressed because it has allow[testing] annotation
         assert!(
             is_item_suppressed(&item, &cache),
-            "Item with debtmap:allow[testing] should be suppressed"
+            "Item with debtmap:ignore[testing] should be suppressed"
         );
     }
 

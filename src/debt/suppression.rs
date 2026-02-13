@@ -9,7 +9,7 @@ pub struct SuppressionContext {
     pub active_blocks: Vec<SuppressionBlock>,
     pub line_suppressions: HashMap<usize, SuppressionRule>,
     pub unclosed_blocks: Vec<UnclosedBlock>,
-    /// Function-level suppressions using `debtmap:allow[types] -- reason`
+    /// Function-level suppressions using `debtmap:ignore[types] - reason`
     /// Maps the line number of the annotation to the suppression rule.
     /// The suppression applies to the next function definition after this line.
     pub function_allows: HashMap<usize, FunctionAllow>,
@@ -36,7 +36,7 @@ pub struct UnclosedBlock {
     pub start_line: usize,
 }
 
-/// Function-level suppression using `debtmap:allow[types] -- reason`
+/// Function-level suppression using `debtmap:ignore[types] - reason`
 /// Applied to the function definition that follows the annotation.
 #[derive(Debug, Clone)]
 pub struct FunctionAllow {
@@ -62,8 +62,8 @@ impl SuppressionContext {
         }
     }
 
-    /// Check if a function starting at the given line is suppressed via `debtmap:allow`.
-    /// Looks for allow annotations in the lines immediately preceding the function.
+    /// Check if a function starting at the given line is suppressed via `debtmap:ignore`.
+    /// Looks for ignore annotations in the lines immediately preceding the function.
     pub fn is_function_allowed(&self, function_start_line: usize, debt_type: &DebtType) -> bool {
         // Check up to 5 lines before the function for an allow annotation
         // (to account for doc comments between the annotation and function)
@@ -210,7 +210,7 @@ struct SuppressionPatterns {
     block_end: Regex,
     line: Regex,
     next_line: Regex,
-    /// Function-level allow: `debtmap:allow[types] -- reason` (reason required)
+    /// Function-level ignore: `debtmap:ignore[types] - reason` (reason required)
     function_allow: Regex,
 }
 
@@ -231,9 +231,9 @@ impl SuppressionPatterns {
             next_line: Regex::new(&format!(
                 r"(?m)^\s*{comment_prefix}\s*debtmap:ignore-next-line(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
             )).unwrap(),
-            // Function-level allow requires a reason (after --)
+            // Function-level ignore requires a reason (after - or --)
             function_allow: Regex::new(&format!(
-                r"(?m)^\s*{comment_prefix}\s*debtmap:allow\s*\[([\w,*]+)\]\s*--\s*(.+)$"
+                r"(?m)^\s*{comment_prefix}\s*debtmap:ignore\s*\[([\w,*]+)\]\s*-{{1,2}}\s*(.+)$"
             )).unwrap(),
         }
     }
@@ -255,7 +255,7 @@ enum LineParseResult {
     BlockEnd(usize),
     NextLineSuppression(usize, Vec<DebtType>, Option<String>),
     LineSuppression(usize, Vec<DebtType>, Option<String>),
-    /// Function-level allow: (line, debt_types, reason)
+    /// Function-level ignore: (line, debt_types, reason)
     FunctionAllowAnnotation(usize, Vec<DebtType>, String),
     None,
 }
@@ -758,7 +758,7 @@ fn untested_function() {}
     #[test]
     fn test_function_allow_basic() {
         let content = r#"
-// debtmap:allow[testing] -- Orchestration function; callees are tested
+// debtmap:ignore[testing] -- Orchestration function; callees are tested
 async fn run_loop() {}
 "#;
         let file = PathBuf::from("test.rs");
@@ -773,7 +773,7 @@ async fn run_loop() {}
     #[test]
     fn test_function_allow_is_function_allowed() {
         let content = r#"
-// debtmap:allow[testing] -- Pure logic extracted and tested
+// debtmap:ignore[testing] -- Pure logic extracted and tested
 async fn orchestration_function() {}
 "#;
         let file = PathBuf::from("test.rs");
@@ -793,7 +793,7 @@ async fn orchestration_function() {}
     #[test]
     fn test_function_allow_get_reason() {
         let content = r#"
-// debtmap:allow[complexity,testing] -- State machine with exhaustive matching
+// debtmap:ignore[complexity,testing] -- State machine with exhaustive matching
 fn complex_match() {}
 "#;
         let file = PathBuf::from("test.rs");
@@ -812,7 +812,7 @@ fn complex_match() {}
     fn test_function_allow_requires_reason() {
         // Without a reason, the pattern should not match
         let content = r#"
-// debtmap:allow[testing]
+// debtmap:ignore[testing]
 fn no_reason() {}
 "#;
         let file = PathBuf::from("test.rs");
@@ -825,7 +825,7 @@ fn no_reason() {}
     #[test]
     fn test_function_allow_multiple_types() {
         let content = r#"
-// debtmap:allow[testing,complexity] -- Async orchestration with inherent complexity
+// debtmap:ignore[testing,complexity] -- Async orchestration with inherent complexity
 async fn run_loop() {}
 "#;
         let file = PathBuf::from("test.rs");
@@ -848,7 +848,7 @@ async fn run_loop() {}
     #[test]
     fn test_function_allow_wildcard() {
         let content = r#"
-// debtmap:allow[*] -- Legacy code pending refactor
+// debtmap:ignore[*] -- Legacy code pending refactor
 fn legacy_function() {}
 "#;
         let file = PathBuf::from("test.rs");
@@ -873,9 +873,9 @@ fn legacy_function() {}
 
     #[test]
     fn test_function_allow_doc_comment() {
-        // Test that /// doc comments are also recognized for allow annotations
+        // Test that /// doc comments are also recognized for ignore annotations
         let content = r#"
-    /// debtmap:allow[complexity,coverage] -- I/O shell function
+    /// debtmap:ignore[complexity,coverage] -- I/O shell function
     async fn invoke() {}
 "#;
         let file = PathBuf::from("test.rs");
@@ -917,5 +917,32 @@ fn untested() {}
             cognitive: 10,
         };
         assert!(context.is_suppressed(3, &testing_gap));
+    }
+
+    #[test]
+    fn test_function_ignore_single_dash() {
+        // Test that single dash works as reason separator (not just double dash)
+        let content = r#"
+// debtmap:ignore[testing] - I/O dispatcher with no extractable pure logic
+async fn run_command() {}
+"#;
+        let file = PathBuf::from("test.rs");
+        let context = parse_suppression_comments(content, Language::Rust, &file);
+
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 6,
+            cognitive: 25,
+        };
+
+        // Function starts at line 3, annotation is at line 2
+        assert!(context.is_function_allowed(3, &testing_gap));
+
+        // Check the reason was captured
+        let reason = context.get_function_allow_reason(3, &testing_gap);
+        assert_eq!(
+            reason,
+            Some("I/O dispatcher with no extractable pure logic")
+        );
     }
 }

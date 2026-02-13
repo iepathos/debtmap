@@ -27,10 +27,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug_span, warn};
 
-/// Filter out unified debt items that are suppressed via debtmap:allow annotations (spec 215).
+/// Filter out unified debt items that are suppressed via debtmap:ignore annotations (spec 215).
 ///
 /// This function checks each item against the suppression context cache and removes
-/// items whose functions have `debtmap:allow[type] -- reason` annotations.
+/// items whose functions have `debtmap:ignore[type] -- reason` annotations.
 fn filter_suppressed_items(
     items: Vec<UnifiedDebtItem>,
     suppression_cache: &SuppressionContextCache,
@@ -756,9 +756,9 @@ impl ParallelUnifiedAnalysisBuilder {
         // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
         let progress: Option<indicatif::ProgressBar> = None;
 
-        // Build suppression context cache for function-level debtmap:allow annotations (spec 215)
+        // Build suppression context cache for function-level debtmap:ignore annotations (spec 215)
         // This enables filtering of unified debt items based on annotations like:
-        //   // debtmap:allow[testing] -- I/O orchestration function
+        //   // debtmap:ignore[testing] -- I/O orchestration function
         let suppression_cache = build_suppression_context_cache(metrics);
 
         // Pre-create shared detectors once to avoid per-metric regex compilation (spec 196)
@@ -809,8 +809,8 @@ impl ParallelUnifiedAnalysisBuilder {
             ));
         }
 
-        // Filter out items that are suppressed via debtmap:allow annotations (spec 215)
-        // This ensures annotations like `// debtmap:allow[testing]` work in coverage mode
+        // Filter out items that are suppressed via debtmap:ignore annotations (spec 215)
+        // This ensures annotations like `// debtmap:ignore[testing]` work in coverage mode
         filter_suppressed_items(items, &suppression_cache)
     }
 
