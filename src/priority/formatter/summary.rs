@@ -164,35 +164,7 @@ fn format_tier_terminal(
 
     let _formatter = ColoredFormatter::new(config);
 
-    // Tier header with color based on tier level
-    let tier_header = match tier {
-        Tier::Critical => format!(
-            "{} {} - {}",
-            "[CRITICAL]",
-            "CRITICAL".bright_red().bold(),
-            "Immediate Action Required".red()
-        ),
-        Tier::High => format!(
-            "{} {} - {}",
-            "[HIGH]",
-            "HIGH PRIORITY",
-            "Current Sprint".yellow()
-        ),
-        Tier::Moderate => format!(
-            "{} {} - {}",
-            "[MODERATE]",
-            "MODERATE".bright_blue().bold(),
-            "Next Sprint".blue()
-        ),
-        Tier::Low => format!(
-            "{} {} - {}",
-            "[LOW]",
-            "LOW".white().bold(),
-            "Backlog".white()
-        ),
-    };
-
-    writeln!(output, "{}", tier_header).unwrap();
+    writeln!(output, "{}", format_tier_header(&tier)).unwrap();
     writeln!(output, "{}", tier.effort_estimate()).unwrap();
     writeln!(output).unwrap();
 
@@ -350,5 +322,35 @@ fn format_item_location(item: &priority::DebtItem) -> String {
                 file.metrics.total_lines
             )
         }
+    }
+}
+
+/// Format tier header with appropriate styling (pure function)
+fn format_tier_header(tier: &Tier) -> String {
+    match tier {
+        Tier::Critical => format!(
+            "{} {} - {}",
+            "[CRITICAL]",
+            "CRITICAL".bright_red().bold(),
+            "Immediate Action Required".red()
+        ),
+        Tier::High => format!(
+            "{} {} - {}",
+            "[HIGH]",
+            "HIGH PRIORITY",
+            "Current Sprint".yellow()
+        ),
+        Tier::Moderate => format!(
+            "{} {} - {}",
+            "[MODERATE]",
+            "MODERATE".bright_blue().bold(),
+            "Next Sprint".blue()
+        ),
+        Tier::Low => format!(
+            "{} {} - {}",
+            "[LOW]",
+            "LOW".white().bold(),
+            "Backlog".white()
+        ),
     }
 }
