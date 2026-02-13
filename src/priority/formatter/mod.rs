@@ -136,6 +136,10 @@ fn coupling_classification_label(classification: &CouplingClassification) -> &'s
 }
 
 // Format file-level priority items with detailed information
+// debtmap:ignore[io_shell] - I/O shell function that formats output to string buffer.
+// Pure logic already extracted to tested helpers: format_file_rationale, format_truncated_list,
+// coupling_classification_label, classify_coupling. Remaining complexity is inherent conditional
+// formatting for optional fields (coupling, god object analysis).
 pub fn format_file_priority_item_with_verbosity(
     output: &mut String,
     rank: usize,
