@@ -153,12 +153,12 @@ fn handle_detail_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
     execute_detail_action(app, action)
 }
 
-// debtmap:ignore[complexity,testing] - I/O dispatcher shell; pure action classification in detail_actions module
 /// Execute a detail action (imperative shell).
 ///
 /// This function contains all the side effects for detail view actions.
 /// It's kept separate from the pure action determination to maintain
 /// clear boundaries between pure logic and effects.
+// debtmap:ignore[complexity,testing] - I/O dispatcher shell; pure action classification in detail_actions module
 fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<bool> {
     match action {
         DetailAction::NavigateBack => {
