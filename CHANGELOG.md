@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.6] - 2026-02-12
+
+### Changed
+
+- **Function-Level Suppression Syntax** - Changed from `debtmap:allow` to `debtmap:ignore`
+  - More consistent with existing `debtmap:ignore-start/end` block syntax
+  - Accepts both single dash (`-`) and double dash (`--`) as reason separator
+  - Example: `// debtmap:ignore[testing] - I/O dispatcher function`
+
+### Fixed
+
+- **Suppression Doc Comment Support** - Recognize `///` doc comments for annotations
+  - Previously only `//` regular comments were recognized
+  - Now `/// debtmap:ignore[testing] - reason` works correctly
+
+- **Complexity Keyword Suppression** - `complexity` keyword now suppresses both debt types
+  - Matches both `Complexity` and `ComplexityHotspot` debt types
+  - Added explicit `hotspot` keyword for hotspot-only suppression
+
+- **Markdown Git Context Output** - Aligned with TUI format for consistency
+  - Added git context section to priority markdown formatter
+  - Shows activity, stability, fix rate, age, contributors, and risk multiplier
+  - Terminal formatter now shows commit counts instead of just changes/month
+
+- **Allow Annotations in Coverage Mode** - Function-level suppressions now work correctly
+  - `debtmap:ignore[testing]` properly filters items in `--lcov` coverage mode
+
 ## [0.13.5] - 2026-02-11
 
 ### Fixed
@@ -33,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Function-Level Debt Suppression** - `debtmap:allow` annotation support
+- **Function-Level Debt Suppression** - `debtmap:ignore` annotation support
   - Suppress specific functions from debt reports with inline comments
   - Useful for intentionally complex functions or false positives
 
