@@ -58,6 +58,7 @@ fn handle_list_key(app: &mut ResultsApp, key: KeyEvent) -> Result<bool> {
 /// This function contains all the side effects for list view actions.
 /// It's kept separate from the pure action determination to maintain
 /// clear boundaries between pure logic and effects.
+// debtmap:ignore[complexity,testing] - I/O dispatcher shell; pure action classification in list_actions module
 fn execute_list_action(app: &mut ResultsApp, action: ListAction) -> Result<bool> {
     match action {
         ListAction::Quit => return Ok(true),
