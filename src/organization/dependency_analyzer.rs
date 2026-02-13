@@ -29,34 +29,35 @@ pub fn extract_dependencies(
     let structs_in_module: HashSet<&str> =
         split.structs_to_move.iter().map(|s| s.as_str()).collect();
 
-    let mut dependencies_in = HashSet::new(); // What we depend on
-    let mut dependencies_out = HashSet::new(); // What depends on us
+    let (deps_in, deps_out) = call_graph
+        .get_all_calls()
+        .into_iter()
+        .filter_map(|call| {
+            let caller_s = extract_struct_name(&call.caller.name)?;
+            let callee_s = extract_struct_name(&call.callee.name)?;
+            Some((caller_s, callee_s))
+        })
+        .fold(
+            (HashSet::new(), HashSet::new()),
+            |(mut deps_in, mut deps_out), (caller_s, callee_s)| {
+                let caller_in = structs_in_module.contains(caller_s.as_str());
+                let callee_in = structs_in_module.contains(callee_s.as_str());
 
-    for call in call_graph.get_all_calls() {
-        // Extract struct names from fully qualified function names
-        let caller_struct = extract_struct_name(&call.caller.name);
-        let callee_struct = extract_struct_name(&call.callee.name);
-
-        if let (Some(caller_s), Some(callee_s)) = (caller_struct, callee_struct) {
-            let caller_in_module = structs_in_module.contains(caller_s.as_str());
-            let callee_in_module = structs_in_module.contains(callee_s.as_str());
-
-            if caller_in_module && !callee_in_module {
-                // We call external struct
-                if all_structs.contains(&callee_s) {
-                    dependencies_in.insert(callee_s);
+                match (caller_in, callee_in) {
+                    (true, false) if all_structs.contains(&callee_s) => {
+                        deps_in.insert(callee_s);
+                    }
+                    (false, true) if all_structs.contains(&caller_s) => {
+                        deps_out.insert(caller_s);
+                    }
+                    _ => {}
                 }
-            } else if !caller_in_module && callee_in_module {
-                // External struct calls us
-                if all_structs.contains(&caller_s) {
-                    dependencies_out.insert(caller_s);
-                }
-            }
-        }
-    }
+                (deps_in, deps_out)
+            },
+        );
 
-    let mut deps_in: Vec<String> = dependencies_in.into_iter().collect();
-    let mut deps_out: Vec<String> = dependencies_out.into_iter().collect();
+    let mut deps_in: Vec<String> = deps_in.into_iter().collect();
+    let mut deps_out: Vec<String> = deps_out.into_iter().collect();
     deps_in.sort();
     deps_out.sort();
 
@@ -83,30 +84,31 @@ pub fn estimate_interface_size(
     all_structs: &[String],
 ) -> crate::organization::InterfaceEstimate {
     use crate::organization::InterfaceEstimate;
-    use std::collections::HashSet;
 
     let structs_in_module: HashSet<&str> =
         split.structs_to_move.iter().map(|s| s.as_str()).collect();
 
-    let mut public_functions = HashSet::new();
-    let mut shared_types = HashSet::new();
-
-    // Analyze all calls to find boundary crossings
-    for call in call_graph.get_all_calls() {
-        let caller_struct = extract_struct_name(&call.caller.name);
-        let callee_struct = extract_struct_name(&call.callee.name);
-
-        if let (Some(caller_s), Some(callee_s)) = (caller_struct, callee_struct) {
-            let caller_in_module = structs_in_module.contains(caller_s.as_str());
-            let callee_in_module = structs_in_module.contains(callee_s.as_str());
-
-            // If call crosses module boundary, the callee needs to be public
-            if caller_in_module != callee_in_module && all_structs.contains(&callee_s) {
-                public_functions.insert(call.callee.name.clone());
-                shared_types.insert(callee_s.clone());
-            }
-        }
-    }
+    let (public_functions, shared_types) = call_graph
+        .get_all_calls()
+        .into_iter()
+        .filter_map(|call| {
+            let caller_s = extract_struct_name(&call.caller.name)?;
+            let callee_s = extract_struct_name(&call.callee.name)?;
+            Some((call, caller_s, callee_s))
+        })
+        .filter(|(_, caller_s, callee_s)| {
+            let caller_in = structs_in_module.contains(caller_s.as_str());
+            let callee_in = structs_in_module.contains(callee_s.as_str());
+            caller_in != callee_in && all_structs.contains(callee_s)
+        })
+        .fold(
+            (HashSet::new(), HashSet::new()),
+            |(mut funcs, mut types), (call, _, callee_s)| {
+                funcs.insert(call.callee.name.clone());
+                types.insert(callee_s);
+                (funcs, types)
+            },
+        );
 
     // Estimate LOC: ~5 lines per public function signature + ~10 lines per shared type
     let estimated_loc = (public_functions.len() * 5) + (shared_types.len() * 10);
