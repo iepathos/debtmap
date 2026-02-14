@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.13.6] - 2026-02-12
+## [0.13.6] - 2026-02-14
+
+### Added
+
+- **God Object Ignore Keyword** - New `god_object` keyword for suppression annotations
+  - `// debtmap:ignore[god_object] - intentionally large coordinator`
+  - Specifically targets god object debt items
 
 ### Changed
 
@@ -33,6 +39,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Allow Annotations in Coverage Mode** - Function-level suppressions now work correctly
   - `debtmap:ignore[testing]` properly filters items in `--lcov` coverage mode
+
+- **TUI Item Scores Header** - Fixed inconsistent header styling in detail view
+
+- **Context Test File References** - Only include existing files in context suggestions
+  - Filters out hypothetical `*_test.rs` paths that don't exist
+  - Prevents misleading references when tests are inline modules
+
+### Security
+
+- **RUSTSEC-2026-0002** - Updated ratatui 0.28 → 0.30 to fix vulnerability
+- **RUSTSEC-2022-0081** - Removed unused cargo-modules dependency
+- **Unmaintained bincode** - Replaced bincode with postcard for serialization
+
+### Dependencies
+
+- Updated minimum dependency versions for better compatibility
+- cc: Updated to newer version
+- libc: Updated to newer version
+
+### Internal (Refactoring)
+
+- **CLI Module Extraction** - Extracted analyze and validate-improvement handlers
+- **TUI Simplification** - Simplified ResultsApp structure with better separation
+- **Formatter Refactoring** - Extracted tier header and blast radius helpers
+- **Suppression System** - Consolidated function-level ignore handling
+- **Organization Module** - Converted to iterator chains for functional style
+- **Profiling Extraction** - Separated profiling concern from main_inner
+
+### Testing
+
+- Added format_file_rationale tests
+- Added TUI navigation helper tests
+- Added missing dispatcher action tests
+- Added call graph tests for async and same-file call detection
+
+### Tech Debt Cleanup
+
+- Added `debtmap:ignore` annotations to intentionally complex functions:
+  - `with_retry` - retry orchestration
+  - `build_adjustment_steps` - multi-phase calculation
+  - `build_page_lines` - rendering coordinator
+  - `execute_list_action` - action dispatcher
+  - `execute_detail_action` - detail view dispatcher
+  - `format_file_priority_item_with_verbosity` - formatting coordinator
+  - `from (crate::core::errors::Error)` - error conversion
 
 ## [0.13.5] - 2026-02-11
 
