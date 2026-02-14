@@ -59,9 +59,13 @@ These signals combine into a **severity score** (0-10). High scores mean high-co
 
 Run `debtmap analyze .` to explore results interactively:
 
-<!-- TODO: Add screenshots -->
-<!-- ![List view](assets/tui-list.png) -->
-<!-- ![Detail view with score breakdown](assets/tui-detail.png) -->
+![List view](docs/images/debtmap%20list%20view.png)
+
+![Detail overview](docs/images/debtmap%20detail%20overview.png)
+
+![Score breakdown](docs/images/debtmap%20detail%20score%20breakdown.png)
+
+![Context for AI](docs/images/debtmap%20detail%20context.png)
 
 Features:
 - Browse debt items sorted by severity
