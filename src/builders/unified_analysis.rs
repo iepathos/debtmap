@@ -21,11 +21,13 @@ pub use super::unified_analysis_phases::phases::god_object::{
 pub use super::unified_analysis_phases::phases::scoring::create_debt_items_from_metric;
 
 use crate::analyzers::call_graph_integration;
-use crate::core::AnalysisResults;
+use crate::core::{AnalysisResults, Language};
+use crate::debt::suppression::parse_suppression_comments;
+use crate::organization::GodObjectAnalysis;
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
     debt_aggregator::DebtAggregator,
-    UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
+    DebtType, UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
 };
 use crate::risk;
 use anyhow::Result;
@@ -543,6 +545,62 @@ fn create_parallel_analysis(
     unified
 }
 
+/// Check if a god object should be suppressed based on file annotations.
+/// Same logic as orchestration.rs - checks both file-level and struct-level suppressions.
+fn is_god_object_suppressed_unified(
+    god_analysis: &GodObjectAnalysis,
+    file_content: &str,
+    file_path: &std::path::Path,
+) -> bool {
+    use crate::organization::DetectionType;
+
+    // Determine language from file extension
+    let language = file_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| match ext {
+            "rs" => Language::Rust,
+            "py" | "pyw" => Language::Python,
+            _ => Language::Rust,
+        })
+        .unwrap_or(Language::Rust);
+
+    let suppression_context = parse_suppression_comments(file_content, language, file_path);
+
+    // Create a representative GodObject debt type for suppression checking
+    let god_object_debt_type = DebtType::GodObject {
+        methods: god_analysis.method_count as u32,
+        fields: Some(god_analysis.field_count as u32),
+        responsibilities: god_analysis.responsibility_count as u32,
+        god_object_score: god_analysis.god_object_score,
+        lines: god_analysis.lines_of_code as u32,
+    };
+
+    // First, always check for file-level suppression at the top of the file
+    // A file-level annotation applies to all god objects in the file
+    for check_line in 1..=6 {
+        if suppression_context.is_suppressed(check_line, &god_object_debt_type) {
+            return true;
+        }
+        if suppression_context.is_function_allowed(check_line, &god_object_debt_type) {
+            return true;
+        }
+    }
+
+    // For GodClass, also check near the struct definition line
+    if let DetectionType::GodClass = god_analysis.detection_type {
+        let struct_line = god_analysis.struct_line.unwrap_or(1);
+        if suppression_context.is_suppressed(struct_line, &god_object_debt_type) {
+            return true;
+        }
+        if suppression_context.is_function_allowed(struct_line, &god_object_debt_type) {
+            return true;
+        }
+    }
+
+    false
+}
+
 fn process_file_analysis(
     unified: &mut UnifiedAnalysis,
     metrics: &[crate::core::FunctionMetrics],
@@ -595,50 +653,62 @@ fn process_file_analysis(
 
         // Use adjusted score for threshold check (same as parallel path)
         if file_item.score > 50.0 || has_god_object {
+            let mut file_item = file_item; // Make mutable for potential god_object suppression
+
             if let Some(god_analysis) = &processed.god_analysis {
-                let mut aggregated = aggregate_from_raw_metrics(&processed.raw_functions);
+                // Check if this god object should be suppressed via debtmap:ignore[god_object]
+                let is_suppressed = file_content.as_ref().is_some_and(|content| {
+                    is_god_object_suppressed_unified(god_analysis, content, &processed.file_path)
+                });
 
-                if let Some(lcov) = coverage_data {
-                    aggregated.weighted_coverage =
-                        aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
-                }
+                if is_suppressed {
+                    // Clear god object analysis from file metrics when suppressed
+                    file_item.metrics.god_object_analysis = None;
+                } else {
+                    let mut aggregated = aggregate_from_raw_metrics(&processed.raw_functions);
 
-                if let Some(analyzer) = risk_analyzer {
-                    aggregated.aggregated_contextual_risk =
-                        core::phases::god_object::analyze_file_git_context(
-                            &processed.file_path,
-                            analyzer,
-                            &processed.project_root,
-                        );
-                }
-
-                let enriched = core::phases::god_object::enrich_god_analysis_with_aggregates(
-                    god_analysis,
-                    &aggregated,
-                );
-
-                for item in unified.items.iter_mut() {
-                    if item.location.file == processed.file_path {
-                        item.god_object_indicators = Some(enriched.clone());
+                    if let Some(lcov) = coverage_data {
+                        aggregated.weighted_coverage =
+                            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
                     }
+
+                    if let Some(analyzer) = risk_analyzer {
+                        aggregated.aggregated_contextual_risk =
+                            core::phases::god_object::analyze_file_git_context(
+                                &processed.file_path,
+                                analyzer,
+                                &processed.project_root,
+                            );
+                    }
+
+                    let enriched = core::phases::god_object::enrich_god_analysis_with_aggregates(
+                        god_analysis,
+                        &aggregated,
+                    );
+
+                    for item in unified.items.iter_mut() {
+                        if item.location.file == processed.file_path {
+                            item.god_object_indicators = Some(enriched.clone());
+                        }
+                    }
+
+                    let mut god_item = core::phases::god_object::create_god_object_debt_item(
+                        &processed.file_path,
+                        &processed.file_metrics,
+                        &enriched,
+                        aggregated,
+                        coverage_data,
+                        Some(call_graph),
+                    );
+
+                    // Generate context suggestion for AI agents (spec 263)
+                    use crate::priority::context::{generate_context_suggestion, ContextConfig};
+                    let context_config = ContextConfig::default();
+                    god_item.context_suggestion =
+                        generate_context_suggestion(&god_item, call_graph, &context_config);
+
+                    unified.add_item(god_item);
                 }
-
-                let mut god_item = core::phases::god_object::create_god_object_debt_item(
-                    &processed.file_path,
-                    &processed.file_metrics,
-                    &enriched,
-                    aggregated,
-                    coverage_data,
-                    Some(call_graph),
-                );
-
-                // Generate context suggestion for AI agents (spec 263)
-                use crate::priority::context::{generate_context_suggestion, ContextConfig};
-                let context_config = ContextConfig::default();
-                god_item.context_suggestion =
-                    generate_context_suggestion(&god_item, call_graph, &context_config);
-
-                unified.add_item(god_item);
             }
 
             // Use the already-created file_item (score already checked above)

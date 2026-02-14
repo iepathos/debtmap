@@ -11,7 +11,10 @@ use crate::analysis::call_graph::{
 };
 use crate::analysis::purity_analysis::PurityAnalyzer;
 use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
-use crate::core::{AnalysisResults, FunctionMetrics};
+use crate::core::{AnalysisResults, FunctionMetrics, Language};
+use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::organization::GodObjectAnalysis;
+use crate::priority::DebtType;
 use crate::data_flow::DataFlowGraph;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::{UnifiedAnalysis, UnifiedAnalysisUtils};
@@ -181,6 +184,55 @@ fn should_process_file(score: f64, has_god_object: bool) -> bool {
     score > 50.0 || has_god_object
 }
 
+/// Check if a god object should be suppressed based on file annotations.
+///
+/// Supports both file-level (GodFile/GodModule) and struct-level (GodClass) suppressions:
+/// - For GodFile/GodModule: checks for `debtmap:ignore[god_object]` at lines 1-5
+/// - For GodClass: checks near the struct definition AND at file level
+///
+/// A file-level `debtmap:ignore[god_object]` annotation at line 1-5 applies to ALL
+/// god objects in the file, including struct-level GodClass detections.
+///
+/// Returns true if the god object should be excluded from analysis output.
+fn is_god_object_suppressed(
+    god_analysis: &GodObjectAnalysis,
+    suppression_context: &SuppressionContext,
+) -> bool {
+    // Create a representative GodObject debt type for suppression checking
+    let god_object_debt_type = DebtType::GodObject {
+        methods: god_analysis.method_count as u32,
+        fields: Some(god_analysis.field_count as u32),
+        responsibilities: god_analysis.responsibility_count as u32,
+        god_object_score: god_analysis.god_object_score,
+        lines: god_analysis.lines_of_code as u32,
+    };
+
+    // First, always check for file-level suppression at the top of the file
+    // A file-level annotation applies to all god objects in the file
+    for check_line in 1..=6 {
+        if suppression_context.is_suppressed(check_line, &god_object_debt_type) {
+            return true;
+        }
+        if suppression_context.is_function_allowed(check_line, &god_object_debt_type) {
+            return true;
+        }
+    }
+
+    // For GodClass, also check near the struct definition line
+    // This allows placing the annotation immediately before the struct
+    if let crate::organization::DetectionType::GodClass = god_analysis.detection_type {
+        let struct_line = god_analysis.struct_line.unwrap_or(1);
+        if suppression_context.is_suppressed(struct_line, &god_object_debt_type) {
+            return true;
+        }
+        if suppression_context.is_function_allowed(struct_line, &god_object_debt_type) {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Context for god object processing.
 struct GodObjectProcessingContext<'a> {
     coverage_data: Option<&'a LcovData>,
@@ -282,6 +334,21 @@ fn process_file_analysis(
 
     for (file_path, functions) in file_groups {
         let file_content = std::fs::read_to_string(&file_path).ok();
+
+        // Parse suppression context for this file
+        let suppression_context = file_content.as_ref().map(|content| {
+            let language = file_path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| match ext {
+                    "rs" => Language::Rust,
+                    "py" | "pyw" => Language::Python,
+                    _ => Language::Rust,
+                })
+                .unwrap_or(Language::Rust);
+            parse_suppression_comments(content, language, &file_path)
+        });
+
         let processed = file_analysis::process_file_metrics(
             file_path.clone(),
             functions,
@@ -302,20 +369,34 @@ fn process_file_analysis(
         }
 
         // Process god object if present (spec 206: check is_god_object even when god_analysis exists)
-        if let Some(god_analysis) = processed.god_analysis.as_ref().filter(|a| a.is_god_object) {
-            let result = process_god_object(&processed, god_analysis, &god_ctx);
-            update_god_indicators_for_file(
-                &mut unified.items,
-                &processed.file_path,
-                &result.enriched_analysis,
-            );
-            unified.add_item(result.debt_item);
-        }
+        let god_object_suppressed = if let Some(god_analysis) =
+            processed.god_analysis.as_ref().filter(|a| a.is_god_object)
+        {
+            // Check if this god object should be suppressed via debtmap:ignore[god_object] annotation
+            let is_suppressed = suppression_context
+                .as_ref()
+                .is_some_and(|ctx| is_god_object_suppressed(god_analysis, ctx));
 
-        let file_item = file_analysis::create_file_debt_item(
-            processed.file_metrics,
-            Some(&processed.file_context),
-        );
+            if !is_suppressed {
+                let result = process_god_object(&processed, god_analysis, &god_ctx);
+                update_god_indicators_for_file(
+                    &mut unified.items,
+                    &processed.file_path,
+                    &result.enriched_analysis,
+                );
+                unified.add_item(result.debt_item);
+            }
+            is_suppressed
+        } else {
+            false
+        };
+
+        // Create file item, clearing god_object_analysis if suppressed
+        let mut file_metrics = processed.file_metrics;
+        if god_object_suppressed {
+            file_metrics.god_object_analysis = None;
+        }
+        let file_item = file_analysis::create_file_debt_item(file_metrics, Some(&processed.file_context));
         unified.add_file_item(file_item);
     }
 }
@@ -369,5 +450,298 @@ mod tests {
         assert!(!should_process_file(50.0, false));
         // Just above threshold should be processed
         assert!(should_process_file(50.1, false));
+    }
+
+    #[test]
+    fn test_is_god_object_suppressed_with_file_annotation() {
+        use crate::organization::{DetectionType, GodObjectConfidence, SplitAnalysisMethod};
+        use std::path::PathBuf;
+
+        // Create god object analysis for a file-level detection
+        let god_analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 50,
+            weighted_method_count: None,
+            field_count: 10,
+            responsibility_count: 5,
+            lines_of_code: 2000,
+            complexity_sum: 100,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["data".to_string()],
+            responsibility_method_counts: std::collections::HashMap::new(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodFile,
+            struct_name: None,
+            struct_line: None,
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 2,
+            domain_diversity: 0.5,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        };
+
+        // Test with suppression annotation at line 1
+        let file_path = PathBuf::from("test.rs");
+        let content = r#"// debtmap:ignore[god_object] - High cohesion: all functions implement merge queue management
+use std::io;
+fn main() {}
+"#;
+        let suppression_context = parse_suppression_comments(content, Language::Rust, &file_path);
+
+        // Should be suppressed because of the annotation at line 1
+        assert!(
+            is_god_object_suppressed(&god_analysis, &suppression_context),
+            "God object with file-level ignore annotation should be suppressed"
+        );
+    }
+
+    #[test]
+    fn test_is_god_object_not_suppressed_without_annotation() {
+        use crate::organization::{DetectionType, GodObjectConfidence, SplitAnalysisMethod};
+        use std::path::PathBuf;
+
+        let god_analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 50,
+            weighted_method_count: None,
+            field_count: 10,
+            responsibility_count: 5,
+            lines_of_code: 2000,
+            complexity_sum: 100,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["data".to_string()],
+            responsibility_method_counts: std::collections::HashMap::new(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodFile,
+            struct_name: None,
+            struct_line: None,
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 2,
+            domain_diversity: 0.5,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        };
+
+        // Test without any suppression annotation
+        let file_path = PathBuf::from("test.rs");
+        let content = r#"use std::io;
+fn main() {}
+"#;
+        let suppression_context = parse_suppression_comments(content, Language::Rust, &file_path);
+
+        // Should NOT be suppressed because there's no annotation
+        assert!(
+            !is_god_object_suppressed(&god_analysis, &suppression_context),
+            "God object without ignore annotation should not be suppressed"
+        );
+    }
+
+    #[test]
+    fn test_is_god_object_suppressed_struct_level() {
+        use crate::organization::{DetectionType, GodObjectConfidence, SplitAnalysisMethod};
+        use std::path::PathBuf;
+
+        // Create god object analysis for a struct-level detection (GodClass)
+        let god_analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 50,
+            weighted_method_count: None,
+            field_count: 10,
+            responsibility_count: 5,
+            lines_of_code: 2000,
+            complexity_sum: 100,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["data".to_string()],
+            responsibility_method_counts: std::collections::HashMap::new(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodClass,
+            struct_name: Some("MergeQueueManager".to_string()),
+            struct_line: Some(10), // Struct is at line 10
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 2,
+            domain_diversity: 0.5,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        };
+
+        // Test with suppression annotation before the struct (at line 9)
+        let file_path = PathBuf::from("test.rs");
+        let content = r#"use std::io;
+
+// Some code...
+
+
+// More code...
+
+
+// debtmap:ignore[god_object] - Coordinator struct by design
+pub struct MergeQueueManager {
+    field: String,
+}
+"#;
+        let suppression_context = parse_suppression_comments(content, Language::Rust, &file_path);
+
+        // Should be suppressed because of the annotation before the struct
+        assert!(
+            is_god_object_suppressed(&god_analysis, &suppression_context),
+            "GodClass with ignore annotation before struct should be suppressed"
+        );
+    }
+
+    #[test]
+    fn test_is_god_object_wrong_debt_type_not_suppressed() {
+        use crate::organization::{DetectionType, GodObjectConfidence, SplitAnalysisMethod};
+        use std::path::PathBuf;
+
+        let god_analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 50,
+            weighted_method_count: None,
+            field_count: 10,
+            responsibility_count: 5,
+            lines_of_code: 2000,
+            complexity_sum: 100,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["data".to_string()],
+            responsibility_method_counts: std::collections::HashMap::new(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodFile,
+            struct_name: None,
+            struct_line: None,
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 2,
+            domain_diversity: 0.5,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        };
+
+        // Test with a different suppression type (testing, not god_object)
+        let file_path = PathBuf::from("test.rs");
+        let content = r#"// debtmap:ignore[testing] - Not a god_object annotation
+use std::io;
+fn main() {}
+"#;
+        let suppression_context = parse_suppression_comments(content, Language::Rust, &file_path);
+
+        // Should NOT be suppressed because the annotation is for testing, not god_object
+        assert!(
+            !is_god_object_suppressed(&god_analysis, &suppression_context),
+            "God object should not be suppressed by testing annotation"
+        );
+    }
+
+    #[test]
+    fn test_is_god_class_suppressed_by_file_level_annotation() {
+        use crate::organization::{DetectionType, GodObjectConfidence, SplitAnalysisMethod};
+        use std::path::PathBuf;
+
+        // Simulates the real-world case: hosaka's merge.rs has a GodClass (MergeQueueManager)
+        // at line 469, but the suppression annotation is at line 1 of the file.
+        // The file-level annotation should apply to all god objects in the file.
+        let god_analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 50,
+            weighted_method_count: None,
+            field_count: 10,
+            responsibility_count: 5,
+            lines_of_code: 2000,
+            complexity_sum: 100,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["data".to_string()],
+            responsibility_method_counts: std::collections::HashMap::new(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodClass,
+            struct_name: Some("MergeQueueManager".to_string()),
+            struct_line: Some(469), // Struct is far down in the file
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 2,
+            domain_diversity: 0.5,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        };
+
+        // File-level annotation at line 1 should apply to the GodClass at line 469
+        let file_path = PathBuf::from("merge.rs");
+        let content = r#"// debtmap:ignore[god_object] - High cohesion (0.95): all functions implement merge queue management
+// as a single domain. Splitting would reduce cohesion.
+use super::template::MergeMode;
+use serde::{Deserialize, Serialize};
+// ... many more lines ...
+pub struct MergeQueueManager {
+    field: String,
+}
+"#;
+        let suppression_context = parse_suppression_comments(content, Language::Rust, &file_path);
+
+        // Should be suppressed because of the file-level annotation at line 1
+        assert!(
+            is_god_object_suppressed(&god_analysis, &suppression_context),
+            "GodClass should be suppressed by file-level annotation at line 1"
+        );
     }
 }

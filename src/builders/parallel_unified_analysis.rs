@@ -50,6 +50,65 @@ fn filter_suppressed_items(
         .collect()
 }
 
+/// Check if a god object should be suppressed based on file annotations.
+/// Same logic as orchestration.rs - checks both file-level and struct-level suppressions.
+fn is_god_object_suppressed_parallel(
+    god_analysis: &crate::organization::GodObjectAnalysis,
+    file_content: &str,
+    file_path: &Path,
+) -> bool {
+    use crate::core::Language;
+    use crate::debt::suppression::parse_suppression_comments;
+    use crate::organization::DetectionType;
+    use crate::priority::DebtType;
+
+    // Determine language from file extension
+    let language = file_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| match ext {
+            "rs" => Language::Rust,
+            "py" | "pyw" => Language::Python,
+            _ => Language::Rust,
+        })
+        .unwrap_or(Language::Rust);
+
+    let suppression_context = parse_suppression_comments(file_content, language, file_path);
+
+    // Create a representative GodObject debt type for suppression checking
+    let god_object_debt_type = DebtType::GodObject {
+        methods: god_analysis.method_count as u32,
+        fields: Some(god_analysis.field_count as u32),
+        responsibilities: god_analysis.responsibility_count as u32,
+        god_object_score: god_analysis.god_object_score,
+        lines: god_analysis.lines_of_code as u32,
+    };
+
+    // First, always check for file-level suppression at the top of the file
+    // A file-level annotation applies to all god objects in the file
+    for check_line in 1..=6 {
+        if suppression_context.is_suppressed(check_line, &god_object_debt_type) {
+            return true;
+        }
+        if suppression_context.is_function_allowed(check_line, &god_object_debt_type) {
+            return true;
+        }
+    }
+
+    // For GodClass, also check near the struct definition line
+    if let DetectionType::GodClass = god_analysis.detection_type {
+        let struct_line = god_analysis.struct_line.unwrap_or(1);
+        if suppression_context.is_suppressed(struct_line, &god_object_debt_type) {
+            return true;
+        }
+        if suppression_context.is_function_allowed(struct_line, &god_object_debt_type) {
+            return true;
+        }
+    }
+
+    false
+}
+
 // Pure functional transformations module
 mod transformations {
     use super::*;
@@ -1202,6 +1261,28 @@ impl ParallelUnifiedAnalysisBuilder {
             // Check if this file has god object analysis
             if let Some(ref god_analysis) = file_item.metrics.god_object_analysis {
                 if god_analysis.is_god_object {
+                    // Check if this god object should be suppressed via debtmap:ignore[god_object]
+                    let is_suppressed = std::fs::read_to_string(&file_item.metrics.path)
+                        .ok()
+                        .is_some_and(|content| {
+                            is_god_object_suppressed_parallel(
+                                god_analysis,
+                                &content,
+                                &file_item.metrics.path,
+                            )
+                        });
+
+                    if is_suppressed {
+                        // Skip creating the god object debt item, but still process file item
+                        // Clear god_object_analysis from file metrics when suppressed
+                        let mut file_item = file_item;
+                        file_item.metrics.god_object_analysis = None;
+                        let file_item_with_deps =
+                            enrich_file_item_with_dependencies(file_item, &unified.items);
+                        unified.add_file_item(file_item_with_deps);
+                        continue;
+                    }
+
                     // Aggregate from raw metrics first for complexity (includes ALL functions, even tests)
                     use crate::priority::god_object_aggregation::{
                         aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
