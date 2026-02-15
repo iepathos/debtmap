@@ -1,8 +1,26 @@
+//! Complexity attribution analysis.
+//!
+//! This module provides tools for attributing complexity metrics to specific
+//! source code constructs, distinguishing between logical complexity,
+//! formatting artifacts, and recognized patterns.
+
 use crate::core::FunctionMetrics;
 use serde::{Deserialize, Serialize};
 
+/// Tracks changes in complexity between analysis runs.
+///
+/// Compares current analysis results with previous runs to identify
+/// complexity trends and categorize changes.
 pub mod change_tracker;
+/// Pattern detection and complexity adjustment.
+///
+/// Identifies recognized patterns (error handling, validation, data transformation)
+/// and adjusts complexity scores based on pattern familiarity.
 pub mod pattern_tracker;
+/// Complexity source tracking and classification.
+///
+/// Tracks the origin of complexity contributions, distinguishing logical
+/// structure from formatting artifacts.
 pub mod source_tracker;
 
 use self::pattern_tracker::PatternTracker;

@@ -367,8 +367,16 @@ pub mod resources;
 pub mod risk;
 pub mod testing;
 pub mod testkit;
+/// Functional transformation utilities for metrics data.
+///
+/// Provides composable transformers for filtering, mapping, and transforming
+/// `FileMetrics` and `FunctionMetrics` data structures.
 pub mod transformers;
 pub mod tui;
+/// Common utility functions and helpers.
+///
+/// Contains shared helper functions for analysis, language parsing, option
+/// extensions, risk analysis, and validation output formatting.
 pub mod utils;
 
 // Re-export commonly used types
