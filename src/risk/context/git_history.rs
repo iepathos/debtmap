@@ -94,12 +94,27 @@ impl GitHistoryProvider {
     /// Git stores paths relative to the repo root, so we need to strip the repo_root
     /// prefix from absolute paths for lookups in batched history.
     ///
-    /// Handles symlink resolution (e.g., macOS /var -> /private/var) by canonicalizing
-    /// both paths before comparison when the initial strip fails.
+    /// Handles:
+    /// - Absolute paths: strips repo_root prefix
+    /// - Symlinks (e.g., macOS /var -> /private/var): canonicalizes before comparison
+    /// - Current directory prefix (./): strips ./ prefix for relative paths
     fn to_relative_path<'a>(&self, path: &'a Path) -> std::borrow::Cow<'a, Path> {
         // Fast path: try direct strip_prefix first
         if let Ok(rel) = path.strip_prefix(&self.repo_root) {
             return std::borrow::Cow::Borrowed(rel);
+        }
+
+        // Handle ./ prefix for relative paths (e.g., ./src/file.ts -> src/file.ts)
+        if let Ok(rel) = path.strip_prefix("./") {
+            return std::borrow::Cow::Borrowed(rel);
+        }
+
+        // Also handle . prefix (single dot component)
+        if let Ok(rel) = path.strip_prefix(".") {
+            // strip_prefix(".") returns empty path if path is exactly "."
+            if !rel.as_os_str().is_empty() {
+                return std::borrow::Cow::Borrowed(rel);
+            }
         }
 
         // Slow path: canonicalize both paths to resolve symlinks (e.g., /var -> /private/var)
@@ -1390,6 +1405,49 @@ fn buggy_func() {
         } else {
             panic!("Expected Historical context details");
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_dot_slash_prefix_normalization() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create src directory and test file
+        std::fs::create_dir_all(repo_path.join("src"))?;
+        let _file_path = create_test_file(&repo_path, "src/test.rs", "fn main() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        // Add more commits
+        modify_and_commit(
+            &repo_path,
+            "src/test.rs",
+            "fn main() { /* v2 */ }",
+            "fix: bug fix",
+        )?;
+
+        let mut provider = GitHistoryProvider::new(repo_path)?;
+
+        // Test with ./ prefix - should find the same history
+        let history_dot_slash = provider.analyze_file(Path::new("./src/test.rs"))?;
+
+        // Test without ./ prefix
+        let history_no_prefix = provider.analyze_file(Path::new("src/test.rs"))?;
+
+        // Both should return valid history with same commit count
+        assert_eq!(
+            history_dot_slash.total_commits, history_no_prefix.total_commits,
+            "./ prefix should be normalized: {} vs {}",
+            history_dot_slash.total_commits, history_no_prefix.total_commits
+        );
+        assert!(
+            history_dot_slash.total_commits > 0,
+            "Should find commits with ./ prefix path"
+        );
+        assert!(
+            history_no_prefix.total_commits > 0,
+            "Should find commits without prefix"
+        );
 
         Ok(())
     }

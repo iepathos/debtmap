@@ -336,3 +336,84 @@ fn log_status_done() {
 fn is_quiet_mode() -> bool {
     std::env::var("DEBTMAP_QUIET").is_ok()
 }
+
+/// Process TypeScript/JavaScript files for call graph
+///
+/// This function parses JS/TS files and extracts function call relationships,
+/// merging them into the provided call graph.
+///
+/// # Arguments
+///
+/// * `project_path` - Root path of the project
+/// * `call_graph` - The call graph to merge extracted calls into
+/// * `js_ts_files` - Optional list of JS/TS files to process (if None, discovers files)
+///
+/// # Returns
+///
+/// Ok(()) on success, Error on failure
+pub fn process_typescript_files_for_call_graph(
+    project_path: &Path,
+    call_graph: &mut priority::CallGraph,
+    js_ts_files: Option<&[PathBuf]>,
+) -> Result<()> {
+    use crate::analyzers::typescript::call_graph::extract_call_graph;
+    use crate::analyzers::typescript::parser::parse_source;
+    use crate::core::ast::JsLanguageVariant;
+
+    // Discover or use provided files
+    let files = if let Some(files) = js_ts_files {
+        files.to_vec()
+    } else {
+        let config = config::get_config();
+        io::walker::find_project_files_with_config(
+            project_path,
+            vec![Language::JavaScript, Language::TypeScript],
+            config,
+        )
+        .context("Failed to find JS/TS files for call graph")?
+    };
+
+    if files.is_empty() {
+        return Ok(());
+    }
+
+    log::info!("Processing {} JS/TS files for call graph", files.len());
+
+    for file_path in &files {
+        // Read file content
+        let content = match io::read_file(file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                log::debug!("Failed to read file {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+
+        // Determine language variant from extension
+        let variant = match file_path.extension().and_then(|e| e.to_str()) {
+            Some("ts" | "tsx" | "mts" | "cts") => JsLanguageVariant::TypeScript,
+            Some("jsx") => JsLanguageVariant::Jsx,
+            _ => JsLanguageVariant::JavaScript,
+        };
+
+        // Parse the file
+        let ast = match parse_source(&content, file_path, variant) {
+            Ok(ast) => ast,
+            Err(e) => {
+                log::debug!("Failed to parse {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+
+        // Extract call graph and merge
+        let file_call_graph = extract_call_graph(&ast);
+        call_graph.merge(file_call_graph);
+    }
+
+    log::info!(
+        "Merged JS/TS call graph: {} total functions",
+        call_graph.node_count()
+    );
+
+    Ok(())
+}

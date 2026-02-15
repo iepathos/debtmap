@@ -20,6 +20,7 @@
 //! ```
 
 pub mod analyzer;
+pub mod call_graph;
 pub mod debt;
 pub mod dependencies;
 pub mod metrics;

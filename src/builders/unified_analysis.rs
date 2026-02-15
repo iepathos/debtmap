@@ -158,6 +158,43 @@ pub fn perform_unified_analysis_with_options(
         result
     };
 
+    // Process TypeScript/JavaScript files for call graph
+    {
+        time_span!("typescript_call_graph", parent: "unified_analysis");
+        let _span = info_span!("typescript_call_graph_building").entered();
+
+        // Collect JS/TS files from the analysis results
+        let js_ts_files: Vec<PathBuf> = results
+            .complexity
+            .metrics
+            .iter()
+            .filter(|m| {
+                let ext = m.file.extension().and_then(|e| e.to_str()).unwrap_or("");
+                matches!(
+                    ext,
+                    "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "mts" | "cts"
+                )
+            })
+            .map(|m| m.file.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if !js_ts_files.is_empty() {
+            info!(
+                "Processing {} JS/TS files for call graph",
+                js_ts_files.len()
+            );
+            if let Err(e) = call_graph::process_typescript_files_for_call_graph(
+                project_path,
+                &mut call_graph,
+                Some(&js_ts_files),
+            ) {
+                warn!("Failed to process TypeScript call graph: {}", e);
+            }
+        }
+    }
+
     let call_graph_time = call_graph_start.elapsed();
     report_stage_complete(1, format!("{} functions", call_graph.node_count()));
 
