@@ -15,11 +15,28 @@
 //! - Data flow analysis for state transition and mutation tracking (Spec 201)
 //! - Analysis workflow state machine with checkpoint/resume support (Spec 202)
 
+/// Complexity attribution analysis for source-level insights.
+///
+/// Maps complexity metrics back to specific code constructs, identifying
+/// whether complexity comes from logical structure, formatting artifacts,
+/// or recognized patterns.
 pub mod attribution;
 pub mod call_graph;
 pub mod context_detection;
+/// Data flow analysis for Rust code.
+///
+/// Provides control flow graph construction and reaching definitions analysis
+/// for tracking variable definitions, uses, and function purity.
 pub mod data_flow;
+/// Diagnostic reporting for complexity analysis.
+///
+/// Generates detailed reports with summaries, attributions, recommendations,
+/// and comparative analysis for multi-pass complexity results.
 pub mod diagnostics;
+/// Effect utilities for analysis modules.
+///
+/// Provides effect wrappers enabling testable, composable analysis operations
+/// while maintaining compatibility with existing `anyhow::Result` based code.
 pub mod effects;
 pub mod file_context;
 pub mod framework_patterns;
@@ -29,6 +46,10 @@ pub mod functional_composition;
 pub mod graph_metrics;
 pub mod io_detection;
 pub mod module_structure;
+/// Multi-pass complexity analysis engine.
+///
+/// Performs raw and normalized complexity analysis with attribution,
+/// generating comprehensive diagnostic reports with recommendations.
 pub mod multi_pass;
 pub mod multi_pass_effects;
 pub mod multi_signal_aggregation;
