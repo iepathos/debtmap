@@ -1,3 +1,16 @@
+//! Utility functions for collecting and aggregating analysis results.
+//!
+//! This module provides high-level utilities for running file analysis across a codebase,
+//! collecting metrics with error handling, and aggregating results into reports. Functions
+//! here coordinate the analysis pipeline by orchestrating parallel file processing and
+//! combining individual file metrics into summary reports.
+//!
+//! Key responsibilities:
+//! - Parallel collection of file metrics with progress reporting
+//! - Aggregation of complexity metrics into summaries
+//! - Construction of technical debt and dependency reports
+//! - Error collection following the "fail completely" pattern
+
 use crate::core::{
     ComplexityReport, ComplexitySummary, DebtItem, DependencyReport, DuplicationBlock, FileMetrics,
     FunctionMetrics, TechnicalDebtReport,

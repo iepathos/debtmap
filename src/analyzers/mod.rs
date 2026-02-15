@@ -1,3 +1,22 @@
+//! Language-specific code analyzers for parsing and extracting metrics.
+//!
+//! This module contains analyzers for different programming languages (Rust, Python,
+//! JavaScript, TypeScript) that parse source code into ASTs and extract metrics like
+//! complexity, function signatures, and call graphs.
+//!
+//! The module provides:
+//! - Language-specific parsers using tree-sitter grammars
+//! - Function and method extraction with purity detection
+//! - Call graph analysis and construction
+//! - Effect tracking (I/O, state mutations)
+//! - Test and macro detection
+//!
+//! # Architecture
+//!
+//! Analyzers implement the [`Analyzer`] trait for unified file analysis, or
+//! [`FileAnalyzer`] for debt-focused metrics. The enhanced analyzer provides
+//! comprehensive analysis including call graphs and effect tracking.
+
 use crate::core::{ast::Ast, FileMetrics, FunctionMetrics};
 use crate::priority::file_metrics::FileDebtMetrics;
 use anyhow::Result;
