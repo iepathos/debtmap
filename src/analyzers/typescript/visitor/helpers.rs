@@ -174,16 +174,18 @@ fn traverse_children_with_nesting(
     nesting: u32,
     field: Option<&str>,
 ) {
-    let mut cursor = node.walk();
-
-    for child in node.children(&mut cursor) {
-        if let Some(field_name) = field {
-            // Only process children with the specified field
-            if let Some(target) = node.child_by_field_name(field_name) {
-                traverse_for_cognitive(&target, source, complexity, nesting);
-                return;
-            }
+    // If a specific field is requested, only process that field
+    if let Some(field_name) = field {
+        if let Some(target) = node.child_by_field_name(field_name) {
+            traverse_for_cognitive(&target, source, complexity, nesting);
         }
+        // If field doesn't exist (e.g., no else branch), do nothing
+        return;
+    }
+
+    // No field specified, process all children
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
         traverse_for_cognitive(&child, source, complexity, nesting);
     }
 }
