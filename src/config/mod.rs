@@ -1,3 +1,30 @@
+//! Configuration system for debtmap analysis.
+//!
+//! This module provides a comprehensive configuration system supporting multiple
+//! sources (files, environment variables, CLI arguments) with validation and
+//! preset configurations for common use cases.
+//!
+//! # Configuration Sources
+//!
+//! Configuration can come from multiple sources with the following precedence
+//! (highest to lowest):
+//! 1. CLI arguments
+//! 2. Environment variables
+//! 3. Project-level config file (`.debtmap.toml`)
+//! 4. Built-in presets
+//!
+//! # Key Components
+//!
+//! - **Thresholds**: Complexity and size limits that trigger debt detection
+//! - **Scoring**: Weights for different debt types and normalization settings
+//! - **Detection**: Rules for identifying patterns like accessors and constructors
+//! - **Presets**: Pre-configured settings for strict, balanced, or lenient analysis
+//!
+//! # Validation
+//!
+//! All configuration is validated before use, ensuring values are within
+//! acceptable ranges and mutually consistent.
+
 // Sub-modules
 mod classification;
 mod detection;

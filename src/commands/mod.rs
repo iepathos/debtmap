@@ -1,3 +1,21 @@
+//! CLI command implementations for debtmap operations.
+//!
+//! This module contains the implementation of all CLI commands exposed by debtmap.
+//! Each submodule handles a specific command with its configuration, validation,
+//! and execution logic.
+//!
+//! Available commands:
+//! - **analyze**: Run technical debt analysis on a codebase
+//! - **compare**: Compare two debtmap analysis results
+//! - **diagnose-coverage**: Debug coverage calculation for specific files
+//! - **explain-coverage**: Explain how coverage scores are calculated
+//! - **init**: Initialize a new debtmap configuration file
+//! - **validate**: Validate codebase against configured thresholds
+//! - **validate-improvement**: Verify that changes improved debt metrics
+//!
+//! Commands follow a type-state pattern for configuration validation,
+//! ensuring that only validated configurations can be executed.
+
 pub mod analyze;
 pub mod compare_debtmap;
 pub mod diagnose_coverage;

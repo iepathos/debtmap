@@ -1,3 +1,22 @@
+//! Complexity calculation algorithms and metrics.
+//!
+//! This module provides various complexity metrics for analyzing code quality,
+//! including cyclomatic complexity, cognitive complexity, and entropy-based measures.
+//! Calculations are implemented as pure functions for testability.
+//!
+//! # Complexity Types
+//!
+//! - **Cyclomatic**: Measures independent paths through code
+//! - **Cognitive**: Measures mental effort required to understand code
+//! - **Entropy**: Measures information density and unpredictability
+//! - **Weighted**: Combines metrics with configurable weights
+//!
+//! # Architecture
+//!
+//! Pure calculation functions are in the [`pure`] module, while I/O wrappers
+//! are in [`effects_wrappers`]. This separation enables fast unit testing
+//! of the core algorithms.
+
 pub mod cognitive;
 pub mod cyclomatic;
 pub mod effects_wrappers;
