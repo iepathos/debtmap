@@ -207,6 +207,7 @@ fn validate_single_source_parseable(file: &FileContent) -> AnalysisValidation<Fi
     match file.language {
         Language::Rust => validate_rust_parseable(file),
         Language::Python => validate_python_parseable(file),
+        Language::JavaScript | Language::TypeScript => validate_js_ts_parseable(file),
         Language::Unknown => {
             // Unknown languages pass through - we can't validate them
             validation_success(file.clone())
@@ -260,6 +261,21 @@ fn validate_python_parseable(file: &FileContent) -> AnalysisValidation<FileConte
     // For now, Python files pass through without deep validation
     // A full Python parser would be needed for proper validation
     validation_success(file.clone())
+}
+
+/// Validate JavaScript/TypeScript source is parseable.
+fn validate_js_ts_parseable(file: &FileContent) -> AnalysisValidation<FileContent> {
+    use crate::analyzers::typescript::parser::{detect_variant, parse_source};
+
+    let variant = detect_variant(&file.path);
+    match parse_source(&file.content, &file.path, variant) {
+        Ok(_) => validation_success(file.clone()),
+        Err(e) => validation_failure(AnalysisError::parse_with_context(
+            format!("JavaScript/TypeScript parse error: {}", e),
+            &file.path,
+            0,
+        )),
+    }
 }
 
 /// Validate sources parseable with backwards-compatible Result API.

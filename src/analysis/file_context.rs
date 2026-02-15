@@ -175,6 +175,22 @@ impl FileContextDetector {
                     0.0
                 }
             }
+            Language::JavaScript | Language::TypeScript => {
+                // Common JS/TS test file patterns
+                if filename.ends_with(".test.js")
+                    || filename.ends_with(".test.ts")
+                    || filename.ends_with(".spec.js")
+                    || filename.ends_with(".spec.ts")
+                    || filename.ends_with(".test.jsx")
+                    || filename.ends_with(".test.tsx")
+                {
+                    0.9
+                } else if filename.starts_with("test_") || filename.starts_with("test.") {
+                    0.8
+                } else {
+                    0.0
+                }
+            }
             Language::Unknown => 0.0,
         }
     }

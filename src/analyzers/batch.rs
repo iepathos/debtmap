@@ -304,6 +304,18 @@ fn validate_syntax(content: &str, language: Language, path: &Path) -> Result<(),
                 Ok(())
             }
         }
+        Language::JavaScript | Language::TypeScript => {
+            // Use tree-sitter for JS/TS syntax validation
+            use crate::analyzers::typescript::parser::{detect_variant, parse_source};
+            let variant = detect_variant(path);
+            parse_source(content, path, variant).map_err(|e| {
+                AnalysisError::parse_with_path(
+                    format!("JavaScript/TypeScript syntax error: {}", e),
+                    path,
+                )
+            })?;
+            Ok(())
+        }
         Language::Unknown => Err(AnalysisError::validation_with_path(
             "Cannot validate unknown language",
             path,

@@ -51,6 +51,7 @@ pub mod trait_resolver;
 pub mod traits;
 pub mod type_registry;
 pub mod type_tracker;
+pub mod typescript;
 pub mod validation_pattern_detector;
 
 pub use enhanced_analyzer::{AnalysisResult, EnhancedAnalyzer};
@@ -107,14 +108,30 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
 
     type AnalyzerFactory = fn() -> Box<dyn Analyzer>;
 
-    static ANALYZER_MAP: &[(Language, AnalyzerFactory)] = &[(Language::Rust, || {
-        let mut analyzer = rust::RustAnalyzer::new();
-        // Check environment variable for functional analysis (spec 111)
-        if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
-            analyzer = analyzer.with_functional_analysis(true);
-        }
-        Box::new(analyzer)
-    })];
+    static ANALYZER_MAP: &[(Language, AnalyzerFactory)] = &[
+        (Language::Rust, || {
+            let mut analyzer = rust::RustAnalyzer::new();
+            // Check environment variable for functional analysis (spec 111)
+            if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
+                analyzer = analyzer.with_functional_analysis(true);
+            }
+            Box::new(analyzer)
+        }),
+        (Language::JavaScript, || {
+            let mut analyzer = typescript::TypeScriptAnalyzer::javascript();
+            if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
+                analyzer = analyzer.with_functional_analysis(true);
+            }
+            Box::new(analyzer)
+        }),
+        (Language::TypeScript, || {
+            let mut analyzer = typescript::TypeScriptAnalyzer::new();
+            if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
+                analyzer = analyzer.with_functional_analysis(true);
+            }
+            Box::new(analyzer)
+        }),
+    ];
 
     ANALYZER_MAP
         .iter()

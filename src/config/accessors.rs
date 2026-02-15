@@ -113,6 +113,15 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
         Language::Python => languages_config
             .and_then(|lc| lc.python.clone())
             .unwrap_or_default(),
+        Language::JavaScript | Language::TypeScript => {
+            // JS/TS uses same defaults as Python for now
+            // TODO: Add specific JS/TS config in LanguagesConfig
+            LanguageFeatures {
+                detect_dead_code: false,
+                detect_complexity: true,
+                detect_duplication: true,
+            }
+        }
         Language::Unknown => LanguageFeatures::default(),
     }
 }

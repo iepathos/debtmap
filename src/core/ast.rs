@@ -35,7 +35,63 @@ use std::path::PathBuf;
 pub enum Ast {
     Rust(RustAst),
     Python(PythonAst),
+    TypeScript(TypeScriptAst),
     Unknown,
+}
+
+/// JavaScript/TypeScript language variant
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
+pub enum JsLanguageVariant {
+    JavaScript,
+    TypeScript,
+    Jsx,
+    Tsx,
+}
+
+impl JsLanguageVariant {
+    /// Determine variant from file extension
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        match ext {
+            "js" | "mjs" | "cjs" => Some(JsLanguageVariant::JavaScript),
+            "jsx" => Some(JsLanguageVariant::Jsx),
+            "ts" | "mts" | "cts" => Some(JsLanguageVariant::TypeScript),
+            "tsx" => Some(JsLanguageVariant::Tsx),
+            _ => None,
+        }
+    }
+
+    /// Check if this variant uses JSX syntax
+    pub fn has_jsx(&self) -> bool {
+        matches!(self, JsLanguageVariant::Jsx | JsLanguageVariant::Tsx)
+    }
+
+    /// Check if this variant uses TypeScript types
+    pub fn has_types(&self) -> bool {
+        matches!(self, JsLanguageVariant::TypeScript | JsLanguageVariant::Tsx)
+    }
+}
+
+/// TypeScript/JavaScript AST wrapper
+#[derive(Clone)]
+pub struct TypeScriptAst {
+    /// The tree-sitter parse tree
+    pub tree: tree_sitter::Tree,
+    /// Path to the source file
+    pub path: PathBuf,
+    /// Original source code
+    pub source: String,
+    /// JavaScript/TypeScript variant
+    pub language_variant: JsLanguageVariant,
+}
+
+impl std::fmt::Debug for TypeScriptAst {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TypeScriptAst")
+            .field("path", &self.path)
+            .field("language_variant", &self.language_variant)
+            .field("source_len", &self.source.len())
+            .finish()
+    }
 }
 
 // Pattern recognition data structures
@@ -188,6 +244,7 @@ impl Ast {
         match self {
             Ast::Rust(_) => self.extract_rust_nodes(),
             Ast::Python(_) => self.extract_python_nodes(),
+            Ast::TypeScript(_) => self.extract_typescript_nodes(),
             Ast::Unknown => vec![],
         }
     }
@@ -197,6 +254,11 @@ impl Ast {
     }
 
     fn extract_python_nodes(&self) -> Vec<AstNode> {
+        vec![]
+    }
+
+    fn extract_typescript_nodes(&self) -> Vec<AstNode> {
+        // Will be populated with tree-sitter traversal in phase 2
         vec![]
     }
 

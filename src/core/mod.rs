@@ -431,13 +431,18 @@ pub enum DependencyKind {
 pub enum Language {
     Rust,
     Python,
+    JavaScript,
+    TypeScript,
     Unknown,
 }
 
 impl Language {
     pub fn from_extension(ext: &str) -> Self {
-        // After spec 191, only Rust is supported
-        static EXTENSION_MAP: &[(&[&str], Language)] = &[(&["rs"], Language::Rust)];
+        static EXTENSION_MAP: &[(&[&str], Language)] = &[
+            (&["rs"], Language::Rust),
+            (&["js", "mjs", "cjs", "jsx"], Language::JavaScript),
+            (&["ts", "mts", "cts", "tsx"], Language::TypeScript),
+        ];
 
         EXTENSION_MAP
             .iter()
@@ -452,6 +457,11 @@ impl Language {
             .map(Self::from_extension)
             .unwrap_or(Language::Unknown)
     }
+
+    /// Check if this language is JavaScript or TypeScript
+    pub fn is_js_ts(&self) -> bool {
+        matches!(self, Language::JavaScript | Language::TypeScript)
+    }
 }
 
 impl std::fmt::Display for Language {
@@ -459,6 +469,8 @@ impl std::fmt::Display for Language {
         static DISPLAY_STRINGS: &[(Language, &str)] = &[
             (Language::Rust, "Rust"),
             (Language::Python, "Python"),
+            (Language::JavaScript, "JavaScript"),
+            (Language::TypeScript, "TypeScript"),
             (Language::Unknown, "Unknown"),
         ];
 
