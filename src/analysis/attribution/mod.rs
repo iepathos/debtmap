@@ -44,6 +44,10 @@ pub struct AttributionEngine {
 }
 
 impl AttributionEngine {
+    /// Creates a new attribution engine with default source trackers.
+    ///
+    /// Initializes the engine with trackers for logical structure complexity
+    /// and formatting artifacts, plus a pattern tracker for recognized patterns.
     pub fn new() -> Self {
         Self {
             source_trackers: vec![
@@ -54,6 +58,11 @@ impl AttributionEngine {
         }
     }
 
+    /// Attributes complexity between logical structure, formatting, and patterns.
+    ///
+    /// Compares raw and normalized complexity results to identify how much
+    /// complexity comes from true logical structure versus formatting artifacts
+    /// or recognized patterns. Returns a complete attribution analysis.
     pub fn attribute(
         &self,
         raw_result: &super::multi_pass::ComplexityResult,
@@ -274,20 +283,34 @@ impl Default for AttributionEngine {
     }
 }
 
-/// Complete complexity attribution analysis
+/// Complete complexity attribution analysis.
+///
+/// Breaks down total complexity into distinct categories: logical structure,
+/// formatting artifacts, and recognized patterns. Includes source mappings
+/// for precise code location tracking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplexityAttribution {
+    /// Complexity from true logical control flow and structure.
     pub logical_complexity: AttributedComplexity,
+    /// Complexity from formatting choices that inflate raw metrics.
     pub formatting_artifacts: AttributedComplexity,
+    /// Complexity from recognized patterns with adjusted scores.
     pub pattern_complexity: AttributedComplexity,
+    /// Mappings from complexity points back to source code locations.
     pub source_mappings: Vec<SourceMapping>,
 }
 
-/// Attributed complexity with breakdown
+/// Attributed complexity with breakdown.
+///
+/// Represents a category of complexity (logical, formatting, or pattern-based)
+/// with detailed breakdown of individual components and confidence level.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributedComplexity {
+    /// Total complexity score for this category.
     pub total: u32,
+    /// Individual components contributing to the total.
     pub breakdown: Vec<ComplexityComponent>,
+    /// Confidence level in the attribution (0.0 to 1.0).
     pub confidence: f32,
 }
 

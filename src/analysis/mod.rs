@@ -41,6 +41,10 @@ pub mod effects;
 pub mod file_context;
 pub mod framework_patterns;
 pub mod framework_patterns_multi;
+/// Function body visitor for statement analysis.
+///
+/// Provides utilities for traversing and classifying statements within
+/// function bodies, useful for complexity analysis and pattern detection.
 pub mod function_visitor;
 pub mod functional_composition;
 pub mod graph_metrics;
