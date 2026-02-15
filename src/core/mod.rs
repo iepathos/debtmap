@@ -1,3 +1,17 @@
+//! Core data types and domain models for debtmap analysis.
+//!
+//! This module contains the fundamental types used throughout debtmap, including
+//! analysis results, complexity reports, function metrics, and technical debt items.
+//! Types here are designed to be serializable for persistence and interoperability.
+//!
+//! # Key Components
+//!
+//! - **Analysis results**: Top-level structures aggregating all analysis data
+//! - **Complexity metrics**: Cyclomatic, cognitive, and weighted complexity measures
+//! - **Debt items**: Individual technical debt findings with severity and location
+//! - **AST utilities**: Abstract syntax tree helpers for code parsing
+//! - **Monadic patterns**: Functional error handling and composition utilities
+
 pub mod ast;
 pub mod errors;
 pub mod injection;

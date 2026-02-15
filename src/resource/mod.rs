@@ -1,4 +1,18 @@
-/// Resource management pattern detection framework
+//! Resource management pattern detection framework.
+//!
+//! This module detects resource management issues that can lead to leaks,
+//! performance problems, or correctness bugs. It identifies missing Drop
+//! implementations, unbounded collections, async resource issues, and
+//! RAII pattern violations.
+//!
+//! # Issue Types
+//!
+//! - **Missing Drop**: Types holding resources without cleanup
+//! - **Resource leaks**: Resources acquired but not released
+//! - **Async resource issues**: Cancellation-unsafe resource handling
+//! - **Unbounded collections**: Collections that can grow without limit
+//! - **RAII violations**: Manual resource management instead of RAII
+
 use crate::core::{DebtItem, DebtType, Priority};
 use std::path::Path;
 

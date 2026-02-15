@@ -1,3 +1,17 @@
+//! Input/output operations and file system abstractions.
+//!
+//! This module provides I/O utilities including file operations, output destinations,
+//! and progress reporting. It follows the functional programming principle of keeping
+//! I/O at system boundaries with pure computation in core modules.
+//!
+//! # Key Components
+//!
+//! - **File operations**: Read, write, and check file/directory existence
+//! - **Output destinations**: Abstracted output targets (stdout, files, memory)
+//! - **Coverage loaders**: Load test coverage data from LCOV files
+//! - **Progress reporting**: Track analysis progress for user feedback
+//! - **Directory walking**: Iterate over files in a directory tree
+
 pub mod destinations;
 pub mod effects;
 pub mod output;

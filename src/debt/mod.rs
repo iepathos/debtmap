@@ -1,3 +1,23 @@
+//! Technical debt detection patterns and categorization.
+//!
+//! This module contains detectors for various types of technical debt, including
+//! code smells, architectural anti-patterns, and error handling issues. Each detector
+//! analyzes source code to identify specific debt patterns and returns categorized findings.
+//!
+//! # Debt Categories
+//!
+//! - **Circular dependencies**: Detect cyclic module dependencies
+//! - **Code duplication**: Find repeated code blocks
+//! - **Error handling**: Identify swallowed errors, poor propagation, and panic patterns
+//! - **Coupling**: Measure excessive dependencies between modules
+//! - **Code smells**: General anti-patterns and maintainability issues
+//!
+//! # Utilities
+//!
+//! - **Suppression**: Honor `debtmap:ignore` annotations to suppress false positives
+//! - **Predicates**: Reusable filtering logic for debt items
+//! - **Rules**: Configurable detection thresholds
+
 pub mod async_errors;
 pub mod circular;
 pub mod coupling;

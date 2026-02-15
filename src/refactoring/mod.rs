@@ -1,3 +1,23 @@
+//! Refactoring analysis and pattern recognition.
+//!
+//! This module provides context-aware refactoring guidance by analyzing function
+//! roles, detecting code patterns, and suggesting appropriate transformations.
+//! It classifies functions by their purpose (pure logic, I/O orchestration,
+//! formatting) to provide role-appropriate recommendations.
+//!
+//! # Function Roles
+//!
+//! - **Pure Logic**: Functions that compute without side effects
+//! - **I/O Orchestrator**: Functions that coordinate external operations
+//! - **Formatting**: Functions that transform data for display
+//! - **Trait Implementation**: Methods implementing trait contracts
+//!
+//! # Refactoring Opportunities
+//!
+//! - **Extract pure functions**: Isolate pure computations from side effects
+//! - **Convert to functional style**: Replace imperative patterns with functional ones
+//! - **Extract side effects**: Separate I/O from business logic
+
 use crate::core::{FileMetrics, FunctionMetrics};
 use std::sync::Arc;
 

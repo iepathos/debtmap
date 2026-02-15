@@ -1,3 +1,24 @@
+//! Code organization analysis and anti-pattern detection.
+//!
+//! This module provides comprehensive analysis of code organization quality, including
+//! detection of god objects, feature envy, magic values, and other architectural
+//! anti-patterns. It also provides guidance for decomposing large modules into
+//! well-defined responsibilities.
+//!
+//! # Anti-Patterns Detected
+//!
+//! - **God objects**: Types with too many responsibilities
+//! - **Feature envy**: Methods that use another type's data more than their own
+//! - **Magic values**: Hard-coded literals that should be named constants
+//! - **Long parameter lists**: Functions with too many parameters
+//! - **Primitive obsession**: Overuse of primitives instead of domain types
+//! - **Data clumps**: Groups of parameters that always appear together
+//!
+//! # Refactoring Guidance
+//!
+//! The module provides split recommendations, naming suggestions, and complexity
+//! impact predictions to guide refactoring decisions.
+
 use crate::common::SourceLocation;
 use syn;
 

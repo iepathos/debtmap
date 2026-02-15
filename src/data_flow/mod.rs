@@ -1,3 +1,15 @@
+//! Data flow analysis infrastructure for tracking variable mutations and state transitions.
+//!
+//! This module provides the data structures and utilities for analyzing how data flows
+//! through functions, including variable bindings, mutations, and cross-function data
+//! dependencies. The analysis is used to detect impure functions and state mutation patterns.
+//!
+//! # Key Components
+//!
+//! - **DataFlowGraph**: Tracks variable definitions, uses, and mutations
+//! - **Population utilities**: Functions for building graphs from call graph analysis
+//! - **Serialization**: Custom serialization for FunctionId-keyed maps
+
 use crate::analysis::data_flow::DataFlowAnalysis;
 use crate::priority::{call_graph::CallGraph, call_graph::FunctionId};
 use serde::{Deserialize, Serialize};
