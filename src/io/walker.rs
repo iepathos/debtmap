@@ -13,7 +13,12 @@ impl FileWalker {
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
-            languages: vec![Language::Rust, Language::Python],
+            languages: vec![
+                Language::Rust,
+                Language::Python,
+                Language::JavaScript,
+                Language::TypeScript,
+            ],
             ignore_patterns: vec![],
         }
     }
