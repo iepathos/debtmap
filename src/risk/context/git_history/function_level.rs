@@ -210,13 +210,13 @@ fn get_function_history_subprocess(
     let intro_commit = parse_introduction_commit(&intro_output);
 
     // If no introduction found, function doesn't exist in git history
+    // Return an error to trigger fallback to file-level analysis
     let Some(ref intro) = intro_commit else {
-        log::debug!(
+        return Err(anyhow::anyhow!(
             "Function '{}' not found in git history for {}",
             function_name,
             file_path.display()
-        );
-        return Ok(FunctionHistory::default());
+        ));
     };
 
     // I/O: Get introduction date

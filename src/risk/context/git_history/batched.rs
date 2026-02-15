@@ -265,6 +265,18 @@ impl BatchedGitHistory {
         self.file_histories.get(path)
     }
 
+    /// Get all file paths stored in the history (for debugging/testing)
+    #[cfg(test)]
+    pub fn all_paths(&self) -> Vec<&PathBuf> {
+        self.file_histories.keys().collect()
+    }
+
+    /// Check if a path exists in the history (for debugging/testing)
+    #[cfg(test)]
+    pub fn has_path(&self, path: &Path) -> bool {
+        self.file_histories.contains_key(path)
+    }
+
     /// Calculate metrics for a file
     #[allow(clippy::type_complexity)]
     pub fn calculate_metrics(

@@ -248,6 +248,30 @@ impl GitHistoryProvider {
     pub fn analyze_file(&mut self, path: &Path) -> Result<FileHistory> {
         self.get_or_fetch_history(path)
     }
+
+    /// Get all paths stored in batched history (for debugging/testing)
+    #[cfg(test)]
+    pub fn batched_paths(&self) -> Vec<std::path::PathBuf> {
+        self.batched_history
+            .as_ref()
+            .map(|b| b.all_paths().into_iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Check if a path exists in batched history (for debugging/testing)
+    #[cfg(test)]
+    pub fn batched_has_path(&self, path: &Path) -> bool {
+        self.batched_history
+            .as_ref()
+            .map(|b| b.has_path(path))
+            .unwrap_or(false)
+    }
+
+    /// Get the repo root path (for debugging/testing)
+    #[cfg(test)]
+    pub fn repo_root(&self) -> &Path {
+        &self.repo_root
+    }
 }
 
 impl ContextProvider for GitHistoryProvider {
@@ -1447,6 +1471,287 @@ fn buggy_func() {
         assert!(
             history_no_prefix.total_commits > 0,
             "Should find commits without prefix"
+        );
+
+        Ok(())
+    }
+
+    /// Diagnostic test: Expose exactly what paths are stored vs looked up
+    /// This test intentionally prints debug info to help identify path mismatches
+    #[test]
+    fn test_batched_history_path_matching_diagnostic() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create src directory and test file
+        std::fs::create_dir_all(repo_path.join("src"))?;
+        let _file_path = create_test_file(&repo_path, "src/test.rs", "fn main() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        let provider = GitHistoryProvider::new(repo_path.clone())?;
+
+        // Debug: Print what paths are stored in batched history
+        let stored_paths = provider.batched_paths();
+        eprintln!("=== BATCHED HISTORY DEBUG ===");
+        eprintln!("Repo root: {:?}", provider.repo_root());
+        eprintln!(
+            "Stored paths in batched history ({} total):",
+            stored_paths.len()
+        );
+        for path in &stored_paths {
+            eprintln!("  - {:?}", path);
+        }
+
+        // Check if the path we expect exists
+        let expected_path = Path::new("src/test.rs");
+        let has_path = provider.batched_has_path(expected_path);
+        eprintln!("Has 'src/test.rs': {}", has_path);
+
+        // The batched history should have the file
+        assert!(
+            !stored_paths.is_empty(),
+            "Batched history should not be empty after commit"
+        );
+
+        // This is the critical assertion - the path format should match
+        assert!(
+            has_path,
+            "Batched history should contain 'src/test.rs'. Stored paths: {:?}",
+            stored_paths
+        );
+
+        Ok(())
+    }
+
+    /// Test against the actual debtmap codebase to see if git history works
+    /// This is the real scenario that's failing
+    #[test]
+    fn test_git_history_on_real_repo() -> Result<()> {
+        // Use the actual debtmap repo (the repo we're in)
+        let cwd = std::env::current_dir()?;
+        eprintln!("=== REAL REPO TEST ===");
+        eprintln!("Current working directory: {:?}", cwd);
+
+        let provider = GitHistoryProvider::new(cwd.clone())?;
+        eprintln!("Provider repo root: {:?}", provider.repo_root());
+
+        // List some paths in batched history
+        let stored_paths = provider.batched_paths();
+        eprintln!("Total paths in batched history: {}", stored_paths.len());
+        eprintln!("First 10 paths:");
+        for (i, path) in stored_paths.iter().take(10).enumerate() {
+            eprintln!("  {}: {:?}", i, path);
+        }
+
+        // Try to find a known file
+        let test_path = Path::new("src/lib.rs");
+        let has_lib = provider.batched_has_path(test_path);
+        eprintln!("Has 'src/lib.rs' in batched: {}", has_lib);
+
+        // The repo should have history for src/lib.rs
+        assert!(
+            stored_paths.len() > 0,
+            "Batched history should not be empty for a real repo with commits"
+        );
+
+        // Now try to get actual history
+        let mut provider = provider;
+        let history = provider.analyze_file(test_path)?;
+        eprintln!(
+            "History for src/lib.rs: commits={}, authors={}, age_days={}",
+            history.total_commits, history.author_count, history.age_days
+        );
+
+        assert!(
+            history.total_commits > 0,
+            "src/lib.rs should have commits in a real repo. Got: {}",
+            history.total_commits
+        );
+
+        Ok(())
+    }
+
+    /// Test that simulates analysis flow with file paths from different origins
+    /// This tests the exact scenario where paths come from analysis results
+    #[test]
+    fn test_git_history_with_analysis_style_paths() -> Result<()> {
+        let cwd = std::env::current_dir()?;
+        eprintln!("=== ANALYSIS STYLE PATHS TEST ===");
+        eprintln!("CWD: {:?}", cwd);
+
+        // This simulates creating GitHistoryProvider with "." path
+        // (like when running `debtmap analyze .`)
+        let dot_path = PathBuf::from(".");
+
+        // First, check that the provider creation succeeds (this mirrors create_git_history_provider)
+        let provider_result = GitHistoryProvider::new(dot_path.clone());
+        eprintln!("Provider creation result: {:?}", provider_result.is_ok());
+        if let Err(ref e) = provider_result {
+            eprintln!("Error creating provider with '.': {}", e);
+        }
+        let provider_from_dot = provider_result?;
+        eprintln!(
+            "Provider repo root (from '.'): {:?}",
+            provider_from_dot.repo_root()
+        );
+
+        // Test paths that might come from analysis results:
+        // 1. Relative from CWD (like metrics might have)
+        let rel_path = PathBuf::from("src/lib.rs");
+
+        // 2. Absolute path (like metrics might have if canonicalized)
+        let abs_path = cwd.join("src/lib.rs");
+
+        // 3. With ./ prefix
+        let dot_slash_path = PathBuf::from("./src/lib.rs");
+
+        eprintln!("Testing paths:");
+        eprintln!("  rel_path: {:?}", rel_path);
+        eprintln!("  abs_path: {:?}", abs_path);
+        eprintln!("  dot_slash_path: {:?}", dot_slash_path);
+
+        let mut provider = provider_from_dot;
+
+        // All three should work
+        let history_rel = provider.analyze_file(&rel_path)?;
+        eprintln!(
+            "Relative path result: commits={}",
+            history_rel.total_commits
+        );
+        assert!(
+            history_rel.total_commits > 0,
+            "Relative path 'src/lib.rs' should find commits. Got: {}",
+            history_rel.total_commits
+        );
+
+        let history_abs = provider.analyze_file(&abs_path)?;
+        eprintln!(
+            "Absolute path result: commits={}",
+            history_abs.total_commits
+        );
+        assert!(
+            history_abs.total_commits > 0,
+            "Absolute path should find commits. Got: {}",
+            history_abs.total_commits
+        );
+
+        let history_dot = provider.analyze_file(&dot_slash_path)?;
+        eprintln!(
+            "Dot-slash path result: commits={}",
+            history_dot.total_commits
+        );
+        assert!(
+            history_dot.total_commits > 0,
+            "./src/lib.rs should find commits. Got: {}",
+            history_dot.total_commits
+        );
+
+        Ok(())
+    }
+
+    /// Test using the full ContextAggregator flow with git history.
+    /// This simulates the actual analysis pipeline and verifies that when
+    /// function-level git history fails (function not found), it falls back
+    /// to file-level history which should have commit data.
+    #[test]
+    fn test_git_history_via_context_aggregator() -> Result<()> {
+        use super::super::{AnalysisTarget, ContextAggregator, ContextDetails};
+
+        let dot_path = PathBuf::from(".");
+        let git_provider = GitHistoryProvider::new(dot_path.clone())?;
+
+        let aggregator = ContextAggregator::new().with_provider(Box::new(git_provider));
+
+        // Use a function name that doesn't exist - this tests the fallback
+        // from function-level to file-level analysis
+        let target = AnalysisTarget {
+            root_path: dot_path.clone(),
+            file_path: PathBuf::from("src/lib.rs"),
+            function_name: "nonexistent_function".to_string(),
+            line_range: (1, 100),
+        };
+
+        let context_map = aggregator.analyze(&target);
+
+        // Verify git history is included with non-zero values
+        let git_context = context_map
+            .contexts
+            .get("git_history")
+            .expect("git_history context should be present");
+
+        if let ContextDetails::Historical {
+            total_commits,
+            author_count,
+            age_days,
+            ..
+        } = &git_context.details
+        {
+            assert!(
+                *total_commits > 0,
+                "Git history should have commits (fallback to file-level). Got: {} commits",
+                total_commits
+            );
+            assert!(
+                *author_count > 0,
+                "Git history should have authors. Got: {} authors",
+                author_count
+            );
+            assert!(
+                *age_days > 0,
+                "Git history should have age. Got: {} days",
+                age_days
+            );
+        } else {
+            panic!("Expected Historical context details");
+        }
+
+        Ok(())
+    }
+
+    /// Test that verifies git history works when called from project subdirectory
+    /// This simulates `cd project && debtmap analyze .`
+    #[test]
+    fn test_git_history_from_subdirectory() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create nested structure
+        std::fs::create_dir_all(repo_path.join("src/utils"))?;
+        let _file_path = create_test_file(&repo_path, "src/utils/helper.rs", "fn help() {}")?;
+        commit_with_message(&repo_path, "Add helper")?;
+
+        // Add more commits
+        modify_and_commit(
+            &repo_path,
+            "src/utils/helper.rs",
+            "fn help() { /* v2 */ }",
+            "fix: improve helper",
+        )?;
+
+        let mut provider = GitHistoryProvider::new(repo_path.clone())?;
+
+        // Test various path formats that might be used in real scenarios:
+        // 1. Relative from repo root
+        let history1 = provider.analyze_file(Path::new("src/utils/helper.rs"))?;
+        assert!(
+            history1.total_commits >= 2,
+            "Should find 2+ commits for relative path. Got: {}",
+            history1.total_commits
+        );
+
+        // 2. With ./ prefix (common when running from working directory)
+        let history2 = provider.analyze_file(Path::new("./src/utils/helper.rs"))?;
+        assert!(
+            history2.total_commits >= 2,
+            "Should find 2+ commits for ./ prefixed path. Got: {}",
+            history2.total_commits
+        );
+
+        // 3. Absolute path
+        let abs_path = repo_path.join("src/utils/helper.rs");
+        let history3 = provider.analyze_file(&abs_path)?;
+        assert!(
+            history3.total_commits >= 2,
+            "Should find 2+ commits for absolute path. Got: {}",
+            history3.total_commits
         );
 
         Ok(())
