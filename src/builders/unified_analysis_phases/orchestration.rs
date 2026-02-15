@@ -12,11 +12,11 @@ use crate::analysis::call_graph::{
 use crate::analysis::purity_analysis::PurityAnalyzer;
 use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
 use crate::core::{AnalysisResults, FunctionMetrics, Language};
+use crate::data_flow::DataFlowGraph;
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use crate::organization::GodObjectAnalysis;
-use crate::priority::DebtType;
-use crate::data_flow::DataFlowGraph;
 use crate::priority::call_graph::{CallGraph, FunctionId};
+use crate::priority::DebtType;
 use crate::priority::{UnifiedAnalysis, UnifiedAnalysisUtils};
 use crate::risk::lcov::LcovData;
 use crate::risk::RiskAnalyzer;
@@ -396,7 +396,8 @@ fn process_file_analysis(
         if god_object_suppressed {
             file_metrics.god_object_analysis = None;
         }
-        let file_item = file_analysis::create_file_debt_item(file_metrics, Some(&processed.file_context));
+        let file_item =
+            file_analysis::create_file_debt_item(file_metrics, Some(&processed.file_context));
         unified.add_file_item(file_item);
     }
 }
