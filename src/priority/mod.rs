@@ -1,3 +1,25 @@
+//! Technical debt prioritization and unified scoring.
+//!
+//! This module provides the core prioritization engine for debtmap, combining
+//! multiple signals (complexity, coverage, architecture) into a unified debt
+//! score. It handles call graph construction, impact calculation, and tiered
+//! classification of debt items.
+//!
+//! # Key Components
+//!
+//! - **UnifiedAnalysis**: Aggregated analysis results with scoring
+//! - **CallGraph**: Function call relationships for impact analysis
+//! - **Scoring**: Multi-factor scoring combining complexity, coverage, and context
+//! - **Tiers**: Classification into actionable priority levels
+//! - **Filtering**: Configurable filtering with statistics tracking
+//!
+//! # Debt Categories
+//!
+//! - **Architecture**: God objects, feature envy, scattered types
+//! - **Testing**: Coverage gaps, test quality issues
+//! - **Performance**: Async misuse, collection inefficiency
+//! - **Code Quality**: Complexity hotspots, duplication
+
 pub mod architecture_recognition;
 pub mod call_graph;
 pub mod caller_classification;

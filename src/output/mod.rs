@@ -1,3 +1,21 @@
+//! Output formatting and rendering for analysis results.
+//!
+//! This module provides multiple output formats for debtmap analysis results,
+//! including terminal display, JSON for machine consumption, and Markdown for
+//! documentation and LLM integration.
+//!
+//! # Output Formats
+//!
+//! - **Terminal**: Colorized output for interactive use
+//! - **JSON**: Structured data for tool integration
+//! - **Markdown**: Human-readable reports and LLM prompts
+//! - **DOT**: Graphviz format for call graph visualization
+//!
+//! # View Pipeline
+//!
+//! Output uses a unified view pipeline that prepares data once and formats it
+//! for the requested output format, ensuring consistency across formats.
+
 pub mod dot;
 pub mod evidence_formatter;
 pub mod formatters;

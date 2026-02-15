@@ -1,3 +1,20 @@
+//! Terminal output formatting and color management.
+//!
+//! This module provides configurable output formatting with support for colored
+//! terminal output. It respects standard environment variables like `NO_COLOR`,
+//! `CLICOLOR`, and `CLICOLOR_FORCE` for controlling color output.
+//!
+//! # Color Modes
+//!
+//! - **Auto**: Detect terminal capability and apply colors when appropriate
+//! - **Always**: Force colored output regardless of terminal
+//! - **Never**: Disable all color output
+//!
+//! # Formatters
+//!
+//! - [`ColoredFormatter`]: Applies ANSI colors based on configuration
+//! - [`PlainFormatter`]: Always returns plain text without formatting
+
 use crate::config::CallerCalleeConfig;
 use colored::*;
 use std::env;

@@ -1,3 +1,22 @@
+//! Pattern detection and extraction for code refactoring suggestions.
+//!
+//! This module identifies extractable patterns in complex functions, such as
+//! accumulation loops, guard chains, and transformation pipelines. It provides
+//! confidence-scored suggestions for breaking down large functions into smaller,
+//! more maintainable pieces.
+//!
+//! # Pattern Types
+//!
+//! - **Accumulation loops**: Loops that build up a result (fold/reduce patterns)
+//! - **Guard chains**: Sequences of early-return checks
+//! - **Transformation pipelines**: Multi-stage data transformations
+//! - **Similar branches**: Conditional branches with shared logic
+//!
+//! # Usage
+//!
+//! The [`ExtractionAnalyzer`] trait provides the main entry point for analyzing
+//! functions and generating extraction suggestions with predicted complexity impact.
+
 pub mod confidence;
 pub mod language_specific;
 pub mod naming;

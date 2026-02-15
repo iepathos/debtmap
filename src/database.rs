@@ -1,4 +1,9 @@
-/// Example database module to demonstrate test addition
+//! Example database module demonstrating test patterns.
+//!
+//! This module provides a simple database abstraction used for testing purposes.
+//! It demonstrates common patterns for configuration-based initialization and
+//! serves as a reference implementation for test coverage validation.
+
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

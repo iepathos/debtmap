@@ -1,3 +1,20 @@
+//! Test quality analysis and anti-pattern detection.
+//!
+//! This module analyzes test code to detect quality issues and anti-patterns
+//! that reduce test reliability and maintainability. It identifies tests
+//! without assertions, overly complex tests, and flaky test patterns.
+//!
+//! # Anti-Patterns Detected
+//!
+//! - **Tests without assertions**: Tests that don't verify anything
+//! - **Overly complex tests**: Tests with excessive mocking or setup
+//! - **Flaky patterns**: Timing dependencies, random values, external deps
+//!
+//! # Quality Assessment
+//!
+//! Each detected pattern is assessed for its impact on test suite reliability
+//! and prioritized for remediation.
+
 pub mod assertion_detector;
 pub mod complexity_detector;
 pub mod flaky_detector;

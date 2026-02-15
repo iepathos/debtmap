@@ -1,3 +1,22 @@
+//! Risk assessment and testing priority analysis.
+//!
+//! This module calculates risk scores for functions based on complexity,
+//! test coverage, and contextual factors. It provides prioritized testing
+//! recommendations with ROI estimates to guide test investment decisions.
+//!
+//! # Risk Factors
+//!
+//! - **Complexity**: Cyclomatic and cognitive complexity
+//! - **Coverage**: Test coverage percentage and gaps
+//! - **Context**: Critical paths, change frequency, dependencies
+//!
+//! # Key Components
+//!
+//! - **RiskAnalyzer**: Main entry point for risk calculation
+//! - **Coverage analysis**: LCOV parsing and coverage gap detection
+//! - **ROI calculation**: Estimate testing effort vs. risk reduction
+//! - **Context aggregation**: Combine multiple risk signals
+
 pub mod context;
 pub mod correlation;
 pub mod coverage_gap;
