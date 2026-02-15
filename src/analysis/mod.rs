@@ -21,7 +21,16 @@
 /// whether complexity comes from logical structure, formatting artifacts,
 /// or recognized patterns.
 pub mod attribution;
+/// Rust call graph analysis with trait dispatch and function pointer tracking.
+///
+/// Builds a call graph from Rust source code, handling static dispatch,
+/// dynamic dispatch through trait objects, and function pointer calls.
+/// Supports cross-module dependency tracking and dead code analysis.
 pub mod call_graph;
+/// Context detection for function and method analysis.
+///
+/// Identifies the execution context of functions, such as async, test,
+/// main entry point, or callback contexts, for more accurate analysis.
 pub mod context_detection;
 /// Data flow analysis for Rust code.
 ///
@@ -38,31 +47,96 @@ pub mod diagnostics;
 /// Provides effect wrappers enabling testable, composable analysis operations
 /// while maintaining compatibility with existing `anyhow::Result` based code.
 pub mod effects;
+/// File-level context detection for analysis.
+///
+/// Detects whether a file is a test file, benchmark, or production code
+/// based on path patterns, content analysis, and project structure.
 pub mod file_context;
+/// Framework pattern detection for Rust applications.
+///
+/// Recognizes common framework patterns like Actix-web handlers, Tokio async
+/// patterns, and other framework-specific constructs for context-aware analysis.
 pub mod framework_patterns;
+/// Multi-language framework pattern detection.
+///
+/// Extends framework detection to JavaScript, TypeScript, and Python frameworks
+/// like React, Express, Django, and FastAPI.
 pub mod framework_patterns_multi;
 /// Function body visitor for statement analysis.
 ///
 /// Provides utilities for traversing and classifying statements within
 /// function bodies, useful for complexity analysis and pattern detection.
 pub mod function_visitor;
+/// Functional composition analysis.
+///
+/// Detects iterator chains, method pipelines, and functional programming
+/// patterns. Analyzes purity and identifies terminal operations.
 pub mod functional_composition;
+/// Call graph metrics and pattern detection.
+///
+/// Computes graph-theoretic metrics like betweenness centrality and
+/// clustering coefficient. Detects architectural patterns for responsibility
+/// classification.
 pub mod graph_metrics;
+/// I/O and side effect detection.
+///
+/// Identifies I/O operations (file, network, database, environment access)
+/// and classifies function responsibility based on side effect profiles.
 pub mod io_detection;
+/// Module structure analysis.
+///
+/// Analyzes module organization, component coupling, and provides
+/// recommendations for splitting large or poorly-organized modules.
 pub mod module_structure;
 /// Multi-pass complexity analysis engine.
 ///
 /// Performs raw and normalized complexity analysis with attribution,
 /// generating comprehensive diagnostic reports with recommendations.
 pub mod multi_pass;
+/// Effect-based multi-pass analysis.
+///
+/// Wraps multi-pass analysis with effect handlers for testable,
+/// composable workflows that separate pure computation from I/O.
 pub mod multi_pass_effects;
+/// Multi-signal responsibility aggregation.
+///
+/// Combines signals from I/O detection, graph metrics, purity analysis,
+/// and type signatures for high-accuracy responsibility classification.
 pub mod multi_signal_aggregation;
+/// Design pattern recognition.
+///
+/// Detects common design patterns like Observer, Factory, and Callback
+/// patterns for context-aware complexity scoring.
 pub mod patterns;
+/// Purity analysis for function classification.
+///
+/// Classifies functions by their purity level (pure, impure, unknown)
+/// and identifies refactoring opportunities to extract pure cores.
 pub mod purity_analysis;
+/// Cross-function purity propagation.
+///
+/// Propagates purity information through the call graph, accounting
+/// for transitive dependencies and caching results.
 pub mod purity_propagation;
+/// Rust-specific pattern detection.
+///
+/// Recognizes Rust idioms and patterns like `impl` blocks, trait
+/// implementations, and async patterns for accurate classification.
 pub mod rust_patterns;
+/// Type flow tracking for analysis.
+///
+/// Tracks type information through expressions and statements,
+/// supporting generic type resolution and collection operation detection.
 pub mod type_flow_tracker;
+/// Type signature-based classification.
+///
+/// Analyzes function signatures to extract type patterns and infer
+/// responsibility categories from parameter and return types.
 pub mod type_signatures;
+/// Analysis workflow state machine.
+///
+/// Manages multi-phase analysis workflows with checkpoint/resume
+/// support for long-running analysis operations.
 pub mod workflow;
 
 pub use call_graph::{

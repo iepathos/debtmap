@@ -314,84 +314,148 @@ pub struct AttributedComplexity {
     pub confidence: f32,
 }
 
-/// Individual complexity component
+/// Individual complexity component with source attribution.
+///
+/// Represents a single contributor to complexity, tracking its source type,
+/// contribution amount, code location, and any improvement suggestions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplexityComponent {
+    /// The type of complexity source (logical structure, formatting, or pattern).
     pub source_type: ComplexitySourceType,
+    /// Numeric contribution to the total complexity score.
     pub contribution: u32,
+    /// Source code location where this complexity originates.
     pub location: CodeLocation,
+    /// Human-readable description of the complexity source.
     pub description: String,
+    /// Suggested improvements to reduce this complexity.
     pub suggestions: Vec<String>,
 }
 
-/// Source-to-complexity mapping
+/// Mapping from a complexity point back to source code.
+///
+/// Provides precise traceability from computed complexity metrics
+/// to their originating source code constructs via AST path.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceMapping {
+    /// The complexity point index being mapped.
     pub complexity_point: u32,
+    /// Source code location for this complexity point.
     pub location: CodeLocation,
+    /// Path through the AST to reach this construct (e.g., `["module", "function", "if"]`).
     pub ast_path: Vec<String>,
+    /// Human-readable context describing what this mapping represents.
     pub context: String,
 }
 
-/// Code location information
+/// Source code location information.
+///
+/// Identifies a specific position in a source file, optionally with a span
+/// for multi-line constructs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeLocation {
+    /// Path to the source file.
     pub file: String,
+    /// Line number (1-indexed).
     pub line: u32,
+    /// Column number (0-indexed).
     pub column: u32,
+    /// Optional span as (start_line, end_line) for multi-line constructs.
     pub span: Option<(u32, u32)>,
 }
 
-/// Logical construct types
+/// Types of logical constructs that contribute to complexity.
+///
+/// These are control flow and structural elements that represent
+/// genuine logical complexity in the code.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LogicalConstruct {
+    /// Function or method definition.
     Function,
+    /// Conditional branch (if/else).
     If,
+    /// Iteration construct (for, while, loop).
     Loop,
+    /// Pattern matching expression.
     Match,
+    /// Error handling block (try/catch in other languages, `?` in Rust).
     Try,
+    /// Closure or lambda expression.
     Closure,
 }
 
-/// Formatting artifact types
+/// Types of formatting artifacts that inflate raw complexity metrics.
+///
+/// These are stylistic choices that don't represent actual logical
+/// complexity but may affect raw line-based metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FormattingArtifact {
+    /// Expression split across multiple lines.
     MultilineExpression,
+    /// Unnecessary blank lines or spacing.
     ExcessiveWhitespace,
+    /// Mixed or inconsistent indentation style.
     InconsistentIndentation,
+    /// Redundant parentheses around expressions.
     UnnecessaryParentheses,
+    /// Unusual line break placement.
     LineBreakPattern,
 }
 
-/// Severity of formatting artifacts
+/// Severity level of formatting artifacts.
+///
+/// Indicates how much the artifact inflates complexity metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ArtifactSeverity {
+    /// Minor impact on metrics (1-2 points).
     Low,
+    /// Moderate impact on metrics (3-5 points).
     Medium,
+    /// Significant impact on metrics (6+ points).
     High,
 }
 
-/// Recognized pattern types
+/// Recognized code patterns that have adjusted complexity scoring.
+///
+/// When these patterns are detected, complexity scores may be adjusted
+/// since the pattern is well-understood and familiar to developers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum RecognizedPattern {
+    /// Result/Option handling chains.
     ErrorHandling,
+    /// Input validation and sanitization.
     Validation,
+    /// Data mapping and transformation pipelines.
     DataTransformation,
+    /// Mutable state management.
     StateManagement,
+    /// Iterator and collection operations.
     Iterator,
+    /// Builder pattern for object construction.
     Builder,
+    /// Factory pattern for object creation.
     Factory,
+    /// Observer/listener pattern for event handling.
     Observer,
 }
 
-/// Language-specific features
+/// Language-specific features that affect complexity analysis.
+///
+/// These features require special handling during analysis since
+/// they have different complexity characteristics per language.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LanguageFeature {
+    /// Async/await syntax for asynchronous code.
     AsyncAwait,
+    /// Pattern matching (Rust `match`, Python `match`).
     PatternMatching,
+    /// Generic type parameters and constraints.
     Generics,
+    /// Macro invocations (Rust macros, C preprocessor).
     Macros,
+    /// Decorators/attributes (Python decorators, Rust attributes).
     Decorators,
+    /// List/dict comprehensions (Python).
     Comprehensions,
 }
 
