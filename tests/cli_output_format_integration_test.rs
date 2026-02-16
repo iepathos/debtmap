@@ -22,7 +22,8 @@ fn test_cli_output_format_unified_produces_valid_structure() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run debtmap analyze with --format json (always uses unified format now)
-    let output = Command::cargo_bin("debtmap").unwrap()
+    let output = Command::cargo_bin("debtmap")
+        .unwrap()
         .args([
             "analyze",
             "--format",
@@ -158,7 +159,8 @@ fn test_cli_unified_format_scope_filtering() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run analysis (JSON output always uses unified format)
-    let output = Command::cargo_bin("debtmap").unwrap()
+    let output = Command::cargo_bin("debtmap")
+        .unwrap()
         .args([
             "analyze",
             "--format",
@@ -208,7 +210,8 @@ fn test_cli_unified_format_metrics_presence() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run analysis (JSON output always uses unified format)
-    let output = Command::cargo_bin("debtmap").unwrap()
+    let output = Command::cargo_bin("debtmap")
+        .unwrap()
         .args([
             "analyze",
             "--format",
