@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-02-16
+
+### Added
+
+- **TypeScript/JavaScript Entropy Analysis** - Entropy-based complexity dampening for JS/TS
+  - Token extraction mapping tree-sitter nodes to weighted categories
+  - Pattern detection for validation guards, method chains, switch cases, try-catch
+  - Branch similarity analysis for if-else chains, switch cases, ternary expressions
+  - Reduces false positives for repetitive validation code and similar constructs
+  - Dampening applies when token entropy < 0.5 and pattern repetition detected
+
+### Fixed
+
+- **TUI Detail View Footer** - Corrected keybinding hints
+  - Back navigation now correctly shows `q/Esc` instead of `←`
+  - Page navigation shows `←/→` for arrow keys
+
 ## [0.14.0] - 2026-02-15
 
 ### Added
