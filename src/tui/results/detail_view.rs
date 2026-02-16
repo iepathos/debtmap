@@ -147,9 +147,9 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
 fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     // Condensed shortcuts - essential actions only, `?` for full help
     let shortcuts = Line::from(vec![
-        Span::styled("←", Style::default().fg(theme.accent())),
+        Span::styled("q/Esc", Style::default().fg(theme.accent())),
         Span::raw(":Back  "),
-        Span::styled("Tab", Style::default().fg(theme.accent())),
+        Span::styled("←/→", Style::default().fg(theme.accent())),
         Span::raw(":Pages  "),
         Span::styled("j/k", Style::default().fg(theme.accent())),
         Span::raw(":Items  "),
