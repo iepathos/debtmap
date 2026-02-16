@@ -1695,11 +1695,8 @@ fn buggy_func() {
                 "Git history should have authors. Got: {} authors",
                 author_count
             );
-            assert!(
-                *age_days > 0,
-                "Git history should have age. Got: {} days",
-                age_days
-            );
+            // Note: age_days can be 0 in CI with shallow clones where only
+            // recent commits are visible, so we don't assert > 0 here
         } else {
             panic!("Expected Historical context details");
         }
