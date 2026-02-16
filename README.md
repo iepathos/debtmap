@@ -55,6 +55,30 @@ Debtmap combines static analysis with git history to score technical debt:
 
 These signals combine into a **severity score** (0-10). High scores mean high-complexity, poorly-tested, frequently-broken code.
 
+## Supported Languages
+
+| Language | Complexity | Functions | Async Patterns | Call Graph |
+|----------|:----------:|:---------:|:--------------:|:----------:|
+| **Rust** | Full | Full | Full | Full |
+| **TypeScript** | Full | Full | Full | Full |
+| **JavaScript** | Full | Full | Full | Full |
+
+**Rust** — Full AST analysis with syn, including macro expansion and trait detection.
+
+**TypeScript/JavaScript** — Tree-sitter parsing with support for:
+- ES6+ syntax (arrow functions, classes, async/await)
+- JSX/TSX for React components
+- TypeScript-specific patterns (`any` usage, type assertions)
+- Promise chains and callback nesting detection
+
+```bash
+# Analyze specific languages
+debtmap analyze . --languages rust,typescript
+
+# All supported languages are enabled by default
+debtmap analyze .
+```
+
 ## Interactive TUI
 
 Run `debtmap analyze .` to explore results interactively:
@@ -246,8 +270,10 @@ perf report
 - [x] Pattern-based false positive reduction
 - [x] LLM-optimized output format
 - [x] Context suggestions for AI
+- [x] Multi-language support (Rust, TypeScript, JavaScript)
 - [ ] Streaming output for large codebases
-- [ ] Multi-language support (Go, Python, TypeScript)
+- [ ] Python language support
+- [ ] Go language support
 
 ## Contributing
 
