@@ -4,6 +4,7 @@
 
 use crate::analyzers::typescript::parser::node_text;
 use crate::analyzers::typescript::types::JsFunctionMetrics;
+use crate::complexity::entropy_core::{EntropyAnalysis, EntropyConfig};
 use crate::core::FunctionMetrics;
 use tree_sitter::Node;
 
@@ -246,6 +247,12 @@ pub fn is_test_function(name: &str) -> bool {
 
 /// Convert JS-specific metrics to standard FunctionMetrics
 pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMetrics {
+    // Create entropy analysis from raw score if available
+    let entropy_analysis = js_metrics
+        .entropy_score
+        .as_ref()
+        .map(|raw| EntropyAnalysis::from_raw(raw, js_metrics.cognitive, &EntropyConfig::default()));
+
     FunctionMetrics {
         name: js_metrics.name.clone(),
         file: js_metrics.file.clone(),
@@ -262,7 +269,7 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         },
         is_trait_method: false,
         in_test_module: js_metrics.is_test,
-        entropy_score: None,
+        entropy_score: js_metrics.entropy_score.clone(),
         is_pure: None,
         purity_confidence: None,
         purity_reason: None,
@@ -277,7 +284,7 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         purity_level: None,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
-        entropy_analysis: None,
+        entropy_analysis,
     }
 }
 

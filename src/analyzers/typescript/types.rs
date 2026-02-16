@@ -2,6 +2,7 @@
 //!
 //! Core data structures for JS/TS analysis.
 
+use crate::complexity::entropy_core::EntropyScore;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -116,6 +117,8 @@ pub struct JsFunctionMetrics {
     pub is_exported: bool,
     /// TypeScript-specific patterns
     pub ts_patterns: Option<TypeScriptPatternResult>,
+    /// Entropy-based complexity score
+    pub entropy_score: Option<EntropyScore>,
 }
 
 impl JsFunctionMetrics {
@@ -136,6 +139,7 @@ impl JsFunctionMetrics {
             parameter_count: 0,
             is_exported: false,
             ts_patterns: None,
+            entropy_score: None,
         }
     }
 

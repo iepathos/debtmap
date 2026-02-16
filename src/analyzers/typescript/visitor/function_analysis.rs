@@ -2,8 +2,10 @@
 //!
 //! Extracts functions from tree-sitter AST and calculates their metrics.
 
+use crate::analyzers::typescript::entropy::calculate_entropy;
 use crate::analyzers::typescript::parser::{node_line, node_text};
 use crate::analyzers::typescript::types::{FunctionKind, JsFunctionMetrics};
+use crate::complexity::entropy_core::EntropyConfig;
 use crate::core::ast::TypeScriptAst;
 use tree_sitter::Node;
 
@@ -118,6 +120,11 @@ fn analyze_function_declaration(
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_parameters(node);
+    metrics.entropy_score = Some(calculate_entropy(
+        &body,
+        &ast.source,
+        &EntropyConfig::default(),
+    ));
 
     Some(metrics)
 }
@@ -144,6 +151,11 @@ fn analyze_generator_function(node: &Node, ast: &TypeScriptAst) -> Option<JsFunc
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_parameters(node);
+    metrics.entropy_score = Some(calculate_entropy(
+        &body,
+        &ast.source,
+        &EntropyConfig::default(),
+    ));
 
     Some(metrics)
 }
@@ -176,6 +188,11 @@ fn analyze_arrow_function(
     metrics.is_test = is_test_function(&func_name);
     metrics.is_exported = is_exported;
     metrics.parameter_count = count_arrow_parameters(node);
+    metrics.entropy_score = Some(calculate_entropy(
+        &body_node,
+        &ast.source,
+        &EntropyConfig::default(),
+    ));
 
     Some(metrics)
 }
@@ -208,6 +225,11 @@ fn analyze_method_definition(
         metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
         metrics.nesting = calculate_nesting_depth(&body);
         metrics.length = count_function_lines(&body, &ast.source);
+        metrics.entropy_score = Some(calculate_entropy(
+            &body,
+            &ast.source,
+            &EntropyConfig::default(),
+        ));
     }
 
     metrics.is_async = has_async_modifier(node);
@@ -284,6 +306,11 @@ fn analyze_function_expression(
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&func_name);
     metrics.parameter_count = count_parameters(node);
+    metrics.entropy_score = Some(calculate_entropy(
+        &body,
+        &ast.source,
+        &EntropyConfig::default(),
+    ));
 
     Some(metrics)
 }
@@ -553,5 +580,67 @@ class Greeter {
 
         assert_eq!(functions.len(), 1);
         assert_eq!(functions[0].name, "greet");
+    }
+
+    #[test]
+    fn test_entropy_score_populated() {
+        let source = r#"
+function validateInput(a, b, c, d) {
+    if (!a) throw new Error("a is required");
+    if (!b) throw new Error("b is required");
+    if (!c) throw new Error("c is required");
+    if (!d) throw new Error("d is required");
+    return { a, b, c, d };
+}
+"#;
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let functions = extract_functions(&ast, false);
+
+        assert_eq!(functions.len(), 1);
+        assert!(
+            functions[0].entropy_score.is_some(),
+            "entropy_score should be populated for JavaScript functions"
+        );
+
+        let entropy = functions[0].entropy_score.as_ref().unwrap();
+        assert!(
+            entropy.token_entropy >= 0.0 && entropy.token_entropy <= 1.0,
+            "token_entropy should be in range [0, 1]: {}",
+            entropy.token_entropy
+        );
+        assert!(
+            entropy.pattern_repetition >= 0.0,
+            "pattern_repetition should be non-negative"
+        );
+    }
+
+    #[test]
+    fn test_entropy_dampening_for_validation_code() {
+        // Validation code with repetitive patterns should have high repetition score
+        let source = r#"
+function validate(a, b, c, d, e) {
+    if (!a) throw new Error("a");
+    if (!b) throw new Error("b");
+    if (!c) throw new Error("c");
+    if (!d) throw new Error("d");
+    if (!e) throw new Error("e");
+    return true;
+}
+"#;
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let functions = extract_functions(&ast, false);
+        let entropy = functions[0].entropy_score.as_ref().unwrap();
+
+        // Repetitive validation code should have pattern repetition detected
+        assert!(
+            entropy.pattern_repetition > 0.0 || entropy.token_entropy < 0.5,
+            "Validation code should have either high repetition or low entropy: repetition={}, entropy={}",
+            entropy.pattern_repetition,
+            entropy.token_entropy
+        );
     }
 }
