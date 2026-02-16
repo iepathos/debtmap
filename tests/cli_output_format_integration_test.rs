@@ -3,6 +3,8 @@
 //! Note: The legacy JSON format was removed in spec 202.
 //! JSON output now always uses the unified format with consistent structure.
 
+#![allow(deprecated)] // cargo_bin deprecation - tests are ignored anyway
+
 use assert_cmd::cargo::CommandCargoExt;
 use serde_json::Value;
 use std::fs;

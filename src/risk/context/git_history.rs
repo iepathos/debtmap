@@ -1549,7 +1549,7 @@ fn buggy_func() {
 
         // The repo should have history for src/lib.rs
         assert!(
-            stored_paths.len() > 0,
+            !stored_paths.is_empty(),
             "Batched history should not be empty for a real repo with commits"
         );
 

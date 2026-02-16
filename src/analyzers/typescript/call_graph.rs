@@ -402,7 +402,7 @@ function main() {
             .find(|f| f.name == "main")
             .expect("main should exist");
 
-        let callees = call_graph.get_callees(&main_id);
+        let callees = call_graph.get_callees(main_id);
         assert!(
             callees.iter().any(|c| c.name == "helper"),
             "main should call helper. Found: {:?}",
@@ -416,7 +416,7 @@ function main() {
             .find(|f| f.name == "helper")
             .expect("helper should exist");
 
-        let callers = call_graph.get_callers(&helper_id);
+        let callers = call_graph.get_callers(helper_id);
         assert!(
             callers.iter().any(|c| c.name == "main"),
             "helper should have main as caller. Found: {:?}",
@@ -444,7 +444,7 @@ const formatName = (name) => name.toUpperCase();
             .find(|f| f.name == "greet")
             .expect("greet should exist");
 
-        let callees = call_graph.get_callees(&greet_id);
+        let callees = call_graph.get_callees(greet_id);
         assert!(
             callees.iter().any(|c| c.name == "formatName"),
             "greet should call formatName. Found: {:?}",
@@ -477,7 +477,7 @@ class Calculator {
             .find(|f| f.name == "Calculator::add")
             .expect("Calculator::add should exist");
 
-        let callees = call_graph.get_callees(&add_id);
+        let callees = call_graph.get_callees(add_id);
         // Method calls like this.validate() extract just "validate"
         assert!(
             callees.iter().any(|c| c.name.contains("validate")),
@@ -511,7 +511,7 @@ function format(d) { return d; }
             .find(|f| f.name == "processData")
             .expect("processData should exist");
 
-        let callees = call_graph.get_callees(&process_id);
+        let callees = call_graph.get_callees(process_id);
 
         assert!(callees.iter().any(|c| c.name == "validate"));
         assert!(callees.iter().any(|c| c.name == "transform"));
