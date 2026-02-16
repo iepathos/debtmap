@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-02-15
+
+### Added
+
+- **TypeScript/JavaScript Analyzer** - Full-featured analyzer with tree-sitter parsing
+  - Cyclomatic and cognitive complexity calculation
+  - Function extraction (declarations, arrows, methods, class constructors)
+  - Async pattern detection (async/await, Promise chains, callbacks)
+  - Functional chain detection (map/filter/reduce pipelines)
+  - TypeScript-specific: `any` usage, type assertions, non-null assertions
+  - JSX/TSX support with appropriate grammar selection
+  - Call graph integration for cross-function analysis
+  - Nesting depth and function length metrics
+
+### Fixed
+
+- **Git History Context Fallback** - Function-level git history now properly falls back to file-level
+  - Previously returned 0 commits/authors when function wasn't found in git history
+  - Now correctly falls back to file-level analysis with accurate commit data
+  - Affects `--context` flag output showing git history metrics
+
+- **TypeScript Cognitive Complexity** - Fixed double-counting of nesting penalties
+  - Nesting increment now happens once per construct, not twice
+
+- **TypeScript Path Lookup** - Fixed file path resolution in call graph building
+  - Ensures TypeScript files are correctly linked in dependency analysis
+
+- **Default Language Discovery** - JavaScript and TypeScript now included in default languages
+  - No longer requires explicit `--languages javascript,typescript` flag
+
+### Testing
+
+- Marked slow CLI integration tests as ignored (run with `--ignored`)
+- Added git history fallback integration test via ContextAggregator
+
 ## [0.13.6] - 2026-02-14
 
 ### Added
