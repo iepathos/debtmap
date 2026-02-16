@@ -30,9 +30,6 @@ cargo install debtmap
 # Explore issues interactively (default)
 debtmap analyze .
 
-# Terminal output for scripts and CI
-debtmap analyze . --format terminal
-
 # JSON for programmatic access
 debtmap analyze . --format json --top 10 > debt.json
 
@@ -124,7 +121,7 @@ debtmap analyze . --format markdown
 debtmap analyze . --format json
 
 # Terminal for human exploration
-debtmap analyze . --format terminal
+debtmap analyze .
 ```
 
 ## Visual Dashboard
