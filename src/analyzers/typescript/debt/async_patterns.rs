@@ -91,34 +91,32 @@ fn detect_unhandled_promises_recursive(
     ast: &TypeScriptAst,
     items: &mut Vec<DebtItem>,
 ) {
-    // Look for .then() calls
-    if node.kind() == "call_expression" {
-        if is_promise_then_call(node, ast) {
-            // Check if there's a .catch() somewhere in the chain
-            if !has_error_handling_in_chain(node, ast) {
-                items.push(DebtItem {
-                    id: format!(
-                        "js-unhandled-promise-{}-{}",
-                        ast.path.display(),
-                        node_line(node)
-                    ),
-                    debt_type: DebtType::ErrorSwallowing {
-                        pattern: "unhandled_promise".to_string(),
-                        context: Some("Promise chain without .catch() or try/catch".to_string()),
-                    },
-                    priority: Priority::High,
-                    file: ast.path.clone(),
-                    line: node_line(node),
-                    column: None,
-                    message: "Promise chain without error handling".to_string(),
-                    context: Some(
-                        "Promise chains should have a .catch() handler or be wrapped in try/catch \
-                         when using async/await to handle potential rejections."
-                            .to_string(),
-                    ),
-                });
-            }
-        }
+    // Look for .then() calls without error handling
+    if node.kind() == "call_expression"
+        && is_promise_then_call(node, ast)
+        && !has_error_handling_in_chain(node, ast)
+    {
+        items.push(DebtItem {
+            id: format!(
+                "js-unhandled-promise-{}-{}",
+                ast.path.display(),
+                node_line(node)
+            ),
+            debt_type: DebtType::ErrorSwallowing {
+                pattern: "unhandled_promise".to_string(),
+                context: Some("Promise chain without .catch() or try/catch".to_string()),
+            },
+            priority: Priority::High,
+            file: ast.path.clone(),
+            line: node_line(node),
+            column: None,
+            message: "Promise chain without error handling".to_string(),
+            context: Some(
+                "Promise chains should have a .catch() handler or be wrapped in try/catch \
+                 when using async/await to handle potential rejections."
+                    .to_string(),
+            ),
+        });
     }
 
     // Recurse

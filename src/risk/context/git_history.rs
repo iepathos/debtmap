@@ -1681,7 +1681,6 @@ fn buggy_func() {
         if let ContextDetails::Historical {
             total_commits,
             author_count,
-            age_days,
             ..
         } = &git_context.details
         {
@@ -1695,8 +1694,7 @@ fn buggy_func() {
                 "Git history should have authors. Got: {} authors",
                 author_count
             );
-            // Note: age_days can be 0 in CI with shallow clones where only
-            // recent commits are visible, so we don't assert > 0 here
+            // Note: age_days not checked - can be 0 in CI with shallow clones
         } else {
             panic!("Expected Historical context details");
         }

@@ -36,7 +36,7 @@ fn try_extract_chain(node: &Node, ast: &TypeScriptAst) -> Option<FunctionalChain
     let text = node_text(node, &ast.source);
 
     // Extract method names from the chain
-    let methods = extract_chain_methods(&text);
+    let methods = extract_chain_methods(text);
 
     if methods.len() >= 2 {
         // This is a meaningful chain

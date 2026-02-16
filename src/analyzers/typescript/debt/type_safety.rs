@@ -126,7 +126,7 @@ fn detect_type_assertions(node: &Node, ast: &TypeScriptAst) -> Vec<usize> {
     locations
 }
 
-fn detect_assertions_recursive(node: &Node, ast: &TypeScriptAst, locations: &mut Vec<usize>) {
+fn detect_assertions_recursive(node: &Node, _ast: &TypeScriptAst, locations: &mut Vec<usize>) {
     match node.kind() {
         "as_expression" | "type_assertion" => {
             locations.push(node_line(node));
@@ -137,7 +137,7 @@ fn detect_assertions_recursive(node: &Node, ast: &TypeScriptAst, locations: &mut
     // Recurse
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        detect_assertions_recursive(&child, ast, locations);
+        detect_assertions_recursive(&child, _ast, locations);
     }
 }
 
@@ -148,7 +148,7 @@ fn detect_non_null_assertions(node: &Node, ast: &TypeScriptAst) -> Vec<usize> {
     locations
 }
 
-fn detect_non_null_recursive(node: &Node, ast: &TypeScriptAst, locations: &mut Vec<usize>) {
+fn detect_non_null_recursive(node: &Node, _ast: &TypeScriptAst, locations: &mut Vec<usize>) {
     if node.kind() == "non_null_expression" {
         locations.push(node_line(node));
     }
@@ -156,7 +156,7 @@ fn detect_non_null_recursive(node: &Node, ast: &TypeScriptAst, locations: &mut V
     // Recurse
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        detect_non_null_recursive(&child, ast, locations);
+        detect_non_null_recursive(&child, _ast, locations);
     }
 }
 
