@@ -61,6 +61,10 @@ fn matches_extension(path: &Path, extensions: &[&str]) -> bool {
 /// Discover source files in the given path.
 ///
 /// Walks the directory tree and filters files by extension.
+///
+/// debtmap:ignore[testing] - I/O shell using WalkDir for filesystem traversal.
+/// Pure predicate `matches_extension` is extracted and tested. Remaining logic
+/// is directory walking orchestration that requires filesystem fixtures to test.
 fn discover_files(path: &Path, _languages: &[Language]) -> Result<Vec<PathBuf>, AnalysisError> {
     use walkdir::WalkDir;
 
