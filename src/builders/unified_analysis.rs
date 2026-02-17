@@ -70,6 +70,10 @@ pub fn perform_unified_analysis(
 }
 
 /// Main entry point for unified analysis with full options.
+///
+/// debtmap:ignore[complexity,testing] - I/O orchestrator coordinating 5 analysis phases
+/// with progress reporting. Pure logic delegated to core::phases::* modules.
+/// Helper functions phase_to_subtask_index/build_progress_info are tested.
 pub fn perform_unified_analysis_with_options(
     options: UnifiedAnalysisOptions,
 ) -> Result<UnifiedAnalysis> {
