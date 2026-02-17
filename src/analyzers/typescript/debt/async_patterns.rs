@@ -126,21 +126,26 @@ fn detect_unhandled_promises_recursive(
     }
 }
 
+/// Extract the method name from a call expression (e.g., "then" from `foo.then()`)
+fn get_call_method_name<'a>(node: &Node, source: &'a str) -> Option<&'a str> {
+    let func = node.child_by_field_name("function")?;
+    if func.kind() != "member_expression" {
+        return None;
+    }
+    let prop = func.child_by_field_name("property")?;
+    Some(node_text(&prop, source))
+}
+
 fn is_promise_then_call(node: &Node, ast: &TypeScriptAst) -> bool {
     if node.kind() != "call_expression" {
         return false;
     }
+    get_call_method_name(node, &ast.source) == Some("then")
+}
 
-    if let Some(func) = node.child_by_field_name("function") {
-        if func.kind() == "member_expression" {
-            if let Some(prop) = func.child_by_field_name("property") {
-                let prop_text = node_text(&prop, &ast.source);
-                return prop_text == "then";
-            }
-        }
-    }
-
-    false
+/// Check if a method name indicates error handling
+fn is_error_handler_method(method: &str) -> bool {
+    matches!(method, "catch" | "finally")
 }
 
 fn has_error_handling_in_chain(node: &Node, ast: &TypeScriptAst) -> bool {
@@ -149,14 +154,9 @@ fn has_error_handling_in_chain(node: &Node, ast: &TypeScriptAst) -> bool {
     let mut current = node.parent();
     while let Some(parent) = current {
         if parent.kind() == "call_expression" {
-            if let Some(func) = parent.child_by_field_name("function") {
-                if func.kind() == "member_expression" {
-                    if let Some(prop) = func.child_by_field_name("property") {
-                        let prop_text = node_text(&prop, &ast.source);
-                        if prop_text == "catch" || prop_text == "finally" {
-                            return true;
-                        }
-                    }
+            if let Some(method) = get_call_method_name(&parent, &ast.source) {
+                if is_error_handler_method(method) {
+                    return true;
                 }
             }
         }
@@ -310,5 +310,82 @@ fetch('/api/data')
         assert!(!items
             .iter()
             .any(|i| i.message.contains("without error handling")));
+    }
+
+    #[test]
+    fn test_is_error_handler_method() {
+        assert!(is_error_handler_method("catch"));
+        assert!(is_error_handler_method("finally"));
+        assert!(!is_error_handler_method("then"));
+        assert!(!is_error_handler_method("map"));
+        assert!(!is_error_handler_method(""));
+    }
+
+    #[test]
+    fn test_promise_with_finally_is_handled() {
+        let source = r#"
+fetch('/api/data')
+    .then(response => response.json())
+    .finally(() => cleanup());
+"#;
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let items = detect_async_debt(&ast, &[]);
+
+        // .finally() counts as error handling
+        assert!(!items
+            .iter()
+            .any(|i| i.message.contains("without error handling")));
+    }
+
+    #[test]
+    fn test_get_call_method_name() {
+        let source = r#"obj.method()"#;
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let root = ast.tree.root_node();
+        // Find the call_expression node
+        fn find_call_expression(node: tree_sitter::Node) -> Option<tree_sitter::Node> {
+            if node.kind() == "call_expression" {
+                return Some(node);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if let Some(found) = find_call_expression(child) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        let call_node = find_call_expression(root).expect("should find call_expression");
+        assert_eq!(get_call_method_name(&call_node, &ast.source), Some("method"));
+    }
+
+    #[test]
+    fn test_get_call_method_name_not_member_expression() {
+        let source = r#"directCall()"#;
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let root = ast.tree.root_node();
+        fn find_call_expression(node: tree_sitter::Node) -> Option<tree_sitter::Node> {
+            if node.kind() == "call_expression" {
+                return Some(node);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if let Some(found) = find_call_expression(child) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        let call_node = find_call_expression(root).expect("should find call_expression");
+        // Direct function call has no method name
+        assert_eq!(get_call_method_name(&call_node, &ast.source), None);
     }
 }
