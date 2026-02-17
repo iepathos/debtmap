@@ -9,12 +9,18 @@ pub struct ChangeTracker {
 }
 
 impl ChangeTracker {
+    /// Creates a new change tracker with no previous results.
     pub fn new() -> Self {
         Self {
             previous_results: HashMap::new(),
         }
     }
 
+    /// Tracks changes between the current analysis result and any previous result for the same file.
+    ///
+    /// On the first call for a given file, stores the result and returns `None`.
+    /// On subsequent calls, computes the change analysis between the previous and current results,
+    /// updates the stored result, and returns the analysis.
     pub fn track_changes(
         &mut self,
         file_id: String,
@@ -146,45 +152,64 @@ impl Default for ChangeTracker {
     }
 }
 
-/// Analysis of changes between runs
+/// Analysis of changes between two analysis runs for the same file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeAnalysis {
+    /// The difference in complexity metrics between runs.
     pub complexity_delta: ChangeMetrics,
+    /// Changes in complexity attribution (logical, formatting, pattern).
     pub attribution_changes: AttributionChanges,
+    /// Categorization of the type of changes detected.
     pub change_categories: Vec<ChangeCategory>,
+    /// Overall improvement score from -1.0 (regression) to 1.0 (improvement).
     pub improvement_score: f32,
 }
 
-/// Metrics describing changes
+/// Metrics describing changes in complexity between analysis runs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeMetrics {
+    /// Change in raw complexity (negative indicates improvement).
     pub raw_change: i32,
+    /// Change in normalized complexity (negative indicates improvement).
     pub normalized_change: i32,
+    /// Change in cognitive complexity (negative indicates improvement).
     pub cognitive_change: i32,
 }
 
-/// Attribution-specific changes
+/// Changes in complexity attribution categories between analysis runs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributionChanges {
+    /// Change in logical complexity (negative indicates improvement).
     pub logical_change: i32,
+    /// Change in formatting-related complexity artifacts.
     pub formatting_change: i32,
+    /// Change in pattern-based complexity.
     pub pattern_change: i32,
+    /// Change in attribution confidence (positive indicates more reliable attribution).
     pub confidence_change: f32,
 }
 
-/// Categories of changes
+/// Categories describing the nature of changes between analysis runs.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ChangeCategory {
+    /// Complexity decreased by more than 5 points.
     SignificantImprovement,
+    /// Complexity increased by more than 5 points.
     SignificantRegression,
+    /// Changes are primarily due to formatting rather than logic.
     FormattingRelated,
+    /// Changes affect the logical structure of the code.
     LogicalChange,
+    /// Better pattern recognition in the analysis.
     PatternImprovement,
+    /// Both raw and cognitive complexity decreased.
     SuccessfulRefactoring,
+    /// Changes that don't fit other categories.
     MinorChange,
 }
 
 impl ChangeCategory {
+    /// Returns a human-readable description of this change category.
     pub fn description(&self) -> &str {
         match self {
             Self::SignificantImprovement => "Significant complexity reduction",
@@ -197,6 +222,7 @@ impl ChangeCategory {
         }
     }
 
+    /// Returns true if this category represents a positive change (improvement).
     pub fn is_positive(&self) -> bool {
         matches!(
             self,
