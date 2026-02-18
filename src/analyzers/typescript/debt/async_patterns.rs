@@ -361,7 +361,10 @@ fetch('/api/data')
         }
 
         let call_node = find_call_expression(root).expect("should find call_expression");
-        assert_eq!(get_call_method_name(&call_node, &ast.source), Some("method"));
+        assert_eq!(
+            get_call_method_name(&call_node, &ast.source),
+            Some("method")
+        );
     }
 
     #[test]
