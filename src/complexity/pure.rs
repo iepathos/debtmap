@@ -623,7 +623,15 @@ fn calculate_expr_nesting_depth(expr: &Expr, current_depth: u32) -> u32 {
             let else_depth = if_expr
                 .else_branch
                 .as_ref()
-                .map(|(_, e)| calculate_expr_nesting_depth(e, current_depth))
+                .map(|(_, e)| {
+                    if matches!(**e, Expr::If(_)) {
+                        // else-if: let the inner if handle its own depth increment
+                        calculate_expr_nesting_depth(e, current_depth)
+                    } else {
+                        // plain else: content is inside the if's nesting level
+                        calculate_expr_nesting_depth(e, new_depth)
+                    }
+                })
                 .unwrap_or(current_depth);
             then_depth.max(else_depth)
         }
@@ -1145,6 +1153,45 @@ mod tests {
         )
         .unwrap();
         assert_eq!(calculate_nesting_depth(&block), 3);
+    }
+
+    #[test]
+    fn test_nesting_depth_plain_else() {
+        // Plain else block content should be at depth 1 (inside the if)
+        let block: Block = syn::parse_str(
+            r#"{
+            if a {
+                x
+            } else {
+                if b {
+                    y
+                }
+            }
+        }"#,
+        )
+        .unwrap();
+        // The nested if inside else should be at depth 2
+        assert_eq!(calculate_nesting_depth(&block), 2);
+    }
+
+    #[test]
+    fn test_nesting_depth_else_if_chain() {
+        // else-if chains should stay flat at depth 1
+        let block: Block = syn::parse_str(
+            r#"{
+            if a {
+                x
+            } else if b {
+                y
+            } else if c {
+                z
+            } else {
+                w
+            }
+        }"#,
+        )
+        .unwrap();
+        assert_eq!(calculate_nesting_depth(&block), 1);
     }
 
     #[test]
