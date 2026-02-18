@@ -141,12 +141,13 @@ fn traverse_for_cognitive(node: &Node, source: &str, complexity: &mut u32, nesti
             *complexity += 1;
         }
 
-        // Nested functions/callbacks increase complexity
-        // Only count nested functions (arrow_function, function_expression), not top-level declarations
+        // Nested functions/callbacks increase complexity for the PARENT function.
+        // We add complexity for the callback's presence but do NOT traverse into its body.
+        // The callback's internal complexity is counted when analyzing the callback itself.
         "arrow_function" | "function_expression" => {
-            // Callback functions add complexity based on nesting
+            // Callback presence adds complexity based on nesting level
             *complexity += 1 + nesting.min(2);
-            traverse_children_with_nesting(node, source, complexity, nesting + 1, Some("body"));
+            // Don't traverse into body - avoids double-counting when callback is analyzed separately
             return;
         }
         // Top-level function declarations don't add complexity, just traverse body
@@ -197,13 +198,14 @@ pub fn calculate_nesting_depth(node: &Node) -> u32 {
 }
 
 fn calculate_nesting_recursive(node: &Node, current_depth: u32) -> u32 {
+    // Only control flow structures add to nesting depth.
+    // Functions/callbacks are NOT counted - their complexity is captured
+    // separately in cognitive complexity, not nesting depth.
     let new_depth = match node.kind() {
         "if_statement" | "for_statement" | "for_in_statement" | "for_of_statement"
         | "while_statement" | "do_statement" | "switch_statement" | "try_statement" => {
             current_depth + 1
         }
-        // Arrow functions and function expressions add nesting
-        "arrow_function" | "function_expression" | "function" => current_depth + 1,
         _ => current_depth,
     };
 
