@@ -94,12 +94,14 @@ pub enum Pattern {
 /// # Algorithm
 ///
 /// Base complexity of 1, plus:
-/// - Each `if` statement adds 1
-/// - Each `else` branch adds 1
+/// - Each `if` statement adds 1 (the decision point)
 /// - Each loop (`while`, `for`, `loop`) adds 1
 /// - Each `match` arm adds 1 (minus 1 for the first arm)
 /// - Each `?` operator adds 1
 /// - Each logical operator (`&&`, `||`) outside conditions adds 1
+///
+/// Note: `else` branches do NOT add complexity - they are not decision points.
+/// The decision is made at the `if` condition, not at the `else`.
 ///
 /// # Example
 ///
@@ -166,9 +168,8 @@ pub fn count_expr_branches(expr: &Expr) -> u32 {
                 .iter()
                 .map(count_stmt_branches)
                 .sum::<u32>();
-            // Count else branch
+            // Count else branch contents (but else itself is not a decision point)
             if let Some((_, else_expr)) = &expr_if.else_branch {
-                count += 1; // else adds complexity
                 count += count_expr_branches(else_expr);
             }
             count
@@ -727,7 +728,8 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(calculate_cyclomatic_pure(&ast), 3);
+        // if-else has ONE decision point (the condition), so complexity = base 1 + 1 = 2
+        assert_eq!(calculate_cyclomatic_pure(&ast), 2);
     }
 
     #[test]
