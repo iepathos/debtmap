@@ -11,6 +11,85 @@ use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::{DebtType, UnifiedDebtItem};
 use serde::{Deserialize, Serialize};
 
+/// Calculate debt-type-specific severity multiplier.
+///
+/// This differentiates scores for different debt types at the same location.
+/// Applied AFTER the cached unified score computation to preserve caching
+/// while providing meaningful score differentiation.
+///
+/// # Rationale
+///
+/// | Debt Type | Multiplier | Rationale |
+/// |-----------|------------|-----------|
+/// | GodObject | 1.4 | Architectural debt, hardest to fix |
+/// | ComplexityHotspot | 1.2 | Direct code quality issue |
+/// | MixedConcerns | 1.15 | Moderate architectural issue |
+/// | DependencyCluster | 1.1 | Coupling concern |
+/// | LegacyPattern | 1.05 | Technical debt, often tolerable |
+/// | TestingGap | 1.0 | Important but secondary to complexity |
+///
+/// # Examples
+///
+/// ```ignore
+/// use crate::priority::DebtType;
+/// let mult = calculate_debt_type_severity_multiplier(&DebtType::GodObject { ... });
+/// assert_eq!(mult, 1.4);
+/// ```
+pub fn calculate_debt_type_severity_multiplier(debt_type: &DebtType) -> f64 {
+    match debt_type {
+        // Architectural debt - hardest to fix, highest multiplier
+        DebtType::GodObject { .. } => 1.4,
+
+        // Direct code quality issues
+        DebtType::ComplexityHotspot { .. } | DebtType::Complexity { .. } => 1.2,
+        DebtType::TestComplexityHotspot { .. } | DebtType::TestComplexity { .. } => 1.2,
+
+        // Moderate architectural issues
+        DebtType::FeatureEnvy { .. }
+        | DebtType::ScatteredType { .. }
+        | DebtType::CodeOrganization { .. } => 1.15,
+
+        // Coupling and dependency concerns
+        DebtType::Dependency { .. }
+        | DebtType::OrphanedFunctions { .. }
+        | DebtType::UtilitiesSprawl { .. } => 1.1,
+
+        // Resource and error handling issues
+        DebtType::ResourceLeak { .. }
+        | DebtType::ErrorSwallowing { .. }
+        | DebtType::AsyncMisuse { .. }
+        | DebtType::BlockingIO { .. } => 1.1,
+
+        // Legacy patterns and minor issues
+        DebtType::PrimitiveObsession { .. }
+        | DebtType::MagicValues { .. }
+        | DebtType::SuboptimalDataStructure { .. }
+        | DebtType::CollectionInefficiency { .. }
+        | DebtType::AllocationInefficiency { .. }
+        | DebtType::StringConcatenation { .. }
+        | DebtType::NestedLoops { .. } => 1.05,
+
+        // Testing gaps - important but secondary to complexity
+        DebtType::TestingGap { .. } => 1.0,
+
+        // Dead code - typically low priority
+        DebtType::DeadCode { .. } => 0.9,
+
+        // All other types (TODOs, FIXMEs, etc.) - neutral
+        DebtType::Todo { .. }
+        | DebtType::Fixme { .. }
+        | DebtType::CodeSmell { .. }
+        | DebtType::ResourceManagement { .. }
+        | DebtType::TestQuality { .. }
+        | DebtType::Duplication { .. }
+        | DebtType::TestDuplication { .. }
+        | DebtType::Risk { .. }
+        | DebtType::TestTodo { .. }
+        | DebtType::AssertionComplexity { .. }
+        | DebtType::FlakyTestPattern { .. } => 1.0,
+    }
+}
+
 /// Configuration for exponential scaling and risk boosting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScalingConfig {
@@ -116,19 +195,20 @@ fn is_untested(item: &UnifiedDebtItem) -> bool {
     )
 }
 
-/// Calculate final score with exponential scaling and risk boosting.
+/// Calculate final score with exponential scaling, risk boosting, and debt type multiplier.
 ///
 /// Pipeline:
-/// 1. Apply exponential scaling based on debt type
-/// 2. Apply discrete risk boosts based on dependencies, entry points, etc.
+/// 1. Apply exponential scaling based on debt type complexity
+/// 2. Apply debt-type-specific severity multiplier (differentiates scores at same location)
+/// 3. Apply discrete risk boosts based on dependencies, entry points, etc.
 ///
-/// Returns tuple of (final_score, exponent_used, boost_applied).
+/// Returns tuple of (final_score, exponent_used, boost_applied, debt_type_multiplier).
 pub fn calculate_final_score(
     base_score: f64,
     debt_type: &DebtType,
     item: &UnifiedDebtItem,
     config: &ScalingConfig,
-) -> (f64, f64, f64) {
+) -> (f64, f64, f64, f64) {
     // Determine exponent (for transparency)
     let exponent = match debt_type {
         DebtType::GodObject { .. } => config.god_object_exponent,
@@ -150,7 +230,11 @@ pub fn calculate_final_score(
     // Step 1: Apply exponential scaling
     let scaled = apply_exponential_scaling(base_score, debt_type, config);
 
-    // Step 2: Calculate risk boost factor
+    // Step 2: Calculate debt type severity multiplier
+    let debt_multiplier = calculate_debt_type_severity_multiplier(debt_type);
+    let after_debt_multiplier = scaled * debt_multiplier;
+
+    // Step 3: Calculate risk boost factor
     let mut boost = 1.0;
     let total_deps = item.upstream_dependencies + item.downstream_dependencies;
     if total_deps > 15 {
@@ -166,10 +250,10 @@ pub fn calculate_final_score(
         boost *= config.error_swallowing_boost;
     }
 
-    // Step 3: Apply risk boosts
-    let final_score = apply_risk_boosts(scaled, item, config);
+    // Step 4: Apply risk boosts (to the debt-multiplied score)
+    let final_score = after_debt_multiplier * boost;
 
-    (final_score, exponent, boost)
+    (final_score, exponent, boost, debt_multiplier)
 }
 
 #[cfg(test)]
@@ -218,6 +302,7 @@ mod tests {
                 has_coverage_data: false,
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
+                debt_type_multiplier: None,
             },
             function_role: role,
             recommendation: ActionableRecommendation {
@@ -372,15 +457,20 @@ mod tests {
             35,
         );
 
-        let (final_score, exponent, boost) =
+        let (final_score, exponent, boost, debt_multiplier) =
             calculate_final_score(30.0, &item.debt_type, &item, &config);
 
-        // 30^1.4 ≈ 108, then * 1.2 (high_deps) * 1.15 (entry_point) ≈ 149
+        // 30^1.4 ≈ 108, then * 1.4 (debt_mult) * 1.2 (high_deps) * 1.15 (entry_point) ≈ 209
         assert!(exponent == 1.4, "Expected exponent 1.4, got {}", exponent);
         assert!(boost > 1.3, "Expected boost > 1.3, got {}", boost);
         assert!(
-            final_score > 140.0,
-            "Expected score > 140, got {}",
+            debt_multiplier == 1.4,
+            "Expected debt_multiplier 1.4 for GodObject, got {}",
+            debt_multiplier
+        );
+        assert!(
+            final_score > 190.0,
+            "Expected score > 190, got {}",
             final_score
         );
     }
@@ -417,13 +507,25 @@ mod tests {
             10,
         );
 
-        let (god_score, _, _) =
+        let (god_score, _, _, god_debt_mult) =
             calculate_final_score(30.0, &god_object_item.debt_type, &god_object_item, &config);
 
-        let (gap_score, _, _) =
+        let (gap_score, _, _, gap_debt_mult) =
             calculate_final_score(50.0, &simple_gap_item.debt_type, &simple_gap_item, &config);
 
-        // 30^1.4 ≈ 108 should beat 50^1.0 = 50
+        // God object gets 1.4x debt multiplier, testing gap gets 1.0x
+        assert!(
+            god_debt_mult == 1.4,
+            "Expected GodObject debt_multiplier 1.4, got {}",
+            god_debt_mult
+        );
+        assert!(
+            gap_debt_mult == 1.0,
+            "Expected TestingGap debt_multiplier 1.0, got {}",
+            gap_debt_mult
+        );
+
+        // 30^1.4 ≈ 108, * 1.4 (debt mult) ≈ 151 should beat 50^1.0 * 1.0 = 50
         assert!(
             god_score > gap_score,
             "God object (score {}) should rank higher than simple testing gap (score {})",
@@ -555,7 +657,7 @@ mod tests {
 
             // Calculate final scores
             let mut scored_items: Vec<_> = items.iter().enumerate().map(|(idx, item)| {
-                let (final_score, _, _) = calculate_final_score(
+                let (final_score, _, _, _) = calculate_final_score(
                     base_scores[idx],
                     &item.debt_type,
                     item,
@@ -678,14 +780,14 @@ mod tests {
                 30,
             );
 
-            let (final_score, _, _) = calculate_final_score(
+            let (final_score, _, _, _) = calculate_final_score(
                 base_score,
                 &item.debt_type,
                 &item,
                 &config,
             );
 
-            // With exponent >= 1.0 and boost >= 1.0, final score should never be less than base
+            // With exponent >= 1.0, debt_mult >= 1.0, and boost >= 1.0, final score should never be less than base
             // (for base_score >= 1.0)
             prop_assert!(
                 final_score >= base_score * 0.99, // Allow tiny floating point errors
@@ -694,5 +796,123 @@ mod tests {
                 base_score
             );
         }
+    }
+
+    // Unit tests for debt type severity multiplier
+    #[test]
+    fn test_debt_type_severity_multiplier_god_object() {
+        let debt_type = DebtType::GodObject {
+            methods: 50,
+            fields: Some(20),
+            responsibilities: 10,
+            god_object_score: 85.0,
+            lines: 400,
+        };
+        assert_eq!(calculate_debt_type_severity_multiplier(&debt_type), 1.4);
+    }
+
+    #[test]
+    fn test_debt_type_severity_multiplier_complexity_hotspot() {
+        let debt_type = DebtType::ComplexityHotspot {
+            cyclomatic: 25,
+            cognitive: 30,
+        };
+        assert_eq!(calculate_debt_type_severity_multiplier(&debt_type), 1.2);
+    }
+
+    #[test]
+    fn test_debt_type_severity_multiplier_testing_gap() {
+        let debt_type = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 15,
+            cognitive: 20,
+        };
+        assert_eq!(calculate_debt_type_severity_multiplier(&debt_type), 1.0);
+    }
+
+    #[test]
+    fn test_debt_type_severity_multiplier_dead_code() {
+        let debt_type = DebtType::DeadCode {
+            visibility: crate::priority::FunctionVisibility::Private,
+            cyclomatic: 5,
+            cognitive: 3,
+            usage_hints: vec![],
+        };
+        // Dead code gets reduced priority (0.9x)
+        assert_eq!(calculate_debt_type_severity_multiplier(&debt_type), 0.9);
+    }
+
+    #[test]
+    fn test_debt_type_severity_multiplier_differentiation() {
+        // Same base score, different debt types should produce different final scores
+        let config = ScalingConfig::default();
+        let base_score = 20.0;
+
+        // Create items with different debt types but same base metrics
+        let god_object = create_test_item(
+            base_score,
+            DebtType::GodObject {
+                methods: 50,
+                fields: Some(20),
+                responsibilities: 10,
+                god_object_score: 85.0,
+                lines: 400,
+            },
+            5,
+            5,
+            FunctionRole::PureLogic,
+            20,
+        );
+
+        let complexity = create_test_item(
+            base_score,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 20,
+            },
+            5,
+            5,
+            FunctionRole::PureLogic,
+            20,
+        );
+
+        let testing_gap = create_test_item(
+            base_score,
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 15,
+                cognitive: 20,
+            },
+            5,
+            5,
+            FunctionRole::PureLogic,
+            20,
+        );
+
+        let (god_score, _, _, god_mult) =
+            calculate_final_score(base_score, &god_object.debt_type, &god_object, &config);
+        let (complexity_score, _, _, complexity_mult) =
+            calculate_final_score(base_score, &complexity.debt_type, &complexity, &config);
+        let (gap_score, _, _, gap_mult) =
+            calculate_final_score(base_score, &testing_gap.debt_type, &testing_gap, &config);
+
+        // Verify multipliers are different
+        assert!(god_mult > complexity_mult, "GodObject should have higher multiplier than ComplexityHotspot");
+        assert!(complexity_mult > gap_mult, "ComplexityHotspot should have higher multiplier than TestingGap");
+
+        // Verify resulting scores reflect the differentiation
+        // Note: god_object also gets exponential scaling (1.4 exponent), so its final score is significantly higher
+        assert!(
+            god_score > complexity_score,
+            "GodObject score {} should be > ComplexityHotspot score {}",
+            god_score,
+            complexity_score
+        );
+        assert!(
+            complexity_score > gap_score,
+            "ComplexityHotspot score {} should be > TestingGap score {}",
+            complexity_score,
+            gap_score
+        );
     }
 }

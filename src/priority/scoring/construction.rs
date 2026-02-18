@@ -496,21 +496,22 @@ fn extract_dependency_metrics(
     }
 }
 
-// Apply exponential scaling and risk boosting to a debt item (spec 171, spec 260)
+// Apply exponential scaling, debt type multiplier, and risk boosting to a debt item (spec 171, spec 260)
 fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     use crate::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
 
     let config = ScalingConfig::default();
     let base_score = item.unified_score.final_score;
 
-    // Calculate final score with scaling
-    let (final_score, exponent, boost) =
+    // Calculate final score with scaling and debt type multiplier
+    let (final_score, exponent, boost, debt_multiplier) =
         calculate_final_score(base_score, &item.debt_type, &item, &config);
 
     // Update the unified score with scaling information
     item.unified_score.base_score = Some(base_score);
     item.unified_score.exponential_factor = Some(exponent);
     item.unified_score.risk_boost = Some(boost);
+    item.unified_score.debt_type_multiplier = Some(debt_multiplier);
 
     // Spec 260: Track pre-normalization score if clamping will occur
     // This ensures the calculation steps show why the score jumped to 100
@@ -1028,6 +1029,7 @@ mod tests {
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         };
 
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
@@ -1066,6 +1068,7 @@ mod tests {
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         };
 
         // Test with all file types

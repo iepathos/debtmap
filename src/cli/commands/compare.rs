@@ -142,6 +142,7 @@ fn output_to_internal_function(
             has_coverage_data: output.metrics.coverage.is_some(),
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         },
         function_role: output.function_role,
         recommendation: ActionableRecommendation {

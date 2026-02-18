@@ -397,6 +397,7 @@ fn create_test_unified_debt_item(
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         },
         function_role: FunctionRole::Unknown,
         recommendation: ActionableRecommendation {

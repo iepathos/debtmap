@@ -38,6 +38,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

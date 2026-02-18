@@ -141,6 +141,11 @@ pub struct UnifiedScore {
     /// This allows the TUI to show the exact score progression
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_contextual_score: Option<f64>,
+    /// Debt type severity multiplier applied to differentiate scores for different debt types
+    /// at the same function location. See `calculate_debt_type_severity_multiplier()` for values.
+    /// Examples: GodObject=1.4, ComplexityHotspot=1.2, TestingGap=1.0, DeadCode=0.9
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debt_type_multiplier: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -304,6 +309,7 @@ pub fn calculate_unified_score_with_patterns(
         has_coverage_data: base_score.has_coverage_data,
         contextual_risk_multiplier: base_score.contextual_risk_multiplier,
         pre_contextual_score: base_score.pre_contextual_score,
+        debt_type_multiplier: base_score.debt_type_multiplier,
     }
 }
 
@@ -384,6 +390,7 @@ pub fn calculate_unified_priority_with_role(
             has_coverage_data,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         };
     }
 
@@ -510,6 +517,7 @@ pub fn calculate_unified_priority_with_role(
         has_coverage_data,
         contextual_risk_multiplier: None, // Set by apply_contextual_risk_to_score
         pre_contextual_score: None,       // Set by apply_contextual_risk_to_score
+        debt_type_multiplier: None,       // Set by apply_score_scaling
     }
 }
 

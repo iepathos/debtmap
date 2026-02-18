@@ -55,6 +55,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,
@@ -149,6 +150,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,

@@ -335,6 +335,7 @@ mod tests {
                 has_coverage_data: false,
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
+                debt_type_multiplier: None,
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
@@ -491,6 +492,7 @@ mod tests {
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         };
 
         let result = format_score_factors(&score);
@@ -599,6 +601,7 @@ mod tests {
             has_coverage_data: false,
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
+            debt_type_multiplier: None,
         };
 
         let result = format_score_factors(&score);

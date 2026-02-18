@@ -25,6 +25,28 @@ const LABEL_WIDTH: usize = 24; // Fixed column width for alignment
 const GAP: usize = 4; // Breathing room between label and value
 
 // ============================================================================
+// Pure Helper Functions
+// ============================================================================
+
+/// Convert debt type multiplier to a human-readable severity label.
+///
+/// Maps the multiplier value to a description that explains why
+/// this debt type has higher/lower priority than others.
+fn debt_type_severity_label(multiplier: f64) -> &'static str {
+    if multiplier >= 1.35 {
+        "architectural"
+    } else if multiplier >= 1.15 {
+        "code quality"
+    } else if multiplier >= 1.05 {
+        "minor issue"
+    } else if multiplier < 0.95 {
+        "low priority"
+    } else {
+        "standard"
+    }
+}
+
+// ============================================================================
 // Pure Section Builders (the "still" core)
 // ============================================================================
 
@@ -433,6 +455,7 @@ pub fn build_scaling_pipeline_section(
     // Only show if we have scaling data
     let has_scaling_data = item.unified_score.base_score.is_some()
         || item.unified_score.exponential_factor.is_some()
+        || item.unified_score.debt_type_multiplier.is_some()
         || item.unified_score.risk_boost.is_some()
         || item.unified_score.pre_adjustment_score.is_some();
 
@@ -461,6 +484,16 @@ pub fn build_scaling_pipeline_section(
             format!("^{:.2} applied", exp)
         };
         add_label_value(&mut lines, "exponential factor", exp_desc, theme, width);
+    }
+
+    // Debt type multiplier (differentiates scores for different debt types at same location)
+    if let Some(mult) = item.unified_score.debt_type_multiplier {
+        let mult_desc = if (mult - 1.0).abs() < 0.01 {
+            "none".to_string()
+        } else {
+            format!("{:.2}x ({})", mult, debt_type_severity_label(mult))
+        };
+        add_label_value(&mut lines, "debt type multiplier", mult_desc, theme, width);
     }
 
     // Risk boost
@@ -1953,6 +1986,7 @@ mod tests {
                 has_coverage_data: false,
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
+                debt_type_multiplier: None,
             },
             debt_type,
             function_role: FunctionRole::PureLogic,
