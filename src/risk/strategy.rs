@@ -159,9 +159,9 @@ impl EnhancedRiskStrategy {
         } else {
             match context.coverage {
                 Some(cov) => {
-                    // Convert fraction to percentage if needed (coverage is 0.0-1.0)
-                    let cov_percentage = if cov <= 1.0 { cov * 100.0 } else { cov };
-                    (100.0 - cov_percentage) / 100.0 * self.weights.coverage
+                    // Coverage is expected in percentage format (0-100)
+                    // No automatic conversion - callers must provide percentages
+                    (100.0 - cov) / 100.0 * self.weights.coverage
                 }
                 None => 0.0, // Don't add coverage weight when coverage is unknown
             }
@@ -186,13 +186,15 @@ impl EnhancedRiskStrategy {
         }
     }
 
+    /// Calculate coverage penalty multiplier.
+    ///
+    /// Coverage is expected in percentage format (0-100), not fraction format.
     fn calculate_coverage_penalty(&self, coverage: Option<f64>) -> f64 {
         match coverage {
             None => 1.0, // No penalty when coverage is unknown (not untested, just unknown)
             Some(c) => {
-                // Convert fraction to percentage if needed (coverage is 0.0-1.0)
-                let cov_percentage = if c <= 1.0 { c * 100.0 } else { c };
-                match cov_percentage {
+                // Coverage is in percentage format (0-100)
+                match c {
                     c if c < 20.0 => 3.0,
                     c if c < 40.0 => 2.0,
                     c if c < 60.0 => 1.5,
@@ -231,7 +233,9 @@ impl EnhancedRiskStrategy {
         }
     }
 
-    /// Calculate additional reduction for well-tested pattern code
+    /// Calculate additional reduction for well-tested pattern code.
+    ///
+    /// Coverage is expected in percentage format (0-100), not fraction format.
     fn calculate_coverage_reduction(&self, context: &RiskContext) -> f64 {
         if !context.is_recognized_pattern {
             return 1.0; // No additional reduction for non-patterns
@@ -239,11 +243,10 @@ impl EnhancedRiskStrategy {
 
         match context.coverage {
             Some(cov) => {
-                // Convert fraction to percentage if needed (coverage is 0.0-1.0)
-                let cov_percentage = if cov <= 1.0 { cov * 100.0 } else { cov };
-                if cov_percentage >= 90.0 {
+                // Coverage is in percentage format (0-100)
+                if cov >= 90.0 {
                     0.8 // Well tested: 20% additional reduction
-                } else if cov_percentage >= 70.0 {
+                } else if cov >= 70.0 {
                     0.9 // Tested: 10% additional reduction
                 } else {
                     1.0 // No additional reduction
@@ -559,5 +562,42 @@ mod tests {
         assert_eq!(categorize_by_risk_score(7.0), RiskCategory::High);
         assert_eq!(categorize_by_risk_score(5.0), RiskCategory::Medium);
         assert_eq!(categorize_by_risk_score(2.0), RiskCategory::Low);
+    }
+
+    /// Bug fix test: Coverage values should be consistently interpreted.
+    /// The old code used a heuristic `if cov <= 1.0` to guess format, but this
+    /// fails for actual percentage values between 0-1 (e.g., 0.5% coverage).
+    ///
+    /// Coverage should be in percentage format (0-100), not fraction format.
+    #[test]
+    fn test_coverage_format_consistency() {
+        let strategy = EnhancedRiskStrategy::default();
+
+        // 1% coverage should be treated as very low coverage (penalty 3.0)
+        // NOT as 100% coverage (which would get penalty 0.8)
+        let one_percent_penalty = strategy.calculate_coverage_penalty(Some(1.0));
+        assert_eq!(
+            one_percent_penalty, 3.0,
+            "1.0 should be treated as 1% coverage (very low), not 100%"
+        );
+
+        // 0.5% coverage should also be treated as very low
+        let half_percent_penalty = strategy.calculate_coverage_penalty(Some(0.5));
+        assert_eq!(
+            half_percent_penalty, 3.0,
+            "0.5 should be treated as 0.5% coverage (very low), not 50%"
+        );
+
+        // Explicit percentages should work correctly
+        assert_eq!(
+            strategy.calculate_coverage_penalty(Some(85.0)),
+            0.8,
+            "85.0 should be treated as 85% coverage (good)"
+        );
+        assert_eq!(
+            strategy.calculate_coverage_penalty(Some(50.0)),
+            1.5,
+            "50.0 should be treated as 50% coverage (medium)"
+        );
     }
 }

@@ -147,7 +147,16 @@ impl ComplexityThresholds {
         }
     }
 
-    /// Check if a function should be flagged based on thresholds
+    /// Check if a function should be flagged based on thresholds.
+    ///
+    /// A function is flagged if ANY of these conditions are met:
+    /// 1. Cyclomatic complexity alone exceeds its threshold
+    /// 2. Cognitive complexity alone exceeds its threshold
+    /// 3. Total complexity (cyclomatic + cognitive) exceeds its threshold AND length exceeds minimum
+    /// 4. Function length is extremely long (5x the minimum threshold)
+    ///
+    /// This ensures single-dimension complexity issues are caught, not just
+    /// functions that are complex in ALL dimensions simultaneously.
     pub fn should_flag_function(&self, metrics: &FunctionMetrics, role: FunctionRole) -> bool {
         let multiplier = self.get_role_multiplier(role);
 
@@ -157,12 +166,26 @@ impl ComplexityThresholds {
         let adjusted_cognitive_threshold =
             (self.minimum_cognitive_complexity as f64 * multiplier) as u32;
         let adjusted_total_threshold = (self.minimum_total_complexity as f64 * multiplier) as u32;
+        let adjusted_length_threshold = (self.minimum_function_length as f64 * multiplier) as usize;
 
-        // Must exceed ALL adjusted thresholds to be flagged
-        metrics.cyclomatic >= adjusted_cyclomatic_threshold
-            && metrics.cognitive >= adjusted_cognitive_threshold
-            && metrics.length >= self.minimum_function_length
-            && (metrics.cyclomatic + metrics.cognitive) >= adjusted_total_threshold
+        let total_complexity = metrics.cyclomatic + metrics.cognitive;
+
+        // Flag if ANY significant threshold is exceeded
+        let cyclomatic_exceeded = metrics.cyclomatic >= adjusted_cyclomatic_threshold;
+        let cognitive_exceeded = metrics.cognitive >= adjusted_cognitive_threshold;
+        let total_exceeded = total_complexity >= adjusted_total_threshold;
+        let length_exceeded = metrics.length >= adjusted_length_threshold;
+        let extremely_long = metrics.length >= adjusted_length_threshold * 5;
+
+        // Flag if:
+        // - Cyclomatic alone is high enough, OR
+        // - Cognitive alone is high enough, OR
+        // - Total complexity is high AND function is not trivially short, OR
+        // - Function is extremely long (5x threshold)
+        cyclomatic_exceeded
+            || cognitive_exceeded
+            || (total_exceeded && length_exceeded)
+            || extremely_long
     }
 
     /// Get the complexity level for given metrics
@@ -393,5 +416,80 @@ mod tests {
         assert_eq!(thresholds.get_role_multiplier(FunctionRole::CoreLogic), 1.0);
         assert_eq!(thresholds.get_role_multiplier(FunctionRole::Utility), 0.8);
         assert_eq!(thresholds.get_role_multiplier(FunctionRole::Test), 2.0);
+    }
+
+    /// Bug fix test: A function with extremely high cyclomatic complexity
+    /// should be flagged even if cognitive complexity is low.
+    /// The current bug requires ALL thresholds to be exceeded, which means
+    /// single-dimension complexity issues are missed.
+    #[test]
+    fn test_high_cyclomatic_low_cognitive_should_flag() {
+        let thresholds = ComplexityThresholds::default();
+        // Default thresholds: cyclomatic=5, cognitive=10, total=8, length=20
+
+        let mut high_cyclomatic = FunctionMetrics::new(
+            "high_cyclomatic".to_string(),
+            std::path::PathBuf::from("test.rs"),
+            1,
+        );
+        // Very high cyclomatic (10x threshold), low cognitive (below threshold)
+        high_cyclomatic.cyclomatic = 50; // Way over 5 threshold
+        high_cyclomatic.cognitive = 5; // Under 10 threshold
+        high_cyclomatic.length = 100; // Over 20 threshold
+                                      // Total = 55, way over 8 threshold
+
+        // This should be flagged - cyclomatic=50 is extremely complex
+        assert!(
+            thresholds.should_flag_function(&high_cyclomatic, FunctionRole::CoreLogic),
+            "Function with cyclomatic=50 should be flagged even if cognitive is low"
+        );
+    }
+
+    /// Bug fix test: A function with extremely high cognitive complexity
+    /// should be flagged even if cyclomatic complexity is low.
+    #[test]
+    fn test_high_cognitive_low_cyclomatic_should_flag() {
+        let thresholds = ComplexityThresholds::default();
+
+        let mut high_cognitive = FunctionMetrics::new(
+            "high_cognitive".to_string(),
+            std::path::PathBuf::from("test.rs"),
+            1,
+        );
+        // Low cyclomatic (below threshold), very high cognitive (5x threshold)
+        high_cognitive.cyclomatic = 3; // Under 5 threshold
+        high_cognitive.cognitive = 50; // Way over 10 threshold
+        high_cognitive.length = 100;
+        // Total = 53, way over 8 threshold
+
+        // This should be flagged - cognitive=50 is extremely complex
+        assert!(
+            thresholds.should_flag_function(&high_cognitive, FunctionRole::CoreLogic),
+            "Function with cognitive=50 should be flagged even if cyclomatic is low"
+        );
+    }
+
+    /// Bug fix test: A very long function should be flagged even if
+    /// complexity metrics are moderate.
+    #[test]
+    fn test_very_long_function_should_flag() {
+        let thresholds = ComplexityThresholds::default();
+
+        let mut very_long = FunctionMetrics::new(
+            "very_long".to_string(),
+            std::path::PathBuf::from("test.rs"),
+            1,
+        );
+        // Moderate complexity but very long
+        very_long.cyclomatic = 6; // Just over 5 threshold
+        very_long.cognitive = 12; // Just over 10 threshold
+        very_long.length = 500; // 25x the threshold!
+                                // Total = 18, over 8 threshold
+
+        // This should be flagged - 500 lines is way too long
+        assert!(
+            thresholds.should_flag_function(&very_long, FunctionRole::CoreLogic),
+            "Function with 500 lines should be flagged"
+        );
     }
 }

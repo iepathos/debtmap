@@ -229,6 +229,11 @@ pub fn calculate_cyclomatic(block: &Block) -> u32 {
 }
 
 /// Calculate cyclomatic complexity with pattern adjustments
+///
+/// When a pattern-like match expression is detected, its contribution to
+/// complexity is adjusted using logarithmic scaling. Importantly, this
+/// adjustment only affects the match's contribution - other control flow
+/// in the block is preserved.
 pub fn calculate_cyclomatic_adjusted(block: &Block) -> u32 {
     let base = calculate_cyclomatic(block);
 
@@ -236,10 +241,15 @@ pub fn calculate_cyclomatic_adjusted(block: &Block) -> u32 {
     for stmt in &block.stmts {
         if let Stmt::Expr(expr, _) = stmt {
             if let Some(info) = detect_match_expression(expr) {
-                // Apply logarithmic scaling for pattern-based match expressions
-                let adjusted = (info.condition_count as f32).log2().ceil() as u32;
+                // Calculate the match's original contribution: (arms - 1)
+                let original_match_contribution = info.condition_count.saturating_sub(1) as u32;
+
+                // Calculate the adjusted contribution using logarithmic scaling
+                let adjusted_match = (info.condition_count as f32).log2().ceil() as u32;
                 let default_penalty = if !info.has_default { 1 } else { 0 };
-                return adjusted + default_penalty;
+
+                // Replace just the match's contribution, preserving other complexity
+                return base - original_match_contribution + adjusted_match + default_penalty;
             }
         }
     }
@@ -255,19 +265,25 @@ pub fn calculate_cyclomatic_adjusted(block: &Block) -> u32 {
 }
 
 /// Calculate complexity contribution for a single expression.
-fn calculate_expr_complexity(expr: &Expr, in_condition: bool) -> u32 {
+///
+/// McCabe cyclomatic complexity counts decision points (predicates), not branches.
+/// An if-else has ONE decision point regardless of whether there's an else branch.
+/// The else branch is just the alternative path from the single decision.
+///
+/// Logical operators (&&, ||) always add complexity because they represent
+/// additional predicates that can independently affect control flow.
+/// `if a && b && c` has 3 predicates and is more complex than `if a`.
+fn calculate_expr_complexity(expr: &Expr, _in_condition: bool) -> u32 {
     match expr {
-        Expr::If(expr_if) => {
-            let mut count = 1;
-            if expr_if.else_branch.is_some() {
-                count += 1;
-            }
-            count
-        }
+        // If adds 1 decision point regardless of else branch presence.
+        // The else is not a separate decision - it's the alternative path.
+        Expr::If(_) => 1,
         Expr::While(_) | Expr::ForLoop(_) | Expr::Loop(_) => 1,
         Expr::Try(_) => 1,
         Expr::Match(expr_match) => expr_match.arms.len().saturating_sub(1) as u32,
-        Expr::Binary(binary) if is_logical_operator(&binary.op) && !in_condition => 1,
+        // Logical operators always add complexity - they represent additional predicates
+        // that can independently affect control flow, regardless of context.
+        Expr::Binary(binary) if is_logical_operator(&binary.op) => 1,
         _ => 0,
     }
 }
@@ -282,4 +298,198 @@ pub fn calculate_cyclomatic_for_function(complexity: u32, params: usize) -> u32 
 
 pub fn combine_cyclomatic(branches: Vec<u32>) -> u32 {
     branches.iter().sum::<u32>() + 1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    /// Bug fix test: if-else should count as 1 decision point, not 2.
+    /// McCabe cyclomatic complexity counts decision points (predicates),
+    /// not branches. An if-else has ONE decision point regardless of
+    /// whether there's an else branch.
+    #[test]
+    fn test_if_else_counts_as_one_decision_point() {
+        // Single if without else: complexity = 1 (base) + 1 (if) = 2
+        let block_if_only: Block = parse_quote! {{
+            if x > 0 {
+                do_something();
+            }
+        }};
+        assert_eq!(
+            calculate_cyclomatic(&block_if_only),
+            2,
+            "if without else should add 1 to base complexity"
+        );
+
+        // Single if WITH else: complexity should ALSO be 1 (base) + 1 (if) = 2
+        // The else is not a separate decision point - it's the alternative path
+        let block_if_else: Block = parse_quote! {{
+            if x > 0 {
+                do_something();
+            } else {
+                do_other();
+            }
+        }};
+        assert_eq!(
+            calculate_cyclomatic(&block_if_else),
+            2,
+            "if-else should add 1 to base complexity, not 2 (else is not a decision point)"
+        );
+    }
+
+    #[test]
+    fn test_multiple_if_else_chains() {
+        // 3 sequential if-else statements: complexity = 1 (base) + 3 (ifs) = 4
+        let block: Block = parse_quote! {{
+            if a { x(); } else { y(); }
+            if b { x(); } else { y(); }
+            if c { x(); } else { y(); }
+        }};
+        assert_eq!(
+            calculate_cyclomatic(&block),
+            4,
+            "3 if-else statements should add 3 to base complexity"
+        );
+    }
+
+    #[test]
+    fn test_nested_if_else() {
+        // Nested if-else: complexity = 1 (base) + 2 (two if decisions) = 3
+        let block: Block = parse_quote! {{
+            if a {
+                if b {
+                    x();
+                } else {
+                    y();
+                }
+            } else {
+                z();
+            }
+        }};
+        assert_eq!(
+            calculate_cyclomatic(&block),
+            3,
+            "nested if-else should count 2 decisions (outer if + inner if)"
+        );
+    }
+
+    #[test]
+    fn test_match_complexity() {
+        // Match with 3 arms: complexity = 1 (base) + 2 (arms - 1) = 3
+        let block: Block = parse_quote! {{
+            match x {
+                A => 1,
+                B => 2,
+                _ => 3,
+            }
+        }};
+        assert_eq!(
+            calculate_cyclomatic(&block),
+            3,
+            "match with 3 arms should add 2 (arms - 1) to base complexity"
+        );
+    }
+
+    #[test]
+    fn test_loop_complexity() {
+        let block: Block = parse_quote! {{
+            while condition {
+                do_work();
+            }
+            for i in items {
+                process(i);
+            }
+            loop {
+                if done { break; }
+            }
+        }};
+        // 1 (base) + 1 (while) + 1 (for) + 1 (loop) + 1 (if inside loop) = 5
+        assert_eq!(calculate_cyclomatic(&block), 5);
+    }
+
+    /// Bug fix test: Logical operators inside conditions SHOULD add complexity.
+    /// `if a && b && c` has 3 predicates and should have higher complexity
+    /// than `if a`.
+    #[test]
+    fn test_logical_operators_in_conditions_add_complexity() {
+        // Single condition: complexity = 1 (base) + 1 (if) = 2
+        let single_condition: Block = parse_quote! {{
+            if a {
+                do_something();
+            }
+        }};
+        assert_eq!(
+            calculate_cyclomatic(&single_condition),
+            2,
+            "Single condition should have complexity 2"
+        );
+
+        // Multiple conditions with &&: complexity = 1 (base) + 1 (if) + 2 (&& operators) = 4
+        let three_conditions: Block = parse_quote! {{
+            if a && b && c {
+                do_something();
+            }
+        }};
+        assert!(
+            calculate_cyclomatic(&three_conditions) > 2,
+            "if a && b && c should have higher complexity than if a (got {})",
+            calculate_cyclomatic(&three_conditions)
+        );
+
+        // Mixed && and ||: should also add complexity
+        let mixed_operators: Block = parse_quote! {{
+            if a && b || c {
+                do_something();
+            }
+        }};
+        assert!(
+            calculate_cyclomatic(&mixed_operators) > 2,
+            "if a && b || c should have higher complexity than if a (got {})",
+            calculate_cyclomatic(&mixed_operators)
+        );
+    }
+
+    /// Bug fix test: calculate_cyclomatic_adjusted should NOT discard base complexity
+    /// when a pattern match is detected. The adjustment should only affect the
+    /// match expression's contribution, not the entire function's complexity.
+    #[test]
+    fn test_adjusted_preserves_other_complexity() {
+        // Function with control flow BEFORE a match expression
+        let block: Block = parse_quote! {{
+            if condition {
+                do_something();
+            }
+            for i in items {
+                process(i);
+            }
+            match x {
+                A => 1,
+                B => 2,
+                C => 3,
+                D => 4,
+                E => 5,
+                F => 6,
+                G => 7,
+                _ => 8,
+            }
+        }};
+
+        let base = calculate_cyclomatic(&block);
+        let adjusted = calculate_cyclomatic_adjusted(&block);
+
+        // Base should be: 1 (base) + 1 (if) + 1 (for) + 7 (match: 8 arms - 1) = 10
+        assert_eq!(base, 10, "Base complexity should include all control flow");
+
+        // Adjusted should NOT be just log2(8)=3 - it should preserve the if and for loop
+        // The if and for contribute 2, and the match should be adjusted to ~3
+        // So adjusted should be around 1 (base) + 1 (if) + 1 (for) + 3 (adjusted match) = 6
+        // At minimum, it should be > 3 (the match-only adjustment)
+        assert!(
+            adjusted > 3,
+            "Adjusted complexity ({}) should preserve non-match control flow, not just return match adjustment",
+            adjusted
+        );
+    }
 }
