@@ -17,7 +17,6 @@
 //! are in [`effects_wrappers`]. This separation enables fast unit testing
 //! of the core algorithms.
 
-pub mod cognitive;
 pub mod cyclomatic;
 pub mod effects_wrappers;
 pub mod entropy;
@@ -52,9 +51,9 @@ pub use weighted::{ComplexityNormalization, ComplexityWeights, WeightedComplexit
 // Re-export pure complexity functions (spec 196)
 // These pure functions operate directly on AST and are much faster to test
 pub use pure::{
-    calculate_cognitive_pure, calculate_cyclomatic_pure, calculate_max_nesting_depth,
-    calculate_nesting_depth, count_branches, detect_complex_matches, detect_patterns_pure,
-    is_pure_mapping_match, Pattern,
+    calculate_cognitive_for_block, calculate_cognitive_pure, calculate_cyclomatic_pure,
+    calculate_max_nesting_depth, calculate_nesting_depth, count_branches, detect_complex_matches,
+    detect_patterns_pure, is_pure_mapping_match, Pattern,
 };
 
 // Re-export effect wrappers for I/O operations (spec 196)

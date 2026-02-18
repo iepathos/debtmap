@@ -5,7 +5,7 @@
 //! line counts. All functions are pure and side-effect-free.
 
 use crate::complexity::{
-    cognitive::calculate_cognitive_with_patterns,
+    calculate_cognitive_for_block,
     visitor_detector::{PatternInfo, PatternType},
 };
 
@@ -59,10 +59,9 @@ fn apply_cognitive_pattern_scaling(block: &syn::Block, pattern_info: &PatternInf
 
 /// Calculate cognitive complexity for a syn block.
 ///
-/// Uses the enhanced version that includes pattern detection.
+/// Uses the pure implementation for consistent, spec-compliant behavior.
 pub fn calculate_cognitive_syn(block: &syn::Block) -> u32 {
-    let (total, _patterns) = calculate_cognitive_with_patterns(block);
-    total
+    calculate_cognitive_for_block(block)
 }
 
 /// Try to detect visitor pattern in a function.

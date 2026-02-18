@@ -287,6 +287,30 @@ fn calculate_item_cognitive(item: &Item, nesting: u32) -> u32 {
     }
 }
 
+/// Calculate cognitive complexity for a code block.
+///
+/// This is a pure function - deterministic, no I/O, no `Result`.
+/// Use this when you have a `syn::Block` rather than a full `syn::File`.
+///
+/// # Algorithm
+///
+/// Same as [`calculate_cognitive_pure`] but operates on a single block.
+/// - Control flow statements add 1 + current nesting level
+/// - `else` adds 1 (flat, not affected by nesting)
+/// - Logical operators add 1 (regardless of nesting)
+/// - Match expressions add 1 + nesting (arms don't add to count)
+///
+/// # Example
+///
+/// ```rust
+/// let block: syn::Block = syn::parse_str("{ if x { } }").unwrap();
+/// let complexity = debtmap::complexity::pure::calculate_cognitive_for_block(&block);
+/// assert_eq!(complexity, 1);
+/// ```
+pub fn calculate_cognitive_for_block(block: &Block) -> u32 {
+    calculate_block_cognitive(block, 0)
+}
+
 fn calculate_block_cognitive(block: &Block, nesting: u32) -> u32 {
     block
         .stmts

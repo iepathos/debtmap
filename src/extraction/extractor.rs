@@ -24,7 +24,7 @@ use crate::analyzers::io_detector::detect_io_operations_from_block;
 use crate::analyzers::purity_detector::PurityDetector;
 use crate::complexity::entropy::EntropyAnalyzer;
 use crate::complexity::entropy_core::EntropyScore;
-use crate::complexity::{cognitive::calculate_cognitive, cyclomatic::calculate_cyclomatic};
+use crate::complexity::{calculate_cognitive_for_block, cyclomatic::calculate_cyclomatic};
 use crate::config::get_entropy_config;
 use crate::core::parsing::reset_span_locations;
 use crate::extraction::types::{
@@ -542,7 +542,7 @@ impl UnifiedFileExtractor {
 
     fn calculate_complexity(&self, block: &syn::Block) -> (u32, u32, u32) {
         let cyclomatic = calculate_cyclomatic(block);
-        let cognitive = calculate_cognitive(block);
+        let cognitive = calculate_cognitive_for_block(block);
         let nesting = self.calculate_max_nesting(block);
         (cyclomatic, cognitive, nesting)
     }
