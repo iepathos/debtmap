@@ -833,8 +833,6 @@ fn format_literal_token(lit: &syn::Lit) -> String {
 struct PatternDetector {
     patterns: HashMap<String, usize>,
     total_patterns: usize,
-    /// Tracks consecutive ? operator usage for chain detection
-    try_chain_depth: usize,
     /// Maximum ? chain length seen in current block
     max_try_chain: usize,
 }
@@ -844,7 +842,6 @@ impl PatternDetector {
         Self {
             patterns: HashMap::new(),
             total_patterns: 0,
-            try_chain_depth: 0,
             max_try_chain: 0,
         }
     }
