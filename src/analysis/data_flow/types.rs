@@ -361,17 +361,29 @@ pub enum Rvalue {
 /// Binary operation type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOp {
+    /// Addition (`+`).
     Add,
+    /// Subtraction (`-`).
     Sub,
+    /// Multiplication (`*`).
     Mul,
+    /// Division (`/`).
     Div,
+    /// Equality comparison (`==`).
     Eq,
+    /// Inequality comparison (`!=`).
     Ne,
+    /// Less than comparison (`<`).
     Lt,
+    /// Greater than comparison (`>`).
     Gt,
+    /// Less than or equal comparison (`<=`).
     Le,
+    /// Greater than or equal comparison (`>=`).
     Ge,
+    /// Logical AND (`&&`).
     And,
+    /// Logical OR (`||`).
     Or,
 }
 
