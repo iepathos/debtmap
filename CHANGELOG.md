@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-02-18
+
+### Fixed
+
+- **Cyclomatic Complexity** - `else` branches no longer incorrectly add to complexity
+  - McCabe cyclomatic complexity counts decision points, not branches
+  - `if-else` now correctly reports 2 (not 3)
+
+- **Cognitive Complexity Unified** - Consolidated to single spec-compliant implementation
+  - Removed duplicate `cognitive.rs` module (-534 lines)
+  - `else` blocks now correctly add +1 per SonarQube spec
+  - Match arms no longer inflate complexity count
+
+- **Nesting Depth for Else Blocks** - Plain else blocks now at correct depth
+  - Content inside `else { if { } }` correctly reports depth 2 (was 1)
+  - else-if chains still correctly stay flat at depth 1
+
+- **TypeScript Nesting Depth** - Functions no longer count as nesting
+  - `data.map(x => x.filter(y => y))` now correctly reports 0 (was 2)
+  - Nesting depth measures control flow only
+
+- **TypeScript Cognitive Complexity** - No longer double-counts callbacks
+  - Parent function counts callback presence, not its internals
+  - Callback complexity counted only when analyzing callback itself
+
 ## [0.15.0] - 2026-02-16
 
 ### Added
