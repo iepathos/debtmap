@@ -177,12 +177,28 @@ pub enum Terminator {
 }
 
 /// Edge type in the control flow graph.
+///
+/// Represents the relationship between two connected basic blocks,
+/// indicating how control flow transitions from one block to another.
 #[derive(Debug, Clone)]
 pub enum Edge {
+    /// Unconditional sequential flow between adjacent blocks.
+    ///
+    /// Used when control flow naturally falls through from one block
+    /// to the next without any branching decision.
     Sequential,
+    /// Conditional branch edge taken based on a boolean condition.
+    ///
+    /// The `condition` field indicates whether this edge is taken
+    /// when the branch condition evaluates to `true` or `false`.
     Branch {
+        /// Whether this edge is taken when the condition is true.
         condition: bool,
     },
+    /// Back edge in a loop, jumping from loop body back to header.
+    ///
+    /// These edges are important for detecting cycles in the CFG
+    /// and for loop analysis algorithms.
     LoopBack,
     /// Edge from match expression to an arm block.
     MatchArm(usize),
@@ -191,9 +207,17 @@ pub enum Edge {
 }
 
 /// Variable identifier with SSA-like versioning.
+///
+/// Each variable is identified by a name index and a version number.
+/// The versioning allows tracking multiple definitions of the same
+/// variable through the control flow graph (similar to SSA form).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct VarId {
+    /// Index into the CFG's `var_names` vector identifying the variable name.
     pub name_id: u32,
+    /// Version number incremented for each new definition of this variable.
+    ///
+    /// Version 0 is typically the initial definition or parameter.
     pub version: u32,
 }
 
@@ -284,30 +308,52 @@ pub struct Use {
     pub point: ProgramPoint,
 }
 
-/// Right-hand side of assignment.
+/// Right-hand side of an assignment statement.
+///
+/// Represents the value being assigned to a variable. Each variant
+/// captures the structure of different expression types, tracking
+/// which variables are used in computing the value.
 #[derive(Debug, Clone)]
 pub enum Rvalue {
+    /// Simple variable use (copying or moving another variable's value).
     Use(VarId),
+    /// Binary operation combining two variable values.
     BinaryOp {
+        /// The binary operator being applied.
         op: BinOp,
+        /// The left operand variable.
         left: VarId,
+        /// The right operand variable.
         right: VarId,
     },
+    /// Unary operation on a single variable.
     UnaryOp {
+        /// The unary operator being applied.
         op: UnOp,
+        /// The operand variable.
         operand: VarId,
     },
+    /// A constant literal value (numbers, strings, etc.).
     Constant,
+    /// Function or method call expression.
     Call {
+        /// Name of the function being called.
         func: String,
+        /// Variables passed as arguments.
         args: Vec<VarId>,
     },
+    /// Field access on a struct or tuple.
     FieldAccess {
+        /// The variable holding the struct or tuple.
         base: VarId,
+        /// Name of the field being accessed.
         field: String,
     },
+    /// Reference creation (borrowing a variable).
     Ref {
+        /// The variable being borrowed.
         var: VarId,
+        /// Whether this is a mutable borrow (`&mut`).
         mutable: bool,
     },
 }
