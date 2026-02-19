@@ -123,22 +123,34 @@ pub struct ComparativeAnalysis {
     pub changes: Vec<ChangeDescription>,
 }
 
-/// Description of a specific change
+/// Description of a specific change between two analysis versions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeDescription {
+    /// Type of change (e.g., "added", "removed", "modified").
     pub change_type: String,
+    /// Description of the change's impact on complexity.
     pub impact: String,
+    /// Source location where the change occurred in "file:line" format.
     pub location: String,
 }
 
-/// Performance metrics for the analysis
+/// Performance metrics for the analysis process.
+///
+/// Tracks timing for each phase of analysis to help identify
+/// bottlenecks and optimize performance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisPerformanceMetrics {
+    /// Total wall-clock time for the entire analysis in milliseconds.
     pub total_time_ms: u64,
+    /// Time spent on raw complexity analysis in milliseconds.
     pub raw_analysis_ms: u64,
+    /// Time spent on normalized complexity analysis in milliseconds.
     pub normalized_analysis_ms: u64,
+    /// Time spent on complexity attribution in milliseconds.
     pub attribution_ms: u64,
+    /// Time spent generating the report in milliseconds.
     pub reporting_ms: u64,
+    /// Peak memory usage during analysis in megabytes.
     pub memory_used_mb: f32,
 }
 
