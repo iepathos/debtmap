@@ -156,37 +156,6 @@ fn apply_exponential_scaling(base_score: f64, debt_type: &DebtType, config: &Sca
     safe_base.powf(exponent)
 }
 
-/// Apply discrete risk-based boosts.
-///
-/// Returns the boosted score by multiplying with risk factors.
-/// Multiple risk factors combine multiplicatively.
-fn apply_risk_boosts(score: f64, item: &UnifiedDebtItem, config: &ScalingConfig) -> f64 {
-    let mut boost = 1.0;
-
-    // High dependency count indicates central, critical code
-    let total_deps = item.upstream_dependencies + item.downstream_dependencies;
-    if total_deps > 15 {
-        boost *= config.high_dependency_boost;
-    }
-
-    // Entry points are critical paths
-    if matches!(item.function_role, FunctionRole::EntryPoint) {
-        boost *= config.entry_point_boost;
-    }
-
-    // Complex + untested is particularly risky
-    if is_untested(item) && item.cyclomatic_complexity > 20 {
-        boost *= config.complex_untested_boost;
-    }
-
-    // Error swallowing indicates poor error handling practices
-    if item.error_swallowing_count.unwrap_or(0) > 0 {
-        boost *= config.error_swallowing_boost;
-    }
-
-    score * boost
-}
-
 /// Check if item is untested (coverage < 10%).
 fn is_untested(item: &UnifiedDebtItem) -> bool {
     matches!(
@@ -353,6 +322,36 @@ mod tests {
             entropy_analysis: None,
             context_suggestion: None,
         }
+    }
+
+    /// Test helper: Apply discrete risk-based boosts.
+    /// This function was moved from production code to test-only code since
+    /// the logic is now inlined in calculate_final_score.
+    fn apply_risk_boosts(score: f64, item: &UnifiedDebtItem, config: &ScalingConfig) -> f64 {
+        let mut boost = 1.0;
+
+        // High dependency count indicates central, critical code
+        let total_deps = item.upstream_dependencies + item.downstream_dependencies;
+        if total_deps > 15 {
+            boost *= config.high_dependency_boost;
+        }
+
+        // Entry points are critical paths
+        if matches!(item.function_role, FunctionRole::EntryPoint) {
+            boost *= config.entry_point_boost;
+        }
+
+        // Complex + untested is particularly risky
+        if is_untested(item) && item.cyclomatic_complexity > 20 {
+            boost *= config.complex_untested_boost;
+        }
+
+        // Error swallowing indicates poor error handling practices
+        if item.error_swallowing_count.unwrap_or(0) > 0 {
+            boost *= config.error_swallowing_boost;
+        }
+
+        score * boost
     }
 
     #[test]
@@ -897,8 +896,14 @@ mod tests {
             calculate_final_score(base_score, &testing_gap.debt_type, &testing_gap, &config);
 
         // Verify multipliers are different
-        assert!(god_mult > complexity_mult, "GodObject should have higher multiplier than ComplexityHotspot");
-        assert!(complexity_mult > gap_mult, "ComplexityHotspot should have higher multiplier than TestingGap");
+        assert!(
+            god_mult > complexity_mult,
+            "GodObject should have higher multiplier than ComplexityHotspot"
+        );
+        assert!(
+            complexity_mult > gap_mult,
+            "ComplexityHotspot should have higher multiplier than TestingGap"
+        );
 
         // Verify resulting scores reflect the differentiation
         // Note: god_object also gets exponential scaling (1.4 exponent), so its final score is significantly higher
