@@ -232,6 +232,45 @@ fn extract_tokens_inner(node: &Node, source: &str, tokens: &mut Vec<JsEntropyTok
             tokens.push(JsEntropyToken::operator("[]".to_string()));
         }
 
+        // JSX elements (React/JSX patterns)
+        "jsx_element" | "jsx_self_closing_element" => {
+            // Extract the tag name for better pattern detection
+            let tag_name = get_jsx_tag_name(node, source);
+            tokens.push(JsEntropyToken::function_call(format!("<{}>", tag_name)));
+        }
+        "jsx_opening_element" | "jsx_closing_element" => {
+            // Opening/closing elements are part of jsx_element, track tag for patterns
+            if let Some(name_node) = node.child_by_field_name("name") {
+                let tag_name = node_text(&name_node, source);
+                tokens.push(JsEntropyToken::identifier(tag_name.to_string()));
+            }
+        }
+        "jsx_attribute" => {
+            // JSX attributes are similar to object properties
+            if let Some(name_node) = node.child_by_field_name("name") {
+                let attr_name = node_text(&name_node, source);
+                // Track common React attributes for pattern detection
+                match attr_name {
+                    "key" | "ref" | "className" | "style" | "onClick" | "onChange"
+                    | "onSubmit" | "disabled" | "type" | "value" | "href" | "src" => {
+                        tokens.push(JsEntropyToken::identifier(attr_name.to_string()));
+                    }
+                    _ => {
+                        // Generic attribute - normalize to reduce entropy noise
+                        tokens.push(JsEntropyToken::identifier("attr".to_string()));
+                    }
+                }
+            }
+        }
+        "jsx_expression" => {
+            // Embedded JS expressions in JSX: {expression}
+            tokens.push(JsEntropyToken::operator("{jsx}".to_string()));
+        }
+        "jsx_text" => {
+            // Text content in JSX - treat as literal
+            tokens.push(JsEntropyToken::literal("jsx_text".to_string()));
+        }
+
         // Default: recurse into children
         _ => {}
     }
@@ -241,6 +280,22 @@ fn extract_tokens_inner(node: &Node, source: &str, tokens: &mut Vec<JsEntropyTok
     for child in node.children(&mut cursor) {
         extract_tokens_inner(&child, source, tokens);
     }
+}
+
+/// Get JSX element tag name
+fn get_jsx_tag_name(node: &Node, source: &str) -> String {
+    // For jsx_element, get the opening element's name
+    if let Some(opening) = node.child_by_field_name("open_tag") {
+        if let Some(name_node) = opening.child_by_field_name("name") {
+            return node_text(&name_node, source).to_string();
+        }
+    }
+    // For jsx_self_closing_element, get name directly
+    if let Some(name_node) = node.child_by_field_name("name") {
+        return node_text(&name_node, source).to_string();
+    }
+    // Fallback
+    "element".to_string()
 }
 
 /// Get function/method call name
@@ -357,6 +412,145 @@ mod tests {
         assert_eq!(
             JsEntropyToken::function_call("bar".to_string()).weight(),
             0.9
+        );
+    }
+
+    fn parse_tsx(source: &str) -> tree_sitter::Tree {
+        let path = PathBuf::from("test.tsx");
+        let ast = parse_source(source, &path, JsLanguageVariant::Tsx).unwrap();
+        ast.tree
+    }
+
+    #[test]
+    fn test_extract_jsx_element_tokens() {
+        let source = r#"
+function Component() {
+    return <div className="container"><span>Hello</span></div>;
+}
+"#;
+        let tree = parse_tsx(source);
+        let tokens = extract_tokens_recursive(&tree.root_node(), source);
+
+        let jsx_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| t.value().starts_with('<') || t.value() == "className")
+            .map(|t| t.value())
+            .collect();
+
+        assert!(
+            !jsx_tokens.is_empty(),
+            "Should detect JSX elements: {:?}",
+            jsx_tokens
+        );
+    }
+
+    #[test]
+    fn test_extract_jsx_self_closing_tokens() {
+        let source = r#"
+function Component() {
+    return <input type="text" value={val} onChange={handleChange} />;
+}
+"#;
+        let tree = parse_tsx(source);
+        let tokens = extract_tokens_recursive(&tree.root_node(), source);
+
+        let attr_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| {
+                matches!(t.value(), "type" | "value" | "onChange")
+            })
+            .map(|t| t.value())
+            .collect();
+
+        assert!(
+            attr_tokens.contains(&"type"),
+            "Should detect type attribute: {:?}",
+            attr_tokens
+        );
+        assert!(
+            attr_tokens.contains(&"onChange"),
+            "Should detect onChange attribute: {:?}",
+            attr_tokens
+        );
+    }
+
+    #[test]
+    fn test_extract_jsx_expression_tokens() {
+        let source = r#"
+function List({ items }) {
+    return (
+        <ul>
+            {items.map(item => <li key={item.id}>{item.name}</li>)}
+        </ul>
+    );
+}
+"#;
+        let tree = parse_tsx(source);
+        let tokens = extract_tokens_recursive(&tree.root_node(), source);
+
+        // Should detect map method and jsx expressions
+        let has_map = tokens.iter().any(|t| t.value() == "map");
+        let has_jsx_expr = tokens.iter().any(|t| t.value() == "{jsx}");
+
+        assert!(has_map, "Should detect map method call");
+        assert!(has_jsx_expr, "Should detect JSX expressions");
+    }
+
+    #[test]
+    fn test_jsx_fragment_tokens() {
+        // Note: tree-sitter-typescript doesn't have a dedicated jsx_fragment node type
+        // Fragments (<>...</>) are parsed as jsx_element with empty tag names
+        let source = r#"
+function Fragment() {
+    return (
+        <>
+            <span>One</span>
+            <span>Two</span>
+        </>
+    );
+}
+"#;
+        let tree = parse_tsx(source);
+        let tokens = extract_tokens_recursive(&tree.root_node(), source);
+
+        // Fragments are detected as JSX elements (spans are detected)
+        let jsx_element_count = tokens
+            .iter()
+            .filter(|t| t.value().starts_with('<'))
+            .count();
+
+        assert!(
+            jsx_element_count >= 2,
+            "Should detect JSX elements including fragment children: {:?}",
+            tokens.iter().map(|t| t.value()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_repetitive_jsx_pattern_detection() {
+        // Repetitive JSX should have high pattern repetition
+        let source = r#"
+function Form() {
+    return (
+        <form>
+            <input type="text" className="input" />
+            <input type="text" className="input" />
+            <input type="text" className="input" />
+            <input type="text" className="input" />
+        </form>
+    );
+}
+"#;
+        let tree = parse_tsx(source);
+        let tokens = extract_tokens_recursive(&tree.root_node(), source);
+
+        // Count repeated patterns
+        let input_count = tokens.iter().filter(|t| t.value().contains("input")).count();
+
+        assert!(
+            input_count >= 4,
+            "Should detect multiple input elements: {}",
+            input_count
         );
     }
 }

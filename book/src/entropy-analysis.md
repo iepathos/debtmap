@@ -66,26 +66,39 @@ Where:
 
 ### Token Classification
 
-Debtmap can classify tokens by importance to give more weight to semantically significant tokens in entropy calculations. This is controlled by the `use_classification` configuration option.
+Debtmap classifies tokens by semantic importance to give more weight to meaningful code structures in entropy calculations. This is controlled by the `use_classification` configuration option.
 
 **When enabled** (`use_classification = false` by default for backward compatibility), tokens are weighted by importance:
 
-**High importance (weight: 1.0):**
-- Control flow keywords (`if`, `match`, `for`, `while`)
-- Error handling (`try`, `catch`, `?`, `unwrap`)
-- Async keywords (`async`, `await`)
-
-**Medium importance (weight: 0.7):**
-- Function calls
-- Method invocations
-- Operators
-
-**Low importance (weight: 0.3):**
-- Identifiers (variable names)
-- Literals (strings, numbers)
-- Punctuation
+| Category | Weight | Examples |
+|----------|--------|----------|
+| **Control flow** | 1.2 | `if`, `match`, `for`, `while`, `loop`, `switch` |
+| **Keywords** | 1.0 | `return`, `break`, `continue`, `async`, `await`, `unsafe` |
+| **Function calls** | 0.9 | `foo()`, `bar.method()`, `map`, `filter`, `reduce` |
+| **Operators** | 0.8 | `+`, `-`, `==`, `&&`, `?` (error propagation) |
+| **Identifiers** | 0.5 | Variable names, field access |
+| **Literals** | 0.3 | Numbers, strings, booleans |
 
 **When disabled** (`use_classification = false`), all tokens are treated equally, which may be useful for debugging or when you want unweighted entropy scores.
+
+#### Language-Specific Token Recognition
+
+**Rust-specific tokens:**
+- The `?` operator (error propagation) is tracked as an operator with weight 0.8
+- Chains of `?` operators (e.g., `file.read()?.parse()?.validate()?`) are detected as repetitive patterns
+- `unsafe` blocks are tracked with keyword weight 1.0
+
+**JavaScript/TypeScript-specific tokens:**
+- Arrow functions (`=>`) are tracked as keywords
+- Method chains (`.map()`, `.filter()`, `.reduce()`) are tracked with function call weight 0.9
+- Promise patterns (`.then()`, `.catch()`, `.finally()`) are recognized
+- Async/await expressions are tracked with keyword weight 1.0
+
+**JSX/React-specific tokens:**
+- JSX elements (`<div>`, `<Component>`) are tracked as function calls (weight 0.9)
+- Common React attributes (`className`, `onClick`, `onChange`, `key`, `ref`) are tracked
+- JSX expressions (`{expression}`) are tracked as operators
+- JSX fragments (`<>...</>`) are detected and tracked
 
 ### Pattern Repetition Detection
 
@@ -168,26 +181,34 @@ Each factor is dampened individually using a graduated calculation:
 
 ```rust
 // Conceptual pseudocode showing the three-factor approach
-// Actual implementation in src/complexity/entropy.rs:185-195 and :429-439
+// Actual implementation in src/complexity/entropy.rs:185-209
 fn calculate_dampening_factor(
-    repetition: f64,     // 0.0-1.0
-    entropy: f64,        // 0.0-1.0
-    branch_similarity: f64  // 0.0-1.0
+    repetition: f64,        // 0.0-1.0
+    entropy: f64,           // 0.0-1.0
+    branch_similarity: f64, // 0.0-1.0
+    config: &EntropyConfig
 ) -> f64 {
-    // Each factor uses calculate_graduated_dampening with its own threshold/range
-    let repetition_factor = graduated_dampening(repetition, threshold=1.0, max_reduction=0.20);
-    let entropy_factor = graduated_dampening(entropy, threshold=0.4, max_reduction=0.15);
-    let branch_factor = graduated_dampening(branch_similarity, threshold=0.8, max_reduction=0.25);
+    // Each factor uses calculate_graduated_dampening with configurable thresholds
+    let repetition_factor = graduated_dampening(
+        repetition, config.pattern_threshold, config.max_repetition_reduction
+    );
+    let entropy_factor = graduated_dampening(
+        entropy, config.entropy_threshold, config.max_entropy_reduction
+    );
+    let branch_factor = graduated_dampening(
+        branch_similarity, config.branch_threshold, config.max_branch_reduction
+    );
 
-    (repetition_factor * entropy_factor * branch_factor).max(0.7)  // Never reduce below 70%
+    let floor = 1.0 - config.max_combined_reduction;
+    (repetition_factor * entropy_factor * branch_factor).max(floor)
 }
 ```
 
-**Key Parameters:**
-- **Repetition**: Threshold 1.0, max 20% reduction (configurable via `max_repetition_reduction`)
-- **Entropy**: Threshold 0.4 (hardcoded), max 15% reduction (configurable via `max_entropy_reduction`)
-- **Branch Similarity**: Threshold 0.8 (configurable via `branch_threshold`), max 25% reduction (configurable via `max_branch_reduction`)
-- **Combined Floor**: Minimum 70% of original complexity preserved (configurable via `max_combined_reduction`)
+**Key Parameters (all configurable):**
+- **Repetition**: Threshold via `pattern_threshold` (default: 0.7), max reduction via `max_repetition_reduction` (default: 0.20)
+- **Entropy**: Threshold via `entropy_threshold` (default: 0.4), max reduction via `max_entropy_reduction` (default: 0.15)
+- **Branch Similarity**: Threshold via `branch_threshold` (default: 0.8), max reduction via `max_branch_reduction` (default: 0.25)
+- **Combined Floor**: Minimum preserved via `max_combined_reduction` (default: 0.30, preserving 70%)
 
 #### Example: Repetitive Validation Function
 
@@ -321,6 +342,10 @@ pattern_threshold = 0.7
 # When true, weights tokens by semantic importance (control flow > operators > identifiers)
 use_classification = false
 
+# Token entropy threshold (0.0-1.0, default: 0.4)
+# Values below this threshold trigger graduated dampening
+entropy_threshold = 0.4
+
 # Branch similarity threshold (0.0-1.0, default: 0.8)
 # Branches with similarity above this threshold contribute to dampening
 branch_threshold = 0.8
@@ -334,10 +359,10 @@ max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% pre
 
 **Important Notes:**
 
-1. **Dampening thresholds** - Some are configurable, some are hardcoded (`src/complexity/entropy.rs:185-195`):
-   - **Entropy factor threshold: 0.4** - Hardcoded in implementation (src/complexity/entropy.rs:192). Although an `entropy_threshold` field exists in the config struct (src/config/languages.rs:84), it is not wired up to be used in the actual dampening calculation. The value 0.4 was chosen based on empirical analysis across multiple codebases to balance false positive reduction with sensitivity to genuinely complex code.
+1. **All dampening thresholds are now configurable** (`src/complexity/entropy.rs:185-209`):
+   - **Entropy factor threshold: 0.4** - Configurable via `entropy_threshold` in config file. Values below this threshold trigger graduated dampening. The default 0.4 was chosen based on empirical analysis across multiple codebases to balance false positive reduction with sensitivity to genuinely complex code.
    - **Branch threshold: 0.8** - Configurable via `branch_threshold` in config file
-   - **Pattern threshold: 0.7/1.0** - Configurable via `pattern_threshold` in config file
+   - **Pattern threshold: 0.7** - Configurable via `pattern_threshold` in config file
 
 2. **The `weight` parameter** affects how entropy scores contribute to overall complexity scoring, but does not change the dampening thresholds or reductions.
 

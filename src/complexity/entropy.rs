@@ -186,13 +186,27 @@ impl EntropyAnalyzer {
             repetition,
             config.pattern_threshold,
             1.0,
-            0.20,
+            config.max_repetition_reduction,
             true,
         );
-        let entropy_factor = Self::calculate_graduated_dampening(entropy, 0.4, 0.4, 0.15, false);
-        let branch_factor = Self::calculate_graduated_dampening(similarity, 0.8, 0.2, 0.25, true);
+        let entropy_factor = Self::calculate_graduated_dampening(
+            entropy,
+            config.entropy_threshold,
+            config.entropy_threshold, // range equals threshold for symmetric dampening
+            config.max_entropy_reduction,
+            false,
+        );
+        let branch_factor = Self::calculate_graduated_dampening(
+            similarity,
+            config.branch_threshold,
+            1.0 - config.branch_threshold, // range to 1.0
+            config.max_branch_reduction,
+            true,
+        );
 
-        (repetition_factor * entropy_factor * branch_factor).max(0.7)
+        // Floor ensures we never reduce more than max_combined_reduction
+        let floor = 1.0 - config.max_combined_reduction;
+        (repetition_factor * entropy_factor * branch_factor).max(floor)
     }
 
     /// Calculate entropy score with caching support
@@ -614,7 +628,7 @@ impl TokenExtractor {
             Expr::Return(_) => self.add_keyword("return"),
             Expr::Break(_) => self.add_keyword("break"),
             Expr::Continue(_) => self.add_keyword("continue"),
-            Expr::Try(_) => self.add_keyword("try"),
+            Expr::Try(_) => self.add_operator("?"), // Error propagation operator
             Expr::Async(_) => self.add_keyword("async"),
             Expr::Await(_) => self.add_keyword("await"),
             Expr::Unsafe(_) => self.add_keyword("unsafe"),
@@ -690,9 +704,13 @@ impl<'ast> ClassifiedTokenExtractor<'ast> {
             | Expr::Match(_)
             | Expr::Return(_)
             | Expr::Break(_)
-            | Expr::Continue(_)
-            | Expr::Try(_) => {
+            | Expr::Continue(_) => {
                 self.handle_control_flow_keyword(expr);
+                false
+            }
+            Expr::Try(_) => {
+                // ? operator is an error propagation operator, not a control flow keyword
+                self.add_token("?", false, false, NodeType::Expression);
                 false
             }
             Expr::Async(_) | Expr::Await(_) => {
@@ -743,7 +761,6 @@ impl<'ast> ClassifiedTokenExtractor<'ast> {
             Expr::Return(_) => "return",
             Expr::Break(_) => "break",
             Expr::Continue(_) => "continue",
-            Expr::Try(_) => "try",
             _ => return,
         };
         self.add_token(keyword, false, false, NodeType::Statement);
@@ -816,6 +833,10 @@ fn format_literal_token(lit: &syn::Lit) -> String {
 struct PatternDetector {
     patterns: HashMap<String, usize>,
     total_patterns: usize,
+    /// Tracks consecutive ? operator usage for chain detection
+    try_chain_depth: usize,
+    /// Maximum ? chain length seen in current block
+    max_try_chain: usize,
 }
 
 impl PatternDetector {
@@ -823,6 +844,8 @@ impl PatternDetector {
         Self {
             patterns: HashMap::new(),
             total_patterns: 0,
+            try_chain_depth: 0,
+            max_try_chain: 0,
         }
     }
 
@@ -852,7 +875,19 @@ impl PatternDetector {
             Expr::ForLoop(_) => "for-loop".to_string(),
             Expr::Break(_) => "break".to_string(),
             Expr::Continue(_) => "continue".to_string(),
+            Expr::Try(_) => "try-op".to_string(), // ? operator
             _ => "other-expr".to_string(),
+        }
+    }
+
+    /// Count ? operators in an expression chain (e.g., `a()?.b()?.c()?`)
+    fn count_try_chain(&self, expr: &Expr) -> usize {
+        match expr {
+            Expr::Try(try_expr) => 1 + self.count_try_chain(&try_expr.expr),
+            Expr::MethodCall(method) => self.count_try_chain(&method.receiver),
+            Expr::Field(field) => self.count_try_chain(&field.base),
+            Expr::Await(await_expr) => self.count_try_chain(&await_expr.base),
+            _ => 0,
         }
     }
 }
@@ -861,6 +896,24 @@ impl<'ast> Visit<'ast> for PatternDetector {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         let pattern = self.expr_to_pattern(expr);
         self.record_pattern(pattern);
+
+        // Special handling for ? operator chains (error propagation patterns)
+        if let Expr::Try(try_expr) = expr {
+            let chain_length = self.count_try_chain(expr);
+            if chain_length > 1 {
+                // Record the chain pattern - multiple ? in a row indicates repetitive error handling
+                self.record_pattern(format!("try-chain-{}", chain_length));
+                self.max_try_chain = self.max_try_chain.max(chain_length);
+            }
+            // Track the inner expression to detect patterns like: file.read()?.parse()?
+            if let Expr::MethodCall(_) = &*try_expr.expr {
+                self.record_pattern("try-method".to_string());
+            } else if let Expr::Call(_) = &*try_expr.expr {
+                self.record_pattern("try-call".to_string());
+            } else if let Expr::Field(_) = &*try_expr.expr {
+                self.record_pattern("try-field".to_string());
+            }
+        }
 
         // Special handling for match arms - check for similarity
         if let Expr::Match(match_expr) = expr {
@@ -1086,6 +1139,45 @@ mod tests {
 
         let repetition = analyzer.detect_pattern_repetition(&block);
         assert!(repetition > 0.5); // Should detect high repetition
+    }
+
+    #[test]
+    fn test_try_operator_extraction() {
+        let mut analyzer = EntropyAnalyzer::new();
+
+        // Code with ? operator chains
+        let block: Block = parse_quote! {{
+            let data = file.read_to_string()?;
+            let parsed = data.parse()?;
+            let result = process(parsed)?;
+            result
+        }};
+
+        let score = analyzer.calculate_entropy(&block);
+
+        // Should have detected ? operators as patterns
+        assert!(score.token_entropy > 0.0, "Should have some entropy");
+    }
+
+    #[test]
+    fn test_try_chain_detection() {
+        let analyzer = EntropyAnalyzer::new();
+
+        // Code with chained ? operators: a()?.b()?.c()?
+        let block: Block = parse_quote! {{
+            let result = file.open()?.read()?.parse()?.validate()?;
+            let another = api.call()?.process()?;
+            result
+        }};
+
+        let repetition = analyzer.detect_pattern_repetition(&block);
+
+        // Chained ? operators should be detected as repetitive patterns
+        assert!(
+            repetition > 0.0,
+            "Should detect repetition in ? chains, got {}",
+            repetition
+        );
     }
 
     #[test]
