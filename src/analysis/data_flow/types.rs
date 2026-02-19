@@ -120,14 +120,31 @@ pub struct MatchArm {
 }
 
 /// Block terminator - how control leaves the block.
+///
+/// Each basic block ends with exactly one terminator that determines
+/// where control flow goes next. This is the only way control can leave
+/// a basic block.
 #[derive(Debug, Clone)]
 pub enum Terminator {
+    /// Unconditional jump to another block.
+    ///
+    /// Used for sequential control flow like the end of a loop body
+    /// jumping back to the loop header, or fall-through to the next block.
     Goto {
+        /// The block to jump to.
         target: BlockId,
     },
+    /// Conditional branch based on a boolean condition.
+    ///
+    /// Evaluates the condition variable and jumps to `then_block` if true,
+    /// or `else_block` if false. Used for `if`/`else` expressions and
+    /// loop conditions.
     Branch {
+        /// The boolean variable to test.
         condition: VarId,
+        /// Block to execute if condition is true.
         then_block: BlockId,
+        /// Block to execute if condition is false.
         else_block: BlockId,
     },
     /// Multi-way branch for match expressions.
@@ -142,9 +159,20 @@ pub enum Terminator {
         /// Join block where all arm paths converge
         join_block: BlockId,
     },
+    /// Return from the function, optionally with a value.
+    ///
+    /// Represents a `return` statement or an implicit return at the end
+    /// of a function. This is a terminal node in the CFG - no further
+    /// blocks are executed after this.
     Return {
+        /// The value being returned, if any. `None` for unit returns.
         value: Option<VarId>,
     },
+    /// Marks unreachable code.
+    ///
+    /// Used after control flow that never completes, such as after
+    /// a `panic!()`, `unreachable!()`, or infinite loops. The optimizer
+    /// can use this information to remove dead code.
     Unreachable,
 }
 
