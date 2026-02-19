@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b99585f7.js";
+            window.path_to_searchindex_js = "searchindex-0a0fea75.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -16494,27 +16494,45 @@ debtmap analyze --pattern-threshold 0.9  # Require very high confidence
 <li>Low entropy (0.0-0.3) = repetitive patterns</li>
 </ul>
 <h3 id="token-classification"><a class="header" href="#token-classification">Token Classification</a></h3>
-<p>Debtmap can classify tokens by importance to give more weight to semantically significant tokens in entropy calculations. This is controlled by the <code>use_classification</code> configuration option.</p>
+<p>Debtmap classifies tokens by semantic importance to give more weight to meaningful code structures in entropy calculations. This is controlled by the <code>use_classification</code> configuration option.</p>
 <p><strong>When enabled</strong> (<code>use_classification = false</code> by default for backward compatibility), tokens are weighted by importance:</p>
-<p><strong>High importance (weight: 1.0):</strong></p>
-<ul>
-<li>Control flow keywords (<code>if</code>, <code>match</code>, <code>for</code>, <code>while</code>)</li>
-<li>Error handling (<code>try</code>, <code>catch</code>, <code>?</code>, <code>unwrap</code>)</li>
-<li>Async keywords (<code>async</code>, <code>await</code>)</li>
-</ul>
-<p><strong>Medium importance (weight: 0.7):</strong></p>
-<ul>
-<li>Function calls</li>
-<li>Method invocations</li>
-<li>Operators</li>
-</ul>
-<p><strong>Low importance (weight: 0.3):</strong></p>
-<ul>
-<li>Identifiers (variable names)</li>
-<li>Literals (strings, numbers)</li>
-<li>Punctuation</li>
-</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Category</th><th>Weight</th><th>Examples</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Control flow</strong></td><td>1.2</td><td><code>if</code>, <code>match</code>, <code>for</code>, <code>while</code>, <code>loop</code>, <code>switch</code></td></tr>
+<tr><td><strong>Keywords</strong></td><td>1.0</td><td><code>return</code>, <code>break</code>, <code>continue</code>, <code>async</code>, <code>await</code>, <code>unsafe</code></td></tr>
+<tr><td><strong>Function calls</strong></td><td>0.9</td><td><code>foo()</code>, <code>bar.method()</code>, <code>map</code>, <code>filter</code>, <code>reduce</code></td></tr>
+<tr><td><strong>Operators</strong></td><td>0.8</td><td><code>+</code>, <code>-</code>, <code>==</code>, <code>&amp;&amp;</code>, <code>?</code> (error propagation)</td></tr>
+<tr><td><strong>Identifiers</strong></td><td>0.5</td><td>Variable names, field access</td></tr>
+<tr><td><strong>Literals</strong></td><td>0.3</td><td>Numbers, strings, booleans</td></tr>
+</tbody>
+</table>
+</div>
 <p><strong>When disabled</strong> (<code>use_classification = false</code>), all tokens are treated equally, which may be useful for debugging or when you want unweighted entropy scores.</p>
+<h4 id="language-specific-token-recognition"><a class="header" href="#language-specific-token-recognition">Language-Specific Token Recognition</a></h4>
+<p><strong>Rust-specific tokens:</strong></p>
+<ul>
+<li>The <code>?</code> operator (error propagation) is tracked as an operator with weight 0.8</li>
+<li>Chains of <code>?</code> operators (e.g., <code>file.read()?.parse()?.validate()?</code>) are detected as repetitive patterns</li>
+<li><code>unsafe</code> blocks are tracked with keyword weight 1.0</li>
+</ul>
+<p><strong>JavaScript/TypeScript-specific tokens:</strong></p>
+<ul>
+<li>Arrow functions (<code>=&gt;</code>) are tracked as keywords</li>
+<li>Method chains (<code>.map()</code>, <code>.filter()</code>, <code>.reduce()</code>) are tracked with function call weight 0.9</li>
+<li>Promise patterns (<code>.then()</code>, <code>.catch()</code>, <code>.finally()</code>) are recognized</li>
+<li>Async/await expressions are tracked with keyword weight 1.0</li>
+</ul>
+<p><strong>JSX/React-specific tokens:</strong></p>
+<ul>
+<li>JSX elements (<code>&lt;div&gt;</code>, <code>&lt;Component&gt;</code>) are tracked as function calls (weight 0.9)</li>
+<li>Common React attributes (<code>className</code>, <code>onClick</code>, <code>onChange</code>, <code>key</code>, <code>ref</code>) are tracked</li>
+<li>JSX expressions (<code>{expression}</code>) are tracked as operators</li>
+<li>JSX fragments (<code>&lt;&gt;...&lt;/&gt;</code>) are detected and tracked</li>
+</ul>
 <h3 id="pattern-repetition-detection"><a class="header" href="#pattern-repetition-detection">Pattern Repetition Detection</a></h3>
 <p>Detects repetitive structures in the AST:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -16581,26 +16599,34 @@ effective_complexity = raw_complexity × dampening_factor
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Conceptual pseudocode showing the three-factor approach
-// Actual implementation in src/complexity/entropy.rs:185-195 and :429-439
+// Actual implementation in src/complexity/entropy.rs:185-209
 fn calculate_dampening_factor(
-    repetition: f64,     // 0.0-1.0
-    entropy: f64,        // 0.0-1.0
-    branch_similarity: f64  // 0.0-1.0
+    repetition: f64,        // 0.0-1.0
+    entropy: f64,           // 0.0-1.0
+    branch_similarity: f64, // 0.0-1.0
+    config: &amp;EntropyConfig
 ) -&gt; f64 {
-    // Each factor uses calculate_graduated_dampening with its own threshold/range
-    let repetition_factor = graduated_dampening(repetition, threshold=1.0, max_reduction=0.20);
-    let entropy_factor = graduated_dampening(entropy, threshold=0.4, max_reduction=0.15);
-    let branch_factor = graduated_dampening(branch_similarity, threshold=0.8, max_reduction=0.25);
+    // Each factor uses calculate_graduated_dampening with configurable thresholds
+    let repetition_factor = graduated_dampening(
+        repetition, config.pattern_threshold, config.max_repetition_reduction
+    );
+    let entropy_factor = graduated_dampening(
+        entropy, config.entropy_threshold, config.max_entropy_reduction
+    );
+    let branch_factor = graduated_dampening(
+        branch_similarity, config.branch_threshold, config.max_branch_reduction
+    );
 
-    (repetition_factor * entropy_factor * branch_factor).max(0.7)  // Never reduce below 70%
+    let floor = 1.0 - config.max_combined_reduction;
+    (repetition_factor * entropy_factor * branch_factor).max(floor)
 }
 <span class="boring">}</span></code></pre>
-<p><strong>Key Parameters:</strong></p>
+<p><strong>Key Parameters (all configurable):</strong></p>
 <ul>
-<li><strong>Repetition</strong>: Threshold 1.0, max 20% reduction (configurable via <code>max_repetition_reduction</code>)</li>
-<li><strong>Entropy</strong>: Threshold 0.4 (hardcoded), max 15% reduction (configurable via <code>max_entropy_reduction</code>)</li>
-<li><strong>Branch Similarity</strong>: Threshold 0.8 (configurable via <code>branch_threshold</code>), max 25% reduction (configurable via <code>max_branch_reduction</code>)</li>
-<li><strong>Combined Floor</strong>: Minimum 70% of original complexity preserved (configurable via <code>max_combined_reduction</code>)</li>
+<li><strong>Repetition</strong>: Threshold via <code>pattern_threshold</code> (default: 0.7), max reduction via <code>max_repetition_reduction</code> (default: 0.20)</li>
+<li><strong>Entropy</strong>: Threshold via <code>entropy_threshold</code> (default: 0.4), max reduction via <code>max_entropy_reduction</code> (default: 0.15)</li>
+<li><strong>Branch Similarity</strong>: Threshold via <code>branch_threshold</code> (default: 0.8), max reduction via <code>max_branch_reduction</code> (default: 0.25)</li>
+<li><strong>Combined Floor</strong>: Minimum preserved via <code>max_combined_reduction</code> (default: 0.30, preserving 70%)</li>
 </ul>
 <h4 id="example-repetitive-validation-function"><a class="header" href="#example-repetitive-validation-function">Example: Repetitive Validation Function</a></h4>
 <pre><code>Raw Complexity: 20
@@ -16726,6 +16752,10 @@ pattern_threshold = 0.7
 # When true, weights tokens by semantic importance (control flow &gt; operators &gt; identifiers)
 use_classification = false
 
+# Token entropy threshold (0.0-1.0, default: 0.4)
+# Values below this threshold trigger graduated dampening
+entropy_threshold = 0.4
+
 # Branch similarity threshold (0.0-1.0, default: 0.8)
 # Branches with similarity above this threshold contribute to dampening
 branch_threshold = 0.8
@@ -16739,11 +16769,11 @@ max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% pre
 <p><strong>Important Notes:</strong></p>
 <ol>
 <li>
-<p><strong>Dampening thresholds</strong> - Some are configurable, some are hardcoded (<code>src/complexity/entropy.rs:185-195</code>):</p>
+<p><strong>All dampening thresholds are now configurable</strong> (<code>src/complexity/entropy.rs:185-209</code>):</p>
 <ul>
-<li><strong>Entropy factor threshold: 0.4</strong> - Hardcoded in implementation (src/complexity/entropy.rs:192). Although an <code>entropy_threshold</code> field exists in the config struct (src/config/languages.rs:84), it is not wired up to be used in the actual dampening calculation. The value 0.4 was chosen based on empirical analysis across multiple codebases to balance false positive reduction with sensitivity to genuinely complex code.</li>
+<li><strong>Entropy factor threshold: 0.4</strong> - Configurable via <code>entropy_threshold</code> in config file. Values below this threshold trigger graduated dampening. The default 0.4 was chosen based on empirical analysis across multiple codebases to balance false positive reduction with sensitivity to genuinely complex code.</li>
 <li><strong>Branch threshold: 0.8</strong> - Configurable via <code>branch_threshold</code> in config file</li>
-<li><strong>Pattern threshold: 0.7/1.0</strong> - Configurable via <code>pattern_threshold</code> in config file</li>
+<li><strong>Pattern threshold: 0.7</strong> - Configurable via <code>pattern_threshold</code> in config file</li>
 </ul>
 </li>
 <li>
