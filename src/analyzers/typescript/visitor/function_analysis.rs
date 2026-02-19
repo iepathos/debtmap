@@ -4,6 +4,7 @@
 
 use crate::analyzers::typescript::entropy::calculate_entropy;
 use crate::analyzers::typescript::parser::{node_line, node_text};
+use crate::analyzers::typescript::purity::TypeScriptPurityAnalyzer;
 use crate::analyzers::typescript::types::{FunctionKind, JsFunctionMetrics};
 use crate::complexity::entropy_core::EntropyConfig;
 use crate::core::ast::TypeScriptAst;
@@ -126,6 +127,12 @@ fn analyze_function_declaration(
         &EntropyConfig::default(),
     ));
 
+    // Purity analysis
+    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
+    metrics.purity_level = Some(purity.level);
+    metrics.purity_confidence = Some(purity.confidence);
+    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
+
     Some(metrics)
 }
 
@@ -156,6 +163,12 @@ fn analyze_generator_function(node: &Node, ast: &TypeScriptAst) -> Option<JsFunc
         &ast.source,
         &EntropyConfig::default(),
     ));
+
+    // Purity analysis
+    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
+    metrics.purity_level = Some(purity.level);
+    metrics.purity_confidence = Some(purity.confidence);
+    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
 
     Some(metrics)
 }
@@ -193,6 +206,12 @@ fn analyze_arrow_function(
         &ast.source,
         &EntropyConfig::default(),
     ));
+
+    // Purity analysis
+    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
+    metrics.purity_level = Some(purity.level);
+    metrics.purity_confidence = Some(purity.confidence);
+    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
 
     Some(metrics)
 }
@@ -235,6 +254,12 @@ fn analyze_method_definition(
     metrics.is_async = has_async_modifier(node);
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_method_parameters(node);
+
+    // Purity analysis
+    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
+    metrics.purity_level = Some(purity.level);
+    metrics.purity_confidence = Some(purity.confidence);
+    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
 
     Some(metrics)
 }
@@ -311,6 +336,12 @@ fn analyze_function_expression(
         &ast.source,
         &EntropyConfig::default(),
     ));
+
+    // Purity analysis
+    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
+    metrics.purity_level = Some(purity.level);
+    metrics.purity_confidence = Some(purity.confidence);
+    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
 
     Some(metrics)
 }
@@ -641,6 +672,98 @@ function validate(a, b, c, d, e) {
             "Validation code should have either high repetition or low entropy: repetition={}, entropy={}",
             entropy.pattern_repetition,
             entropy.token_entropy
+        );
+    }
+
+    #[test]
+    fn test_purity_analysis_pure_function() {
+        use crate::core::PurityLevel;
+
+        let source = "function add(a, b) { return a + b; }";
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let functions = extract_functions(&ast, false);
+
+        assert_eq!(functions.len(), 1);
+        assert!(
+            functions[0].purity_level.is_some(),
+            "purity_level should be populated"
+        );
+        assert_eq!(
+            functions[0].purity_level,
+            Some(PurityLevel::StrictlyPure),
+            "pure arithmetic function should be StrictlyPure"
+        );
+        assert!(
+            functions[0].purity_confidence.is_some(),
+            "purity_confidence should be populated"
+        );
+        assert!(
+            functions[0].impurity_reasons.is_empty(),
+            "pure function should have no impurity reasons"
+        );
+    }
+
+    #[test]
+    fn test_purity_analysis_impure_function() {
+        use crate::core::PurityLevel;
+
+        let source = "function log(msg) { console.log(msg); }";
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let functions = extract_functions(&ast, false);
+
+        assert_eq!(functions.len(), 1);
+        assert_eq!(
+            functions[0].purity_level,
+            Some(PurityLevel::Impure),
+            "console.log should make function Impure"
+        );
+        assert!(
+            !functions[0].impurity_reasons.is_empty(),
+            "impure function should have impurity reasons"
+        );
+        assert!(
+            functions[0].impurity_reasons.iter().any(|r| r.contains("console")),
+            "impurity reasons should mention console"
+        );
+    }
+
+    #[test]
+    fn test_purity_flows_to_function_metrics() {
+        use crate::analyzers::typescript::visitor::helpers::convert_to_function_metrics;
+        use crate::core::PurityLevel;
+
+        // Test that purity data flows from JsFunctionMetrics to FunctionMetrics
+        let source = "const rand = () => Math.random();";
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let js_functions = extract_functions(&ast, false);
+        assert_eq!(js_functions.len(), 1);
+
+        let function_metrics = convert_to_function_metrics(&js_functions[0]);
+
+        // Verify purity data was transferred
+        assert_eq!(
+            function_metrics.purity_level,
+            Some(PurityLevel::Impure),
+            "Math.random should make function Impure"
+        );
+        assert_eq!(
+            function_metrics.is_pure,
+            Some(false),
+            "is_pure should be derived from purity_level"
+        );
+        assert!(
+            function_metrics.purity_confidence.is_some(),
+            "purity_confidence should be populated"
+        );
+        assert!(
+            function_metrics.purity_reason.is_some(),
+            "purity_reason should be populated for impure functions"
         );
     }
 }

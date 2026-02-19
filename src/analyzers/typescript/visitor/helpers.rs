@@ -249,11 +249,25 @@ pub fn is_test_function(name: &str) -> bool {
 
 /// Convert JS-specific metrics to standard FunctionMetrics
 pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMetrics {
+    use crate::core::PurityLevel;
+
     // Create entropy analysis from raw score if available
     let entropy_analysis = js_metrics
         .entropy_score
         .as_ref()
         .map(|raw| EntropyAnalysis::from_raw(raw, js_metrics.cognitive, &EntropyConfig::default()));
+
+    // Convert purity level to is_pure boolean
+    let is_pure = js_metrics
+        .purity_level
+        .map(|level| matches!(level, PurityLevel::StrictlyPure | PurityLevel::LocallyPure));
+
+    // Format purity reason from impurity reasons
+    let purity_reason = if js_metrics.impurity_reasons.is_empty() {
+        None
+    } else {
+        Some(js_metrics.impurity_reasons.join(", "))
+    };
 
     FunctionMetrics {
         name: js_metrics.name.clone(),
@@ -272,9 +286,9 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         is_trait_method: false,
         in_test_module: js_metrics.is_test,
         entropy_score: js_metrics.entropy_score.clone(),
-        is_pure: None,
-        purity_confidence: None,
-        purity_reason: None,
+        is_pure,
+        purity_confidence: js_metrics.purity_confidence,
+        purity_reason,
         call_dependencies: None,
         detected_patterns: None,
         upstream_callers: None,
@@ -283,7 +297,7 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
-        purity_level: None,
+        purity_level: js_metrics.purity_level,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis,

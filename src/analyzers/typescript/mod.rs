@@ -28,6 +28,7 @@ pub mod metrics;
 pub mod orchestration;
 pub mod parser;
 pub mod patterns;
+pub mod purity;
 pub mod types;
 pub mod visitor;
 

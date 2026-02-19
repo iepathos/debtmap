@@ -3,6 +3,7 @@
 //! Core data structures for JS/TS analysis.
 
 use crate::complexity::entropy_core::EntropyScore;
+use crate::core::PurityLevel;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -119,6 +120,12 @@ pub struct JsFunctionMetrics {
     pub ts_patterns: Option<TypeScriptPatternResult>,
     /// Entropy-based complexity score
     pub entropy_score: Option<EntropyScore>,
+    /// Purity level classification
+    pub purity_level: Option<PurityLevel>,
+    /// Confidence in purity analysis (0.0 to 1.0)
+    pub purity_confidence: Option<f32>,
+    /// Reasons for impurity (if any)
+    pub impurity_reasons: Vec<String>,
 }
 
 impl JsFunctionMetrics {
@@ -140,6 +147,9 @@ impl JsFunctionMetrics {
             is_exported: false,
             ts_patterns: None,
             entropy_score: None,
+            purity_level: None,
+            purity_confidence: None,
+            impurity_reasons: Vec::new(),
         }
     }
 
