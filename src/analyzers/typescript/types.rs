@@ -70,7 +70,7 @@ pub enum AsyncPattern {
 pub enum JsDebtPattern {
     /// TypeScript `any` type usage
     AnyTypeUsage { count: u32, locations: Vec<usize> },
-    /// Type assertion usage (as, <Type>)
+    /// Type assertion usage (`as`, `<Type>`)
     TypeAssertion { count: u32, locations: Vec<usize> },
     /// Non-null assertion (!)
     NonNullAssertion { count: u32, locations: Vec<usize> },

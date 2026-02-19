@@ -14,9 +14,9 @@
 //!
 //! # Module Structure
 //!
-//! - [`call_classification`] - Database of known pure/impure functions
-//! - [`types`] - Core CFG types (blocks, edges, variables)
-//! - [`reaching_definitions`] - Data flow analysis algorithm
+//! - `call_classification` - Database of known pure/impure functions
+//! - `types` - Core CFG types (blocks, edges, variables)
+//! - `reaching_definitions` - Data flow analysis algorithm
 //! - `cfg_builder` - AST-to-CFG transformation
 //!
 //! # Design Decisions
