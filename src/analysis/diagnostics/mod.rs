@@ -100,18 +100,26 @@ pub struct AttributionBreakdown {
 /// Individual attribution component
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributionComponent {
+    /// Name or description of this component (e.g., "nested conditionals").
     pub name: String,
+    /// Complexity points contributed by this component.
     pub contribution: u32,
+    /// Source location in "file:line" format.
     pub location: String,
+    /// Actionable suggestions for reducing this component's complexity.
     pub suggestions: Vec<String>,
 }
 
 /// Comparative analysis between versions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComparativeAnalysis {
+    /// Complexity score before the change.
     pub before_complexity: u32,
+    /// Complexity score after the change.
     pub after_complexity: u32,
+    /// Percentage improvement (positive means reduction in complexity).
     pub improvement_percentage: f32,
+    /// Detailed descriptions of individual changes.
     pub changes: Vec<ChangeDescription>,
 }
 
