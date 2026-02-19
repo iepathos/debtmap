@@ -390,21 +390,31 @@ pub enum BinOp {
 /// Unary operation type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOp {
+    /// Arithmetic negation (`-x`).
     Neg,
+    /// Logical/bitwise negation (`!x`).
     Not,
+    /// Dereference operation (`*x`).
     Deref,
 }
 
 /// Expression kinds for side effect tracking.
 #[derive(Debug, Clone)]
 pub enum ExprKind {
+    /// Method call expression (e.g., `receiver.method(args)`).
     MethodCall {
+        /// The variable the method is called on.
         receiver: VarId,
+        /// Name of the method being called.
         method: String,
+        /// Variables passed as arguments.
         args: Vec<VarId>,
     },
+    /// Macro invocation (e.g., `println!(args)`).
     MacroCall {
+        /// Name of the macro being invoked.
         macro_name: String,
+        /// Variables passed as macro arguments.
         args: Vec<VarId>,
     },
     /// Closure expression with captured variables
