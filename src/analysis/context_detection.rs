@@ -30,11 +30,17 @@ pub enum FunctionContext {
     Parser,
     /// Functions that handle CLI commands or user interactions
     CliHandler,
+    /// Functions that manage state transitions or finite state machines
     StateMachine,
+    /// Functions that load, save, or manage configuration settings
     Configuration,
+    /// Functions used in test code to set up fixtures or assert conditions
     TestHelper,
+    /// Functions that construct or execute database queries
     DatabaseQuery,
+    /// Functions that validate input data or enforce constraints
     Validator,
+    /// Functions without a specific detected context
     Generic,
 }
 
