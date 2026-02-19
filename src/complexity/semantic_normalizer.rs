@@ -468,7 +468,7 @@ fn calculate_statement_complexity(stmt: &NormalizedStatement, nesting: u32) -> u
         NormalizedStatement::Local(local) => local
             .init
             .as_ref()
-            .map(|init| calculate_expression_complexity(init))
+            .map(calculate_expression_complexity)
             .unwrap_or(0),
         NormalizedStatement::Declaration(_) => 0,
     }
