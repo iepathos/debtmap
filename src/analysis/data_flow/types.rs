@@ -72,20 +72,34 @@ pub struct BasicBlock {
 }
 
 /// A statement within a basic block.
+///
+/// Statements are the primitive operations that occur sequentially within a block.
+/// Each statement may define or use variables, which is tracked for data flow analysis.
 #[derive(Debug, Clone)]
 pub enum Statement {
+    /// Assignment to an existing variable (e.g., `x = expr`).
     Assign {
+        /// The variable being assigned to.
         target: VarId,
+        /// The value being assigned.
         source: Rvalue,
+        /// Source line number for diagnostics.
         line: Option<usize>,
     },
+    /// Variable declaration, optionally with initialization (e.g., `let x = expr`).
     Declare {
+        /// The variable being declared.
         var: VarId,
+        /// Optional initializer expression.
         init: Option<Rvalue>,
+        /// Source line number for diagnostics.
         line: Option<usize>,
     },
+    /// Expression statement evaluated for side effects (e.g., `foo()`).
     Expr {
+        /// The expression being evaluated.
         expr: ExprKind,
+        /// Source line number for diagnostics.
         line: Option<usize>,
     },
 }
