@@ -68,22 +68,32 @@ pub struct ComplexitySummary {
     pub key_findings: Vec<String>,
 }
 
-/// Detailed attribution breakdown
+/// Detailed attribution breakdown showing how complexity is distributed
+/// across different categories (logical, formatting, and pattern-based).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetailedAttribution {
+    /// Breakdown of complexity from logical constructs (conditionals, loops, etc.).
     pub logical_breakdown: AttributionBreakdown,
+    /// Breakdown of complexity from formatting choices (nesting, line length, etc.).
     pub formatting_breakdown: AttributionBreakdown,
+    /// Breakdown of complexity from recognized code patterns.
     pub pattern_breakdown: AttributionBreakdown,
+    /// Sum of all attributed complexity across categories.
     pub total_attribution: u32,
+    /// Confidence level (0.0-1.0) in the accuracy of the attribution.
     pub confidence_level: f32,
 }
 
-/// Breakdown of a specific attribution type
+/// Breakdown of a specific attribution type (logical, formatting, or pattern).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributionBreakdown {
+    /// Name of this attribution category (e.g., "logical", "formatting").
     pub category: String,
+    /// Total complexity points attributed to this category.
     pub total: u32,
+    /// Percentage of total complexity this category represents (0.0-100.0).
     pub percentage: f32,
+    /// Individual components contributing to this category's complexity.
     pub components: Vec<AttributionComponent>,
 }
 
