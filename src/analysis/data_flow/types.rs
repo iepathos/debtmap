@@ -57,10 +57,17 @@ pub struct ControlFlowGraph {
 pub struct BlockId(pub usize);
 
 /// A basic block in the control flow graph.
+///
+/// A basic block is a straight-line sequence of statements with a single entry
+/// point (the first statement) and a single exit point (the terminator).
+/// Control flow only enters at the beginning and exits at the end.
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
+    /// Unique identifier for this block within the CFG.
     pub id: BlockId,
+    /// Statements executed sequentially within this block.
     pub statements: Vec<Statement>,
+    /// How control flow exits this block (branch, return, etc.).
     pub terminator: Terminator,
 }
 

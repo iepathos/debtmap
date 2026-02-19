@@ -45,6 +45,9 @@ pub enum FunctionContext {
 }
 
 impl FunctionContext {
+    /// Returns a human-readable name for this context type.
+    ///
+    /// Used for display in reports and user-facing output.
     pub fn display_name(&self) -> &'static str {
         match self {
             FunctionContext::Formatter => "Formatter",
@@ -60,13 +63,44 @@ impl FunctionContext {
     }
 }
 
+/// Result of context detection for a function.
+///
+/// Contains the detected context type, a confidence score indicating how
+/// certain the detection is, and a list of signals that contributed to
+/// the classification.
 #[derive(Debug, Clone)]
 pub struct ContextAnalysis {
+    /// The detected context or domain of the function.
     pub context: FunctionContext,
+    /// Confidence score from 0.0 to 1.0 indicating detection certainty.
+    ///
+    /// Higher values indicate stronger evidence for the classification.
     pub confidence: f64,
+    /// Human-readable descriptions of signals that led to this classification.
     pub detected_signals: Vec<String>,
 }
 
+/// Detects the context or domain of functions based on naming patterns and file location.
+///
+/// The detector uses compiled regexes to identify common function naming conventions
+/// (e.g., `format_*`, `parse_*`, `handle_*`) and file path patterns to classify
+/// functions into domain-specific contexts.
+///
+/// # Performance
+///
+/// Creating a new `ContextDetector` compiles 17 regexes. For repeated use,
+/// prefer the [`ContextDetector::global()`] singleton to avoid recompilation.
+///
+/// # Example
+///
+/// ```ignore
+/// use debtmap::analysis::context_detection::ContextDetector;
+/// use std::path::Path;
+///
+/// let detector = ContextDetector::global();
+/// let analysis = detector.detect_context(&function, Path::new("src/parser.rs"));
+/// println!("Context: {:?}, confidence: {}", analysis.context, analysis.confidence);
+/// ```
 pub struct ContextDetector {
     // Cache compiled regexes for performance
     format_patterns: Vec<Regex>,
@@ -81,6 +115,10 @@ impl Default for ContextDetector {
 }
 
 impl ContextDetector {
+    /// Creates a new context detector with compiled regex patterns.
+    ///
+    /// Compiles 17 regexes for pattern matching. For hot paths, prefer
+    /// [`ContextDetector::global()`] to reuse a singleton instance.
     pub fn new() -> Self {
         Self {
             format_patterns: vec![
