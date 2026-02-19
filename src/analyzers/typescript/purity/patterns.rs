@@ -304,11 +304,11 @@ pub const DYNAMIC_EVAL: &[&str] = &["eval", "Function"];
 
 /// Non-deterministic functions (impure due to non-reproducible output)
 pub const NON_DETERMINISTIC_METHODS: &[&str] = &[
-    "random",         // Math.random()
-    "now",            // Date.now(), performance.now()
-    "getTime",        // date.getTime()
+    "random",          // Math.random()
+    "now",             // Date.now(), performance.now()
+    "getTime",         // date.getTime()
     "getRandomValues", // crypto.getRandomValues()
-    "randomUUID",     // crypto.randomUUID()
+    "randomUUID",      // crypto.randomUUID()
 ];
 
 /// Non-deterministic global calls

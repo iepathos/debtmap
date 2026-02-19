@@ -726,7 +726,10 @@ function validate(a, b, c, d, e) {
             "impure function should have impurity reasons"
         );
         assert!(
-            functions[0].impurity_reasons.iter().any(|r| r.contains("console")),
+            functions[0]
+                .impurity_reasons
+                .iter()
+                .any(|r| r.contains("console")),
             "impurity reasons should mention console"
         );
     }
