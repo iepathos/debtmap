@@ -17,6 +17,7 @@
 //! are in [`effects_wrappers`]. This separation enables fast unit testing
 //! of the core algorithms.
 
+pub mod cognitive;
 pub mod cyclomatic;
 pub mod effects_wrappers;
 pub mod entropy;
@@ -34,6 +35,9 @@ pub mod pure_mapping_patterns;
 pub mod recursive_detector;
 pub mod rust_normalizer;
 pub mod semantic_normalizer;
+
+// Re-export semantic normalization functions (spec 79)
+pub use semantic_normalizer::{calculate_cognitive_normalized, calculate_cognitive_visitor_based};
 pub mod threshold_manager;
 pub mod token_classifier;
 pub mod visitor_detector;

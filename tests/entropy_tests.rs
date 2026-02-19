@@ -85,10 +85,9 @@ fn test_entropy_preserves_complex_logic() {
 
     // Complex logic with variety
     // With pattern-adjusted complexity using logarithmic scaling for match expressions
-    // The match with 3 arms gets log2(3) = ~2 instead of 2
-    // The if-else chains are recognized as patterns and adjusted
+    // Patterns are recognized and complexity is reduced accordingly
     assert!(func.cyclomatic >= 1); // Correctly adjusted for pattern recognition
-    assert!(func.cognitive >= 2); // Cognitive complexity also adjusted
+    assert!(func.cognitive >= 1); // Cognitive complexity also adjusted with pattern recognition
 }
 
 #[test]

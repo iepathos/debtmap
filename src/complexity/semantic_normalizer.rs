@@ -423,6 +423,66 @@ fn has_early_return(statements: &[NormalizedStatement]) -> bool {
     false
 }
 
+/// Calculate cognitive complexity using semantic normalization.
+/// This filters out formatting artifacts to provide consistent
+/// complexity scores regardless of code formatting.
+pub fn calculate_cognitive_normalized(block: &Block) -> u32 {
+    let normalized = NormalizedBlock::from_syn_block(block);
+    calculate_complexity_from_normalized(&normalized)
+}
+
+/// Calculate cognitive complexity using visitor-based approach.
+/// This is the traditional method that walks the AST directly.
+pub fn calculate_cognitive_visitor_based(block: &Block) -> u32 {
+    crate::complexity::calculate_cognitive_for_block(block)
+}
+
+/// Calculate complexity from normalized representation
+fn calculate_complexity_from_normalized(block: &NormalizedBlock) -> u32 {
+    let mut complexity = 0u32;
+
+    for stmt in &block.statements {
+        complexity += calculate_statement_complexity(stmt, 0);
+    }
+
+    complexity
+}
+
+/// Calculate complexity contribution from a normalized statement
+fn calculate_statement_complexity(stmt: &NormalizedStatement, nesting: u32) -> u32 {
+    match stmt {
+        NormalizedStatement::Control(control) => {
+            let mut complexity = 1 + nesting; // Base + nesting increment
+
+            // Add condition complexity if present
+            if let Some(condition) = &control.condition {
+                complexity += calculate_expression_complexity(condition);
+            }
+
+            // Recursively add body complexity
+            complexity += calculate_complexity_from_normalized(&control.body);
+
+            complexity
+        }
+        NormalizedStatement::Expression(expr) => calculate_expression_complexity(expr),
+        NormalizedStatement::Local(local) => local
+            .init
+            .as_ref()
+            .map(|init| calculate_expression_complexity(init))
+            .unwrap_or(0),
+        NormalizedStatement::Declaration(_) => 0,
+    }
+}
+
+/// Calculate complexity from a normalized expression
+fn calculate_expression_complexity(expr: &NormalizedExpression) -> u32 {
+    // Sum up logical component contributions
+    expr.logical_components
+        .iter()
+        .map(|c| c.complexity_contribution)
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

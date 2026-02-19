@@ -1,6 +1,4 @@
-use debtmap::complexity::cognitive::{
-    calculate_cognitive_normalized, calculate_cognitive_visitor_based,
-};
+use debtmap::complexity::{calculate_cognitive_normalized, calculate_cognitive_visitor_based};
 use syn::parse_quote;
 
 #[test]

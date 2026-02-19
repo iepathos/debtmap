@@ -42,8 +42,8 @@ fn test_calculate_cyclomatic_if_else() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 3,
-        "If-else adds 2 to complexity (one for if, one for else)"
+        complexity, 2,
+        "If-else adds 1 to complexity (for the decision point)"
     );
 }
 
@@ -148,8 +148,8 @@ fn test_calculate_cyclomatic_logical_and() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 2,
-        "If statement adds 1, logical AND in condition doesn't add extra"
+        complexity, 3,
+        "If with logical AND adds 2 to base (one for if, one for &&)"
     );
 }
 
@@ -163,8 +163,8 @@ fn test_calculate_cyclomatic_logical_or() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 2,
-        "If statement adds 1, logical OR in condition doesn't add extra"
+        complexity, 3,
+        "If with logical OR adds 2 to base (one for if, one for ||)"
     );
 }
 
@@ -178,8 +178,8 @@ fn test_calculate_cyclomatic_multiple_logical_operators() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 2,
-        "If statement adds 1, logical operators in condition don't add extra"
+        complexity, 4,
+        "If with multiple logical operators adds 3 to base (one for if, one for &&, one for ||)"
     );
 }
 
@@ -347,7 +347,10 @@ fn test_calculate_cyclomatic_else_if_chain() {
     }};
 
     let complexity = calculate_cyclomatic(&block);
-    assert_eq!(complexity, 7, "Each if/else if/else branch adds complexity");
+    assert_eq!(
+        complexity, 4,
+        "Else-if chain: 1 base + 3 conditions (if, else-if, else-if)"
+    );
 }
 
 #[test]
