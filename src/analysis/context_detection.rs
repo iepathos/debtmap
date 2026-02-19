@@ -18,10 +18,17 @@ use std::sync::OnceLock;
 /// Global singleton for ContextDetector to avoid repeated regex compilation.
 static GLOBAL_CONTEXT_DETECTOR: OnceLock<ContextDetector> = OnceLock::new();
 
+/// The detected context or domain of a function based on naming patterns and file location.
+///
+/// Context detection helps provide more relevant recommendations by understanding
+/// what kind of work a function performs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FunctionContext {
+    /// Functions that format, render, or display output
     Formatter,
+    /// Functions that parse, read, or decode input
     Parser,
+    /// Functions that handle CLI commands or user interactions
     CliHandler,
     StateMachine,
     Configuration,

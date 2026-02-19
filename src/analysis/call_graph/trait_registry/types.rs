@@ -61,7 +61,10 @@ pub struct TraitMethodCall {
 /// Statistics about trait usage in the codebase
 #[derive(Debug, Clone)]
 pub struct TraitStatistics {
+    /// Number of distinct traits defined in the codebase
     pub total_traits: usize,
+    /// Number of trait implementations (impl Trait for Type blocks)
     pub total_implementations: usize,
+    /// Number of trait method calls that couldn't be resolved to a specific implementation
     pub total_unresolved_calls: usize,
 }

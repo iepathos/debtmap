@@ -211,14 +211,14 @@ impl<'a> TypeScriptPurityAnalyzer<'a> {
                     if is_time_dependent_constructor(&name) {
                         // new Date() without arguments is non-deterministic
                         let args = node.child_by_field_name("arguments");
-                        let has_args = args
-                            .map(|a| a.named_child_count() > 0)
-                            .unwrap_or(false);
+                        let has_args = args.map(|a| a.named_child_count() > 0).unwrap_or(false);
                         if !has_args {
                             self.has_io = true;
-                            self.reasons.push(JsImpurityReason::NonDeterministic(
-                                format!("new {}()", name),
-                            ));
+                            self.reasons
+                                .push(JsImpurityReason::NonDeterministic(format!(
+                                    "new {}()",
+                                    name
+                                )));
                             return;
                         }
                     }
@@ -360,10 +360,11 @@ impl<'a> TypeScriptPurityAnalyzer<'a> {
         // Check for non-deterministic methods (Math.random, Date.now, etc.)
         if is_non_deterministic_method(&property) {
             self.has_io = true;
-            self.reasons.push(JsImpurityReason::NonDeterministic(format!(
-                "{}.{}",
-                object, property
-            )));
+            self.reasons
+                .push(JsImpurityReason::NonDeterministic(format!(
+                    "{}.{}",
+                    object, property
+                )));
             return;
         }
 

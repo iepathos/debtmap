@@ -33,8 +33,11 @@ pub enum PatternType {
     MainFunction,
     /// Visit trait pattern (visitor pattern implementations)
     VisitTrait,
-    /// Custom framework pattern
-    CustomPattern { name: String },
+    /// Custom framework pattern defined by user configuration
+    CustomPattern {
+        /// The attribute name that identifies this custom pattern
+        name: String,
+    },
 }
 
 /// Information about a detected framework pattern
