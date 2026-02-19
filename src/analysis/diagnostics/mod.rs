@@ -1,24 +1,50 @@
+//! Diagnostic reporting and analysis output for complexity results.
+//!
+//! This module provides types and utilities for generating human-readable diagnostic
+//! reports from complexity analysis results. It transforms raw analysis data into
+//! actionable insights, recommendations, and formatted output.
+//!
+//! # Components
+//!
+//! - [`InsightGenerator`]: Generates insights from complexity attribution data
+//! - [`RecommendationEngine`]: Produces prioritized refactoring recommendations
+//! - [`DiagnosticReporter`]: Formats analysis results into various output formats
+//!
+//! # Effect-Based API
+//!
+//! The [`effects`] submodule provides effect-based wrappers that integrate with
+//! the stillwater effect system for configuration access and testability.
+
 use crate::analysis::attribution::ComplexityAttribution;
 use crate::analysis::multi_pass::{ComplexityRecommendation, MultiPassResult};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Effect-based wrappers for diagnostic generation with configuration access.
 pub mod effects;
+/// Insight generation from complexity attribution data.
 pub mod insights;
+/// Recommendation strategies for complexity reduction.
 pub mod recommendations;
+/// Report formatting and output generation.
 pub mod reporter;
 
 pub use insights::InsightGenerator;
 pub use recommendations::RecommendationEngine;
 pub use reporter::DiagnosticReporter;
 
-/// Complete diagnostic report
+/// Complete diagnostic report containing analysis results and recommendations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiagnosticReport {
+    /// High-level summary of complexity metrics and key findings.
     pub summary: ComplexitySummary,
+    /// Detailed breakdown of complexity by category (logical, formatting, patterns).
     pub detailed_attribution: DetailedAttribution,
+    /// Prioritized list of recommendations for reducing complexity.
     pub recommendations: Vec<ComplexityRecommendation>,
+    /// Comparison with a previous version, if available.
     pub comparative_analysis: Option<ComparativeAnalysis>,
+    /// Performance metrics from the analysis process itself.
     pub performance_metrics: Option<AnalysisPerformanceMetrics>,
 }
 
