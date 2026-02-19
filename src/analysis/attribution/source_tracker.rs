@@ -6,41 +6,64 @@ use serde::{Deserialize, Serialize};
 
 /// Trait for tracking complexity sources
 pub trait SourceTracker: Send + Sync {
+    /// Analyzes an AST node and returns complexity attributions.
+    ///
+    /// Each attribution identifies a specific source of complexity with
+    /// its contribution amount and confidence level.
     fn track_complexity_source(&self, ast_node: &AstNode) -> Vec<ComplexityAttribution>;
 }
 
 /// Placeholder AST node for tracking
 pub struct AstNode {
+    /// The type of AST node (e.g., "function", "if", "loop").
     pub node_type: String,
+    /// The base complexity score for this node.
     pub complexity: u32,
+    /// The source line number where this node appears.
     pub line: u32,
+    /// The source column where this node begins.
     pub column: u32,
 }
 
 /// Complexity attribution from source tracking
 pub struct ComplexityAttribution {
+    /// The type of complexity source that was detected.
     pub source_type: ComplexitySourceType,
+    /// The amount this source contributes to total complexity.
     pub contribution: u32,
+    /// Confidence level (0.0 to 1.0) in this attribution.
     pub confidence: f32,
 }
 
 /// Types of complexity sources
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ComplexitySourceType {
+    /// Complexity from logical control flow structures.
     LogicalStructure {
+        /// The type of control flow construct.
         construct_type: LogicalConstruct,
+        /// How deeply nested this construct is.
         nesting_level: u32,
     },
+    /// Complexity from formatting patterns that may inflate metrics.
     FormattingArtifact {
+        /// The type of formatting artifact detected.
         artifact_type: FormattingArtifact,
+        /// How significantly this artifact inflates complexity.
         severity: ArtifactSeverity,
     },
+    /// Complexity adjusted for recognized coding patterns.
     PatternRecognition {
+        /// The recognized pattern type.
         pattern_type: RecognizedPattern,
+        /// Multiplier applied to complexity (< 1.0 reduces perceived complexity).
         adjustment_factor: f32,
     },
+    /// Complexity from language-specific features.
     LanguageSpecific {
+        /// The programming language.
         language: Language,
+        /// The language feature contributing to complexity.
         feature: LanguageFeature,
     },
 }
@@ -52,6 +75,7 @@ pub struct LogicalStructureTracker {
 }
 
 impl LogicalStructureTracker {
+    /// Creates a new logical structure tracker with an empty nesting stack.
     pub fn new() -> Self {
         Self::default()
     }
@@ -120,6 +144,7 @@ impl Default for FormattingArtifactTracker {
 }
 
 impl FormattingArtifactTracker {
+    /// Creates a new formatting artifact tracker with default patterns.
     pub fn new() -> Self {
         Self::default()
     }
@@ -197,6 +222,7 @@ impl Default for PatternBasedTracker {
 }
 
 impl PatternBasedTracker {
+    /// Creates a new pattern-based tracker with default code patterns.
     pub fn new() -> Self {
         Self::default()
     }

@@ -25,10 +25,19 @@ impl Default for PatternTracker {
 }
 
 impl PatternTracker {
+    /// Creates a new pattern tracker with default pattern detectors.
+    ///
+    /// Includes detectors for error handling, validation, data transformation,
+    /// state management, and iterator patterns.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Analyzes functions for recognized patterns and returns attributed complexity.
+    ///
+    /// Scans each function through all registered pattern detectors, accumulating
+    /// complexity adjustments based on detected patterns. Returns an attribution
+    /// with a confidence score based on pattern consistency across the codebase.
     pub fn analyze_patterns(&self, functions: &[FunctionMetrics]) -> AttributedComplexity {
         let mut total = 0u32;
         let mut breakdown = Vec::new();
