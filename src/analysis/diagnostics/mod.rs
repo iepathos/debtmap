@@ -48,14 +48,23 @@ pub struct DiagnosticReport {
     pub performance_metrics: Option<AnalysisPerformanceMetrics>,
 }
 
-/// Summary of complexity analysis
+/// Summary of complexity analysis results.
+///
+/// Provides high-level metrics comparing raw and normalized complexity,
+/// along with key findings from the analysis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplexitySummary {
+    /// Original complexity score before normalization.
     pub raw_complexity: u32,
+    /// Complexity score after normalization adjustments.
     pub normalized_complexity: u32,
+    /// Percentage reduction from raw to normalized complexity.
     pub complexity_reduction: f32,
+    /// Percentage of complexity attributed to formatting choices.
     pub formatting_impact: f32,
+    /// Confidence level (0.0-100.0) of pattern recognition in the analysis.
     pub pattern_recognition: f32,
+    /// List of notable findings from the complexity analysis.
     pub key_findings: Vec<String>,
 }
 
