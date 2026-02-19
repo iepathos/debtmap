@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-372b4d5e.js";
+            window.path_to_searchindex_js = "searchindex-b99585f7.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -248,20 +248,14 @@ debtmap analyze . --format markdown --top 10 &gt; debt-report.md
 <h3 id="what-languages-are-supported"><a class="header" href="#what-languages-are-supported">What languages are supported?</a></h3>
 <p><strong>Currently supported:</strong></p>
 <ul>
-<li>Rust - Full support with AST parsing, macro expansion, and trait resolution</li>
+<li><strong>Rust</strong> - Full support with AST parsing via <code>syn</code>, macro expansion, and trait resolution</li>
+<li><strong>TypeScript</strong> - Full support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis</li>
+<li><strong>JavaScript</strong> - Full support with tree-sitter parsing, ES6+ syntax, React components, Promise chains</li>
 </ul>
 <p><strong>Planned:</strong></p>
 <ul>
-<li>Python, JavaScript/TypeScript, Go (after Rust analysis is mature)</li>
+<li>Python, Go</li>
 </ul>
-<h3 id="why-is-debtmap-rust-only-right-now"><a class="header" href="#why-is-debtmap-rust-only-right-now">Why is debtmap Rust-only right now?</a></h3>
-<p>We’re taking a focused approach to deliver the best possible Rust code analyzer before expanding. This allows us to:</p>
-<ol>
-<li>Perfect core algorithms with one language</li>
-<li>Build Rust-specific features (macros, traits, lifetimes)</li>
-<li>Establish trust in the Rust community</li>
-<li>Apply learnings to future languages</li>
-</ol>
 <h3 id="how-does-coverage-integration-work"><a class="header" href="#how-does-coverage-integration-work">How does coverage integration work?</a></h3>
 <p>Debtmap reads LCOV format coverage data and maps it to functions:</p>
 <pre><code class="language-bash"># Generate coverage
@@ -361,7 +355,7 @@ fn validate_many_fields() { ... }
 </table>
 </div>
 <p><strong>When to use SonarQube:</strong> Multi-language enterprise dashboards.
-<strong>When to use debtmap:</strong> AI-assisted Rust development.</p>
+<strong>When to use debtmap:</strong> AI-assisted development with Rust, TypeScript, and JavaScript.</p>
 <h3 id="should-i-replace-clippy-with-debtmap"><a class="header" href="#should-i-replace-clippy-with-debtmap">Should I replace clippy with debtmap?</a></h3>
 <p><strong>No—use both.</strong> They serve different purposes:</p>
 <p><strong>clippy:</strong></p>
@@ -414,7 +408,7 @@ exclude_patterns = ["**/target/**", "**/vendor/**"]
 <h3 id="debtmap-reports-no-functions-found"><a class="header" href="#debtmap-reports-no-functions-found">Debtmap reports “No functions found”</a></h3>
 <p>Check:</p>
 <ol>
-<li>Project contains Rust files (<code>.rs</code>)</li>
+<li>Project contains supported source files (<code>.rs</code>, <code>.ts</code>, <code>.tsx</code>, <code>.js</code>, <code>.jsx</code>)</li>
 <li>Files aren’t excluded by ignore patterns</li>
 <li>No syntax errors: <code>debtmap analyze . -vv</code></li>
 </ol>

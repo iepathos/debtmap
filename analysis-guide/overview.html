@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-372b4d5e.js";
+            window.path_to_searchindex_js = "../searchindex-b99585f7.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -182,9 +182,9 @@
 <h2 id="supported-languages"><a class="header" href="#supported-languages">Supported Languages</a></h2>
 <ul>
 <li><strong>Rust</strong> - Full analysis support with AST-based parsing via <code>syn</code></li>
-<li><strong>Python</strong> - File detection only; analysis not yet implemented (language enum defined for future expansion)</li>
+<li><strong>TypeScript</strong> - Full analysis support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis</li>
+<li><strong>JavaScript</strong> - Full analysis support with tree-sitter parsing, ES6+ syntax, React components, Promise chains</li>
 </ul>
-<p>Source: <code>src/organization/language.rs:4-7</code> (Language enum), <code>src/analyzers/implementations.rs:185-186</code> (analysis status)</p>
 <h2 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h2>
 <h3 id="complexity-metrics"><a class="header" href="#complexity-metrics">Complexity Metrics</a></h3>
 <p>Calculates multiple dimensions of code complexity:</p>
@@ -280,7 +280,7 @@ untested_penalty:  2.0   // Multiplier for untested code
 <h3 id="three-phase-analysis-pipeline"><a class="header" href="#three-phase-analysis-pipeline">Three-Phase Analysis Pipeline</a></h3>
 <p><strong>Phase 1: Parallel Parsing</strong></p>
 <ul>
-<li>Language-specific AST generation using tree-sitter (Rust via <code>syn</code>)</li>
+<li>Language-specific AST generation (Rust via <code>syn</code>, TypeScript/JavaScript via tree-sitter)</li>
 <li>Pure functional transformation: source code → AST</li>
 <li>Files parsed once, ASTs cached and cloned for reuse (44% faster)</li>
 <li>Runs in parallel using Rayon for CPU-intensive parsing</li>
@@ -291,7 +291,6 @@ untested_penalty:  2.0   // Multiplier for untested code
 <li>Purity analysis tracking pure vs impure functions</li>
 <li>Pattern detection with entropy analysis</li>
 <li>Metrics computation through pure functions</li>
-<li>Default batch size: 100 items (configurable via <code>--batch-size</code>)</li>
 </ul>
 <p><strong>Phase 3: Sequential Aggregation</strong></p>
 <ul>

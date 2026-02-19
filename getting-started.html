@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-372b4d5e.js";
+            window.path_to_searchindex_js = "searchindex-b99585f7.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -261,8 +261,8 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for source files (currently Rust <code>.rs</code> with full analysis; Python <code>.py</code> file detection only)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for source files (Rust <code>.rs</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, JavaScript <code>.js</code>/<code>.jsx</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for TypeScript/JavaScript</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
@@ -464,7 +464,7 @@ patterns = ["**/target/**", "**/tests/**"]
 </ul>
 <h3 id="analysis-issues"><a class="header" href="#analysis-issues">Analysis Issues</a></h3>
 <ul>
-<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code> for Rust, <code>.py</code> for Python)</li>
+<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code> for Rust, <code>.ts</code>/<code>.tsx</code> for TypeScript, <code>.js</code>/<code>.jsx</code> for JavaScript)</li>
 <li><strong>Parser failures</strong>: Run with <code>-vv</code> for debug output</li>
 <li><strong>Performance issues</strong>: Limit parallel jobs with <code>--jobs 4</code></li>
 <li><strong>Large codebase slowness</strong>: Use <code>--streaming</code> mode for O(1) memory overhead</li>

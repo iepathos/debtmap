@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-372b4d5e.js";
+            window.path_to_searchindex_js = "searchindex-b99585f7.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -549,8 +549,8 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for source files (currently Rust <code>.rs</code> with full analysis; Python <code>.py</code> file detection only)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for source files (Rust <code>.rs</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, JavaScript <code>.js</code>/<code>.jsx</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for TypeScript/JavaScript</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
@@ -752,7 +752,7 @@ patterns = ["**/target/**", "**/tests/**"]
 </ul>
 <h3 id="analysis-issues"><a class="header" href="#analysis-issues">Analysis Issues</a></h3>
 <ul>
-<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code> for Rust, <code>.py</code> for Python)</li>
+<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code> for Rust, <code>.ts</code>/<code>.tsx</code> for TypeScript, <code>.js</code>/<code>.jsx</code> for JavaScript)</li>
 <li><strong>Parser failures</strong>: Run with <code>-vv</code> for debug output</li>
 <li><strong>Performance issues</strong>: Limit parallel jobs with <code>--jobs 4</code></li>
 <li><strong>Large codebase slowness</strong>: Use <code>--streaming</code> mode for O(1) memory overhead</li>
@@ -1494,12 +1494,11 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <p>Control how analysis results are formatted and displayed.</p>
 <p><strong>Format Options:</strong></p>
 <ul>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, html, dot (default: terminal for analyze)
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, dot (default: terminal for analyze)
 <ul>
 <li><code>json</code> - JSON format for programmatic processing</li>
 <li><code>markdown</code> - Markdown format with comprehensive analysis (uses LLM-optimized writer)</li>
 <li><code>terminal</code> - Human-readable terminal output with colors and formatting</li>
-<li><code>html</code> - HTML format for web display</li>
 <li><code>dot</code> - Graphviz DOT format for dependency visualization</li>
 </ul>
 </li>
@@ -2248,9 +2247,9 @@ See Prodigy documentation for detailed usage instructions.</p>
 <h2 id="supported-languages"><a class="header" href="#supported-languages">Supported Languages</a></h2>
 <ul>
 <li><strong>Rust</strong> - Full analysis support with AST-based parsing via <code>syn</code></li>
-<li><strong>Python</strong> - File detection only; analysis not yet implemented (language enum defined for future expansion)</li>
+<li><strong>TypeScript</strong> - Full analysis support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis</li>
+<li><strong>JavaScript</strong> - Full analysis support with tree-sitter parsing, ES6+ syntax, React components, Promise chains</li>
 </ul>
-<p>Source: <code>src/organization/language.rs:4-7</code> (Language enum), <code>src/analyzers/implementations.rs:185-186</code> (analysis status)</p>
 <h2 id="analysis-capabilities-1"><a class="header" href="#analysis-capabilities-1">Analysis Capabilities</a></h2>
 <h3 id="complexity-metrics"><a class="header" href="#complexity-metrics">Complexity Metrics</a></h3>
 <p>Calculates multiple dimensions of code complexity:</p>
@@ -2346,7 +2345,7 @@ untested_penalty:  2.0   // Multiplier for untested code
 <h3 id="three-phase-analysis-pipeline"><a class="header" href="#three-phase-analysis-pipeline">Three-Phase Analysis Pipeline</a></h3>
 <p><strong>Phase 1: Parallel Parsing</strong></p>
 <ul>
-<li>Language-specific AST generation using tree-sitter (Rust via <code>syn</code>)</li>
+<li>Language-specific AST generation (Rust via <code>syn</code>, TypeScript/JavaScript via tree-sitter)</li>
 <li>Pure functional transformation: source code → AST</li>
 <li>Files parsed once, ASTs cached and cloned for reuse (44% faster)</li>
 <li>Runs in parallel using Rayon for CPU-intensive parsing</li>
@@ -2357,7 +2356,6 @@ untested_penalty:  2.0   // Multiplier for untested code
 <li>Purity analysis tracking pure vs impure functions</li>
 <li>Pattern detection with entropy analysis</li>
 <li>Metrics computation through pure functions</li>
-<li>Default batch size: 100 items (configurable via <code>--batch-size</code>)</li>
 </ul>
 <p><strong>Phase 3: Sequential Aggregation</strong></p>
 <ul>
@@ -4761,9 +4759,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="analyzer-types"><a class="header" href="#analyzer-types">Analyzer Types</a></h1>
 <h2 id="overview-2"><a class="header" href="#overview-2">Overview</a></h2>
-<p><strong>Debtmap is a Rust-only code analysis tool.</strong> As of specification 191, debtmap focuses exclusively on Rust codebases to provide deep, language-specific insights into code complexity, technical debt, and architectural patterns.</p>
-<p>While the architecture supports extensibility through the <code>Analyzer</code> trait, only Rust is actively supported and maintained. Files in other programming languages are automatically filtered during discovery and never reach the analysis phase.</p>
-<p><strong>Source</strong>: Language enum at src/core/mod.rs:416-421, AnalyzerFactory at src/core/injection.rs:190-203</p>
+<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility, with full implementations for Rust, TypeScript, and JavaScript.</p>
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
@@ -4792,49 +4788,43 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 </ul>
 <p>These classifications are used to calculate role-based priority multipliers in the risk scoring system. See <a href="#risk-scoring-1">Risk Scoring</a> for details on how semantic classification affects debt prioritization.</p>
 <h2 id="language-support"><a class="header" href="#language-support">Language Support</a></h2>
-<h3 id="supported-rust-only"><a class="header" href="#supported-rust-only">Supported: Rust Only</a></h3>
-<p>Debtmap exclusively analyzes Rust source files (<code>.rs</code> extension). All analysis features, metrics, and debt detection patterns are designed specifically for Rust’s syntax and semantics.</p>
-<p><strong>Language Detection</strong> (src/core/mod.rs:435-440):</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn from_path(path: &amp;std::path::Path) -&gt; Self {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(Self::from_extension)
-        .unwrap_or(Language::Unknown)
-}
-<span class="boring">}</span></code></pre>
-<p>The <code>Language</code> enum (src/core/mod.rs:416-421) includes <code>Rust</code>, <code>Python</code>, and <code>Unknown</code> variants, but only <code>Rust</code> is actively processed:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum Language {
-    Rust,
-    Python,  // Architectural placeholder, not supported
-    Unknown,
-}
-<span class="boring">}</span></code></pre>
-<h3 id="file-filtering-behavior"><a class="header" href="#file-filtering-behavior">File Filtering Behavior</a></h3>
-<p>During file discovery, debtmap filters files by extension:</p>
-<ol>
-<li><strong>Rust files (<code>.rs</code>)</strong>: Parsed and analyzed</li>
-<li><strong>All other files</strong>: Silently filtered out—no warnings or errors generated</li>
-<li><strong>Unknown extensions</strong>: Mapped to <code>Language::Unknown</code> and filtered during discovery</li>
-</ol>
-<p><strong>Source</strong>: Language detection implemented in src/core/mod.rs:423-440</p>
-<p><strong>Example Usage</strong>:</p>
-<pre><code class="language-bash"># Analyze all Rust files in current directory
+<h3 id="supported-languages-1"><a class="header" href="#supported-languages-1">Supported Languages</a></h3>
+<p>Debtmap provides full analysis for the following languages:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Parser</th><th>File Extensions</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Rust</strong></td><td><code>syn</code> (native AST)</td><td><code>.rs</code></td></tr>
+<tr><td><strong>TypeScript</strong></td><td>tree-sitter</td><td><code>.ts</code>, <code>.tsx</code></td></tr>
+<tr><td><strong>JavaScript</strong></td><td>tree-sitter</td><td><code>.js</code>, <code>.jsx</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="typescriptjavascript-analyzer"><a class="header" href="#typescriptjavascript-analyzer">TypeScript/JavaScript Analyzer</a></h3>
+<p>The TypeScript and JavaScript analyzers use tree-sitter for AST parsing and provide:</p>
+<ul>
+<li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, nesting depth</li>
+<li><strong>Entropy Analysis</strong>: Pattern-based false positive reduction</li>
+<li><strong>Async Pattern Detection</strong>: Promise chains, async/await, callback nesting</li>
+<li><strong>React Support</strong>: JSX/TSX component analysis</li>
+<li><strong>Type-Specific Analysis</strong>: TypeScript <code>any</code> usage, type assertions</li>
+</ul>
+<h3 id="file-detection"><a class="header" href="#file-detection">File Detection</a></h3>
+<p>During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:</p>
+<pre><code class="language-bash"># Analyze all supported files in current directory
 debtmap analyze .
 
-# Analyze specific Rust file
-debtmap analyze src/main.rs
+# Analyze specific languages only
+debtmap analyze . --languages rust,typescript
 
-# Python, JavaScript, and other files are ignored
-# (no error messages, just skipped)
+# All supported languages are enabled by default
 </code></pre>
 <h2 id="extensibility"><a class="header" href="#extensibility">Extensibility</a></h2>
-<p>While debtmap currently focuses on Rust-only analysis, the architecture is designed to support additional languages in the future through the <code>Analyzer</code> trait.</p>
+<p>The architecture supports adding new languages through the <code>Analyzer</code> trait.</p>
 <h3 id="analyzer-trait"><a class="header" href="#analyzer-trait">Analyzer Trait</a></h3>
-<p>The core <code>Analyzer</code> trait defines the interface for language-specific analyzers (src/analyzers/mod.rs:40-44):</p>
+<p>The core <code>Analyzer</code> trait defines the interface for language-specific analyzers:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub trait Analyzer: Send + Sync {
@@ -4843,32 +4833,15 @@ debtmap analyze src/main.rs
     fn language(&amp;self) -&gt; crate::core::Language;
 }
 <span class="boring">}</span></code></pre>
-<p><strong>Note</strong>: There is also a generic <code>Analyzer</code> trait with associated types in src/core/traits.rs:11-16, used for internal abstractions. The trait shown above is the public extension point for language analyzers.</p>
-<h3 id="current-implementation"><a class="header" href="#current-implementation">Current Implementation</a></h3>
-<p>The <code>AnalyzerFactory</code> (src/core/injection.rs:190-203) creates language-specific analyzers:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl AnalyzerFactory {
-    pub fn create_analyzer(&amp;self, language: Language) -&gt; Box&lt;dyn Analyzer&lt;...&gt;&gt; {
-        match language {
-            Language::Rust =&gt; Box::new(RustAnalyzerAdapter::new()),
-            Language::Python =&gt; {
-                panic!("Python analysis is not currently supported.
-                       Debtmap is focusing exclusively on Rust analysis.")
-            }
-        }
-    }
-}
-<span class="boring">}</span></code></pre>
-<h3 id="adding-language-support-future"><a class="header" href="#adding-language-support-future">Adding Language Support (Future)</a></h3>
+<h3 id="adding-language-support"><a class="header" href="#adding-language-support">Adding Language Support</a></h3>
 <p>To add support for a new language:</p>
 <ol>
 <li><strong>Implement the <code>Analyzer</code> trait</strong> with language-specific parsing and analysis</li>
-<li><strong>Add the language variant</strong> to the <code>Language</code> enum (src/core/mod.rs:416-421)</li>
-<li><strong>Update <code>from_extension()</code></strong> to recognize the file extension (src/core/mod.rs:423-433)</li>
-<li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer (src/core/injection.rs:190-203)</li>
+<li><strong>Add the language variant</strong> to the <code>Language</code> enum</li>
+<li><strong>Update <code>from_extension()</code></strong> to recognize the file extension</li>
+<li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer</li>
 </ol>
-<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code> for a complete example of implementing the <code>Analyzer</code> trait with full complexity analysis, purity detection, and call graph support.</p>
+<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code> for Rust or <code>src/analyzers/typescript.rs</code> for TypeScript as examples of implementing the <code>Analyzer</code> trait.</p>
 <h2 id="see-also-2"><a class="header" href="#see-also-2">See Also</a></h2>
 <ul>
 <li><a href="#overview-1">Overview</a> - Analysis pipeline and workflow</li>
@@ -7481,7 +7454,7 @@ min_lines_per_function = 3.0  # Safety threshold (default: 3.0)
 <li>Toggle analysis features per language</li>
 <li>Configure language-specific detection behavior</li>
 </ul>
-<h2 id="supported-languages-1"><a class="header" href="#supported-languages-1">Supported Languages</a></h2>
+<h2 id="supported-languages-2"><a class="header" href="#supported-languages-2">Supported Languages</a></h2>
 <p><strong>Full Support (AST-Based Analysis):</strong></p>
 <ul>
 <li><strong>Rust</strong> - Full AST parsing with tree-sitter</li>
@@ -28483,20 +28456,14 @@ debtmap analyze . --format markdown --top 10 &gt; debt-report.md
 <h3 id="what-languages-are-supported"><a class="header" href="#what-languages-are-supported">What languages are supported?</a></h3>
 <p><strong>Currently supported:</strong></p>
 <ul>
-<li>Rust - Full support with AST parsing, macro expansion, and trait resolution</li>
+<li><strong>Rust</strong> - Full support with AST parsing via <code>syn</code>, macro expansion, and trait resolution</li>
+<li><strong>TypeScript</strong> - Full support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis</li>
+<li><strong>JavaScript</strong> - Full support with tree-sitter parsing, ES6+ syntax, React components, Promise chains</li>
 </ul>
 <p><strong>Planned:</strong></p>
 <ul>
-<li>Python, JavaScript/TypeScript, Go (after Rust analysis is mature)</li>
+<li>Python, Go</li>
 </ul>
-<h3 id="why-is-debtmap-rust-only-right-now"><a class="header" href="#why-is-debtmap-rust-only-right-now">Why is debtmap Rust-only right now?</a></h3>
-<p>We’re taking a focused approach to deliver the best possible Rust code analyzer before expanding. This allows us to:</p>
-<ol>
-<li>Perfect core algorithms with one language</li>
-<li>Build Rust-specific features (macros, traits, lifetimes)</li>
-<li>Establish trust in the Rust community</li>
-<li>Apply learnings to future languages</li>
-</ol>
 <h3 id="how-does-coverage-integration-work"><a class="header" href="#how-does-coverage-integration-work">How does coverage integration work?</a></h3>
 <p>Debtmap reads LCOV format coverage data and maps it to functions:</p>
 <pre><code class="language-bash"># Generate coverage
@@ -28596,7 +28563,7 @@ fn validate_many_fields() { ... }
 </table>
 </div>
 <p><strong>When to use SonarQube:</strong> Multi-language enterprise dashboards.
-<strong>When to use debtmap:</strong> AI-assisted Rust development.</p>
+<strong>When to use debtmap:</strong> AI-assisted development with Rust, TypeScript, and JavaScript.</p>
 <h3 id="should-i-replace-clippy-with-debtmap"><a class="header" href="#should-i-replace-clippy-with-debtmap">Should I replace clippy with debtmap?</a></h3>
 <p><strong>No—use both.</strong> They serve different purposes:</p>
 <p><strong>clippy:</strong></p>
@@ -28649,7 +28616,7 @@ exclude_patterns = ["**/target/**", "**/vendor/**"]
 <h3 id="debtmap-reports-no-functions-found"><a class="header" href="#debtmap-reports-no-functions-found">Debtmap reports “No functions found”</a></h3>
 <p>Check:</p>
 <ol>
-<li>Project contains Rust files (<code>.rs</code>)</li>
+<li>Project contains supported source files (<code>.rs</code>, <code>.ts</code>, <code>.tsx</code>, <code>.js</code>, <code>.jsx</code>)</li>
 <li>Files aren’t excluded by ignore patterns</li>
 <li>No syntax errors: <code>debtmap analyze . -vv</code></li>
 </ol>
