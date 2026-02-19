@@ -107,8 +107,8 @@ debtmap analyze .
 
 **What happens during analysis:**
 
-1. **File Discovery** - Debtmap scans your project for source files (currently Rust `.rs` with full analysis; Python `.py` file detection only)
-2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST)
+1. **File Discovery** - Debtmap scans your project for source files (Rust `.rs`, TypeScript `.ts`/`.tsx`, JavaScript `.js`/`.jsx`)
+2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST) using `syn` for Rust and tree-sitter for TypeScript/JavaScript
 3. **Metric Extraction** - Complexity, coverage gaps, and coupling are measured
 4. **Prioritization** - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)
 5. **Context Generation** - File ranges are suggested for each debt item
@@ -334,7 +334,7 @@ patterns = ["**/target/**", "**/tests/**"]
 
 ### Analysis Issues
 
-- **Empty output**: Check that your project contains supported source files (`.rs` for Rust, `.py` for Python)
+- **Empty output**: Check that your project contains supported source files (`.rs` for Rust, `.ts`/`.tsx` for TypeScript, `.js`/`.jsx` for JavaScript)
 - **Parser failures**: Run with `-vv` for debug output
 - **Performance issues**: Limit parallel jobs with `--jobs 4`
 - **Large codebase slowness**: Use `--streaming` mode for O(1) memory overhead

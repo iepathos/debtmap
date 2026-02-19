@@ -2,11 +2,7 @@
 
 ## Overview
 
-**Debtmap is a Rust-only code analysis tool.** As of specification 191, debtmap focuses exclusively on Rust codebases to provide deep, language-specific insights into code complexity, technical debt, and architectural patterns.
-
-While the architecture supports extensibility through the `Analyzer` trait, only Rust is actively supported and maintained. Files in other programming languages are automatically filtered during discovery and never reach the analysis phase.
-
-**Source**: Language enum at src/core/mod.rs:416-421, AnalyzerFactory at src/core/injection.rs:190-203
+Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the `Analyzer` trait for extensibility, with full implementations for Rust, TypeScript, and JavaScript.
 
 ## Rust Analyzer
 
@@ -44,61 +40,47 @@ These classifications are used to calculate role-based priority multipliers in t
 
 ## Language Support
 
-### Supported: Rust Only
+### Supported Languages
 
-Debtmap exclusively analyzes Rust source files (`.rs` extension). All analysis features, metrics, and debt detection patterns are designed specifically for Rust's syntax and semantics.
+Debtmap provides full analysis for the following languages:
 
-**Language Detection** (src/core/mod.rs:435-440):
+| Language | Parser | File Extensions |
+|----------|--------|-----------------|
+| **Rust** | `syn` (native AST) | `.rs` |
+| **TypeScript** | tree-sitter | `.ts`, `.tsx` |
+| **JavaScript** | tree-sitter | `.js`, `.jsx` |
 
-```rust
-pub fn from_path(path: &std::path::Path) -> Self {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(Self::from_extension)
-        .unwrap_or(Language::Unknown)
-}
-```
+### TypeScript/JavaScript Analyzer
 
-The `Language` enum (src/core/mod.rs:416-421) includes `Rust`, `Python`, and `Unknown` variants, but only `Rust` is actively processed:
+The TypeScript and JavaScript analyzers use tree-sitter for AST parsing and provide:
 
-```rust
-pub enum Language {
-    Rust,
-    Python,  // Architectural placeholder, not supported
-    Unknown,
-}
-```
+- **Complexity Metrics**: Cyclomatic complexity, cognitive complexity, nesting depth
+- **Entropy Analysis**: Pattern-based false positive reduction
+- **Async Pattern Detection**: Promise chains, async/await, callback nesting
+- **React Support**: JSX/TSX component analysis
+- **Type-Specific Analysis**: TypeScript `any` usage, type assertions
 
-### File Filtering Behavior
+### File Detection
 
-During file discovery, debtmap filters files by extension:
-
-1. **Rust files (`.rs`)**: Parsed and analyzed
-2. **All other files**: Silently filtered out—no warnings or errors generated
-3. **Unknown extensions**: Mapped to `Language::Unknown` and filtered during discovery
-
-**Source**: Language detection implemented in src/core/mod.rs:423-440
-
-**Example Usage**:
+During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:
 
 ```bash
-# Analyze all Rust files in current directory
+# Analyze all supported files in current directory
 debtmap analyze .
 
-# Analyze specific Rust file
-debtmap analyze src/main.rs
+# Analyze specific languages only
+debtmap analyze . --languages rust,typescript
 
-# Python, JavaScript, and other files are ignored
-# (no error messages, just skipped)
+# All supported languages are enabled by default
 ```
 
 ## Extensibility
 
-While debtmap currently focuses on Rust-only analysis, the architecture is designed to support additional languages in the future through the `Analyzer` trait.
+The architecture supports adding new languages through the `Analyzer` trait.
 
 ### Analyzer Trait
 
-The core `Analyzer` trait defines the interface for language-specific analyzers (src/analyzers/mod.rs:40-44):
+The core `Analyzer` trait defines the interface for language-specific analyzers:
 
 ```rust
 pub trait Analyzer: Send + Sync {
@@ -108,36 +90,16 @@ pub trait Analyzer: Send + Sync {
 }
 ```
 
-**Note**: There is also a generic `Analyzer` trait with associated types in src/core/traits.rs:11-16, used for internal abstractions. The trait shown above is the public extension point for language analyzers.
-
-### Current Implementation
-
-The `AnalyzerFactory` (src/core/injection.rs:190-203) creates language-specific analyzers:
-
-```rust
-impl AnalyzerFactory {
-    pub fn create_analyzer(&self, language: Language) -> Box<dyn Analyzer<...>> {
-        match language {
-            Language::Rust => Box::new(RustAnalyzerAdapter::new()),
-            Language::Python => {
-                panic!("Python analysis is not currently supported.
-                       Debtmap is focusing exclusively on Rust analysis.")
-            }
-        }
-    }
-}
-```
-
-### Adding Language Support (Future)
+### Adding Language Support
 
 To add support for a new language:
 
 1. **Implement the `Analyzer` trait** with language-specific parsing and analysis
-2. **Add the language variant** to the `Language` enum (src/core/mod.rs:416-421)
-3. **Update `from_extension()`** to recognize the file extension (src/core/mod.rs:423-433)
-4. **Register in `AnalyzerFactory`** to instantiate your analyzer (src/core/injection.rs:190-203)
+2. **Add the language variant** to the `Language` enum
+3. **Update `from_extension()`** to recognize the file extension
+4. **Register in `AnalyzerFactory`** to instantiate your analyzer
 
-**Reference Implementation**: See `src/analyzers/rust.rs` for a complete example of implementing the `Analyzer` trait with full complexity analysis, purity detection, and call graph support.
+**Reference Implementation**: See `src/analyzers/rust.rs` for Rust or `src/analyzers/typescript.rs` for TypeScript as examples of implementing the `Analyzer` trait.
 
 ## See Also
 

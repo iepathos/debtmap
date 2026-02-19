@@ -11,15 +11,18 @@ Debtmap analyzes your codebase and ranks technical debt by risk. Know exactly wh
 
 Large codebases accumulate complexity. You know there's debt, but where do you start?
 
-Debtmap answers that question by combining multiple signals into a single priority score:
+Debtmap combines static analysis with git history to score technical debt across multiple signals:
 
-- **Complexity** - cyclomatic, cognitive, nesting depth
-- **Coverage gaps** - untested code with high complexity
-- **Git history** - files with high churn and bug fix rates
-- **Coupling** - functions with many dependencies
-- **Purity** - side effects that make code harder to test
+| Signal | What It Measures | Why It Matters |
+|--------|------------------|----------------|
+| **Complexity** | Cyclomatic, cognitive, nesting depth | How hard code is to understand |
+| **Coverage** | Test coverage percentage per function | How risky changes are |
+| **Git History** | Change frequency, bug fix rate, author count | Which code keeps breaking |
+| **Coupling** | Dependencies, call graph depth | How changes ripple through the codebase |
+| **Purity** | Side effects, I/O operations | How testable and predictable code is |
+| **Entropy** | Pattern consistency within a codebase | Reduces false positives from intentional complexity |
 
-The result: a ranked list of what to fix first, with the context needed to understand why.
+These signals combine into a **severity score** (0-10). The result: a ranked list of what to fix first, with the context needed to understand why.
 
 ## Quick Start
 
@@ -37,36 +40,11 @@ debtmap analyze . --format json --top 10 > debt.json
 debtmap analyze . --format markdown --top 1 | claude "Fix this"
 ```
 
-## How It Works
-
-Debtmap combines static analysis with git history to score technical debt:
-
-| Signal | What It Measures | Why It Matters |
-|--------|------------------|----------------|
-| **Complexity** | Cyclomatic, cognitive, nesting depth | How hard code is to understand |
-| **Coverage** | Test coverage percentage per function | How risky changes are |
-| **Git History** | Change frequency, bug fix rate, author count | Which code keeps breaking |
-| **Coupling** | Dependencies, call graph depth | How changes ripple through the codebase |
-| **Purity** | Side effects, I/O operations | How testable and predictable code is |
-| **Entropy** | Pattern consistency | Reduces false positives from intentional complexity |
-
-These signals combine into a **severity score** (0-10). High scores mean high-complexity, poorly-tested, frequently-broken code.
-
 ## Supported Languages
 
-| Language | Complexity | Functions | Async Patterns | Call Graph |
-|----------|:----------:|:---------:|:--------------:|:----------:|
-| **Rust** | Full | Full | Full | Full |
-| **TypeScript** | Full | Full | Full | Full |
-| **JavaScript** | Full | Full | Full | Full |
-
-**Rust** — Full AST analysis with syn, including macro expansion and trait detection.
-
-**TypeScript/JavaScript** — Tree-sitter parsing with support for:
-- ES6+ syntax (arrow functions, classes, async/await)
-- JSX/TSX for React components
-- TypeScript-specific patterns (`any` usage, type assertions)
-- Promise chains and callback nesting detection
+- **Rust** — Full AST analysis with syn, including macro expansion and trait detection
+- **TypeScript** — Tree-sitter parsing with JSX/TSX, async patterns, and type-specific analysis
+- **JavaScript** — ES6+ syntax, React components, Promise chains, callback nesting
 
 ```bash
 # Analyze specific languages

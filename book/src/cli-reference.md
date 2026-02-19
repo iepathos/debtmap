@@ -302,11 +302,10 @@ Options are organized by category for clarity. Most options apply to the `analyz
 Control how analysis results are formatted and displayed.
 
 **Format Options:**
-- `-f, --format <FORMAT>` - Output format: json, markdown, terminal, html, dot (default: terminal for analyze)
+- `-f, --format <FORMAT>` - Output format: json, markdown, terminal, dot (default: terminal for analyze)
   - `json` - JSON format for programmatic processing
   - `markdown` - Markdown format with comprehensive analysis (uses LLM-optimized writer)
   - `terminal` - Human-readable terminal output with colors and formatting
-  - `html` - HTML format for web display
   - `dot` - Graphviz DOT format for dependency visualization
 - `-o, --output <OUTPUT>` - Output file path (defaults to stdout)
 - `--plain` - Plain output mode: ASCII-only, no colors, no emoji, machine-parseable

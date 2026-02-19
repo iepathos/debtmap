@@ -95,19 +95,12 @@ A function with 20 identical if/return validation checks has the same cyclomatic
 ### What languages are supported?
 
 **Currently supported:**
-- Rust - Full support with AST parsing, macro expansion, and trait resolution
+- **Rust** - Full support with AST parsing via `syn`, macro expansion, and trait resolution
+- **TypeScript** - Full support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis
+- **JavaScript** - Full support with tree-sitter parsing, ES6+ syntax, React components, Promise chains
 
 **Planned:**
-- Python, JavaScript/TypeScript, Go (after Rust analysis is mature)
-
-### Why is debtmap Rust-only right now?
-
-We're taking a focused approach to deliver the best possible Rust code analyzer before expanding. This allows us to:
-
-1. Perfect core algorithms with one language
-2. Build Rust-specific features (macros, traits, lifetimes)
-3. Establish trust in the Rust community
-4. Apply learnings to future languages
+- Python, Go
 
 ### How does coverage integration work?
 
@@ -220,7 +213,7 @@ Use risk scores for prioritization, but apply your domain knowledge when decidin
 | **Setup** | Single binary | Server required |
 
 **When to use SonarQube:** Multi-language enterprise dashboards.
-**When to use debtmap:** AI-assisted Rust development.
+**When to use debtmap:** AI-assisted development with Rust, TypeScript, and JavaScript.
 
 ### Should I replace clippy with debtmap?
 
@@ -280,7 +273,7 @@ Check:
 ### Debtmap reports "No functions found"
 
 Check:
-1. Project contains Rust files (`.rs`)
+1. Project contains supported source files (`.rs`, `.ts`, `.tsx`, `.js`, `.jsx`)
 2. Files aren't excluded by ignore patterns
 3. No syntax errors: `debtmap analyze . -vv`
 
