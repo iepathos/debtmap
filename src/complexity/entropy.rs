@@ -877,15 +877,16 @@ impl PatternDetector {
         }
     }
 
-    /// Count ? operators in an expression chain (e.g., `a()?.b()?.c()?`)
-    fn count_try_chain(&self, expr: &Expr) -> usize {
-        match expr {
-            Expr::Try(try_expr) => 1 + self.count_try_chain(&try_expr.expr),
-            Expr::MethodCall(method) => self.count_try_chain(&method.receiver),
-            Expr::Field(field) => self.count_try_chain(&field.base),
-            Expr::Await(await_expr) => self.count_try_chain(&await_expr.base),
-            _ => 0,
-        }
+}
+
+/// Count ? operators in an expression chain (e.g., `a()?.b()?.c()?`)
+fn count_try_chain(expr: &Expr) -> usize {
+    match expr {
+        Expr::Try(try_expr) => 1 + count_try_chain(&try_expr.expr),
+        Expr::MethodCall(method) => count_try_chain(&method.receiver),
+        Expr::Field(field) => count_try_chain(&field.base),
+        Expr::Await(await_expr) => count_try_chain(&await_expr.base),
+        _ => 0,
     }
 }
 
@@ -896,7 +897,7 @@ impl<'ast> Visit<'ast> for PatternDetector {
 
         // Special handling for ? operator chains (error propagation patterns)
         if let Expr::Try(try_expr) = expr {
-            let chain_length = self.count_try_chain(expr);
+            let chain_length = count_try_chain(expr);
             if chain_length > 1 {
                 // Record the chain pattern - multiple ? in a row indicates repetitive error handling
                 self.record_pattern(format!("try-chain-{}", chain_length));

@@ -251,8 +251,8 @@ fn extract_tokens_inner(node: &Node, source: &str, tokens: &mut Vec<JsEntropyTok
                 let attr_name = node_text(&name_node, source);
                 // Track common React attributes for pattern detection
                 match attr_name {
-                    "key" | "ref" | "className" | "style" | "onClick" | "onChange"
-                    | "onSubmit" | "disabled" | "type" | "value" | "href" | "src" => {
+                    "key" | "ref" | "className" | "style" | "onClick" | "onChange" | "onSubmit"
+                    | "disabled" | "type" | "value" | "href" | "src" => {
                         tokens.push(JsEntropyToken::identifier(attr_name.to_string()));
                     }
                     _ => {
@@ -456,9 +456,7 @@ function Component() {
 
         let attr_tokens: Vec<_> = tokens
             .iter()
-            .filter(|t| {
-                matches!(t.value(), "type" | "value" | "onChange")
-            })
+            .filter(|t| matches!(t.value(), "type" | "value" | "onChange"))
             .map(|t| t.value())
             .collect();
 
@@ -514,10 +512,7 @@ function Fragment() {
         let tokens = extract_tokens_recursive(&tree.root_node(), source);
 
         // Fragments are detected as JSX elements (spans are detected)
-        let jsx_element_count = tokens
-            .iter()
-            .filter(|t| t.value().starts_with('<'))
-            .count();
+        let jsx_element_count = tokens.iter().filter(|t| t.value().starts_with('<')).count();
 
         assert!(
             jsx_element_count >= 2,
@@ -545,7 +540,10 @@ function Form() {
         let tokens = extract_tokens_recursive(&tree.root_node(), source);
 
         // Count repeated patterns
-        let input_count = tokens.iter().filter(|t| t.value().contains("input")).count();
+        let input_count = tokens
+            .iter()
+            .filter(|t| t.value().contains("input"))
+            .count();
 
         assert!(
             input_count >= 4,
