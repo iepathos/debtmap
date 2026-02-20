@@ -876,7 +876,6 @@ impl PatternDetector {
             _ => "other-expr".to_string(),
         }
     }
-
 }
 
 /// Count ? operators in an expression chain (e.g., `a()?.b()?.c()?`)
