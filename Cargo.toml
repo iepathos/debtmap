@@ -86,7 +86,7 @@ regex = "1.10"
 which = "8.0"
 
 # Error handling
-anyhow = "1.0.31"  # minimum for From<&str> impl
+anyhow = "1.0.102"  # minimum for From<&str> impl
 thiserror = "2.0"
 
 # Effect composition and validation
