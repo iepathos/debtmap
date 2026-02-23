@@ -44,6 +44,89 @@ const CLEAR_IMPURITY_BOOST: f32 = 0.1;
 /// Weight for unknown call ratio in confidence calculation
 const UNKNOWN_CALL_RATIO_WEIGHT: f32 = 0.2;
 
+// ============================================================================
+// Pure helper types and functions for assignment analysis
+// ============================================================================
+
+/// Result of classifying a mutation's effect
+enum MutationEffect {
+    /// External mutation with an impurity reason
+    External(JsImpurityReason),
+    /// Local mutation (no impurity reason needed)
+    Local,
+}
+
+/// Classify member mutation (e.g., `obj.prop = value`)
+///
+/// Returns the mutation effect based on the object and property being assigned.
+/// This is a pure function that doesn't modify any state.
+fn classify_member_mutation(
+    object: &str,
+    property: &str,
+    scope: &JsScopeTracker,
+) -> Option<MutationEffect> {
+    // this.x = y
+    if object == "this" {
+        return Some(MutationEffect::External(JsImpurityReason::ExternalMutation(
+            format!("this.{}", property),
+        )));
+    }
+
+    // window.x = y or globalThis.x = y
+    if object == "window" || object == "globalThis" {
+        return Some(MutationEffect::External(JsImpurityReason::GlobalAccess(
+            format!("{}.{}", object, property),
+        )));
+    }
+
+    // DOM property mutation
+    if is_dom_mutation_property(property) {
+        return Some(MutationEffect::External(JsImpurityReason::DomMutation(
+            format!("{}.{}", object, property),
+        )));
+    }
+
+    // Parameter property mutation - affects caller's object
+    if scope.is_param(object) {
+        return Some(MutationEffect::External(
+            JsImpurityReason::ParameterMutation(format!("{}.{}", object, property)),
+        ));
+    }
+
+    // Local variable property mutation
+    if scope.is_local(object) {
+        return Some(MutationEffect::Local);
+    }
+
+    // External object mutation
+    Some(MutationEffect::External(JsImpurityReason::ExternalMutation(
+        format!("{}.{}", object, property),
+    )))
+}
+
+/// Classify subscript mutation (e.g., `arr[i] = value`)
+///
+/// Returns the mutation effect based on the object being indexed.
+/// This is a pure function that doesn't modify any state.
+fn classify_subscript_mutation(obj_name: &str, scope: &JsScopeTracker) -> Option<MutationEffect> {
+    // Parameter array/object mutation affects caller
+    if scope.is_param(obj_name) {
+        return Some(MutationEffect::External(
+            JsImpurityReason::ParameterMutation(format!("{}[...]", obj_name)),
+        ));
+    }
+
+    // Local variable mutation
+    if scope.is_local(obj_name) {
+        return Some(MutationEffect::Local);
+    }
+
+    // External array/object mutation
+    Some(MutationEffect::External(JsImpurityReason::ExternalMutation(
+        format!("{}[...]", obj_name),
+    )))
+}
+
 /// Purity analyzer for TypeScript/JavaScript functions
 pub struct TypeScriptPurityAnalyzer<'a> {
     /// Source code for extracting text
@@ -464,93 +547,9 @@ impl<'a> TypeScriptPurityAnalyzer<'a> {
     fn analyze_assignment(&mut self, node: &Node) {
         if let Some(left) = node.child_by_field_name("left") {
             match left.kind() {
-                "identifier" => {
-                    let name = self.node_text(&left);
-                    if self.scope.is_param(&name) {
-                        // Assigning to parameter
-                        self.has_external_mutation = true;
-                        self.reasons.push(JsImpurityReason::ParameterMutation(name));
-                    } else if !self.scope.is_local(&name) {
-                        // Assigning to external variable
-                        self.has_external_mutation = true;
-                        self.reasons.push(JsImpurityReason::ExternalMutation(name));
-                    }
-                }
-                "member_expression" => {
-                    let (object, property) = self.extract_member_parts(&left);
-
-                    // this.x = y
-                    if object == "this" {
-                        self.has_external_mutation = true;
-                        self.reasons
-                            .push(JsImpurityReason::ExternalMutation(format!(
-                                "this.{}",
-                                property
-                            )));
-                    }
-                    // window.x = y
-                    else if object == "window" || object == "globalThis" {
-                        self.has_external_mutation = true;
-                        self.reasons.push(JsImpurityReason::GlobalAccess(format!(
-                            "{}.{}",
-                            object, property
-                        )));
-                    }
-                    // DOM property mutation
-                    else if is_dom_mutation_property(&property) {
-                        self.has_external_mutation = true;
-                        self.reasons.push(JsImpurityReason::DomMutation(format!(
-                            "{}.{}",
-                            object, property
-                        )));
-                    }
-                    // Parameter property mutation - this affects caller's object
-                    else if self.scope.is_param(&object) {
-                        self.has_external_mutation = true;
-                        self.reasons
-                            .push(JsImpurityReason::ParameterMutation(format!(
-                                "{}.{}",
-                                object, property
-                            )));
-                    }
-                    // Local variable property mutation (not parameter)
-                    else if self.scope.is_local(&object) {
-                        self.has_local_mutation = true;
-                    }
-                    // External object mutation
-                    else {
-                        self.has_external_mutation = true;
-                        self.reasons
-                            .push(JsImpurityReason::ExternalMutation(format!(
-                                "{}.{}",
-                                object, property
-                            )));
-                    }
-                }
-                "subscript_expression" => {
-                    // arr[i] = x
-                    if let Some(obj) = left.child_by_field_name("object") {
-                        let obj_name = self.node_text(&obj);
-                        // Parameter array/object mutation affects caller
-                        if self.scope.is_param(&obj_name) {
-                            self.has_external_mutation = true;
-                            self.reasons
-                                .push(JsImpurityReason::ParameterMutation(format!(
-                                    "{}[...]",
-                                    obj_name
-                                )));
-                        } else if self.scope.is_local(&obj_name) {
-                            self.has_local_mutation = true;
-                        } else {
-                            self.has_external_mutation = true;
-                            self.reasons
-                                .push(JsImpurityReason::ExternalMutation(format!(
-                                    "{}[...]",
-                                    obj_name
-                                )));
-                        }
-                    }
-                }
+                "identifier" => self.analyze_identifier_assignment(&left),
+                "member_expression" => self.analyze_member_assignment(&left),
+                "subscript_expression" => self.analyze_subscript_assignment(&left),
                 _ => {}
             }
         }
@@ -558,6 +557,53 @@ impl<'a> TypeScriptPurityAnalyzer<'a> {
         // Visit the right side (might have side effects)
         if let Some(right) = node.child_by_field_name("right") {
             self.visit_node(&right);
+        }
+    }
+
+    /// Analyze assignment to a simple identifier (e.g., `x = 5`)
+    fn analyze_identifier_assignment(&mut self, left: &Node) {
+        let name = self.node_text(left);
+        if self.scope.is_param(&name) {
+            self.has_external_mutation = true;
+            self.reasons.push(JsImpurityReason::ParameterMutation(name));
+        } else if !self.scope.is_local(&name) {
+            self.has_external_mutation = true;
+            self.reasons.push(JsImpurityReason::ExternalMutation(name));
+        }
+    }
+
+    /// Analyze assignment to a member expression (e.g., `obj.prop = value`)
+    fn analyze_member_assignment(&mut self, left: &Node) {
+        let (object, property) = self.extract_member_parts(left);
+
+        if let Some(effect) = classify_member_mutation(&object, &property, &self.scope) {
+            match effect {
+                MutationEffect::External(reason) => {
+                    self.has_external_mutation = true;
+                    self.reasons.push(reason);
+                }
+                MutationEffect::Local => {
+                    self.has_local_mutation = true;
+                }
+            }
+        }
+    }
+
+    /// Analyze assignment to a subscript expression (e.g., `arr[i] = value`)
+    fn analyze_subscript_assignment(&mut self, left: &Node) {
+        if let Some(obj) = left.child_by_field_name("object") {
+            let obj_name = self.node_text(&obj);
+            if let Some(effect) = classify_subscript_mutation(&obj_name, &self.scope) {
+                match effect {
+                    MutationEffect::External(reason) => {
+                        self.has_external_mutation = true;
+                        self.reasons.push(reason);
+                    }
+                    MutationEffect::Local => {
+                        self.has_local_mutation = true;
+                    }
+                }
+            }
         }
     }
 
