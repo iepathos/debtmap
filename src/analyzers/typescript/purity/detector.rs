@@ -67,9 +67,9 @@ fn classify_member_mutation(
 ) -> Option<MutationEffect> {
     // this.x = y
     if object == "this" {
-        return Some(MutationEffect::External(JsImpurityReason::ExternalMutation(
-            format!("this.{}", property),
-        )));
+        return Some(MutationEffect::External(
+            JsImpurityReason::ExternalMutation(format!("this.{}", property)),
+        ));
     }
 
     // window.x = y or globalThis.x = y
@@ -99,9 +99,9 @@ fn classify_member_mutation(
     }
 
     // External object mutation
-    Some(MutationEffect::External(JsImpurityReason::ExternalMutation(
-        format!("{}.{}", object, property),
-    )))
+    Some(MutationEffect::External(
+        JsImpurityReason::ExternalMutation(format!("{}.{}", object, property)),
+    ))
 }
 
 /// Classify subscript mutation (e.g., `arr[i] = value`)
@@ -122,9 +122,9 @@ fn classify_subscript_mutation(obj_name: &str, scope: &JsScopeTracker) -> Option
     }
 
     // External array/object mutation
-    Some(MutationEffect::External(JsImpurityReason::ExternalMutation(
-        format!("{}[...]", obj_name),
-    )))
+    Some(MutationEffect::External(
+        JsImpurityReason::ExternalMutation(format!("{}[...]", obj_name)),
+    ))
 }
 
 /// Purity analyzer for TypeScript/JavaScript functions
