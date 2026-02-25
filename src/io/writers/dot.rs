@@ -162,6 +162,20 @@ impl DotWriter {
         graph: &HashMap<String, Vec<String>>,
         out: &mut W,
     ) -> io::Result<()> {
+        self.write_graph_header(out)?;
+        self.write_legend(out)?;
+        writeln!(out)?;
+
+        self.write_all_nodes(items, out)?;
+        writeln!(out)?;
+
+        self.write_edges(out, graph)?;
+        writeln!(out, "}}")?;
+        Ok(())
+    }
+
+    /// Write DOT digraph header and styling
+    fn write_graph_header<W: Write>(&self, out: &mut W) -> io::Result<()> {
         writeln!(out, "digraph debtmap {{")?;
         writeln!(out, "  rankdir={};", self.config.rankdir.as_str())?;
         writeln!(
@@ -170,30 +184,25 @@ impl DotWriter {
         )?;
         writeln!(out, "  edge [fontname=\"Helvetica\", fontsize=10];")?;
         writeln!(out)?;
+        Ok(())
+    }
 
-        // Write legend
-        self.write_legend(out)?;
-        writeln!(out)?;
-
-        // Group files by module if clustering is enabled
+    /// Write all nodes, potentially clustered by module
+    fn write_all_nodes<W: Write>(
+        &self,
+        items: &[FileDebtItemOutput],
+        out: &mut W,
+    ) -> io::Result<()> {
         if self.config.cluster_by_module {
             let modules = self.group_by_module(items);
             for (module, module_items) in &modules {
                 self.write_cluster(out, module, module_items)?;
             }
         } else {
-            // Write all nodes without clustering
             for item in items {
                 self.write_node(out, item, "  ")?;
             }
         }
-
-        writeln!(out)?;
-
-        // Write edges
-        self.write_edges(out, graph)?;
-
-        writeln!(out, "}}")?;
         Ok(())
     }
 

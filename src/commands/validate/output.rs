@@ -18,45 +18,39 @@ use anyhow::Result;
 ///
 /// Only displays if verbosity > 0 and quiet mode is not enabled.
 pub fn display_timing_information(unified: &UnifiedAnalysis, verbosity: u8) {
-    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-
-    if quiet_mode || verbosity == 0 {
+    if std::env::var("DEBTMAP_QUIET").is_ok() || verbosity == 0 {
         return;
     }
 
-    if let Some(timings) = &unified.timings {
-        eprintln!("\nTiming information:");
-        eprintln!("  Total analysis time: {:?}", timings.total);
+    let Some(timings) = &unified.timings else {
+        return;
+    };
 
-        if verbosity >= 1 {
-            eprintln!("  - Call graph building: {:?}", timings.call_graph_building);
-            eprintln!("  - Trait resolution: {:?}", timings.trait_resolution);
-            eprintln!("  - Coverage loading: {:?}", timings.coverage_loading);
+    eprintln!("\nTiming information:");
+    eprintln!("  Total analysis time: {:?}", timings.total);
 
-            if timings.data_flow_creation.as_millis() > 0 {
-                eprintln!("  - Data flow: {:?}", timings.data_flow_creation);
-            }
-            if timings.purity_analysis.as_millis() > 0 {
-                eprintln!("  - Purity: {:?}", timings.purity_analysis);
-            }
-            if timings.test_detection.as_millis() > 0 {
-                eprintln!("  - Test detection: {:?}", timings.test_detection);
-            }
-            if timings.debt_aggregation.as_millis() > 0 {
-                eprintln!("  - Debt aggregation: {:?}", timings.debt_aggregation);
-            }
-            if timings.function_analysis.as_millis() > 0 {
-                eprintln!("  - Function analysis: {:?}", timings.function_analysis);
-            }
-            if timings.file_analysis.as_millis() > 0 {
-                eprintln!("  - File analysis: {:?}", timings.file_analysis);
-            }
-            if timings.sorting.as_millis() > 0 {
-                eprintln!("  - Sorting: {:?}", timings.sorting);
+    if verbosity >= 1 {
+        eprintln!("  - Call graph building: {:?}", timings.call_graph_building);
+        eprintln!("  - Trait resolution: {:?}", timings.trait_resolution);
+        eprintln!("  - Coverage loading: {:?}", timings.coverage_loading);
+
+        let optional_phases = [
+            ("Data flow", timings.data_flow_creation),
+            ("Purity", timings.purity_analysis),
+            ("Test detection", timings.test_detection),
+            ("Debt aggregation", timings.debt_aggregation),
+            ("Function analysis", timings.function_analysis),
+            ("File analysis", timings.file_analysis),
+            ("Sorting", timings.sorting),
+        ];
+
+        for (n, d) in optional_phases {
+            if d.as_millis() > 0 {
+                eprintln!("  - {}: {:?}", n, d);
             }
         }
-        eprintln!();
     }
+    eprintln!();
 }
 
 /// I/O: Print deprecation warning for deprecated threshold settings.

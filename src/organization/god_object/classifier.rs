@@ -818,25 +818,22 @@ pub fn analyze_function_responsibility(function_name: &str) -> Option<String> {
 pub fn classify_struct_domain(struct_name: &str) -> String {
     let lower = struct_name.to_lowercase();
 
-    if lower.contains("weight")
-        || lower.contains("multiplier")
-        || lower.contains("factor")
-        || lower.contains("scoring")
-    {
-        "scoring".to_string()
-    } else if lower.contains("threshold") || lower.contains("limit") || lower.contains("bound") {
-        "thresholds".to_string()
-    } else if lower.contains("detection") || lower.contains("detector") || lower.contains("checker")
-    {
-        "detection".to_string()
-    } else if lower.contains("config") || lower.contains("settings") || lower.contains("options") {
-        "core_config".to_string()
-    } else if lower.contains("data") || lower.contains("info") || lower.contains("metrics") {
-        "data".to_string()
-    } else {
-        // Extract first meaningful word from struct name as domain
-        extract_domain_from_name(struct_name)
-    }
+    let domain_mappings = [
+        (
+            ["weight", "multiplier", "factor", "scoring"].as_slice(),
+            "scoring",
+        ),
+        (["threshold", "limit", "bound"].as_slice(), "thresholds"),
+        (["detection", "detector", "checker"].as_slice(), "detection"),
+        (["config", "settings", "options"].as_slice(), "core_config"),
+        (["data", "info", "metrics"].as_slice(), "data"),
+    ];
+
+    domain_mappings
+        .into_iter()
+        .find(|(keywords, _)| keywords.iter().any(|k| lower.contains(k)))
+        .map(|(_, domain)| domain.to_string())
+        .unwrap_or_else(|| extract_domain_from_name(struct_name))
 }
 
 /// Extract domain name from struct/type name by taking first meaningful word.

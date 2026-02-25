@@ -651,12 +651,29 @@ fn process_file_analysis(
     project_path: &Path,
     call_graph: &CallGraph,
 ) {
-    use crate::metrics::loc_counter::LocCounter;
-    use crate::priority::god_object_aggregation::{
-        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
-    };
-
     let file_groups = core::phases::file_analysis::group_functions_by_file(metrics);
+
+    register_analyzed_files(unified, &file_groups);
+
+    for (file_path, functions) in file_groups {
+        process_single_file(
+            unified,
+            file_path,
+            functions,
+            coverage_data,
+            no_god_object,
+            risk_analyzer,
+            project_path,
+            call_graph,
+        );
+    }
+}
+
+fn register_analyzed_files(
+    unified: &mut UnifiedAnalysis,
+    file_groups: &std::collections::HashMap<PathBuf, Vec<crate::core::FunctionMetrics>>,
+) {
+    use crate::metrics::loc_counter::LocCounter;
     let loc_counter = LocCounter::default();
 
     for file_path in file_groups.keys() {
@@ -664,98 +681,141 @@ fn process_file_analysis(
             unified.register_analyzed_file(file_path.clone(), loc_count.physical_lines);
         }
     }
+}
 
-    for (file_path, functions) in file_groups {
-        let file_content = std::fs::read_to_string(&file_path).ok();
+#[allow(clippy::too_many_arguments)]
+fn process_single_file(
+    unified: &mut UnifiedAnalysis,
+    file_path: PathBuf,
+    functions: Vec<crate::core::FunctionMetrics>,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    no_god_object: bool,
+    risk_analyzer: Option<&risk::RiskAnalyzer>,
+    project_path: &Path,
+    call_graph: &CallGraph,
+) {
+    let file_content = std::fs::read_to_string(&file_path).ok();
 
-        let mut processed = core::phases::file_analysis::process_file_metrics(
-            file_path.clone(),
-            functions,
-            file_content.as_deref(),
-            coverage_data,
-            no_god_object,
-            project_path,
-        );
+    let mut processed = core::phases::file_analysis::process_file_metrics(
+        file_path.clone(),
+        functions,
+        file_content.as_deref(),
+        coverage_data,
+        no_god_object,
+        project_path,
+    );
 
-        // Clear function_scores for consistency with parallel path
-        // (function scores come from scored debt items, not raw complexity aggregation)
-        processed.file_metrics.function_scores = Vec::new();
+    // Clear function_scores for consistency with parallel path
+    processed.file_metrics.function_scores = Vec::new();
 
-        // Create file_item to get context-adjusted score (consistent with parallel path)
-        let file_item = core::phases::file_analysis::create_file_debt_item(
-            processed.file_metrics.clone(),
-            Some(&processed.file_context),
-        );
+    let mut file_item = core::phases::file_analysis::create_file_debt_item(
+        processed.file_metrics.clone(),
+        Some(&processed.file_context),
+    );
 
-        let has_god_object = processed
-            .god_analysis
-            .as_ref()
-            .is_some_and(|a| a.is_god_object);
+    let has_god_object = processed
+        .god_analysis
+        .as_ref()
+        .is_some_and(|a| a.is_god_object);
 
-        // Use adjusted score for threshold check (same as parallel path)
-        if file_item.score > 50.0 || has_god_object {
-            let mut file_item = file_item; // Make mutable for potential god_object suppression
+    if file_item.score > 50.0 || has_god_object {
+        if let Some(god_analysis) = &processed.god_analysis {
+            handle_god_object(
+                unified,
+                god_analysis,
+                &processed,
+                file_content.as_deref(),
+                coverage_data,
+                risk_analyzer,
+                call_graph,
+                &mut file_item,
+            );
+        }
+        unified.add_file_item(file_item);
+    }
+}
 
-            if let Some(god_analysis) = &processed.god_analysis {
-                // Check if this god object should be suppressed via debtmap:ignore[god_object]
-                let is_suppressed = file_content.as_ref().is_some_and(|content| {
-                    is_god_object_suppressed_unified(god_analysis, content, &processed.file_path)
-                });
+#[allow(clippy::too_many_arguments)]
+fn handle_god_object(
+    unified: &mut UnifiedAnalysis,
+    god_analysis: &crate::organization::GodObjectAnalysis,
+    processed: &core::phases::file_analysis::ProcessedFileData,
+    file_content: Option<&str>,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    risk_analyzer: Option<&risk::RiskAnalyzer>,
+    call_graph: &CallGraph,
+    file_item: &mut crate::priority::FileDebtItem,
+) {
+    let is_suppressed = file_content.is_some_and(|content| {
+        is_god_object_suppressed_unified(god_analysis, content, &processed.file_path)
+    });
 
-                if is_suppressed {
-                    // Clear god object analysis from file metrics when suppressed
-                    file_item.metrics.god_object_analysis = None;
-                } else {
-                    let mut aggregated = aggregate_from_raw_metrics(&processed.raw_functions);
+    if is_suppressed {
+        file_item.metrics.god_object_analysis = None;
+        return;
+    }
 
-                    if let Some(lcov) = coverage_data {
-                        aggregated.weighted_coverage =
-                            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
-                    }
+    let (god_item, enriched) = build_god_object_item(
+        god_analysis,
+        processed,
+        coverage_data,
+        risk_analyzer,
+        call_graph,
+    );
 
-                    if let Some(analyzer) = risk_analyzer {
-                        aggregated.aggregated_contextual_risk =
-                            core::phases::god_object::analyze_file_git_context(
-                                &processed.file_path,
-                                analyzer,
-                                &processed.project_root,
-                            );
-                    }
-
-                    let enriched = core::phases::god_object::enrich_god_analysis_with_aggregates(
-                        god_analysis,
-                        &aggregated,
-                    );
-
-                    for item in unified.items.iter_mut() {
-                        if item.location.file == processed.file_path {
-                            item.god_object_indicators = Some(enriched.clone());
-                        }
-                    }
-
-                    let mut god_item = core::phases::god_object::create_god_object_debt_item(
-                        &processed.file_path,
-                        &processed.file_metrics,
-                        &enriched,
-                        aggregated,
-                        coverage_data,
-                        Some(call_graph),
-                    );
-
-                    // Generate context suggestion for AI agents (spec 263)
-                    use crate::priority::context::{generate_context_suggestion, ContextConfig};
-                    let context_config = ContextConfig::default();
-                    god_item.context_suggestion =
-                        generate_context_suggestion(&god_item, call_graph, &context_config);
-
-                    unified.add_item(god_item);
-                }
-            }
-
-            // Use the already-created file_item (score already checked above)
-            unified.add_file_item(file_item);
+    for item in unified.items.iter_mut() {
+        if item.location.file == processed.file_path {
+            item.god_object_indicators = Some(enriched.clone());
         }
     }
+
+    unified.add_item(god_item);
+}
+
+fn build_god_object_item(
+    god_analysis: &crate::organization::GodObjectAnalysis,
+    processed: &core::phases::file_analysis::ProcessedFileData,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    risk_analyzer: Option<&risk::RiskAnalyzer>,
+    call_graph: &CallGraph,
+) -> (UnifiedDebtItem, crate::organization::GodObjectAnalysis) {
+    use crate::priority::context::{generate_context_suggestion, ContextConfig};
+    use crate::priority::god_object_aggregation::{
+        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
+    };
+
+    let mut aggregated = aggregate_from_raw_metrics(&processed.raw_functions);
+
+    if let Some(lcov) = coverage_data {
+        aggregated.weighted_coverage =
+            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
+    }
+
+    if let Some(analyzer) = risk_analyzer {
+        aggregated.aggregated_contextual_risk = core::phases::god_object::analyze_file_git_context(
+            &processed.file_path,
+            analyzer,
+            &processed.project_root,
+        );
+    }
+
+    let enriched =
+        core::phases::god_object::enrich_god_analysis_with_aggregates(god_analysis, &aggregated);
+
+    let mut god_item = core::phases::god_object::create_god_object_debt_item(
+        &processed.file_path,
+        &processed.file_metrics,
+        &enriched,
+        aggregated,
+        coverage_data,
+        Some(call_graph),
+    );
+
+    let context_config = ContextConfig::default();
+    god_item.context_suggestion =
+        generate_context_suggestion(&god_item, call_graph, &context_config);
+
+    (god_item, enriched)
 }
 
 // --- Progress reporting helpers ---

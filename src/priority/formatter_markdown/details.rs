@@ -19,9 +19,25 @@ pub(crate) fn format_priority_item_markdown(
     item: &UnifiedDebtItem,
     verbosity: u8,
 ) {
-    let severity = get_severity_label(item.unified_score.final_score);
+    format_header(output, rank, item, verbosity);
+    format_location_and_impact(output, item);
+    format_dependencies(output, item, verbosity);
 
-    // Header with rank, tier, and score
+    if verbosity >= 1 {
+        format_git_context_section(output, item);
+    }
+
+    writeln!(output, "\n**Why:** {}", item.recommendation.rationale).unwrap();
+
+    if verbosity >= 2 {
+        if let Some(context) = &item.context_suggestion {
+            format_context_suggestion(output, context);
+        }
+    }
+}
+
+fn format_header(output: &mut String, rank: usize, item: &UnifiedDebtItem, verbosity: u8) {
+    let severity = get_severity_label(item.unified_score.final_score);
     let tier_label = item
         .tier
         .as_ref()
@@ -35,23 +51,21 @@ pub(crate) fn format_priority_item_markdown(
     )
     .unwrap();
 
-    // Show score breakdown for verbosity >= 2
     if verbosity >= 2 {
         output.push_str(&format_score_breakdown_with_coverage(
             &item.unified_score,
             item.transitive_coverage.as_ref(),
         ));
     } else if verbosity >= 1 {
-        // Show main contributing factors for verbosity >= 1
         output.push_str(&format_main_factors_with_coverage(
             &item.unified_score,
             &item.debt_type,
             item.transitive_coverage.as_ref(),
         ));
     }
+}
 
-    // Location and type
-    // Location line (spec 181: clean location line without context tag)
+fn format_location_and_impact(output: &mut String, item: &UnifiedDebtItem) {
     writeln!(
         output,
         "**Type:** {} | **Location:** `{}:{} {}()`",
@@ -62,7 +76,6 @@ pub(crate) fn format_priority_item_markdown(
     )
     .unwrap();
 
-    // Action and impact
     writeln!(output, "**Action:** {}", item.recommendation.primary_action).unwrap();
     writeln!(
         output,
@@ -71,48 +84,37 @@ pub(crate) fn format_priority_item_markdown(
     )
     .unwrap();
 
-    // Complexity details
     if let Some(complexity) = extract_complexity_info(&item.debt_type) {
         writeln!(output, "**Complexity:** {}", complexity).unwrap();
     }
+}
 
-    // Dependencies
-    if verbosity >= 1 {
-        writeln!(output, "\n#### Dependencies").unwrap();
-        writeln!(
-            output,
-            "- **Upstream:** {} | **Downstream:** {}",
-            item.upstream_dependencies, item.downstream_dependencies
-        )
-        .unwrap();
+fn format_dependencies(output: &mut String, item: &UnifiedDebtItem, verbosity: u8) {
+    if verbosity < 1 {
+        return;
+    }
 
-        if !item.upstream_callers.is_empty() && verbosity >= 2 {
+    writeln!(output, "\n#### Dependencies").unwrap();
+    writeln!(
+        output,
+        "- **Upstream:** {} | **Downstream:** {}",
+        item.upstream_dependencies, item.downstream_dependencies
+    )
+    .unwrap();
+
+    if verbosity >= 2 {
+        if !item.upstream_callers.is_empty() {
             let caller_info = format_dependency_list(&item.upstream_callers, 3, "Called by");
             if !caller_info.is_empty() {
                 writeln!(output, "{}", caller_info).unwrap();
             }
         }
 
-        if !item.downstream_callees.is_empty() && verbosity >= 2 {
+        if !item.downstream_callees.is_empty() {
             let callee_info = format_dependency_list(&item.downstream_callees, 3, "Calls");
             if !callee_info.is_empty() {
                 writeln!(output, "{}", callee_info).unwrap();
             }
-        }
-    }
-
-    // Git Context (match TUI format)
-    if verbosity >= 1 {
-        format_git_context_section(output, item);
-    }
-
-    // Rationale
-    writeln!(output, "\n**Why:** {}", item.recommendation.rationale).unwrap();
-
-    // Context suggestions (spec 263)
-    if verbosity >= 2 {
-        if let Some(context) = &item.context_suggestion {
-            format_context_suggestion(output, context);
         }
     }
 }
