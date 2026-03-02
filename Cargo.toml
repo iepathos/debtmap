@@ -149,7 +149,7 @@ tui-scrollview = "0.6.2"
 # Testing
 proptest = "1.4"
 pretty_assertions = "1.4"
-tempfile = "3.10"
+tempfile = "3.26"
 criterion = "0.8"
 trybuild = "1.0"
 assert_cmd = "2.0"
