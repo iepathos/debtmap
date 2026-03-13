@@ -649,7 +649,7 @@ mod tests {
         );
 
         // Now test the correct case where the conditional is true
-        let files_with_content = vec!["test.rs".to_string()];
+        let files_with_content = ["test.rs".to_string()];
         if !files_with_content.is_empty() {
             time_span!("conditional_operation_recorded");
             // ... processing
@@ -657,7 +657,8 @@ mod tests {
 
         let after_nonempty = get_count("conditional_operation_recorded");
         assert_eq!(
-            after_nonempty, before_nonempty + 1,
+            after_nonempty,
+            before_nonempty + 1,
             "Timing span inside true conditional should be recorded"
         );
     }
