@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.3] - 2026-03-13
+
+### Fixed
+
+- **Analysis Determinism** - Results are now bit-for-bit identical across multiple runs
+  - LCOV record merging now correctly handles duplicate file entries instead of overwriting
+  - Parallel call graph conversion now sorts nodes and edges for stable internal iteration order
+  - Deterministic function updates in parallel coverage calculation, resolving overlap conflicts
+  - Enforced sorted results for all call graph queries (callers, callees, search methods)
+  - Stabilized floating-point summation order in risk context to prevent bit-level drift
+  - Use of a fixed `reference_time` for all age-based risk calculations
+  - Added secondary sort keys (file, line, function) to the prioritization pipeline
+  - Sorted god object detection results and responsibility groups
+
+- **TUI Robustness** - Tracing output suppressed while TUI is active to prevent display corruption
+
+- **ROI Test Compilation** - Added missing `chrono::Utc` import to ROI unit tests
+
+### Added
+
+- **Determinism Regression Tests** - Permanent integration tests for stability
+  - Targeted tests for LCOV parsing with adversarial shuffled input
+  - Stability tests for call graph traversal and topological sorting
+  - Floating-point summation order validation
+
 ## [0.15.2] - 2026-03-12
 
 ### Fixed
