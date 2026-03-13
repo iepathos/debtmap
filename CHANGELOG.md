@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-03-12
+
+### Fixed
+
+- **Profiling Report for Rust-Only Codebases** - Language-specific timing no longer appears spuriously
+  - TypeScript call graph timing now only recorded when TypeScript files exist
+  - Fixed unconditional timing span creation in conditional block
+  - Profiling reports now accurate for monolingual projects
+
+### Added
+
+- **Profiling Regression Tests** - Prevent unconditional timing pattern regressions
+  - Test validates timing spans inside false conditionals aren't recorded
+  - Test ensures language-specific timing doesn't appear for Rust-only projects
+
+### Documentation
+
+- **Profiling Audit Report** - Comprehensive audit of timing instrumentation
+  - All 12 timing spans reviewed and validated
+  - Pattern guidelines documented for future development
+  - Related to commit 0a58e595
+
 ## [0.15.1] - 2026-02-18
 
 ### Fixed
