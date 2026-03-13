@@ -69,6 +69,9 @@ impl TuiManager {
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen)?;
 
+        // Suppress tracing output to prevent TUI corruption
+        crate::observability::set_tui_active(true);
+
         let backend = CrosstermBackend::new(stdout);
         let terminal = Arc::new(Mutex::new(Terminal::new(backend)?));
         let should_exit = Arc::new(AtomicBool::new(false));
@@ -188,6 +191,9 @@ impl TuiManager {
         let mut terminal = self.terminal.lock();
         execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
         terminal.show_cursor()?;
+
+        // Restore tracing output
+        crate::observability::set_tui_active(false);
         Ok(())
     }
 }

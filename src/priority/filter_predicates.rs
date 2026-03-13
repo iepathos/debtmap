@@ -224,6 +224,7 @@ pub fn meets_complexity_thresholds(
 pub fn is_duplicate_of(item: &UnifiedDebtItem, existing: &UnifiedDebtItem) -> bool {
     existing.location.file == item.location.file
         && existing.location.line == item.location.line
+        && existing.location.function == item.location.function
         && std::mem::discriminant(&existing.debt_type) == std::mem::discriminant(&item.debt_type)
 }
 

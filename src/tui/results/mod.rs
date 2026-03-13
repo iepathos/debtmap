@@ -97,6 +97,9 @@ impl ResultsExplorer {
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
+        // Suppress tracing output to prevent TUI corruption
+        crate::observability::set_tui_active(true);
+
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
@@ -122,6 +125,9 @@ impl ResultsExplorer {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+        // Suppress tracing output to prevent TUI corruption
+        crate::observability::set_tui_active(true);
 
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
@@ -179,6 +185,9 @@ impl ResultsExplorer {
             DisableMouseCapture
         )?;
         self.terminal.show_cursor()?;
+
+        // Restore tracing output
+        crate::observability::set_tui_active(false);
         Ok(())
     }
 }

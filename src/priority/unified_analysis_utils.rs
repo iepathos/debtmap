@@ -17,12 +17,18 @@ fn compare_debt_items_by_score(a: &UnifiedDebtItem, b: &UnifiedDebtItem) -> Orde
         .final_score
         .partial_cmp(&a.unified_score.final_score)
         .unwrap_or(Ordering::Equal)
+        .then_with(|| a.location.file.cmp(&b.location.file))
+        .then_with(|| a.location.line.cmp(&b.location.line))
+        .then_with(|| a.location.function.cmp(&b.location.function))
 }
 
 /// Compare file items by score (pure function).
 /// Returns descending order (highest scores first).
 fn compare_file_items_by_score(a: &FileDebtItem, b: &FileDebtItem) -> Ordering {
-    b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal)
+    b.score
+        .partial_cmp(&a.score)
+        .unwrap_or(Ordering::Equal)
+        .then_with(|| a.metrics.path.cmp(&b.metrics.path))
 }
 
 /// Extension trait providing utility operations for UnifiedAnalysis

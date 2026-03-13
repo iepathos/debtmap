@@ -215,6 +215,7 @@ mod file_analysis {
 }
 
 /// Options for parallel unified analysis
+#[derive(Debug, Clone)]
 pub struct ParallelUnifiedAnalysisOptions {
     pub parallel: bool,
     pub jobs: Option<usize>,
@@ -1000,7 +1001,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         // Analyze files in parallel with TUI progress updates
         // Store both file items and raw functions for god object aggregation
-        let file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)> = files_map
+        let mut file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)> = files_map
             .par_iter()
             .progress_with(progress.clone())
             .filter_map(|(file_path, functions)| {
@@ -1033,6 +1034,10 @@ impl ParallelUnifiedAnalysisBuilder {
                 })
             })
             .collect();
+
+        // Sort file_data by path to ensure deterministic order (Spec 214 fix)
+        // This ensures god objects are added in a stable order for duplicate checks.
+        file_data.sort_by(|a, b| a.0.metrics.path.cmp(&b.0.metrics.path));
 
         self.timings.file_analysis = start.elapsed();
 

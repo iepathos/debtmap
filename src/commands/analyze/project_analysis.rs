@@ -240,6 +240,11 @@ fn parse_and_extract_metrics_hybrid(
     let mut all_metrics = rust_metrics;
     all_metrics.extend(non_rust_metrics);
 
+    // Sort metrics by path to ensure deterministic analysis results (spec 214 fix)
+    // Non-deterministic order from HashMap iteration was causing unstable scores
+    // and location counts in the prioritization phase.
+    all_metrics.sort_by(|a, b| a.path.cmp(&b.path));
+
     complete_parsing(files.len());
 
     Ok((all_metrics, extracted_data))
@@ -292,11 +297,9 @@ fn log_parallel_status(parallel_enabled: bool) {
     }
 }
 
-/// Log massive project warnings.
+/// Log massive project info.
 fn log_massive_project(file_count: usize) {
-    log::warn!("Analyzing {} files (massive project)", file_count);
-    log::warn!("Consider using .debtmapignore to exclude test/vendor directories");
-    log::warn!("Focus analysis on specific modules with targeted paths");
+    log::info!("Analyzing {} files (massive project)", file_count);
 }
 
 /// Configure environment for large projects.

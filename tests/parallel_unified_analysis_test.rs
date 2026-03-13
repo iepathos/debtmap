@@ -95,6 +95,158 @@ fn test_parallel_unified_analysis_execution() {
 }
 
 #[test]
+fn test_parallel_analysis_determinism() {
+    // Create test metrics with multiple functions on the same line to test duplicate detection
+    let mut metrics = create_test_metrics(50);
+
+    // Add some "duplicate" functions (same file/line, different name)
+    // This mimics macro expansions or other patterns that might put multiple functions on one line
+    let dup_file = PathBuf::from("test0.rs");
+    let dup_line = 10;
+
+    metrics.push(FunctionMetrics {
+        file: dup_file.clone(),
+        name: "function_dup_1".to_string(),
+        line: dup_line,
+        length: 20,
+        cyclomatic: 15,
+        cognitive: 10,
+        nesting: 2,
+        is_test: false,
+        in_test_module: false,
+        visibility: None,
+        is_trait_method: false,
+        entropy_score: None,
+        is_pure: Some(false),
+        purity_confidence: Some(0.9),
+        detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+        composition_metrics: None,
+        language_specific: None,
+        purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
+        entropy_analysis: None,
+        purity_reason: None,
+        call_dependencies: None,
+    });
+
+    metrics.push(FunctionMetrics {
+        file: dup_file.clone(),
+        name: "function_dup_2".to_string(),
+        line: dup_line,
+        length: 20,
+        cyclomatic: 15,
+        cognitive: 10,
+        nesting: 2,
+        is_test: false,
+        in_test_module: false,
+        visibility: None,
+        is_trait_method: false,
+        entropy_score: None,
+        is_pure: Some(false),
+        purity_confidence: Some(0.9),
+        detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+        composition_metrics: None,
+        language_specific: None,
+        purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
+        entropy_analysis: None,
+        purity_reason: None,
+        call_dependencies: None,
+    });
+
+    let call_graph = CallGraph::new();
+    let options = ParallelUnifiedAnalysisOptions {
+        parallel: true,
+        jobs: Some(4),
+        batch_size: 10,
+        progress: false,
+    };
+
+    // Run analysis 5 times and ensure results are identical
+    let mut results = Vec::new();
+
+    for _ in 0..5 {
+        let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options.clone());
+        let (data_flow, purity, test_funcs, debt_agg) =
+            builder.execute_phase1_parallel(&metrics, None);
+
+        let items = builder.execute_phase2_parallel(
+            &metrics,
+            &test_funcs,
+            &debt_agg,
+            &data_flow,
+            None,
+            &Default::default(),
+            None,
+        );
+
+        let file_items = builder.execute_phase3_parallel(&metrics, None, false);
+        let (unified, _timings) = builder.build(data_flow, purity, items, file_items, None);
+
+        // Store scores and locations for comparison
+        let item_data: Vec<_> = unified
+            .items
+            .iter()
+            .map(|item| {
+                (
+                    item.location.file.clone(),
+                    item.location.function.clone(),
+                    item.location.line,
+                    item.unified_score.final_score,
+                )
+            })
+            .collect();
+        results.push(item_data);
+    }
+
+    // Compare all results to the first one
+    let first_result = &results[0];
+    for (i, result) in results.iter().enumerate().skip(1) {
+        assert_eq!(
+            first_result.len(),
+            result.len(),
+            "Result {} has different item count",
+            i
+        );
+
+        for (j, (item1, item2)) in first_result.iter().zip(result.iter()).enumerate() {
+            assert_eq!(
+                item1, item2,
+                "Result {}, Item {} differs: {:?} vs {:?}",
+                i, j, item1, item2
+            );
+        }
+    }
+
+    // Verify that BOTH "duplicate" functions are present (not filtered out by mistake)
+    let dup1_present = first_result
+        .iter()
+        .any(|(_, name, _, _)| name == "function_dup_1");
+    let dup2_present = first_result
+        .iter()
+        .any(|(_, name, _, _)| name == "function_dup_2");
+
+    assert!(
+        dup1_present,
+        "function_dup_1 should be present in results"
+    );
+    assert!(
+        dup2_present,
+        "function_dup_2 should be present in results"
+    );
+}
+
+#[test]
 fn test_optimized_test_detector() {
     use debtmap::builders::parallel_unified_analysis::OptimizedTestDetector;
     use debtmap::priority::call_graph::FunctionId;
