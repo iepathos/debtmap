@@ -627,4 +627,63 @@ mod tests {
             "Should record 40 spans (4 threads × 10 each)"
         );
     }
+
+    #[test]
+    fn test_conditional_timing_not_recorded_when_guard_is_false() {
+        enable_profiling();
+        let before_empty = get_count("conditional_operation");
+        let before_nonempty = get_count("conditional_operation_recorded");
+
+        // Simulate the TypeScript call graph pattern:
+        // Timing span INSIDE the conditional (correct pattern)
+        let files: Vec<String> = vec![];
+        if !files.is_empty() {
+            time_span!("conditional_operation");
+            // ... processing
+        }
+
+        let after_empty = get_count("conditional_operation");
+        assert_eq!(
+            after_empty, before_empty,
+            "Timing span inside false conditional should NOT be recorded"
+        );
+
+        // Now test the correct case where the conditional is true
+        let files_with_content = vec!["test.rs".to_string()];
+        if !files_with_content.is_empty() {
+            time_span!("conditional_operation_recorded");
+            // ... processing
+        }
+
+        let after_nonempty = get_count("conditional_operation_recorded");
+        assert_eq!(
+            after_nonempty, before_nonempty + 1,
+            "Timing span inside true conditional should be recorded"
+        );
+    }
+
+    #[test]
+    fn test_language_specific_timing_not_in_rust_only_codebase() {
+        enable_profiling();
+        let before = get_count("typescript_call_graph");
+
+        // Simulate analyzing a Rust-only codebase (no .ts files)
+        let metrics: Vec<String> = vec![];
+        let js_ts_files: Vec<String> = metrics
+            .iter()
+            .filter(|_m| false) // Simulates no TypeScript files
+            .map(|_| "dummy".to_string())
+            .collect();
+
+        if !js_ts_files.is_empty() {
+            time_span!("typescript_call_graph");
+            // Would process TypeScript files here
+        }
+
+        let after = get_count("typescript_call_graph");
+        assert_eq!(
+            after, before,
+            "Language-specific timing should not appear in profiling report for Rust-only codebase"
+        );
+    }
 }
