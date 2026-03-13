@@ -92,6 +92,7 @@ fn create_analysis_options_with_extracted<'a>(
         disable_context: config.disable_context.clone(),
         rust_files: Some(rust_files),
         extracted_data, // Spec 213: Pre-extracted data for parallel analysis
+        reference_time: config.reference_time,
     }
 }
 

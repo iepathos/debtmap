@@ -502,6 +502,7 @@ mod tests {
             function_name: "some_function".to_string(),
             file_path: PathBuf::from("src/lib.rs"),
             line_range: (10, 20),
+            reference_time: chrono::Utc::now(),
         };
 
         let result = provider.gather(&target).unwrap();
@@ -547,6 +548,7 @@ mod tests {
             function_name: "handle_event".to_string(),
             file_path: PathBuf::from("src/events.rs"),
             line_range: (20, 40),
+            reference_time: chrono::Utc::now(),
         };
 
         let result = provider.gather(&target).unwrap();
@@ -593,6 +595,7 @@ mod tests {
             function_name: "main".to_string(),
             file_path: PathBuf::from("src/main.rs"),
             line_range: (1, 10),
+            reference_time: chrono::Utc::now(),
         };
 
         let result = provider.gather(&target).unwrap();
@@ -651,6 +654,7 @@ mod tests {
             function_name: "shared_function".to_string(),
             file_path: PathBuf::from("src/shared.rs"),
             line_range: (50, 100),
+            reference_time: chrono::Utc::now(),
         };
 
         let result = provider.gather(&target).unwrap();
@@ -828,6 +832,7 @@ mod tests {
             function_name: "connection_pool".to_string(),
             file_path: PathBuf::from("src/database.rs"),
             line_range: (45, 80),
+            reference_time: chrono::Utc::now(),
         };
 
         let result = provider.gather(&target).unwrap();
@@ -900,6 +905,7 @@ mod tests {
             function_name: "shared_utility".to_string(),
             file_path: PathBuf::from("src/utils.rs"),
             line_range: (1, 30),
+            reference_time: chrono::Utc::now(),
         };
 
         let result = provider.gather(&target).unwrap();
@@ -932,6 +938,7 @@ mod tests {
             function_name: "orphaned_function".to_string(),
             file_path: PathBuf::from("src/orphaned.rs"),
             line_range: (10, 20),
+            reference_time: chrono::Utc::now(),
         };
 
         let orphaned_result = provider.gather(&orphaned_target).unwrap();

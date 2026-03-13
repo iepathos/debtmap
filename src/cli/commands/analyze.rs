@@ -421,6 +421,7 @@ fn build_analyze_config(
         f.min_split_lines,
         d.no_tui,
         d.show_filter_stats,
+        chrono::Utc::now(),
     )
 }
 

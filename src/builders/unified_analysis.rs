@@ -43,6 +43,7 @@ pub fn perform_unified_analysis(
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
 ) -> Result<UnifiedAnalysis> {
+    let now = chrono::Utc::now();
     perform_unified_analysis_with_options(UnifiedAnalysisOptions {
         results,
         coverage_file,
@@ -66,6 +67,7 @@ pub fn perform_unified_analysis(
         disable_context: None,
         rust_files: None,     // Fallback to file discovery
         extracted_data: None, // Fallback to per-function parsing (spec 213)
+        reference_time: now,
     })
 }
 
@@ -100,6 +102,7 @@ pub fn perform_unified_analysis_with_options(
         disable_context,
         rust_files,
         extracted_data,
+        reference_time,
     } = options;
 
     time_span!("unified_analysis");
@@ -263,19 +266,20 @@ pub fn perform_unified_analysis_with_options(
         time_span!("context_loading", parent: "unified_analysis");
         let _span = info_span!("context_loading").entered();
         info!("Loading context providers");
-        let result = build_risk_analyzer(
+        let risk_analyzer = build_risk_analyzer(
             project_path,
             enable_context,
             context_providers,
             disable_context,
             results,
+            reference_time,
         );
-        if result.is_some() {
+        if risk_analyzer.is_some() {
             debug!("Context providers loaded");
         } else {
             debug!("Context analysis disabled or not available");
         }
-        result
+        risk_analyzer
     };
     let context_metric = if enable_context { "loaded" } else { "skipped" };
     report_stage_complete(4, context_metric);
@@ -305,6 +309,7 @@ pub fn perform_unified_analysis_with_options(
             parallel,
             jobs,
             extracted_data,
+            reference_time,
         );
         debug!(
             item_count = result.items.len(),
@@ -338,6 +343,7 @@ pub fn create_unified_analysis_with_exclusions(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
+    reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
     create_unified_analysis_with_exclusions_and_timing(
         metrics,
@@ -357,6 +363,7 @@ pub fn create_unified_analysis_with_exclusions(
         false,
         0,
         None, // No extracted data - fallback to per-function parsing (spec 213)
+        reference_time,
     )
 }
 
@@ -421,6 +428,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
     >,
+    reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
     // Use parallel path if enabled
     let parallel_enabled = parallel
@@ -443,6 +451,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
             risk_analyzer,
             project_path,
             extracted_data,
+            reference_time,
         );
     }
 
@@ -533,6 +542,7 @@ fn create_parallel_analysis(
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
     >,
+    reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::{
         ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
@@ -543,6 +553,7 @@ fn create_parallel_analysis(
         jobs: if jobs > 0 { Some(jobs) } else { None },
         batch_size: 100,
         progress: std::env::var("DEBTMAP_QUIET").is_err(),
+        reference_time,
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options)
@@ -1056,6 +1067,7 @@ fn build_risk_analyzer(
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
     results: &AnalysisResults,
+    reference_time: chrono::DateTime<chrono::Utc>,
 ) -> Option<risk::RiskAnalyzer> {
     if !enable_context {
         return None;
@@ -1072,7 +1084,8 @@ fn build_risk_analyzer(
     Some(
         risk::RiskAnalyzer::default()
             .with_debt_context(debt_score, 100.0)
-            .with_context_aggregator(aggregator),
+            .with_context_aggregator(aggregator)
+            .with_reference_time(reference_time),
     )
 }
 

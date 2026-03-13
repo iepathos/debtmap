@@ -72,8 +72,8 @@ impl FunctionHistory {
     /// Calculate change frequency (modifications per month)
     ///
     /// Pure function: returns 0.0 if function was never modified
-    pub fn change_frequency(&self) -> f64 {
-        let age_days = self.age_days();
+    pub fn change_frequency(&self, now: DateTime<Utc>) -> f64 {
+        let age_days = self.age_days(now);
         if age_days == 0 || self.total_commits == 0 {
             return 0.0;
         }
@@ -81,9 +81,9 @@ impl FunctionHistory {
     }
 
     /// Calculate function age in days since introduction
-    pub fn age_days(&self) -> u32 {
+    pub fn age_days(&self, now: DateTime<Utc>) -> u32 {
         self.introduced
-            .map(|d| Utc::now().signed_duration_since(d).num_days().max(0) as u32)
+            .map(|d| now.signed_duration_since(d).num_days().max(0) as u32)
             .unwrap_or(0)
     }
 
@@ -187,11 +187,19 @@ pub fn get_function_history(
     function_name: &str,
     line_range: (usize, usize),
     blame_cache: &FileBlameCache,
+    now: DateTime<Utc>,
 ) -> Result<FunctionHistory> {
     time_span!("git_function_history");
 
     // Use subprocess for pickaxe search - git2 doesn't support -S/-G flags
-    get_function_history_subprocess(repo_root, file_path, function_name, line_range, blame_cache)
+    get_function_history_subprocess(
+        repo_root,
+        file_path,
+        function_name,
+        line_range,
+        blame_cache,
+        now,
+    )
 }
 
 /// Get function history using subprocess calls
@@ -204,6 +212,7 @@ fn get_function_history_subprocess(
     function_name: &str,
     line_range: (usize, usize),
     blame_cache: &FileBlameCache,
+    _now: DateTime<Utc>,
 ) -> Result<FunctionHistory> {
     // I/O: Find introduction commit
     let intro_output = run_git_log_introduction(repo_root, file_path, function_name)?;
@@ -450,20 +459,22 @@ more garbage"#;
 
     #[test]
     fn test_function_history_never_modified() {
+        let now = Utc::now();
         let history = FunctionHistory {
             total_commits: 0,
             bug_fix_count: 0,
-            introduced: Some(Utc::now() - chrono::Duration::days(30)),
+            introduced: Some(now - chrono::Duration::days(30)),
             ..Default::default()
         };
 
         assert_eq!(history.bug_density(), 0.0);
-        assert_eq!(history.change_frequency(), 0.0);
+        assert_eq!(history.change_frequency(now), 0.0);
     }
 
     #[test]
     fn test_function_history_with_modifications() {
-        let introduced = Utc::now() - chrono::Duration::days(30);
+        let now = Utc::now();
+        let introduced = now - chrono::Duration::days(30);
         let history = FunctionHistory {
             introduction_commit: Some("abc123".to_string()),
             total_commits: 4,
@@ -474,16 +485,17 @@ more garbage"#;
 
         assert_eq!(history.bug_density(), 0.25);
         // ~4 commits in 30 days = ~4 commits/month
-        let freq = history.change_frequency();
+        let freq = history.change_frequency(now);
         assert!(freq > 3.5 && freq < 4.5, "Expected ~4.0, got {freq}");
     }
 
     #[test]
     fn test_function_history_all_bug_fixes() {
+        let now = Utc::now();
         let history = FunctionHistory {
             total_commits: 5,
             bug_fix_count: 5,
-            introduced: Some(Utc::now() - chrono::Duration::days(10)),
+            introduced: Some(now - chrono::Duration::days(10)),
             ..Default::default()
         };
 
@@ -492,13 +504,14 @@ more garbage"#;
 
     #[test]
     fn test_function_history_age_days() {
-        let ten_days_ago = Utc::now() - chrono::Duration::days(10);
+        let now = Utc::now();
+        let ten_days_ago = now - chrono::Duration::days(10);
         let history = FunctionHistory {
             introduced: Some(ten_days_ago),
             ..Default::default()
         };
 
-        let age = history.age_days();
+        let age = history.age_days(now);
         // Allow some tolerance for timing
         assert!((9..=11).contains(&age), "Expected ~10 days, got {age}");
     }

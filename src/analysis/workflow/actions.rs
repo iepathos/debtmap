@@ -314,6 +314,7 @@ pub fn compute_scores<Env: ProgressReporter>(
         state.config.aggregation_method.clone(),
         state.config.min_problematic,
         state.config.no_god_object,
+        chrono::Utc::now(),
     );
 
     env.phase_progress(0.9);

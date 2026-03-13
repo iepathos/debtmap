@@ -35,6 +35,7 @@ pub mod strategy;
 pub mod thresholds;
 
 use crate::core::ComplexityMetrics;
+use chrono::{DateTime, Utc};
 use im::Vector;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -123,6 +124,8 @@ pub struct RiskAnalyzer {
     debt_score: Option<f64>,
     debt_threshold: Option<f64>,
     context_aggregator: Option<Arc<ContextAggregator>>,
+    /// Reference time for deterministic analysis (Spec 214)
+    pub reference_time: DateTime<Utc>,
 }
 
 impl Clone for RiskAnalyzer {
@@ -136,6 +139,7 @@ impl Clone for RiskAnalyzer {
             debt_score: self.debt_score,
             debt_threshold: self.debt_threshold,
             context_aggregator: self.context_aggregator.clone(), // Arc::clone is cheap!
+            reference_time: self.reference_time,
         }
     }
 }
@@ -147,11 +151,17 @@ impl Default for RiskAnalyzer {
             debt_score: None,
             debt_threshold: None,
             context_aggregator: None,
+            reference_time: Utc::now(),
         }
     }
 }
 
 impl RiskAnalyzer {
+    /// Set the reference time for analysis (for determinism)
+    pub fn with_reference_time(mut self, time: DateTime<Utc>) -> Self {
+        self.reference_time = time;
+        self
+    }
     pub fn with_debt_context(mut self, debt_score: f64, debt_threshold: f64) -> Self {
         self.debt_score = Some(debt_score);
         self.debt_threshold = Some(debt_threshold);
@@ -219,6 +229,7 @@ impl RiskAnalyzer {
                 file_path: file,
                 function_name: function_name.clone(),
                 line_range,
+                reference_time: self.reference_time,
             };
 
             let context_map = aggregator.analyze(&target);
@@ -321,6 +332,7 @@ impl RiskAnalyzer {
             file_path,
             function_name: String::new(), // Empty for file-level analysis
             line_range: (0, 0),           // Not applicable for file-level
+            reference_time: self.reference_time,
         };
 
         let context_map = aggregator.analyze(&target);

@@ -112,10 +112,11 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
     // Build analysis with coverage data
     let call_graph = CallGraph::new();
     let options = ParallelUnifiedAnalysisOptions {
-        parallel: false,
-        jobs: Some(1),
-        batch_size: 100,
+        parallel: true,
+        jobs: Some(4),
+        batch_size: 10,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -223,10 +224,11 @@ fn test_well_tested_simple_function_has_low_score() {
 
     let call_graph = CallGraph::new();
     let options = ParallelUnifiedAnalysisOptions {
-        parallel: false,
-        jobs: Some(1),
-        batch_size: 100,
+        parallel: true,
+        jobs: Some(4),
+        batch_size: 10,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);

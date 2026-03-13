@@ -45,6 +45,8 @@ pub struct UnifiedAnalysisOptions<'a> {
     /// Pre-extracted file data from unified extraction phase (spec 213).
     /// When present, avoids re-parsing files during analysis.
     pub extracted_data: Option<HashMap<PathBuf, ExtractedFileData>>,
+    /// Reference time for deterministic analysis (Spec 214)
+    pub reference_time: chrono::DateTime<chrono::Utc>,
 }
 
 /// Owned options for unified analysis.

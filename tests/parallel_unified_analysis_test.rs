@@ -52,6 +52,7 @@ fn test_parallel_unified_analysis_execution() {
         jobs: Some(4),
         batch_size: 25,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     // Create builder
@@ -170,6 +171,7 @@ fn test_parallel_analysis_determinism() {
         jobs: Some(4),
         batch_size: 10,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     // Run analysis 5 times and ensure results are identical
@@ -312,6 +314,7 @@ fn test_parallel_vs_sequential_consistency() {
         None,
         None,
         false,
+        chrono::Utc::now(),
     );
 
     // Run parallel analysis
@@ -327,6 +330,7 @@ fn test_parallel_vs_sequential_consistency() {
         None,
         None,
         false,
+        chrono::Utc::now(),
     );
     std::env::remove_var("DEBTMAP_PARALLEL");
 
@@ -389,6 +393,7 @@ fn test_large_codebase_parallel_analysis() {
         jobs: None, // Use all cores
         batch_size: 100,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -453,6 +458,7 @@ fn test_parallel_analysis_different_batch_sizes() {
             jobs: Some(4),
             batch_size,
             progress: false,
+            reference_time: chrono::Utc::now(),
         };
 
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
@@ -507,6 +513,7 @@ fn test_parallel_analysis_with_coverage_data() {
         jobs: Some(4),
         batch_size: 25,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -546,6 +553,7 @@ fn test_parallel_analysis_memory_efficiency() {
         jobs: Some(2),  // Limit parallelism to control memory
         batch_size: 50, // Small batches
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -670,6 +678,7 @@ fn test_god_objects_created_in_parallel_analysis() {
         jobs: Some(2),
         batch_size: 50,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -956,6 +965,7 @@ fn test_data_flow_population_performance_overhead() {
             jobs: Some(4),
             batch_size: 50,
             progress: false,
+            reference_time: chrono::Utc::now(),
         };
 
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
@@ -1227,6 +1237,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
         jobs: Some(4),
         batch_size: 25,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder_with_extracted =
@@ -1242,6 +1253,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
         jobs: Some(4),
         batch_size: 25,
         progress: false,
+        reference_time: chrono::Utc::now(),
     };
 
     let mut builder_without_extracted =

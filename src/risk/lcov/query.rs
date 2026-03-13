@@ -185,7 +185,9 @@ impl LcovData {
         }
 
         // Phase 1: Path matching using Spec 201
-        let available_paths: Vec<PathBuf> = self.functions.keys().cloned().collect();
+        let mut available_paths: Vec<PathBuf> = self.functions.keys().cloned().collect();
+        // Sort available paths to ensure deterministic matching when multiple candidates match (Spec 214)
+        available_paths.sort();
         let path_match = find_matching_path(file, &available_paths);
 
         if debug_mode {

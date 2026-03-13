@@ -46,10 +46,11 @@ impl ContextProvider for MockProvider {
 fn test_context_aggregator_default() {
     let aggregator = ContextAggregator::default();
     let target = AnalysisTarget {
-        root_path: PathBuf::from("/test"),
-        file_path: PathBuf::from("/test/file.rs"),
-        function_name: "test_fn".to_string(),
+        root_path: PathBuf::from("/project"),
+        file_path: PathBuf::from("src/lib.rs"),
+        function_name: "test_func".to_string(),
         line_range: (1, 10),
+        reference_time: chrono::Utc::now(),
     };
 
     let context_map = aggregator.analyze(&target);
@@ -62,10 +63,11 @@ fn test_context_aggregator_default() {
 fn test_context_aggregator_new() {
     let aggregator = ContextAggregator::new();
     let target = AnalysisTarget {
-        root_path: PathBuf::from("/test"),
-        file_path: PathBuf::from("/test/file.rs"),
-        function_name: "test_fn".to_string(),
+        root_path: PathBuf::from("/project"),
+        file_path: PathBuf::from("src/lib.rs"),
+        function_name: "test_func".to_string(),
         line_range: (1, 10),
+        reference_time: chrono::Utc::now(),
     };
 
     let context_map = aggregator.analyze(&target);
@@ -85,10 +87,11 @@ fn test_context_aggregator_with_provider() {
     let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
-        root_path: PathBuf::from("/test"),
-        file_path: PathBuf::from("/test/file.rs"),
-        function_name: "test_fn".to_string(),
+        root_path: PathBuf::from("/project"),
+        file_path: PathBuf::from("src/lib.rs"),
+        function_name: "test_func".to_string(),
         line_range: (1, 10),
+        reference_time: chrono::Utc::now(),
     };
 
     let context_map = aggregator.analyze(&target);
@@ -109,10 +112,11 @@ fn test_context_aggregator_with_failing_provider() {
     let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
-        root_path: PathBuf::from("/test"),
-        file_path: PathBuf::from("/test/file.rs"),
-        function_name: "test_fn".to_string(),
+        root_path: PathBuf::from("/project"),
+        file_path: PathBuf::from("src/lib.rs"),
+        function_name: "test_func".to_string(),
         line_range: (1, 10),
+        reference_time: chrono::Utc::now(),
     };
 
     let context_map = aggregator.analyze(&target);
@@ -133,10 +137,11 @@ fn test_context_aggregator_cache() {
     let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
-        root_path: PathBuf::from("/test"),
-        file_path: PathBuf::from("/test/file.rs"),
-        function_name: "test_fn".to_string(),
+        root_path: PathBuf::from("/project"),
+        file_path: PathBuf::from("src/lib.rs"),
+        function_name: "test_func".to_string(),
         line_range: (1, 10),
+        reference_time: chrono::Utc::now(),
     };
 
     // First call
@@ -162,10 +167,11 @@ fn test_context_aggregator_clear_cache() {
     let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
-        root_path: PathBuf::from("/test"),
-        file_path: PathBuf::from("/test/file.rs"),
-        function_name: "test_fn".to_string(),
+        root_path: PathBuf::from("/project"),
+        file_path: PathBuf::from("src/lib.rs"),
+        function_name: "test_func".to_string(),
         line_range: (1, 10),
+        reference_time: chrono::Utc::now(),
     };
 
     let _ = aggregator.analyze(&target);

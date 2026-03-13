@@ -17,6 +17,7 @@ use crate::{
     progress::ProgressManager,
     risk::lcov::LcovData,
 };
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use indicatif::ParallelProgressIterator;
 use parking_lot::Mutex;
@@ -221,15 +222,18 @@ pub struct ParallelUnifiedAnalysisOptions {
     pub jobs: Option<usize>,
     pub batch_size: usize,
     pub progress: bool,
+    /// Reference time for analysis (for determinism)
+    pub reference_time: DateTime<Utc>,
 }
 
 impl Default for ParallelUnifiedAnalysisOptions {
     fn default() -> Self {
         Self {
             parallel: true,
-            jobs: None, // Use all available cores
+            jobs: None,
             batch_size: 100,
             progress: true,
+            reference_time: Utc::now(),
         }
     }
 }
@@ -453,7 +457,9 @@ impl ParallelUnifiedAnalysisBuilder {
 
     /// Set the risk analyzer for contextual risk analysis
     pub fn with_risk_analyzer(mut self, risk_analyzer: crate::risk::RiskAnalyzer) -> Self {
-        self.risk_analyzer = Some(risk_analyzer);
+        // Ensure analyzer uses same reference time as overall analysis (Spec 214)
+        let analyzer = risk_analyzer.with_reference_time(self.options.reference_time);
+        self.risk_analyzer = Some(analyzer);
         self
     }
 

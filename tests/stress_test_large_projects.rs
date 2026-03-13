@@ -136,6 +136,7 @@ mod stress_tests {
             jobs: None, // Use all available cores
             batch_size: 100,
             progress: false,
+            reference_time: chrono::Utc::now(),
         };
 
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -203,6 +204,7 @@ mod stress_tests {
             jobs: None,      // Use all available cores
             batch_size: 200, // Larger batches for better efficiency
             progress: false,
+            reference_time: chrono::Utc::now(),
         };
 
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -260,6 +262,7 @@ mod stress_tests {
             jobs: Some(2),  // Limit to 2 threads to reduce memory pressure
             batch_size: 50, // Small batches
             progress: false,
+            reference_time: chrono::Utc::now(),
         };
 
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -326,9 +329,10 @@ mod stress_tests {
 
         let options = ParallelUnifiedAnalysisOptions {
             parallel: true,
-            jobs: None,
+            jobs: Some(4),
             batch_size: 100,
             progress: false,
+            reference_time: chrono::Utc::now(),
         };
 
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
@@ -375,9 +379,10 @@ mod stress_tests {
         for jobs in [1, 2, 4, 8, 16] {
             let options = ParallelUnifiedAnalysisOptions {
                 parallel: true,
-                jobs: Some(jobs),
+                jobs: Some(4),
                 batch_size: 100,
                 progress: false,
+                reference_time: chrono::Utc::now(),
             };
 
             let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);

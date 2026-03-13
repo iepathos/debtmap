@@ -102,6 +102,7 @@ pub struct AnalyzeConfig<State = Unvalidated> {
     pub min_split_lines: usize,
     pub no_tui: bool,
     pub show_filter_stats: bool,
+    pub reference_time: chrono::DateTime<chrono::Utc>,
 
     // Phantom type to encode validation state
     _state: PhantomData<State>,
@@ -170,6 +171,7 @@ impl AnalyzeConfig<Unvalidated> {
         min_split_lines: usize,
         no_tui: bool,
         show_filter_stats: bool,
+        reference_time: chrono::DateTime<chrono::Utc>,
     ) -> Self {
         AnalyzeConfig {
             path,
@@ -231,6 +233,7 @@ impl AnalyzeConfig<Unvalidated> {
             min_split_lines,
             no_tui,
             show_filter_stats,
+            reference_time,
             _state: PhantomData,
         }
     }
@@ -342,6 +345,7 @@ impl AnalyzeConfig<Unvalidated> {
             min_split_lines: self.min_split_lines,
             no_tui: self.no_tui,
             show_filter_stats: self.show_filter_stats,
+            reference_time: self.reference_time,
             _state: PhantomData,
         })
     }
@@ -414,6 +418,7 @@ impl AnalyzeConfig<Validated> {
             min_split_lines: self.min_split_lines,
             no_tui: self.no_tui,
             show_filter_stats: self.show_filter_stats,
+            reference_time: self.reference_time,
         };
 
         super::analyze::handle_analyze(old_config).context("Analysis execution failed")
@@ -487,6 +492,7 @@ mod tests {
             20,
             false,
             false,
+            chrono::Utc::now(),
         );
 
         // Validate should succeed for current directory
@@ -556,6 +562,7 @@ mod tests {
             20,
             false,
             false,
+            chrono::Utc::now(),
         );
 
         // Validation should fail
@@ -625,6 +632,7 @@ mod tests {
             20,
             false,
             false,
+            chrono::Utc::now(),
         );
 
         let result = config.validate();
@@ -693,6 +701,7 @@ mod tests {
             20,
             false,
             false,
+            chrono::Utc::now(),
         );
 
         let result = config.validate();

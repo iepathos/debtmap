@@ -125,10 +125,11 @@ impl Git2Repository {
     ///
     /// # Arguments
     /// * `file_path` - Path to the file, relative to repository root
+    /// * `now` - Reference time for age calculation
     ///
     /// # Returns
     /// * Age in days, or 0 if file has no git history
-    pub fn file_age_days(&self, file_path: &Path) -> Result<u32> {
+    pub fn file_age_days(&self, file_path: &Path, now: DateTime<Utc>) -> Result<u32> {
         let repo = self.open_repo()?;
         let relative_path = self.to_relative_path(file_path);
 
@@ -147,7 +148,7 @@ impl Git2Repository {
                 let commit_date = Utc.timestamp_opt(time.seconds(), 0).single();
                 match commit_date {
                     Some(date) => {
-                        let age = Utc::now().signed_duration_since(date);
+                        let age = now.signed_duration_since(date);
                         Ok(age.num_days().max(0) as u32)
                     }
                     None => Ok(0),

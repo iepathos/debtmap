@@ -133,7 +133,7 @@ impl GitHistoryProvider {
     }
 
     /// Get file history from cache or fetch it (immutable, thread-safe)
-    fn get_or_fetch_history(&self, path: &Path) -> Result<FileHistory> {
+    fn get_or_fetch_history(&self, path: &Path, now: DateTime<Utc>) -> Result<FileHistory> {
         // Convert to relative path for git lookups (git stores relative paths)
         let relative_path = self.to_relative_path(path);
 
@@ -152,7 +152,7 @@ impl GitHistoryProvider {
                 stability_score,
                 total_commits,
                 age_days,
-            )) = batched.calculate_metrics(relative_path.as_ref())
+            )) = batched.calculate_metrics(relative_path.as_ref(), now)
             {
                 let history = FileHistory {
                     change_frequency,
@@ -171,18 +171,18 @@ impl GitHistoryProvider {
         }
 
         // Fallback to direct git queries (slow path)
-        let history = self.fetch_history_direct(relative_path.as_ref())?;
+        let history = self.fetch_history_direct(relative_path.as_ref(), now)?;
         self.cache
             .insert(relative_path.into_owned(), history.clone());
         Ok(history)
     }
 
     /// Fetch file history directly via git2 (fallback when batched fails)
-    fn fetch_history_direct(&self, path: &Path) -> Result<FileHistory> {
+    fn fetch_history_direct(&self, path: &Path, now: DateTime<Utc>) -> Result<FileHistory> {
         if let Some(ref repo) = self.git2_repo {
             // Use git2 for reliable path handling
             let total_commits = repo.count_file_commits(path)?;
-            let age_days = repo.file_age_days(path)?;
+            let age_days = repo.file_age_days(path, now)?;
             let bug_fix_count = repo.count_bug_fixes(path)?;
             let author_count = repo.file_authors(path)?.len();
             let last_modified = repo.file_last_modified(path)?;
@@ -246,7 +246,12 @@ impl GitHistoryProvider {
 
     /// Legacy mutable API - kept for backward compatibility
     pub fn analyze_file(&mut self, path: &Path) -> Result<FileHistory> {
-        self.get_or_fetch_history(path)
+        self.get_or_fetch_history(path, Utc::now())
+    }
+
+    /// Get file history with explicit reference time
+    pub fn analyze_file_with_time(&self, path: &Path, now: DateTime<Utc>) -> Result<FileHistory> {
+        self.get_or_fetch_history(path, now)
     }
 
     /// Get all paths stored in batched history (for debugging/testing)
@@ -337,19 +342,22 @@ impl GitHistoryProvider {
             &target.function_name,
             target.line_range,
             &self.blame_cache,
+            target.reference_time,
         )?;
 
-        let contribution =
-            Self::classify_risk_contribution(history.change_frequency(), history.bug_density());
+        let contribution = Self::classify_risk_contribution(
+            history.change_frequency(target.reference_time),
+            history.bug_density(),
+        );
 
         Ok(Context {
             provider: self.name().to_string(),
             weight: self.weight(),
             contribution,
             details: ContextDetails::Historical {
-                change_frequency: history.change_frequency(),
+                change_frequency: history.change_frequency(target.reference_time),
                 bug_density: history.bug_density(),
-                age_days: history.age_days(),
+                age_days: history.age_days(target.reference_time),
                 author_count: history.authors.len(),
                 // Use total including introduction for display (not just modifications)
                 total_commits: history.total_commits_including_introduction() as u32,
@@ -361,7 +369,7 @@ impl GitHistoryProvider {
     /// Gather context using file-level git history analysis (fallback)
     fn gather_for_file(&self, target: &AnalysisTarget) -> Result<Context> {
         // Use cached/batched history (O(1) lookup, no git subprocess calls)
-        let history = self.get_or_fetch_history(&target.file_path)?;
+        let history = self.get_or_fetch_history(&target.file_path, target.reference_time)?;
 
         // Calculate contribution based on instability
         let bug_density = Self::calculate_bug_density(history.bug_fix_count, history.total_commits);
@@ -1009,6 +1017,7 @@ mod tests {
             file_path: PathBuf::from("test.rs"),
             function_name: "main".to_string(),
             line_range: (1, 10),
+            reference_time: chrono::Utc::now(),
         };
 
         let context = provider.gather(&target)?;
@@ -1249,6 +1258,7 @@ fn other_func() {
             "my_func",
             (1, 10),
             &blame_cache,
+            chrono::Utc::now(),
         )?;
 
         // my_func was introduced but never modified after introduction
@@ -1263,7 +1273,7 @@ fn other_func() {
             "my_func should have 0% bug density"
         );
         assert_eq!(
-            history.change_frequency(),
+            history.change_frequency(chrono::Utc::now()),
             0.0,
             "my_func should have 0 change frequency"
         );
@@ -1302,6 +1312,7 @@ fn other_func() {
             "my_func",
             (1, 5),
             &blame_cache,
+            chrono::Utc::now(),
         )?;
 
         // my_func has 2 modifications after introduction, 1 is a bug fix
@@ -1355,6 +1366,7 @@ fn buggy_func() {
             file_path: PathBuf::from("test.rs"),
             function_name: "stable_func".to_string(),
             line_range: (1, 1),
+            reference_time: chrono::Utc::now(),
         };
         let context_stable = provider.gather(&target_stable)?;
         if let ContextDetails::Historical { bug_density, .. } = context_stable.details {
@@ -1373,6 +1385,7 @@ fn buggy_func() {
             file_path: PathBuf::from("test.rs"),
             function_name: "buggy_func".to_string(),
             line_range: (3, 5),
+            reference_time: chrono::Utc::now(),
         };
         let context_buggy = provider.gather(&target_buggy)?;
         if let ContextDetails::Historical { bug_density, .. } = context_buggy.details {
@@ -1405,6 +1418,7 @@ fn buggy_func() {
             file_path: PathBuf::from("test.rs"),
             function_name: String::new(), // Empty - triggers fallback
             line_range: (1, 1),
+            reference_time: chrono::Utc::now(),
         };
         let context = provider.gather(&target)?;
 
@@ -1668,6 +1682,7 @@ fn buggy_func() {
             file_path: PathBuf::from("src/lib.rs"),
             function_name: "nonexistent_function".to_string(),
             line_range: (1, 100),
+            reference_time: chrono::Utc::now(),
         };
 
         let context_map = aggregator.analyze(&target);

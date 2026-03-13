@@ -588,6 +588,7 @@ mod tests {
             file_path: PathBuf::from("src/core/lib.rs"),
             function_name: "critical_function".to_string(),
             line_range: (10, 50),
+            reference_time: chrono::Utc::now(),
         };
 
         let context = provider.gather(&target).unwrap();
@@ -640,6 +641,7 @@ mod tests {
             file_path: PathBuf::from("src/service/mod.rs"),
             function_name: "process".to_string(),
             line_range: (5, 25),
+            reference_time: chrono::Utc::now(),
         };
 
         let context = provider.gather(&target).unwrap();
@@ -686,6 +688,7 @@ mod tests {
             file_path: PathBuf::from("src/util/helpers.rs"),
             function_name: "helper".to_string(),
             line_range: (1, 10),
+            reference_time: chrono::Utc::now(),
         };
 
         let context = provider.gather(&target).unwrap();
@@ -730,6 +733,7 @@ mod tests {
             file_path: PathBuf::from("src/leaf/simple.rs"),
             function_name: "simple".to_string(),
             line_range: (1, 5),
+            reference_time: chrono::Utc::now(),
         };
 
         let context = provider.gather(&target).unwrap();
@@ -761,6 +765,7 @@ mod tests {
             file_path: PathBuf::from("src/unknown/file.rs"),
             function_name: "orphan_function".to_string(),
             line_range: (1, 10),
+            reference_time: chrono::Utc::now(),
         };
 
         let context = provider.gather(&target).unwrap();
@@ -929,6 +934,7 @@ mod tests {
             file_path: PathBuf::from("src/isolated/mod.rs"),
             function_name: "standalone".to_string(),
             line_range: (10, 20),
+            reference_time: chrono::Utc::now(),
         };
 
         let context = provider.gather(&target).unwrap();

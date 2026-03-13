@@ -62,8 +62,8 @@ impl FileHistoryData {
     }
 
     /// Pure function: Calculate change frequency (commits per month)
-    fn calculate_change_frequency(&self) -> f64 {
-        let age_days = self.calculate_age_days();
+    fn calculate_change_frequency(&self, now: DateTime<Utc>) -> f64 {
+        let age_days = self.calculate_age_days(now);
         if age_days > 0 {
             (self.total_commits as f64 / age_days as f64) * 30.0
         } else {
@@ -72,19 +72,19 @@ impl FileHistoryData {
     }
 
     /// Pure function: Calculate file age in days
-    fn calculate_age_days(&self) -> u32 {
+    fn calculate_age_days(&self, now: DateTime<Utc>) -> u32 {
         self.first_seen
-            .map(|first| Utc::now().signed_duration_since(first).num_days().max(0) as u32)
+            .map(|first| now.signed_duration_since(first).num_days().max(0) as u32)
             .unwrap_or(0)
     }
 
     /// Pure function: Calculate stability score
-    fn calculate_stability(&self) -> f64 {
+    fn calculate_stability(&self, now: DateTime<Utc>) -> f64 {
         if self.total_commits == 0 {
             return 1.0; // New file, assume stable
         }
 
-        let age_days = self.calculate_age_days();
+        let age_days = self.calculate_age_days(now);
 
         let churn_factor = if age_days > 0 {
             let monthly_churn = (self.total_commits as f64) / (age_days as f64) * 30.0;
@@ -282,16 +282,17 @@ impl BatchedGitHistory {
     pub fn calculate_metrics(
         &self,
         path: &Path,
+        now: DateTime<Utc>,
     ) -> Option<(f64, usize, Option<DateTime<Utc>>, usize, f64, usize, u32)> {
         self.get_file_history(path).map(|history| {
             (
-                history.calculate_change_frequency(),
+                history.calculate_change_frequency(now),
                 history.bug_fix_count,
                 history.last_modified,
                 history.authors.len(),
-                history.calculate_stability(),
+                history.calculate_stability(now),
                 history.total_commits,
-                history.calculate_age_days(),
+                history.calculate_age_days(now),
             )
         })
     }
@@ -551,7 +552,8 @@ mod tests {
 
     #[test]
     fn test_calculate_change_frequency() {
-        let ten_days_ago = Utc::now() - chrono::Duration::days(10);
+        let now = Utc::now();
+        let ten_days_ago = now - chrono::Duration::days(10);
         let history = FileHistoryData {
             total_commits: 10,
             first_seen: Some(ten_days_ago),
@@ -559,19 +561,21 @@ mod tests {
         };
 
         // With 10 days age and 10 commits, expect ~30 commits/month
-        let freq = history.calculate_change_frequency();
+        let freq = history.calculate_change_frequency(now);
         assert!(freq > 25.0 && freq < 35.0); // Allow some tolerance for timing
     }
 
     #[test]
     fn test_calculate_stability_new_file() {
+        let now = Utc::now();
         let history = FileHistoryData::default();
-        let stability = history.calculate_stability();
+        let stability = history.calculate_stability(now);
         assert_eq!(stability, 1.0); // New file assumed stable
     }
 
     #[test]
     fn test_calculate_stability_with_commits() {
+        let now = Utc::now();
         let history = FileHistoryData {
             total_commits: 10,
             bug_fix_count: 2,
@@ -583,7 +587,7 @@ mod tests {
             ..Default::default()
         };
 
-        let stability = history.calculate_stability();
+        let stability = history.calculate_stability(now);
         // Should be between 0 and 1
         assert!((0.0..=1.0).contains(&stability));
     }

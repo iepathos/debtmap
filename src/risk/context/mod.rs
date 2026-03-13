@@ -31,6 +31,8 @@ pub struct AnalysisTarget {
     pub file_path: PathBuf,
     pub function_name: String,
     pub line_range: (usize, usize),
+    /// Reference time for age calculations (Spec 214 fix for determinism)
+    pub reference_time: chrono::DateTime<chrono::Utc>,
 }
 
 /// Context information gathered by a provider
@@ -276,6 +278,7 @@ mod tests {
                         file_path: PathBuf::from(format!("/test/file{}.rs", i)),
                         function_name: format!("test_fn_{}", i),
                         line_range: (1, 10),
+                        reference_time: chrono::Utc::now(),
                     };
                     agg.analyze(&target)
                 })
@@ -326,6 +329,7 @@ mod tests {
             function_name: "func_2000".to_string(), // Middle of the chain
             file_path: PathBuf::from("src/lib.rs"),
             line_range: (1, 10),
+            reference_time: chrono::Utc::now(),
         };
 
         let result = provider.gather(&target);
@@ -375,6 +379,7 @@ mod tests {
                 function_name: format!("func_{}", i * 10),
                 file_path: PathBuf::from("src/lib.rs"),
                 line_range: (1, 10),
+                reference_time: chrono::Utc::now(),
             };
 
             let context_map = aggregator.analyze(&target);

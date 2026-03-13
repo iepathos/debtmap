@@ -69,6 +69,8 @@ pub struct AnalyzeConfig {
     pub min_split_lines: usize,
     pub no_tui: bool,
     pub show_filter_stats: bool,
+    /// Reference time for deterministic analysis (Spec 214)
+    pub reference_time: chrono::DateTime<chrono::Utc>,
 }
 
 impl AnalyzeConfig {
