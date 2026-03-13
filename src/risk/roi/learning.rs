@@ -62,11 +62,12 @@ impl ROILearningSystem {
         prediction: ROIPrediction,
         actual: ROIActual,
         target: &TestTarget,
+        now: DateTime<Utc>,
     ) {
         let outcome = ROIOutcome {
             prediction,
             actual,
-            timestamp: Utc::now(),
+            timestamp: now,
             context: self.capture_context(target),
         };
 

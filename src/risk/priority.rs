@@ -174,7 +174,15 @@ pub fn prioritize_by_roi(
 fn process_and_sort_targets(targets: Vec<TestTarget>) -> Vec<TestTarget> {
     let pipeline = PrioritizationPipeline::new();
     let mut prioritized = pipeline.process(targets);
-    prioritized.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
+    // Sort by priority score with deterministic tie-breaking (Spec 214 fix)
+    prioritized.sort_by(|a, b| {
+        b.priority_score
+            .partial_cmp(&a.priority_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.path.cmp(&b.path))
+            .then_with(|| a.line.cmp(&b.line))
+            .then_with(|| a.function.cmp(&b.function))
+    });
     prioritized
 }
 
@@ -229,6 +237,9 @@ fn sort_recommendations_by_roi(recommendations: &mut Vector<TestingRecommendatio
         b_roi
             .partial_cmp(&a_roi)
             .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.file.cmp(&b.file))
+            .then_with(|| a.line.cmp(&b.line))
+            .then_with(|| a.function.cmp(&b.function))
     });
 }
 

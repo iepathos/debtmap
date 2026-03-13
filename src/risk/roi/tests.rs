@@ -198,7 +198,7 @@ fn test_learning_system() {
         coverage_achieved: 75.0,
     };
 
-    learning.record_outcome(prediction, actual, &target);
+    learning.record_outcome(prediction, actual, &target, Utc::now());
 
     // Adjustment should reflect the actual being less effort than predicted
     let adjusted = learning.adjust_estimate(5.0, &target);

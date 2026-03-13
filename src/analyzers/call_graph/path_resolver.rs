@@ -37,7 +37,11 @@ impl PathResolver {
     pub fn with_function_index(mut self, call_graph: &CallGraph) -> Self {
         let mut index: HashMap<String, Vec<FunctionId>> = HashMap::new();
 
-        for func in call_graph.get_all_functions() {
+        // Use deterministic iteration order (Spec 214 fix)
+        let mut all_funcs: Vec<FunctionId> = call_graph.get_all_functions().cloned().collect();
+        all_funcs.sort();
+
+        for func in all_funcs {
             // Index by full name
             index
                 .entry(func.name.clone())
@@ -69,6 +73,11 @@ impl PathResolver {
             // Index by file + name for same-file lookups
             let file_key = format!("{:?}:{}", func.file, func.name);
             index.entry(file_key).or_default().push(func.clone());
+        }
+
+        // Sort all Vec<FunctionId> in the index for perfectly stable lookups (Spec 214)
+        for funcs in index.values_mut() {
+            funcs.sort();
         }
 
         self.function_index = index;

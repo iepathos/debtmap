@@ -94,9 +94,16 @@ pub fn analyze_risk_insights(functions: Vector<FunctionRisk>) -> RiskInsight {
     let complexity_coverage_correlation = calculate_complexity_coverage_correlation(&functions);
     let risk_distribution = build_risk_distribution(&functions);
 
-    // Sort functions by risk score to get top risks
+    // Sort functions by risk score to get top risks (Spec 214 fix for determinism)
     let mut sorted_functions = functions.clone();
-    sorted_functions.sort_by(|a, b| b.risk_score.partial_cmp(&a.risk_score).unwrap());
+    sorted_functions.sort_by(|a, b| {
+        b.risk_score
+            .partial_cmp(&a.risk_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.file.cmp(&b.file))
+            .then_with(|| a.function_name.cmp(&b.function_name))
+            .then_with(|| a.line_range.0.cmp(&b.line_range.0))
+    });
 
     let top_risks = sorted_functions.into_iter().take(10).collect();
 

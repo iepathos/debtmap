@@ -5,11 +5,13 @@ use im::{HashMap, HashSet};
 
 impl CallGraph {
     pub fn find_test_functions(&self) -> Vec<FunctionId> {
-        self.nodes
-            .values()
-            .filter(|node| node.is_test)
-            .map(|node| node.id.clone())
-            .collect()
+        let mut funcs: Vec<FunctionId> = self.nodes
+            .iter()
+            .filter(|(_, node)| node.is_test)
+            .map(|(id, _)| id.clone())
+            .collect();
+        funcs.sort();
+        funcs
     }
 
     /// Check if a function is only called by test functions (test helper)
@@ -28,13 +30,17 @@ impl CallGraph {
         callers.iter().all(|caller| self.is_test_function(caller))
     }
 
-    /// Pure function to identify all test functions from nodes
+    /// Collect all functions marked as tests from nodes
     fn collect_test_functions(nodes: &HashMap<FunctionId, FunctionNode>) -> HashSet<FunctionId> {
-        nodes
+        let mut test_funcs: Vec<FunctionId> = nodes
             .iter()
             .filter(|(_, node)| node.is_test)
             .map(|(id, _)| id.clone())
-            .collect()
+            .collect();
+
+        // Sort for deterministic insertion order (Spec 214 fix)
+        test_funcs.sort();
+        test_funcs.into_iter().collect()
     }
 
     /// Pure function to check if a node is a production entry point
@@ -77,7 +83,12 @@ impl CallGraph {
         test_functions: &HashSet<FunctionId>,
     ) -> HashSet<FunctionId> {
         let mut reachable_from_tests = test_functions.clone();
-        for test_fn in test_functions {
+        
+        // Sort for deterministic traversal order (Spec 214 fix)
+        let mut sorted_tests: Vec<_> = test_functions.iter().collect();
+        sorted_tests.sort();
+
+        for test_fn in sorted_tests {
             let callees = self.get_transitive_callees(test_fn, usize::MAX);
             reachable_from_tests.extend(callees);
         }
@@ -87,7 +98,12 @@ impl CallGraph {
     /// Find all functions reachable from production (non-test) entry points
     fn find_functions_reachable_from_production(&self) -> HashSet<FunctionId> {
         let mut reachable_from_production = HashSet::new();
-        for (id, node) in &self.nodes {
+        
+        // Sort nodes for deterministic traversal order (Spec 214 fix)
+        let mut sorted_nodes: Vec<_> = self.nodes.iter().collect();
+        sorted_nodes.sort_by(|a, b| a.0.cmp(b.0));
+
+        for (id, node) in sorted_nodes {
             let callers = self.get_callers(id);
             if Self::is_production_entry_point(node, &callers) {
                 reachable_from_production.insert(id.clone());

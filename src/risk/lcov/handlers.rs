@@ -129,7 +129,24 @@ pub(crate) fn handle_source_file(state: &mut LcovParserState, path: PathBuf) {
     if let Some(file) = state.current_file.take() {
         if !state.file_functions.is_empty() {
             let funcs = finalize_file_functions(&mut state.file_functions);
-            state.data.functions.insert(file, funcs);
+            
+            // Merge into existing file data if it exists (Spec 214 fix)
+            if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
+                for new_func in funcs {
+                    if let Some(existing) = existing_funcs.iter_mut().find(|f| f.name == new_func.name) {
+                        existing.execution_count = existing.execution_count.max(new_func.execution_count);
+                        // Line coverage is already pre-calculated in finalize_file_functions,
+                        // but if we merge later we might need to recalculate. 
+                        // For now, assume same function has same start_line.
+                    } else {
+                        existing_funcs.push(new_func);
+                    }
+                }
+                // Maintain sorted order
+                existing_funcs.sort_by(|a, b| a.start_line.cmp(&b.start_line).then_with(|| a.name.cmp(&b.name)));
+            } else {
+                state.data.functions.insert(file, funcs);
+            }
         }
     }
     state.current_file = Some(path);
@@ -251,7 +268,21 @@ pub(crate) fn handle_end_of_record(state: &mut LcovParserState) {
     if let Some(file) = state.current_file.take() {
         if !state.file_functions.is_empty() {
             let funcs = finalize_file_functions(&mut state.file_functions);
-            state.data.functions.insert(file, funcs);
+            
+            // Merge into existing file data if it exists (Spec 214 fix)
+            if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
+                for new_func in funcs {
+                    if let Some(existing) = existing_funcs.iter_mut().find(|f| f.name == new_func.name) {
+                        existing.execution_count = existing.execution_count.max(new_func.execution_count);
+                    } else {
+                        existing_funcs.push(new_func);
+                    }
+                }
+                // Maintain sorted order
+                existing_funcs.sort_by(|a, b| a.start_line.cmp(&b.start_line).then_with(|| a.name.cmp(&b.name)));
+            } else {
+                state.data.functions.insert(file, funcs);
+            }
         }
     }
 
@@ -272,7 +303,21 @@ pub(crate) fn handle_incomplete_file(state: &mut LcovParserState) {
     if let Some(file) = state.current_file.take() {
         if !state.file_functions.is_empty() {
             let funcs = finalize_file_functions(&mut state.file_functions);
-            state.data.functions.insert(file, funcs);
+            
+            // Merge into existing file data if it exists (Spec 214 fix)
+            if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
+                for new_func in funcs {
+                    if let Some(existing) = existing_funcs.iter_mut().find(|f| f.name == new_func.name) {
+                        existing.execution_count = existing.execution_count.max(new_func.execution_count);
+                    } else {
+                        existing_funcs.push(new_func);
+                    }
+                }
+                // Maintain sorted order
+                existing_funcs.sort_by(|a, b| a.start_line.cmp(&b.start_line).then_with(|| a.name.cmp(&b.name)));
+            } else {
+                state.data.functions.insert(file, funcs);
+            }
         }
     }
 }

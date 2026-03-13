@@ -481,8 +481,11 @@ pub fn build_call_graph_from_extracted(
     // Initialize with base graph
     parallel_graph.merge_concurrent(base_graph);
 
-    // Process each file's extracted data
-    for (path, file_data) in extracted {
+    // Process each file's extracted data in deterministic order (Spec 214 fix)
+    let mut sorted_extracted: Vec<_> = extracted.iter().collect();
+    sorted_extracted.sort_by(|a, b| a.0.cmp(b.0));
+
+    for (path, file_data) in sorted_extracted {
         // Add functions to call graph
         for func in &file_data.functions {
             let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
@@ -567,7 +570,10 @@ fn resolve_callee_from_extracted(
             }
 
             // Look in all files for qualified names (e.g., "Module::function")
-            for (path, file_data) in extracted {
+            let mut sorted_files: Vec<_> = extracted.iter().collect();
+            sorted_files.sort_by(|a, b| a.0.cmp(b.0));
+
+            for (path, file_data) in sorted_files {
                 for func in &file_data.functions {
                     if func.qualified_name == callee_name {
                         return Some(FunctionId::new(
@@ -584,7 +590,10 @@ fn resolve_callee_from_extracted(
         CallType::Method => {
             // Method calls are harder to resolve without type information
             // Just look for matching method names across all types
-            for (path, file_data) in extracted {
+            let mut sorted_files: Vec<_> = extracted.iter().collect();
+            sorted_files.sort_by(|a, b| a.0.cmp(b.0));
+
+            for (path, file_data) in sorted_files {
                 for func in &file_data.functions {
                     // Check if this is an impl method with matching name
                     if func.name == callee_name {

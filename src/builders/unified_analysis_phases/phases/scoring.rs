@@ -82,12 +82,15 @@ pub fn build_file_line_count_cache(metrics: &[FunctionMetrics]) -> FileLineCount
     use crate::metrics::LocCounter;
 
     // Collect unique file paths into a Vec for parallel iteration
-    let unique_files: Vec<&PathBuf> = metrics
+    let mut unique_files: Vec<&PathBuf> = metrics
         .iter()
         .map(|m| &m.file)
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
+
+    // Sort files for deterministic I/O order (Spec 214 fix)
+    unique_files.sort();
 
     // Read files in parallel - file I/O benefits from parallelism
     unique_files
@@ -123,12 +126,15 @@ pub type SuppressionContextCache = HashMap<PathBuf, SuppressionContext>;
 /// unified analysis pipeline would ignore suppression annotations.
 pub fn build_suppression_context_cache(metrics: &[FunctionMetrics]) -> SuppressionContextCache {
     // Collect unique file paths into a Vec for parallel iteration
-    let unique_files: Vec<&PathBuf> = metrics
+    let mut unique_files: Vec<&PathBuf> = metrics
         .iter()
         .map(|m| &m.file)
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
+    
+    // Sort files for deterministic I/O order (Spec 214 fix)
+    unique_files.sort();
 
     // Read files in parallel and parse suppression comments
     unique_files

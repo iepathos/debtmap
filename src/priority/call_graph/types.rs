@@ -14,6 +14,21 @@ pub struct FunctionId {
     pub module_path: String,
 }
 
+impl Ord for FunctionId {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.file.cmp(&other.file)
+            .then_with(|| self.line.cmp(&other.line))
+            .then_with(|| self.name.cmp(&other.name))
+            .then_with(|| self.module_path.cmp(&other.module_path))
+    }
+}
+
+impl PartialOrd for FunctionId {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl FunctionId {
     /// Create a new FunctionId
     pub fn new(file: PathBuf, name: String, line: usize) -> Self {
@@ -110,7 +125,7 @@ pub struct SimpleFunctionKey {
 }
 
 /// Represents a function call relationship between two functions
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct FunctionCall {
     pub caller: FunctionId,
     pub callee: FunctionId,
@@ -118,7 +133,7 @@ pub struct FunctionCall {
 }
 
 /// Type of function call
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum CallType {
     Direct,
     Delegate,

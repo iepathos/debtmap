@@ -7,7 +7,11 @@ use std::path::PathBuf;
 impl CallGraph {
     pub fn merge(&mut self, other: CallGraph) {
         // Merge nodes (use add_function to maintain indexes)
-        for (id, node) in other.nodes {
+        // Sort nodes for deterministic merging order (Spec 214 fix)
+        let mut sorted_nodes: Vec<_> = other.nodes.into_iter().collect();
+        sorted_nodes.sort_by(|a, b| a.0.cmp(&b.0));
+
+        for (id, node) in sorted_nodes {
             self.add_function(
                 id,
                 node.is_entry_point,
@@ -88,9 +92,7 @@ impl CallGraph {
             .unwrap_or_default();
 
         // Sort for deterministic traversal (Spec 214 fix)
-        callees.sort_by(|a, b| a.file.cmp(&b.file)
-            .then_with(|| a.line.cmp(&b.line))
-            .then_with(|| a.name.cmp(&b.name)));
+        callees.sort();
 
         callees
     }
@@ -113,9 +115,7 @@ impl CallGraph {
             .unwrap_or_default();
 
         // Sort for deterministic traversal (Spec 214 fix)
-        callers.sort_by(|a, b| a.file.cmp(&b.file)
-            .then_with(|| a.line.cmp(&b.line))
-            .then_with(|| a.name.cmp(&b.name)));
+        callers.sort();
 
         callers
     }
@@ -126,7 +126,9 @@ impl CallGraph {
 
     /// Get all functions in the graph
     pub fn get_all_functions(&self) -> impl Iterator<Item = &FunctionId> {
-        self.nodes.keys()
+        let mut funcs: Vec<&FunctionId> = self.nodes.keys().collect();
+        funcs.sort();
+        funcs.into_iter()
     }
 
     /// Get function info
@@ -197,27 +199,33 @@ impl CallGraph {
     /// Get callees by function name (returns function names)
     pub fn get_callees_by_name(&self, function: &str) -> Vec<String> {
         // Find all nodes with this function name
-        self.nodes
+        let mut results: Vec<String> = self.nodes
             .keys()
             .filter(|id| id.name == function)
             .flat_map(|id| self.get_callees(id))
             .map(|id| id.name.clone())
             .collect::<HashSet<_>>()
             .into_iter()
-            .collect()
+            .collect();
+            
+        results.sort();
+        results
     }
 
     /// Get callers by function name (returns function names)
     pub fn get_callers_by_name(&self, function: &str) -> Vec<String> {
         // Find all nodes with this function name
-        self.nodes
+        let mut results: Vec<String> = self.nodes
             .keys()
             .filter(|id| id.name == function)
             .flat_map(|id| self.get_callers(id))
             .map(|id| id.name.clone())
             .collect::<HashSet<_>>()
             .into_iter()
-            .collect()
+            .collect();
+            
+        results.sort();
+        results
     }
 
     pub fn get_transitive_callees(
@@ -277,28 +285,66 @@ impl CallGraph {
     }
 
     pub fn find_entry_points(&self) -> Vec<FunctionId> {
-        self.nodes
+        let mut results: Vec<FunctionId> = self.nodes
             .values()
             .filter(|node| node.is_entry_point)
             .map(|node| node.id.clone())
-            .collect()
+            .collect();
+        results.sort();
+        results
     }
 
     pub fn find_all_functions(&self) -> Vec<FunctionId> {
-        self.nodes.keys().cloned().collect()
+        let mut results: Vec<FunctionId> = self.nodes.keys().cloned().collect();
+        results.sort();
+        results
+    }
+
+    /// Get all functions in a specific file
+    pub fn get_functions_by_file(&self, file: &PathBuf) -> Vec<FunctionId> {
+        let mut results: Vec<FunctionId> = self.nodes.keys()
+            .filter(|id| &id.file == file)
+            .cloned()
+            .collect();
+        results.sort();
+        results
+    }
+
+    /// Get all functions with a specific name
+    pub fn get_functions_by_name(&self, name: &str) -> Vec<FunctionId> {
+        let mut results: Vec<FunctionId> = self.nodes.keys()
+            .filter(|id| id.name == name)
+            .cloned()
+            .collect();
+        results.sort();
+        results
+    }
+
+    /// Get all functions that have no callers
+    pub fn get_functions_with_no_callers(&self) -> Vec<FunctionId> {
+        let mut results: Vec<FunctionId> = self.nodes.keys()
+            .filter(|id| !self.caller_index.contains_key(id) || self.caller_index.get(id).map_or(true, |set| set.is_empty()))
+            .cloned()
+            .collect();
+        results.sort();
+        results
     }
 
     pub fn get_function_calls(&self, func_id: &FunctionId) -> Vec<FunctionCall> {
-        self.edges
+        let mut results: Vec<FunctionCall> = self.edges
             .iter()
             .filter(|call| &call.caller == func_id)
             .cloned()
-            .collect()
+            .collect();
+        results.sort();
+        results
     }
 
     /// Get all function calls in the graph (for testing and debugging)
     pub fn get_all_calls(&self) -> Vec<FunctionCall> {
-        self.edges.iter().cloned().collect()
+        let mut results: Vec<FunctionCall> = self.edges.iter().cloned().collect();
+        results.sort();
+        results
     }
 
     pub fn is_empty(&self) -> bool {
@@ -373,7 +419,9 @@ impl CallGraph {
         nodes: &'a HashMap<FunctionId, FunctionNode>,
         file: &PathBuf,
     ) -> Vec<&'a FunctionId> {
-        nodes.keys().filter(|id| &id.file == file).collect()
+        let mut results: Vec<&'a FunctionId> = nodes.keys().filter(|id| &id.file == file).collect();
+        results.sort();
+        results
     }
 
     /// Pure function to find the best matching function by line proximity
@@ -459,7 +507,11 @@ impl CallGraph {
         let mut visited = HashSet::new();
         let mut result = Vector::new();
 
-        for func_id in self.nodes.keys() {
+        // Sort initial nodes for deterministic traversal start (Spec 214 fix)
+        let mut nodes: Vec<_> = self.nodes.keys().collect();
+        nodes.sort();
+
+        for func_id in nodes {
             if !visited.contains(func_id) {
                 self.topo_sort_dfs_iterative(func_id, &mut visited, &mut result);
             }

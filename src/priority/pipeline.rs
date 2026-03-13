@@ -41,7 +41,11 @@ fn compare_debt_items_stably(a: &super::DebtItem, b: &super::DebtItem) -> Orderi
             .file
             .cmp(&fb.location.file)
             .then_with(|| fa.location.line.cmp(&fb.location.line))
-            .then_with(|| fa.location.function.cmp(&fb.location.function)),
+            .then_with(|| fa.location.function.cmp(&fb.location.function))
+            .then_with(|| {
+                // Use a stable string representation for debt type comparison if Discriminant cmp is failing
+                format!("{:?}", fa.debt_type).cmp(&format!("{:?}", fb.debt_type))
+            }),
         (super::DebtItem::File(fa), super::DebtItem::File(fb)) => fa.metrics.path.cmp(&fb.metrics.path),
         // Group functions before files (arbitrary but stable)
         (super::DebtItem::Function(_), super::DebtItem::File(_)) => Ordering::Less,

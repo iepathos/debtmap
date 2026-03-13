@@ -62,7 +62,11 @@ impl<'a> CallResolver<'a> {
         // Build function name index once during construction
         let mut function_index: HashMap<String, Vec<FunctionId>> = HashMap::new();
 
-        for func_id in call_graph.get_all_functions() {
+        // Use deterministic iteration order (Spec 214 fix)
+        let mut all_funcs: Vec<FunctionId> = call_graph.get_all_functions().cloned().collect();
+        all_funcs.sort();
+
+        for func_id in all_funcs {
             let key = Self::normalize_path_prefix(&func_id.name);
             function_index.entry(key).or_default().push(func_id.clone());
 
@@ -75,6 +79,11 @@ impl<'a> CallResolver<'a> {
                         .push(func_id.clone());
                 }
             }
+        }
+
+        // Sort all Vec<FunctionId> in the index for perfectly stable lookups (Spec 214)
+        for funcs in function_index.values_mut() {
+            funcs.sort();
         }
 
         Self {

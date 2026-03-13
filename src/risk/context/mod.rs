@@ -197,8 +197,12 @@ impl ContextMap {
     }
 
     pub fn total_contribution(&self) -> f64 {
-        self.contexts
-            .values()
+        let mut values: Vec<_> = self.contexts.values().collect();
+        // Sort by provider name for deterministic summation order (Spec 214 fix)
+        values.sort_by(|a, b| a.provider.cmp(&b.provider));
+        
+        values
+            .iter()
             .map(|c| c.contribution * c.weight)
             .sum()
     }
@@ -229,10 +233,13 @@ impl ContextualRisk {
 
         let contextual_risk = base_risk * (1.0 + context_contribution);
 
-        let contexts: Vec<Context> = context_map
+        let mut contexts: Vec<Context> = context_map
             .iter()
             .map(|(_, context)| context.clone())
             .collect();
+
+        // Sort contexts by provider name for deterministic explanation strings (Spec 214 fix)
+        contexts.sort_by(|a, b| a.provider.cmp(&b.provider));
 
         let explanation = Self::generate_explanation(base_risk, &contexts);
 

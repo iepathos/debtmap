@@ -141,9 +141,12 @@ impl ParallelCallGraph {
     pub fn to_call_graph(&self) -> CallGraph {
         let mut call_graph = CallGraph::new();
 
+        // Sort nodes by ID for deterministic insertion order (Spec 214 fix)
+        let mut sorted_nodes: Vec<_> = self.nodes.iter().map(|e| e.clone()).collect();
+        sorted_nodes.sort_by(|a, b| a.id.cmp(&b.id));
+
         // Add all nodes
-        for entry in self.nodes.iter() {
-            let node = entry;
+        for node in sorted_nodes {
             call_graph.add_function(
                 node.id.clone(),
                 node.is_entry_point,
@@ -153,9 +156,13 @@ impl ParallelCallGraph {
             );
         }
 
+        // Sort edges for deterministic insertion order (Spec 214 fix)
+        let mut sorted_edges: Vec<_> = self.edges.iter().map(|e| e.clone()).collect();
+        sorted_edges.sort();
+
         // Add all edges
-        for call in self.edges.iter() {
-            call_graph.add_call(call.clone());
+        for call in sorted_edges {
+            call_graph.add_call(call);
         }
 
         call_graph

@@ -19,7 +19,6 @@
 use super::types::FunctionCoverage;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::Mutex;
 
 /// Coverage data for a single function (intermediate result).
 ///
@@ -160,23 +159,30 @@ pub fn process_function_coverage_parallel(
         .into_iter()
         .collect();
 
-    // Use Mutex for thread-safe access to the functions HashMap
-    let functions_mutex = Mutex::new(file_functions);
+    // Pre-calculate coverage for all unique start lines
+    let coverage_results: HashMap<usize, FunctionCoverageData> = func_boundaries
+        .par_iter()
+        .map(|&func_start| {
+            (
+                func_start,
+                calculate_function_coverage_data(func_start, &func_boundaries, &sorted_lines),
+            )
+        })
+        .collect();
 
-    // Process functions in parallel
-    func_boundaries.par_iter().for_each(|&func_start| {
-        // Calculate function coverage for this function
-        let coverage_data =
-            calculate_function_coverage_data(func_start, &func_boundaries, &sorted_lines);
+    // Update all functions deterministically (Spec 214 fix)
+    // We iterate over the file_functions map entries sorted by name
+    let mut sorted_names: Vec<String> = file_functions.keys().cloned().collect();
+    sorted_names.sort();
 
-        // Update the function in the mutex-protected HashMap
-        if let Ok(mut functions) = functions_mutex.lock() {
-            if let Some(func) = functions.values_mut().find(|f| f.start_line == func_start) {
-                func.coverage_percentage = coverage_data.coverage_percentage;
-                func.uncovered_lines = coverage_data.uncovered_lines;
+    for name in sorted_names {
+        if let Some(func) = file_functions.get_mut(&name) {
+            if let Some(data) = coverage_results.get(&func.start_line) {
+                func.coverage_percentage = data.coverage_percentage;
+                func.uncovered_lines = data.uncovered_lines.clone();
             }
         }
-    });
+    }
 }
 
 #[cfg(test)]

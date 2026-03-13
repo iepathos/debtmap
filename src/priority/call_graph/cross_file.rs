@@ -9,7 +9,12 @@ impl CallGraph {
     #[allow(dead_code)]
     fn build_function_name_map(&self) -> std::collections::HashMap<String, Vec<FunctionId>> {
         let mut functions_by_name = std::collections::HashMap::new();
-        for func_id in self.nodes.keys() {
+        
+        // Sort keys for deterministic map building (Spec 214 fix)
+        let mut sorted_keys: Vec<_> = self.nodes.keys().collect();
+        sorted_keys.sort();
+
+        for func_id in sorted_keys {
             functions_by_name
                 .entry(func_id.name.clone())
                 .or_insert_with(Vec::new)
@@ -245,7 +250,8 @@ impl CallGraph {
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
 
-        let all_functions: Vec<FunctionId> = self.get_all_functions().cloned().collect();
+        let mut all_functions: Vec<FunctionId> = self.get_all_functions().cloned().collect();
+        all_functions.sort();
         let calls_to_resolve = self.find_unresolved_calls();
         let total_calls = calls_to_resolve.len();
 
@@ -321,7 +327,8 @@ impl CallGraph {
     ///
     /// In production, prefer `resolve_cross_file_calls()` for better performance.
     pub fn resolve_cross_file_calls_sequential(&mut self) {
-        let all_functions: Vec<FunctionId> = self.get_all_functions().cloned().collect();
+        let mut all_functions: Vec<FunctionId> = self.get_all_functions().cloned().collect();
+        all_functions.sort();
         let calls_to_resolve = self.find_unresolved_calls();
 
         for call in calls_to_resolve {

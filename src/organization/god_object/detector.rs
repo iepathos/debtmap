@@ -107,8 +107,12 @@ impl OrganizationDetector for GodObjectDetector {
         let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
         visitor.visit_file(file);
 
+        // Sort types by name for deterministic analysis order (Spec 214 fix)
+        let mut sorted_types: Vec<_> = visitor.types.into_iter().collect();
+        sorted_types.sort_by(|a, b| a.0.cmp(&b.0));
+
         // Analyze each struct found
-        for (type_name, type_info) in visitor.types {
+        for (type_name, type_info) in sorted_types {
             // Check if it's a god object using thresholds
             let method_names = &type_info.methods;
             let responsibilities = group_methods_by_responsibility(method_names);
@@ -117,8 +121,11 @@ impl OrganizationDetector for GodObjectDetector {
                 || responsibilities.len() > self.max_responsibilities;
 
             if is_god {
-                // Create responsibility groups
-                let suggested_split: Vec<ResponsibilityGroup> = responsibilities
+                // Create responsibility groups in deterministic order (Spec 214 fix)
+                let mut sorted_responsibilities: Vec<_> = responsibilities.into_iter().collect();
+                sorted_responsibilities.sort_by(|a, b| a.0.cmp(&b.0));
+
+                let suggested_split: Vec<ResponsibilityGroup> = sorted_responsibilities
                     .into_iter()
                     .map(|(responsibility, methods)| ResponsibilityGroup {
                         name: responsibility.clone(),
