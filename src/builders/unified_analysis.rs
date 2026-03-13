@@ -164,9 +164,6 @@ pub fn perform_unified_analysis_with_options(
 
     // Process TypeScript/JavaScript files for call graph
     {
-        time_span!("typescript_call_graph", parent: "unified_analysis");
-        let _span = info_span!("typescript_call_graph_building").entered();
-
         // Collect JS/TS files from the analysis results
         let js_ts_files: Vec<PathBuf> = results
             .complexity
@@ -185,6 +182,9 @@ pub fn perform_unified_analysis_with_options(
             .collect();
 
         if !js_ts_files.is_empty() {
+            time_span!("typescript_call_graph", parent: "unified_analysis");
+            let _span = info_span!("typescript_call_graph_building").entered();
+
             info!(
                 "Processing {} JS/TS files for call graph",
                 js_ts_files.len()
