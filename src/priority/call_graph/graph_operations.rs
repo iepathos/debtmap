@@ -82,10 +82,17 @@ impl CallGraph {
             .find_function(func_id)
             .unwrap_or_else(|| func_id.clone());
 
-        self.callee_index
+        let mut callees: Vec<FunctionId> = self.callee_index
             .get(&canonical_func_id)
             .map(|set| set.iter().cloned().collect())
-            .unwrap_or_default()
+            .unwrap_or_default();
+
+        // Sort for deterministic traversal (Spec 214 fix)
+        callees.sort_by(|a, b| a.file.cmp(&b.file)
+            .then_with(|| a.line.cmp(&b.line))
+            .then_with(|| a.name.cmp(&b.name)));
+
+        callees
     }
 
     pub fn node_count(&self) -> usize {
@@ -100,10 +107,17 @@ impl CallGraph {
             .find_function(func_id)
             .unwrap_or_else(|| func_id.clone());
 
-        self.caller_index
+        let mut callers: Vec<FunctionId> = self.caller_index
             .get(&canonical_func_id)
             .map(|set| set.iter().cloned().collect())
-            .unwrap_or_default()
+            .unwrap_or_default();
+
+        // Sort for deterministic traversal (Spec 214 fix)
+        callers.sort_by(|a, b| a.file.cmp(&b.file)
+            .then_with(|| a.line.cmp(&b.line))
+            .then_with(|| a.name.cmp(&b.name)));
+
+        callers
     }
 
     pub fn get_dependency_count(&self, func_id: &FunctionId) -> usize {

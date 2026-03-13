@@ -109,7 +109,8 @@ pub fn finalize_file_functions(
     file_functions: &mut HashMap<String, FunctionCoverage>,
 ) -> Vec<FunctionCoverage> {
     let mut funcs: Vec<FunctionCoverage> = file_functions.drain().map(|(_, v)| v).collect();
-    funcs.sort_by_key(|f| f.start_line);
+    // Sort by line, then by name for perfectly deterministic order (Spec 214 fix)
+    funcs.sort_by(|a, b| a.start_line.cmp(&b.start_line).then_with(|| a.name.cmp(&b.name)));
     funcs
 }
 

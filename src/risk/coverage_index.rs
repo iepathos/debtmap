@@ -298,8 +298,9 @@ impl CoverageIndex {
             }
         }
 
-        // Pre-compute file paths for faster iteration
-        let file_paths: Vec<PathBuf> = by_file.keys().cloned().collect();
+        // Pre-compute and sort file paths for faster, deterministic iteration
+        let mut file_paths: Vec<PathBuf> = by_file.keys().cloned().collect();
+        file_paths.sort();
 
         let index_build_time = start.elapsed();
         let total_files = by_file.len();
@@ -798,7 +799,12 @@ impl CoverageIndex {
         let mut best_match = None;
         let mut best_confidence = MatchConfidence::None;
 
-        for (lcov_name, func) in file_functions {
+        // Sort functions by name to ensure deterministic matching when multiple functions
+        // have the same confidence level (Spec 214 fix)
+        let mut sorted_functions: Vec<_> = file_functions.iter().collect();
+        sorted_functions.sort_by(|a, b| a.0.cmp(b.0));
+
+        for (lcov_name, func) in sorted_functions {
             let (matches, confidence) = function_names_match(query_name, lcov_name);
 
             if matches && confidence > best_confidence {

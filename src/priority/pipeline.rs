@@ -13,32 +13,40 @@ use std::cmp::Ordering;
 
 /// Sorts items by score in descending order (pure).
 ///
-/// Creates a new sorted vector without mutating the input.
-/// While this function uses `sort_by()` which mutates the local vector,
-/// the function itself is pure - it always returns the same output for
-/// the same input with no observable side effects.
-///
-/// # Arguments
-///
-/// * `items` - Items to sort (consumed and transformed)
-///
-/// # Returns
-///
-/// New vector with items sorted by score (descending)
-///
-/// # Examples
-///
-/// ```no_run
-/// use debtmap::priority::pipeline::sort_by_score;
-/// # use debtmap::priority::filtering::ClassifiedItem;
-///
-/// # let items: Vec<ClassifiedItem> = vec![];
-/// let sorted = sort_by_score(items);
-/// // Items are now sorted by score, highest first
-/// ```
+/// Uses secondary sort keys (file path, line, function name) to ensure
+/// perfectly deterministic results even when scores are identical (Spec 214 fix).
 pub fn sort_by_score(mut items: Vec<ClassifiedItem>) -> Vec<ClassifiedItem> {
-    items.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+    items.sort_by(|a, b| {
+        // Primary sort: score (descending)
+        let order = b
+            .score
+            .partial_cmp(&a.score)
+            .unwrap_or(Ordering::Equal);
+
+        if order != Ordering::Equal {
+            return order;
+        }
+
+        // Secondary sort: item identity (ascending) for deterministic tie-breaking
+        compare_debt_items_stably(&a.item, &b.item)
+    });
     items
+}
+
+/// Compare two debt items stably for deterministic sorting.
+fn compare_debt_items_stably(a: &super::DebtItem, b: &super::DebtItem) -> Ordering {
+    match (a, b) {
+        (super::DebtItem::Function(fa), super::DebtItem::Function(fb)) => fa
+            .location
+            .file
+            .cmp(&fb.location.file)
+            .then_with(|| fa.location.line.cmp(&fb.location.line))
+            .then_with(|| fa.location.function.cmp(&fb.location.function)),
+        (super::DebtItem::File(fa), super::DebtItem::File(fb)) => fa.metrics.path.cmp(&fb.metrics.path),
+        // Group functions before files (arbitrary but stable)
+        (super::DebtItem::Function(_), super::DebtItem::File(_)) => Ordering::Less,
+        (super::DebtItem::File(_), super::DebtItem::Function(_)) => Ordering::Greater,
+    }
 }
 
 /// Limits items to top N (pure).
