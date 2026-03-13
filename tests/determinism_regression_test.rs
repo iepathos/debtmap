@@ -133,3 +133,38 @@ fn test_context_summation_determinism() {
         assert_eq!(first.to_bits(), other.to_bits(), "Float summation non-deterministic at iteration {}", i);
     }
 }
+
+#[test]
+fn test_typescript_extraction_determinism() {
+    use debtmap::analyzers::typescript::parser::parse_source;
+    use debtmap::analyzers::typescript::visitor::function_analysis::extract_functions;
+    use debtmap::analyzers::typescript::call_graph::extract_call_graph;
+    use debtmap::core::ast::JsLanguageVariant;
+    use std::path::PathBuf;
+
+    let source = r#"
+function common() { return 1; }
+class Test {
+    common() { return 2; }
+}
+const arrow = () => common();
+"#;
+    let path = PathBuf::from("test.ts");
+
+    let mut results = Vec::new();
+    for _ in 0..5 {
+        let ast = parse_source(source, &path, JsLanguageVariant::TypeScript).unwrap();
+        let funcs = extract_functions(&ast, false);
+        let graph = extract_call_graph(&ast);
+        
+        let func_data: Vec<_> = funcs.iter().map(|f| (f.name.clone(), f.line)).collect();
+        let graph_nodes: Vec<_> = graph.get_all_functions().cloned().collect();
+        results.push((func_data, graph_nodes));
+    }
+
+    let (first_funcs, first_nodes) = &results[0];
+    for (i, (other_funcs, other_nodes)) in results.iter().enumerate().skip(1) {
+        assert_eq!(first_funcs, other_funcs, "TS function extraction non-deterministic at iteration {}", i);
+        assert_eq!(first_nodes, other_nodes, "TS call graph nodes non-deterministic at iteration {}", i);
+    }
+}

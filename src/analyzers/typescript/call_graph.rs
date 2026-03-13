@@ -37,7 +37,10 @@ pub struct FunctionWithCalls {
 /// Extract function call graph from a TypeScript/JavaScript AST
 pub fn extract_call_graph(ast: &TypeScriptAst) -> CallGraph {
     let mut call_graph = CallGraph::new();
-    let functions = extract_functions_with_calls(ast);
+    let mut functions = extract_functions_with_calls(ast);
+
+    // Sort functions by line and name for deterministic graph construction (Spec 214 fix)
+    functions.sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
 
     // First pass: add all functions to the call graph
     for func in &functions {
@@ -56,7 +59,11 @@ pub fn extract_call_graph(ast: &TypeScriptAst) -> CallGraph {
             .next()
             .filter(|_| func.name.contains("::"));
 
-        for call in &func.calls {
+        // Sort calls by line and name for deterministic edge addition (Spec 214 fix)
+        let mut sorted_calls = func.calls.clone();
+        sorted_calls.sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.callee_name.cmp(&b.callee_name)));
+
+        for call in sorted_calls {
             // Try multiple matching strategies
             let callee_func = find_callee_function(&functions, &call.callee_name, caller_class);
 

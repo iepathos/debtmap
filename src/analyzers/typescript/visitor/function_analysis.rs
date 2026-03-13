@@ -25,6 +25,9 @@ pub fn extract_functions(
 
     extract_functions_recursive(&root, ast, &mut functions, false, None);
 
+    // Sort functions for deterministic analysis order (Spec 214 fix)
+    functions.sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
+
     functions
 }
 
