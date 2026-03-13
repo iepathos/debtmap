@@ -120,7 +120,7 @@ arboard = "3.5"  # Clipboard access (cross-platform); 3.5+ uses objc2 without li
 fuzzy-matcher = "0.3"  # Fuzzy search for results explorer
 
 # Date/time
-chrono = { version = "0.4.20", features = ["serde"] }  # minimum for stable error types
+chrono = { version = "0.4.44", features = ["serde"] }  # minimum for stable error types
 
 # Path handling
 pathdiff = "0.2"
