@@ -322,8 +322,9 @@ impl CallGraph {
 
     /// Get all functions that have no callers
     pub fn get_functions_with_no_callers(&self) -> Vec<FunctionId> {
-        let mut results: Vec<FunctionId> = self.nodes.keys()
-            .filter(|id| !self.caller_index.contains_key(id) || self.caller_index.get(id).map_or(true, |set| set.is_empty()))
+        let mut results: Vec<FunctionId> = self.nodes
+            .keys()
+            .filter(|id| !self.caller_index.contains_key(id) || self.caller_index.get(id).is_none_or(|set| set.is_empty()))
             .cloned()
             .collect();
         results.sort();
