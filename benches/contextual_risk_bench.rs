@@ -105,6 +105,7 @@ fn benchmark_git_history_provider(c: &mut Criterion) {
                 file_path: repo_path.join("test.rs"),
                 function_name: "test".to_string(),
                 line_range: (1, 1),
+                reference_time: chrono::Utc::now(),
             };
             let mut provider = provider;
             let result = provider.analyze_file(black_box(&target.file_path)).unwrap();
@@ -133,6 +134,7 @@ fn benchmark_context_aggregator(c: &mut Criterion) {
                 file_path: repo_path.join("test.rs"),
                 function_name: "test".to_string(),
                 line_range: (1, 1),
+                reference_time: chrono::Utc::now(),
             };
             let context_map = aggregator.analyze(black_box(&target));
             black_box(context_map);
@@ -186,8 +188,8 @@ fn benchmark_analysis_overhead(c: &mut Criterion) {
                             file_path: metric.file.clone(),
                             function_name: metric.name.clone(),
                             line_range: (metric.line, metric.line + metric.length),
-                        };
-                        let _context_map = aggregator.analyze(&target);
+                            reference_time: chrono::Utc::now(),
+                            };                        let _context_map = aggregator.analyze(&target);
                         black_box(metric);
                         black_box(&call_graph);
                     }

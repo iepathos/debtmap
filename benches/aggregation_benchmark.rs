@@ -87,6 +87,7 @@ fn benchmark_analysis_without_aggregation(c: &mut Criterion) {
                     disable_context: None,
                     rust_files: None,
                     extracted_data: None,
+                    reference_time: chrono::Utc::now(),
                 },
             );
         });
@@ -131,6 +132,7 @@ fn benchmark_analysis_with_aggregation(c: &mut Criterion) {
                     disable_context: None,
                     rust_files: None,
                     extracted_data: None,
+                    reference_time: chrono::Utc::now(),
                 },
             );
         });
@@ -178,6 +180,7 @@ fn benchmark_aggregation_methods(c: &mut Criterion) {
                         disable_context: None,
                         rust_files: None,
                         extracted_data: None,
+                        reference_time: chrono::Utc::now(),
                     },
                 );
             });

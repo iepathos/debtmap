@@ -113,6 +113,7 @@ fn benchmark_unified_format_serialization(c: &mut Criterion) {
                 disable_context: None,
                 rust_files: None,
                 extracted_data: None,
+                reference_time: chrono::Utc::now(),
             },
         )
         .unwrap();
@@ -181,6 +182,7 @@ fn benchmark_scaling_by_debt_items(c: &mut Criterion) {
                 disable_context: None,
                 rust_files: None,
                 extracted_data: None,
+                reference_time: chrono::Utc::now(),
             },
         )
         .unwrap();

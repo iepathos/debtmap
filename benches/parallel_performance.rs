@@ -94,6 +94,7 @@ fn benchmark_sequential_analysis(c: &mut Criterion) {
                         disable_context: None,
                         rust_files: None,
                         extracted_data: None,
+                        reference_time: chrono::Utc::now(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -143,6 +144,7 @@ fn benchmark_parallel_analysis(c: &mut Criterion) {
                         disable_context: None,
                         rust_files: None,
                         extracted_data: None,
+                        reference_time: chrono::Utc::now(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -191,6 +193,7 @@ fn benchmark_parallel_with_job_counts(c: &mut Criterion) {
                         disable_context: None,
                         rust_files: None,
                         extracted_data: None,
+                        reference_time: chrono::Utc::now(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -240,6 +243,7 @@ fn benchmark_file_counts(c: &mut Criterion) {
                         disable_context: None,
                         rust_files: None,
                         extracted_data: None,
+                        reference_time: chrono::Utc::now(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
