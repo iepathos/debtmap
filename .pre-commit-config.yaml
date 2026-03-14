@@ -9,6 +9,15 @@ repos:
     - id: check-merge-conflict
     - id: check-case-conflict
     - id: detect-private-key
+  - repo: local
+    hooks:
+    - id: rustfmt
+      name: rustfmt
+      description: Run cargo fmt on staged files
+      entry: cargo fmt --all --
+      language: system
+      types: [rust]
+      pass_filenames: false
   - repo: https://github.com/crate-ci/typos
     rev: v1.32.0
     hooks:
