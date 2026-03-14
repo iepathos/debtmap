@@ -200,11 +200,8 @@ impl ContextMap {
         let mut values: Vec<_> = self.contexts.values().collect();
         // Sort by provider name for deterministic summation order (Spec 214 fix)
         values.sort_by(|a, b| a.provider.cmp(&b.provider));
-        
-        values
-            .iter()
-            .map(|c| c.contribution * c.weight)
-            .sum()
+
+        values.iter().map(|c| c.contribution * c.weight).sum()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Context)> {

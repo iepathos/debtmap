@@ -132,7 +132,7 @@ pub fn build_suppression_context_cache(metrics: &[FunctionMetrics]) -> Suppressi
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
-    
+
     // Sort files for deterministic I/O order (Spec 214 fix)
     unique_files.sort();
 

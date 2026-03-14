@@ -9,7 +9,7 @@ impl CallGraph {
     #[allow(dead_code)]
     fn build_function_name_map(&self) -> std::collections::HashMap<String, Vec<FunctionId>> {
         let mut functions_by_name = std::collections::HashMap::new();
-        
+
         // Sort keys for deterministic map building (Spec 214 fix)
         let mut sorted_keys: Vec<_> = self.nodes.keys().collect();
         sorted_keys.sort();

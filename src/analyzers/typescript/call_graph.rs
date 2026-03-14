@@ -61,7 +61,11 @@ pub fn extract_call_graph(ast: &TypeScriptAst) -> CallGraph {
 
         // Sort calls by line and name for deterministic edge addition (Spec 214 fix)
         let mut sorted_calls = func.calls.clone();
-        sorted_calls.sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.callee_name.cmp(&b.callee_name)));
+        sorted_calls.sort_by(|a, b| {
+            a.line
+                .cmp(&b.line)
+                .then_with(|| a.callee_name.cmp(&b.callee_name))
+        });
 
         for call in sorted_calls {
             // Try multiple matching strategies

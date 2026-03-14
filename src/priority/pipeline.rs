@@ -18,10 +18,7 @@ use std::cmp::Ordering;
 pub fn sort_by_score(mut items: Vec<ClassifiedItem>) -> Vec<ClassifiedItem> {
     items.sort_by(|a, b| {
         // Primary sort: score (descending)
-        let order = b
-            .score
-            .partial_cmp(&a.score)
-            .unwrap_or(Ordering::Equal);
+        let order = b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal);
 
         if order != Ordering::Equal {
             return order;
@@ -46,7 +43,9 @@ fn compare_debt_items_stably(a: &super::DebtItem, b: &super::DebtItem) -> Orderi
                 // Use a stable string representation for debt type comparison if Discriminant cmp is failing
                 format!("{:?}", fa.debt_type).cmp(&format!("{:?}", fb.debt_type))
             }),
-        (super::DebtItem::File(fa), super::DebtItem::File(fb)) => fa.metrics.path.cmp(&fb.metrics.path),
+        (super::DebtItem::File(fa), super::DebtItem::File(fb)) => {
+            fa.metrics.path.cmp(&fb.metrics.path)
+        }
         // Group functions before files (arbitrary but stable)
         (super::DebtItem::Function(_), super::DebtItem::File(_)) => Ordering::Less,
         (super::DebtItem::File(_), super::DebtItem::Function(_)) => Ordering::Greater,

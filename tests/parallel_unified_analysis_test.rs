@@ -238,14 +238,8 @@ fn test_parallel_analysis_determinism() {
         .iter()
         .any(|(_, name, _, _)| name == "function_dup_2");
 
-    assert!(
-        dup1_present,
-        "function_dup_1 should be present in results"
-    );
-    assert!(
-        dup2_present,
-        "function_dup_2 should be present in results"
-    );
+    assert!(dup1_present, "function_dup_1 should be present in results");
+    assert!(dup2_present, "function_dup_2 should be present in results");
 }
 
 #[test]

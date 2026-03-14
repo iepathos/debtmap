@@ -144,8 +144,11 @@ fn merge_coverage(coverages: Vec<&FunctionCoverage>) -> AggregateCoverage {
     sorted_coverages.sort_by(|a, b| a.name.cmp(&b.name));
 
     let version_count = sorted_coverages.len();
-    let avg_coverage: f64 =
-        sorted_coverages.iter().map(|c| c.coverage_percentage).sum::<f64>() / version_count as f64;
+    let avg_coverage: f64 = sorted_coverages
+        .iter()
+        .map(|c| c.coverage_percentage)
+        .sum::<f64>()
+        / version_count as f64;
 
     let mut uncovered_lines: Vec<usize> = uncovered_in_all.into_iter().collect();
     uncovered_lines.sort_unstable();

@@ -189,7 +189,8 @@ fn benchmark_analysis_overhead(c: &mut Criterion) {
                             function_name: metric.name.clone(),
                             line_range: (metric.line, metric.line + metric.length),
                             reference_time: chrono::Utc::now(),
-                            };                        let _context_map = aggregator.analyze(&target);
+                        };
+                        let _context_map = aggregator.analyze(&target);
                         black_box(metric);
                         black_box(&call_graph);
                     }

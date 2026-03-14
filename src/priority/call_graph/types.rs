@@ -16,7 +16,8 @@ pub struct FunctionId {
 
 impl Ord for FunctionId {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.file.cmp(&other.file)
+        self.file
+            .cmp(&other.file)
             .then_with(|| self.line.cmp(&other.line))
             .then_with(|| self.name.cmp(&other.name))
             .then_with(|| self.module_path.cmp(&other.module_path))

@@ -295,11 +295,23 @@ mod tests {
         colored::control::set_override(false);
 
         let header = format_score_header(1, 85.5, " [WARN]", "HIGH", Color::Red);
-        
+
         // Use regex or strip colors to be sure, but set_override(false) should work
-        assert!(header.contains("#1"), "Header should contain rank #1, got: {}", header);
-        assert!(header.contains("SCORE:"), "Header should contain SCORE:, got: {}", header);
-        assert!(header.contains("[HIGH]"), "Header should contain [HIGH], got: {}", header);
+        assert!(
+            header.contains("#1"),
+            "Header should contain rank #1, got: {}",
+            header
+        );
+        assert!(
+            header.contains("SCORE:"),
+            "Header should contain SCORE:, got: {}",
+            header
+        );
+        assert!(
+            header.contains("[HIGH]"),
+            "Header should contain [HIGH], got: {}",
+            header
+        );
 
         // Re-enable colors
         colored::control::unset_override();

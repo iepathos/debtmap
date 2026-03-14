@@ -86,7 +86,8 @@ impl CallGraph {
             .find_function(func_id)
             .unwrap_or_else(|| func_id.clone());
 
-        let mut callees: Vec<FunctionId> = self.callee_index
+        let mut callees: Vec<FunctionId> = self
+            .callee_index
             .get(&canonical_func_id)
             .map(|set| set.iter().cloned().collect())
             .unwrap_or_default();
@@ -109,7 +110,8 @@ impl CallGraph {
             .find_function(func_id)
             .unwrap_or_else(|| func_id.clone());
 
-        let mut callers: Vec<FunctionId> = self.caller_index
+        let mut callers: Vec<FunctionId> = self
+            .caller_index
             .get(&canonical_func_id)
             .map(|set| set.iter().cloned().collect())
             .unwrap_or_default();
@@ -199,7 +201,8 @@ impl CallGraph {
     /// Get callees by function name (returns function names)
     pub fn get_callees_by_name(&self, function: &str) -> Vec<String> {
         // Find all nodes with this function name
-        let mut results: Vec<String> = self.nodes
+        let mut results: Vec<String> = self
+            .nodes
             .keys()
             .filter(|id| id.name == function)
             .flat_map(|id| self.get_callees(id))
@@ -207,7 +210,7 @@ impl CallGraph {
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
-            
+
         results.sort();
         results
     }
@@ -215,7 +218,8 @@ impl CallGraph {
     /// Get callers by function name (returns function names)
     pub fn get_callers_by_name(&self, function: &str) -> Vec<String> {
         // Find all nodes with this function name
-        let mut results: Vec<String> = self.nodes
+        let mut results: Vec<String> = self
+            .nodes
             .keys()
             .filter(|id| id.name == function)
             .flat_map(|id| self.get_callers(id))
@@ -223,7 +227,7 @@ impl CallGraph {
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
-            
+
         results.sort();
         results
     }
@@ -285,7 +289,8 @@ impl CallGraph {
     }
 
     pub fn find_entry_points(&self) -> Vec<FunctionId> {
-        let mut results: Vec<FunctionId> = self.nodes
+        let mut results: Vec<FunctionId> = self
+            .nodes
             .values()
             .filter(|node| node.is_entry_point)
             .map(|node| node.id.clone())
@@ -302,7 +307,9 @@ impl CallGraph {
 
     /// Get all functions in a specific file
     pub fn get_functions_by_file(&self, file: &PathBuf) -> Vec<FunctionId> {
-        let mut results: Vec<FunctionId> = self.nodes.keys()
+        let mut results: Vec<FunctionId> = self
+            .nodes
+            .keys()
             .filter(|id| &id.file == file)
             .cloned()
             .collect();
@@ -312,7 +319,9 @@ impl CallGraph {
 
     /// Get all functions with a specific name
     pub fn get_functions_by_name(&self, name: &str) -> Vec<FunctionId> {
-        let mut results: Vec<FunctionId> = self.nodes.keys()
+        let mut results: Vec<FunctionId> = self
+            .nodes
+            .keys()
             .filter(|id| id.name == name)
             .cloned()
             .collect();
@@ -322,9 +331,13 @@ impl CallGraph {
 
     /// Get all functions that have no callers
     pub fn get_functions_with_no_callers(&self) -> Vec<FunctionId> {
-        let mut results: Vec<FunctionId> = self.nodes
+        let mut results: Vec<FunctionId> = self
+            .nodes
             .keys()
-            .filter(|id| !self.caller_index.contains_key(id) || self.caller_index.get(id).is_none_or(|set| set.is_empty()))
+            .filter(|id| {
+                !self.caller_index.contains_key(id)
+                    || self.caller_index.get(id).is_none_or(|set| set.is_empty())
+            })
             .cloned()
             .collect();
         results.sort();
@@ -332,7 +345,8 @@ impl CallGraph {
     }
 
     pub fn get_function_calls(&self, func_id: &FunctionId) -> Vec<FunctionCall> {
-        let mut results: Vec<FunctionCall> = self.edges
+        let mut results: Vec<FunctionCall> = self
+            .edges
             .iter()
             .filter(|call| &call.caller == func_id)
             .cloned()

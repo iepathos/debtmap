@@ -5,7 +5,8 @@ use im::{HashMap, HashSet};
 
 impl CallGraph {
     pub fn find_test_functions(&self) -> Vec<FunctionId> {
-        let mut funcs: Vec<FunctionId> = self.nodes
+        let mut funcs: Vec<FunctionId> = self
+            .nodes
             .iter()
             .filter(|(_, node)| node.is_test)
             .map(|(id, _)| id.clone())
@@ -83,7 +84,7 @@ impl CallGraph {
         test_functions: &HashSet<FunctionId>,
     ) -> HashSet<FunctionId> {
         let mut reachable_from_tests = test_functions.clone();
-        
+
         // Sort for deterministic traversal order (Spec 214 fix)
         let mut sorted_tests: Vec<_> = test_functions.iter().collect();
         sorted_tests.sort();
@@ -98,7 +99,7 @@ impl CallGraph {
     /// Find all functions reachable from production (non-test) entry points
     fn find_functions_reachable_from_production(&self) -> HashSet<FunctionId> {
         let mut reachable_from_production = HashSet::new();
-        
+
         // Sort nodes for deterministic traversal order (Spec 214 fix)
         let mut sorted_nodes: Vec<_> = self.nodes.iter().collect();
         sorted_nodes.sort_by(|a, b| a.0.cmp(b.0));
