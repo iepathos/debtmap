@@ -290,7 +290,6 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         purity_confidence: js_metrics.purity_confidence,
         purity_reason,
         call_dependencies: None,
-        detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
         mapping_pattern_result: None,
@@ -301,6 +300,17 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis,
+        detected_patterns: if js_metrics.functional_chains.is_empty() {
+            None
+        } else {
+            Some(
+                js_metrics
+                    .functional_chains
+                    .iter()
+                    .map(|chain| format!("functional-chain:{}", chain.methods.join("->")))
+                    .collect(),
+            )
+        },
     }
 }
 

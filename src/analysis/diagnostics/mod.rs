@@ -6,9 +6,9 @@
 //!
 //! # Components
 //!
-//! - [`InsightGenerator`]: Generates insights from complexity attribution data
-//! - [`RecommendationEngine`]: Produces prioritized refactoring recommendations
-//! - [`DiagnosticReporter`]: Formats analysis results into various output formats
+//! - [`crate::analysis::diagnostics::InsightGenerator`]: Generates insights from complexity attribution data
+//! - [`crate::analysis::diagnostics::RecommendationEngine`]: Produces prioritized refactoring recommendations
+//! - [`crate::analysis::diagnostics::DiagnosticReporter`]: Formats analysis results into various output formats
 //!
 //! # Effect-Based API
 //!

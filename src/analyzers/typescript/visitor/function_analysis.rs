@@ -4,6 +4,7 @@
 
 use crate::analyzers::typescript::entropy::calculate_entropy;
 use crate::analyzers::typescript::parser::{node_line, node_text};
+use crate::analyzers::typescript::patterns::functional::detect_functional_chains;
 use crate::analyzers::typescript::purity::TypeScriptPurityAnalyzer;
 use crate::analyzers::typescript::types::{FunctionKind, JsFunctionMetrics};
 use crate::complexity::entropy_core::EntropyConfig;
@@ -18,12 +19,23 @@ use super::helpers::{
 /// Extract all functions from a TypeScript/JavaScript AST
 pub fn extract_functions(
     ast: &TypeScriptAst,
-    _enable_functional_analysis: bool,
+    enable_functional_analysis: bool,
 ) -> Vec<JsFunctionMetrics> {
     let mut functions = Vec::new();
     let root = ast.tree.root_node();
 
-    extract_functions_recursive(&root, ast, &mut functions, false, None);
+    extract_functions_recursive(
+        &root,
+        ast,
+        &mut functions,
+        false,
+        None,
+        enable_functional_analysis,
+    );
+
+    if enable_functional_analysis {
+        annotate_functional_chains(&root, ast, &mut functions);
+    }
 
     // Sort functions for deterministic analysis order (Spec 214 fix)
     functions.sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
@@ -38,6 +50,7 @@ fn extract_functions_recursive(
     functions: &mut Vec<JsFunctionMetrics>,
     in_class: bool,
     class_name: Option<&str>,
+    enable_functional_analysis: bool,
 ) {
     let mut cursor = node.walk();
 
@@ -72,7 +85,13 @@ fn extract_functions_recursive(
             // Class declarations
             "class_declaration" | "class" => {
                 let name = get_class_name(&child, ast);
-                extract_class_methods(&child, ast, functions, name.as_deref());
+                extract_class_methods(
+                    &child,
+                    ast,
+                    functions,
+                    name.as_deref(),
+                    enable_functional_analysis,
+                );
             }
 
             // Arrow functions at module level (rare but possible)
@@ -91,7 +110,14 @@ fn extract_functions_recursive(
 
             // Continue recursion for other nodes
             _ => {
-                extract_functions_recursive(&child, ast, functions, in_class, class_name);
+                extract_functions_recursive(
+                    &child,
+                    ast,
+                    functions,
+                    in_class,
+                    class_name,
+                    enable_functional_analysis,
+                );
             }
         }
     }
@@ -375,7 +401,7 @@ fn extract_export_functions(
             }
             "class_declaration" | "class" => {
                 let name = get_class_name(&child, ast);
-                extract_class_methods(&child, ast, functions, name.as_deref());
+                extract_class_methods(&child, ast, functions, name.as_deref(), true);
             }
             _ => {}
         }
@@ -388,6 +414,7 @@ fn extract_class_methods(
     ast: &TypeScriptAst,
     functions: &mut Vec<JsFunctionMetrics>,
     class_name: Option<&str>,
+    _enable_functional_analysis: bool,
 ) {
     // Find class body
     let body = node
@@ -412,6 +439,56 @@ fn extract_class_methods(
                 _ => {}
             }
         }
+    }
+}
+
+fn annotate_functional_chains(
+    node: &Node,
+    ast: &TypeScriptAst,
+    functions: &mut [JsFunctionMetrics],
+) {
+    let chains = detect_functional_chains(node, ast);
+    if chains.is_empty() {
+        return;
+    }
+
+    for chain in chains {
+        if let Some(func) = functions
+            .iter_mut()
+            .filter(|func| func.line <= chain.line)
+            .max_by_key(|func| func.line)
+        {
+            func.functional_chains.push(chain);
+        }
+    }
+}
+
+#[cfg(test)]
+mod functional_analysis_tests {
+    use super::*;
+    use crate::analyzers::typescript::parser::parse_source;
+    use crate::core::ast::JsLanguageVariant;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_functional_analysis_toggle_controls_chain_annotation() {
+        let source = r#"
+const transform = (items) => items.filter(x => x > 0).map(x => x * 2);
+"#;
+        let path = PathBuf::from("test.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let disabled = extract_functions(&ast, false);
+        let enabled = extract_functions(&ast, true);
+
+        assert_eq!(disabled.len(), 1);
+        assert_eq!(enabled.len(), 1);
+        assert!(disabled[0].functional_chains.is_empty());
+        assert_eq!(enabled[0].functional_chains.len(), 1);
+        assert_eq!(
+            enabled[0].functional_chains[0].methods,
+            vec!["map".to_string(), "filter".to_string()]
+        );
     }
 }
 

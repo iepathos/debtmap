@@ -25,6 +25,10 @@ pub fn parse_source(content: &str, path: &Path) -> Result<PythonAst> {
         .parse(content, None)
         .context("Failed to parse source code")?;
 
+    if has_parse_errors(&tree) {
+        anyhow::bail!("Python parse tree contains syntax errors");
+    }
+
     Ok(PythonAst {
         tree,
         path: path.to_path_buf(),
@@ -89,5 +93,13 @@ mod tests {
 
         let root = ast.tree.root_node();
         assert_eq!(node_line(&root), 1);
+    }
+
+    #[test]
+    fn test_parse_invalid_python_fails() {
+        let source = "def broken(:\n    pass";
+        let path = PathBuf::from("broken.py");
+        let result = parse_source(source, &path);
+        assert!(result.is_err());
     }
 }

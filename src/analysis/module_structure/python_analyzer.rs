@@ -1,109 +1,116 @@
 //! Python module structure analysis
 //!
-//! Provides basic text-based analysis of Python source files.
-//! Detects classes and function definitions through pattern matching.
+//! Provides parser-backed analysis of Python source files.
 
 use std::path::Path;
 
 use super::types::{ComponentDependencyGraph, FunctionCounts, ModuleComponent, ModuleStructure};
+use crate::analyzers::python::parser::parse_source;
+use crate::extraction::python::PythonExtractor;
 
 /// Analyze a Python source file to extract module structure
-pub fn analyze_python_file(content: &str, _file_path: &Path) -> ModuleStructure {
-    let lines: Vec<&str> = content.lines().collect();
-    let total_lines = lines.len();
+pub fn analyze_python_file(content: &str, file_path: &Path) -> ModuleStructure {
+    let Ok(ast) = parse_source(content, file_path) else {
+        return empty_structure(content);
+    };
 
-    let (components, public_count, private_count) = extract_python_components(&lines);
+    let Ok(extracted) = PythonExtractor::extract(&ast) else {
+        return empty_structure(content);
+    };
+
+    let mut components = Vec::new();
+    let mut counts = FunctionCounts::new();
+
+    for class_data in &extracted.structs {
+        let method_count = extracted
+            .impls
+            .iter()
+            .find(|impl_data| impl_data.type_name == class_data.name)
+            .map(|impl_data| impl_data.methods.len())
+            .unwrap_or(0);
+
+        components.push(ModuleComponent::Struct {
+            name: class_data.name.clone(),
+            fields: class_data.fields.len(),
+            methods: method_count,
+            public: class_data.is_public,
+            line_range: (class_data.line, class_data.line),
+        });
+    }
+
+    for func in &extracted.functions {
+        let public = func.visibility.is_some();
+        let component = ModuleComponent::ModuleLevelFunction {
+            name: func.qualified_name.clone(),
+            public,
+            lines: func.length,
+            complexity: func.cyclomatic,
+        };
+
+        if func.qualified_name.contains('.') {
+            counts.impl_methods += 1;
+        } else {
+            counts.module_level_functions += 1;
+            if public {
+                counts.public_functions += 1;
+            } else {
+                counts.private_functions += 1;
+            }
+        }
+
+        components.push(component);
+    }
+
     let responsibility_count = (components.len() / 5).max(1);
 
     ModuleStructure {
-        total_lines,
+        total_lines: extracted.total_lines,
         components,
-        function_counts: FunctionCounts {
-            module_level_functions: public_count + private_count,
-            impl_methods: 0,
-            trait_methods: 0,
-            nested_module_functions: 0,
-            public_functions: public_count,
-            private_functions: private_count,
-        },
+        function_counts: counts.clone(),
         responsibility_count,
-        public_api_surface: public_count,
+        public_api_surface: counts.public_functions,
         dependencies: ComponentDependencyGraph::new(),
         facade_info: None,
     }
 }
 
-/// Extract components from Python source lines
-fn extract_python_components(lines: &[&str]) -> (Vec<ModuleComponent>, usize, usize) {
-    let mut components = Vec::new();
-    let mut public_count = 0;
-    let mut private_count = 0;
-
-    for (idx, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-
-        if let Some(comp) = try_extract_class(trimmed, idx) {
-            components.push(comp);
-        }
-
-        if let Some((comp, is_public)) = try_extract_function(trimmed) {
-            if is_public {
-                public_count += 1;
-            } else {
-                private_count += 1;
-            }
-            components.push(comp);
-        }
+fn empty_structure(content: &str) -> ModuleStructure {
+    ModuleStructure {
+        total_lines: content.lines().count(),
+        components: vec![],
+        function_counts: FunctionCounts::new(),
+        responsibility_count: 0,
+        public_api_surface: 0,
+        dependencies: ComponentDependencyGraph::new(),
+        facade_info: None,
     }
-
-    (components, public_count, private_count)
 }
 
-/// Try to extract a class definition from a line
-fn try_extract_class(line: &str, idx: usize) -> Option<ModuleComponent> {
-    if !line.starts_with("class ") {
-        return None;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parser_backed_python_module_structure_counts_methods_separately() {
+        let source = r#"
+class Service:
+    def process(self, item):
+        return item
+
+def helper():
+    return 1
+"#;
+        let structure = analyze_python_file(source, Path::new("service.py"));
+
+        assert_eq!(structure.function_counts.module_level_functions, 1);
+        assert_eq!(structure.function_counts.impl_methods, 1);
+        assert!(structure
+            .components
+            .iter()
+            .any(|component| matches!(component, ModuleComponent::Struct { name, .. } if name == "Service")));
+        assert!(structure
+            .components
+            .iter()
+            .any(|component| matches!(component, ModuleComponent::ModuleLevelFunction { name, .. } if name == "Service.process")));
     }
-
-    let name = line
-        .strip_prefix("class ")
-        .and_then(|s| s.split(['(', ':']).next())
-        .unwrap_or("Unknown")
-        .trim()
-        .to_string();
-
-    let public = !name.starts_with('_');
-
-    Some(ModuleComponent::Struct {
-        name,
-        fields: 0,
-        methods: 0,
-        public,
-        line_range: (idx, idx),
-    })
-}
-
-/// Try to extract a function definition from a line
-fn try_extract_function(line: &str) -> Option<(ModuleComponent, bool)> {
-    if !line.starts_with("def ") {
-        return None;
-    }
-
-    let name = line
-        .strip_prefix("def ")
-        .and_then(|s| s.split('(').next())
-        .unwrap_or("unknown")
-        .trim()
-        .to_string();
-
-    let public = !name.starts_with('_');
-
-    let comp = ModuleComponent::ModuleLevelFunction {
-        name,
-        public,
-        lines: 5, // Estimate
-        complexity: 1,
-    };
-
-    Some((comp, public))
 }

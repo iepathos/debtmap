@@ -1,116 +1,129 @@
 //! JavaScript/TypeScript module structure analysis
 //!
-//! Provides basic text-based analysis of JavaScript and TypeScript source files.
-//! Detects classes and function definitions through pattern matching.
+//! Provides parser-backed analysis of JavaScript and TypeScript source files.
 
 use std::path::Path;
 
 use super::types::{ComponentDependencyGraph, FunctionCounts, ModuleComponent, ModuleStructure};
+use crate::analyzers::typescript::parser::parse_source;
+use crate::analyzers::typescript::visitor::class_analysis::extract_classes;
+use crate::analyzers::typescript::visitor::function_analysis::extract_functions;
+use crate::core::ast::JsLanguageVariant;
 
 /// Analyze a JavaScript source file to extract module structure
-pub fn analyze_javascript_file(content: &str, _file_path: &Path) -> ModuleStructure {
-    let lines: Vec<&str> = content.lines().collect();
-    let total_lines = lines.len();
-
-    let (components, public_count, private_count) = extract_js_components(&lines);
-    let responsibility_count = (components.len() / 5).max(1);
-
-    ModuleStructure {
-        total_lines,
-        components,
-        function_counts: FunctionCounts {
-            module_level_functions: public_count + private_count,
-            impl_methods: 0,
-            trait_methods: 0,
-            nested_module_functions: 0,
-            public_functions: public_count,
-            private_functions: private_count,
-        },
-        responsibility_count,
-        public_api_surface: public_count,
-        dependencies: ComponentDependencyGraph::new(),
-        facade_info: None,
-    }
+pub fn analyze_javascript_file(content: &str, file_path: &Path) -> ModuleStructure {
+    analyze_script_file(content, file_path, JsLanguageVariant::JavaScript)
 }
 
 /// Analyze a TypeScript source file to extract module structure
 ///
 /// TypeScript analysis is similar to JavaScript with type annotations.
-/// For now, delegates to JavaScript analyzer.
 pub fn analyze_typescript_file(content: &str, file_path: &Path) -> ModuleStructure {
-    analyze_javascript_file(content, file_path)
+    analyze_script_file(content, file_path, JsLanguageVariant::TypeScript)
 }
 
-/// Extract components from JavaScript source lines
-fn extract_js_components(lines: &[&str]) -> (Vec<ModuleComponent>, usize, usize) {
-    let mut components = Vec::new();
-    let mut public_count = 0;
-    let mut private_count = 0;
-
-    for (idx, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-
-        if let Some(comp) = try_extract_class(trimmed, idx) {
-            components.push(comp);
-        }
-
-        if let Some((comp, is_export)) = try_extract_function(trimmed) {
-            if is_export {
-                public_count += 1;
-            } else {
-                private_count += 1;
-            }
-            components.push(comp);
-        }
-    }
-
-    (components, public_count, private_count)
-}
-
-/// Try to extract a class definition from a line
-fn try_extract_class(line: &str, idx: usize) -> Option<ModuleComponent> {
-    if !line.starts_with("class ") && !line.contains(" class ") {
-        return None;
-    }
-
-    let name = line
-        .split_whitespace()
-        .skip_while(|&s| s != "class")
-        .nth(1)
-        .unwrap_or("Unknown")
-        .split(['{', ' '])
-        .next()
-        .unwrap_or("Unknown")
-        .to_string();
-
-    Some(ModuleComponent::Struct {
-        name,
-        fields: 0,
-        methods: 0,
-        public: true,
-        line_range: (idx, idx),
-    })
-}
-
-/// Try to extract a function definition from a line
-fn try_extract_function(line: &str) -> Option<(ModuleComponent, bool)> {
-    let is_function = line.starts_with("function ")
-        || line.starts_with("export function ")
-        || line.contains("= function")
-        || (line.contains("=> ") && (line.starts_with("const ") || line.starts_with("let ")));
-
-    if !is_function {
-        return None;
-    }
-
-    let is_export = line.starts_with("export ");
-
-    let comp = ModuleComponent::ModuleLevelFunction {
-        name: "function".to_string(),
-        public: is_export,
-        lines: 5,
-        complexity: 1,
+fn analyze_script_file(
+    content: &str,
+    file_path: &Path,
+    variant: JsLanguageVariant,
+) -> ModuleStructure {
+    let Ok(ast) = parse_source(content, file_path, variant) else {
+        return empty_structure(content);
     };
 
-    Some((comp, is_export))
+    let classes = extract_classes(&ast);
+    let functions = extract_functions(&ast, true);
+
+    let mut components = Vec::new();
+    let mut counts = FunctionCounts::new();
+
+    for class_info in classes {
+        components.push(ModuleComponent::Struct {
+            name: class_info.name,
+            fields: class_info.property_count,
+            methods: class_info.method_count,
+            public: class_info.is_exported,
+            line_range: (class_info.line, class_info.line),
+        });
+    }
+
+    for func in functions {
+        let public = func.is_exported;
+        let is_method = matches!(
+            func.kind,
+            crate::analyzers::typescript::types::FunctionKind::ClassMethod
+                | crate::analyzers::typescript::types::FunctionKind::Constructor
+                | crate::analyzers::typescript::types::FunctionKind::Getter
+                | crate::analyzers::typescript::types::FunctionKind::Setter
+        );
+
+        if is_method {
+            counts.impl_methods += 1;
+        } else {
+            counts.module_level_functions += 1;
+            if public {
+                counts.public_functions += 1;
+            } else {
+                counts.private_functions += 1;
+            }
+        }
+
+        components.push(ModuleComponent::ModuleLevelFunction {
+            name: func.name,
+            public,
+            lines: func.length,
+            complexity: func.cyclomatic,
+        });
+    }
+
+    let responsibility_count = (components.len() / 5).max(1);
+
+    ModuleStructure {
+        total_lines: content.lines().count(),
+        components,
+        function_counts: counts.clone(),
+        responsibility_count,
+        public_api_surface: counts.public_functions,
+        dependencies: ComponentDependencyGraph::new(),
+        facade_info: None,
+    }
+}
+
+fn empty_structure(content: &str) -> ModuleStructure {
+    ModuleStructure {
+        total_lines: content.lines().count(),
+        components: vec![],
+        function_counts: FunctionCounts::new(),
+        responsibility_count: 0,
+        public_api_surface: 0,
+        dependencies: ComponentDependencyGraph::new(),
+        facade_info: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parser_backed_javascript_module_structure_preserves_names() {
+        let source = r#"
+export function helper() { return 1; }
+class Greeter {
+  greet() { return "hi"; }
+}
+"#;
+        let structure = analyze_javascript_file(source, Path::new("greeter.js"));
+
+        assert_eq!(structure.function_counts.module_level_functions, 1);
+        assert_eq!(structure.function_counts.impl_methods, 1);
+        assert!(structure
+            .components
+            .iter()
+            .any(|component| matches!(component, ModuleComponent::ModuleLevelFunction { name, .. } if name == "helper")));
+        assert!(structure
+            .components
+            .iter()
+            .any(|component| matches!(component, ModuleComponent::Struct { name, methods, .. } if name == "Greeter" && *methods == 1)));
+    }
 }

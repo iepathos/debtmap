@@ -15,7 +15,7 @@ pub fn analyze_rust_file(
     ast: &RustAst,
     threshold: u32,
     enhanced_thresholds: &ComplexityThresholds,
-    _use_enhanced: bool,
+    use_enhanced: bool,
     enable_functional_analysis: bool,
     enable_rust_patterns: bool,
 ) -> FileMetrics {
@@ -35,13 +35,18 @@ pub fn analyze_rust_file(
     let analysis_time = analysis_start.elapsed();
 
     let debt_start = std::time::Instant::now();
+    let enhanced_analysis = if use_enhanced {
+        analysis_result.enhanced_analysis.as_slice()
+    } else {
+        &[]
+    };
     let debt_items = create_debt_items(
         &ast.file,
         &ast.path,
         threshold,
         &analysis_result.functions,
         &ast.source,
-        &analysis_result.enhanced_analysis,
+        enhanced_analysis,
     );
     let debt_time = debt_start.elapsed();
 
@@ -72,4 +77,58 @@ pub fn analyze_rust_file(
         dependencies,
         total_lines,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::complexity::threshold_manager::ThresholdPreset;
+    use crate::core::ast::RustAst;
+    use std::path::PathBuf;
+
+    fn test_ast(source: &str) -> RustAst {
+        RustAst {
+            file: syn::parse_str(source).unwrap(),
+            path: PathBuf::from("test.rs"),
+            source: source.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_enhanced_detection_toggle_changes_debt_context() {
+        let source = r#"
+fn complex(value: i32) -> i32 {
+    if value == 0 {
+        0
+    } else if value == 1 {
+        1
+    } else if value == 2 {
+        2
+    } else if value == 3 {
+        3
+    } else {
+        4
+    }
+}
+"#;
+        let ast = test_ast(source);
+        let thresholds = ComplexityThresholds::from_preset(ThresholdPreset::Balanced);
+
+        let enhanced = analyze_rust_file(&ast, 1, &thresholds, true, false, false);
+        let basic = analyze_rust_file(&ast, 1, &thresholds, false, false, false);
+
+        let enhanced_complexity = enhanced
+            .debt_items
+            .iter()
+            .find(|item| matches!(item.debt_type, crate::core::DebtType::Complexity { .. }))
+            .unwrap();
+        let basic_complexity = basic
+            .debt_items
+            .iter()
+            .find(|item| matches!(item.debt_type, crate::core::DebtType::Complexity { .. }))
+            .unwrap();
+
+        assert!(enhanced_complexity.context.is_some());
+        assert!(basic_complexity.context.is_none());
+    }
 }

@@ -126,6 +126,8 @@ pub struct JsFunctionMetrics {
     pub purity_confidence: Option<f32>,
     /// Reasons for impurity (if any)
     pub impurity_reasons: Vec<String>,
+    /// Functional map/filter/reduce style chains detected for this function
+    pub functional_chains: Vec<FunctionalChain>,
 }
 
 impl JsFunctionMetrics {
@@ -150,6 +152,7 @@ impl JsFunctionMetrics {
             purity_level: None,
             purity_confidence: None,
             impurity_reasons: Vec::new(),
+            functional_chains: Vec::new(),
         }
     }
 

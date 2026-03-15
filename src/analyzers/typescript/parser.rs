@@ -35,6 +35,13 @@ pub fn parse_source(
         .parse(content, None)
         .context("Failed to parse source code")?;
 
+    if has_parse_errors(&tree) {
+        anyhow::bail!(
+            "TypeScript/JavaScript parse tree contains syntax errors for {}",
+            path.display()
+        );
+    }
+
     Ok(TypeScriptAst {
         tree,
         path: path.to_path_buf(),
@@ -168,5 +175,13 @@ mod tests {
 
         let root = ast.tree.root_node();
         assert_eq!(node_line(&root), 1);
+    }
+
+    #[test]
+    fn test_parse_invalid_typescript_fails() {
+        let source = "function broken( {";
+        let path = PathBuf::from("broken.ts");
+        let result = parse_source(source, &path, JsLanguageVariant::TypeScript);
+        assert!(result.is_err());
     }
 }

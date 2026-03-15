@@ -53,6 +53,11 @@ impl RustAnalyzer {
         self.enable_rust_patterns = enable;
         self
     }
+
+    pub fn with_enhanced_detection(mut self, enable: bool) -> Self {
+        self.use_enhanced_detection = enable;
+        self
+    }
 }
 
 impl Default for RustAnalyzer {

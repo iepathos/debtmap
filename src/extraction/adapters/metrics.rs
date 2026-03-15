@@ -8,7 +8,11 @@
 //! All functions in this module are pure (no I/O, no parsing). They perform O(n)
 //! conversions where n is the number of items being converted.
 
-use crate::core::{ComplexityMetrics, FileMetrics, FunctionMetrics, Language};
+use crate::core::ast::{ClassDef, MethodDef};
+use crate::core::{
+    ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
+    FunctionMetrics, Language, Priority,
+};
 use crate::extraction::types::{ExtractedFileData, ExtractedFunctionData, PurityLevel};
 use std::path::Path;
 
@@ -115,13 +119,172 @@ pub fn to_file_metrics(extracted: &ExtractedFileData) -> FileMetrics {
             cyclomatic_complexity: total_cyclomatic,
             cognitive_complexity: total_cognitive,
         },
-        debt_items: vec![], // Populated by debt detection phase
-        dependencies: vec![],
+        debt_items: debt_items_from_extracted(extracted),
+        dependencies: dependencies_from_imports(extracted),
         duplications: vec![],
         total_lines: extracted.total_lines,
         module_scope: None,
-        classes: None,
+        classes: classes_from_extracted(extracted),
     }
+}
+
+fn dependencies_from_imports(extracted: &ExtractedFileData) -> Vec<Dependency> {
+    extracted
+        .imports
+        .iter()
+        .map(|import| Dependency {
+            name: import.path.clone(),
+            kind: DependencyKind::Import,
+        })
+        .collect()
+}
+
+fn classes_from_extracted(extracted: &ExtractedFileData) -> Option<Vec<ClassDef>> {
+    if !matches!(Language::from_path(&extracted.path), Language::Python)
+        || extracted.structs.is_empty()
+    {
+        return None;
+    }
+
+    let classes = extracted
+        .structs
+        .iter()
+        .map(|class_data| {
+            let methods = extracted
+                .impls
+                .iter()
+                .find(|impl_data| impl_data.type_name == class_data.name)
+                .map(|impl_data| {
+                    impl_data
+                        .methods
+                        .iter()
+                        .map(|method| MethodDef {
+                            name: method.name.clone(),
+                            is_abstract: false,
+                            decorators: Vec::new(),
+                            overrides_base: false,
+                            line: method.line,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            ClassDef {
+                name: class_data.name.clone(),
+                base_classes: Vec::new(),
+                methods,
+                is_abstract: false,
+                decorators: Vec::new(),
+                line: class_data.line,
+            }
+        })
+        .collect();
+
+    Some(classes)
+}
+
+fn debt_items_from_extracted(extracted: &ExtractedFileData) -> Vec<DebtItem> {
+    extracted
+        .detected_patterns
+        .iter()
+        .map(|pattern| match pattern {
+            crate::extraction::types::DetectedPattern::GodObject { name, field_count } => {
+                DebtItem {
+                    id: format!("pattern-god-object-{}-{}", extracted.path.display(), name),
+                    debt_type: DebtType::GodObject {
+                        methods: 0,
+                        fields: Some(*field_count as u32),
+                        responsibilities: 0,
+                        god_object_score: *field_count as f64,
+                        lines: 0,
+                    },
+                    priority: Priority::High,
+                    file: extracted.path.clone(),
+                    line: line_for_struct(extracted, name),
+                    column: None,
+                    message: format!(
+                        "Potential god object '{}' with {} fields",
+                        name, field_count
+                    ),
+                    context: None,
+                }
+            }
+            crate::extraction::types::DetectedPattern::LongFunction { name, lines } => DebtItem {
+                id: format!(
+                    "pattern-long-function-{}-{}",
+                    extracted.path.display(),
+                    name
+                ),
+                debt_type: DebtType::CodeSmell {
+                    smell_type: Some("LongFunction".to_string()),
+                },
+                priority: Priority::Medium,
+                file: extracted.path.clone(),
+                line: line_for_function(extracted, name),
+                column: None,
+                message: format!("Function '{}' is long ({} lines)", name, lines),
+                context: None,
+            },
+            crate::extraction::types::DetectedPattern::ManyParameters { name, param_count } => {
+                DebtItem {
+                    id: format!(
+                        "pattern-many-parameters-{}-{}",
+                        extracted.path.display(),
+                        name
+                    ),
+                    debt_type: DebtType::CodeSmell {
+                        smell_type: Some("ManyParameters".to_string()),
+                    },
+                    priority: Priority::Medium,
+                    file: extracted.path.clone(),
+                    line: line_for_function(extracted, name),
+                    column: None,
+                    message: format!("Function '{}' has many parameters ({})", name, param_count),
+                    context: None,
+                }
+            }
+            crate::extraction::types::DetectedPattern::DeepNesting {
+                function_name,
+                depth,
+            } => DebtItem {
+                id: format!(
+                    "pattern-deep-nesting-{}-{}",
+                    extracted.path.display(),
+                    function_name
+                ),
+                debt_type: DebtType::CodeSmell {
+                    smell_type: Some("DeepNesting".to_string()),
+                },
+                priority: Priority::Medium,
+                file: extracted.path.clone(),
+                line: line_for_function(extracted, function_name),
+                column: None,
+                message: format!(
+                    "Function '{}' has deep nesting (depth {})",
+                    function_name, depth
+                ),
+                context: None,
+            },
+        })
+        .collect()
+}
+
+fn line_for_function(extracted: &ExtractedFileData, name: &str) -> usize {
+    extracted
+        .functions
+        .iter()
+        .find(|func| func.name == name || func.qualified_name == name)
+        .map(|func| func.line)
+        .unwrap_or(1)
+}
+
+fn line_for_struct(extracted: &ExtractedFileData, name: &str) -> usize {
+    extracted
+        .structs
+        .iter()
+        .find(|item| item.name == name)
+        .map(|item| item.line)
+        .unwrap_or(1)
 }
 
 /// Convert all extracted files to function metrics.
@@ -230,6 +393,43 @@ mod tests {
             imports: vec![],
             total_lines: 50,
             detected_patterns: vec![],
+            test_lines: 0,
+        }
+    }
+
+    fn create_python_test_file_data() -> ExtractedFileData {
+        ExtractedFileData {
+            path: PathBuf::from("src/test.py"),
+            functions: vec![
+                create_test_function("foo", 1, 5),
+                create_test_function("bar", 20, 3),
+            ],
+            structs: vec![crate::extraction::types::ExtractedStructData {
+                name: "Widget".to_string(),
+                line: 30,
+                fields: vec![],
+                is_public: true,
+            }],
+            impls: vec![crate::extraction::types::ExtractedImplData {
+                type_name: "Widget".to_string(),
+                trait_name: None,
+                methods: vec![crate::extraction::types::MethodInfo {
+                    name: "render".to_string(),
+                    line: 31,
+                    is_public: true,
+                }],
+                line: 30,
+            }],
+            imports: vec![crate::extraction::types::ImportInfo {
+                path: "os".to_string(),
+                alias: None,
+                is_glob: false,
+            }],
+            total_lines: 50,
+            detected_patterns: vec![crate::extraction::types::DetectedPattern::ManyParameters {
+                name: "foo".to_string(),
+                param_count: 6,
+            }],
             test_lines: 0, // Spec 214
         }
     }
@@ -263,6 +463,21 @@ mod tests {
         assert!(metrics.is_trait_method);
         assert!(metrics.in_test_module);
         assert_eq!(metrics.visibility, Some("pub(crate)".to_string()));
+    }
+
+    #[test]
+    fn test_to_file_metrics_preserves_extracted_metadata() {
+        let metrics = to_file_metrics(&create_python_test_file_data());
+
+        assert_eq!(metrics.dependencies.len(), 1);
+        assert_eq!(metrics.dependencies[0].name, "os");
+        assert_eq!(metrics.debt_items.len(), 1);
+        assert!(metrics.classes.is_some());
+        assert_eq!(metrics.classes.as_ref().unwrap()[0].name, "Widget");
+        assert_eq!(
+            metrics.classes.as_ref().unwrap()[0].methods[0].name,
+            "render"
+        );
     }
 
     #[test]

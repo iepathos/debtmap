@@ -5,7 +5,7 @@
 use crate::analyzers::Analyzer;
 use crate::complexity::threshold_manager::{ComplexityThresholds, ThresholdPreset};
 use crate::core::ast::Ast;
-use crate::core::{ComplexityMetrics, FileMetrics, Language};
+use crate::core::{ComplexityMetrics, DebtItem, DebtType, FileMetrics, Language, Priority};
 use anyhow::Result;
 use std::path::PathBuf;
 use tracing::{debug, debug_span};
@@ -97,7 +97,10 @@ impl Analyzer for PythonAnalyzer {
                             path: py_ast.path.clone(),
                             language: Language::Python,
                             complexity: ComplexityMetrics::default(),
-                            debt_items: vec![],
+                            debt_items: vec![python_extraction_failure(
+                                &py_ast.path,
+                                &e.to_string(),
+                            )],
                             dependencies: vec![],
                             duplications: vec![],
                             total_lines: py_ast.source.lines().count(),
@@ -126,6 +129,21 @@ impl Analyzer for PythonAnalyzer {
     }
 }
 
+fn python_extraction_failure(path: &std::path::Path, error: &str) -> DebtItem {
+    DebtItem {
+        id: format!("python-extraction-failure-{}", path.display()),
+        debt_type: DebtType::CodeSmell {
+            smell_type: Some("PythonExtractionFailure".to_string()),
+        },
+        priority: Priority::High,
+        file: path.to_path_buf(),
+        line: 1,
+        column: None,
+        message: "Python analysis failed during extraction".to_string(),
+        context: Some(error.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,5 +163,13 @@ mod tests {
         let result = analyzer.parse(content, path);
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), Ast::Python(_)));
+    }
+
+    #[test]
+    fn test_python_extraction_failure_creates_debt_item() {
+        let item = python_extraction_failure(std::path::Path::new("broken.py"), "boom");
+        assert_eq!(item.priority, Priority::High);
+        assert_eq!(item.line, 1);
+        assert!(item.context.as_deref().unwrap().contains("boom"));
     }
 }
