@@ -71,20 +71,30 @@ impl UnifiedFileExtractor {
     ///
     /// Returns an error if the file cannot be parsed.
     pub fn extract(path: &Path, content: &str) -> Result<ExtractedFileData> {
-        let ast = syn::parse_file(content)
-            .map_err(|e| anyhow::anyhow!("Parse error in {}: {}", path.display(), e))?;
+        let language = crate::core::Language::from_path(path);
 
-        let mut extractor = Self {
-            line_count: content.lines().count(),
-            test_lines: 0,
-        };
+        match language {
+            crate::core::Language::Python => {
+                let ast = crate::analyzers::python::parse_source(content, path)?;
+                crate::extraction::python::PythonExtractor::extract(&ast)
+            }
+            _ => {
+                let ast = syn::parse_file(content)
+                    .map_err(|e| anyhow::anyhow!("Parse error in {}: {}", path.display(), e))?;
 
-        let data = extractor.extract_from_ast(path, &ast);
+                let mut extractor = Self {
+                    line_count: content.lines().count(),
+                    test_lines: 0,
+                };
 
-        // Reset SourceMap to prevent overflow
-        reset_span_locations();
+                let data = extractor.extract_from_ast(path, &ast);
 
-        Ok(data)
+                // Reset SourceMap to prevent overflow
+                reset_span_locations();
+
+                Ok(data)
+            }
+        }
     }
 
     /// Extract from multiple files in parallel with batched SourceMap resets.

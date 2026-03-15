@@ -161,8 +161,7 @@ fn test_language_from_extension_rust() {
 
 #[test]
 fn test_language_from_extension_python() {
-    // Python support removed in spec 191
-    assert_eq!(Language::from_extension("py"), Language::Unknown);
+    assert_eq!(Language::from_extension("py"), Language::Python);
 }
 
 #[test]

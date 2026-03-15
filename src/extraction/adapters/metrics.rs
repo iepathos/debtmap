@@ -109,7 +109,7 @@ pub fn to_file_metrics(extracted: &ExtractedFileData) -> FileMetrics {
 
     FileMetrics {
         path: extracted.path.clone(),
-        language: Language::Rust,
+        language: Language::from_path(&extracted.path),
         complexity: ComplexityMetrics {
             functions,
             cyclomatic_complexity: total_cyclomatic,

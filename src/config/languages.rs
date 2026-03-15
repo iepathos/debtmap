@@ -47,9 +47,9 @@ impl Default for LanguageFeatures {
     }
 }
 
-// Default feature flags - all enabled except Rust dead code detection
+// Default feature flags - dead code detection disabled by default (spec 191)
 pub fn default_detect_dead_code() -> bool {
-    true // Will be overridden for Rust
+    false
 }
 
 pub fn default_detect_complexity() -> bool {

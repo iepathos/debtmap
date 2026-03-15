@@ -191,11 +191,24 @@ pub struct RustAst {
     pub source: String,
 }
 
-// Stub for removed Python AST support
-#[derive(Clone, Debug)]
+/// Python AST wrapper
+#[derive(Clone)]
 pub struct PythonAst {
+    /// The tree-sitter parse tree
+    pub tree: tree_sitter::Tree,
+    /// Path to the source file
     pub path: PathBuf,
+    /// Original source code
     pub source: String,
+}
+
+impl std::fmt::Debug for PythonAst {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PythonAst")
+            .field("path", &self.path)
+            .field("source_len", &self.source.len())
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug)]

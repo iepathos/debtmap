@@ -105,7 +105,7 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
             languages_config
                 .and_then(|lc| lc.rust.clone())
                 .unwrap_or(LanguageFeatures {
-                    detect_dead_code: false, // Rust dead code detection disabled by default
+                    detect_dead_code: false, // Explicitly disabled for Rust
                     detect_complexity: true,
                     detect_duplication: true,
                 })
@@ -114,13 +114,8 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
             .and_then(|lc| lc.python.clone())
             .unwrap_or_default(),
         Language::JavaScript | Language::TypeScript => {
-            // JS/TS uses same defaults as Python for now
-            // TODO: Add specific JS/TS config in LanguagesConfig
-            LanguageFeatures {
-                detect_dead_code: false,
-                detect_complexity: true,
-                detect_duplication: true,
-            }
+            // JS/TS also uses defaults (dead code: false)
+            LanguageFeatures::default()
         }
         Language::Unknown => LanguageFeatures::default(),
     }

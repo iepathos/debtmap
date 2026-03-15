@@ -35,6 +35,7 @@ pub mod function_registry;
 pub mod io_detector;
 pub mod macro_definition_collector;
 pub mod purity_detector;
+pub mod python;
 pub mod rust;
 pub mod rust_call_graph;
 pub mod rust_complexity_calculation;
@@ -112,6 +113,13 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
         (Language::Rust, || {
             let mut analyzer = rust::RustAnalyzer::new();
             // Check environment variable for functional analysis (spec 111)
+            if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
+                analyzer = analyzer.with_functional_analysis(true);
+            }
+            Box::new(analyzer)
+        }),
+        (Language::Python, || {
+            let mut analyzer = python::PythonAnalyzer::new();
             if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
                 analyzer = analyzer.with_functional_analysis(true);
             }

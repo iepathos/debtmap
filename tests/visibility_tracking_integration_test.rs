@@ -240,18 +240,19 @@ fn test_visibility_integration_preserves_other_counts() {
 }
 
 #[test]
-fn test_non_rust_files_still_work() {
-    // Test that non-Rust files don't break (backward compatibility)
+fn test_python_files_work() {
+    // Test that Python files work with the unified extractor
     let code = r#"
-        def function1():
-            pass
-        def function2():
-            pass
-    "#;
+def function1():
+    pass
+def function2():
+    pass
+"#;
 
     let path = Path::new("test.py");
-    // Non-Rust files will fail to parse, which is expected
-    // This should return an error, not panic
+    // Python files now have full support
     let result = UnifiedFileExtractor::extract(path, code);
-    assert!(result.is_err(), "Python code should fail to parse as Rust");
+    assert!(result.is_ok(), "Python code should now parse correctly");
+    let data = result.unwrap();
+    assert_eq!(data.functions.len(), 2);
 }

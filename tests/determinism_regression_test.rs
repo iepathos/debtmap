@@ -204,3 +204,53 @@ const arrow = () => common();
         );
     }
 }
+
+#[test]
+fn test_python_extraction_determinism() {
+    use debtmap::analyzers::python::parser::parse_source;
+    use debtmap::extraction::python::PythonExtractor;
+    use std::path::PathBuf;
+
+    let source = r#"
+def common():
+    return 1
+
+class Test:
+    def common(self):
+        return 2
+
+def other():
+    common()
+    t = Test()
+    t.common()
+"#;
+    let path = PathBuf::from("test.py");
+
+    let mut results = Vec::new();
+    for _ in 0..10 {
+        let ast = parse_source(source, &path).unwrap();
+        let data = PythonExtractor::extract(&ast).unwrap();
+
+        let func_data: Vec<_> = data
+            .functions
+            .iter()
+            .map(|f| (f.name.clone(), f.line, f.cyclomatic))
+            .collect();
+        let import_data: Vec<_> = data.imports.iter().map(|i| i.path.clone()).collect();
+        results.push((func_data, import_data));
+    }
+
+    let (first_funcs, first_imports) = &results[0];
+    for (i, (other_funcs, other_imports)) in results.iter().enumerate().skip(1) {
+        assert_eq!(
+            first_funcs, other_funcs,
+            "Python function extraction non-deterministic at iteration {}",
+            i
+        );
+        assert_eq!(
+            first_imports, other_imports,
+            "Python import extraction non-deterministic at iteration {}",
+            i
+        );
+    }
+}

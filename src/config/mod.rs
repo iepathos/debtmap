@@ -540,7 +540,7 @@ interface_weight = 0.15
     #[test]
     fn test_language_features_default() {
         let features = LanguageFeatures::default();
-        assert!(features.detect_dead_code);
+        assert!(!features.detect_dead_code);
         assert!(features.detect_complexity);
         assert!(features.detect_duplication);
     }
@@ -612,7 +612,7 @@ interface_weight = 0.15
     fn test_get_language_features_python() {
         use crate::core::Language;
         let features = get_language_features(&Language::Python);
-        assert!(features.detect_dead_code);
+        assert!(!features.detect_dead_code);
         assert!(features.detect_complexity);
         assert!(features.detect_duplication);
     }
@@ -621,7 +621,7 @@ interface_weight = 0.15
     fn test_get_language_features_unknown() {
         use crate::core::Language;
         let features = get_language_features(&Language::Unknown);
-        assert!(features.detect_dead_code);
+        assert!(!features.detect_dead_code);
         assert!(features.detect_complexity);
         assert!(features.detect_duplication);
     }
@@ -682,7 +682,7 @@ interface_weight = 0.15
     #[test]
     fn test_default_language_feature_functions() {
         use crate::config::languages::*;
-        assert!(default_detect_dead_code());
+        assert!(!default_detect_dead_code());
         assert!(default_detect_complexity());
         assert!(default_detect_duplication());
     }
