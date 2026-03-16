@@ -21,3 +21,21 @@
 **Success Criteria**: Relevant cargo tests pass and the plan reflects completed stages.
 **Tests**: Targeted `cargo test` filters for Python analyzer/adapters, TypeScript analyzer/module structure, and Rust analyzer behavior.
 **Status**: Complete
+
+## Stage 5: Complete JS/TS Function Classification
+**Goal**: Remove placeholder behavior from TypeScript function extraction where supported kinds are defined but never emitted.
+**Success Criteria**: Class constructors are classified as `FunctionKind::Constructor` and covered by focused visitor tests.
+**Tests**: TypeScript function-analysis tests for constructor extraction and kind classification.
+**Status**: Complete
+
+## Stage 6: Restore JS/TS Structural Signals
+**Goal**: Stop discarding parsed JS/TS dependency and facade information in module-structure analysis.
+**Success Criteria**: JS/TS module structure includes a populated dependency graph for imports/re-exports and computes facade metadata from barrel-style exports.
+**Tests**: Module-structure tests covering imports, re-exports, dependency edges, and facade detection.
+**Status**: Complete
+
+## Stage 7: Honor TS Threshold Configuration
+**Goal**: Make TypeScript AST analysis reflect configured complexity thresholds instead of ignoring them.
+**Success Criteria**: Converted `FunctionMetrics` include threshold-derived analysis metadata that changes with strict vs lenient threshold configurations.
+**Tests**: Visitor tests comparing threshold-sensitive analysis output across different presets.
+**Status**: Complete

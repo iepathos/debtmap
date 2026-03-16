@@ -255,7 +255,7 @@ fn analyze_method_definition(
     let name = get_method_name(node, ast)?;
     let line = node_line(node);
 
-    let kind = determine_method_kind(node, in_class);
+    let kind = determine_method_kind(node, ast, in_class);
 
     let mut metrics = JsFunctionMetrics::new(
         if let Some(cn) = class_name {
@@ -550,7 +550,7 @@ fn has_async_modifier(node: &Node) -> bool {
     result
 }
 
-fn determine_method_kind(node: &Node, in_class: bool) -> FunctionKind {
+fn determine_method_kind(node: &Node, ast: &TypeScriptAst, in_class: bool) -> FunctionKind {
     let mut cursor = node.walk();
 
     // Check for getter/setter
@@ -565,8 +565,10 @@ fn determine_method_kind(node: &Node, in_class: bool) -> FunctionKind {
     // Check for constructor
     if let Some(name) = node.child_by_field_name("name") {
         let kind = name.kind();
-        if kind == "property_identifier" || kind == "identifier" {
-            // We'd need to check the text but this is just for kind determination
+        if (kind == "property_identifier" || kind == "identifier")
+            && node_text(&name, &ast.source) == "constructor"
+        {
+            return FunctionKind::Constructor;
         }
     }
 
@@ -667,6 +669,12 @@ class Greeter {
 
         // Should find constructor and greet method
         assert!(functions.len() >= 2);
+        assert!(
+            functions
+                .iter()
+                .any(|function| function.kind == FunctionKind::Constructor),
+            "class constructor should be classified as Constructor"
+        );
     }
 
     #[test]
@@ -817,6 +825,7 @@ function validate(a, b, c, d, e) {
     #[test]
     fn test_purity_flows_to_function_metrics() {
         use crate::analyzers::typescript::visitor::helpers::convert_to_function_metrics;
+        use crate::complexity::threshold_manager::ComplexityThresholds;
         use crate::core::PurityLevel;
 
         // Test that purity data flows from JsFunctionMetrics to FunctionMetrics
@@ -827,7 +836,8 @@ function validate(a, b, c, d, e) {
         let js_functions = extract_functions(&ast, false);
         assert_eq!(js_functions.len(), 1);
 
-        let function_metrics = convert_to_function_metrics(&js_functions[0]);
+        let function_metrics =
+            convert_to_function_metrics(&js_functions[0], &ComplexityThresholds::default());
 
         // Verify purity data was transferred
         assert_eq!(

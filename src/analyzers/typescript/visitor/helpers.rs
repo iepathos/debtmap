@@ -3,8 +3,9 @@
 //! Provides complexity calculation and conversion utilities.
 
 use crate::analyzers::typescript::parser::node_text;
-use crate::analyzers::typescript::types::JsFunctionMetrics;
+use crate::analyzers::typescript::types::{FunctionKind, JsFunctionMetrics};
 use crate::complexity::entropy_core::{EntropyAnalysis, EntropyConfig};
+use crate::complexity::threshold_manager::{ComplexityLevel, ComplexityThresholds, FunctionRole};
 use crate::core::FunctionMetrics;
 use tree_sitter::Node;
 
@@ -248,7 +249,10 @@ pub fn is_test_function(name: &str) -> bool {
 }
 
 /// Convert JS-specific metrics to standard FunctionMetrics
-pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMetrics {
+pub fn convert_to_function_metrics(
+    js_metrics: &JsFunctionMetrics,
+    thresholds: &ComplexityThresholds,
+) -> FunctionMetrics {
     use crate::core::PurityLevel;
 
     // Create entropy analysis from raw score if available
@@ -269,7 +273,7 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         Some(js_metrics.impurity_reasons.join(", "))
     };
 
-    FunctionMetrics {
+    let mut metrics = FunctionMetrics {
         name: js_metrics.name.clone(),
         file: js_metrics.file.clone(),
         line: js_metrics.line,
@@ -293,25 +297,93 @@ pub fn convert_to_function_metrics(js_metrics: &JsFunctionMetrics) -> FunctionMe
         upstream_callers: None,
         downstream_callees: None,
         mapping_pattern_result: None,
-        adjusted_complexity: None,
+        adjusted_complexity: Some(calculate_adjusted_complexity(js_metrics, thresholds)),
         composition_metrics: None,
         language_specific: None,
         purity_level: js_metrics.purity_level,
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis,
-        detected_patterns: if js_metrics.functional_chains.is_empty() {
-            None
-        } else {
-            Some(
-                js_metrics
-                    .functional_chains
-                    .iter()
-                    .map(|chain| format!("functional-chain:{}", chain.methods.join("->")))
-                    .collect(),
-            )
-        },
+        detected_patterns: None,
+    };
+
+    let detected_patterns = build_detected_patterns(js_metrics, thresholds, &metrics);
+    metrics.detected_patterns = (!detected_patterns.is_empty()).then_some(detected_patterns);
+
+    metrics
+}
+
+fn build_detected_patterns(
+    js_metrics: &JsFunctionMetrics,
+    thresholds: &ComplexityThresholds,
+    metrics: &FunctionMetrics,
+) -> Vec<String> {
+    let mut patterns: Vec<String> = js_metrics
+        .functional_chains
+        .iter()
+        .map(|chain| format!("functional-chain:{}", chain.methods.join("->")))
+        .collect();
+
+    let role = classify_function_role(js_metrics);
+    if thresholds.should_flag_function(metrics, role.clone()) {
+        let level = match thresholds.get_complexity_level(metrics) {
+            ComplexityLevel::Trivial => "trivial",
+            ComplexityLevel::Moderate => "moderate",
+            ComplexityLevel::High => "high",
+            ComplexityLevel::Excessive => "excessive",
+        };
+        patterns.push(format!("threshold-exceeded:{level}"));
     }
+
+    if metrics.cyclomatic >= thresholds.minimum_cyclomatic_complexity {
+        patterns.push("cyclomatic-threshold-exceeded".to_string());
+    }
+
+    if metrics.cognitive >= thresholds.minimum_cognitive_complexity {
+        patterns.push("cognitive-threshold-exceeded".to_string());
+    }
+
+    if metrics.length >= thresholds.minimum_function_length {
+        patterns.push("length-threshold-exceeded".to_string());
+    }
+
+    patterns
+}
+
+fn classify_function_role(js_metrics: &JsFunctionMetrics) -> FunctionRole {
+    if js_metrics.is_test {
+        return FunctionRole::Test;
+    }
+
+    if js_metrics.name == "main"
+        || js_metrics.name.ends_with("_handler")
+        || js_metrics.name.starts_with("handle_")
+    {
+        return FunctionRole::EntryPoint;
+    }
+
+    if matches!(
+        js_metrics.kind,
+        FunctionKind::Getter | FunctionKind::Setter | FunctionKind::Constructor
+    ) {
+        return FunctionRole::Utility;
+    }
+
+    FunctionRole::from_name(
+        js_metrics
+            .name
+            .rsplit("::")
+            .next()
+            .unwrap_or(&js_metrics.name),
+    )
+}
+
+fn calculate_adjusted_complexity(
+    js_metrics: &JsFunctionMetrics,
+    thresholds: &ComplexityThresholds,
+) -> f64 {
+    let baseline = thresholds.minimum_total_complexity.max(1) as f64;
+    (js_metrics.cyclomatic + js_metrics.cognitive) as f64 / baseline
 }
 
 #[cfg(test)]
@@ -428,10 +500,54 @@ function foo(a, b, c) {
             FunctionKind::Declaration,
         );
 
-        let metrics = convert_to_function_metrics(&js_metrics);
+        let metrics = convert_to_function_metrics(&js_metrics, &ComplexityThresholds::default());
 
         assert_eq!(metrics.name, "test");
         assert_eq!(metrics.line, 10);
         assert_eq!(metrics.cyclomatic, 1);
+    }
+
+    #[test]
+    fn test_convert_to_function_metrics_honors_thresholds() {
+        use crate::complexity::threshold_manager::ThresholdPreset;
+
+        let mut js_metrics = JsFunctionMetrics::new(
+            "handle_request".to_string(),
+            PathBuf::from("test.ts"),
+            5,
+            FunctionKind::Declaration,
+        );
+        js_metrics.cyclomatic = 4;
+        js_metrics.cognitive = 4;
+        js_metrics.length = 18;
+
+        let strict = ComplexityThresholds::from_preset(ThresholdPreset::Strict);
+        let lenient = ComplexityThresholds::from_preset(ThresholdPreset::Lenient);
+
+        let strict_metrics = convert_to_function_metrics(&js_metrics, &strict);
+        let lenient_metrics = convert_to_function_metrics(&js_metrics, &lenient);
+
+        assert!(
+            strict_metrics
+                .detected_patterns
+                .as_ref()
+                .is_some_and(|patterns| patterns
+                    .iter()
+                    .any(|pattern| pattern.starts_with("threshold-exceeded:"))),
+            "strict thresholds should flag this function"
+        );
+        assert!(
+            lenient_metrics
+                .detected_patterns
+                .as_ref()
+                .is_none_or(|patterns| patterns
+                    .iter()
+                    .all(|pattern| !pattern.starts_with("threshold-exceeded:"))),
+            "lenient thresholds should not flag this function"
+        );
+        assert_ne!(
+            strict_metrics.adjusted_complexity,
+            lenient_metrics.adjusted_complexity
+        );
     }
 }

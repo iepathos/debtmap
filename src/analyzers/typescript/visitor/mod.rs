@@ -34,7 +34,7 @@ pub fn analyze_ast(
     // Convert to standard function metrics for compatibility
     let functions: Vec<FunctionMetrics> = js_functions
         .iter()
-        .map(convert_to_function_metrics)
+        .map(|metrics| convert_to_function_metrics(metrics, _thresholds))
         .collect();
 
     AnalysisResult {
