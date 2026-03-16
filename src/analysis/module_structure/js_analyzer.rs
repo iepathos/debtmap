@@ -241,7 +241,7 @@ fn collect_reexports(
             reexports.push(PathDeclaration {
                 module_name,
                 file_path,
-                line: node_line(&node),
+                line: node_line(node),
             });
         }
     }

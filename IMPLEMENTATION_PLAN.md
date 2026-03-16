@@ -39,3 +39,15 @@
 **Success Criteria**: Converted `FunctionMetrics` include threshold-derived analysis metadata that changes with strict vs lenient threshold configurations.
 **Tests**: Visitor tests comparing threshold-sensitive analysis output across different presets.
 **Status**: Complete
+
+## Stage 8: Honor Python Analyzer Configuration
+**Goal**: Remove dead Python analyzer knobs by making thresholds and functional-analysis settings affect output.
+**Success Criteria**: Python analysis emits threshold-derived metadata and complexity debt items, and functional-analysis settings change detected patterns.
+**Tests**: Python analyzer tests for threshold-sensitive debt output and functional-pattern detection.
+**Status**: Complete
+
+## Stage 9: Restore Python Structural Signals
+**Goal**: Stop returning placeholder dependency and facade data from Python module-structure analysis.
+**Success Criteria**: Python module structure includes dependency graph edges from extracted imports and computes package-facade metadata for `__init__.py`-style modules.
+**Tests**: Python module-structure tests covering imports, dependency edges, and facade detection.
+**Status**: Complete
