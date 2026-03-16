@@ -51,3 +51,9 @@
 **Success Criteria**: Python module structure includes dependency graph edges from extracted imports and computes package-facade metadata for `__init__.py`-style modules.
 **Tests**: Python module-structure tests covering imports, dependency edges, and facade detection.
 **Status**: Complete
+
+## Stage 10: Restore Rust Structural Coupling
+**Goal**: Replace placeholder Rust module-structure dependency graphs with real AST-derived coupling data.
+**Success Criteria**: Rust module structure includes component/module dependency edges and non-placeholder coupling scores derived from imports and local references.
+**Tests**: Rust module-structure tests covering imports, local type references, and populated dependency edges.
+**Status**: Complete
