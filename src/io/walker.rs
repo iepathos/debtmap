@@ -38,6 +38,8 @@ impl FileWalker {
         let walker = WalkBuilder::new(&self.root)
             .hidden(false)
             .git_ignore(true)
+            .require_git(false)
+            .filter_entry(|entry| !is_git_metadata(entry.path()))
             .build();
 
         for entry in walker {
@@ -92,6 +94,11 @@ impl FileWalker {
             false
         }
     }
+}
+
+fn is_git_metadata(path: &Path) -> bool {
+    path.components()
+        .any(|component| component.as_os_str() == ".git")
 }
 
 pub fn find_project_files(root: &Path, languages: Vec<Language>) -> Result<Vec<PathBuf>> {
@@ -182,6 +189,11 @@ mod tests {
         let mut bench_file = fs::File::create(root.join("benches/bench.rs")).unwrap();
         writeln!(bench_file, "fn bench() {{}}").unwrap();
 
+        fs::create_dir_all(root.join(".git/worktrees/feature/src")).unwrap();
+        let mut git_worktree_file =
+            fs::File::create(root.join(".git/worktrees/feature/src/duplicate.rs")).unwrap();
+        writeln!(git_worktree_file, "fn duplicate() {{}}").unwrap();
+
         (temp_dir, root)
     }
 
@@ -260,6 +272,39 @@ mod tests {
         assert!(file_names.contains(&"bench.rs".to_string()));
         assert!(!file_names.contains(&"test_main.rs".to_string()));
         assert!(!file_names.contains(&"foo.test.rs".to_string()));
+    }
+
+    #[test]
+    fn test_walk_skips_git_worktree_metadata() {
+        let (_temp_dir, root) = create_test_project();
+
+        let walker = FileWalker::new(root).with_languages(vec![Language::Rust]);
+        let files = walker.walk().unwrap();
+
+        assert!(
+            files
+                .iter()
+                .all(|path| !path.to_string_lossy().contains(".git/worktrees")),
+            "Git metadata paths should not be analyzed: {files:?}"
+        );
+    }
+
+    #[test]
+    fn test_walk_honors_gitignore_patterns_for_rust_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path().to_path_buf();
+
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join("generated")).unwrap();
+        fs::write(root.join("src/main.rs"), "fn main() {}").unwrap();
+        fs::write(root.join("generated/ignored.rs"), "fn ignored() {}").unwrap();
+        fs::write(root.join(".gitignore"), "generated/\n").unwrap();
+
+        let walker = FileWalker::new(root).with_languages(vec![Language::Rust]);
+        let files = walker.walk().unwrap();
+
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("src/main.rs"));
     }
 
     #[test]

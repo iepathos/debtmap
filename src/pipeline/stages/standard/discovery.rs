@@ -4,6 +4,7 @@
 
 use crate::core::Language;
 use crate::errors::AnalysisError;
+use crate::io::walker::FileWalker;
 use crate::pipeline::data::PipelineData;
 use crate::pipeline::stage::Stage;
 use std::path::{Path, PathBuf};
@@ -40,75 +41,22 @@ impl Stage for FileDiscoveryStage {
     }
 }
 
-// =============================================================================
-// Pure Predicates
-// =============================================================================
-
-/// Check if a path has one of the specified extensions.
-///
-/// Pure function: path + extensions in, boolean out.
-fn matches_extension(path: &Path, extensions: &[&str]) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| extensions.contains(&ext))
-        .unwrap_or(false)
-}
-
-// =============================================================================
-// I/O - File Discovery
-// =============================================================================
-
 /// Discover source files in the given path.
 ///
-/// Walks the directory tree and filters files by extension.
-///
-/// debtmap:ignore[testing] - I/O shell using WalkDir for filesystem traversal.
-/// Pure predicate `matches_extension` is extracted and tested. Remaining logic
-/// is directory walking orchestration that requires filesystem fixtures to test.
-fn discover_files(path: &Path, _languages: &[Language]) -> Result<Vec<PathBuf>, AnalysisError> {
-    use walkdir::WalkDir;
-
-    let mut files = Vec::new();
-
-    // For now, only support Rust files
-    let extensions = ["rs"];
-
-    let mut skipped_count = 0;
-    for entry in WalkDir::new(path)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| match e {
-            Ok(entry) => Some(entry),
-            Err(err) => {
-                if skipped_count < 10 {
-                    eprintln!("Warning: Skipping directory entry: {}", err);
-                }
-                skipped_count += 1;
-                None
-            }
-        })
-    {
-        if entry.file_type().is_file() {
-            let file_path = entry.path();
-            if matches_extension(file_path, &extensions) {
-                files.push(file_path.to_path_buf());
-            }
-        }
-    }
-
-    if skipped_count > 10 {
-        eprintln!(
-            "Warning: Skipped {} additional directory entries",
-            skipped_count - 10
-        );
-    }
-
-    Ok(files)
+/// debtmap:ignore[testing] - I/O shell delegates to `FileWalker`, which requires
+/// filesystem fixtures to exercise ignore handling and language filtering.
+fn discover_files(path: &Path, languages: &[Language]) -> Result<Vec<PathBuf>, AnalysisError> {
+    FileWalker::new(path.to_path_buf())
+        .with_languages(languages.to_vec())
+        .walk()
+        .map_err(AnalysisError::from)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_file_discovery_stage_creation() {
@@ -117,27 +65,37 @@ mod tests {
     }
 
     #[test]
-    fn matches_extension_rust_file() {
-        assert!(matches_extension(Path::new("foo.rs"), &["rs"]));
-        assert!(matches_extension(Path::new("/path/to/bar.rs"), &["rs"]));
+    fn discover_files_filters_to_requested_languages() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/main.rs"), "fn main() {}").unwrap();
+        fs::write(root.join("src/tool.py"), "def tool(): pass").unwrap();
+
+        let files = discover_files(root, &[Language::Rust]).unwrap();
+
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("src/main.rs"));
     }
 
     #[test]
-    fn matches_extension_non_rust_file() {
-        assert!(!matches_extension(Path::new("foo.py"), &["rs"]));
-        assert!(!matches_extension(Path::new("foo.rs.bak"), &["rs"]));
-    }
+    fn discover_files_skips_git_worktree_entries() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
 
-    #[test]
-    fn matches_extension_no_extension() {
-        assert!(!matches_extension(Path::new("Makefile"), &["rs"]));
-        assert!(!matches_extension(Path::new("/path/to/README"), &["rs"]));
-    }
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join(".git/worktrees/feature/src")).unwrap();
+        fs::write(root.join("src/main.rs"), "fn main() {}").unwrap();
+        fs::write(
+            root.join(".git/worktrees/feature/src/duplicate.rs"),
+            "fn duplicate() {}",
+        )
+        .unwrap();
 
-    #[test]
-    fn matches_extension_multiple_extensions() {
-        assert!(matches_extension(Path::new("foo.rs"), &["rs", "py", "js"]));
-        assert!(matches_extension(Path::new("foo.py"), &["rs", "py", "js"]));
-        assert!(!matches_extension(Path::new("foo.rb"), &["rs", "py", "js"]));
+        let files = discover_files(root, &[Language::Rust]).unwrap();
+
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("src/main.rs"));
     }
 }
