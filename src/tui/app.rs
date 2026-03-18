@@ -245,10 +245,11 @@ impl App {
                 ],
             ),
             // Stage 6: Debt scoring and prioritization (index 5 due to 0-based indexing)
-            // Breaks down the debt scoring process into 3 subsections:
+            // Breaks down the debt scoring process into 4 subsections:
             // 1. Aggregate debt from all sources
             // 2. Score individual functions based on debt
             // 3. Filter and rank results by severity (includes prioritization)
+            // 4. Finalize unified results and impact calculations
             PipelineStage::with_subtasks(
                 "debt scoring",
                 vec![
@@ -264,6 +265,11 @@ impl App {
                     },
                     SubTask {
                         name: "filter results".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "finalize results".to_string(),
                         status: StageStatus::Pending,
                         progress: None,
                     },

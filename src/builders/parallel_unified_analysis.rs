@@ -1231,11 +1231,21 @@ impl ParallelUnifiedAnalysisBuilder {
         coverage_data: Option<&LcovData>,
     ) -> (UnifiedAnalysis, AnalysisPhaseTimings) {
         let start = Instant::now();
+        let total_file_items = file_data.len();
 
         // Create progress spinner for final aggregation
         let agg_progress = ProgressManager::global()
             .map(|pm| pm.create_spinner("Aggregating analysis results"))
             .unwrap_or_else(indicatif::ProgressBar::hidden);
+
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(
+                5,
+                3,
+                crate::tui::app::StageStatus::Active,
+                Some((0, total_file_items.max(1))),
+            );
+        }
 
         let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
         unified.data_flow_graph = data_flow_graph;
@@ -1268,7 +1278,7 @@ impl ParallelUnifiedAnalysisBuilder {
         }
 
         // Add file items and create god object UnifiedDebtItems (spec 207)
-        for (file_item, raw_functions) in file_data {
+        for (index, (file_item, raw_functions)) in file_data.into_iter().enumerate() {
             // Check if this file has god object analysis
             if let Some(ref god_analysis) = file_item.metrics.god_object_analysis {
                 if god_analysis.is_god_object {
@@ -1291,6 +1301,7 @@ impl ParallelUnifiedAnalysisBuilder {
                         let file_item_with_deps =
                             enrich_file_item_with_dependencies(file_item, &unified.items);
                         unified.add_file_item(file_item_with_deps);
+                        update_finalization_subtask(index + 1, total_file_items);
                         continue;
                     }
 
@@ -1382,6 +1393,7 @@ impl ParallelUnifiedAnalysisBuilder {
             // Spec 201: Enrich file item with dependency metrics aggregated from function-level data
             let file_item_with_deps = enrich_file_item_with_dependencies(file_item, &unified.items);
             unified.add_file_item(file_item_with_deps);
+            update_finalization_subtask(index + 1, total_file_items);
         }
 
         agg_progress.set_message("Sorting by priority and calculating impact");
@@ -1395,6 +1407,15 @@ impl ParallelUnifiedAnalysisBuilder {
 
         if let Some(lcov) = coverage_data {
             unified.overall_coverage = Some(lcov.get_overall_coverage());
+        }
+
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(
+                5,
+                3,
+                crate::tui::app::StageStatus::Completed,
+                Some((total_file_items.max(1), total_file_items.max(1))),
+            );
         }
 
         agg_progress.finish_with_message(format!(
@@ -1437,6 +1458,22 @@ impl ParallelUnifiedAnalysisBuilder {
         }
 
         (unified, self.timings)
+    }
+}
+
+fn update_finalization_subtask(current: usize, total: usize) {
+    let Some(manager) = ProgressManager::global() else {
+        return;
+    };
+
+    let should_refresh = current == total || current == 1 || current % 10 == 0;
+    if should_refresh {
+        manager.tui_update_subtask(
+            5,
+            3,
+            crate::tui::app::StageStatus::Active,
+            Some((current, total.max(1))),
+        );
     }
 }
 
