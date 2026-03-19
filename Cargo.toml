@@ -97,7 +97,7 @@ tokio = { version = "1.50", features = ["rt", "rt-multi-thread"] }
 
 # File system
 walkdir = "2.5"
-ignore = "0.4"
+ignore = "0.4.25"
 
 # Output formatting
 colored = "3.0"
