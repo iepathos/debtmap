@@ -137,7 +137,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 # Git operations
 git2 = { version = "0.20", features = ["vendored-openssl"] }
 # openssl-sys/openssl-src are transitive deps; minimum 0.9.93 uses OpenSSL 3.x with Apple Silicon support
-openssl-sys = "0.9.93"
+openssl-sys = "0.9.112"
 openssl-src = "300"
 
 # Graph algorithms for taint analysis
