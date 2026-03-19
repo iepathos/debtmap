@@ -505,17 +505,21 @@ fn extract_field_functions(
                 .child_by_field_name("name")
                 .map(|n| node_text(&n, &ast.source).to_string());
 
-            let full_name = if let (Some(cn), Some(n)) = (class_name, &name) {
-                format!("{}::{}", cn, n)
-            } else {
-                name.unwrap_or_else(|| "<field>".to_string())
-            };
+            let full_name = field_full_name(class_name, name.as_deref());
 
             if let Some(mut metrics) = analyze_arrow_function(&value, ast, Some(full_name), false) {
                 metrics.kind = FunctionKind::Method;
                 functions.push(metrics);
             }
         }
+    }
+}
+
+fn field_full_name(class_name: Option<&str>, name: Option<&str>) -> String {
+    match (class_name, name) {
+        (Some(cn), Some(n)) => format!("{}::{}", cn, n),
+        (_, Some(n)) => n.to_string(),
+        _ => "<field>".to_string(),
     }
 }
 
