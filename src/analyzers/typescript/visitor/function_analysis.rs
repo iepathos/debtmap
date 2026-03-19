@@ -475,8 +475,8 @@ mod functional_analysis_tests {
         let source = r#"
 const transform = (items) => items.filter(x => x > 0).map(x => x * 2);
 "#;
-        let path = PathBuf::from("test.js");
-        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+        let path = PathBuf::from("test.ts");
+        let ast = parse_source(source, &path, JsLanguageVariant::TypeScript).unwrap();
 
         let disabled = extract_functions(&ast, false);
         let enabled = extract_functions(&ast, true);
@@ -616,8 +616,8 @@ mod tests {
     #[test]
     fn test_extract_function_declaration() {
         let source = "function hello() { return 'world'; }";
-        let path = PathBuf::from("test.js");
-        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+        let path = PathBuf::from("test.ts");
+        let ast = parse_source(source, &path, JsLanguageVariant::TypeScript).unwrap();
 
         let functions = extract_functions(&ast, false);
 
@@ -629,8 +629,8 @@ mod tests {
     #[test]
     fn test_extract_arrow_function() {
         let source = "const greet = (name) => `Hello ${name}`;";
-        let path = PathBuf::from("test.js");
-        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+        let path = PathBuf::from("test.ts");
+        let ast = parse_source(source, &path, JsLanguageVariant::TypeScript).unwrap();
 
         let functions = extract_functions(&ast, false);
 
@@ -660,6 +660,8 @@ class Greeter {
     constructor(name) {
         this.name = name;
     }
+
+    
 
     greet() {
         return `Hello ${this.name}`;
@@ -862,5 +864,18 @@ function validate(a, b, c, d, e) {
             function_metrics.purity_reason.is_some(),
             "purity_reason should be populated for impure functions"
         );
+    }
+
+    #[test]
+    fn test_field_full_name_helper() {
+        // With class and field name
+        assert_eq!(
+            super::field_full_name(Some("Greeter"), Some("greet")),
+            "Greeter::greet"
+        );
+        // Without class name, keep field name
+        assert_eq!(super::field_full_name(None, Some("greet")), "greet");
+        // Missing field name falls back to placeholder
+        assert_eq!(super::field_full_name(Some("Greeter"), None), "<field>");
     }
 }
