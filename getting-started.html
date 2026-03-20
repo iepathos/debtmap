@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -194,6 +194,7 @@
 <p><strong>Optional</strong> (for coverage-based risk analysis):</p>
 <ul>
 <li><strong>Rust projects</strong>: <code>cargo-tarpaulin</code> or <code>cargo-llvm-cov</code> for coverage data</li>
+<li><strong>Python projects</strong>: <code>pytest-cov</code> or another LCOV-compatible coverage tool</li>
 </ul>
 <h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
 <h3 id="quick-install-recommended"><a class="header" href="#quick-install-recommended">Quick Install (Recommended)</a></h3>
@@ -243,10 +244,14 @@ debtmap analyze . --format markdown
 debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # JSON output for programmatic access
-debtmap analyze . --format json --top 10 &gt; debt.json
+debtmap analyze . --format json --top 10 --output debt.json
 
 # With coverage data for accurate risk assessment
 cargo llvm-cov --lcov --output-path coverage.lcov
+debtmap analyze . --lcov coverage.lcov
+
+# Python coverage workflow
+pytest --cov=. --cov-report=lcov:coverage.lcov
 debtmap analyze . --lcov coverage.lcov
 
 # Show only critical/high priority items
@@ -261,8 +266,8 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for source files (Rust <code>.rs</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, JavaScript <code>.js</code>/<code>.jsx</code>)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for TypeScript/JavaScript</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, and TypeScript</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
@@ -356,6 +361,12 @@ cargo llvm-cov --lcov --output-path coverage.lcov
 
 # Or with cargo-tarpaulin
 cargo tarpaulin --out lcov --output-dir target/coverage
+
+# Analyze with coverage
+debtmap analyze . --lcov coverage.lcov
+</code></pre>
+<pre><code class="language-bash"># Python coverage with pytest-cov
+pytest --cov=. --cov-report=lcov:coverage.lcov
 
 # Analyze with coverage
 debtmap analyze . --lcov coverage.lcov
@@ -464,7 +475,7 @@ patterns = ["**/target/**", "**/tests/**"]
 </ul>
 <h3 id="analysis-issues"><a class="header" href="#analysis-issues">Analysis Issues</a></h3>
 <ul>
-<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code> for Rust, <code>.ts</code>/<code>.tsx</code> for TypeScript, <code>.js</code>/<code>.jsx</code> for JavaScript)</li>
+<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code>, <code>.py</code>, <code>.js</code>, <code>.jsx</code>, <code>.ts</code>, <code>.tsx</code>)</li>
 <li><strong>Parser failures</strong>: Run with <code>-vv</code> for debug output</li>
 <li><strong>Performance issues</strong>: Limit parallel jobs with <code>--jobs 4</code></li>
 <li><strong>Large codebase slowness</strong>: Use <code>--streaming</code> mode for O(1) memory overhead</li>

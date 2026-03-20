@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -189,7 +189,7 @@
 <h2 id="supported-languages"><a class="header" href="#supported-languages">Supported Languages</a></h2>
 <p><strong>Full Support (AST-Based Analysis):</strong></p>
 <ul>
-<li><strong>Rust</strong> - Full AST parsing with tree-sitter</li>
+<li><strong>Rust</strong> - Full AST parsing with <code>syn</code></li>
 <li><strong>Python</strong> - Full AST parsing with tree-sitter</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/types.rs:9-12</code> (Language enum) and <code>src/organization/language.rs:4-7</code></p>
@@ -205,7 +205,7 @@ pub enum Language {
 <p><strong>Language Detection</strong>: Debtmap determines file language by extension:</p>
 <ul>
 <li><code>.rs</code> files are analyzed as Rust</li>
-<li><code>.py</code> and <code>.pyw</code> files are analyzed as Python</li>
+<li><code>.py</code> files are analyzed as Python</li>
 </ul>
 <p><strong>Source</strong>: <code>src/organization/language.rs:10-17</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -284,7 +284,7 @@ detect_duplication = true
 <pre><code class="language-toml">[languages]
 enabled = ["rust", "python"]
 </code></pre>
-<p><strong>Note</strong>: The configuration structure supports JavaScript and TypeScript entries (see <code>src/config/languages.rs:15-21</code>), but the core <code>Language</code> enum and detection logic only implement Rust and Python. JavaScript/TypeScript support may be planned for future releases.</p>
+<p>The documented and implemented user-facing language set for <code>0.16.0</code> is Rust and Python.</p>
 <h2 id="feature-defaults"><a class="header" href="#feature-defaults">Feature Defaults</a></h2>
 <p><strong>Source</strong>: <code>src/config/languages.rs:40-61</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -339,7 +339,7 @@ detect_duplication = false      # Skip if not needed
 <p><strong>Source</strong>: <code>src/complexity/languages/rust.rs</code> and <code>src/analyzers/implementations.rs</code></p>
 <h3 id="rust-complexity"><a class="header" href="#rust-complexity">Rust Complexity</a></h3>
 <ul>
-<li>Uses tree-sitter for AST parsing</li>
+<li>Uses <code>syn</code> for AST parsing</li>
 <li>Calculates cyclomatic complexity from control flow</li>
 <li>Tracks cognitive complexity with nesting depth penalties</li>
 <li>Detects pattern match complexity with entropy analysis</li>
@@ -359,7 +359,7 @@ detect_duplication = false      # Skip if not needed
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
-    "*.min.js",        # Would be skipped anyway (JS not supported)
+    "*.min.js",        # Frontend artifacts that are not part of the supported set
 ]
 </code></pre>
 <p>See <a href="thresholds.html">Thresholds Configuration</a> for complexity thresholds that can be language-aware.</p>
@@ -378,8 +378,8 @@ patterns = [
 <tr><td><code>enabled</code></td><td><code>Vec&lt;String&gt;</code></td><td>Languages to analyze</td></tr>
 <tr><td><code>rust</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Rust-specific settings</td></tr>
 <tr><td><code>python</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Python-specific settings</td></tr>
-<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>JavaScript settings (planned)</td></tr>
-<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>TypeScript settings (planned)</td></tr>
+<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
+<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
 </tbody>
 </table>
 </div>
@@ -401,7 +401,7 @@ patterns = [
 <h3 id="language-not-detected"><a class="header" href="#language-not-detected">Language Not Detected</a></h3>
 <p>If files aren’t being analyzed:</p>
 <ol>
-<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>, <code>.pyw</code>)</li>
+<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>)</li>
 <li>Verify the language is in <code>enabled</code> array</li>
 <li>Check ignore patterns aren’t excluding the files</li>
 </ol>

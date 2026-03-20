@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -192,9 +192,13 @@ lines = 80
 coverage = 0.8
 
 [languages]
-rust = true
-python = true
-javascript = true
+enabled = ["rust", "python", "javascript", "typescript"]
+
+[languages.rust]
+detect_dead_code = false
+
+[languages.python]
+detect_dead_code = true
 </code></pre>
 <h2 id="configuration-topics"><a class="header" href="#configuration-topics">Configuration Topics</a></h2>
 <ul>

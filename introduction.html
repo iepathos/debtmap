@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -178,21 +178,35 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Debtmap is a <strong>code complexity sensor</strong> for AI-assisted development. It identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them.</p>
+<p>Debtmap is a <strong>code complexity sensor</strong> for modern development workflows. It identifies technical debt hotspots and gives developers clear, prioritized insight directly in the terminal, TUI, dashboard, or machine-readable outputs.</p>
 <h2 id="what-is-debtmap"><a class="header" href="#what-is-debtmap">What is Debtmap?</a></h2>
-<p>Debtmap is different from traditional static analysis tools. Instead of telling you what to fix, it provides <strong>signals</strong> that AI assistants can use to make informed decisions:</p>
+<p>Debtmap is different from traditional static analysis tools. Instead of burying you in warnings, it provides <strong>signals</strong> that developers and automation can use to make informed decisions:</p>
 <ol>
 <li><strong>Where to look</strong> - Prioritized list of debt items with exact file locations</li>
 <li><strong>What to read</strong> - Context suggestions (callers, callees, test files)</li>
-<li><strong>What signals matter</strong> - Complexity, coverage, coupling metrics</li>
+<li><strong>What signals matter</strong> - Multi-strategy analysis across complexity, coverage, coupling, git history, purity, and entropy</li>
 </ol>
-<p>The key insight: AI coding assistants are great at fixing code, but they need guidance on <em>where</em> to focus and <em>what</em> to read. Debtmap provides that guidance.</p>
+<p>Good prioritization matters whether a developer is reviewing the results directly or an AI assistant is acting on them. Debtmap provides that guidance.</p>
+<p>What makes Debtmap distinctive is that it does not rely on a single complexity score. It cross-checks multiple strategies:</p>
+<ul>
+<li><strong>Entropy-adjusted complexity</strong> - Reduces false positives when repetitive boilerplate or patterned code inflates raw complexity</li>
+<li><strong>Coverage + complexity prioritization</strong> - Treats untested complex code as materially riskier than equally complex code with strong coverage</li>
+<li><strong>Git history hotspot analysis</strong> - Uses churn, bug-fix patterns, and author activity to identify code that keeps causing trouble</li>
+<li><strong>Coupling and dependency analysis</strong> - Estimates impact radius by looking at fan-in, fan-out, and call-graph relationships</li>
+<li><strong>Purity analysis</strong> - Distinguishes testable, low-side-effect code from code with heavier mutation and I/O risk</li>
+</ul>
+<p>The result is a ranked view of technical debt that is designed to surface genuinely risky hotspots instead of overwhelming developers with generic complexity warnings.</p>
 <h2 id="the-ai-sensor-model"><a class="header" href="#the-ai-sensor-model">The AI Sensor Model</a></h2>
 <p>Debtmap is a <strong>sensor</strong>, not a prescriber. It measures and reports; it doesn’t tell you what to do.</p>
 <p><strong>What Debtmap provides:</strong></p>
 <ul>
 <li>Quantified complexity signals (cyclomatic, cognitive, nesting)</li>
-<li>Test coverage gaps with risk prioritization</li>
+<li>Entropy-adjusted scoring to reduce false positives</li>
+<li>Test coverage gaps combined with complexity for cross-prioritization</li>
+<li>Git history context to surface churn and bug hotspots</li>
+<li>Coupling and dependency signals to estimate impact radius</li>
+<li>Purity analysis to reflect side effects and testability</li>
+<li>Direct, browsable results for developers in terminal and TUI workflows</li>
 <li>Context suggestions for AI consumption</li>
 <li>Structured output (JSON, LLM-markdown) for machine consumption</li>
 </ul>
@@ -202,16 +216,19 @@
 <li>“You should consider Y” advice</li>
 <li>Template-based refactoring suggestions</li>
 </ul>
-<p>This design is intentional. AI assistants can consider business context, team preferences, and constraints that Debtmap can’t know. The AI decides what to do; Debtmap tells it where to look.</p>
+<p>This design is intentional. Developers and AI assistants can consider business context, team preferences, and constraints that Debtmap can’t know. Debtmap tells you where to look and why it matters.</p>
 <h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
 <pre><code class="language-bash"># Install
 cargo install debtmap
 
-# Analyze and pipe to Claude Code
-debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
+# Analyze directly in the terminal/TUI
+debtmap analyze .
 
-# Get structured signals for your AI workflow
-debtmap analyze . --format json --top 10 &gt; debt.json
+# Get structured signals for dashboards and automation
+debtmap analyze . --format json --top 10 --output debt.json
+
+# Optional: pipe the top item to Claude Code
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # With coverage data for accurate risk assessment
 cargo llvm-cov --lcov --output-path coverage.lcov
@@ -221,9 +238,10 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <h3 id="signal-generation"><a class="header" href="#signal-generation">Signal Generation</a></h3>
 <ul>
 <li><strong>Complexity signals</strong> - Cyclomatic, cognitive, nesting depth, lines of code</li>
-<li><strong>Coverage signals</strong> - Line coverage, branch coverage, function coverage</li>
-<li><strong>Coupling signals</strong> - Fan-in, fan-out, call graph depth</li>
-<li><strong>Quality signals</strong> - Entropy (false positive reduction), purity (testability)</li>
+<li><strong>Coverage signals</strong> - Line coverage, branch coverage, function coverage, combined with complexity for risk ranking</li>
+<li><strong>Git context signals</strong> - Churn, bug-fix frequency, and author/change history</li>
+<li><strong>Coupling signals</strong> - Fan-in, fan-out, call graph depth, and impact radius</li>
+<li><strong>Quality signals</strong> - Entropy (false positive reduction) and purity (testability and side-effect profile)</li>
 </ul>
 <p>For a complete list of metrics and their formulas, see the <a href="./metrics-reference.html">Metrics Reference</a>.</p>
 <h3 id="ai-optimized-output"><a class="header" href="#ai-optimized-output">AI-Optimized Output</a></h3>
@@ -235,30 +253,35 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </ul>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Rust-first analysis</strong> - Full AST parsing, macro expansion, trait resolution</li>
-<li><strong>Coverage integration</strong> - Native LCOV support for risk assessment</li>
+<li><strong>Rust, Python, and JS/TS analysis</strong> - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, and TypeScript</li>
+<li><strong>Multi-strategy prioritization</strong> - Cross-ranks debt using complexity, coverage, git history, coupling, purity, and entropy</li>
+<li><strong>Coverage integration</strong> - Native LCOV support for risk assessment, especially for complex code</li>
 <li><strong>Debt pattern detection</strong> - God objects, boilerplate code, error handling anti-patterns</li>
-<li><strong>Entropy analysis</strong> - Reduces false positives from repetitive code</li>
+<li><strong>Entropy analysis</strong> - Reduces false positives from repetitive or formulaic code</li>
+<li><strong>Git and dependency context</strong> - Highlights bug hotspots and likely impact radius before refactoring</li>
 <li><strong>Parallel processing</strong> - Fast analysis (10-100x faster than Java/Python tools)</li>
 </ul>
 <h3 id="workflow-integration"><a class="header" href="#workflow-integration">Workflow Integration</a></h3>
 <ul>
+<li><strong>Developer-first exploration</strong> - Review prioritized debt directly in terminal, TUI, and dashboard flows</li>
 <li><strong>Direct piping</strong> - Pipe output to Claude, Cursor, or custom agents</li>
 <li><strong>CI/CD gates</strong> - Validate debt thresholds with the <code>validate</code> command</li>
 <li><strong>Progress tracking</strong> - Compare debt across commits with <code>compare</code> and <code>validate-improvement</code> commands</li>
 </ul>
 <h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
-<p>Debtmap focuses exclusively on Rust. This focused approach allows us to:</p>
+<p>Debtmap currently supports Rust, Python, JavaScript, and TypeScript analysis. This lets debtmap:</p>
 <ul>
 <li>Build deep Rust-specific analysis (macros, traits, lifetimes)</li>
-<li>Perfect core algorithms before expanding</li>
-<li>Deliver the best possible AI sensor for Rust</li>
+<li>Analyze Python projects with language-aware parsing and complexity detection</li>
+<li>Analyze JavaScript and TypeScript projects with tree-sitter-based parsing and frontend/backend-aware patterns</li>
+<li>Keep the core AI workflow focused on high-signal, coverage-aware prioritization</li>
 </ul>
-<p>Multi-language support (Python, JavaScript/TypeScript, Go) is planned for future releases.</p>
+<p>Additional language expansion remains possible in future releases, but <code>0.16.0</code> ships with Rust, Python, JavaScript, and TypeScript as the documented supported set.</p>
 <h2 id="target-audience"><a class="header" href="#target-audience">Target Audience</a></h2>
 <p>Debtmap is designed for:</p>
 <ul>
-<li><strong>AI-assisted developers</strong> - Get signals that help AI assistants make better decisions</li>
+<li><strong>Individual developers</strong> - Inspect complexity hotspots and debt rankings directly while coding</li>
+<li><strong>AI-assisted developers</strong> - Feed the same signals into coding assistants when useful</li>
 <li><strong>Development teams</strong> - Prioritize debt remediation with quantified metrics</li>
 <li><strong>CI/CD engineers</strong> - Enforce quality gates with coverage-aware thresholds</li>
 <li><strong>Legacy codebase maintainers</strong> - Identify where AI can help most</li>
@@ -268,7 +291,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <ul>
 <li><a href="./getting-started.html">Getting Started</a> - Installation and first analysis</li>
 <li><a href="./llm-integration.html">LLM Integration</a> - AI workflow patterns</li>
-<li><a href="./why-debtmap.html">Why Debtmap?</a> - The AI sensor model explained</li>
+<li><a href="./why-debtmap.html">Why Debtmap?</a> - Positioning, tradeoffs, and workflow model</li>
 <li><a href="./tui-guide.html">TUI Guide</a> - Interactive exploration with the terminal UI</li>
 </ul>
 <p><strong>Quick tip:</strong> Start with <code>debtmap analyze . --format markdown --top 5</code> to see the top priority items with context suggestions.</p>

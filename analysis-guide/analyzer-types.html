@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -179,7 +179,7 @@
                     <main>
                         <h1 id="analyzer-types"><a class="header" href="#analyzer-types">Analyzer Types</a></h1>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
-<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility, with full implementations for Rust, TypeScript, and JavaScript.</p>
+<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility across Rust, Python, JavaScript, and TypeScript.</p>
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
@@ -217,19 +217,29 @@
 </thead>
 <tbody>
 <tr><td><strong>Rust</strong></td><td><code>syn</code> (native AST)</td><td><code>.rs</code></td></tr>
-<tr><td><strong>TypeScript</strong></td><td>tree-sitter</td><td><code>.ts</code>, <code>.tsx</code></td></tr>
-<tr><td><strong>JavaScript</strong></td><td>tree-sitter</td><td><code>.js</code>, <code>.jsx</code></td></tr>
+<tr><td><strong>Python</strong></td><td>tree-sitter</td><td><code>.py</code></td></tr>
+<tr><td><strong>JavaScript</strong></td><td>tree-sitter</td><td><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.jsx</code></td></tr>
+<tr><td><strong>TypeScript</strong></td><td>tree-sitter</td><td><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, <code>.tsx</code></td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="typescriptjavascript-analyzer"><a class="header" href="#typescriptjavascript-analyzer">TypeScript/JavaScript Analyzer</a></h3>
-<p>The TypeScript and JavaScript analyzers use tree-sitter for AST parsing and provide:</p>
+<h3 id="python-analyzer"><a class="header" href="#python-analyzer">Python Analyzer</a></h3>
+<p>The Python analyzer uses tree-sitter for AST parsing and provides:</p>
 <ul>
 <li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, nesting depth</li>
+<li><strong>Class and Method Extraction</strong>: Python classes, methods, and module-level functions</li>
+<li><strong>Decorator Awareness</strong>: Handles decorated functions and class methods</li>
+<li><strong>Python-Specific Constructs</strong>: Comprehensions, exception blocks, and idiomatic control flow</li>
 <li><strong>Entropy Analysis</strong>: Pattern-based false positive reduction</li>
-<li><strong>Async Pattern Detection</strong>: Promise chains, async/await, callback nesting</li>
-<li><strong>React Support</strong>: JSX/TSX component analysis</li>
-<li><strong>Type-Specific Analysis</strong>: TypeScript <code>any</code> usage, type assertions</li>
+</ul>
+<h3 id="javascripttypescript-analyzer"><a class="header" href="#javascripttypescript-analyzer">JavaScript/TypeScript Analyzer</a></h3>
+<p>The JavaScript and TypeScript analyzers use tree-sitter for AST parsing and provide:</p>
+<ul>
+<li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, and nesting depth</li>
+<li><strong>Async Pattern Detection</strong>: Promise chains, async/await, and callback-heavy flows</li>
+<li><strong>React Support</strong>: JSX and TSX component analysis</li>
+<li><strong>Type-Oriented Patterns</strong>: TypeScript-specific constructs such as assertions and broad type usage</li>
+<li><strong>Entropy Analysis</strong>: Pattern-based false positive reduction</li>
 </ul>
 <h3 id="file-detection"><a class="header" href="#file-detection">File Detection</a></h3>
 <p>During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:</p>
@@ -237,7 +247,7 @@
 debtmap analyze .
 
 # Analyze specific languages only
-debtmap analyze . --languages rust,typescript
+debtmap analyze . --languages rust,python,javascript,typescript
 
 # All supported languages are enabled by default
 </code></pre>
@@ -261,7 +271,7 @@ debtmap analyze . --languages rust,typescript
 <li><strong>Update <code>from_extension()</code></strong> to recognize the file extension</li>
 <li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer</li>
 </ol>
-<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code> for Rust or <code>src/analyzers/typescript.rs</code> for TypeScript as examples of implementing the <code>Analyzer</code> trait.</p>
+<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code>, <code>src/analyzers/python/analyzer.rs</code>, and <code>src/analyzers/typescript/analyzer.rs</code> for the current language-specific analyzer implementations.</p>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
 <li><a href="overview.html">Overview</a> - Analysis pipeline and workflow</li>

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -178,7 +178,16 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="why-debtmap"><a class="header" href="#why-debtmap">Why Debtmap?</a></h1>
-<p>Debtmap is a <strong>code complexity sensor</strong> designed for AI-assisted development workflows. It identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them.</p>
+<p>Debtmap is a <strong>code complexity sensor</strong> for developers and automation. It identifies technical debt hotspots and provides prioritized results that you can inspect directly in the terminal, TUI, or dashboard, with structured outputs available when you want to feed the same findings into AI tools.</p>
+<h2 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h2>
+<p>Technical debt prioritization is hard even before AI enters the picture. Developers need to know:</p>
+<ul>
+<li>Which hotspots are actually risky</li>
+<li>Which complex areas are protected by tests</li>
+<li>Which issues are isolated vs deeply coupled</li>
+<li>Which files keep causing churn over time</li>
+</ul>
+<p>Debtmap answers those questions directly, then makes the same information available to automation.</p>
 <h2 id="the-ai-development-paradox"><a class="header" href="#the-ai-development-paradox">The AI Development Paradox</a></h2>
 <p>AI coding assistants like Claude Code, GitHub Copilot, and Cursor are transforming software development. They can write code faster than ever before. But this creates a paradox:</p>
 <p><strong>AI creates technical debt faster than humans can manage it.</strong></p>
@@ -190,8 +199,8 @@
 <li><strong>No prioritization</strong> - They can’t identify what matters most</li>
 <li><strong>Wasted tokens</strong> - They read irrelevant code while missing critical context</li>
 </ul>
-<h2 id="what-ai-coding-tools-need"><a class="header" href="#what-ai-coding-tools-need">What AI Coding Tools Need</a></h2>
-<p>For an AI assistant to effectively fix technical debt, it needs:</p>
+<h2 id="what-developers-and-ai-tools-need"><a class="header" href="#what-developers-and-ai-tools-need">What Developers and AI Tools Need</a></h2>
+<p>For a developer or AI assistant to effectively fix technical debt, they need:</p>
 <h3 id="1-prioritized-targets"><a class="header" href="#1-prioritized-targets">1. Prioritized Targets</a></h3>
 <p>Not “here are 500 complex functions,” but “here are the 10 functions that matter most, ranked by severity.”</p>
 <p>Debtmap provides a severity score (0-10) that combines:</p>
@@ -203,7 +212,7 @@
 </ul>
 <h3 id="2-context-suggestions"><a class="header" href="#2-context-suggestions">2. Context Suggestions</a></h3>
 <p>Not “this function is complex,” but “read lines 38-85 of parser.rs, plus lines 100-120 of handler.rs where it’s called, and lines 50-75 of the test file.”</p>
-<p>Debtmap’s context suggestions tell the AI exactly which code to read:</p>
+<p>Debtmap’s context suggestions tell you exactly which code to read:</p>
 <pre><code>CONTEXT:
 ├─ Primary: src/parser.rs:38-85 (the debt item)
 ├─ Caller: src/handler.rs:100-120 (usage context)
@@ -211,7 +220,7 @@
 </code></pre>
 <h3 id="3-quantified-signals"><a class="header" href="#3-quantified-signals">3. Quantified Signals</a></h3>
 <p>Not “this code is bad,” but “cyclomatic complexity: 12, cognitive complexity: 18, test coverage: 0%, called by 8 functions.”</p>
-<p>These signals let the AI make informed decisions about the best approach:</p>
+<p>These signals let developers and AI make informed decisions about the best approach:</p>
 <ul>
 <li>High complexity + good coverage = risky to refactor</li>
 <li>Low complexity + no coverage = easy test target</li>
@@ -226,6 +235,11 @@
 <li>Stable IDs for referencing items across runs</li>
 </ul>
 <h2 id="what-debtmap-provides"><a class="header" href="#what-debtmap-provides">What Debtmap Provides</a></h2>
+<p>Debtmap is useful in two modes:</p>
+<ul>
+<li><strong>Direct developer use</strong> - Inspect findings in the terminal, TUI, or dashboard and decide what to tackle next</li>
+<li><strong>Structured handoff</strong> - Export markdown or JSON for automation, AI tools, CI, or downstream systems</li>
+</ul>
 <h3 id="complexity-signals"><a class="header" href="#complexity-signals">Complexity Signals</a></h3>
 <div class="table-wrapper">
 <table>
@@ -303,7 +317,7 @@
 </tbody>
 </table>
 </div>
-<p>Traditional tools are designed for human code review workflows. Debtmap is designed for AI-assisted development.</p>
+<p>Debtmap is designed to work well for developers directly and to hand off cleanly to automation when needed.</p>
 <h3 id="vs-linters-clippy-eslint"><a class="header" href="#vs-linters-clippy-eslint">vs Linters (Clippy, ESLint)</a></h3>
 <div class="table-wrapper">
 <table>
@@ -319,6 +333,21 @@
 </table>
 </div>
 <p>Linters catch code style issues. Debtmap identifies complexity hotspots. Use both.</p>
+<h3 id="can-debtmap-replace-sonarqube"><a class="header" href="#can-debtmap-replace-sonarqube">Can Debtmap Replace SonarQube?</a></h3>
+<p>For teams working primarily in Debtmap’s supported languages, often yes.</p>
+<p>Debtmap is a strong replacement when you want:</p>
+<ul>
+<li>Fast local analysis without running a server</li>
+<li>Terminal/TUI-first workflows for developers</li>
+<li>Built-in coverage-aware prioritization</li>
+<li>Structured outputs for CI, dashboards, and AI handoff</li>
+</ul>
+<p>SonarQube still has an advantage when you need:</p>
+<ul>
+<li>Broader language coverage across a large organization</li>
+<li>Centralized enterprise dashboards and policy management</li>
+<li>A server-centric workflow across many repositories</li>
+</ul>
 <h3 id="vs-coverage-tools-tarpaulin-pytest-cov"><a class="header" href="#vs-coverage-tools-tarpaulin-pytest-cov">vs Coverage Tools (Tarpaulin, pytest-cov)</a></h3>
 <div class="table-wrapper">
 <table>

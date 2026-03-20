@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -178,7 +178,16 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="frequently-asked-questions"><a class="header" href="#frequently-asked-questions">Frequently Asked Questions</a></h1>
-<p>Common questions about debtmap’s features, usage, and AI integration.</p>
+<p>Common questions about debtmap’s features, usage, direct developer workflows, and AI integration.</p>
+<h2 id="general-usage"><a class="header" href="#general-usage">General Usage</a></h2>
+<h3 id="can-i-use-debtmap-without-ai-tools"><a class="header" href="#can-i-use-debtmap-without-ai-tools">Can I use debtmap without AI tools?</a></h3>
+<p>Yes. <code>debtmap analyze .</code> is useful on its own for developers who want a prioritized view of complexity, coverage gaps, and coupling risk.</p>
+<p>Common direct-use workflows:</p>
+<ul>
+<li>Browse the default terminal/TUI output during local development</li>
+<li>Export JSON to the dashboard for deeper visual analysis</li>
+<li>Run validation in CI to enforce debt thresholds</li>
+</ul>
 <h2 id="ai-integration"><a class="header" href="#ai-integration">AI Integration</a></h2>
 <h3 id="how-does-debtmap-work-with-ai-coding-assistants"><a class="header" href="#how-does-debtmap-work-with-ai-coding-assistants">How does debtmap work with AI coding assistants?</a></h3>
 <p>Debtmap is designed as a <strong>sensor</strong> that provides structured data for AI consumption. Instead of telling you what to fix, it tells AI assistants:</p>
@@ -249,12 +258,13 @@ debtmap analyze . --format markdown --top 10 &gt; debt-report.md
 <p><strong>Currently supported:</strong></p>
 <ul>
 <li><strong>Rust</strong> - Full support with AST parsing via <code>syn</code>, macro expansion, and trait resolution</li>
-<li><strong>TypeScript</strong> - Full support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis</li>
-<li><strong>JavaScript</strong> - Full support with tree-sitter parsing, ES6+ syntax, React components, Promise chains</li>
+<li><strong>Python</strong> - Language-aware parsing with tree-sitter plus function, class, decorator, and comprehension analysis</li>
+<li><strong>JavaScript</strong> - Tree-sitter parsing with modern ES syntax, JSX support, and async pattern analysis</li>
+<li><strong>TypeScript</strong> - Tree-sitter parsing with TS/TSX syntax, type-oriented patterns, and modern module support</li>
 </ul>
 <p><strong>Planned:</strong></p>
 <ul>
-<li>Python, Go</li>
+<li>Go</li>
 </ul>
 <h3 id="how-does-coverage-integration-work"><a class="header" href="#how-does-coverage-integration-work">How does coverage integration work?</a></h3>
 <p>Debtmap reads LCOV format coverage data and maps it to functions:</p>
@@ -346,16 +356,17 @@ fn validate_many_fields() { ... }
 <tr><th>Aspect</th><th>Debtmap</th><th>SonarQube</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Output</strong></td><td>Signals for AI</td><td>Recommendations</td></tr>
+<tr><td><strong>Primary UX</strong></td><td>CLI, TUI, JSON, dashboard</td><td>Server/dashboard</td></tr>
 <tr><td><strong>Speed</strong></td><td>Seconds</td><td>Minutes</td></tr>
-<tr><td><strong>Coverage</strong></td><td>Built-in</td><td>Enterprise only</td></tr>
-<tr><td><strong>Entropy</strong></td><td>Yes</td><td>No</td></tr>
+<tr><td><strong>Coverage</strong></td><td>Built-in</td><td>Enterprise-heavy workflows</td></tr>
 <tr><td><strong>Setup</strong></td><td>Single binary</td><td>Server required</td></tr>
+<tr><td><strong>Supported-language fit</strong></td><td>Strong within supported languages</td><td>Broader language coverage</td></tr>
+<tr><td><strong>AI handoff</strong></td><td>First-class markdown/JSON</td><td>Less workflow-oriented</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>When to use SonarQube:</strong> Multi-language enterprise dashboards.
-<strong>When to use debtmap:</strong> AI-assisted development with Rust, TypeScript, and JavaScript.</p>
+<p><strong>When to use SonarQube:</strong> You need a broader enterprise platform across many languages and centralized server workflows.
+<strong>When to use debtmap:</strong> You want a faster, lighter-weight replacement for supported languages, especially when developers work directly in terminal/TUI flows or want structured output for automation.</p>
 <h3 id="should-i-replace-clippy-with-debtmap"><a class="header" href="#should-i-replace-clippy-with-debtmap">Should I replace clippy with debtmap?</a></h3>
 <p><strong>No—use both.</strong> They serve different purposes:</p>
 <p><strong>clippy:</strong></p>

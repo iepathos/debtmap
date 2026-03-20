@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0a0fea75.js";
+            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -179,21 +179,35 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Debtmap is a <strong>code complexity sensor</strong> for AI-assisted development. It identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them.</p>
+<p>Debtmap is a <strong>code complexity sensor</strong> for modern development workflows. It identifies technical debt hotspots and gives developers clear, prioritized insight directly in the terminal, TUI, dashboard, or machine-readable outputs.</p>
 <h2 id="what-is-debtmap"><a class="header" href="#what-is-debtmap">What is Debtmap?</a></h2>
-<p>Debtmap is different from traditional static analysis tools. Instead of telling you what to fix, it provides <strong>signals</strong> that AI assistants can use to make informed decisions:</p>
+<p>Debtmap is different from traditional static analysis tools. Instead of burying you in warnings, it provides <strong>signals</strong> that developers and automation can use to make informed decisions:</p>
 <ol>
 <li><strong>Where to look</strong> - Prioritized list of debt items with exact file locations</li>
 <li><strong>What to read</strong> - Context suggestions (callers, callees, test files)</li>
-<li><strong>What signals matter</strong> - Complexity, coverage, coupling metrics</li>
+<li><strong>What signals matter</strong> - Multi-strategy analysis across complexity, coverage, coupling, git history, purity, and entropy</li>
 </ol>
-<p>The key insight: AI coding assistants are great at fixing code, but they need guidance on <em>where</em> to focus and <em>what</em> to read. Debtmap provides that guidance.</p>
+<p>Good prioritization matters whether a developer is reviewing the results directly or an AI assistant is acting on them. Debtmap provides that guidance.</p>
+<p>What makes Debtmap distinctive is that it does not rely on a single complexity score. It cross-checks multiple strategies:</p>
+<ul>
+<li><strong>Entropy-adjusted complexity</strong> - Reduces false positives when repetitive boilerplate or patterned code inflates raw complexity</li>
+<li><strong>Coverage + complexity prioritization</strong> - Treats untested complex code as materially riskier than equally complex code with strong coverage</li>
+<li><strong>Git history hotspot analysis</strong> - Uses churn, bug-fix patterns, and author activity to identify code that keeps causing trouble</li>
+<li><strong>Coupling and dependency analysis</strong> - Estimates impact radius by looking at fan-in, fan-out, and call-graph relationships</li>
+<li><strong>Purity analysis</strong> - Distinguishes testable, low-side-effect code from code with heavier mutation and I/O risk</li>
+</ul>
+<p>The result is a ranked view of technical debt that is designed to surface genuinely risky hotspots instead of overwhelming developers with generic complexity warnings.</p>
 <h2 id="the-ai-sensor-model"><a class="header" href="#the-ai-sensor-model">The AI Sensor Model</a></h2>
 <p>Debtmap is a <strong>sensor</strong>, not a prescriber. It measures and reports; it doesn’t tell you what to do.</p>
 <p><strong>What Debtmap provides:</strong></p>
 <ul>
 <li>Quantified complexity signals (cyclomatic, cognitive, nesting)</li>
-<li>Test coverage gaps with risk prioritization</li>
+<li>Entropy-adjusted scoring to reduce false positives</li>
+<li>Test coverage gaps combined with complexity for cross-prioritization</li>
+<li>Git history context to surface churn and bug hotspots</li>
+<li>Coupling and dependency signals to estimate impact radius</li>
+<li>Purity analysis to reflect side effects and testability</li>
+<li>Direct, browsable results for developers in terminal and TUI workflows</li>
 <li>Context suggestions for AI consumption</li>
 <li>Structured output (JSON, LLM-markdown) for machine consumption</li>
 </ul>
@@ -203,16 +217,19 @@
 <li>“You should consider Y” advice</li>
 <li>Template-based refactoring suggestions</li>
 </ul>
-<p>This design is intentional. AI assistants can consider business context, team preferences, and constraints that Debtmap can’t know. The AI decides what to do; Debtmap tells it where to look.</p>
+<p>This design is intentional. Developers and AI assistants can consider business context, team preferences, and constraints that Debtmap can’t know. Debtmap tells you where to look and why it matters.</p>
 <h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
 <pre><code class="language-bash"># Install
 cargo install debtmap
 
-# Analyze and pipe to Claude Code
-debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
+# Analyze directly in the terminal/TUI
+debtmap analyze .
 
-# Get structured signals for your AI workflow
-debtmap analyze . --format json --top 10 &gt; debt.json
+# Get structured signals for dashboards and automation
+debtmap analyze . --format json --top 10 --output debt.json
+
+# Optional: pipe the top item to Claude Code
+debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # With coverage data for accurate risk assessment
 cargo llvm-cov --lcov --output-path coverage.lcov
@@ -222,9 +239,10 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <h3 id="signal-generation"><a class="header" href="#signal-generation">Signal Generation</a></h3>
 <ul>
 <li><strong>Complexity signals</strong> - Cyclomatic, cognitive, nesting depth, lines of code</li>
-<li><strong>Coverage signals</strong> - Line coverage, branch coverage, function coverage</li>
-<li><strong>Coupling signals</strong> - Fan-in, fan-out, call graph depth</li>
-<li><strong>Quality signals</strong> - Entropy (false positive reduction), purity (testability)</li>
+<li><strong>Coverage signals</strong> - Line coverage, branch coverage, function coverage, combined with complexity for risk ranking</li>
+<li><strong>Git context signals</strong> - Churn, bug-fix frequency, and author/change history</li>
+<li><strong>Coupling signals</strong> - Fan-in, fan-out, call graph depth, and impact radius</li>
+<li><strong>Quality signals</strong> - Entropy (false positive reduction) and purity (testability and side-effect profile)</li>
 </ul>
 <p>For a complete list of metrics and their formulas, see the <a href="#metrics-reference">Metrics Reference</a>.</p>
 <h3 id="ai-optimized-output"><a class="header" href="#ai-optimized-output">AI-Optimized Output</a></h3>
@@ -236,30 +254,35 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </ul>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Rust-first analysis</strong> - Full AST parsing, macro expansion, trait resolution</li>
-<li><strong>Coverage integration</strong> - Native LCOV support for risk assessment</li>
+<li><strong>Rust, Python, and JS/TS analysis</strong> - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, and TypeScript</li>
+<li><strong>Multi-strategy prioritization</strong> - Cross-ranks debt using complexity, coverage, git history, coupling, purity, and entropy</li>
+<li><strong>Coverage integration</strong> - Native LCOV support for risk assessment, especially for complex code</li>
 <li><strong>Debt pattern detection</strong> - God objects, boilerplate code, error handling anti-patterns</li>
-<li><strong>Entropy analysis</strong> - Reduces false positives from repetitive code</li>
+<li><strong>Entropy analysis</strong> - Reduces false positives from repetitive or formulaic code</li>
+<li><strong>Git and dependency context</strong> - Highlights bug hotspots and likely impact radius before refactoring</li>
 <li><strong>Parallel processing</strong> - Fast analysis (10-100x faster than Java/Python tools)</li>
 </ul>
 <h3 id="workflow-integration"><a class="header" href="#workflow-integration">Workflow Integration</a></h3>
 <ul>
+<li><strong>Developer-first exploration</strong> - Review prioritized debt directly in terminal, TUI, and dashboard flows</li>
 <li><strong>Direct piping</strong> - Pipe output to Claude, Cursor, or custom agents</li>
 <li><strong>CI/CD gates</strong> - Validate debt thresholds with the <code>validate</code> command</li>
 <li><strong>Progress tracking</strong> - Compare debt across commits with <code>compare</code> and <code>validate-improvement</code> commands</li>
 </ul>
 <h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
-<p>Debtmap focuses exclusively on Rust. This focused approach allows us to:</p>
+<p>Debtmap currently supports Rust, Python, JavaScript, and TypeScript analysis. This lets debtmap:</p>
 <ul>
 <li>Build deep Rust-specific analysis (macros, traits, lifetimes)</li>
-<li>Perfect core algorithms before expanding</li>
-<li>Deliver the best possible AI sensor for Rust</li>
+<li>Analyze Python projects with language-aware parsing and complexity detection</li>
+<li>Analyze JavaScript and TypeScript projects with tree-sitter-based parsing and frontend/backend-aware patterns</li>
+<li>Keep the core AI workflow focused on high-signal, coverage-aware prioritization</li>
 </ul>
-<p>Multi-language support (Python, JavaScript/TypeScript, Go) is planned for future releases.</p>
+<p>Additional language expansion remains possible in future releases, but <code>0.16.0</code> ships with Rust, Python, JavaScript, and TypeScript as the documented supported set.</p>
 <h2 id="target-audience"><a class="header" href="#target-audience">Target Audience</a></h2>
 <p>Debtmap is designed for:</p>
 <ul>
-<li><strong>AI-assisted developers</strong> - Get signals that help AI assistants make better decisions</li>
+<li><strong>Individual developers</strong> - Inspect complexity hotspots and debt rankings directly while coding</li>
+<li><strong>AI-assisted developers</strong> - Feed the same signals into coding assistants when useful</li>
 <li><strong>Development teams</strong> - Prioritize debt remediation with quantified metrics</li>
 <li><strong>CI/CD engineers</strong> - Enforce quality gates with coverage-aware thresholds</li>
 <li><strong>Legacy codebase maintainers</strong> - Identify where AI can help most</li>
@@ -269,13 +292,22 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <ul>
 <li><a href="#getting-started-1">Getting Started</a> - Installation and first analysis</li>
 <li><a href="#llm-integration-guide">LLM Integration</a> - AI workflow patterns</li>
-<li><a href="#why-debtmap">Why Debtmap?</a> - The AI sensor model explained</li>
+<li><a href="#why-debtmap">Why Debtmap?</a> - Positioning, tradeoffs, and workflow model</li>
 <li><a href="#tui-results-viewer-guide">TUI Guide</a> - Interactive exploration with the terminal UI</li>
 </ul>
 <p><strong>Quick tip:</strong> Start with <code>debtmap analyze . --format markdown --top 5</code> to see the top priority items with context suggestions.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="why-debtmap"><a class="header" href="#why-debtmap">Why Debtmap?</a></h1>
-<p>Debtmap is a <strong>code complexity sensor</strong> designed for AI-assisted development workflows. It identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them.</p>
+<p>Debtmap is a <strong>code complexity sensor</strong> for developers and automation. It identifies technical debt hotspots and provides prioritized results that you can inspect directly in the terminal, TUI, or dashboard, with structured outputs available when you want to feed the same findings into AI tools.</p>
+<h2 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h2>
+<p>Technical debt prioritization is hard even before AI enters the picture. Developers need to know:</p>
+<ul>
+<li>Which hotspots are actually risky</li>
+<li>Which complex areas are protected by tests</li>
+<li>Which issues are isolated vs deeply coupled</li>
+<li>Which files keep causing churn over time</li>
+</ul>
+<p>Debtmap answers those questions directly, then makes the same information available to automation.</p>
 <h2 id="the-ai-development-paradox"><a class="header" href="#the-ai-development-paradox">The AI Development Paradox</a></h2>
 <p>AI coding assistants like Claude Code, GitHub Copilot, and Cursor are transforming software development. They can write code faster than ever before. But this creates a paradox:</p>
 <p><strong>AI creates technical debt faster than humans can manage it.</strong></p>
@@ -287,8 +319,8 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <li><strong>No prioritization</strong> - They can’t identify what matters most</li>
 <li><strong>Wasted tokens</strong> - They read irrelevant code while missing critical context</li>
 </ul>
-<h2 id="what-ai-coding-tools-need"><a class="header" href="#what-ai-coding-tools-need">What AI Coding Tools Need</a></h2>
-<p>For an AI assistant to effectively fix technical debt, it needs:</p>
+<h2 id="what-developers-and-ai-tools-need"><a class="header" href="#what-developers-and-ai-tools-need">What Developers and AI Tools Need</a></h2>
+<p>For a developer or AI assistant to effectively fix technical debt, they need:</p>
 <h3 id="1-prioritized-targets"><a class="header" href="#1-prioritized-targets">1. Prioritized Targets</a></h3>
 <p>Not “here are 500 complex functions,” but “here are the 10 functions that matter most, ranked by severity.”</p>
 <p>Debtmap provides a severity score (0-10) that combines:</p>
@@ -300,7 +332,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </ul>
 <h3 id="2-context-suggestions"><a class="header" href="#2-context-suggestions">2. Context Suggestions</a></h3>
 <p>Not “this function is complex,” but “read lines 38-85 of parser.rs, plus lines 100-120 of handler.rs where it’s called, and lines 50-75 of the test file.”</p>
-<p>Debtmap’s context suggestions tell the AI exactly which code to read:</p>
+<p>Debtmap’s context suggestions tell you exactly which code to read:</p>
 <pre><code>CONTEXT:
 ├─ Primary: src/parser.rs:38-85 (the debt item)
 ├─ Caller: src/handler.rs:100-120 (usage context)
@@ -308,7 +340,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </code></pre>
 <h3 id="3-quantified-signals"><a class="header" href="#3-quantified-signals">3. Quantified Signals</a></h3>
 <p>Not “this code is bad,” but “cyclomatic complexity: 12, cognitive complexity: 18, test coverage: 0%, called by 8 functions.”</p>
-<p>These signals let the AI make informed decisions about the best approach:</p>
+<p>These signals let developers and AI make informed decisions about the best approach:</p>
 <ul>
 <li>High complexity + good coverage = risky to refactor</li>
 <li>Low complexity + no coverage = easy test target</li>
@@ -323,6 +355,11 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <li>Stable IDs for referencing items across runs</li>
 </ul>
 <h2 id="what-debtmap-provides"><a class="header" href="#what-debtmap-provides">What Debtmap Provides</a></h2>
+<p>Debtmap is useful in two modes:</p>
+<ul>
+<li><strong>Direct developer use</strong> - Inspect findings in the terminal, TUI, or dashboard and decide what to tackle next</li>
+<li><strong>Structured handoff</strong> - Export markdown or JSON for automation, AI tools, CI, or downstream systems</li>
+</ul>
 <h3 id="complexity-signals"><a class="header" href="#complexity-signals">Complexity Signals</a></h3>
 <div class="table-wrapper">
 <table>
@@ -400,7 +437,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </tbody>
 </table>
 </div>
-<p>Traditional tools are designed for human code review workflows. Debtmap is designed for AI-assisted development.</p>
+<p>Debtmap is designed to work well for developers directly and to hand off cleanly to automation when needed.</p>
 <h3 id="vs-linters-clippy-eslint"><a class="header" href="#vs-linters-clippy-eslint">vs Linters (Clippy, ESLint)</a></h3>
 <div class="table-wrapper">
 <table>
@@ -416,6 +453,21 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </table>
 </div>
 <p>Linters catch code style issues. Debtmap identifies complexity hotspots. Use both.</p>
+<h3 id="can-debtmap-replace-sonarqube"><a class="header" href="#can-debtmap-replace-sonarqube">Can Debtmap Replace SonarQube?</a></h3>
+<p>For teams working primarily in Debtmap’s supported languages, often yes.</p>
+<p>Debtmap is a strong replacement when you want:</p>
+<ul>
+<li>Fast local analysis without running a server</li>
+<li>Terminal/TUI-first workflows for developers</li>
+<li>Built-in coverage-aware prioritization</li>
+<li>Structured outputs for CI, dashboards, and AI handoff</li>
+</ul>
+<p>SonarQube still has an advantage when you need:</p>
+<ul>
+<li>Broader language coverage across a large organization</li>
+<li>Centralized enterprise dashboards and policy management</li>
+<li>A server-centric workflow across many repositories</li>
+</ul>
 <h3 id="vs-coverage-tools-tarpaulin-pytest-cov"><a class="header" href="#vs-coverage-tools-tarpaulin-pytest-cov">vs Coverage Tools (Tarpaulin, pytest-cov)</a></h3>
 <div class="table-wrapper">
 <table>
@@ -482,6 +534,7 @@ debtmap analyze . --lcov coverage.lcov --format terminal -vv
 <p><strong>Optional</strong> (for coverage-based risk analysis):</p>
 <ul>
 <li><strong>Rust projects</strong>: <code>cargo-tarpaulin</code> or <code>cargo-llvm-cov</code> for coverage data</li>
+<li><strong>Python projects</strong>: <code>pytest-cov</code> or another LCOV-compatible coverage tool</li>
 </ul>
 <h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
 <h3 id="quick-install-recommended"><a class="header" href="#quick-install-recommended">Quick Install (Recommended)</a></h3>
@@ -531,10 +584,14 @@ debtmap analyze . --format markdown
 debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # JSON output for programmatic access
-debtmap analyze . --format json --top 10 &gt; debt.json
+debtmap analyze . --format json --top 10 --output debt.json
 
 # With coverage data for accurate risk assessment
 cargo llvm-cov --lcov --output-path coverage.lcov
+debtmap analyze . --lcov coverage.lcov
+
+# Python coverage workflow
+pytest --cov=. --cov-report=lcov:coverage.lcov
 debtmap analyze . --lcov coverage.lcov
 
 # Show only critical/high priority items
@@ -549,8 +606,8 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for source files (Rust <code>.rs</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, JavaScript <code>.js</code>/<code>.jsx</code>)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for TypeScript/JavaScript</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, and TypeScript</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
@@ -644,6 +701,12 @@ cargo llvm-cov --lcov --output-path coverage.lcov
 
 # Or with cargo-tarpaulin
 cargo tarpaulin --out lcov --output-dir target/coverage
+
+# Analyze with coverage
+debtmap analyze . --lcov coverage.lcov
+</code></pre>
+<pre><code class="language-bash"># Python coverage with pytest-cov
+pytest --cov=. --cov-report=lcov:coverage.lcov
 
 # Analyze with coverage
 debtmap analyze . --lcov coverage.lcov
@@ -752,7 +815,7 @@ patterns = ["**/target/**", "**/tests/**"]
 </ul>
 <h3 id="analysis-issues"><a class="header" href="#analysis-issues">Analysis Issues</a></h3>
 <ul>
-<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code> for Rust, <code>.ts</code>/<code>.tsx</code> for TypeScript, <code>.js</code>/<code>.jsx</code> for JavaScript)</li>
+<li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code>, <code>.py</code>, <code>.js</code>, <code>.jsx</code>, <code>.ts</code>, <code>.tsx</code>)</li>
 <li><strong>Parser failures</strong>: Run with <code>-vv</code> for debug output</li>
 <li><strong>Performance issues</strong>: Limit parallel jobs with <code>--jobs 4</code></li>
 <li><strong>Large codebase slowness</strong>: Use <code>--streaming</code> mode for O(1) memory overhead</li>
@@ -1030,7 +1093,7 @@ jobs:
 
       - name: Analyze debt
         run: |
-          debtmap analyze . --format json --lcov coverage.lcov &gt; debt.json
+          debtmap analyze . --format json --lcov coverage.lcov --output debt.json
 
       - name: Check for critical items
         run: |
@@ -2247,8 +2310,9 @@ See Prodigy documentation for detailed usage instructions.</p>
 <h2 id="supported-languages"><a class="header" href="#supported-languages">Supported Languages</a></h2>
 <ul>
 <li><strong>Rust</strong> - Full analysis support with AST-based parsing via <code>syn</code></li>
-<li><strong>TypeScript</strong> - Full analysis support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis</li>
-<li><strong>JavaScript</strong> - Full analysis support with tree-sitter parsing, ES6+ syntax, React components, Promise chains</li>
+<li><strong>Python</strong> - Full analysis support with tree-sitter parsing, class/function extraction, and Python-specific complexity handling</li>
+<li><strong>JavaScript</strong> - Full analysis support with tree-sitter parsing, modern ES syntax, JSX support, and async pattern handling</li>
+<li><strong>TypeScript</strong> - Full analysis support with tree-sitter parsing, TS/TSX syntax, and type-oriented pattern analysis</li>
 </ul>
 <h2 id="analysis-capabilities-1"><a class="header" href="#analysis-capabilities-1">Analysis Capabilities</a></h2>
 <h3 id="complexity-metrics"><a class="header" href="#complexity-metrics">Complexity Metrics</a></h3>
@@ -2345,7 +2409,7 @@ untested_penalty:  2.0   // Multiplier for untested code
 <h3 id="three-phase-analysis-pipeline"><a class="header" href="#three-phase-analysis-pipeline">Three-Phase Analysis Pipeline</a></h3>
 <p><strong>Phase 1: Parallel Parsing</strong></p>
 <ul>
-<li>Language-specific AST generation (Rust via <code>syn</code>, TypeScript/JavaScript via tree-sitter)</li>
+<li>Language-specific AST generation (Rust via <code>syn</code>, Python/JavaScript/TypeScript via tree-sitter)</li>
 <li>Pure functional transformation: source code → AST</li>
 <li>Files parsed once, ASTs cached and cloned for reuse (44% faster)</li>
 <li>Runs in parallel using Rayon for CPU-intensive parsing</li>
@@ -4759,7 +4823,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="analyzer-types"><a class="header" href="#analyzer-types">Analyzer Types</a></h1>
 <h2 id="overview-2"><a class="header" href="#overview-2">Overview</a></h2>
-<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility, with full implementations for Rust, TypeScript, and JavaScript.</p>
+<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility across Rust, Python, JavaScript, and TypeScript.</p>
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
@@ -4797,19 +4861,29 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 </thead>
 <tbody>
 <tr><td><strong>Rust</strong></td><td><code>syn</code> (native AST)</td><td><code>.rs</code></td></tr>
-<tr><td><strong>TypeScript</strong></td><td>tree-sitter</td><td><code>.ts</code>, <code>.tsx</code></td></tr>
-<tr><td><strong>JavaScript</strong></td><td>tree-sitter</td><td><code>.js</code>, <code>.jsx</code></td></tr>
+<tr><td><strong>Python</strong></td><td>tree-sitter</td><td><code>.py</code></td></tr>
+<tr><td><strong>JavaScript</strong></td><td>tree-sitter</td><td><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.jsx</code></td></tr>
+<tr><td><strong>TypeScript</strong></td><td>tree-sitter</td><td><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, <code>.tsx</code></td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="typescriptjavascript-analyzer"><a class="header" href="#typescriptjavascript-analyzer">TypeScript/JavaScript Analyzer</a></h3>
-<p>The TypeScript and JavaScript analyzers use tree-sitter for AST parsing and provide:</p>
+<h3 id="python-analyzer"><a class="header" href="#python-analyzer">Python Analyzer</a></h3>
+<p>The Python analyzer uses tree-sitter for AST parsing and provides:</p>
 <ul>
 <li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, nesting depth</li>
+<li><strong>Class and Method Extraction</strong>: Python classes, methods, and module-level functions</li>
+<li><strong>Decorator Awareness</strong>: Handles decorated functions and class methods</li>
+<li><strong>Python-Specific Constructs</strong>: Comprehensions, exception blocks, and idiomatic control flow</li>
 <li><strong>Entropy Analysis</strong>: Pattern-based false positive reduction</li>
-<li><strong>Async Pattern Detection</strong>: Promise chains, async/await, callback nesting</li>
-<li><strong>React Support</strong>: JSX/TSX component analysis</li>
-<li><strong>Type-Specific Analysis</strong>: TypeScript <code>any</code> usage, type assertions</li>
+</ul>
+<h3 id="javascripttypescript-analyzer"><a class="header" href="#javascripttypescript-analyzer">JavaScript/TypeScript Analyzer</a></h3>
+<p>The JavaScript and TypeScript analyzers use tree-sitter for AST parsing and provide:</p>
+<ul>
+<li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, and nesting depth</li>
+<li><strong>Async Pattern Detection</strong>: Promise chains, async/await, and callback-heavy flows</li>
+<li><strong>React Support</strong>: JSX and TSX component analysis</li>
+<li><strong>Type-Oriented Patterns</strong>: TypeScript-specific constructs such as assertions and broad type usage</li>
+<li><strong>Entropy Analysis</strong>: Pattern-based false positive reduction</li>
 </ul>
 <h3 id="file-detection"><a class="header" href="#file-detection">File Detection</a></h3>
 <p>During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:</p>
@@ -4817,7 +4891,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 debtmap analyze .
 
 # Analyze specific languages only
-debtmap analyze . --languages rust,typescript
+debtmap analyze . --languages rust,python,javascript,typescript
 
 # All supported languages are enabled by default
 </code></pre>
@@ -4841,7 +4915,7 @@ debtmap analyze . --languages rust,typescript
 <li><strong>Update <code>from_extension()</code></strong> to recognize the file extension</li>
 <li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer</li>
 </ol>
-<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code> for Rust or <code>src/analyzers/typescript.rs</code> for TypeScript as examples of implementing the <code>Analyzer</code> trait.</p>
+<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code>, <code>src/analyzers/python/analyzer.rs</code>, and <code>src/analyzers/typescript/analyzer.rs</code> for the current language-specific analyzer implementations.</p>
 <h2 id="see-also-2"><a class="header" href="#see-also-2">See Also</a></h2>
 <ul>
 <li><a href="#overview-1">Overview</a> - Analysis pipeline and workflow</li>
@@ -6761,9 +6835,13 @@ lines = 80
 coverage = 0.8
 
 [languages]
-rust = true
-python = true
-javascript = true
+enabled = ["rust", "python", "javascript", "typescript"]
+
+[languages.rust]
+detect_dead_code = false
+
+[languages.python]
+detect_dead_code = true
 </code></pre>
 <h2 id="configuration-topics"><a class="header" href="#configuration-topics">Configuration Topics</a></h2>
 <ul>
@@ -7457,7 +7535,7 @@ min_lines_per_function = 3.0  # Safety threshold (default: 3.0)
 <h2 id="supported-languages-2"><a class="header" href="#supported-languages-2">Supported Languages</a></h2>
 <p><strong>Full Support (AST-Based Analysis):</strong></p>
 <ul>
-<li><strong>Rust</strong> - Full AST parsing with tree-sitter</li>
+<li><strong>Rust</strong> - Full AST parsing with <code>syn</code></li>
 <li><strong>Python</strong> - Full AST parsing with tree-sitter</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/types.rs:9-12</code> (Language enum) and <code>src/organization/language.rs:4-7</code></p>
@@ -7473,7 +7551,7 @@ pub enum Language {
 <p><strong>Language Detection</strong>: Debtmap determines file language by extension:</p>
 <ul>
 <li><code>.rs</code> files are analyzed as Rust</li>
-<li><code>.py</code> and <code>.pyw</code> files are analyzed as Python</li>
+<li><code>.py</code> files are analyzed as Python</li>
 </ul>
 <p><strong>Source</strong>: <code>src/organization/language.rs:10-17</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -7552,7 +7630,7 @@ detect_duplication = true
 <pre><code class="language-toml">[languages]
 enabled = ["rust", "python"]
 </code></pre>
-<p><strong>Note</strong>: The configuration structure supports JavaScript and TypeScript entries (see <code>src/config/languages.rs:15-21</code>), but the core <code>Language</code> enum and detection logic only implement Rust and Python. JavaScript/TypeScript support may be planned for future releases.</p>
+<p>The documented and implemented user-facing language set for <code>0.16.0</code> is Rust and Python.</p>
 <h2 id="feature-defaults"><a class="header" href="#feature-defaults">Feature Defaults</a></h2>
 <p><strong>Source</strong>: <code>src/config/languages.rs:40-61</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -7607,7 +7685,7 @@ detect_duplication = false      # Skip if not needed
 <p><strong>Source</strong>: <code>src/complexity/languages/rust.rs</code> and <code>src/analyzers/implementations.rs</code></p>
 <h3 id="rust-complexity"><a class="header" href="#rust-complexity">Rust Complexity</a></h3>
 <ul>
-<li>Uses tree-sitter for AST parsing</li>
+<li>Uses <code>syn</code> for AST parsing</li>
 <li>Calculates cyclomatic complexity from control flow</li>
 <li>Tracks cognitive complexity with nesting depth penalties</li>
 <li>Detects pattern match complexity with entropy analysis</li>
@@ -7627,7 +7705,7 @@ detect_duplication = false      # Skip if not needed
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
-    "*.min.js",        # Would be skipped anyway (JS not supported)
+    "*.min.js",        # Frontend artifacts that are not part of the supported set
 ]
 </code></pre>
 <p>See <a href="#thresholds-configuration">Thresholds Configuration</a> for complexity thresholds that can be language-aware.</p>
@@ -7646,8 +7724,8 @@ patterns = [
 <tr><td><code>enabled</code></td><td><code>Vec&lt;String&gt;</code></td><td>Languages to analyze</td></tr>
 <tr><td><code>rust</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Rust-specific settings</td></tr>
 <tr><td><code>python</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Python-specific settings</td></tr>
-<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>JavaScript settings (planned)</td></tr>
-<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>TypeScript settings (planned)</td></tr>
+<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
+<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
 </tbody>
 </table>
 </div>
@@ -7669,7 +7747,7 @@ patterns = [
 <h3 id="language-not-detected"><a class="header" href="#language-not-detected">Language Not Detected</a></h3>
 <p>If files aren’t being analyzed:</p>
 <ol>
-<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>, <code>.pyw</code>)</li>
+<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>)</li>
 <li>Verify the language is in <code>enabled</code> array</li>
 <li>Check ignore patterns aren’t excluding the files</li>
 </ol>
@@ -12998,7 +13076,7 @@ Recommendation:
 <li><strong>Cognitive Complexity</strong>: Low (simple delegation pattern)</li>
 <li><strong>Boilerplate Confidence</strong>: 95% (trait implementation with mechanical structure)</li>
 </ul>
-<h3 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h3>
+<h3 id="why-this-matters-1"><a class="header" href="#why-this-matters-1">Why This Matters</a></h3>
 <p>Without boilerplate detection, this file would be flagged as:</p>
 <ul>
 <li>High complexity debt</li>
@@ -20837,7 +20915,7 @@ HashMap&lt;(PathBuf, String), FunctionCoverage&gt;
 <li>Path matching fallback: ~10 microseconds (375 file checks vs 1,500 function checks)</li>
 <li>Overall speedup: <strong>50-100x faster</strong> coverage lookups</li>
 </ul>
-<h3 id="why-this-matters-1"><a class="header" href="#why-this-matters-1">Why This Matters</a></h3>
+<h3 id="why-this-matters-2"><a class="header" href="#why-this-matters-2">Why This Matters</a></h3>
 <p>When analyzing a typical Rust project with coverage enabled:</p>
 <ul>
 <li><strong>Function count</strong>: ~1,500 functions (after demangling)</li>
@@ -28416,7 +28494,16 @@ debtmap compare \
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="frequently-asked-questions-1"><a class="header" href="#frequently-asked-questions-1">Frequently Asked Questions</a></h1>
-<p>Common questions about debtmap’s features, usage, and AI integration.</p>
+<p>Common questions about debtmap’s features, usage, direct developer workflows, and AI integration.</p>
+<h2 id="general-usage"><a class="header" href="#general-usage">General Usage</a></h2>
+<h3 id="can-i-use-debtmap-without-ai-tools"><a class="header" href="#can-i-use-debtmap-without-ai-tools">Can I use debtmap without AI tools?</a></h3>
+<p>Yes. <code>debtmap analyze .</code> is useful on its own for developers who want a prioritized view of complexity, coverage gaps, and coupling risk.</p>
+<p>Common direct-use workflows:</p>
+<ul>
+<li>Browse the default terminal/TUI output during local development</li>
+<li>Export JSON to the dashboard for deeper visual analysis</li>
+<li>Run validation in CI to enforce debt thresholds</li>
+</ul>
 <h2 id="ai-integration"><a class="header" href="#ai-integration">AI Integration</a></h2>
 <h3 id="how-does-debtmap-work-with-ai-coding-assistants"><a class="header" href="#how-does-debtmap-work-with-ai-coding-assistants">How does debtmap work with AI coding assistants?</a></h3>
 <p>Debtmap is designed as a <strong>sensor</strong> that provides structured data for AI consumption. Instead of telling you what to fix, it tells AI assistants:</p>
@@ -28487,12 +28574,13 @@ debtmap analyze . --format markdown --top 10 &gt; debt-report.md
 <p><strong>Currently supported:</strong></p>
 <ul>
 <li><strong>Rust</strong> - Full support with AST parsing via <code>syn</code>, macro expansion, and trait resolution</li>
-<li><strong>TypeScript</strong> - Full support with tree-sitter parsing, JSX/TSX, async patterns, and type-specific analysis</li>
-<li><strong>JavaScript</strong> - Full support with tree-sitter parsing, ES6+ syntax, React components, Promise chains</li>
+<li><strong>Python</strong> - Language-aware parsing with tree-sitter plus function, class, decorator, and comprehension analysis</li>
+<li><strong>JavaScript</strong> - Tree-sitter parsing with modern ES syntax, JSX support, and async pattern analysis</li>
+<li><strong>TypeScript</strong> - Tree-sitter parsing with TS/TSX syntax, type-oriented patterns, and modern module support</li>
 </ul>
 <p><strong>Planned:</strong></p>
 <ul>
-<li>Python, Go</li>
+<li>Go</li>
 </ul>
 <h3 id="how-does-coverage-integration-work"><a class="header" href="#how-does-coverage-integration-work">How does coverage integration work?</a></h3>
 <p>Debtmap reads LCOV format coverage data and maps it to functions:</p>
@@ -28584,16 +28672,17 @@ fn validate_many_fields() { ... }
 <tr><th>Aspect</th><th>Debtmap</th><th>SonarQube</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Output</strong></td><td>Signals for AI</td><td>Recommendations</td></tr>
+<tr><td><strong>Primary UX</strong></td><td>CLI, TUI, JSON, dashboard</td><td>Server/dashboard</td></tr>
 <tr><td><strong>Speed</strong></td><td>Seconds</td><td>Minutes</td></tr>
-<tr><td><strong>Coverage</strong></td><td>Built-in</td><td>Enterprise only</td></tr>
-<tr><td><strong>Entropy</strong></td><td>Yes</td><td>No</td></tr>
+<tr><td><strong>Coverage</strong></td><td>Built-in</td><td>Enterprise-heavy workflows</td></tr>
 <tr><td><strong>Setup</strong></td><td>Single binary</td><td>Server required</td></tr>
+<tr><td><strong>Supported-language fit</strong></td><td>Strong within supported languages</td><td>Broader language coverage</td></tr>
+<tr><td><strong>AI handoff</strong></td><td>First-class markdown/JSON</td><td>Less workflow-oriented</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>When to use SonarQube:</strong> Multi-language enterprise dashboards.
-<strong>When to use debtmap:</strong> AI-assisted development with Rust, TypeScript, and JavaScript.</p>
+<p><strong>When to use SonarQube:</strong> You need a broader enterprise platform across many languages and centralized server workflows.
+<strong>When to use debtmap:</strong> You want a faster, lighter-weight replacement for supported languages, especially when developers work directly in terminal/TUI flows or want structured output for automation.</p>
 <h3 id="should-i-replace-clippy-with-debtmap"><a class="header" href="#should-i-replace-clippy-with-debtmap">Should I replace clippy with debtmap?</a></h3>
 <p><strong>No—use both.</strong> They serve different purposes:</p>
 <p><strong>clippy:</strong></p>
