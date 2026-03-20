@@ -5,7 +5,7 @@
 [![CI](https://github.com/iepathos/debtmap/actions/workflows/ci.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Debtmap analyzes your codebase and ranks technical debt by risk. Know exactly where to focus your refactoring effort - whether you're fixing it yourself or handing it to an AI assistant.
+Debtmap analyzes your codebase and ranks technical debt by risk. Use it directly in the terminal, TUI, or dashboard to understand where to focus refactoring effort, or pipe the results into an AI assistant when that fits your workflow.
 
 ## Why Debtmap?
 
@@ -22,7 +22,7 @@ Debtmap combines static analysis with git history to score technical debt across
 | **Purity** | Side effects, I/O operations | How testable and predictable code is |
 | **Entropy** | Pattern consistency within a codebase | Reduces false positives from intentional complexity |
 
-These signals combine into a **severity score** (0-10). The result: a ranked list of what to fix first, with the context needed to understand why.
+These signals combine into a **severity score** (0-10). The result: a ranked list of what to fix first, with the context needed to understand why, whether you're reviewing it yourself or handing it off to automation.
 
 ## Quick Start
 
@@ -36,7 +36,7 @@ debtmap analyze .
 # JSON for programmatic access
 debtmap analyze . --format json --top 10 > debt.json
 
-# Pipe to an LLM for automated fixes
+# Optional: pipe to an LLM for automated fixes
 debtmap analyze . --format markdown --top 1 | claude "Fix this"
 ```
 
@@ -44,10 +44,12 @@ debtmap analyze . --format markdown --top 1 | claude "Fix this"
 
 - **Rust** — Full AST analysis with syn, including macro expansion and trait detection
 - **Python** — Tree-sitter-based analysis for functions, classes, decorators, comprehensions, and Python-specific complexity patterns
+- **JavaScript** — Tree-sitter parsing with ES modules, React/JSX patterns, and async workflow analysis
+- **TypeScript** — Tree-sitter parsing with TS/TSX support, type-aware patterns, and modern frontend/server syntax
 
 ```bash
 # Analyze specific languages
-debtmap analyze . --languages rust,python
+debtmap analyze . --languages rust,python,javascript,typescript
 
 # All supported languages are enabled by default
 debtmap analyze .
@@ -69,12 +71,12 @@ Features:
 - Browse debt items sorted by severity
 - Drill into score breakdowns to understand why code ranks high
 - View git history, dependencies, and test coverage per function
-- Copy context to clipboard for AI assistants
+- Copy context to clipboard for AI assistants when needed
 - Jump to code in your editor
 
 ## LLM Integration
 
-The `--format markdown` output is designed for AI coding assistants. It provides:
+Debtmap works well on its own, and the `--format markdown` output is available when you want to feed findings into AI coding assistants. It provides:
 
 - **Context suggestions** - Specific file ranges the LLM should read to understand the problem
 - **Structured metadata** - All scoring factors exposed so the LLM can reason about priorities
@@ -91,13 +93,13 @@ See [LLM Integration Guide](https://iepathos.github.io/debtmap/llm-integration.h
 ## Output Formats
 
 ```bash
-# Markdown (recommended for AI workflows)
+# Markdown (good for AI workflows)
 debtmap analyze . --format markdown
 
 # JSON for programmatic access
 debtmap analyze . --format json
 
-# Terminal for human exploration
+# Terminal/TUI for direct exploration
 debtmap analyze .
 ```
 
@@ -245,7 +247,7 @@ perf report
 
 ## Roadmap
 
-**Current focus:** Rust and Python analysis quality + AI workflow integration
+**Current focus:** Rust, Python, and JS/TS analysis quality + AI workflow integration
 
 - [x] Cognitive + cyclomatic complexity
 - [x] Test coverage correlation
@@ -254,6 +256,8 @@ perf report
 - [x] Context suggestions for AI
 - [x] Rust language support
 - [x] Python language support
+- [x] JavaScript language support
+- [x] TypeScript language support
 - [ ] Streaming output for large codebases
 - [ ] Go language support
 

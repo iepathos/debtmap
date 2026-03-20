@@ -2,7 +2,7 @@
 
 ## Overview
 
-Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the `Analyzer` trait for extensibility, with current user-facing support centered on Rust and Python.
+Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the `Analyzer` trait for extensibility across Rust, Python, JavaScript, and TypeScript.
 
 ## Rust Analyzer
 
@@ -48,6 +48,8 @@ Debtmap provides full analysis for the following languages:
 |----------|--------|-----------------|
 | **Rust** | `syn` (native AST) | `.rs` |
 | **Python** | tree-sitter | `.py` |
+| **JavaScript** | tree-sitter | `.js`, `.mjs`, `.cjs`, `.jsx` |
+| **TypeScript** | tree-sitter | `.ts`, `.mts`, `.cts`, `.tsx` |
 
 ### Python Analyzer
 
@@ -59,6 +61,16 @@ The Python analyzer uses tree-sitter for AST parsing and provides:
 - **Python-Specific Constructs**: Comprehensions, exception blocks, and idiomatic control flow
 - **Entropy Analysis**: Pattern-based false positive reduction
 
+### JavaScript/TypeScript Analyzer
+
+The JavaScript and TypeScript analyzers use tree-sitter for AST parsing and provide:
+
+- **Complexity Metrics**: Cyclomatic complexity, cognitive complexity, and nesting depth
+- **Async Pattern Detection**: Promise chains, async/await, and callback-heavy flows
+- **React Support**: JSX and TSX component analysis
+- **Type-Oriented Patterns**: TypeScript-specific constructs such as assertions and broad type usage
+- **Entropy Analysis**: Pattern-based false positive reduction
+
 ### File Detection
 
 During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:
@@ -68,7 +80,7 @@ During file discovery, debtmap detects files by extension and routes them to the
 debtmap analyze .
 
 # Analyze specific languages only
-debtmap analyze . --languages rust,python
+debtmap analyze . --languages rust,python,javascript,typescript
 
 # All supported languages are enabled by default
 ```
@@ -98,7 +110,7 @@ To add support for a new language:
 3. **Update `from_extension()`** to recognize the file extension
 4. **Register in `AnalyzerFactory`** to instantiate your analyzer
 
-**Reference Implementation**: See `src/analyzers/rust.rs` for Rust and `src/analyzers/python/analyzer.rs` for Python as examples of language-specific analyzer implementations.
+**Reference Implementation**: See `src/analyzers/rust.rs`, `src/analyzers/python/analyzer.rs`, and `src/analyzers/typescript/analyzer.rs` for the current language-specific analyzer implementations.
 
 ## See Also
 

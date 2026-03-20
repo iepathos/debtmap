@@ -18,7 +18,7 @@ lines = 80
 coverage = 0.8
 
 [languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 
 [languages.rust]
 detect_dead_code = false

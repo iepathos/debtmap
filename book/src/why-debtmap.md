@@ -1,6 +1,17 @@
 # Why Debtmap?
 
-Debtmap is a **code complexity sensor** designed for AI-assisted development workflows. It identifies technical debt hotspots and provides the structured data AI coding tools need to understand and fix them.
+Debtmap is a **code complexity sensor** for developers and automation. It identifies technical debt hotspots and provides prioritized results that you can inspect directly in the terminal, TUI, or dashboard, with structured outputs available when you want to feed the same findings into AI tools.
+
+## Why This Matters
+
+Technical debt prioritization is hard even before AI enters the picture. Developers need to know:
+
+- Which hotspots are actually risky
+- Which complex areas are protected by tests
+- Which issues are isolated vs deeply coupled
+- Which files keep causing churn over time
+
+Debtmap answers those questions directly, then makes the same information available to automation.
 
 ## The AI Development Paradox
 
@@ -17,9 +28,9 @@ At the same time, AI assistants struggle to fix the debt they create:
 - **No prioritization** - They can't identify what matters most
 - **Wasted tokens** - They read irrelevant code while missing critical context
 
-## What AI Coding Tools Need
+## What Developers and AI Tools Need
 
-For an AI assistant to effectively fix technical debt, it needs:
+For a developer or AI assistant to effectively fix technical debt, they need:
 
 ### 1. Prioritized Targets
 
@@ -35,7 +46,7 @@ Debtmap provides a severity score (0-10) that combines:
 
 Not "this function is complex," but "read lines 38-85 of parser.rs, plus lines 100-120 of handler.rs where it's called, and lines 50-75 of the test file."
 
-Debtmap's context suggestions tell the AI exactly which code to read:
+Debtmap's context suggestions tell you exactly which code to read:
 
 ```
 CONTEXT:
@@ -48,7 +59,7 @@ CONTEXT:
 
 Not "this code is bad," but "cyclomatic complexity: 12, cognitive complexity: 18, test coverage: 0%, called by 8 functions."
 
-These signals let the AI make informed decisions about the best approach:
+These signals let developers and AI make informed decisions about the best approach:
 - High complexity + good coverage = risky to refactor
 - Low complexity + no coverage = easy test target
 - High coupling + high complexity = incremental approach needed
@@ -62,6 +73,11 @@ Not free-form text, but JSON and markdown optimized for LLM consumption:
 - Stable IDs for referencing items across runs
 
 ## What Debtmap Provides
+
+Debtmap is useful in two modes:
+
+- **Direct developer use** - Inspect findings in the terminal, TUI, or dashboard and decide what to tackle next
+- **Structured handoff** - Export markdown or JSON for automation, AI tools, CI, or downstream systems
 
 ### Complexity Signals
 
@@ -124,7 +140,7 @@ Debtmap doesn't claim "refactoring this will reduce bugs by 40%." Such predictio
 | Speed | Minutes | Seconds |
 | Focus | "Fix this" | "Here's what exists" |
 
-Traditional tools are designed for human code review workflows. Debtmap is designed for AI-assisted development.
+Debtmap is designed to work well for developers directly and to hand off cleanly to automation when needed.
 
 ### vs Linters (Clippy, ESLint)
 
@@ -136,6 +152,21 @@ Traditional tools are designed for human code review workflows. Debtmap is desig
 | Coverage | Not integrated | Core feature |
 
 Linters catch code style issues. Debtmap identifies complexity hotspots. Use both.
+
+### Can Debtmap Replace SonarQube?
+
+For teams working primarily in Debtmap's supported languages, often yes.
+
+Debtmap is a strong replacement when you want:
+- Fast local analysis without running a server
+- Terminal/TUI-first workflows for developers
+- Built-in coverage-aware prioritization
+- Structured outputs for CI, dashboards, and AI handoff
+
+SonarQube still has an advantage when you need:
+- Broader language coverage across a large organization
+- Centralized enterprise dashboards and policy management
+- A server-centric workflow across many repositories
 
 ### vs Coverage Tools (Tarpaulin, pytest-cov)
 

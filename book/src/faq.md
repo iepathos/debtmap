@@ -1,6 +1,17 @@
 # Frequently Asked Questions
 
-Common questions about debtmap's features, usage, and AI integration.
+Common questions about debtmap's features, usage, direct developer workflows, and AI integration.
+
+## General Usage
+
+### Can I use debtmap without AI tools?
+
+Yes. `debtmap analyze .` is useful on its own for developers who want a prioritized view of complexity, coverage gaps, and coupling risk.
+
+Common direct-use workflows:
+- Browse the default terminal/TUI output during local development
+- Export JSON to the dashboard for deeper visual analysis
+- Run validation in CI to enforce debt thresholds
 
 ## AI Integration
 
@@ -97,6 +108,8 @@ A function with 20 identical if/return validation checks has the same cyclomatic
 **Currently supported:**
 - **Rust** - Full support with AST parsing via `syn`, macro expansion, and trait resolution
 - **Python** - Language-aware parsing with tree-sitter plus function, class, decorator, and comprehension analysis
+- **JavaScript** - Tree-sitter parsing with modern ES syntax, JSX support, and async pattern analysis
+- **TypeScript** - Tree-sitter parsing with TS/TSX syntax, type-oriented patterns, and modern module support
 
 **Planned:**
 - Go
@@ -205,14 +218,15 @@ Use risk scores for prioritization, but apply your domain knowledge when decidin
 
 | Aspect | Debtmap | SonarQube |
 |--------|---------|-----------|
-| **Output** | Signals for AI | Recommendations |
+| **Primary UX** | CLI, TUI, JSON, dashboard | Server/dashboard |
 | **Speed** | Seconds | Minutes |
-| **Coverage** | Built-in | Enterprise only |
-| **Entropy** | Yes | No |
+| **Coverage** | Built-in | Enterprise-heavy workflows |
 | **Setup** | Single binary | Server required |
+| **Supported-language fit** | Strong within supported languages | Broader language coverage |
+| **AI handoff** | First-class markdown/JSON | Less workflow-oriented |
 
-**When to use SonarQube:** Multi-language enterprise dashboards.
-**When to use debtmap:** AI-assisted development with Rust and Python.
+**When to use SonarQube:** You need a broader enterprise platform across many languages and centralized server workflows.
+**When to use debtmap:** You want a faster, lighter-weight replacement for supported languages, especially when developers work directly in terminal/TUI flows or want structured output for automation.
 
 ### Should I replace clippy with debtmap?
 

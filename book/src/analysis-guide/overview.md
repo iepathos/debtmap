@@ -6,6 +6,8 @@ Debtmap analyzes code through multiple lenses to provide a comprehensive view of
 
 - **Rust** - Full analysis support with AST-based parsing via `syn`
 - **Python** - Full analysis support with tree-sitter parsing, class/function extraction, and Python-specific complexity handling
+- **JavaScript** - Full analysis support with tree-sitter parsing, modern ES syntax, JSX support, and async pattern handling
+- **TypeScript** - Full analysis support with tree-sitter parsing, TS/TSX syntax, and type-oriented pattern analysis
 
 ## Analysis Capabilities
 
@@ -112,7 +114,7 @@ Debtmap uses a **functional, multi-layered architecture** for accurate and perfo
 ### Three-Phase Analysis Pipeline
 
 **Phase 1: Parallel Parsing**
-- Language-specific AST generation (Rust via `syn`, Python via tree-sitter)
+- Language-specific AST generation (Rust via `syn`, Python/JavaScript/TypeScript via tree-sitter)
 - Pure functional transformation: source code → AST
 - Files parsed once, ASTs cached and cloned for reuse (44% faster)
 - Runs in parallel using Rayon for CPU-intensive parsing
