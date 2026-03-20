@@ -85,7 +85,7 @@ debtmap analyze . --format markdown
 debtmap analyze . --format markdown --top 3 | claude "Fix the top item"
 
 # JSON output for programmatic access
-debtmap analyze . --format json --top 10 > debt.json
+debtmap analyze . --format json --top 10 --output debt.json
 
 # With coverage data for accurate risk assessment
 cargo llvm-cov --lcov --output-path coverage.lcov

@@ -34,7 +34,7 @@ cargo install debtmap
 debtmap analyze .
 
 # JSON for programmatic access
-debtmap analyze . --format json --top 10 > debt.json
+debtmap analyze . --format json --top 10 --output debt.json
 
 # Optional: pipe to an LLM for automated fixes
 debtmap analyze . --format markdown --top 1 | claude "Fix this"

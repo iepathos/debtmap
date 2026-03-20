@@ -54,7 +54,7 @@ cargo install debtmap
 debtmap analyze .
 
 # Get structured signals for dashboards and automation
-debtmap analyze . --format json --top 10 > debt.json
+debtmap analyze . --format json --top 10 --output debt.json
 
 # Optional: pipe the top item to Claude Code
 debtmap analyze . --format markdown --top 3 | claude "Fix the top item"

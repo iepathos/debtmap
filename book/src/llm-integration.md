@@ -295,7 +295,7 @@ jobs:
 
       - name: Analyze debt
         run: |
-          debtmap analyze . --format json --lcov coverage.lcov > debt.json
+          debtmap analyze . --format json --lcov coverage.lcov --output debt.json
 
       - name: Check for critical items
         run: |
