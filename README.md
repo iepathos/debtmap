@@ -43,12 +43,11 @@ debtmap analyze . --format markdown --top 1 | claude "Fix this"
 ## Supported Languages
 
 - **Rust** — Full AST analysis with syn, including macro expansion and trait detection
-- **TypeScript** — Tree-sitter parsing with JSX/TSX, async patterns, and type-specific analysis
-- **JavaScript** — ES6+ syntax, React components, Promise chains, callback nesting
+- **Python** — Tree-sitter-based analysis for functions, classes, decorators, comprehensions, and Python-specific complexity patterns
 
 ```bash
 # Analyze specific languages
-debtmap analyze . --languages rust,typescript
+debtmap analyze . --languages rust,python
 
 # All supported languages are enabled by default
 debtmap analyze .
@@ -127,8 +126,16 @@ All processing happens client-side - your data never leaves your browser.
 ## With Coverage Data
 
 ```bash
-# Generate coverage first
+# Rust coverage
 cargo llvm-cov --lcov --output-path coverage.lcov
+
+# Analyze with coverage integration
+debtmap analyze . --lcov coverage.lcov
+```
+
+```bash
+# Python coverage
+pytest --cov=. --cov-report=lcov:coverage.lcov
 
 # Analyze with coverage integration
 debtmap analyze . --lcov coverage.lcov
@@ -238,16 +245,16 @@ perf report
 
 ## Roadmap
 
-**Current focus:** Rust analysis excellence + AI workflow integration
+**Current focus:** Rust and Python analysis quality + AI workflow integration
 
 - [x] Cognitive + cyclomatic complexity
 - [x] Test coverage correlation
 - [x] Pattern-based false positive reduction
 - [x] LLM-optimized output format
 - [x] Context suggestions for AI
-- [x] Multi-language support (Rust, TypeScript, JavaScript)
+- [x] Rust language support
+- [x] Python language support
 - [ ] Streaming output for large codebases
-- [ ] Python language support
 - [ ] Go language support
 
 ## Contributing

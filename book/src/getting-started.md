@@ -14,6 +14,7 @@ Before installing Debtmap, you'll need:
 
 **Optional** (for coverage-based risk analysis):
 - **Rust projects**: `cargo-tarpaulin` or `cargo-llvm-cov` for coverage data
+- **Python projects**: `pytest-cov` or another LCOV-compatible coverage tool
 
 ## Installation
 
@@ -90,6 +91,10 @@ debtmap analyze . --format json --top 10 > debt.json
 cargo llvm-cov --lcov --output-path coverage.lcov
 debtmap analyze . --lcov coverage.lcov
 
+# Python coverage workflow
+pytest --cov=. --cov-report=lcov:coverage.lcov
+debtmap analyze . --lcov coverage.lcov
+
 # Show only critical/high priority items
 debtmap analyze . --min-priority high --top 10
 
@@ -107,8 +112,8 @@ debtmap analyze .
 
 **What happens during analysis:**
 
-1. **File Discovery** - Debtmap scans your project for source files (Rust `.rs`, TypeScript `.ts`/`.tsx`, JavaScript `.js`/`.jsx`)
-2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST) using `syn` for Rust and tree-sitter for TypeScript/JavaScript
+1. **File Discovery** - Debtmap scans your project for supported source files (Rust `.rs`, Python `.py`)
+2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST) using `syn` for Rust and tree-sitter for Python
 3. **Metric Extraction** - Complexity, coverage gaps, and coupling are measured
 4. **Prioritization** - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)
 5. **Context Generation** - File ranges are suggested for each debt item
@@ -227,6 +232,14 @@ cargo tarpaulin --out lcov --output-dir target/coverage
 debtmap analyze . --lcov coverage.lcov
 ```
 
+```bash
+# Python coverage with pytest-cov
+pytest --cov=. --cov-report=lcov:coverage.lcov
+
+# Analyze with coverage
+debtmap analyze . --lcov coverage.lcov
+```
+
 With coverage data:
 - Complex code with good tests = lower priority
 - Simple code with no tests = higher priority
@@ -334,7 +347,7 @@ patterns = ["**/target/**", "**/tests/**"]
 
 ### Analysis Issues
 
-- **Empty output**: Check that your project contains supported source files (`.rs` for Rust, `.ts`/`.tsx` for TypeScript, `.js`/`.jsx` for JavaScript)
+- **Empty output**: Check that your project contains supported source files (`.rs` for Rust or `.py` for Python)
 - **Parser failures**: Run with `-vv` for debug output
 - **Performance issues**: Limit parallel jobs with `--jobs 4`
 - **Large codebase slowness**: Use `--streaming` mode for O(1) memory overhead

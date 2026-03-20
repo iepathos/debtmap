@@ -18,9 +18,13 @@ lines = 80
 coverage = 0.8
 
 [languages]
-rust = true
-python = true
-javascript = true
+enabled = ["rust", "python"]
+
+[languages.rust]
+detect_dead_code = false
+
+[languages.python]
+detect_dead_code = true
 ```
 
 ## Configuration Topics

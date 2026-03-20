@@ -13,7 +13,7 @@ Debtmap analyzes source code for technical debt and complexity issues. Language 
 ## Supported Languages
 
 **Full Support (AST-Based Analysis):**
-- **Rust** - Full AST parsing with tree-sitter
+- **Rust** - Full AST parsing with `syn`
 - **Python** - Full AST parsing with tree-sitter
 
 **Source**: `src/core/types.rs:9-12` (Language enum) and `src/organization/language.rs:4-7`
@@ -30,7 +30,7 @@ pub enum Language {
 
 **Language Detection**: Debtmap determines file language by extension:
 - `.rs` files are analyzed as Rust
-- `.py` and `.pyw` files are analyzed as Python
+- `.py` files are analyzed as Python
 
 **Source**: `src/organization/language.rs:10-17`
 
@@ -126,7 +126,7 @@ Specify which languages to analyze with the `enabled` array:
 enabled = ["rust", "python"]
 ```
 
-**Note**: The configuration structure supports JavaScript and TypeScript entries (see `src/config/languages.rs:15-21`), but the core `Language` enum and detection logic only implement Rust and Python. JavaScript/TypeScript support may be planned for future releases.
+The documented and implemented user-facing language set for `0.16.0` is Rust and Python.
 
 ## Feature Defaults
 
@@ -198,7 +198,7 @@ Debtmap uses language-specific complexity analyzers:
 
 ### Rust Complexity
 
-- Uses tree-sitter for AST parsing
+- Uses `syn` for AST parsing
 - Calculates cyclomatic complexity from control flow
 - Tracks cognitive complexity with nesting depth penalties
 - Detects pattern match complexity with entropy analysis
@@ -223,7 +223,7 @@ File exclusions in `[ignore]` apply before language detection:
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
-    "*.min.js",        # Would be skipped anyway (JS not supported)
+    "*.min.js",        # Frontend artifacts that are not part of the supported set
 ]
 ```
 
@@ -246,8 +246,8 @@ See [Advanced Options](advanced.md) for classification configuration.
 | `enabled` | `Vec<String>` | Languages to analyze |
 | `rust` | `Option<LanguageFeatures>` | Rust-specific settings |
 | `python` | `Option<LanguageFeatures>` | Python-specific settings |
-| `javascript` | `Option<LanguageFeatures>` | JavaScript settings (planned) |
-| `typescript` | `Option<LanguageFeatures>` | TypeScript settings (planned) |
+| `javascript` | `Option<LanguageFeatures>` | Reserved configuration field |
+| `typescript` | `Option<LanguageFeatures>` | Reserved configuration field |
 
 ### LanguageFeatures
 
@@ -265,7 +265,7 @@ See [Advanced Options](advanced.md) for classification configuration.
 
 If files aren't being analyzed:
 
-1. Check the file extension is recognized (`.rs`, `.py`, `.pyw`)
+1. Check the file extension is recognized (`.rs`, `.py`)
 2. Verify the language is in `enabled` array
 3. Check ignore patterns aren't excluding the files
 

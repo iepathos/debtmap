@@ -63,7 +63,7 @@ For a complete list of metrics and their formulas, see the [Metrics Reference](.
 - **Deterministic output** - Same input = same output
 
 ### Analysis Capabilities
-- **Rust-first analysis** - Full AST parsing, macro expansion, trait resolution
+- **Rust and Python analysis** - Native Rust AST parsing plus Python tree-sitter analysis
 - **Coverage integration** - Native LCOV support for risk assessment
 - **Debt pattern detection** - God objects, boilerplate code, error handling anti-patterns
 - **Entropy analysis** - Reduces false positives from repetitive code
@@ -76,13 +76,13 @@ For a complete list of metrics and their formulas, see the [Metrics Reference](.
 
 ## Current Status
 
-Debtmap focuses exclusively on Rust. This focused approach allows us to:
+Debtmap currently supports Rust and Python analysis. This lets debtmap:
 
 - Build deep Rust-specific analysis (macros, traits, lifetimes)
-- Perfect core algorithms before expanding
-- Deliver the best possible AI sensor for Rust
+- Analyze Python projects with language-aware parsing and complexity detection
+- Keep the core AI workflow focused on high-signal, coverage-aware prioritization
 
-Multi-language support (Python, JavaScript/TypeScript, Go) is planned for future releases.
+Additional language expansion remains possible in future releases, but `0.16.0` ships with Rust and Python as the documented supported set.
 
 ## Target Audience
 
