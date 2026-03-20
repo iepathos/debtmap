@@ -8,9 +8,19 @@ Debtmap is different from traditional static analysis tools. Instead of burying 
 
 1. **Where to look** - Prioritized list of debt items with exact file locations
 2. **What to read** - Context suggestions (callers, callees, test files)
-3. **What signals matter** - Complexity, coverage, coupling metrics
+3. **What signals matter** - Multi-strategy analysis across complexity, coverage, coupling, git history, purity, and entropy
 
-The key insight: good prioritization matters whether a developer is reviewing the results directly or an AI assistant is acting on them. Debtmap provides that guidance.
+Good prioritization matters whether a developer is reviewing the results directly or an AI assistant is acting on them. Debtmap provides that guidance.
+
+What makes Debtmap distinctive is that it does not rely on a single complexity score. It cross-checks multiple strategies:
+
+- **Entropy-adjusted complexity** - Reduces false positives when repetitive boilerplate or patterned code inflates raw complexity
+- **Coverage + complexity prioritization** - Treats untested complex code as materially riskier than equally complex code with strong coverage
+- **Git history hotspot analysis** - Uses churn, bug-fix patterns, and author activity to identify code that keeps causing trouble
+- **Coupling and dependency analysis** - Estimates impact radius by looking at fan-in, fan-out, and call-graph relationships
+- **Purity analysis** - Distinguishes testable, low-side-effect code from code with heavier mutation and I/O risk
+
+The result is a ranked view of technical debt that is designed to surface genuinely risky hotspots instead of overwhelming developers with generic complexity warnings.
 
 ## The AI Sensor Model
 
@@ -18,7 +28,11 @@ Debtmap is a **sensor**, not a prescriber. It measures and reports; it doesn't t
 
 **What Debtmap provides:**
 - Quantified complexity signals (cyclomatic, cognitive, nesting)
-- Test coverage gaps with risk prioritization
+- Entropy-adjusted scoring to reduce false positives
+- Test coverage gaps combined with complexity for cross-prioritization
+- Git history context to surface churn and bug hotspots
+- Coupling and dependency signals to estimate impact radius
+- Purity analysis to reflect side effects and testability
 - Direct, browsable results for developers in terminal and TUI workflows
 - Context suggestions for AI consumption
 - Structured output (JSON, LLM-markdown) for machine consumption
@@ -54,9 +68,10 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 
 ### Signal Generation
 - **Complexity signals** - Cyclomatic, cognitive, nesting depth, lines of code
-- **Coverage signals** - Line coverage, branch coverage, function coverage
-- **Coupling signals** - Fan-in, fan-out, call graph depth
-- **Quality signals** - Entropy (false positive reduction), purity (testability)
+- **Coverage signals** - Line coverage, branch coverage, function coverage, combined with complexity for risk ranking
+- **Git context signals** - Churn, bug-fix frequency, and author/change history
+- **Coupling signals** - Fan-in, fan-out, call graph depth, and impact radius
+- **Quality signals** - Entropy (false positive reduction) and purity (testability and side-effect profile)
 
 For a complete list of metrics and their formulas, see the [Metrics Reference](./metrics-reference.md).
 
@@ -68,9 +83,11 @@ For a complete list of metrics and their formulas, see the [Metrics Reference](.
 
 ### Analysis Capabilities
 - **Rust, Python, and JS/TS analysis** - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, and TypeScript
-- **Coverage integration** - Native LCOV support for risk assessment
+- **Multi-strategy prioritization** - Cross-ranks debt using complexity, coverage, git history, coupling, purity, and entropy
+- **Coverage integration** - Native LCOV support for risk assessment, especially for complex code
 - **Debt pattern detection** - God objects, boilerplate code, error handling anti-patterns
-- **Entropy analysis** - Reduces false positives from repetitive code
+- **Entropy analysis** - Reduces false positives from repetitive or formulaic code
+- **Git and dependency context** - Highlights bug hotspots and likely impact radius before refactoring
 - **Parallel processing** - Fast analysis (10-100x faster than Java/Python tools)
 
 ### Workflow Integration
