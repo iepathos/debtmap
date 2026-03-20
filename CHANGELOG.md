@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-03-19
+
+### Added
+
+- **AST-Based Python Analysis** - Added first-class Python support powered by tree-sitter
+  - New Python analyzer and extractor with function discovery and metric extraction
+  - Complexity, entropy, and purity analysis for Python codebases
+  - Added Python-focused regression coverage for extraction, complexity, and entropy
+
+### Fixed
+
+- **Cross-Language Analysis Wiring** - Restored and completed analyzer signal propagation
+  - JavaScript and TypeScript analysis now fully wire extracted signals into downstream analysis
+  - Python analysis now honors analyzer configuration and module-structure signals
+  - Rust module-structure analysis now populates dependency graph relationships correctly
+
+- **Discovery Safety** - File discovery now ignores Git metadata paths
+  - Prevents traversal into `.git` internals such as worktree metadata
+  - Preserves normal source discovery while avoiding repository bookkeeping noise
+
+- **TypeScript Determinism** - Extraction and call graph construction now produce stable ordering
+  - Functions and call edges are sorted deterministically during analysis
+  - Added regression coverage for TypeScript determinism
+
+- **TUI Scoring Progress** - TUI now shows debt-scoring finalization progress more clearly
+
+- **Benchmark Option Consistency** - Bench analysis options now pass a fixed `reference_time`
+
+### Dependencies
+
+- Refreshed the Cargo lockfile and updated direct dependency minimums
+- clap: 4.5.60 -> 4.6.0
+- once_cell: 1.21.3 -> 1.21.4
+- assert_cmd: 2.1.2 -> 2.2.0
+- tempfile: 3.26.0 -> 3.27.0
+- openssl-sys: 0.9.111 -> 0.9.112
+- tracing-subscriber: 0.3.22 -> 0.3.23
+
 ## [0.15.3] - 2026-03-13
 
 ### Fixed
