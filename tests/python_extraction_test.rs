@@ -114,3 +114,26 @@ def test_func():
     assert!(data.test_lines >= 2);
     assert!(data.production_lines() >= 2);
 }
+
+#[test]
+fn test_python_extraction_handles_typed_default_parameters() {
+    let source = r#"
+def configure(
+    host: str = "localhost",
+    port: int = 5432,
+    *args,
+    **kwargs,
+):
+    return host, port, args, kwargs
+"#;
+    let path = Path::new("typed_default_params.py");
+    let data = UnifiedFileExtractor::extract(path, source).expect("Failed to extract");
+
+    let func = data
+        .functions
+        .iter()
+        .find(|f| f.name == "configure")
+        .expect("configure function should be extracted");
+
+    assert_eq!(func.parameter_names, vec!["host", "port", "args", "kwargs"]);
+}

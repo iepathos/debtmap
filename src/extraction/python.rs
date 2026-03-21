@@ -366,20 +366,42 @@ impl<'a> PythonExtractor<'a> {
         if let Some(params_node) = node.child_by_field_name("parameters") {
             let mut cursor = params_node.walk();
             for child in params_node.children(&mut cursor) {
-                if child.kind() == "identifier"
-                    || child.kind() == "typed_parameter"
-                    || child.kind() == "default_parameter"
-                {
-                    let id_node = if child.kind() == "identifier" {
-                        child
-                    } else {
-                        child.child_by_field_name("name").unwrap()
-                    };
-                    params.push(self.node_text(id_node).to_string());
+                if let Some(name) = self.extract_parameter_name(child) {
+                    params.push(name);
                 }
             }
         }
         params
+    }
+
+    fn extract_parameter_name(&self, node: Node) -> Option<String> {
+        match node.kind() {
+            "identifier" => Some(self.node_text(node).to_string()),
+            "typed_parameter"
+            | "default_parameter"
+            | "typed_default_parameter"
+            | "list_splat_pattern"
+            | "dictionary_splat_pattern" => node
+                .child_by_field_name("name")
+                .and_then(|name| self.extract_parameter_name(name))
+                .or_else(|| self.find_identifier_descendant(node).map(str::to_string)),
+            _ => None,
+        }
+    }
+
+    fn find_identifier_descendant(&self, node: Node) -> Option<&str> {
+        if node.kind() == "identifier" {
+            return Some(self.node_text(node));
+        }
+
+        let mut cursor = node.walk();
+        for child in node.named_children(&mut cursor) {
+            if let Some(name) = self.find_identifier_descendant(child) {
+                return Some(name);
+            }
+        }
+
+        None
     }
 
     fn extract_calls(&self, node: Node) -> Vec<CallSite> {
