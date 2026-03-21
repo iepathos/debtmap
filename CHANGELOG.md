@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-03-21
+
+### Fixed
+
+- **Python Parameter Extraction** - Analyzer no longer panics on typed default parameters
+  - Hardened Python extractor parameter-name discovery for tree-sitter node variants
+  - Added regression coverage for typed defaults plus `*args` and `**kwargs`
+
 ## [0.16.0] - 2026-03-19
 
 ### Added
