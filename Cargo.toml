@@ -144,7 +144,7 @@ openssl-src = "300"
 petgraph = "0.8.1"  # minimum for stable node_indices API
 lazy_static = "1.5.0"
 html-escape = "0.2.13"
-tui-scrollview = "0.6.2"
+tui-scrollview = "0.6.3"
 
 [dev-dependencies]
 # Testing
