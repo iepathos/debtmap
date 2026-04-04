@@ -148,7 +148,7 @@ tui-scrollview = "0.6.2"
 
 [dev-dependencies]
 # Testing
-proptest = "1.4"
+proptest = "1.11"
 pretty_assertions = "1.4"
 tempfile = "3.27"
 criterion = "0.8"
