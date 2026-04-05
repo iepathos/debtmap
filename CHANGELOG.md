@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-04-05
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.16.2 release
+- lcov: 0.8.1 -> 0.8.2
+- tui-scrollview: 0.6.2 -> 0.6.4
+- env_logger: 0.11.9 -> 0.11.10
+- proptest: 1.10.0 -> 1.11.0
+
 ## [0.16.1] - 2026-03-21
 
 ### Fixed
