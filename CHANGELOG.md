@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.3] - 2026-04-14
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.16.3 release
+- stillwater: 1.0.0 -> 1.0.1
+- openssl-src: 300.5.5+3.5.5 -> 300.6.0+3.6.2
+- tokio: 1.51.0 -> 1.52.0
+- openssl-sys: 0.9.112 -> 0.9.113
+
 ## [0.16.2] - 2026-04-05
 
 ### Dependencies
