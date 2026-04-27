@@ -153,8 +153,10 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::raw(":Pages  "),
         Span::styled("j/k", Style::default().fg(theme.accent())),
         Span::raw(":Items  "),
-        Span::styled("^D/^U", Style::default().fg(theme.accent())),
-        Span::raw(":Scroll  "),
+        Span::styled("c", Style::default().fg(theme.accent())),
+        Span::raw(":Copy page  "),
+        Span::styled("C", Style::default().fg(theme.accent())),
+        Span::raw(":Copy item  "),
         Span::styled("?", Style::default().fg(theme.accent())),
         Span::raw(":Help"),
     ]);
