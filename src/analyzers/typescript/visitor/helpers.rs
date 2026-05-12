@@ -33,13 +33,12 @@ fn traverse_for_cyclomatic(node: &Node, source: &str, complexity: &mut u32) {
         }
         "catch_clause" => *complexity += 1,
         "ternary_expression" | "conditional_expression" => *complexity += 1,
-        "optional_chain_expression" => *complexity += 1,
 
         // Logical operators create branches
         "binary_expression" => {
             if let Some(op) = node.child_by_field_name("operator") {
                 let op_text = node_text(&op, source);
-                if op_text == "&&" || op_text == "||" || op_text == "??" {
+                if op_text == "&&" || op_text == "||" {
                     *complexity += 1;
                 }
             }
@@ -131,7 +130,7 @@ fn traverse_for_cognitive(node: &Node, source: &str, complexity: &mut u32, nesti
         "binary_expression" => {
             if let Some(op) = node.child_by_field_name("operator") {
                 let op_text = node_text(&op, source);
-                if op_text == "&&" || op_text == "||" || op_text == "??" {
+                if op_text == "&&" || op_text == "||" {
                     *complexity += 1;
                 }
             }
@@ -428,6 +427,37 @@ mod tests {
 
         let complexity = calculate_cyclomatic_complexity(&root, &source);
         assert_eq!(complexity, 4); // 1 base + 1 if + 2 logical ops
+    }
+
+    #[test]
+    fn test_nullish_defaults_do_not_inflate_async_persistence_complexity() {
+        let source = r#"
+async function persist(db, input) {
+    await prepare(db);
+    const artifact = input.artifact;
+    const promptHash = artifact?.prompt ? await hash(artifact.prompt) : null;
+    await db
+        .prepare("insert into table values (?, ?, ?, ?, ?, ?)")
+        .bind(
+            artifact?.artifactId ?? null,
+            artifact?.format ?? input.request?.format ?? null,
+            artifact?.variant ?? input.request?.variant ?? null,
+            input.request?.presetId ?? null,
+            input.model ?? null,
+            promptHash,
+        )
+        .run();
+    return [
+        artifact?.artifactId ?? null,
+        artifact?.format ?? input.request?.format ?? null,
+    ];
+}
+"#;
+        let (tree, source) = parse_and_get_body(source);
+        let root = tree.root_node();
+
+        assert_eq!(calculate_cyclomatic_complexity(&root, &source), 2);
+        assert_eq!(calculate_cognitive_complexity(&root, &source), 4);
     }
 
     #[test]
