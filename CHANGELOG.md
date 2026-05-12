@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.4] - 2026-05-12
+
+### Fixed
+
+- **TypeScript Complexity False Positive** - Optional chaining and nullish defaults no longer inflate complexity
+  - `?.` expressions are treated as safe access syntax rather than decision points
+  - `??` defaults are no longer counted as logical branches in cyclomatic or cognitive complexity
+  - Added regression coverage for async persistence-style code with optional fields and null defaults
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.16.4 release
+- assert_cmd: 2.2.0 -> 2.2.2
+- clap: 4.6.0 -> 4.6.1
+- openssl-sys: 0.9.113 -> 0.9.115
+- premortem: 0.6.1 -> 0.6.2
+- tokio: 1.52.0 -> 1.52.3
+
 ## [0.16.3] - 2026-04-14
 
 ### Dependencies
