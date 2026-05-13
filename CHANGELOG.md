@@ -23,6 +23,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Routes Python files through the unified extraction-backed god object analyzer before heuristic fallback
   - Added regression coverage for semantic responsibility names in Python god object reports
 
+- **Python Decorated Handler Responsibilities** - Decorated Python functions now retain semantic responsibility classification
+  - Added shared responsibility classification for extraction-backed god object analysis
+  - Preserves handler-style domains when decorators wrap the underlying function
+  - Added Python extraction regression coverage for decorated handlers
+
+- **God Object Priority Score Bounds** - God object scoring now caps priority scores to valid ranges
+  - Prevents file-level and god-object debt scores from exceeding expected priority bounds
+  - Keeps god-object scoring compatible with downstream display and sorting assumptions
+
+### Tech Debt Cleanup
+
+- **Parallel Analysis Finalization Refactor** - Simplified `ParallelUnifiedAnalysisBuilder::build`
+  - Extracted final aggregation, god-object item creation, file-item enrichment, coverage finalization, and timing updates into focused helpers
+  - Preserved parallel analysis behavior while reducing the critical build function's size and branching complexity
+  - Verified with the parallel unified analysis integration test suite
+
+- **Complexity Analysis Refactors** - Simplified high-complexity traversal code paths
+  - Decomposed cyclomatic traversal into smaller helpers with targeted regression coverage
+  - Split recursive match visitor logic into focused traversal and predicate helpers
+  - Preserved existing complexity behavior while reducing debt in core analysis code
+
+- **Call Graph Expression Visitor Refactor** - Simplified expression visitor handling
+  - Extracted visitor responsibilities in `analyzers::call_graph` to reduce branching in expression traversal
+  - Kept call graph behavior unchanged while improving maintainability
+
+### Documentation
+
+- **Agent Guidance** - Moved local development guidance from `CLAUDE.md` into `AGENTS.md`
+  - Keeps Codex and Claude guidance aligned through the existing `CLAUDE.md` symlink
+
 ### Dependencies
 
 - Refreshed the Cargo lockfile for the 0.16.5 release
