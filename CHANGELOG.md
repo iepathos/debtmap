@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.5] - 2026-05-13
+
+### Added
+
+- **JavaScript/TypeScript God Object Analysis** - God object detection now uses parser-derived semantic responsibilities
+  - Classifies large JS/TS files by extracted function names instead of generic heuristic buckets
+  - Produces responsibility-based split suggestions for cohesive method groups
+  - Includes module structure, visibility, confidence, and detection-type details in god object reports
+
+### Fixed
+
+- **Python God Object Responsibilities** - Python analysis now uses extracted semantic responsibilities
+  - Replaces generic `responsibility_*` labels with named domains such as parsing, validation, and rendering
+  - Routes Python files through the unified extraction-backed god object analyzer before heuristic fallback
+  - Added regression coverage for semantic responsibility names in Python god object reports
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.16.5 release
+
 ## [0.16.4] - 2026-05-12
 
 ### Fixed
