@@ -15,217 +15,300 @@
 use super::match_patterns::detect_match_expression;
 use syn::{Block, Expr, Stmt};
 
+enum WorkItem<'ast> {
+    Expr(&'ast Expr, bool),
+    Stmt(&'ast Stmt),
+}
+
+struct TraversalState<'ast> {
+    complexity: u32,
+    work: Vec<WorkItem<'ast>>,
+}
+
+impl<'ast> TraversalState<'ast> {
+    fn from_block(block: &'ast Block) -> Self {
+        let mut traversal = Self {
+            complexity: 1,
+            work: Vec::new(),
+        };
+        traversal.push_block(block);
+        traversal
+    }
+
+    fn run(mut self) -> u32 {
+        while let Some(item) = self.work.pop() {
+            self.process_item(item);
+        }
+
+        self.complexity
+    }
+
+    fn process_item(&mut self, item: WorkItem<'ast>) {
+        match item {
+            WorkItem::Expr(expr, in_condition) => self.process_expr(expr, in_condition),
+            WorkItem::Stmt(stmt) => self.process_stmt(stmt),
+        }
+    }
+
+    fn process_stmt(&mut self, stmt: &'ast Stmt) {
+        if let Some(expr) = stmt_expr(stmt) {
+            self.push_expr(expr, false);
+        }
+    }
+
+    fn process_expr(&mut self, expr: &'ast Expr, in_condition: bool) {
+        self.complexity += calculate_expr_complexity(expr, in_condition);
+        push_expr_children(self, expr, in_condition);
+    }
+
+    fn push_expr(&mut self, expr: &'ast Expr, in_condition: bool) {
+        self.work.push(WorkItem::Expr(expr, in_condition));
+    }
+
+    fn push_stmt(&mut self, stmt: &'ast Stmt) {
+        self.work.push(WorkItem::Stmt(stmt));
+    }
+
+    fn push_block(&mut self, block: &'ast Block) {
+        block
+            .stmts
+            .iter()
+            .rev()
+            .for_each(|stmt| self.push_stmt(stmt));
+    }
+}
+
 /// Calculate cyclomatic complexity using iterative AST traversal.
 ///
 /// Uses an explicit stack instead of recursive visitor to avoid stack overflow
 /// on deeply nested AST structures.
 pub fn calculate_cyclomatic(block: &Block) -> u32 {
-    let mut complexity = 1u32;
+    TraversalState::from_block(block).run()
+}
 
-    // Use explicit stack for iterative traversal
-    // Stack contains (expression, in_condition flag)
-    let mut expr_stack: Vec<(&Expr, bool)> = Vec::new();
-    let mut stmt_stack: Vec<&Stmt> = Vec::new();
+fn stmt_expr(stmt: &Stmt) -> Option<&Expr> {
+    match stmt {
+        Stmt::Local(local) => local.init.as_ref().map(|init| init.expr.as_ref()),
+        Stmt::Expr(expr, _) => Some(expr),
+        Stmt::Item(_) | Stmt::Macro(_) => None,
+    }
+}
 
-    // Initialize with block statements
-    for stmt in block.stmts.iter().rev() {
-        stmt_stack.push(stmt);
+fn push_expr_children<'ast>(
+    traversal: &mut TraversalState<'ast>,
+    expr: &'ast Expr,
+    in_condition: bool,
+) {
+    if push_control_flow_children(traversal, expr) {
+        return;
     }
 
-    while !stmt_stack.is_empty() || !expr_stack.is_empty() {
-        // Process statements first
-        if let Some(stmt) = stmt_stack.pop() {
-            match stmt {
-                Stmt::Local(local) => {
-                    if let Some(init) = &local.init {
-                        expr_stack.push((&init.expr, false));
-                    }
-                }
-                Stmt::Expr(expr, _) => {
-                    expr_stack.push((expr, false));
-                }
-                Stmt::Item(_) => {
-                    // Items don't contribute to complexity
-                }
-                Stmt::Macro(_) => {
-                    // Macros can't be analyzed without expansion
-                }
-            }
-            continue;
-        }
-
-        // Process expressions
-        if let Some((expr, in_condition)) = expr_stack.pop() {
-            // Calculate complexity contribution for this expression
-            complexity += calculate_expr_complexity(expr, in_condition);
-
-            // Add child expressions to stack (in reverse order for correct traversal)
-            match expr {
-                Expr::If(expr_if) => {
-                    // Add else branch
-                    if let Some((_, else_expr)) = &expr_if.else_branch {
-                        expr_stack.push((else_expr, false));
-                    }
-                    // Add then block statements
-                    for stmt in expr_if.then_branch.stmts.iter().rev() {
-                        stmt_stack.push(stmt);
-                    }
-                    // Add condition (mark as in_condition)
-                    expr_stack.push((&expr_if.cond, true));
-                }
-                Expr::While(expr_while) => {
-                    // Add body statements
-                    for stmt in expr_while.body.stmts.iter().rev() {
-                        stmt_stack.push(stmt);
-                    }
-                    // Add condition
-                    expr_stack.push((&expr_while.cond, true));
-                }
-                Expr::ForLoop(expr_for) => {
-                    // Add body statements
-                    for stmt in expr_for.body.stmts.iter().rev() {
-                        stmt_stack.push(stmt);
-                    }
-                    // Add iterator expression
-                    expr_stack.push((&expr_for.expr, false));
-                }
-                Expr::Loop(expr_loop) => {
-                    // Add body statements
-                    for stmt in expr_loop.body.stmts.iter().rev() {
-                        stmt_stack.push(stmt);
-                    }
-                }
-                Expr::Match(expr_match) => {
-                    // Add arm bodies
-                    for arm in expr_match.arms.iter().rev() {
-                        expr_stack.push((&arm.body, false));
-                        if let Some((_, guard)) = &arm.guard {
-                            expr_stack.push((guard, false));
-                        }
-                    }
-                    // Add match expression
-                    expr_stack.push((&expr_match.expr, false));
-                }
-                Expr::Block(expr_block) => {
-                    for stmt in expr_block.block.stmts.iter().rev() {
-                        stmt_stack.push(stmt);
-                    }
-                }
-                Expr::Closure(closure) => {
-                    expr_stack.push((&closure.body, false));
-                }
-                Expr::Async(async_block) => {
-                    for stmt in async_block.block.stmts.iter().rev() {
-                        stmt_stack.push(stmt);
-                    }
-                }
-                Expr::Try(expr_try) => {
-                    expr_stack.push((&expr_try.expr, false));
-                }
-                Expr::Binary(binary) => {
-                    expr_stack.push((&binary.right, in_condition));
-                    expr_stack.push((&binary.left, in_condition));
-                }
-                Expr::Unary(unary) => {
-                    expr_stack.push((&unary.expr, in_condition));
-                }
-                Expr::Call(call) => {
-                    for arg in call.args.iter().rev() {
-                        expr_stack.push((arg, false));
-                    }
-                    expr_stack.push((&call.func, false));
-                }
-                Expr::MethodCall(method_call) => {
-                    for arg in method_call.args.iter().rev() {
-                        expr_stack.push((arg, false));
-                    }
-                    expr_stack.push((&method_call.receiver, false));
-                }
-                Expr::Field(field) => {
-                    expr_stack.push((&field.base, false));
-                }
-                Expr::Index(index) => {
-                    expr_stack.push((&index.index, false));
-                    expr_stack.push((&index.expr, false));
-                }
-                Expr::Paren(paren) => {
-                    expr_stack.push((&paren.expr, in_condition));
-                }
-                Expr::Reference(reference) => {
-                    expr_stack.push((&reference.expr, false));
-                }
-                Expr::Await(await_expr) => {
-                    expr_stack.push((&await_expr.base, false));
-                }
-                Expr::Cast(cast) => {
-                    expr_stack.push((&cast.expr, false));
-                }
-                Expr::Assign(assign) => {
-                    expr_stack.push((&assign.right, false));
-                    expr_stack.push((&assign.left, false));
-                }
-                Expr::Return(ret) => {
-                    if let Some(expr) = &ret.expr {
-                        expr_stack.push((expr, false));
-                    }
-                }
-                Expr::Break(brk) => {
-                    if let Some(expr) = &brk.expr {
-                        expr_stack.push((expr, false));
-                    }
-                }
-                Expr::Tuple(tuple) => {
-                    for elem in tuple.elems.iter().rev() {
-                        expr_stack.push((elem, false));
-                    }
-                }
-                Expr::Array(array) => {
-                    for elem in array.elems.iter().rev() {
-                        expr_stack.push((elem, false));
-                    }
-                }
-                Expr::Struct(struct_expr) => {
-                    if let Some(rest) = &struct_expr.rest {
-                        expr_stack.push((rest, false));
-                    }
-                    for field in struct_expr.fields.iter().rev() {
-                        expr_stack.push((&field.expr, false));
-                    }
-                }
-                Expr::Repeat(repeat) => {
-                    expr_stack.push((&repeat.len, false));
-                    expr_stack.push((&repeat.expr, false));
-                }
-                Expr::Range(range) => {
-                    if let Some(to) = &range.end {
-                        expr_stack.push((to, false));
-                    }
-                    if let Some(from) = &range.start {
-                        expr_stack.push((from, false));
-                    }
-                }
-                Expr::Let(let_expr) => {
-                    expr_stack.push((&let_expr.expr, false));
-                }
-                Expr::Yield(yield_expr) => {
-                    if let Some(expr) = &yield_expr.expr {
-                        expr_stack.push((expr, false));
-                    }
-                }
-                // Leaf expressions - no children to process
-                Expr::Lit(_)
-                | Expr::Path(_)
-                | Expr::Continue(_)
-                | Expr::Infer(_)
-                | Expr::Verbatim(_)
-                | Expr::Const(_) => {}
-                // Catch-all for any other expressions
-                _ => {}
-            }
-        }
+    if push_call_and_access_children(traversal, expr) {
+        return;
     }
 
-    complexity
+    if push_operator_children(traversal, expr, in_condition) {
+        return;
+    }
+
+    let _ = push_literal_children(traversal, expr);
+}
+
+fn push_control_flow_children<'ast>(
+    traversal: &mut TraversalState<'ast>,
+    expr: &'ast Expr,
+) -> bool {
+    match expr {
+        Expr::If(expr_if) => {
+            push_optional_expr(
+                traversal,
+                expr_if.else_branch.as_ref().map(|(_, expr)| expr.as_ref()),
+            );
+            traversal.push_block(&expr_if.then_branch);
+            traversal.push_expr(&expr_if.cond, true);
+            true
+        }
+        Expr::While(expr_while) => {
+            traversal.push_block(&expr_while.body);
+            traversal.push_expr(&expr_while.cond, true);
+            true
+        }
+        Expr::ForLoop(expr_for) => {
+            traversal.push_block(&expr_for.body);
+            traversal.push_expr(&expr_for.expr, false);
+            true
+        }
+        Expr::Loop(expr_loop) => {
+            traversal.push_block(&expr_loop.body);
+            true
+        }
+        Expr::Match(expr_match) => {
+            expr_match.arms.iter().rev().for_each(|arm| {
+                traversal.push_expr(&arm.body, false);
+                push_optional_expr(
+                    traversal,
+                    arm.guard.as_ref().map(|(_, guard)| guard.as_ref()),
+                );
+            });
+            traversal.push_expr(&expr_match.expr, false);
+            true
+        }
+        Expr::Block(expr_block) => {
+            traversal.push_block(&expr_block.block);
+            true
+        }
+        Expr::Closure(closure) => {
+            traversal.push_expr(&closure.body, false);
+            true
+        }
+        Expr::Async(async_block) => {
+            traversal.push_block(&async_block.block);
+            true
+        }
+        Expr::Try(expr_try) => {
+            traversal.push_expr(&expr_try.expr, false);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn push_call_and_access_children<'ast>(
+    traversal: &mut TraversalState<'ast>,
+    expr: &'ast Expr,
+) -> bool {
+    match expr {
+        Expr::Call(call) => {
+            call.args
+                .iter()
+                .rev()
+                .for_each(|arg| traversal.push_expr(arg, false));
+            traversal.push_expr(&call.func, false);
+            true
+        }
+        Expr::MethodCall(method_call) => {
+            method_call
+                .args
+                .iter()
+                .rev()
+                .for_each(|arg| traversal.push_expr(arg, false));
+            traversal.push_expr(&method_call.receiver, false);
+            true
+        }
+        Expr::Field(field) => {
+            traversal.push_expr(&field.base, false);
+            true
+        }
+        Expr::Index(index) => {
+            traversal.push_expr(&index.index, false);
+            traversal.push_expr(&index.expr, false);
+            true
+        }
+        Expr::Await(await_expr) => {
+            traversal.push_expr(&await_expr.base, false);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn push_operator_children<'ast>(
+    traversal: &mut TraversalState<'ast>,
+    expr: &'ast Expr,
+    in_condition: bool,
+) -> bool {
+    match expr {
+        Expr::Binary(binary) => {
+            traversal.push_expr(&binary.right, in_condition);
+            traversal.push_expr(&binary.left, in_condition);
+            true
+        }
+        Expr::Unary(unary) => {
+            traversal.push_expr(&unary.expr, in_condition);
+            true
+        }
+        Expr::Paren(paren) => {
+            traversal.push_expr(&paren.expr, in_condition);
+            true
+        }
+        Expr::Reference(reference) => {
+            traversal.push_expr(&reference.expr, false);
+            true
+        }
+        Expr::Cast(cast) => {
+            traversal.push_expr(&cast.expr, false);
+            true
+        }
+        Expr::Assign(assign) => {
+            traversal.push_expr(&assign.right, false);
+            traversal.push_expr(&assign.left, false);
+            true
+        }
+        Expr::Let(let_expr) => {
+            traversal.push_expr(&let_expr.expr, false);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn push_literal_children<'ast>(traversal: &mut TraversalState<'ast>, expr: &'ast Expr) -> bool {
+    match expr {
+        Expr::Return(ret) => {
+            push_optional_expr(traversal, ret.expr.as_deref());
+            true
+        }
+        Expr::Break(brk) => {
+            push_optional_expr(traversal, brk.expr.as_deref());
+            true
+        }
+        Expr::Tuple(tuple) => {
+            tuple
+                .elems
+                .iter()
+                .rev()
+                .for_each(|elem| traversal.push_expr(elem, false));
+            true
+        }
+        Expr::Array(array) => {
+            array
+                .elems
+                .iter()
+                .rev()
+                .for_each(|elem| traversal.push_expr(elem, false));
+            true
+        }
+        Expr::Struct(struct_expr) => {
+            push_optional_expr(traversal, struct_expr.rest.as_deref());
+            struct_expr
+                .fields
+                .iter()
+                .rev()
+                .for_each(|field| traversal.push_expr(&field.expr, false));
+            true
+        }
+        Expr::Repeat(repeat) => {
+            traversal.push_expr(&repeat.len, false);
+            traversal.push_expr(&repeat.expr, false);
+            true
+        }
+        Expr::Range(range) => {
+            push_optional_expr(traversal, range.end.as_deref());
+            push_optional_expr(traversal, range.start.as_deref());
+            true
+        }
+        Expr::Yield(yield_expr) => {
+            push_optional_expr(traversal, yield_expr.expr.as_deref());
+            true
+        }
+        _ => false,
+    }
+}
+
+fn push_optional_expr<'ast>(traversal: &mut TraversalState<'ast>, expr: Option<&'ast Expr>) {
+    if let Some(expr) = expr {
+        traversal.push_expr(expr, false);
+    }
 }
 
 /// Calculate cyclomatic complexity with pattern adjustments
@@ -448,6 +531,42 @@ mod tests {
             calculate_cyclomatic(&mixed_operators) > 2,
             "if a && b || c should have higher complexity than if a (got {})",
             calculate_cyclomatic(&mixed_operators)
+        );
+    }
+
+    #[test]
+    fn test_traverses_closure_and_async_children() {
+        let block: Block = parse_quote! {{
+            let closure = || if ready { work() } else { wait() };
+            async {
+                while pending {
+                    poll().await;
+                }
+            };
+        }};
+
+        assert_eq!(
+            calculate_cyclomatic(&block),
+            3,
+            "closure if and async while should both contribute complexity"
+        );
+    }
+
+    #[test]
+    fn test_traverses_nested_literal_children() {
+        let block: Block = parse_quote! {{
+            let value = Config {
+                enabled: if flag { true } else { false },
+                ..default_config()
+            };
+            let repeated = [if value.enabled { 1 } else { 0 }; if count > 0 { count } else { 1 }];
+            let range = (if start_ok { start } else { 0 })..(if end_ok { end } else { 1 });
+        }};
+
+        assert_eq!(
+            calculate_cyclomatic(&block),
+            6,
+            "struct fields, repeat expressions, and range bounds should be traversed"
         );
     }
 
