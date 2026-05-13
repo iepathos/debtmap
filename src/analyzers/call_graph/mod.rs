@@ -389,6 +389,76 @@ impl CallGraphExtractor {
             self.visit_expr(&await_expr.base);
         }
     }
+
+    fn record_let_expr_binding(&mut self, expr_let: &syn::ExprLet) {
+        if let Pat::Ident(pat_ident) = &*expr_let.pat {
+            let var_name = pat_ident.ident.to_string();
+            if let Some(type_info) = self.type_tracker.resolve_expr_type(&expr_let.expr) {
+                self.type_tracker.record_variable(var_name, type_info);
+            }
+        }
+    }
+
+    fn visit_scoped_stmts(&mut self, stmts: &[syn::Stmt]) {
+        self.type_tracker.enter_scope(ScopeKind::Block, None);
+        for stmt in stmts {
+            self.visit_stmt(stmt);
+        }
+        self.type_tracker.exit_scope();
+    }
+
+    fn visit_scoped_expr(&mut self, expr: &Expr) {
+        self.type_tracker.enter_scope(ScopeKind::Block, None);
+        self.visit_expr(expr);
+        self.type_tracker.exit_scope();
+    }
+
+    fn handle_let_expr(&mut self, expr_let: &syn::ExprLet, expr: &Expr) {
+        self.record_let_expr_binding(expr_let);
+        syn::visit::visit_expr(self, expr);
+    }
+
+    fn handle_block_expr(&mut self, block_expr: &syn::ExprBlock) {
+        self.visit_scoped_stmts(&block_expr.block.stmts);
+    }
+
+    fn handle_if_expr(&mut self, if_expr: &syn::ExprIf) {
+        self.visit_expr(&if_expr.cond);
+        self.visit_scoped_stmts(&if_expr.then_branch.stmts);
+        if let Some((_, else_branch)) = &if_expr.else_branch {
+            self.visit_scoped_expr(else_branch);
+        }
+    }
+
+    fn handle_loop_expr(&mut self, loop_expr: &syn::ExprLoop) {
+        self.visit_scoped_stmts(&loop_expr.body.stmts);
+    }
+
+    fn handle_while_expr(&mut self, while_expr: &syn::ExprWhile) {
+        self.visit_expr(&while_expr.cond);
+        self.visit_scoped_stmts(&while_expr.body.stmts);
+    }
+
+    fn handle_for_loop_expr(&mut self, for_loop: &syn::ExprForLoop) {
+        self.visit_expr(&for_loop.expr);
+        self.visit_scoped_stmts(&for_loop.body.stmts);
+    }
+
+    fn handle_match_expr(&mut self, match_expr: &syn::ExprMatch) {
+        self.visit_expr(&match_expr.expr);
+        for arm in &match_expr.arms {
+            self.visit_match_arm(arm);
+        }
+    }
+
+    fn visit_match_arm(&mut self, arm: &syn::Arm) {
+        self.type_tracker.enter_scope(ScopeKind::Block, None);
+        if let Some(guard) = &arm.guard {
+            self.visit_expr(&guard.1);
+        }
+        self.visit_expr(&arm.body);
+        self.type_tracker.exit_scope();
+    }
 }
 
 /// Visitor implementation for syntax tree traversal
@@ -523,14 +593,12 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        // Check for special handling needs
         let category = GraphBuilder::classify_expr_category(expr);
         if GraphBuilder::needs_special_handling(category) {
             self.process_special_expr(expr, category);
             return;
         }
 
-        // Handle regular expressions
         match expr {
             Expr::Call(call_expr) => {
                 self.handle_call_expr(&call_expr.func, &call_expr.args);
@@ -549,16 +617,9 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 self.handle_struct_expr(expr_struct);
             }
             Expr::Let(expr_let) => {
-                if let Pat::Ident(pat_ident) = &*expr_let.pat {
-                    let var_name = pat_ident.ident.to_string();
-                    if let Some(type_info) = self.type_tracker.resolve_expr_type(&expr_let.expr) {
-                        self.type_tracker.record_variable(var_name, type_info);
-                    }
-                }
-                syn::visit::visit_expr(self, expr);
+                self.handle_let_expr(expr_let, expr);
             }
             Expr::Field(field_expr) => {
-                // Visit base expression
                 self.visit_expr(&field_expr.base);
             }
             Expr::Path(_path_expr) => {
@@ -566,75 +627,22 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 syn::visit::visit_expr(self, expr);
             }
             Expr::Block(block_expr) => {
-                self.type_tracker.enter_scope(ScopeKind::Block, None);
-                for stmt in &block_expr.block.stmts {
-                    self.visit_stmt(stmt);
-                }
-                self.type_tracker.exit_scope();
+                self.handle_block_expr(block_expr);
             }
             Expr::If(if_expr) => {
-                self.visit_expr(&if_expr.cond);
-
-                self.type_tracker.enter_scope(ScopeKind::Block, None);
-                for stmt in &if_expr.then_branch.stmts {
-                    self.visit_stmt(stmt);
-                }
-                self.type_tracker.exit_scope();
-
-                if let Some((_, else_branch)) = &if_expr.else_branch {
-                    self.type_tracker.enter_scope(ScopeKind::Block, None);
-                    self.visit_expr(else_branch);
-                    self.type_tracker.exit_scope();
-                }
+                self.handle_if_expr(if_expr);
             }
             Expr::Loop(loop_expr) => {
-                self.type_tracker.enter_scope(ScopeKind::Block, None);
-                for stmt in &loop_expr.body.stmts {
-                    self.visit_stmt(stmt);
-                }
-                self.type_tracker.exit_scope();
+                self.handle_loop_expr(loop_expr);
             }
             Expr::While(while_expr) => {
-                self.visit_expr(&while_expr.cond);
-
-                self.type_tracker.enter_scope(ScopeKind::Block, None);
-                for stmt in &while_expr.body.stmts {
-                    self.visit_stmt(stmt);
-                }
-                self.type_tracker.exit_scope();
+                self.handle_while_expr(while_expr);
             }
             Expr::ForLoop(for_loop) => {
-                self.visit_expr(&for_loop.expr);
-
-                self.type_tracker.enter_scope(ScopeKind::Block, None);
-
-                // Track the loop variable
-                if let Pat::Ident(pat_ident) = &*for_loop.pat {
-                    let _var_name = pat_ident.ident.to_string();
-                    // In a real implementation, we'd infer the iterator item type
-                }
-
-                for stmt in &for_loop.body.stmts {
-                    self.visit_stmt(stmt);
-                }
-                self.type_tracker.exit_scope();
+                self.handle_for_loop_expr(for_loop);
             }
             Expr::Match(match_expr) => {
-                self.visit_expr(&match_expr.expr);
-
-                for arm in &match_expr.arms {
-                    self.type_tracker.enter_scope(ScopeKind::Block, None);
-
-                    // Track pattern bindings
-                    // In a real implementation, we'd extract type info from patterns
-
-                    if let Some(guard) = &arm.guard {
-                        self.visit_expr(&guard.1);
-                    }
-                    self.visit_expr(&arm.body);
-
-                    self.type_tracker.exit_scope();
-                }
+                self.handle_match_expr(match_expr);
             }
             _ => {
                 syn::visit::visit_expr(self, expr);
