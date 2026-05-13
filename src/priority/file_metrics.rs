@@ -284,7 +284,7 @@ impl FileDebtMetrics {
         // This aligns with contextual risk cap (max 3x) for consistent scoring
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                1.0 + (analysis.god_object_score / 50.0)
+                calculate_god_object_multiplier(analysis.god_object_score)
             } else {
                 1.0
             }
@@ -355,7 +355,7 @@ impl FileDebtMetrics {
         // This aligns with contextual risk cap (max 3x) for consistent scoring
         let god_object_multiplier = if let Some(ref analysis) = self.god_object_analysis {
             if analysis.is_god_object {
-                1.0 + (analysis.god_object_score / 50.0)
+                calculate_god_object_multiplier(analysis.god_object_score)
             } else {
                 1.0
             }
@@ -542,6 +542,10 @@ impl FileDebtMetrics {
             String::new()
         }
     }
+}
+
+fn calculate_god_object_multiplier(god_object_score: f64) -> f64 {
+    1.0 + (god_object_score.clamp(0.0, 100.0) / 50.0)
 }
 
 impl Default for FileDebtMetrics {
@@ -1559,6 +1563,58 @@ mod tests {
         });
         let factors = metrics.get_score_factors();
         assert!((factors.god_object_multiplier - 1.17).abs() < 0.01); // 1.0 + (8.5 / 50.0)
+    }
+
+    #[test]
+    fn test_factors_god_object_multiplier_caps_raw_detector_score() {
+        use crate::organization::{DetectionType, GodObjectAnalysis, GodObjectConfidence};
+
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 200,
+            function_count: 10,
+            god_object_analysis: Some(GodObjectAnalysis {
+                weighted_method_count: None,
+                is_god_object: true,
+                method_count: 10,
+                field_count: 5,
+                responsibility_count: 2,
+                lines_of_code: 200,
+                complexity_sum: 50,
+                god_object_score: 1_178.7,
+                confidence: GodObjectConfidence::Definite,
+                detection_type: DetectionType::GodClass,
+                struct_name: None,
+                struct_line: None,
+                struct_location: None,
+                responsibilities: Vec::new(),
+                responsibility_method_counts: Default::default(),
+                recommended_splits: Vec::new(),
+                purity_distribution: None,
+                module_structure: None,
+                visibility_breakdown: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: Default::default(),
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+                aggregated_entropy: None,
+                aggregated_error_swallowing_count: None,
+                aggregated_error_swallowing_patterns: None,
+                layering_impact: None,
+                anti_pattern_report: None,
+                complexity_metrics: None,
+                trait_method_summary: None,
+            }),
+            function_scores: vec![],
+            god_object_type: None,
+            file_type: None,
+            ..Default::default()
+        };
+
+        let factors = metrics.get_score_factors();
+        assert_eq!(factors.god_object_multiplier, 3.0);
     }
 
     // Tests for spec 168: File context-aware scoring

@@ -147,8 +147,6 @@ fn calculate_god_object_score(
     god_analysis: &GodObjectAnalysis,
     aggregated_metrics: &GodObjectAggregatedMetrics,
 ) -> UnifiedScore {
-    let base_score = god_analysis.god_object_score;
-
     // Use aggregated coverage in score calculation
     let coverage_factor = aggregated_metrics
         .weighted_coverage
@@ -156,21 +154,16 @@ fn calculate_god_object_score(
         .map(|cov| (1.0 - cov.direct) * 10.0)
         .unwrap_or(0.0);
 
-    // Apply coverage as dampening multiplier
-    let coverage_multiplier = aggregated_metrics
-        .weighted_coverage
-        .as_ref()
-        .map(|cov| 1.0 - cov.direct)
-        .unwrap_or(1.0);
-    let coverage_adjusted_score = base_score * coverage_multiplier;
-
     let total_complexity = aggregated_metrics.total_cyclomatic + aggregated_metrics.total_cognitive;
+    let complexity_factor = total_complexity as f64 / 10.0;
+    let dependency_factor = calculate_god_object_risk(god_analysis) / 10.0;
+    let base_score = complexity_factor + coverage_factor + dependency_factor;
     let has_coverage_data = aggregated_metrics.weighted_coverage.is_some();
     let mut unified_score = UnifiedScore {
-        final_score: coverage_adjusted_score.max(0.0),
-        complexity_factor: total_complexity as f64 / 10.0,
+        final_score: base_score.max(0.0),
+        complexity_factor,
         coverage_factor,
-        dependency_factor: calculate_god_object_risk(god_analysis) / 10.0,
+        dependency_factor,
         role_multiplier: 1.0,
         base_score: Some(base_score),
         exponential_factor: None,
@@ -613,6 +606,73 @@ mod tests {
         // Total = 55
         assert!(risk > 0.0);
         assert!(risk <= 100.0);
+    }
+
+    fn create_test_aggregated_metrics(
+        total_cyclomatic: u32,
+        total_cognitive: u32,
+    ) -> GodObjectAggregatedMetrics {
+        GodObjectAggregatedMetrics {
+            total_cyclomatic,
+            total_cognitive,
+            max_nesting_depth: 3,
+            weighted_coverage: None,
+            unique_upstream_callers: Vec::new(),
+            unique_downstream_callees: Vec::new(),
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            aggregated_contextual_risk: None,
+            total_error_swallowing_count: 0,
+            error_swallowing_patterns: Vec::new(),
+            aggregated_entropy: None,
+            distribution_metrics: None,
+        }
+    }
+
+    #[test]
+    fn test_god_object_score_uses_composite_priority_not_raw_detector_score() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 39;
+        analysis.responsibility_count = 6;
+        analysis.god_object_score = 2_350.75;
+        let metrics = create_test_aggregated_metrics(168, 264);
+
+        let score = calculate_god_object_score(&analysis, &metrics);
+
+        let expected_dependency = calculate_god_object_risk(&analysis) / 10.0;
+        let expected_base = 43.2 + expected_dependency;
+        assert!((score.base_score.unwrap() - expected_base).abs() < 0.01);
+        assert!((score.final_score - expected_base).abs() < 0.01);
+        assert!(
+            score.final_score < 100.0,
+            "raw detector score should not become final priority score: {}",
+            score.final_score
+        );
+    }
+
+    #[test]
+    fn test_god_object_contextual_risk_stays_in_priority_scale() {
+        let mut analysis = create_test_god_analysis();
+        analysis.method_count = 39;
+        analysis.responsibility_count = 6;
+        analysis.god_object_score = 2_350.75;
+        let mut metrics = create_test_aggregated_metrics(168, 264);
+        metrics.aggregated_contextual_risk = Some(ContextualRisk {
+            base_risk: 40.0,
+            contextual_risk: 79.6,
+            contexts: Vec::new(),
+            explanation: "test risk".to_string(),
+        });
+
+        let score = calculate_god_object_score(&analysis, &metrics);
+
+        assert!((score.contextual_risk_multiplier.unwrap() - 1.99).abs() < 0.01);
+        assert!(score.final_score > 90.0);
+        assert!(
+            score.final_score < 200.0,
+            "contextual risk should amplify the composite score, not the raw detector score: {}",
+            score.final_score
+        );
     }
 
     #[test]
