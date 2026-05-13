@@ -1,6 +1,9 @@
 use super::match_patterns::MatchExpressionRecognizer;
 use std::collections::HashMap;
-use syn::{visit::Visit, Block, Expr, ExprMatch, ImplItem, Item, Stmt};
+use syn::{
+    visit::Visit, Block, Expr, ExprAsync, ExprBlock, ExprClosure, ExprForLoop, ExprIf, ExprLoop,
+    ExprMatch, ExprWhile, ImplItem, Item, Stmt,
+};
 
 /// Location information for a match expression found in the AST
 #[derive(Debug, Clone)]
@@ -171,6 +174,146 @@ impl RecursiveMatchDetector {
         // For now, return a placeholder
         1
     }
+
+    fn visit_with_nested_depth(&mut self, visit_nested: impl FnOnce(&mut Self)) {
+        self.depth_tracker += 1;
+        if self.check_depth_limit() {
+            visit_nested(self);
+        }
+        self.depth_tracker -= 1;
+    }
+
+    fn record_match(&mut self, match_expr: &ExprMatch) {
+        self.matches_found.push(MatchLocation {
+            line: self.get_line_number(match_expr),
+            arms: match_expr.arms.len(),
+            complexity: self.calculate_match_complexity(match_expr),
+            context: self.complexity_context.clone(),
+        });
+    }
+
+    fn visit_match_expr(&mut self, match_expr: &ExprMatch) {
+        self.record_match(match_expr);
+        self.visit_with_nested_depth(|detector| {
+            for arm in &match_expr.arms {
+                detector.visit_expr(&arm.body);
+            }
+        });
+    }
+
+    fn visit_closure_expr(&mut self, closure: &ExprClosure) {
+        let was_in_closure = self.in_closure;
+        self.in_closure = true;
+        self.complexity_context.in_closure = true;
+
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_expr(&closure.body);
+        });
+
+        self.complexity_context.in_closure = was_in_closure;
+        self.in_closure = was_in_closure;
+    }
+
+    fn visit_async_expr(&mut self, async_block: &ExprAsync) {
+        let was_in_async = self.in_async;
+        self.in_async = true;
+        self.complexity_context.in_async = true;
+
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_block(&async_block.block);
+        });
+
+        self.complexity_context.in_async = was_in_async;
+        self.in_async = was_in_async;
+    }
+
+    fn visit_block_expr(&mut self, expr_block: &ExprBlock) {
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_block(&expr_block.block);
+        });
+    }
+
+    fn visit_if_expr(&mut self, if_expr: &ExprIf) {
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_expr(&if_expr.cond);
+            detector.visit_block(&if_expr.then_branch);
+            if let Some((_else_token, else_branch)) = &if_expr.else_branch {
+                detector.visit_expr(else_branch);
+            }
+        });
+    }
+
+    fn visit_while_expr(&mut self, while_expr: &ExprWhile) {
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_expr(&while_expr.cond);
+            detector.visit_block(&while_expr.body);
+        });
+    }
+
+    fn visit_for_loop_expr(&mut self, for_loop: &ExprForLoop) {
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_expr(&for_loop.expr);
+            detector.visit_block(&for_loop.body);
+        });
+    }
+
+    fn visit_loop_expr(&mut self, loop_expr: &ExprLoop) {
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_block(&loop_expr.body);
+        });
+    }
+
+    fn visit_other_expr(&mut self, expr: &Expr) {
+        self.visit_with_nested_depth(|detector| {
+            detector.visit_other_expr_children(expr);
+        });
+    }
+
+    fn visit_other_expr_children(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Binary(e) => {
+                self.visit_expr(&e.left);
+                self.visit_expr(&e.right);
+            }
+            Expr::Unary(e) => {
+                self.visit_expr(&e.expr);
+            }
+            Expr::Call(e) => {
+                self.visit_expr(&e.func);
+                for arg in &e.args {
+                    self.visit_expr(arg);
+                }
+            }
+            Expr::MethodCall(e) => {
+                self.visit_expr(&e.receiver);
+                for arg in &e.args {
+                    self.visit_expr(arg);
+                }
+            }
+            Expr::Field(e) => {
+                self.visit_expr(&e.base);
+            }
+            Expr::Index(e) => {
+                self.visit_expr(&e.expr);
+                self.visit_expr(&e.index);
+            }
+            Expr::Paren(e) => {
+                self.visit_expr(&e.expr);
+            }
+            Expr::Try(e) => {
+                self.visit_expr(&e.expr);
+            }
+            Expr::Await(e) => {
+                self.visit_expr(&e.base);
+            }
+            Expr::Lit(_) | Expr::Path(_) | Expr::Continue(_) | Expr::Break(_) => {}
+            _ => {
+                if self.depth_tracker < MAX_RECURSION_DEPTH / 2 {
+                    syn::visit::visit_expr(self, expr);
+                }
+            }
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for RecursiveMatchDetector {
@@ -181,149 +324,15 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
         }
 
         match expr {
-            Expr::Match(match_expr) => {
-                // Record this match expression
-                self.matches_found.push(MatchLocation {
-                    line: self.get_line_number(match_expr),
-                    arms: match_expr.arms.len(),
-                    complexity: self.calculate_match_complexity(match_expr),
-                    context: self.complexity_context.clone(),
-                });
-
-                // Continue traversing match arms
-                self.depth_tracker += 1;
-                if self.check_depth_limit() {
-                    for arm in &match_expr.arms {
-                        self.visit_expr(&arm.body);
-                    }
-                }
-                self.depth_tracker -= 1;
-            }
-            Expr::Closure(closure) => {
-                let was_in_closure = self.in_closure;
-                self.in_closure = true;
-                self.complexity_context.in_closure = true;
-                self.depth_tracker += 1;
-
-                if self.check_depth_limit() {
-                    self.visit_expr(&closure.body);
-                }
-
-                self.depth_tracker -= 1;
-                self.complexity_context.in_closure = was_in_closure;
-                self.in_closure = was_in_closure;
-            }
-            Expr::Async(async_block) => {
-                let was_in_async = self.in_async;
-                self.in_async = true;
-                self.complexity_context.in_async = true;
-                self.depth_tracker += 1;
-
-                if self.check_depth_limit() {
-                    self.visit_block(&async_block.block);
-                }
-
-                self.depth_tracker -= 1;
-                self.complexity_context.in_async = was_in_async;
-                self.in_async = was_in_async;
-            }
-            Expr::Block(expr_block) => {
-                self.depth_tracker += 1;
-                if self.check_depth_limit() {
-                    self.visit_block(&expr_block.block);
-                }
-                self.depth_tracker -= 1;
-            }
-            Expr::If(if_expr) => {
-                self.depth_tracker += 1;
-                if self.check_depth_limit() {
-                    self.visit_expr(&if_expr.cond);
-                    self.visit_block(&if_expr.then_branch);
-                    if let Some((_else_token, else_branch)) = &if_expr.else_branch {
-                        self.visit_expr(else_branch);
-                    }
-                }
-                self.depth_tracker -= 1;
-            }
-            Expr::While(while_expr) => {
-                self.depth_tracker += 1;
-                if self.check_depth_limit() {
-                    self.visit_expr(&while_expr.cond);
-                    self.visit_block(&while_expr.body);
-                }
-                self.depth_tracker -= 1;
-            }
-            Expr::ForLoop(for_loop) => {
-                self.depth_tracker += 1;
-                if self.check_depth_limit() {
-                    self.visit_expr(&for_loop.expr);
-                    self.visit_block(&for_loop.body);
-                }
-                self.depth_tracker -= 1;
-            }
-            Expr::Loop(loop_expr) => {
-                self.depth_tracker += 1;
-                if self.check_depth_limit() {
-                    self.visit_block(&loop_expr.body);
-                }
-                self.depth_tracker -= 1;
-            }
-            _ => {
-                // For other expressions, manually traverse common nested expressions
-                // to avoid infinite recursion with the default visitor
-                self.depth_tracker += 1;
-                if self.check_depth_limit() {
-                    match expr {
-                        Expr::Binary(e) => {
-                            self.visit_expr(&e.left);
-                            self.visit_expr(&e.right);
-                        }
-                        Expr::Unary(e) => {
-                            self.visit_expr(&e.expr);
-                        }
-                        Expr::Call(e) => {
-                            self.visit_expr(&e.func);
-                            for arg in &e.args {
-                                self.visit_expr(arg);
-                            }
-                        }
-                        Expr::MethodCall(e) => {
-                            self.visit_expr(&e.receiver);
-                            for arg in &e.args {
-                                self.visit_expr(arg);
-                            }
-                        }
-                        Expr::Field(e) => {
-                            self.visit_expr(&e.base);
-                        }
-                        Expr::Index(e) => {
-                            self.visit_expr(&e.expr);
-                            self.visit_expr(&e.index);
-                        }
-                        Expr::Paren(e) => {
-                            self.visit_expr(&e.expr);
-                        }
-                        Expr::Try(e) => {
-                            self.visit_expr(&e.expr);
-                        }
-                        Expr::Await(e) => {
-                            self.visit_expr(&e.base);
-                        }
-                        // For truly simple expressions with no nested expressions, do nothing
-                        Expr::Lit(_) | Expr::Path(_) | Expr::Continue(_) | Expr::Break(_) => {
-                            // These have no nested expressions to visit
-                        }
-                        _ => {
-                            // For any other complex expressions we haven't handled,
-                            // use the default visitor cautiously
-                            if self.depth_tracker < MAX_RECURSION_DEPTH / 2 {
-                                syn::visit::visit_expr(self, expr);
-                            }
-                        }
-                    }
-                }
-                self.depth_tracker -= 1;
-            }
+            Expr::Match(match_expr) => self.visit_match_expr(match_expr),
+            Expr::Closure(closure) => self.visit_closure_expr(closure),
+            Expr::Async(async_block) => self.visit_async_expr(async_block),
+            Expr::Block(expr_block) => self.visit_block_expr(expr_block),
+            Expr::If(if_expr) => self.visit_if_expr(if_expr),
+            Expr::While(while_expr) => self.visit_while_expr(while_expr),
+            Expr::ForLoop(for_loop) => self.visit_for_loop_expr(for_loop),
+            Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr),
+            _ => self.visit_other_expr(expr),
         }
     }
 
@@ -445,6 +454,62 @@ mod tests {
 
         assert_eq!(matches.len(), 1);
         assert!(matches[0].context.in_async);
+    }
+
+    #[test]
+    fn test_context_is_restored_after_closure_and_async() {
+        let block: Block = parse_quote! {{
+            let from_closure = |item| {
+                match item {
+                    Item::A => 1,
+                    _ => 2,
+                }
+            };
+
+            let from_async = async {
+                match fetch_data().await {
+                    Ok(data) => data,
+                    Err(_) => 0,
+                }
+            };
+
+            match current {
+                Current::Ready => 1,
+                _ => 0,
+            }
+        }};
+
+        let mut detector = RecursiveMatchDetector::new();
+        let matches = detector.find_matches_in_block(&block);
+
+        assert_eq!(matches.len(), 3);
+        assert!(matches[0].context.in_closure);
+        assert!(!matches[0].context.in_async);
+        assert!(!matches[1].context.in_closure);
+        assert!(matches[1].context.in_async);
+        assert!(!matches[2].context.in_closure);
+        assert!(!matches[2].context.in_async);
+    }
+
+    #[test]
+    fn test_default_fallback_finds_match_in_tuple_expression() {
+        let block: Block = parse_quote! {{
+            let pair = (
+                match left {
+                    Side::A => 1,
+                    _ => 0,
+                },
+                match right {
+                    Side::B => 2,
+                    _ => 0,
+                },
+            );
+        }};
+
+        let mut detector = RecursiveMatchDetector::new();
+        let matches = detector.find_matches_in_block(&block);
+
+        assert_eq!(matches.len(), 2);
     }
 
     #[test]
