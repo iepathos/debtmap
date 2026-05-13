@@ -42,6 +42,13 @@ fn is_javascript_like(path: &Path) -> bool {
     crate::core::Language::from_path(path).is_js_ts()
 }
 
+fn uses_extracted_god_object_analysis(path: &Path) -> bool {
+    matches!(
+        crate::core::Language::from_path(path),
+        crate::core::Language::Rust | crate::core::Language::Python
+    )
+}
+
 fn semantic_responsibility_groups(function_names: &[String]) -> HashMap<String, Vec<String>> {
     group_methods_by_responsibility(function_names)
         .into_iter()
@@ -263,10 +270,19 @@ impl UnifiedFileAnalyzer {
         Option<crate::organization::GodObjectAnalysis>,
         Option<crate::organization::GodObjectType>,
     ) {
+        let language = crate::core::Language::from_path(path);
+
+        if language == crate::core::Language::Python {
+            let analysis = self.analyze_god_object_from_data(path, content, extracted);
+            if analysis.0.is_some() {
+                return analysis;
+            }
+        }
+
         // Use the comprehensive god object detector for Rust files
         // The detector needs the AST, but we can check if extracted data indicates
         // a potential god object first to avoid unnecessary re-parsing for simple files
-        if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+        if language == crate::core::Language::Rust {
             // Quick heuristic check using extracted data
             let method_count: usize = extracted.impls.iter().map(|i| i.methods.len()).sum();
             let field_count: usize = extracted.structs.iter().map(|s| s.fields.len()).sum();
@@ -333,8 +349,8 @@ impl UnifiedFileAnalyzer {
         Option<crate::organization::GodObjectAnalysis>,
         Option<crate::organization::GodObjectType>,
     ) {
-        // Use the comprehensive god object detector for Rust files
-        if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+        // Use extracted data for languages with a unified extractor.
+        if uses_extracted_god_object_analysis(path) {
             // Try to use extracted data first (spec 202)
             if let Ok(extracted) = UnifiedFileExtractor::extract(path, content) {
                 return self.analyze_god_object_from_extracted(path, content, &extracted);
@@ -844,6 +860,41 @@ mod tests {
         let analyzer = UnifiedFileAnalyzer::new(None);
         let metrics = analyzer
             .analyze_file(Path::new("generator.js"), &content)
+            .unwrap();
+        let analysis = metrics.god_object_analysis.unwrap();
+
+        assert!(analysis.is_god_object);
+        assert_eq!(analysis.method_count, 52);
+        assert!(analysis.responsibilities.contains(&"Parsing".to_string()));
+        assert!(analysis
+            .responsibilities
+            .contains(&"Validation".to_string()));
+        assert!(analysis.responsibilities.contains(&"Rendering".to_string()));
+        assert!(!analysis
+            .responsibilities
+            .iter()
+            .any(|name| name.starts_with("responsibility_")));
+    }
+
+    #[test]
+    fn test_python_god_object_uses_semantic_responsibilities() {
+        let mut content = String::from("class ReportGenerator:\n");
+        for i in 0..20 {
+            content.push_str(&format!("    def parse_thing_{}(self):\n", i));
+            content.push_str(&format!("        return {}\n", i));
+        }
+        for i in 0..20 {
+            content.push_str(&format!("    def validate_thing_{}(self):\n", i));
+            content.push_str("        return True\n");
+        }
+        for i in 0..12 {
+            content.push_str(&format!("    def render_thing_{}(self):\n", i));
+            content.push_str(&format!("        return str({})\n", i));
+        }
+
+        let analyzer = UnifiedFileAnalyzer::new(None);
+        let metrics = analyzer
+            .analyze_file(Path::new("generator.py"), &content)
             .unwrap();
         let analysis = metrics.god_object_analysis.unwrap();
 
