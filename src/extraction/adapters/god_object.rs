@@ -17,6 +17,7 @@
 //!   type/trait names as responsibilities.
 //! - **Composable pipeline**: Pure helper functions that can be unit tested independently.
 
+use crate::extraction::responsibilities::file_responsibility_groups;
 use crate::extraction::types::{ExtractedFileData, ExtractedImplData, ExtractedStructData};
 use crate::organization::god_object::classifier::{
     calculate_weighted_count_from_names, group_methods_by_responsibility, is_cohesive_struct,
@@ -24,8 +25,8 @@ use crate::organization::god_object::classifier::{
 use crate::organization::god_object::scoring::calculate_god_object_score_weighted;
 use crate::organization::god_object::{
     classify_all_methods, DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis,
-    GodObjectThresholds, KnownTraitRegistry, SplitAnalysisMethod, TraitImplInfo,
-    TraitMethodSummary,
+    GodObjectThresholds, KnownTraitRegistry, ModuleSplit, Priority, SplitAnalysisMethod,
+    TraitImplInfo, TraitMethodSummary,
 };
 
 use std::collections::HashMap;
@@ -172,6 +173,44 @@ fn is_god_object_candidate(
     metrics.trait_weighted_count > thresholds.max_methods as f64
         || metrics.field_count > thresholds.max_fields
         || responsibilities.len() > thresholds.max_traits
+}
+
+fn module_name_for_responsibility(responsibility: &str) -> String {
+    responsibility.to_lowercase().replace(' ', "_")
+}
+
+fn build_file_level_splits(responsibilities: &HashMap<String, Vec<String>>) -> Vec<ModuleSplit> {
+    let mut splits: Vec<ModuleSplit> = responsibilities
+        .iter()
+        .filter(|(_, methods)| methods.len() >= 2)
+        .map(|(responsibility, methods)| ModuleSplit {
+            suggested_name: module_name_for_responsibility(responsibility),
+            methods_to_move: methods.clone(),
+            structs_to_move: Vec::new(),
+            responsibility: responsibility.clone(),
+            estimated_lines: 0,
+            method_count: methods.len(),
+            priority: if methods.len() > 10 {
+                Priority::High
+            } else {
+                Priority::Medium
+            },
+            cohesion_score: Some(0.85),
+            domain: responsibility.clone(),
+            rationale: Some("Extracted functions share this file-level responsibility".to_string()),
+            method: SplitAnalysisMethod::MethodBased,
+            representative_methods: methods.iter().take(8).cloned().collect(),
+            behavior_category: Some(responsibility.clone()),
+            ..Default::default()
+        })
+        .collect();
+
+    splits.sort_by(|a, b| {
+        b.method_count
+            .cmp(&a.method_count)
+            .then_with(|| a.responsibility.cmp(&b.responsibility))
+    });
+    splits
 }
 
 /// Pure function: build GodObjectAnalysis from struct metrics and responsibilities.
@@ -384,67 +423,48 @@ fn analyze_file_level(
     thresholds: &GodObjectThresholds,
 ) -> Option<GodObjectAnalysis> {
     let total_methods: usize = extracted.impls.iter().map(|i| i.methods.len()).sum();
-    let total_standalone = extracted.functions.len();
+    let responsibility_groups = file_responsibility_groups(&extracted.functions);
+    let total_functions = responsibility_groups.function_count();
     let total_fields: usize = extracted.structs.iter().map(|s| s.fields.len()).sum();
+    let responsibility_count = responsibility_groups.responsibility_count();
+    let production_lines = extracted.production_lines();
+    let complexity_sum: u32 = extracted.functions.iter().map(|f| f.cyclomatic).sum();
 
-    // Need significant function count for file-level detection
-    if total_standalone < 50 {
+    // Need significant file-level evidence before flagging a mixed module.
+    if total_functions <= thresholds.max_methods
+        && total_fields <= thresholds.max_fields
+        && production_lines <= thresholds.max_lines
+        && complexity_sum <= thresholds.max_complexity
+        && responsibility_count <= thresholds.max_traits
+    {
         return None;
     }
 
     // Determine detection type
-    let detection_type = determine_detection_type(extracted, total_methods, total_standalone);
+    let detection_type =
+        determine_detection_type(extracted, total_methods, total_functions, thresholds);
 
     // Only proceed for GodFile or GodModule
     if detection_type == DetectionType::GodClass {
         return None;
     }
 
-    let method_count = total_standalone + total_methods;
+    let method_count = total_functions;
 
-    // Collect all function names for behavioral categorization
-    let all_function_names: Vec<String> = extracted
-        .functions
-        .iter()
-        .map(|f| f.name.clone())
-        .chain(
-            extracted
-                .impls
-                .iter()
-                .flat_map(|i| i.methods.iter().map(|m| m.name.clone())),
-        )
-        .collect();
-
-    let responsibilities = group_methods_by_responsibility(&all_function_names);
-    let responsibility_method_counts: HashMap<String, usize> = responsibilities
-        .iter()
-        .map(|(k, v)| (k.clone(), v.len()))
-        .collect();
-    let responsibility_names: Vec<String> = responsibilities.keys().cloned().collect();
+    let responsibility_method_counts = responsibility_groups.responsibility_method_counts();
+    let responsibility_names = responsibility_groups.sorted_responsibility_names();
 
     // Calculate weighted method count (Spec 209)
-    // Also apply pure function weighting: standalone functions have no `self` access,
-    // so they're inherently pure helpers (0.2 weight each per Spec 213)
-    let name_weighted_count =
-        calculate_weighted_count_from_names(all_function_names.iter().map(String::as_str));
+    // Use the single deduplicated function identity list to keep counts and
+    // scoring aligned for languages that represent class methods in multiple
+    // extracted collections.
+    let weighted_method_count = calculate_weighted_count_from_names(
+        responsibility_groups
+            .unique_function_names
+            .iter()
+            .map(String::as_str),
+    );
 
-    // Standalone functions are pure by definition (no self parameter)
-    // Apply pure function weight (0.2) to standalone functions
-    // Impl methods use name-based weighting
-    let standalone_pure_weighted = total_standalone as f64 * 0.2;
-    let impl_method_names: Vec<String> = extracted
-        .impls
-        .iter()
-        .flat_map(|i| i.methods.iter().map(|m| m.name.clone()))
-        .collect();
-    let impl_weighted =
-        calculate_weighted_count_from_names(impl_method_names.iter().map(String::as_str));
-
-    // Use the lower of name-based weighting or pure function weighting
-    // This gives benefit of both Spec 209 (accessor detection) and Spec 213 (pure functions)
-    let weighted_method_count = (standalone_pure_weighted + impl_weighted).min(name_weighted_count);
-
-    let complexity_sum: u32 = extracted.functions.iter().map(|f| f.cyclomatic).sum();
     let visibility_breakdown = build_visibility_breakdown(extracted);
 
     // Calculate average complexity for weighted scoring
@@ -453,9 +473,6 @@ fn analyze_file_level(
     } else {
         0.0
     };
-
-    // Spec 214: Use production LOC for scoring and confidence
-    let production_lines = extracted.production_lines();
 
     let confidence = crate::organization::god_object::classifier::determine_confidence(
         method_count,
@@ -494,7 +511,7 @@ fn analyze_file_level(
         lines_of_code: production_lines, // Spec 214: Use production LOC
         complexity_sum,
         god_object_score: god_score.max(0.0),
-        recommended_splits: vec![],
+        recommended_splits: build_file_level_splits(&responsibility_groups.groups),
         confidence,
         responsibilities: responsibility_names,
         responsibility_method_counts,
@@ -505,10 +522,18 @@ fn analyze_file_level(
         struct_line: None,
         struct_location: None,
         visibility_breakdown: Some(visibility_breakdown),
-        domain_count: 0,
-        domain_diversity: 0.0,
+        domain_count: responsibility_count,
+        domain_diversity: if method_count == 0 {
+            0.0
+        } else {
+            responsibility_count as f64 / method_count as f64
+        },
         struct_ratio: calculate_struct_ratio(extracted),
-        analysis_method: SplitAnalysisMethod::None,
+        analysis_method: if responsibility_count == 0 {
+            SplitAnalysisMethod::None
+        } else {
+            SplitAnalysisMethod::MethodBased
+        },
         cross_domain_severity: None,
         domain_diversity_metrics: None,
         aggregated_entropy: None,
@@ -525,13 +550,16 @@ fn analyze_file_level(
 fn determine_detection_type(
     extracted: &ExtractedFileData,
     impl_methods: usize,
-    standalone_functions: usize,
+    total_functions: usize,
+    thresholds: &GodObjectThresholds,
 ) -> DetectionType {
     let has_structs = !extracted.structs.is_empty();
 
-    if !has_structs && standalone_functions > 50 {
+    if !has_structs && total_functions > 50 {
         DetectionType::GodFile
-    } else if has_structs && standalone_functions > 50 && standalone_functions > impl_methods * 3 {
+    } else if has_structs && total_functions > 50 && total_functions > impl_methods * 3 {
+        DetectionType::GodModule
+    } else if has_structs && total_functions > thresholds.max_methods {
         DetectionType::GodModule
     } else {
         DetectionType::GodClass
@@ -734,6 +762,59 @@ mod tests {
         let result = analyze_god_object(&file_data.path, &file_data).unwrap();
 
         assert_eq!(result.detection_type, DetectionType::GodModule);
+    }
+
+    #[test]
+    fn test_file_level_handlers_use_qualified_semantic_responsibilities() {
+        let handler_specs: Vec<(&str, Vec<&str>)> = vec![
+            ("CharacterListHandler", vec!["get", "post"]),
+            ("CharacterHandler", vec!["get", "put", "delete"]),
+            ("CharacterVersionHandler", vec!["get", "delete"]),
+            ("CityListHandler", vec!["get", "post"]),
+            ("CityHandler", vec!["get", "put", "delete"]),
+            ("CityVersionHandler", vec!["get", "delete"]),
+            ("WorldListHandler", vec!["get", "post"]),
+            ("WorldHandler", vec!["get", "put", "delete"]),
+            ("WorldVersionHandler", vec!["get", "delete"]),
+        ];
+        let mut functions = Vec::new();
+        let mut structs = Vec::new();
+
+        for (class_index, (class_name, methods)) in handler_specs.iter().enumerate() {
+            structs.push(ExtractedStructData {
+                name: class_name.to_string(),
+                line: class_index * 20 + 1,
+                fields: vec![],
+                is_public: true,
+            });
+
+            for (method_index, method_name) in methods.iter().enumerate() {
+                let mut func =
+                    create_test_function(method_name, class_index * 20 + method_index + 2);
+                func.qualified_name = format!("{}.{}", class_name, method_name);
+                functions.push(func);
+            }
+        }
+
+        let file_data = ExtractedFileData {
+            path: PathBuf::from("worldturtle/api.py"),
+            functions,
+            structs,
+            impls: vec![],
+            imports: vec![],
+            total_lines: 685,
+            detected_patterns: vec![],
+            test_lines: 0,
+        };
+
+        let result = analyze_god_object(&file_data.path, &file_data).unwrap();
+
+        assert_eq!(result.detection_type, DetectionType::GodModule);
+        assert!(result.responsibilities.contains(&"Character".to_string()));
+        assert!(result.responsibilities.contains(&"City".to_string()));
+        assert!(result.responsibilities.contains(&"World".to_string()));
+        assert_eq!(result.analysis_method, SplitAnalysisMethod::MethodBased);
+        assert!(!result.recommended_splits.is_empty());
     }
 
     #[test]

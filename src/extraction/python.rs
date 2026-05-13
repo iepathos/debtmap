@@ -160,7 +160,7 @@ impl<'a> PythonExtractor<'a> {
             transformation_patterns: Vec::new(),
             calls: self.extract_calls(node),
             is_test: name.starts_with("test_"),
-            is_async: node.kind() == "async_function_definition",
+            is_async: Self::is_async_function_node(node),
             visibility: if name.starts_with('_') {
                 None
             } else {
@@ -169,6 +169,18 @@ impl<'a> PythonExtractor<'a> {
             is_trait_method: false,
             in_test_module: self.path.to_string_lossy().contains("test"),
         })
+    }
+
+    fn is_async_function_node(node: Node) -> bool {
+        if node.kind() == "async_function_definition" {
+            return true;
+        }
+
+        let mut cursor = node.walk();
+        let has_async_child = node
+            .children(&mut cursor)
+            .any(|child| child.kind() == "async");
+        has_async_child
     }
 
     fn extract_class_name(&self, node: Node) -> Result<String> {
@@ -211,10 +223,8 @@ impl<'a> PythonExtractor<'a> {
         if cursor.goto_first_child() {
             loop {
                 let child = cursor.node();
-                if child.kind() == "function_definition"
-                    || child.kind() == "async_function_definition"
-                {
-                    let func_data = self.extract_function(child, Some(class_name))?;
+                if let Some(function_node) = Self::function_definition_node(child) {
+                    let func_data = self.extract_function(function_node, Some(class_name))?;
                     if func_data.is_test || func_data.in_test_module {
                         self.test_lines += func_data.length;
                     }
@@ -239,6 +249,23 @@ impl<'a> PythonExtractor<'a> {
         };
 
         Ok((impl_data, methods))
+    }
+
+    fn function_definition_node(node: Node) -> Option<Node> {
+        match node.kind() {
+            "function_definition" | "async_function_definition" => Some(node),
+            "decorated_definition" => {
+                let mut cursor = node.walk();
+                let function = node.children(&mut cursor).find(|child| {
+                    matches!(
+                        child.kind(),
+                        "function_definition" | "async_function_definition"
+                    )
+                });
+                function
+            }
+            _ => None,
+        }
     }
 
     fn extract_imports(&self, node: Node) -> Result<Vec<ImportInfo>> {

@@ -602,7 +602,11 @@ impl From<crate::organization::GodObjectAnalysis> for GodObjectIndicators {
             is_god_object: analysis.is_god_object,
             god_object_score: (analysis.god_object_score.max(0.0) / 100.0), // Convert back from percentage
             responsibility_names: analysis.responsibilities,
-            recommended_splits: Vec::new(), // GodObjectAnalysis uses different split structure
+            recommended_splits: analysis
+                .recommended_splits
+                .into_iter()
+                .map(convert_from_org_module_split)
+                .collect(),
             module_structure: analysis.module_structure,
             domain_count: analysis.domain_count,
             domain_diversity: analysis.domain_diversity,
@@ -630,6 +634,36 @@ fn convert_from_org_split_method(
         crate::organization::SplitAnalysisMethod::MethodBased => SplitAnalysisMethod::MethodBased,
         crate::organization::SplitAnalysisMethod::Hybrid => SplitAnalysisMethod::Hybrid,
         crate::organization::SplitAnalysisMethod::TypeBased => SplitAnalysisMethod::TypeBased,
+    }
+}
+
+fn convert_from_org_priority(priority: crate::organization::Priority) -> Priority {
+    match priority {
+        crate::organization::Priority::High => Priority::High,
+        crate::organization::Priority::Medium => Priority::Medium,
+        crate::organization::Priority::Low => Priority::Low,
+    }
+}
+
+fn convert_from_org_module_split(split: crate::organization::ModuleSplit) -> ModuleSplit {
+    ModuleSplit {
+        suggested_name: split.suggested_name,
+        methods_to_move: split.methods_to_move,
+        structs_to_move: split.structs_to_move,
+        responsibility: split.responsibility,
+        estimated_lines: split.estimated_lines,
+        method_count: split.method_count,
+        warning: split.warning,
+        priority: convert_from_org_priority(split.priority),
+        domain: split.domain,
+        rationale: split.rationale,
+        method: convert_from_org_split_method(split.method),
+        severity: split.severity.map(convert_from_org_severity),
+        classification_evidence: split.classification_evidence,
+        representative_methods: split.representative_methods,
+        fields_needed: split.fields_needed,
+        trait_suggestion: split.trait_suggestion,
+        behavior_category: split.behavior_category,
     }
 }
 

@@ -137,3 +137,36 @@ def configure(
 
     assert_eq!(func.parameter_names, vec!["host", "port", "args", "kwargs"]);
 }
+
+#[test]
+fn test_python_extraction_handles_decorated_methods() {
+    let source = r#"
+def authenticated(method):
+    return method
+
+class CharacterHandler:
+    @authenticated
+    def get(self, character_id):
+        return character_id
+
+    @authenticated
+    async def post(self):
+        return None
+"#;
+    let path = Path::new("decorated_methods.py");
+    let data = UnifiedFileExtractor::extract(path, source).expect("Failed to extract");
+
+    let get_func = data
+        .functions
+        .iter()
+        .find(|f| f.qualified_name == "CharacterHandler.get")
+        .expect("decorated get method should be extracted");
+    let post_func = data
+        .functions
+        .iter()
+        .find(|f| f.qualified_name == "CharacterHandler.post")
+        .expect("decorated async post method should be extracted");
+
+    assert_eq!(get_func.parameter_names, vec!["self", "character_id"]);
+    assert!(post_func.is_async);
+}

@@ -48,6 +48,7 @@
 pub mod adapters;
 mod extractor;
 pub mod python;
+pub mod responsibilities;
 mod types;
 
 // Re-export all public types
