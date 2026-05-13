@@ -1233,232 +1233,314 @@ impl ParallelUnifiedAnalysisBuilder {
         let start = Instant::now();
         let total_file_items = file_data.len();
 
-        // Create progress spinner for final aggregation
-        let agg_progress = ProgressManager::global()
-            .map(|pm| pm.create_spinner("Aggregating analysis results"))
-            .unwrap_or_else(indicatif::ProgressBar::hidden);
+        let agg_progress = create_final_aggregation_progress(total_file_items);
+        let mut unified = self.initialize_unified_analysis(data_flow_graph, &file_data);
 
-        if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(
-                5,
-                3,
-                crate::tui::app::StageStatus::Active,
-                Some((0, total_file_items.max(1))),
-            );
-        }
-
-        let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
-        unified.data_flow_graph = data_flow_graph;
-
-        // Spec 201: Register all analyzed files for accurate total LOC calculation
-        // Use cached total_lines from FileDebtMetrics (avoids redundant file I/O)
-        for (file_item, _) in &file_data {
-            if file_item.metrics.total_lines > 0 {
-                unified.register_analyzed_file(
-                    file_item.metrics.path.clone(),
-                    file_item.metrics.total_lines,
-                );
-            }
-        }
-
-        // Add purity information
-        for (func_name, is_pure) in purity_analysis {
-            if let Some(item) = unified
-                .items
-                .iter_mut()
-                .find(|i| i.location.function == func_name)
-            {
-                item.is_pure = Some(is_pure);
-            }
-        }
-
-        // Add all items
-        for item in items {
-            unified.add_item(item);
-        }
-
-        // Add file items and create god object UnifiedDebtItems (spec 207)
-        for (index, (file_item, raw_functions)) in file_data.into_iter().enumerate() {
-            // Check if this file has god object analysis
-            if let Some(ref god_analysis) = file_item.metrics.god_object_analysis {
-                if god_analysis.is_god_object {
-                    // Check if this god object should be suppressed via debtmap:ignore[god_object]
-                    let is_suppressed = std::fs::read_to_string(&file_item.metrics.path)
-                        .ok()
-                        .is_some_and(|content| {
-                            is_god_object_suppressed_parallel(
-                                god_analysis,
-                                &content,
-                                &file_item.metrics.path,
-                            )
-                        });
-
-                    if is_suppressed {
-                        // Skip creating the god object debt item, but still process file item
-                        // Clear god_object_analysis from file metrics when suppressed
-                        let mut file_item = file_item;
-                        file_item.metrics.god_object_analysis = None;
-                        let file_item_with_deps =
-                            enrich_file_item_with_dependencies(file_item, &unified.items);
-                        unified.add_file_item(file_item_with_deps);
-                        update_finalization_subtask(index + 1, total_file_items);
-                        continue;
-                    }
-
-                    // Aggregate from raw metrics first for complexity (includes ALL functions, even tests)
-                    use crate::priority::god_object_aggregation::{
-                        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
-                        aggregate_god_object_metrics, extract_member_functions,
-                    };
-
-                    let mut aggregated_metrics = aggregate_from_raw_metrics(&raw_functions);
-
-                    // Aggregate coverage from ALL raw functions (not just debt items)
-                    // This ensures god objects show accurate coverage even when member
-                    // functions are filtered out by complexity thresholds.
-                    if let Some(lcov) = coverage_data {
-                        aggregated_metrics.weighted_coverage =
-                            aggregate_coverage_from_raw_metrics(&raw_functions, lcov);
-                    }
-
-                    // Enrich with contextual risk
-                    // NOTE: Dependencies are already aggregated from raw metrics (complete architectural view).
-                    let member_functions =
-                        extract_member_functions(unified.items.iter(), &file_item.metrics.path);
-                    if !member_functions.is_empty() {
-                        let item_metrics = aggregate_god_object_metrics(&member_functions);
-
-                        // Spec 248: Prefer direct file-level git analysis over member aggregation
-                        aggregated_metrics.aggregated_contextual_risk = self
-                            .risk_analyzer
-                            .as_ref()
-                            .and_then(|analyzer| {
-                                crate::builders::unified_analysis::analyze_file_git_context(
-                                    &file_item.metrics.path,
-                                    analyzer,
-                                    &self.project_path,
-                                )
-                            })
-                            .or(item_metrics.aggregated_contextual_risk); // Fallback to member aggregation
-                    } else {
-                        // Spec 248: When no member functions, try direct file analysis
-                        aggregated_metrics.aggregated_contextual_risk =
-                            self.risk_analyzer.as_ref().and_then(|analyzer| {
-                                crate::builders::unified_analysis::analyze_file_git_context(
-                                    &file_item.metrics.path,
-                                    analyzer,
-                                    &self.project_path,
-                                )
-                            });
-                    }
-                    // Dependencies are already populated from raw metrics (complete architectural view)
-
-                    // Enrich god_analysis with aggregated entropy and error swallowing data
-                    let mut god_analysis = god_analysis.clone();
-                    god_analysis.aggregated_entropy = aggregated_metrics.aggregated_entropy.clone();
-                    god_analysis.aggregated_error_swallowing_count =
-                        if aggregated_metrics.total_error_swallowing_count > 0 {
-                            Some(aggregated_metrics.total_error_swallowing_count)
-                        } else {
-                            None
-                        };
-                    god_analysis.aggregated_error_swallowing_patterns =
-                        if !aggregated_metrics.error_swallowing_patterns.is_empty() {
-                            Some(aggregated_metrics.error_swallowing_patterns.clone())
-                        } else {
-                            None
-                        };
-
-                    // Create god object UnifiedDebtItem using same function as sequential path
-                    let mut god_item =
-                        crate::builders::unified_analysis::create_god_object_debt_item(
-                            &file_item.metrics.path,
-                            &file_item.metrics,
-                            &god_analysis,
-                            aggregated_metrics,
-                            coverage_data,
-                            Some(&self.call_graph),
-                        );
-
-                    // Generate context suggestion for AI agents (spec 263)
-                    use crate::priority::context::{generate_context_suggestion, ContextConfig};
-                    let context_config = ContextConfig::default();
-                    god_item.context_suggestion =
-                        generate_context_suggestion(&god_item, &self.call_graph, &context_config);
-
-                    unified.add_item(god_item);
-                }
-            }
-
-            // Spec 201: Enrich file item with dependency metrics aggregated from function-level data
-            let file_item_with_deps = enrich_file_item_with_dependencies(file_item, &unified.items);
-            unified.add_file_item(file_item_with_deps);
-            update_finalization_subtask(index + 1, total_file_items);
-        }
+        apply_purity_analysis(&mut unified, purity_analysis);
+        add_unified_items(&mut unified, items);
+        self.add_finalized_file_items(&mut unified, file_data, coverage_data);
 
         agg_progress.set_message("Sorting by priority and calculating impact");
+        finalize_unified_analysis(&mut unified, coverage_data);
+        complete_finalization_subtask(total_file_items);
+        finish_aggregation_progress(&agg_progress, &unified);
 
-        // Final sorting and impact calculation
-        unified.sort_by_priority();
-        unified.calculate_total_impact();
-
-        // Set coverage data availability flag (spec 108)
-        unified.has_coverage_data = coverage_data.is_some();
-
-        if let Some(lcov) = coverage_data {
-            unified.overall_coverage = Some(lcov.get_overall_coverage());
-        }
-
-        if let Some(manager) = ProgressManager::global() {
-            manager.tui_update_subtask(
-                5,
-                3,
-                crate::tui::app::StageStatus::Completed,
-                Some((total_file_items.max(1), total_file_items.max(1))),
-            );
-        }
-
-        agg_progress.finish_with_message(format!(
-            "Analysis complete ({} function items, {} file items)",
-            unified.items.len(),
-            unified.file_items.len()
-        ));
-
-        self.timings.sorting = start.elapsed();
-        self.timings.total = self.timings.call_graph_building
-            + self.timings.trait_resolution
-            + self.timings.coverage_loading
-            + self.timings.data_flow_creation
-            + self.timings.purity_analysis
-            + self.timings.test_detection
-            + self.timings.debt_aggregation
-            + self.timings.function_analysis
-            + self.timings.file_analysis
-            + self.timings.aggregation
-            + self.timings.sorting;
-
-        if self.options.progress {
-            log::debug!("Total parallel analysis time: {:?}", self.timings.total);
-            log::debug!(
-                "  - Call graph building: {:?}",
-                self.timings.call_graph_building
-            );
-            log::debug!("  - Trait resolution: {:?}", self.timings.trait_resolution);
-            log::debug!("  - Coverage loading: {:?}", self.timings.coverage_loading);
-            log::debug!("  - Data flow: {:?}", self.timings.data_flow_creation);
-            log::debug!("  - Purity: {:?}", self.timings.purity_analysis);
-            log::debug!("  - Test detection: {:?}", self.timings.test_detection);
-            log::debug!("  - Debt aggregation: {:?}", self.timings.debt_aggregation);
-            log::debug!(
-                "  - Function analysis: {:?}",
-                self.timings.function_analysis
-            );
-            log::debug!("  - File analysis: {:?}", self.timings.file_analysis);
-            log::debug!("  - Sorting: {:?}", self.timings.sorting);
-        }
+        self.record_final_timing(start.elapsed());
+        self.log_timing_summary();
 
         (unified, self.timings)
     }
+
+    fn initialize_unified_analysis(
+        &self,
+        data_flow_graph: DataFlowGraph,
+        file_data: &[(FileDebtItem, Vec<FunctionMetrics>)],
+    ) -> UnifiedAnalysis {
+        let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
+        unified.data_flow_graph = data_flow_graph;
+        register_analyzed_files(&mut unified, file_data);
+        unified
+    }
+
+    fn add_finalized_file_items(
+        &self,
+        unified: &mut UnifiedAnalysis,
+        file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)>,
+        coverage_data: Option<&LcovData>,
+    ) {
+        let total_file_items = file_data.len();
+
+        for (index, (file_item, raw_functions)) in file_data.into_iter().enumerate() {
+            let finalized =
+                self.finalize_file_item(unified, file_item, &raw_functions, coverage_data);
+            unified.add_file_item(finalized);
+            update_finalization_subtask(index + 1, total_file_items);
+        }
+    }
+
+    fn finalize_file_item(
+        &self,
+        unified: &mut UnifiedAnalysis,
+        mut file_item: FileDebtItem,
+        raw_functions: &[FunctionMetrics],
+        coverage_data: Option<&LcovData>,
+    ) -> FileDebtItem {
+        self.add_god_object_item_if_needed(unified, &mut file_item, raw_functions, coverage_data);
+        enrich_file_item_with_dependencies(file_item, &unified.items)
+    }
+
+    fn add_god_object_item_if_needed(
+        &self,
+        unified: &mut UnifiedAnalysis,
+        file_item: &mut FileDebtItem,
+        raw_functions: &[FunctionMetrics],
+        coverage_data: Option<&LcovData>,
+    ) {
+        let Some(god_analysis) = god_object_analysis_for_item(file_item) else {
+            return;
+        };
+
+        if is_god_object_suppressed_for_file(file_item, &god_analysis) {
+            file_item.metrics.god_object_analysis = None;
+            return;
+        }
+
+        let god_item = self.create_god_object_item(
+            unified,
+            file_item,
+            &god_analysis,
+            raw_functions,
+            coverage_data,
+        );
+        unified.add_item(god_item);
+    }
+
+    fn create_god_object_item(
+        &self,
+        unified: &UnifiedAnalysis,
+        file_item: &FileDebtItem,
+        god_analysis: &crate::organization::GodObjectAnalysis,
+        raw_functions: &[FunctionMetrics],
+        coverage_data: Option<&LcovData>,
+    ) -> UnifiedDebtItem {
+        use crate::priority::context::{generate_context_suggestion, ContextConfig};
+
+        let aggregated_metrics = self.aggregate_god_object_metrics(
+            unified,
+            &file_item.metrics.path,
+            raw_functions,
+            coverage_data,
+        );
+        let god_analysis = crate::builders::unified_analysis_phases::phases::god_object::
+            enrich_god_analysis_with_aggregates(god_analysis, &aggregated_metrics);
+
+        let mut god_item = crate::builders::unified_analysis::create_god_object_debt_item(
+            &file_item.metrics.path,
+            &file_item.metrics,
+            &god_analysis,
+            aggregated_metrics,
+            coverage_data,
+            Some(&self.call_graph),
+        );
+
+        let context_config = ContextConfig::default();
+        god_item.context_suggestion =
+            generate_context_suggestion(&god_item, &self.call_graph, &context_config);
+        god_item
+    }
+
+    fn aggregate_god_object_metrics(
+        &self,
+        unified: &UnifiedAnalysis,
+        file_path: &Path,
+        raw_functions: &[FunctionMetrics],
+        coverage_data: Option<&LcovData>,
+    ) -> crate::priority::god_object_aggregation::GodObjectAggregatedMetrics {
+        use crate::priority::god_object_aggregation::{
+            aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
+        };
+
+        let mut aggregated = aggregate_from_raw_metrics(raw_functions);
+
+        if let Some(lcov) = coverage_data {
+            aggregated.weighted_coverage = aggregate_coverage_from_raw_metrics(raw_functions, lcov);
+        }
+
+        aggregated.aggregated_contextual_risk = self
+            .file_contextual_risk(file_path)
+            .or_else(|| member_contextual_risk(unified, file_path));
+
+        aggregated
+    }
+
+    fn file_contextual_risk(
+        &self,
+        file_path: &Path,
+    ) -> Option<crate::risk::context::ContextualRisk> {
+        self.risk_analyzer.as_ref().and_then(|analyzer| {
+            crate::builders::unified_analysis::analyze_file_git_context(
+                file_path,
+                analyzer,
+                &self.project_path,
+            )
+        })
+    }
+
+    fn record_final_timing(&mut self, elapsed: Duration) {
+        self.timings.sorting = elapsed;
+        self.timings.total = total_analysis_duration(&self.timings);
+    }
+
+    fn log_timing_summary(&self) {
+        if !self.options.progress {
+            return;
+        }
+
+        log::debug!("Total parallel analysis time: {:?}", self.timings.total);
+        log::debug!(
+            "  - Call graph building: {:?}",
+            self.timings.call_graph_building
+        );
+        log::debug!("  - Trait resolution: {:?}", self.timings.trait_resolution);
+        log::debug!("  - Coverage loading: {:?}", self.timings.coverage_loading);
+        log::debug!("  - Data flow: {:?}", self.timings.data_flow_creation);
+        log::debug!("  - Purity: {:?}", self.timings.purity_analysis);
+        log::debug!("  - Test detection: {:?}", self.timings.test_detection);
+        log::debug!("  - Debt aggregation: {:?}", self.timings.debt_aggregation);
+        log::debug!(
+            "  - Function analysis: {:?}",
+            self.timings.function_analysis
+        );
+        log::debug!("  - File analysis: {:?}", self.timings.file_analysis);
+        log::debug!("  - Sorting: {:?}", self.timings.sorting);
+    }
+}
+
+fn create_final_aggregation_progress(total_file_items: usize) -> indicatif::ProgressBar {
+    let progress = ProgressManager::global()
+        .map(|pm| pm.create_spinner("Aggregating analysis results"))
+        .unwrap_or_else(indicatif::ProgressBar::hidden);
+
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_update_subtask(
+            5,
+            3,
+            crate::tui::app::StageStatus::Active,
+            Some((0, total_file_items.max(1))),
+        );
+    }
+
+    progress
+}
+
+fn register_analyzed_files(
+    unified: &mut UnifiedAnalysis,
+    file_data: &[(FileDebtItem, Vec<FunctionMetrics>)],
+) {
+    for (file_item, _) in file_data {
+        if file_item.metrics.total_lines > 0 {
+            unified.register_analyzed_file(
+                file_item.metrics.path.clone(),
+                file_item.metrics.total_lines,
+            );
+        }
+    }
+}
+
+fn apply_purity_analysis(unified: &mut UnifiedAnalysis, purity_analysis: HashMap<String, bool>) {
+    for (func_name, is_pure) in purity_analysis {
+        if let Some(item) = unified
+            .items
+            .iter_mut()
+            .find(|i| i.location.function == func_name)
+        {
+            item.is_pure = Some(is_pure);
+        }
+    }
+}
+
+fn add_unified_items(unified: &mut UnifiedAnalysis, items: Vec<UnifiedDebtItem>) {
+    for item in items {
+        unified.add_item(item);
+    }
+}
+
+fn god_object_analysis_for_item(
+    file_item: &FileDebtItem,
+) -> Option<crate::organization::GodObjectAnalysis> {
+    file_item
+        .metrics
+        .god_object_analysis
+        .clone()
+        .filter(|analysis| analysis.is_god_object)
+}
+
+fn is_god_object_suppressed_for_file(
+    file_item: &FileDebtItem,
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) -> bool {
+    std::fs::read_to_string(&file_item.metrics.path)
+        .ok()
+        .is_some_and(|content| {
+            is_god_object_suppressed_parallel(god_analysis, &content, &file_item.metrics.path)
+        })
+}
+
+fn member_contextual_risk(
+    unified: &UnifiedAnalysis,
+    file_path: &Path,
+) -> Option<crate::risk::context::ContextualRisk> {
+    use crate::priority::god_object_aggregation::{
+        aggregate_god_object_metrics, extract_member_functions,
+    };
+
+    let member_functions = extract_member_functions(unified.items.iter(), file_path);
+    (!member_functions.is_empty())
+        .then(|| aggregate_god_object_metrics(&member_functions).aggregated_contextual_risk)
+        .flatten()
+}
+
+fn finalize_unified_analysis(unified: &mut UnifiedAnalysis, coverage_data: Option<&LcovData>) {
+    unified.sort_by_priority();
+    unified.calculate_total_impact();
+    unified.has_coverage_data = coverage_data.is_some();
+
+    if let Some(lcov) = coverage_data {
+        unified.overall_coverage = Some(lcov.get_overall_coverage());
+    }
+}
+
+fn complete_finalization_subtask(total_file_items: usize) {
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_update_subtask(
+            5,
+            3,
+            crate::tui::app::StageStatus::Completed,
+            Some((total_file_items.max(1), total_file_items.max(1))),
+        );
+    }
+}
+
+fn finish_aggregation_progress(progress: &indicatif::ProgressBar, unified: &UnifiedAnalysis) {
+    progress.finish_with_message(format!(
+        "Analysis complete ({} function items, {} file items)",
+        unified.items.len(),
+        unified.file_items.len()
+    ));
+}
+
+fn total_analysis_duration(timings: &AnalysisPhaseTimings) -> Duration {
+    timings.call_graph_building
+        + timings.trait_resolution
+        + timings.coverage_loading
+        + timings.data_flow_creation
+        + timings.purity_analysis
+        + timings.test_detection
+        + timings.debt_aggregation
+        + timings.function_analysis
+        + timings.file_analysis
+        + timings.aggregation
+        + timings.sorting
 }
 
 fn update_finalization_subtask(current: usize, total: usize) {
