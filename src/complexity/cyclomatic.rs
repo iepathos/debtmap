@@ -70,11 +70,9 @@ impl<'ast> TraversalState<'ast> {
     }
 
     fn push_block(&mut self, block: &'ast Block) {
-        block
-            .stmts
-            .iter()
-            .rev()
-            .for_each(|stmt| self.push_stmt(stmt));
+        for stmt in block.stmts.iter().rev() {
+            self.push_stmt(stmt);
+        }
     }
 }
 
@@ -143,13 +141,13 @@ fn push_control_flow_children<'ast>(
             true
         }
         Expr::Match(expr_match) => {
-            expr_match.arms.iter().rev().for_each(|arm| {
+            for arm in expr_match.arms.iter().rev() {
                 traversal.push_expr(&arm.body, false);
                 push_optional_expr(
                     traversal,
                     arm.guard.as_ref().map(|(_, guard)| guard.as_ref()),
                 );
-            });
+            }
             traversal.push_expr(&expr_match.expr, false);
             true
         }
@@ -179,19 +177,16 @@ fn push_call_and_access_children<'ast>(
 ) -> bool {
     match expr {
         Expr::Call(call) => {
-            call.args
-                .iter()
-                .rev()
-                .for_each(|arg| traversal.push_expr(arg, false));
+            for arg in call.args.iter().rev() {
+                traversal.push_expr(arg, false);
+            }
             traversal.push_expr(&call.func, false);
             true
         }
         Expr::MethodCall(method_call) => {
-            method_call
-                .args
-                .iter()
-                .rev()
-                .for_each(|arg| traversal.push_expr(arg, false));
+            for arg in method_call.args.iter().rev() {
+                traversal.push_expr(arg, false);
+            }
             traversal.push_expr(&method_call.receiver, false);
             true
         }
@@ -263,28 +258,22 @@ fn push_literal_children<'ast>(traversal: &mut TraversalState<'ast>, expr: &'ast
             true
         }
         Expr::Tuple(tuple) => {
-            tuple
-                .elems
-                .iter()
-                .rev()
-                .for_each(|elem| traversal.push_expr(elem, false));
+            for elem in tuple.elems.iter().rev() {
+                traversal.push_expr(elem, false);
+            }
             true
         }
         Expr::Array(array) => {
-            array
-                .elems
-                .iter()
-                .rev()
-                .for_each(|elem| traversal.push_expr(elem, false));
+            for elem in array.elems.iter().rev() {
+                traversal.push_expr(elem, false);
+            }
             true
         }
         Expr::Struct(struct_expr) => {
             push_optional_expr(traversal, struct_expr.rest.as_deref());
-            struct_expr
-                .fields
-                .iter()
-                .rev()
-                .for_each(|field| traversal.push_expr(&field.expr, false));
+            for field in struct_expr.fields.iter().rev() {
+                traversal.push_expr(&field.expr, false);
+            }
             true
         }
         Expr::Repeat(repeat) => {
