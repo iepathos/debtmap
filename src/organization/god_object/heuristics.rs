@@ -59,21 +59,18 @@ pub fn fallback_god_object_heuristics(
         5.0 // Default moderate complexity when not available
     };
 
-    // Estimate responsibility count based on function count
-    let estimated_resp_count = (function_count / 10).clamp(1, 10);
-    let responsibilities: Vec<String> = (1..=estimated_resp_count)
-        .map(|i| format!("responsibility_{}", i))
-        .collect();
-    let responsibility_method_counts: HashMap<String, usize> = responsibilities
-        .iter()
-        .map(|r| (r.clone(), function_count / estimated_resp_count))
-        .collect();
+    // Heuristic detection can identify "large file / too many functions", but it
+    // cannot infer semantic responsibilities. Leave responsibility data empty so
+    // fallback estimates are not presented as real decomposition guidance.
+    let responsibility_count = 0;
+    let responsibilities = Vec::new();
+    let responsibility_method_counts = HashMap::new();
 
     // Use weighted scoring for consistency (Spec 212)
     let god_object_score = calculate_god_object_score_weighted(
         function_count as f64,
         field_count,
-        estimated_resp_count,
+        responsibility_count,
         line_count,
         avg_complexity,
         &thresholds,
@@ -84,7 +81,7 @@ pub fn fallback_god_object_heuristics(
         method_count: function_count,
         weighted_method_count: None,
         field_count,
-        responsibility_count: estimated_resp_count,
+        responsibility_count,
         lines_of_code: line_count,
         complexity_sum,
         god_object_score: god_object_score.max(0.0),
@@ -187,10 +184,10 @@ pub fn fallback_with_preserved_analysis(
                     analysis.responsibility_count,
                 )
             } else {
-                estimate_responsibilities(function_count)
+                empty_responsibilities()
             }
         } else {
-            estimate_responsibilities(function_count)
+            empty_responsibilities()
         };
 
     // Use weighted scoring for consistency (Spec 212)
@@ -239,23 +236,9 @@ pub fn fallback_with_preserved_analysis(
     })
 }
 
-/// Helper: Estimate responsibilities based on function count.
-fn estimate_responsibilities(
-    function_count: usize,
-) -> (Vec<String>, HashMap<String, usize>, usize) {
-    let estimated_resp_count = (function_count / 10).clamp(1, 10);
-    let responsibilities: Vec<String> = (1..=estimated_resp_count)
-        .map(|i| format!("responsibility_{}", i))
-        .collect();
-    let responsibility_method_counts: HashMap<String, usize> = responsibilities
-        .iter()
-        .map(|r| (r.clone(), function_count / estimated_resp_count))
-        .collect();
-    (
-        responsibilities,
-        responsibility_method_counts,
-        estimated_resp_count,
-    )
+/// Helper: Return no semantic responsibilities for heuristic-only detections.
+fn empty_responsibilities() -> (Vec<String>, HashMap<String, usize>, usize) {
+    (Vec::new(), HashMap::new(), 0)
 }
 
 #[cfg(test)]
@@ -319,8 +302,8 @@ pub struct Thing { pub field: i32 }
     #[test]
     fn test_responsibilities_estimated() {
         let result = fallback_god_object_heuristics(100, 3000, 20, 0).unwrap();
-        // 100 functions / 10 = 10 responsibilities
-        assert_eq!(result.responsibility_count, 10);
-        assert_eq!(result.responsibilities.len(), 10);
+        assert_eq!(result.responsibility_count, 0);
+        assert!(result.responsibilities.is_empty());
+        assert!(result.responsibility_method_counts.is_empty());
     }
 }

@@ -1,12 +1,23 @@
+use crate::analyzers::typescript::parser::{detect_variant, parse_source};
+use crate::analyzers::typescript::visitor::class_analysis::extract_classes;
+use crate::analyzers::typescript::visitor::function_analysis::extract_functions;
 use crate::analyzers::FileAnalyzer;
 use crate::core::FunctionMetrics;
 use crate::extraction::{ExtractedFileData, UnifiedFileExtractor};
+use crate::organization::god_object::classifier::group_methods_by_responsibility;
 use crate::organization::god_object::heuristics::{
-    detect_from_content, fallback_god_object_heuristics,
+    detect_from_content, fallback_god_object_heuristics, HEURISTIC_MAX_FUNCTIONS,
+    HEURISTIC_MAX_LINES,
+};
+use crate::organization::god_object::scoring::calculate_god_object_score_weighted;
+use crate::organization::god_object::{
+    DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis, GodObjectConfidence,
+    GodObjectThresholds, ModuleSplit, Priority, SplitAnalysisMethod,
 };
 use crate::priority::file_metrics::FileDebtMetrics;
 use crate::risk::lcov::LcovData;
 use anyhow::Result;
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Helper struct for complexity calculation results
@@ -25,6 +36,206 @@ struct CoverageMetrics {
 struct LineMetrics {
     total_lines: usize,
     uncovered_lines: usize,
+}
+
+fn is_javascript_like(path: &Path) -> bool {
+    crate::core::Language::from_path(path).is_js_ts()
+}
+
+fn semantic_responsibility_groups(function_names: &[String]) -> HashMap<String, Vec<String>> {
+    group_methods_by_responsibility(function_names)
+        .into_iter()
+        .filter(|(responsibility, methods)| responsibility != "unclassified" && !methods.is_empty())
+        .collect()
+}
+
+fn build_semantic_splits(groups: &HashMap<String, Vec<String>>) -> Vec<ModuleSplit> {
+    let mut splits: Vec<ModuleSplit> = groups
+        .iter()
+        .filter(|(_, methods)| methods.len() >= 2)
+        .map(|(responsibility, methods)| ModuleSplit {
+            suggested_name: format!("{}_module", responsibility.to_lowercase().replace(' ', "_")),
+            methods_to_move: methods.clone(),
+            structs_to_move: Vec::new(),
+            responsibility: responsibility.clone(),
+            estimated_lines: 0,
+            method_count: methods.len(),
+            warning: None,
+            priority: if methods.len() > 10 {
+                Priority::High
+            } else {
+                Priority::Medium
+            },
+            cohesion_score: Some(0.85),
+            dependencies_in: Vec::new(),
+            dependencies_out: Vec::new(),
+            domain: responsibility.clone(),
+            rationale: Some("Parser-derived function names share this responsibility".to_string()),
+            method: SplitAnalysisMethod::MethodBased,
+            severity: None,
+            interface_estimate: None,
+            classification_evidence: None,
+            representative_methods: methods.iter().take(8).cloned().collect(),
+            fields_needed: Vec::new(),
+            trait_suggestion: None,
+            behavior_category: Some(responsibility.clone()),
+            core_type: None,
+            data_flow: Vec::new(),
+            suggested_type_definition: None,
+            data_flow_stage: None,
+            pipeline_position: None,
+            input_types: Vec::new(),
+            output_types: Vec::new(),
+            merge_history: Vec::new(),
+            alternative_names: Vec::new(),
+            naming_confidence: None,
+            naming_strategy: None,
+            cluster_quality: None,
+        })
+        .collect();
+
+    splits.sort_by(|a, b| {
+        b.method_count
+            .cmp(&a.method_count)
+            .then_with(|| a.responsibility.cmp(&b.responsibility))
+    });
+    splits
+}
+
+fn build_js_visibility_breakdown(
+    functions: &[crate::analyzers::typescript::types::JsFunctionMetrics],
+) -> FunctionVisibilityBreakdown {
+    functions
+        .iter()
+        .fold(FunctionVisibilityBreakdown::new(), |mut breakdown, func| {
+            if func.is_exported {
+                breakdown.public += 1;
+            } else {
+                breakdown.private += 1;
+            }
+            breakdown
+        })
+}
+
+fn analyze_js_ts_god_object(path: &Path, content: &str) -> Option<GodObjectAnalysis> {
+    if !is_javascript_like(path) {
+        return None;
+    }
+
+    let language = crate::core::Language::from_path(path);
+    let ast = parse_source(content, path, detect_variant(path)).ok()?;
+    let functions = extract_functions(&ast, true);
+    let production_functions: Vec<_> = functions.iter().filter(|func| !func.is_test).collect();
+    let function_count = production_functions.len();
+    let total_lines = content.lines().count();
+
+    if function_count <= HEURISTIC_MAX_FUNCTIONS && total_lines <= HEURISTIC_MAX_LINES {
+        return None;
+    }
+
+    let function_names: Vec<String> = production_functions
+        .iter()
+        .filter(|func| !func.name.is_empty())
+        .map(|func| func.name.clone())
+        .collect();
+    let responsibility_groups = semantic_responsibility_groups(&function_names);
+    let responsibility_method_counts: HashMap<String, usize> = responsibility_groups
+        .iter()
+        .map(|(name, methods)| (name.clone(), methods.len()))
+        .collect();
+    let mut responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
+    responsibilities.sort();
+
+    let complexity_sum: u32 = production_functions
+        .iter()
+        .map(|func| func.cyclomatic)
+        .sum();
+    let avg_complexity = if function_count == 0 {
+        0.0
+    } else {
+        complexity_sum as f64 / function_count as f64
+    };
+    let class_count = extract_classes(&ast).len();
+    let thresholds = GodObjectThresholds::default();
+    let responsibility_count = responsibilities.len();
+    let god_object_score = calculate_god_object_score_weighted(
+        function_count as f64,
+        0,
+        responsibility_count,
+        total_lines,
+        avg_complexity,
+        &thresholds,
+    );
+    let confidence = crate::organization::god_object::classifier::determine_confidence(
+        function_count,
+        0,
+        responsibility_count,
+        total_lines,
+        complexity_sum,
+        &thresholds,
+    );
+
+    Some(GodObjectAnalysis {
+        is_god_object: true,
+        method_count: function_count,
+        weighted_method_count: None,
+        field_count: 0,
+        responsibility_count,
+        lines_of_code: total_lines,
+        complexity_sum,
+        god_object_score: god_object_score.max(0.0),
+        recommended_splits: build_semantic_splits(&responsibility_groups),
+        confidence: if confidence == GodObjectConfidence::NotGodObject {
+            GodObjectConfidence::Possible
+        } else {
+            confidence
+        },
+        responsibilities,
+        responsibility_method_counts,
+        purity_distribution: None,
+        module_structure: Some(match language {
+            crate::core::Language::TypeScript => {
+                crate::analysis::ModuleStructureAnalyzer::new_typescript()
+                    .analyze_typescript_file(content, path)
+            }
+            _ => crate::analysis::ModuleStructureAnalyzer::new_javascript()
+                .analyze_javascript_file(content, path),
+        }),
+        detection_type: if class_count == 0 {
+            DetectionType::GodFile
+        } else {
+            DetectionType::GodModule
+        },
+        struct_name: None,
+        struct_line: None,
+        struct_location: None,
+        visibility_breakdown: Some(build_js_visibility_breakdown(&functions)),
+        domain_count: responsibility_count,
+        domain_diversity: if function_count == 0 {
+            0.0
+        } else {
+            responsibility_count as f64 / function_count as f64
+        },
+        struct_ratio: if function_count == 0 {
+            0.0
+        } else {
+            class_count as f64 / function_count as f64
+        },
+        analysis_method: if responsibility_count == 0 {
+            SplitAnalysisMethod::None
+        } else {
+            SplitAnalysisMethod::MethodBased
+        },
+        cross_domain_severity: None,
+        domain_diversity_metrics: None,
+        aggregated_entropy: None,
+        aggregated_error_swallowing_count: None,
+        aggregated_error_swallowing_patterns: None,
+        layering_impact: None,
+        anti_pattern_report: None,
+        complexity_metrics: None,
+        trait_method_summary: None,
+    })
 }
 
 pub struct UnifiedFileAnalyzer {
@@ -128,6 +339,10 @@ impl UnifiedFileAnalyzer {
             if let Ok(extracted) = UnifiedFileExtractor::extract(path, content) {
                 return self.analyze_god_object_from_extracted(path, content, &extracted);
             }
+        }
+
+        if let Some(analysis) = analyze_js_ts_god_object(path, content) {
+            return (Some(analysis), None);
         }
 
         // Fallback to simple heuristics for non-Rust files
@@ -605,5 +820,53 @@ mod tests {
             assert!(score >= 0.0);
             assert!(score <= 10.0);
         }
+    }
+
+    #[test]
+    fn test_js_god_object_uses_semantic_responsibilities() {
+        let mut content = String::new();
+        for i in 0..20 {
+            content.push_str(&format!("function parseThing{}() {{ return {}; }}\n", i, i));
+        }
+        for i in 0..20 {
+            content.push_str(&format!(
+                "function validateThing{}() {{ return true; }}\n",
+                i
+            ));
+        }
+        for i in 0..12 {
+            content.push_str(&format!(
+                "function renderThing{}() {{ return String({}); }}\n",
+                i, i
+            ));
+        }
+
+        let analyzer = UnifiedFileAnalyzer::new(None);
+        let metrics = analyzer
+            .analyze_file(Path::new("generator.js"), &content)
+            .unwrap();
+        let analysis = metrics.god_object_analysis.unwrap();
+
+        assert!(analysis.is_god_object);
+        assert_eq!(analysis.method_count, 52);
+        assert!(analysis.responsibilities.contains(&"Parsing".to_string()));
+        assert!(analysis
+            .responsibilities
+            .contains(&"Validation".to_string()));
+        assert!(analysis.responsibilities.contains(&"Rendering".to_string()));
+        assert!(!analysis
+            .responsibilities
+            .iter()
+            .any(|name| name.starts_with("responsibility_")));
+    }
+
+    #[test]
+    fn test_heuristic_fallback_does_not_invent_responsibilities() {
+        let analysis = UnifiedFileAnalyzer::detect_god_object(60, 1000).unwrap();
+
+        assert!(analysis.is_god_object);
+        assert_eq!(analysis.responsibility_count, 0);
+        assert!(analysis.responsibilities.is_empty());
+        assert!(analysis.responsibility_method_counts.is_empty());
     }
 }
