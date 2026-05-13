@@ -559,7 +559,7 @@ fn determine_detection_type(
         DetectionType::GodFile
     } else if has_structs && total_functions > 50 && total_functions > impl_methods * 3 {
         DetectionType::GodModule
-    } else if has_structs && total_functions > thresholds.max_methods {
+    } else if has_structs && impl_methods == 0 && total_functions > thresholds.max_methods {
         DetectionType::GodModule
     } else {
         DetectionType::GodClass
