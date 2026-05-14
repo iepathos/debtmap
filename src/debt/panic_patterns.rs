@@ -76,47 +76,9 @@ impl<'a> PanicPatternDetector<'a> {
     }
 
     fn check_unwrap_patterns(&mut self, method_call: &ExprMethodCall) {
-        let method_name = method_call.method.to_string();
-
-        if method_name == "unwrap" {
+        if let Some(pattern) = classify_method_panic(method_call) {
             let line = self.get_line_number(method_call.method.span());
-
-            // Try to determine if it's Result or Option based on context
-            // For now, we'll assume it could be either
-            self.add_debt_item(
-                line,
-                PanicPattern::UnwrapOnResult,
-                ".unwrap() can panic in production",
-            );
-        } else if method_name == "expect" {
-            let line = self.get_line_number(method_call.method.span());
-
-            // Check if the expect message is generic
-            let is_generic = method_call.args.iter().any(|arg| {
-                if let Expr::Lit(lit) = arg {
-                    if let syn::Lit::Str(s) = &lit.lit {
-                        let msg = s.value().to_lowercase();
-                        // Common generic messages
-                        msg == "failed"
-                            || msg == "error"
-                            || msg == "should not happen"
-                            || msg == "unexpected"
-                            || msg.len() < 10 // Very short messages are likely generic
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            });
-
-            if is_generic {
-                self.add_debt_item(
-                    line,
-                    PanicPattern::ExpectWithGenericMessage,
-                    "expect() with generic error message",
-                );
-            }
+            self.add_debt_item(line, pattern.debt_pattern(), pattern.context());
         }
     }
 
@@ -158,6 +120,63 @@ impl<'a> PanicPatternDetector<'a> {
             }
         }
     }
+}
+
+#[derive(Debug, PartialEq)]
+enum MethodPanicPattern {
+    Unwrap,
+    GenericExpect,
+}
+
+impl MethodPanicPattern {
+    fn debt_pattern(&self) -> PanicPattern {
+        match self {
+            Self::Unwrap => PanicPattern::UnwrapOnResult,
+            Self::GenericExpect => PanicPattern::ExpectWithGenericMessage,
+        }
+    }
+
+    fn context(&self) -> &'static str {
+        match self {
+            Self::Unwrap => ".unwrap() can panic in production",
+            Self::GenericExpect => "expect() with generic error message",
+        }
+    }
+}
+
+fn classify_method_panic(method_call: &ExprMethodCall) -> Option<MethodPanicPattern> {
+    match method_call.method.to_string().as_str() {
+        "unwrap" => Some(MethodPanicPattern::Unwrap),
+        "expect" if has_generic_expect_message(method_call) => {
+            Some(MethodPanicPattern::GenericExpect)
+        }
+        _ => None,
+    }
+}
+
+fn has_generic_expect_message(method_call: &ExprMethodCall) -> bool {
+    method_call.args.iter().any(expect_arg_is_generic)
+}
+
+fn expect_arg_is_generic(arg: &Expr) -> bool {
+    expect_message(arg).is_some_and(|message| is_generic_expect_message(&message))
+}
+
+fn expect_message(arg: &Expr) -> Option<String> {
+    match arg {
+        Expr::Lit(lit) => match &lit.lit {
+            syn::Lit::Str(message) => Some(message.value().to_lowercase()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn is_generic_expect_message(message: &str) -> bool {
+    matches!(
+        message,
+        "failed" | "error" | "should not happen" | "unexpected"
+    ) || message.len() < 10
 }
 
 impl<'a> Visit<'_> for PanicPatternDetector<'a> {
@@ -263,6 +282,13 @@ pub fn detect_panic_patterns(
 mod tests {
     use super::*;
     use syn::parse_str;
+
+    fn parse_method_call(code: &str) -> ExprMethodCall {
+        match parse_str::<Expr>(code).expect("Failed to parse test expression") {
+            Expr::MethodCall(call) => call,
+            _ => panic!("Expected method call expression"),
+        }
+    }
 
     #[test]
     fn test_unwrap_detection() {
@@ -386,6 +412,34 @@ mod tests {
 
         // Should not detect issues for descriptive expect messages
         assert!(items.is_empty() || !items[0].message.contains("generic"));
+    }
+
+    #[test]
+    fn test_classify_unwrap_method_as_panic() {
+        let method_call = parse_method_call("operation().unwrap()");
+
+        assert_eq!(
+            classify_method_panic(&method_call),
+            Some(MethodPanicPattern::Unwrap)
+        );
+    }
+
+    #[test]
+    fn test_classify_generic_expect_message() {
+        let method_call = parse_method_call("operation().expect(\"Failed\")");
+
+        assert_eq!(
+            classify_method_panic(&method_call),
+            Some(MethodPanicPattern::GenericExpect)
+        );
+    }
+
+    #[test]
+    fn test_ignore_descriptive_expect_message() {
+        let method_call =
+            parse_method_call("operation().expect(\"Failed to load config file from disk\")");
+
+        assert_eq!(classify_method_panic(&method_call), None);
     }
 
     #[test]
