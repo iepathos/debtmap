@@ -66,40 +66,16 @@ impl AsyncBoundaryDetector {
     fn process_use_tree(&mut self, tree: &UseTree, prefix: String) {
         match tree {
             UseTree::Path(path) => {
-                let new_prefix = if prefix.is_empty() {
-                    path.ident.to_string()
-                } else {
-                    format!("{}::{}", prefix, path.ident)
-                };
+                let new_prefix = join_import_path(&prefix, &path.ident.to_string());
                 self.process_use_tree(&path.tree, new_prefix);
             }
             UseTree::Name(name) => {
-                let full_path = if prefix.is_empty() {
-                    name.ident.to_string()
-                } else {
-                    format!("{}::{}", prefix, name.ident)
-                };
-
-                // Track what kind of Command is imported
-                if full_path == "tokio::process::Command"
-                    || full_path == "async_std::process::Command"
-                {
-                    self.imports.has_async_command = true;
-                    self.imports.imported_symbols.insert("Command".to_string());
-                } else if full_path == "std::process::Command" {
-                    self.imports.has_std_command = true;
-                    self.imports.imported_symbols.insert("Command".to_string());
-                }
-
-                self.imports.imported_symbols.insert(full_path);
+                let symbol = name.ident.to_string();
+                let full_path = join_import_path(&prefix, &symbol);
+                self.imports.record_named_import(full_path, symbol);
             }
             UseTree::Glob(_) => {
-                // Handle glob imports
-                if prefix == "tokio::process" || prefix == "async_std::process" {
-                    self.imports.has_async_command = true;
-                } else if prefix == "std::process" {
-                    self.imports.has_std_command = true;
-                }
+                self.imports.record_glob_import(&prefix);
             }
             UseTree::Group(group) => {
                 for tree in &group.items {
@@ -107,25 +83,10 @@ impl AsyncBoundaryDetector {
                 }
             }
             UseTree::Rename(rename) => {
-                let full_path = if prefix.is_empty() {
-                    rename.ident.to_string()
-                } else {
-                    format!("{}::{}", prefix, rename.ident)
-                };
-
-                if full_path == "tokio::process::Command"
-                    || full_path == "async_std::process::Command"
-                {
-                    self.imports.has_async_command = true;
-                    self.imports
-                        .imported_symbols
-                        .insert(rename.rename.to_string());
-                } else if full_path == "std::process::Command" {
-                    self.imports.has_std_command = true;
-                    self.imports
-                        .imported_symbols
-                        .insert(rename.rename.to_string());
-                }
+                let symbol = rename.ident.to_string();
+                let alias = rename.rename.to_string();
+                let full_path = join_import_path(&prefix, &symbol);
+                self.imports.record_renamed_import(full_path, alias);
             }
         }
     }
@@ -261,6 +222,62 @@ impl AsyncBoundaryDetector {
         }
         has_await
     }
+}
+
+impl ImportTracker {
+    fn record_named_import(&mut self, full_path: String, symbol: String) {
+        self.record_command_import(&full_path, symbol);
+        self.imported_symbols.insert(full_path);
+    }
+
+    fn record_renamed_import(&mut self, full_path: String, alias: String) {
+        self.record_command_import(&full_path, alias);
+    }
+
+    fn record_glob_import(&mut self, prefix: &str) {
+        if is_async_command_module(prefix) {
+            self.has_async_command = true;
+        } else if is_std_command_module(prefix) {
+            self.has_std_command = true;
+        }
+    }
+
+    fn record_command_import(&mut self, full_path: &str, imported_symbol: String) {
+        if is_async_command_path(full_path) {
+            self.has_async_command = true;
+            self.imported_symbols.insert(imported_symbol);
+        } else if is_std_command_path(full_path) {
+            self.has_std_command = true;
+            self.imported_symbols.insert(imported_symbol);
+        }
+    }
+}
+
+fn join_import_path(prefix: &str, symbol: &str) -> String {
+    if prefix.is_empty() {
+        symbol.to_string()
+    } else {
+        format!("{prefix}::{symbol}")
+    }
+}
+
+fn is_async_command_path(path: &str) -> bool {
+    matches!(
+        path,
+        "tokio::process::Command" | "async_std::process::Command"
+    )
+}
+
+fn is_std_command_path(path: &str) -> bool {
+    path == "std::process::Command"
+}
+
+fn is_async_command_module(path: &str) -> bool {
+    matches!(path, "tokio::process" | "async_std::process")
+}
+
+fn is_std_command_module(path: &str) -> bool {
+    path == "std::process"
 }
 
 impl<'ast> Visit<'ast> for AsyncBoundaryDetector {
@@ -456,5 +473,42 @@ mod tests {
 
         // Should detect blocking I/O in async context
         assert!(!detector.blocking_in_async.is_empty());
+    }
+
+    #[test]
+    fn grouped_std_command_import_is_tracked() {
+        let file = syn::parse_file("use std::{fs, process::Command};").unwrap();
+        let mut detector = AsyncBoundaryDetector::new();
+
+        detector.analyze_imports(&file.items);
+
+        assert!(detector.imports.has_std_command);
+        assert!(detector.imports.imported_symbols.contains("Command"));
+        assert!(detector
+            .imports
+            .imported_symbols
+            .contains("std::process::Command"));
+    }
+
+    #[test]
+    fn renamed_async_command_import_is_tracked_by_alias() {
+        let file = syn::parse_file("use tokio::process::Command as TokioCommand;").unwrap();
+        let mut detector = AsyncBoundaryDetector::new();
+
+        detector.analyze_imports(&file.items);
+
+        assert!(detector.imports.has_async_command);
+        assert!(detector.imports.imported_symbols.contains("TokioCommand"));
+    }
+
+    #[test]
+    fn glob_command_import_tracks_command_source() {
+        let file = syn::parse_file("use async_std::process::*;").unwrap();
+        let mut detector = AsyncBoundaryDetector::new();
+
+        detector.analyze_imports(&file.items);
+
+        assert!(detector.imports.has_async_command);
+        assert!(!detector.imports.has_std_command);
     }
 }
