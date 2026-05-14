@@ -38,6 +38,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Install just
       uses: extractions/setup-just@v4
@@ -89,6 +91,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Check formatting
       run: cargo fmt --all -- --check
@@ -110,6 +114,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Install SARIF tools
       run: cargo install clippy-sarif sarif-fmt --locked
@@ -143,6 +149,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Install cargo-hack
       uses: taiki-e/install-action@cargo-hack
@@ -165,6 +173,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Generate minimal lockfile
       run: cargo +nightly generate-lockfile -Z minimal-versions
@@ -184,6 +194,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Install cargo-hack
       uses: taiki-e/install-action@cargo-hack

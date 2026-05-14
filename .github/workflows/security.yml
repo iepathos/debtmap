@@ -38,6 +38,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Install cargo-audit
       uses: taiki-e/install-action@v2
@@ -73,6 +75,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Install cargo-deny
       uses: taiki-e/install-action@v2
@@ -135,6 +139,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Check for suspicious dependencies
       run: |

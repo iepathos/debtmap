@@ -32,6 +32,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Install cargo-llvm-cov
       uses: taiki-e/install-action@v2

@@ -38,6 +38,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
 
     - name: Free disk space
       run: |

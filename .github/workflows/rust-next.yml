@@ -47,6 +47,8 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
 
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
@@ -73,6 +75,8 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
 
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
