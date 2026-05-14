@@ -44,7 +44,7 @@ struct AnalysisPhase {
     printed_start: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum PhaseStatus {
     Pending,
     InProgress,
@@ -158,73 +158,62 @@ impl AnalysisProgress {
 
     /// Render current progress state
     fn render(&mut self) {
-        if self.current_phase >= self.phases.len() {
+        if !self.can_render_current_phase() {
             return;
         }
-
-        // Don't render if TUI is active (prevents interference)
-        if crate::progress::ProgressManager::global()
-            .and_then(|m| m.is_tui_active())
-            .unwrap_or(false)
-        {
-            return;
-        }
-
-        let phase_index = self.current_phase;
-        let phase = &self.phases[phase_index];
-        let phase_num = self.current_phase + 1;
-        let total_phases = self.phases.len();
 
         if self.interactive {
-            // Interactive mode: overwrite line with carriage return
-            let indicator = match phase.status {
-                PhaseStatus::InProgress => "→",
-                PhaseStatus::Complete => "✓",
-                PhaseStatus::Pending => " ",
-            };
+            render_interactive_phase(&self.current_render_state());
+            return;
+        }
 
-            let progress_str = format_progress(&phase.progress);
+        self.render_ci_phase();
+    }
 
-            let duration_str = phase
-                .duration
-                .map(|d| format!(" - {}s", d.as_secs()))
-                .unwrap_or_default();
+    fn can_render_current_phase(&self) -> bool {
+        self.current_phase < self.phases.len() && !is_tui_active()
+    }
 
-            // Clear the line first, then write new content
-            // Use ANSI escape code to clear from cursor to end of line: \x1b[K
-            eprint!(
-                "\r\x1b[K{} {}/{} {}...{}{}",
-                indicator, phase_num, total_phases, phase.name, progress_str, duration_str
-            );
+    fn current_render_state(&self) -> PhaseRenderState {
+        let phase = &self.phases[self.current_phase];
 
-            // Move to next line when phase completes
-            if matches!(phase.status, PhaseStatus::Complete) {
-                eprintln!();
-            }
-        } else {
-            // CI/CD mode: print complete lines
-            match phase.status {
-                PhaseStatus::Complete => {
-                    let duration = phase
-                        .duration
-                        .map(|d| format!("{}s", d.as_secs()))
-                        .unwrap_or_else(|| "0s".to_string());
-                    eprintln!(
-                        "✓ {}/{} {} - {}",
-                        phase_num, total_phases, phase.name, duration
-                    );
-                }
-                PhaseStatus::InProgress => {
-                    // Only print once per phase, not on every update
-                    if !self.phases[phase_index].printed_start {
-                        eprintln!("→ {}/{} {}...", phase_num, total_phases, phase.name);
-                        self.phases[phase_index].printed_start = true;
-                    }
-                }
-                _ => {}
-            }
+        PhaseRenderState {
+            phase_index: self.current_phase,
+            phase_num: self.current_phase + 1,
+            total_phases: self.phases.len(),
+            name: phase.name,
+            status: phase.status,
+            progress: format_progress(&phase.progress),
+            duration_secs: phase.duration.map(|d| d.as_secs()),
         }
     }
+
+    fn render_ci_phase(&mut self) {
+        let state = self.current_render_state();
+        let has_printed_start = self.phases[state.phase_index].printed_start;
+
+        if let Some(line) = format_ci_phase_line(&state, has_printed_start) {
+            eprintln!("{line}");
+            self.mark_ci_start_printed(&state);
+        }
+    }
+
+    fn mark_ci_start_printed(&mut self, state: &PhaseRenderState) {
+        if matches!(state.status, PhaseStatus::InProgress) {
+            self.phases[state.phase_index].printed_start = true;
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct PhaseRenderState {
+    phase_index: usize,
+    phase_num: usize,
+    total_phases: usize,
+    name: &'static str,
+    status: PhaseStatus,
+    progress: String,
+    duration_secs: Option<u64>,
 }
 
 impl Default for AnalysisProgress {
@@ -243,6 +232,59 @@ impl AnalysisPhase {
             progress,
             printed_start: false,
         }
+    }
+}
+
+fn is_tui_active() -> bool {
+    crate::progress::ProgressManager::global()
+        .and_then(|m| m.is_tui_active())
+        .unwrap_or(false)
+}
+
+fn render_interactive_phase(state: &PhaseRenderState) {
+    eprint!(
+        "\r\x1b[K{} {}/{} {}...{}{}",
+        phase_indicator(state.status),
+        state.phase_num,
+        state.total_phases,
+        state.name,
+        state.progress,
+        format_duration_suffix(state.duration_secs)
+    );
+
+    if matches!(state.status, PhaseStatus::Complete) {
+        eprintln!();
+    }
+}
+
+fn phase_indicator(status: PhaseStatus) -> &'static str {
+    match status {
+        PhaseStatus::InProgress => "→",
+        PhaseStatus::Complete => "✓",
+        PhaseStatus::Pending => " ",
+    }
+}
+
+fn format_duration_suffix(duration_secs: Option<u64>) -> String {
+    duration_secs
+        .map(|seconds| format!(" - {seconds}s"))
+        .unwrap_or_default()
+}
+
+fn format_ci_phase_line(state: &PhaseRenderState, has_printed_start: bool) -> Option<String> {
+    match state.status {
+        PhaseStatus::Complete => Some(format!(
+            "✓ {}/{} {} - {}s",
+            state.phase_num,
+            state.total_phases,
+            state.name,
+            state.duration_secs.unwrap_or(0)
+        )),
+        PhaseStatus::InProgress if !has_printed_start => Some(format!(
+            "→ {}/{} {}...",
+            state.phase_num, state.total_phases, state.name
+        )),
+        _ => None,
     }
 }
 
@@ -330,6 +372,47 @@ mod tests {
     }
 
     #[test]
+    fn test_phase_indicator() {
+        assert_eq!(phase_indicator(PhaseStatus::Pending), " ");
+        assert_eq!(phase_indicator(PhaseStatus::InProgress), "→");
+        assert_eq!(phase_indicator(PhaseStatus::Complete), "✓");
+    }
+
+    #[test]
+    fn test_format_duration_suffix() {
+        assert_eq!(format_duration_suffix(None), "");
+        assert_eq!(format_duration_suffix(Some(12)), " - 12s");
+    }
+
+    #[test]
+    fn test_format_ci_phase_line_starts_once() {
+        let state = test_render_state(PhaseStatus::InProgress, None);
+
+        assert_eq!(
+            format_ci_phase_line(&state, false),
+            Some("→ 1/2 files parse...".to_string())
+        );
+        assert_eq!(format_ci_phase_line(&state, true), None);
+    }
+
+    #[test]
+    fn test_format_ci_phase_line_completion_includes_duration() {
+        let state = test_render_state(PhaseStatus::Complete, Some(7));
+
+        assert_eq!(
+            format_ci_phase_line(&state, true),
+            Some("✓ 1/2 files parse - 7s".to_string())
+        );
+    }
+
+    #[test]
+    fn test_format_ci_phase_line_skips_pending() {
+        let state = test_render_state(PhaseStatus::Pending, None);
+
+        assert_eq!(format_ci_phase_line(&state, false), None);
+    }
+
+    #[test]
     fn test_multiple_phases() {
         let mut progress = AnalysisProgress::new();
 
@@ -351,5 +434,17 @@ mod tests {
         // Both phases should have durations
         assert!(progress.phases[0].duration.is_some());
         assert!(progress.phases[1].duration.is_some());
+    }
+
+    fn test_render_state(status: PhaseStatus, duration_secs: Option<u64>) -> PhaseRenderState {
+        PhaseRenderState {
+            phase_index: 0,
+            phase_num: 1,
+            total_phases: 2,
+            name: "files parse",
+            status,
+            progress: String::new(),
+            duration_secs,
+        }
     }
 }
