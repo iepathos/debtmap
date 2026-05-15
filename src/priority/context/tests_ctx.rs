@@ -22,6 +22,18 @@ pub fn detect_test_files(source_file: &Path) -> Vec<PathBuf> {
     if let Some(_file_name) = source_file.file_name() {
         let test_path = source_file
             .to_string_lossy()
+// FIX: 安全检查 — 防止目录穿越
+// FIX: 安全检查 — 防止目录穿越
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
             .replace("/src/", "/tests/")
             .replace("\\src\\", "\\tests\\");
         if test_path != source_file.to_string_lossy() {
