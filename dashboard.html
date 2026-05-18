@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -206,7 +206,6 @@
 <tr><td><code>--format json</code></td><td>Required - dashboard reads JSON format</td></tr>
 <tr><td><code>--lcov &lt;path&gt;</code></td><td>Coverage data enables coverage gap visualization</td></tr>
 <tr><td><code>--context</code></td><td>Adds git history for churn analysis</td></tr>
-<tr><td><code>--cohesion</code></td><td>Adds module cohesion metrics</td></tr>
 </tbody>
 </table>
 </div>
@@ -215,8 +214,7 @@
   --format json \
   -o debtmap.json \
   --lcov target/coverage/lcov.info \
-  --context \
-  --cohesion
+  --context
 </code></pre>
 <h2 id="visualizations"><a class="header" href="#visualizations">Visualizations</a></h2>
 <h3 id="risk-quadrant"><a class="header" href="#risk-quadrant">Risk Quadrant</a></h3>

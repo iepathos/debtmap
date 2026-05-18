@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -277,7 +277,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <li>Analyze JavaScript and TypeScript projects with tree-sitter-based parsing and frontend/backend-aware patterns</li>
 <li>Keep the core AI workflow focused on high-signal, coverage-aware prioritization</li>
 </ul>
-<p>Additional language expansion remains possible in future releases, but <code>0.16.0</code> ships with Rust, Python, JavaScript, and TypeScript as the documented supported set.</p>
+<p>Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, and TypeScript.</p>
 <h2 id="target-audience"><a class="header" href="#target-audience">Target Audience</a></h2>
 <p>Debtmap is designed for:</p>
 <ul>
@@ -323,7 +323,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <p>For a developer or AI assistant to effectively fix technical debt, they need:</p>
 <h3 id="1-prioritized-targets"><a class="header" href="#1-prioritized-targets">1. Prioritized Targets</a></h3>
 <p>Not “here are 500 complex functions,” but “here are the 10 functions that matter most, ranked by severity.”</p>
-<p>Debtmap provides a severity score (0-10) that combines:</p>
+<p>Debtmap provides a unified priority score with critical, high, medium, and low severity bands. The score combines:</p>
 <ul>
 <li>Complexity metrics (cyclomatic, cognitive, nesting)</li>
 <li>Test coverage gaps</li>
@@ -620,11 +620,11 @@ debtmap analyze . --format terminal
 
 ## Summary
 - Total items: 47
-- Critical: 3, High: 12, Moderate: 20, Low: 12
+- Critical: 3, High: 12, Medium: 20, Low: 12
 
 ## #1 [CRITICAL] parse_complex_input
 **Location:** src/parser.rs:38-85
-**Score:** 8.9/10
+**Score:** 128.4
 
 **Signals:**
 | Metric | Value |
@@ -647,11 +647,10 @@ debtmap analyze . --format terminal
 <tr><th>Tier</th><th>Score</th><th>Meaning</th></tr>
 </thead>
 <tbody>
-<tr><td>CRITICAL</td><td>9.0-10.0</td><td>Severe risk requiring immediate attention</td></tr>
-<tr><td>HIGH</td><td>7.0-8.9</td><td>Significant risk, address this sprint</td></tr>
-<tr><td>MEDIUM</td><td>5.0-6.9</td><td>Moderate risk, plan for next sprint</td></tr>
-<tr><td>LOW</td><td>3.0-4.9</td><td>Minor risk, monitor</td></tr>
-<tr><td>MINIMAL</td><td>0.0-2.9</td><td>Well-managed code</td></tr>
+<tr><td>CRITICAL</td><td>&gt;= 100</td><td>Severe risk requiring immediate attention</td></tr>
+<tr><td>HIGH</td><td>&gt;= 50</td><td>Significant risk, address soon</td></tr>
+<tr><td>MEDIUM</td><td>&gt;= 20</td><td>Moderate risk, plan for future work</td></tr>
+<tr><td>LOW</td><td>&lt; 20</td><td>Lower-risk maintenance item</td></tr>
 </tbody>
 </table>
 </div>
@@ -847,6 +846,7 @@ patterns = ["**/target/**", "**/tests/**"]
 <li>Example workflows for different AI tools</li>
 <li>Interpreting signals for effective prompts</li>
 </ol>
+<p>Debtmap currently analyzes Rust, Python, JavaScript, and TypeScript. All languages are enabled by default; use <code>--languages rust,python,javascript,typescript</code> when you want to constrain a run.</p>
 <h2 id="output-formats-1"><a class="header" href="#output-formats-1">Output Formats</a></h2>
 <h3 id="markdown-recommended"><a class="header" href="#markdown-recommended">Markdown (Recommended)</a></h3>
 <p>The <code>markdown</code> format is specifically designed for LLM consumption:</p>
@@ -859,21 +859,21 @@ patterns = ["**/target/**", "**/tests/**"]
 - Total items: 47
 - Critical: 3
 - High: 12
-- Moderate: 20
+- Medium: 20
 - Low: 12
 
 ## Top Priority Items
 
 ### #1 [CRITICAL] parse_complex_input
 **Location:** src/parser.rs:38-85
-**Score:** 8.9/10
+**Score:** 128.4
 
 **Signals:**
 | Metric | Value | Threshold |
 |--------|-------|-----------|
 | Cyclomatic | 12 | 10 |
 | Cognitive | 18 | 15 |
-| Coverage | 0% | 80% |
+| Coverage | 0.00 | 0.80 |
 | Nesting | 4 | 3 |
 
 **Context to read:**
@@ -900,49 +900,59 @@ patterns = ["**/target/**", "**/tests/**"]
 </code></pre>
 <p><strong>Structure:</strong></p>
 <pre><code class="language-json">{
-  "version": "1.0",
-  "timestamp": "2024-01-15T10:30:00Z",
+  "format_version": "3.0",
+  "metadata": {
+    "debtmap_version": "0.16.5",
+    "generated_at": "2026-05-18T10:30:00Z",
+    "project_root": ".",
+    "analysis_type": "unified"
+  },
   "summary": {
     "total_items": 47,
-    "by_tier": {
+    "total_debt_score": 2140.5,
+    "debt_density": 138.8,
+    "total_loc": 15420,
+    "score_distribution": {
       "critical": 3,
       "high": 12,
-      "moderate": 20,
+      "medium": 20,
       "low": 12
-    },
-    "total_loc": 15420
+    }
   },
   "items": [
     {
-      "rank": 1,
-      "id": "parse_complex_input_38",
-      "tier": "critical",
-      "score": 8.9,
+      "type": "Function",
+      "score": 128.4,
+      "category": "Testing",
+      "priority": "critical",
       "location": {
         "file": "src/parser.rs",
-        "line_start": 38,
-        "line_end": 85,
+        "line": 38,
         "function": "parse_complex_input"
       },
       "metrics": {
-        "cyclomatic": 12,
-        "cognitive": 18,
-        "nesting": 4,
-        "loc": 47
+        "cyclomatic_complexity": 12,
+        "cognitive_complexity": 18,
+        "length": 47,
+        "nesting_depth": 4,
+        "coverage": 0.0
       },
-      "coverage": {
-        "line_percent": 0.0,
-        "branch_percent": 0.0
+      "dependencies": {
+        "upstream_count": 2,
+        "downstream_count": 4,
+        "blast_radius": 6,
+        "critical_path": true
       },
       "context": {
-        "primary": "src/parser.rs:38-85",
-        "callers": [
-          {"file": "src/handler.rs", "lines": "100-120", "calls": 12},
-          {"file": "src/api.rs", "lines": "45-60", "calls": 8}
-        ],
-        "tests": [
-          {"file": "tests/parser_test.rs", "lines": "50-75"}
-        ]
+        "primary": {
+          "file": "src/parser.rs",
+          "start_line": 38,
+          "end_line": 85,
+          "symbol": "parse_complex_input"
+        },
+        "related": [],
+        "total_lines": 48,
+        "completeness_confidence": 0.86
       }
     }
   ]
@@ -951,6 +961,11 @@ patterns = ["**/target/**", "**/tests/**"]
 <h3 id="terminal"><a class="header" href="#terminal">Terminal</a></h3>
 <p>For human exploration (not recommended for AI piping):</p>
 <pre><code class="language-bash">debtmap analyze . --format terminal
+</code></pre>
+<h3 id="dot"><a class="header" href="#dot">DOT</a></h3>
+<p>For dependency graph visualization:</p>
+<pre><code class="language-bash">debtmap analyze . --format dot -o deps.dot
+dot -Tsvg deps.dot -o deps.svg
 </code></pre>
 <h2 id="context-suggestions-1"><a class="header" href="#context-suggestions-1">Context Suggestions</a></h2>
 <p>Each debt item includes a <code>context</code> field that tells the AI exactly what code to read:</p>
@@ -978,12 +993,12 @@ patterns = ["**/target/**", "**/tests/**"]
 </div>
 <h3 id="using-context-effectively"><a class="header" href="#using-context-effectively">Using Context Effectively</a></h3>
 <p><strong>Minimal context (fastest):</strong></p>
-<pre><code class="language-bash"># Just get the primary location
-debtmap analyze . --format json | jq '.items[0].location'
+<pre><code class="language-bash"># Just get the primary location for the first item
+debtmap analyze . --format json --top 1 | jq '.items[0].location'
 </code></pre>
 <p><strong>Full context (most accurate):</strong></p>
 <pre><code class="language-bash"># Read all suggested files
-debtmap analyze . --format markdown --top 1
+debtmap analyze . --context --format markdown --top 1
 # Then have the AI read each file in the context section
 </code></pre>
 <h2 id="example-workflows"><a class="header" href="#example-workflows">Example Workflows</a></h2>
@@ -1030,7 +1045,7 @@ import subprocess
 
 # Run debtmap analysis
 result = subprocess.run(
-    ["debtmap", "analyze", ".", "--format", "json", "--top", "10"],
+    ["debtmap", "analyze", ".", "--context", "--format", "json", "--top", "10"],
     capture_output=True,
     text=True
 )
@@ -1038,28 +1053,45 @@ debt_data = json.loads(result.stdout)
 
 # Process each item
 for item in debt_data["items"]:
+    if item["type"] != "Function":
+        continue
+
     # Extract context files
     context_files = []
-    context_files.append(item["context"]["primary"])
-    context_files.extend([c["file"] for c in item["context"].get("callers", [])])
+    if "context" in item:
+        primary = item["context"]["primary"]
+        context_files.append(primary)
+        context_files.extend([related["range"] for related in item["context"].get("related", [])])
+    else:
+        location = item["location"]
+        context_files.append({
+            "file": location["file"],
+            "start_line": location.get("line", 1),
+            "end_line": location.get("line", 1),
+            "symbol": location.get("function")
+        })
 
     # Read context files
     context_content = ""
-    for file_spec in context_files:
-        file_path, lines = parse_file_spec(file_spec)
-        context_content += read_file_lines(file_path, lines)
+    for file_range in context_files:
+        context_content += read_file_lines(
+            file_range["file"],
+            file_range["start_line"],
+            file_range["end_line"]
+        )
 
     # Build prompt
     prompt = f"""
     Fix this technical debt item:
 
-    Location: {item["location"]["file"]}:{item["location"]["line_start"]}
-    Function: {item["location"]["function"]}
-    Score: {item["score"]}/10
+    Location: {item["location"]["file"]}:{item["location"].get("line")}
+    Function: {item["location"].get("function")}
+    Score: {item["score"]} ({item["priority"]})
 
     Signals:
-    - Cyclomatic complexity: {item["metrics"]["cyclomatic"]}
-    - Test coverage: {item["coverage"]["line_percent"]}%
+    - Cyclomatic complexity: {item["metrics"]["cyclomatic_complexity"]}
+    - Cognitive complexity: {item["metrics"]["cognitive_complexity"]}
+    - Test coverage: {item["metrics"].get("coverage", "unknown")}
 
     Context code:
     {context_content}
@@ -1097,7 +1129,7 @@ jobs:
 
       - name: Check for critical items
         run: |
-          CRITICAL=$(jq '.summary.by_tier.critical' debt.json)
+          CRITICAL=$(jq '.summary.score_distribution.critical' debt.json)
           if [ "$CRITICAL" -gt 0 ]; then
             echo "::warning::Found $CRITICAL critical debt items"
           fi
@@ -1109,18 +1141,18 @@ jobs:
           path: debt.json
 </code></pre>
 <h2 id="interpreting-signals"><a class="header" href="#interpreting-signals">Interpreting Signals</a></h2>
-<h3 id="severity-score-0-10"><a class="header" href="#severity-score-0-10">Severity Score (0-10)</a></h3>
-<p>The severity score combines multiple signals:</p>
+<h3 id="priority-score"><a class="header" href="#priority-score">Priority Score</a></h3>
+<p>The priority score combines multiple signals:</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Score</th><th>Tier</th><th>Interpretation</th></tr>
 </thead>
 <tbody>
-<tr><td>8.0-10.0</td><td>Critical</td><td>High complexity, no tests, high coupling</td></tr>
-<tr><td>5.0-7.9</td><td>High</td><td>Moderate risk, coverage gaps</td></tr>
-<tr><td>2.0-4.9</td><td>Moderate</td><td>Lower risk, monitor</td></tr>
-<tr><td>0.0-1.9</td><td>Low</td><td>Acceptable state</td></tr>
+<tr><td>&gt;= 100</td><td>Critical</td><td>High-risk debt, often structural or highly coupled</td></tr>
+<tr><td>&gt;= 50</td><td>High</td><td>Meaningful risk, usually worth addressing soon</td></tr>
+<tr><td>&gt;= 20</td><td>Medium</td><td>Moderate priority, useful for planned cleanup</td></tr>
+<tr><td>&lt; 20</td><td>Low</td><td>Lower-risk maintenance item</td></tr>
 </tbody>
 </table>
 </div>
@@ -1145,19 +1177,14 @@ jobs:
 <li>4+: Strongly consider refactoring</li>
 </ul>
 <h3 id="coverage-signals-1"><a class="header" href="#coverage-signals-1">Coverage Signals</a></h3>
-<p><strong>Line coverage:</strong></p>
+<p><strong>Coverage:</strong></p>
 <ul>
-<li>0%: Critical gap, no tests at all</li>
-<li>1-50%: Poor coverage</li>
-<li>51-80%: Moderate coverage</li>
-<li>81%+: Good coverage</li>
+<li><code>0.0</code>: Critical gap, no matching coverage</li>
+<li><code>0.01-0.50</code>: Poor coverage</li>
+<li><code>0.51-0.80</code>: Moderate coverage</li>
+<li><code>0.81+</code>: Good coverage</li>
 </ul>
-<p><strong>Branch coverage:</strong></p>
-<ul>
-<li>More important than line coverage</li>
-<li>Missing branches = missing edge cases</li>
-<li>0% branch = high risk</li>
-</ul>
+<p>Coverage is read from LCOV. When coverage is present, well-tested code is dampened so untested complex code rises in priority.</p>
 <h3 id="coupling-signals-1"><a class="header" href="#coupling-signals-1">Coupling Signals</a></h3>
 <p><strong>Fan-in (callers):</strong></p>
 <ul>
@@ -1242,8 +1269,8 @@ jobs:
 <p><strong>Solution:</strong> Report as a bug with reproducible example</p>
 <h3 id="large-context-suggestions"><a class="header" href="#large-context-suggestions">Large context suggestions</a></h3>
 <p><strong>Cause:</strong> High coupling in codebase</p>
-<p><strong>Solution:</strong> Use <code>--max-context-lines</code> to limit:</p>
-<pre><code class="language-bash">debtmap analyze . --format markdown --max-context-lines 300
+<p><strong>Solution:</strong> Limit the number of reported items or dependency entries:</p>
+<pre><code class="language-bash">debtmap analyze . --context --format markdown --top 1 --max-callers 3 --max-callees 3
 </code></pre>
 <h2 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h2>
 <h3 id="cli-options-for-llm-integration"><a class="header" href="#cli-options-for-llm-integration">CLI Options for LLM Integration</a></h3>
@@ -1257,6 +1284,9 @@ jobs:
 <tr><td><code>--format json</code></td><td>Structured JSON output</td></tr>
 <tr><td><code>--top N</code></td><td>Limit to top N items</td></tr>
 <tr><td><code>--lcov FILE</code></td><td>Include coverage data</td></tr>
+<tr><td><code>--context</code></td><td>Enable context-aware risk analysis</td></tr>
+<tr><td><code>--context-providers LIST</code></td><td>Select <code>critical_path</code>, <code>dependency</code>, and/or <code>git_history</code></td></tr>
+<tr><td><code>--show-dependencies</code></td><td>Include caller/callee details</td></tr>
 <tr><td><code>--min-score N</code></td><td>Filter items below score N</td></tr>
 <tr><td><code>--output FILE</code></td><td>Write to file instead of stdout</td></tr>
 </tbody>
@@ -1350,7 +1380,7 @@ Creates a <code>.debtmap.toml</code> configuration file in the current directory
 <p><em>Configuration &amp; Output:</em></p>
 <ul>
 <li><code>-c, --config &lt;CONFIG&gt;</code> - Configuration file path</li>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, dot</li>
 <li><code>-o, --output &lt;OUTPUT&gt;</code> - Output file path (defaults to stdout)</li>
 </ul>
 <p><em>Coverage &amp; Context:</em></p>
@@ -1423,7 +1453,7 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 <p>Use one or the other to specify the target location.</p>
 <p><strong>Output Options:</strong></p>
 <ul>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, dot (default: json)</li>
 <li><code>-o, --output &lt;OUTPUT&gt;</code> - Output file (defaults to stdout)</li>
 </ul>
 <p><strong>Description:</strong>
@@ -1442,7 +1472,7 @@ Compares two analysis results and generates a diff showing improvements or regre
 <li><code>-o, --output &lt;FILE&gt;</code> - Output file path for validation results (default: <code>.prodigy/debtmap-validation.json</code>)</li>
 <li><code>--previous-validation &lt;FILE&gt;</code> - Path to previous validation result for trend tracking</li>
 <li><code>--threshold &lt;N&gt;</code> - Improvement threshold percentage (default: 75.0)</li>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, dot (default: json)</li>
 <li><code>--quiet</code> - Suppress console output (useful for automation)</li>
 </ul>
 <p><strong>Description:</strong>
@@ -3315,21 +3345,20 @@ fn process_payment(tx: Transaction) -&gt; Result&lt;Receipt&gt; {
 <h1 id="risk-scoring-1"><a class="header" href="#risk-scoring-1">Risk Scoring</a></h1>
 <p>Debtmap’s risk scoring identifies code that is both complex AND poorly tested - the true risk hotspots.</p>
 <h2 id="unified-scoring-system"><a class="header" href="#unified-scoring-system">Unified Scoring System</a></h2>
-<p>Debtmap uses a <strong>unified scoring system</strong> (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.</p>
+<p>Debtmap uses a <strong>unified priority scoring system</strong> as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, dependency impact, purity, entropy, context, and debt type adjustments.</p>
 <p><strong>Source</strong>: <a href="../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:97-144</a> (UnifiedScore struct)</p>
 <h3 id="score-scale-and-priority-classifications"><a class="header" href="#score-scale-and-priority-classifications">Score Scale and Priority Classifications</a></h3>
-<p>Functions receive scores from 0 (minimal risk) to 10 (critical risk):</p>
+<p>Debt items are classified into severity bands using the unified score:</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Score Range</th><th>Priority</th><th>Description</th><th>Action</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>9.0-10.0</strong></td><td>Critical</td><td>Severe risk requiring immediate attention</td><td>Address immediately</td></tr>
-<tr><td><strong>7.0-8.9</strong></td><td>High</td><td>Significant risk, should be addressed soon</td><td>Plan for this sprint</td></tr>
-<tr><td><strong>5.0-6.9</strong></td><td>Medium</td><td>Moderate risk, plan for future work</td><td>Schedule for next sprint</td></tr>
-<tr><td><strong>3.0-4.9</strong></td><td>Low</td><td>Minor risk, lower priority</td><td>Monitor and address as time permits</td></tr>
-<tr><td><strong>0.0-2.9</strong></td><td>Minimal</td><td>Well-managed code</td><td>Continue monitoring</td></tr>
+<tr><td><strong>&gt;= 100</strong></td><td>Critical</td><td>Severe risk requiring immediate attention</td><td>Address immediately</td></tr>
+<tr><td><strong>&gt;= 50</strong></td><td>High</td><td>Significant risk, should be addressed soon</td><td>Plan soon</td></tr>
+<tr><td><strong>&gt;= 20</strong></td><td>Medium</td><td>Moderate risk, plan for future work</td><td>Schedule when relevant</td></tr>
+<tr><td><strong>&lt; 20</strong></td><td>Low</td><td>Lower-risk maintenance item</td><td>Monitor or batch with related work</td></tr>
 </tbody>
 </table>
 </div>
@@ -3337,7 +3366,7 @@ fn process_payment(tx: Transaction) -&gt; Result&lt;Receipt&gt; {
 <p>The unified score combines three weighted factors:</p>
 <pre><code>Base Score = (Complexity Factor × Weight) + (Coverage Factor × Weight) + (Dependency Factor × Weight)
 
-Final Score = Base Score × Role Multiplier × Purity Adjustment
+Final Score = Base Score × Role Multiplier × Purity/Refactorability/Pattern Adjustments × Context Adjustments
 </code></pre>
 <p><strong>Source</strong>: <a href="../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:300-325</a> (calculate_unified_priority_with_debt)</p>
 <h4 id="dynamic-weight-adjustment"><a class="header" href="#dynamic-weight-adjustment">Dynamic Weight Adjustment</a></h4>
@@ -3656,7 +3685,7 @@ If this function had 0% coverage AND higher dependency (8 callers):
 <h3 id="legacy-risk-scoring-pre-02x"><a class="header" href="#legacy-risk-scoring-pre-02x">Legacy Risk Scoring (Pre-0.2.x)</a></h3>
 <p>Prior to the unified scoring system, Debtmap used a simpler additive risk formula. This is still available for compatibility but unified scoring is now the default and provides better prioritization.</p>
 <h3 id="risk-categories"><a class="header" href="#risk-categories">Risk Categories</a></h3>
-<p><strong>Note:</strong> The <code>RiskLevel</code> enum (Low, Medium, High, Critical) is used for <strong>legacy risk scoring compatibility</strong>. When using <strong>unified scoring</strong> (0-10 scale), refer to the priority classifications shown in the Unified Scoring System section above.</p>
+<p><strong>Note:</strong> The <code>RiskLevel</code> enum (Low, Medium, High, Critical) is used for <strong>legacy risk scoring compatibility</strong>. When using <strong>unified scoring</strong>, refer to the priority classifications shown in the Unified Scoring System section above.</p>
 <h4 id="legacy-risklevel-enum"><a class="header" href="#legacy-risklevel-enum">Legacy RiskLevel Enum</a></h4>
 <p>For legacy risk scoring, Debtmap classifies functions into four risk levels:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3693,18 +3722,17 @@ If this function had 0% coverage AND higher dependency (8 callers):
 <li><strong>Action</strong>: Monitor, low priority</li>
 </ul>
 <h4 id="unified-scoring-priority-levels"><a class="header" href="#unified-scoring-priority-levels">Unified Scoring Priority Levels</a></h4>
-<p>When using unified scoring (default), functions are classified using the 0-10 scale:</p>
+<p>When using unified scoring (default), items are classified using the current severity thresholds:</p>
 <ul>
-<li><strong>Critical</strong> (9.0-10.0): Immediate attention</li>
-<li><strong>High</strong> (7.0-8.9): Address this sprint</li>
-<li><strong>Medium</strong> (5.0-6.9): Plan for next sprint</li>
-<li><strong>Low</strong> (3.0-4.9): Monitor and address as time permits</li>
-<li><strong>Minimal</strong> (0.0-2.9): Well-managed code</li>
+<li><strong>Critical</strong> (&gt;= 100): Immediate attention</li>
+<li><strong>High</strong> (&gt;= 50): Address soon</li>
+<li><strong>Medium</strong> (&gt;= 20): Plan for future work</li>
+<li><strong>Low</strong> (&lt; 20): Monitor or batch with related work</li>
 </ul>
 <p><strong>Well-tested complex code</strong> is an <strong>outcome</strong> in both systems, not a separate category:</p>
 <ul>
 <li>Complex function (cyclomatic 18, cognitive 25) with 95% coverage</li>
-<li>Unified score: ~2.5 (Minimal priority due to coverage dampening)</li>
+<li>Unified score: low priority due to coverage dampening</li>
 <li>Legacy risk score: ~8 (Low risk)</li>
 <li>Falls into low-priority categories because good testing mitigates complexity</li>
 <li>This is the desired state for inherently complex business logic</li>
@@ -3750,7 +3778,7 @@ Calculation:
 </ul>
 <p><strong>Why unified scoring is better:</strong></p>
 <ul>
-<li>Normalized 0-10 scale is more intuitive</li>
+<li>Current severity bands align with the JSON output and TUI ranking</li>
 <li>Dynamic weights adjust based on coverage data availability</li>
 <li>Role multipliers adjust priority based on function importance</li>
 <li>Coverage propagation reduces false positives for utility functions</li>
@@ -3796,20 +3824,22 @@ Calculation:
 <h3 id="risk-distribution"><a class="header" href="#risk-distribution">Risk Distribution</a></h3>
 <p>Debtmap provides codebase-wide risk metrics:</p>
 <pre><code class="language-json">{
-  "risk_distribution": {
-    "critical_count": 12,
-    "high_count": 45,
-    "medium_count": 123,
-    "low_count": 456,
-    "minimal_count": 234,
-    "total_functions": 870
+  "summary": {
+    "score_distribution": {
+      "critical": 12,
+      "high": 45,
+      "medium": 123,
+      "low": 456
+    },
+    "total_items": 636,
+    "total_debt_score": 1247.5
   },
-  "codebase_risk_score": 1247.5
+  "items": []
 }
 </code></pre>
 <p><strong>Interpreting distribution:</strong></p>
 <ul>
-<li><strong>Healthy codebase</strong>: Most functions in Low/Minimal priority (unified scoring) or Low/WellTested (legacy)</li>
+<li><strong>Healthy codebase</strong>: Most functions in Low priority (unified scoring) or Low/WellTested (legacy)</li>
 <li><strong>Needs attention</strong>: Many Critical/High priority functions</li>
 <li><strong>Technical debt</strong>: High codebase risk score</li>
 </ul>
@@ -3818,14 +3848,13 @@ Calculation:
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Unified Scoring (0-10 scale)</th><th>Legacy Scoring (RiskCategory enum)</th></tr>
+<tr><th>Unified Scoring</th><th>Legacy Scoring (RiskCategory enum)</th></tr>
 </thead>
 <tbody>
-<tr><td><code>minimal_count</code> (0-2.9)</td><td>Not present</td></tr>
-<tr><td><code>low_count</code> (3.0-4.9)</td><td><code>low_count</code></td></tr>
-<tr><td><code>medium_count</code> (5.0-6.9)</td><td><code>medium_count</code></td></tr>
-<tr><td><code>high_count</code> (7.0-8.9)</td><td><code>high_count</code></td></tr>
-<tr><td><code>critical_count</code> (9.0-10.0)</td><td><code>critical_count</code></td></tr>
+<tr><td><code>score_distribution.low</code> (&lt; 20)</td><td><code>low_count</code></td></tr>
+<tr><td><code>score_distribution.medium</code> (&gt;= 20)</td><td><code>medium_count</code></td></tr>
+<tr><td><code>score_distribution.high</code> (&gt;= 50)</td><td><code>high_count</code></td></tr>
+<tr><td><code>score_distribution.critical</code> (&gt;= 100)</td><td><code>critical_count</code></td></tr>
 <tr><td>Not present</td><td><code>well_tested_count</code> (legacy outcome)</td></tr>
 </tbody>
 </table>
@@ -3835,14 +3864,14 @@ Calculation:
 <li>Unified priority tiers: <a href="../src/priority/tiers/mod.rs">src/priority/tiers/mod.rs</a></li>
 <li>Legacy RiskCategory enum: <a href="../src/risk/mod.rs">src/risk/mod.rs:36-42</a></li>
 </ul>
-<p><strong>Note on minimal_count:</strong></p>
-<p>In unified scoring (0-10 scale), <code>minimal_count</code> represents functions scoring 0-2.9, which includes:</p>
+<p><strong>Note on low-priority items:</strong></p>
+<p>In unified scoring, low-priority items include:</p>
 <ul>
 <li>Simple utility functions with low complexity</li>
 <li>Helper functions with minimal risk</li>
 <li>Well-tested complex code that scores low due to coverage dampening</li>
 </ul>
-<p>This is not a separate risk category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk.</p>
+<p>This is not a separate risk category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with strong test coverage appropriately receives a low score, reflecting that good testing mitigates complexity risk.</p>
 <p><strong>When using legacy scoring</strong>, there is <strong>NO</strong> <code>minimal_count</code> field. Instead, you’ll see <code>well_tested_count</code> which represents functions that are both complex and well-tested (the desired outcome).</p>
 <h3 id="testing-recommendations"><a class="header" href="#testing-recommendations">Testing Recommendations</a></h3>
 <p>When coverage data is provided, Debtmap generates prioritized testing recommendations with ROI analysis.</p>
@@ -3977,15 +4006,15 @@ ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight)
 <p><strong>Visual Dashboard</strong>: For interactive visualizations, generate JSON and use the <a href="https://iepathos.github.io/debtmap/dashboard/">online dashboard</a>.</p>
 <p><strong>Source:</strong> Output formats defined in src/io/writers/ (markdown.rs, terminal.rs, json.rs)</p>
 <h3 id="json-structure"><a class="header" href="#json-structure">JSON Structure</a></h3>
-<p>Debtmap uses a unified JSON format (spec 108) that provides consistent structure for all debt items. The output is generated by converting the internal <code>UnifiedAnalysis</code> to <code>UnifiedOutput</code> format (src/output/unified.rs).</p>
+<p>Debtmap uses a unified JSON format that provides consistent structure for all debt items. The output is generated by converting the internal <code>UnifiedAnalysis</code> to <code>UnifiedOutput</code> types under <code>src/output/unified/</code>.</p>
 <p><strong>Top-level JSON structure:</strong></p>
 <pre><code class="language-json">{
-  "format_version": "1.0",
+  "format_version": "3.0",
   "metadata": {
-    "debtmap_version": "0.11.0",
-    "generated_at": "2025-12-04T12:00:00Z",
+    "debtmap_version": "0.16.5",
+    "generated_at": "2026-05-18T12:00:00Z",
     "project_root": "/path/to/project",
-    "analysis_type": "full"
+    "analysis_type": "unified"
   },
   "summary": {
     "total_items": 45,
@@ -4264,7 +4293,7 @@ let y = operation2().map_err(|e| /* wrap error */)?;
 <li><code>entropy_score &lt; 0.4</code>: Low entropy, highly repetitive pattern - likely false positive if flagged complex</li>
 </ul>
 <h3 id="prioritizing-work"><a class="header" href="#prioritizing-work">Prioritizing Work</a></h3>
-<p>Debtmap provides multiple prioritization strategies, with <strong>unified scoring (0-10 scale)</strong> as the recommended default for most workflows:</p>
+<p>Debtmap provides multiple prioritization strategies, with <strong>unified priority scoring</strong> as the recommended default for most workflows:</p>
 <p><strong>1. By Unified Score (default - recommended)</strong></p>
 <pre><code class="language-bash">debtmap analyze . --top 10
 </code></pre>
@@ -4273,16 +4302,16 @@ let y = operation2().map_err(|e| /* wrap error */)?;
 <ul>
 <li>Balances complexity (40%), coverage (40%), and dependency impact (20%)</li>
 <li>Adjusts for function importance (entry points prioritized over utilities)</li>
-<li>Normalized 0-10 scale is intuitive and consistent</li>
+<li>Severity bands are consistent across terminal, TUI, markdown, and JSON output</li>
 <li>Reduces false positives through coverage propagation</li>
 <li>Best for <strong>sprint planning</strong> and <strong>function-level refactoring decisions</strong></li>
 </ul>
 <p><strong>Example:</strong></p>
 <pre><code class="language-bash"># Show top 20 critical items
-debtmap analyze . --min-priority 7.0 --top 20
+debtmap analyze . --min-priority critical --top 20
 
-# Focus on high-impact functions (score &gt;= 7.0)
-debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;= 7.0)'
+# Focus on high-impact items (score &gt;= 50)
+debtmap analyze . --format json | jq '.items[] | select(.score &gt;= 50)'
 </code></pre>
 <p><strong>2. By Risk Category (legacy compatibility)</strong></p>
 <pre><code class="language-bash">debtmap analyze . --min-priority high
@@ -4312,9 +4341,9 @@ debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;=
 <li><strong>Historical comparisons</strong>: Use legacy risk scoring (for consistency with old reports)</li>
 </ul>
 <h3 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h3>
-<p><strong>Note:</strong> Tiered prioritization uses <strong>traditional debt scoring</strong> (additive, higher = worse) and is complementary to the unified scoring system (0-10 scale). Both systems can be used together:</p>
+<p><strong>Note:</strong> Tiered prioritization uses debt categories and recommendation tiers, and is complementary to the unified priority score. Both views can be used together:</p>
 <ul>
-<li><strong>Unified scoring</strong> (0-10 scale): Best for <strong>function-level prioritization</strong> and sprint planning</li>
+<li><strong>Unified scoring</strong>: Best for <strong>function-level prioritization</strong> and sprint planning</li>
 <li><strong>Tiered prioritization</strong> (debt tiers): Best for <strong>architectural focus</strong> and strategic debt planning</li>
 </ul>
 <p>Use <code>--summary</code> for tiered view focusing on architectural issues, or default output for function-level unified scores.</p>
@@ -4827,7 +4856,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
-<p>The Rust analyzer (<code>src/analyzers/rust.rs</code>) provides:</p>
+<p>The Rust analyzer (<code>src/analyzers/rust/analyzer.rs</code>) provides:</p>
 <ul>
 <li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, and entropy analysis</li>
 <li><strong>Purity Detection</strong>: Identifies pure functions with confidence scoring</li>
@@ -4838,10 +4867,10 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <li><strong>Visibility Tracking</strong>: Distinguishes <code>pub</code>, <code>pub(crate)</code>, and private functions</li>
 <li><strong>Test Module Detection</strong>: Identifies <code>#[cfg(test)]</code> modules and <code>#[test]</code> functions</li>
 </ul>
-<p><strong>Source</strong>: Capabilities verified in src/analyzers/rust.rs:1-100</p>
+<p><strong>Source</strong>: Capabilities verified in <code>src/analyzers/rust/analyzer.rs</code> and related modules under <code>src/analyzers/rust/</code>.</p>
 <h3 id="semantic-function-classification"><a class="header" href="#semantic-function-classification">Semantic Function Classification</a></h3>
 <p>The Rust analyzer automatically classifies functions by their role in the system. This classification feeds into the unified scoring system’s role multiplier for accurate technical debt assessment.</p>
-<p><strong>Classification Categories</strong> (src/analyzers/rust.rs):</p>
+<p><strong>Classification Categories</strong> (<code>src/analyzers/rust/</code>):</p>
 <ul>
 <li><strong>Entry Points</strong>: Functions named <code>main</code>, <code>start</code>, or public functions in <code>bin/</code> modules</li>
 <li><strong>Business Logic</strong>: Core domain functions containing complex algorithms and business rules</li>
@@ -4915,7 +4944,7 @@ debtmap analyze . --languages rust,python,javascript,typescript
 <li><strong>Update <code>from_extension()</code></strong> to recognize the file extension</li>
 <li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer</li>
 </ol>
-<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code>, <code>src/analyzers/python/analyzer.rs</code>, and <code>src/analyzers/typescript/analyzer.rs</code> for the current language-specific analyzer implementations.</p>
+<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust/analyzer.rs</code>, <code>src/analyzers/python/analyzer.rs</code>, and <code>src/analyzers/typescript/analyzer.rs</code> for the current language-specific analyzer implementations.</p>
 <h2 id="see-also-2"><a class="header" href="#see-also-2">See Also</a></h2>
 <ul>
 <li><a href="#overview-1">Overview</a> - Analysis pipeline and workflow</li>
@@ -5846,12 +5875,12 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
 <p>The unified format includes summary statistics at the top level.</p>
 <p><strong>JSON Output:</strong></p>
 <pre><code class="language-json">{
-  "format_version": "1.0.0",
+  "format_version": "3.0",
   "metadata": {
-    "debtmap_version": "0.5.0",
-    "generated_at": "2025-12-04T22:15:00Z",
+    "debtmap_version": "0.16.5",
+    "generated_at": "2026-05-18T22:15:00Z",
     "project_root": "/home/user/myproject",
-    "analysis_type": "full"
+    "analysis_type": "unified"
   },
   "summary": {
     "total_items": 127,
@@ -6366,12 +6395,12 @@ jobs:
       - name: Analyze main branch
         run: |
           git checkout main
-          debtmap analyze --output before.json
+          debtmap analyze . --format json --output before.json
 
       - name: Analyze PR branch
         run: |
           git checkout ${{ github.head_ref }}
-          debtmap analyze --output after.json
+          debtmap analyze . --format json --output after.json
 
       - name: Compare analyses
         run: |
@@ -6439,11 +6468,11 @@ jobs:
     # Analyze main branch
     - git fetch origin main
     - git checkout origin/main
-    - debtmap analyze --output before.json
+    - debtmap analyze . --format json --output before.json
 
     # Analyze current branch
     - git checkout $CI_COMMIT_SHA
-    - debtmap analyze --output after.json
+    - debtmap analyze . --format json --output after.json
 
     # Compare and check status
     - debtmap compare --before before.json --after after.json --output comparison.json
@@ -6479,12 +6508,12 @@ jobs:
 <h3 id="example-1-basic-comparison"><a class="header" href="#example-1-basic-comparison">Example 1: Basic Comparison</a></h3>
 <p>Compare two analyses to track debt changes:</p>
 <pre><code class="language-bash"># Run before analysis
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # Make changes to codebase...
 
 # Run after analysis
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare
 debtmap compare --before before.json --after after.json --output comparison.json
@@ -6496,7 +6525,7 @@ cat comparison.json | jq '.'
 <h3 id="example-2-validating-function-refactoring"><a class="header" href="#example-2-validating-function-refactoring">Example 2: Validating Function Refactoring</a></h3>
 <p>Validate your refactoring work with target location tracking:</p>
 <pre><code class="language-bash"># Run before analysis
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # Identify critical items to fix
 jq '.items[] | select(.unified_score.final_score &gt;= 60.0)' before.json
@@ -6504,7 +6533,7 @@ jq '.items[] | select(.unified_score.final_score &gt;= 60.0)' before.json
 # Refactor the high-priority functions...
 
 # Run after analysis
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare and validate with target location
 debtmap compare \
@@ -6527,11 +6556,11 @@ jq '.improvements[]' comparison.json
 <p>Check if a pull request introduces new critical debt:</p>
 <pre><code class="language-bash"># Analyze base branch
 git checkout main
-debtmap analyze --output main.json
+debtmap analyze . --format json --output main.json
 
 # Analyze PR branch
 git checkout feature/new-feature
-debtmap analyze --output feature.json
+debtmap analyze . --format json --output feature.json
 
 # Compare
 debtmap compare \
@@ -6563,11 +6592,11 @@ jq '.' comparison.json
 <p>Track overall project health across releases:</p>
 <pre><code class="language-bash"># Analyze release v1.0
 git checkout v1.0
-debtmap analyze --output v1.0.json
+debtmap analyze . --format json --output v1.0.json
 
 # Analyze release v1.1
 git checkout v1.1
-debtmap analyze --output v1.1.json
+debtmap analyze . --format json --output v1.1.json
 
 # Compare
 debtmap compare \
@@ -6602,12 +6631,12 @@ COMPARISON="comparison.json"
 # Step 1: Analyze baseline (main branch)
 echo "📊 Analyzing baseline..."
 git checkout main
-debtmap analyze --output "$BEFORE"
+debtmap analyze . --format json --output "$BEFORE"
 
 # Step 2: Analyze current branch
 echo "📊 Analyzing current branch..."
 git checkout -
-debtmap analyze --output "$AFTER"
+debtmap analyze . --format json --output "$AFTER"
 
 # Step 3: Run comparison
 echo "🔍 Running comparison..."
@@ -7537,40 +7566,47 @@ min_lines_per_function = 3.0  # Safety threshold (default: 3.0)
 <ul>
 <li><strong>Rust</strong> - Full AST parsing with <code>syn</code></li>
 <li><strong>Python</strong> - Full AST parsing with tree-sitter</li>
+<li><strong>JavaScript</strong> - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows</li>
+<li><strong>TypeScript</strong> - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows</li>
 </ul>
-<p><strong>Source</strong>: <code>src/core/types.rs:9-12</code> (Language enum) and <code>src/organization/language.rs:4-7</code></p>
+<p><strong>Source</strong>: <code>src/core/mod.rs</code> (Language enum) and <code>src/config/languages.rs</code> (language-specific configuration fields)</p>
 <p>The <code>Language</code> enum in the codebase currently supports:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/core/types.rs:9-12
+</span>// From src/core/mod.rs
 pub enum Language {
     Rust,
     Python,
+    JavaScript,
+    TypeScript,
+    Unknown,
 }
 <span class="boring">}</span></code></pre>
 <p><strong>Language Detection</strong>: Debtmap determines file language by extension:</p>
 <ul>
 <li><code>.rs</code> files are analyzed as Rust</li>
-<li><code>.py</code> files are analyzed as Python</li>
+<li><code>.py</code> and <code>.pyw</code> files are analyzed as Python</li>
+<li><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, and <code>.jsx</code> files are analyzed as JavaScript</li>
+<li><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, and <code>.tsx</code> files are analyzed as TypeScript</li>
 </ul>
-<p><strong>Source</strong>: <code>src/organization/language.rs:10-17</code></p>
+<p><strong>Source</strong>: <code>src/core/mod.rs</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub fn from_path(path: &amp;Path) -&gt; Option&lt;Language&gt; {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .and_then(|ext| match ext {
-            "rs" =&gt; Some(Language::Rust),
-            "py" =&gt; Some(Language::Python),
-            _ =&gt; None,
-        })
+</span>pub fn from_extension(ext: &amp;str) -&gt; Self {
+    match ext {
+        "rs" =&gt; Language::Rust,
+        "py" | "pyw" =&gt; Language::Python,
+        "js" | "mjs" | "cjs" | "jsx" =&gt; Language::JavaScript,
+        "ts" | "mts" | "cts" | "tsx" =&gt; Language::TypeScript,
+        _ =&gt; Language::Unknown,
+    }
 }
 <span class="boring">}</span></code></pre>
 <h2 id="configuration-structure"><a class="header" href="#configuration-structure">Configuration Structure</a></h2>
 <p>The <code>[languages]</code> section in your <code>debtmap.toml</code> configures language analysis.</p>
 <p><strong>Source</strong>: <code>src/config/languages.rs:4-22</code> (LanguagesConfig struct)</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -7578,6 +7614,16 @@ detect_complexity = true
 detect_duplication = true
 
 [languages.python]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.typescript]
 detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
@@ -7625,12 +7671,26 @@ detect_duplication = true
 </code></pre>
 <p>All features enabled by default for Python. Dead code detection is valuable since Python lacks a compiler phase that catches unused code.</p>
 <p><strong>Source</strong>: <code>src/config/accessors.rs:113-115</code></p>
+<h3 id="javascript-configuration"><a class="header" href="#javascript-configuration">JavaScript Configuration</a></h3>
+<pre><code class="language-toml">[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+</code></pre>
+<p>JavaScript analysis covers modern ES syntax, JSX, callbacks, promises, and async workflow patterns.</p>
+<h3 id="typescript-configuration"><a class="header" href="#typescript-configuration">TypeScript Configuration</a></h3>
+<pre><code class="language-toml">[languages.typescript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+</code></pre>
+<p>TypeScript analysis covers TS/TSX syntax, modules, type-oriented patterns, and async workflow patterns.</p>
 <h2 id="enabling-languages"><a class="header" href="#enabling-languages">Enabling Languages</a></h2>
 <p>Specify which languages to analyze with the <code>enabled</code> array:</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 </code></pre>
-<p>The documented and implemented user-facing language set for <code>0.16.0</code> is Rust and Python.</p>
+<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, and TypeScript.</p>
 <h2 id="feature-defaults"><a class="header" href="#feature-defaults">Feature Defaults</a></h2>
 <p><strong>Source</strong>: <code>src/config/languages.rs:40-61</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -7667,7 +7727,7 @@ detect_duplication = true
 </code></pre>
 <h3 id="multi-language-projects"><a class="header" href="#multi-language-projects">Multi-Language Projects</a></h3>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 
 # Different settings per language
 [languages.rust]
@@ -7679,6 +7739,16 @@ detect_duplication = true
 detect_dead_code = true         # Python needs this
 detect_complexity = true
 detect_duplication = false      # Skip if not needed
+
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.typescript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
 </code></pre>
 <h2 id="complexity-calculations-by-language"><a class="header" href="#complexity-calculations-by-language">Complexity Calculations by Language</a></h2>
 <p>Debtmap uses language-specific complexity analyzers:</p>
@@ -7697,6 +7767,20 @@ detect_duplication = false      # Skip if not needed
 <li>Tracks class method complexity</li>
 <li>Analyzes exception handling patterns</li>
 </ul>
+<h3 id="javascript-complexity"><a class="header" href="#javascript-complexity">JavaScript Complexity</a></h3>
+<ul>
+<li>Uses tree-sitter for AST parsing</li>
+<li>Handles ES modules, JSX, callbacks, promises, and async workflows</li>
+<li>Tracks function and class method complexity</li>
+<li>Detects JavaScript-specific functional and async patterns</li>
+</ul>
+<h3 id="typescript-complexity"><a class="header" href="#typescript-complexity">TypeScript Complexity</a></h3>
+<ul>
+<li>Uses tree-sitter for TS/TSX parsing</li>
+<li>Handles modern module syntax and frontend/server patterns</li>
+<li>Tracks type-oriented complexity and async workflows</li>
+<li>Detects broad type-safety and promise-related patterns</li>
+</ul>
 <h2 id="integration-with-other-configuration"><a class="header" href="#integration-with-other-configuration">Integration with Other Configuration</a></h2>
 <p>Language configuration interacts with other debtmap settings:</p>
 <h3 id="ignore-patterns"><a class="header" href="#ignore-patterns">Ignore Patterns</a></h3>
@@ -7705,7 +7789,7 @@ detect_duplication = false      # Skip if not needed
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
-    "*.min.js",        # Frontend artifacts that are not part of the supported set
+    "*.min.js",        # Minified frontend artifacts
 ]
 </code></pre>
 <p>See <a href="#thresholds-configuration">Thresholds Configuration</a> for complexity thresholds that can be language-aware.</p>
@@ -7724,8 +7808,8 @@ patterns = [
 <tr><td><code>enabled</code></td><td><code>Vec&lt;String&gt;</code></td><td>Languages to analyze</td></tr>
 <tr><td><code>rust</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Rust-specific settings</td></tr>
 <tr><td><code>python</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Python-specific settings</td></tr>
-<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
-<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
+<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>JavaScript-specific settings</td></tr>
+<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>TypeScript-specific settings</td></tr>
 </tbody>
 </table>
 </div>
@@ -7747,7 +7831,7 @@ patterns = [
 <h3 id="language-not-detected"><a class="header" href="#language-not-detected">Language Not Detected</a></h3>
 <p>If files aren’t being analyzed:</p>
 <ol>
-<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>)</li>
+<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>, <code>.pyw</code>, <code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.jsx</code>, <code>.ts</code>, <code>.mts</code>, <code>.cts</code>, <code>.tsx</code>)</li>
 <li>Verify the language is in <code>enabled</code> array</li>
 <li>Check ignore patterns aren’t excluding the files</li>
 </ol>
@@ -7756,13 +7840,14 @@ patterns = [
 <pre><code class="language-toml">[languages.rust]
 detect_dead_code = true  # Override default
 </code></pre>
-<p>For Python: Ensure <code>detect_dead_code = true</code> (the default).</p>
+<p>For Python, JavaScript, and TypeScript: Ensure <code>detect_dead_code = true</code> (the default).</p>
 <h3 id="unexpected-complexity-scores"><a class="header" href="#unexpected-complexity-scores">Unexpected Complexity Scores</a></h3>
 <p>Language-specific complexity varies due to:</p>
 <ul>
 <li>Different control flow constructs</li>
 <li>Pattern matching complexity (Rust)</li>
 <li>Exception handling (Python)</li>
+<li>Async and callback flow (JavaScript/TypeScript)</li>
 </ul>
 <p>See <a href="#entropy-analysis-1">Entropy Analysis</a> for how entropy affects complexity scoring.</p>
 <h2 id="see-also-4"><a class="header" href="#see-also-4">See Also</a></h2>
@@ -8265,10 +8350,10 @@ max_lines: 500, max_complexity: 150
 <p>A higher score indicates a more severe god object problem. Scores are used to prioritize which types/files to refactor first.</p>
 <h3 id="viewing-god-object-analysis"><a class="header" href="#viewing-god-object-analysis">Viewing God Object Analysis</a></h3>
 <pre><code class="language-bash"># Show detailed god object information
-debtmap analyze . --show-god-objects
+debtmap analyze . --show-splits
 
 # Include split recommendations
-debtmap analyze . --show-god-objects --verbose
+debtmap analyze . --show-splits --verbose
 </code></pre>
 <h2 id="context-aware-detection"><a class="header" href="#context-aware-detection">Context-Aware Detection</a></h2>
 <p>Context-aware detection reduces false positives by adjusting severity based on code context. Test files, example code, and debug functions receive different treatment than production code.</p>
@@ -9572,7 +9657,7 @@ patterns = [
 </table>
 </div>
 <p><strong>Note</strong>: Languages not explicitly listed use <code>//</code> as the default comment prefix.</p>
-<p><em>*JavaScript and TypeScript</em>: While debtmap recognizes suppression comments using <code>//</code> syntax in these files, full language analysis (AST parsing, complexity metrics, etc.) currently only supports Rust and Python. JavaScript/TypeScript files will have suppression comments detected if processed, but complete debt analysis for these languages is planned for future releases.</p>
+<p><em>*JavaScript and TypeScript</em>: Debtmap analyzes JS/TS files and recognizes suppression comments using <code>//</code> syntax.</p>
 <p>You don’t need to configure this—Debtmap detects the language and uses the appropriate syntax.</p>
 <h2 id="explicitly-specified-files"><a class="header" href="#explicitly-specified-files">Explicitly Specified Files</a></h2>
 <p><strong>Important behavior</strong>: When you analyze a specific file directly, ignore patterns are bypassed:</p>
@@ -10715,7 +10800,7 @@ xdot deps.dot
 <ul>
 <li><strong>DOT</strong>: Best for dependency visualization and architecture understanding</li>
 <li><strong>JSON</strong>: Best for programmatic processing and CI/CD integration</li>
-<li><strong>HTML</strong>: Best for interactive dashboards and metrics overview</li>
+<li><strong>Dashboard</strong>: Load JSON into the web dashboard for interactive metrics overview</li>
 <li><strong>Terminal/Markdown</strong>: Best for readable reports and documentation</li>
 </ul>
 <h2 id="tool-integration"><a class="header" href="#tool-integration">Tool Integration</a></h2>
@@ -11045,12 +11130,11 @@ debtmap analyze . --summary --min-priority medium
 <li>Archiving analysis results</li>
 <li>Producing executive summaries</li>
 </ul>
-<p><strong>Use HTML Format When:</strong></p>
+<p><strong>Use Dashboard JSON When:</strong></p>
 <ul>
-<li>Viewing analysis in a web browser</li>
+<li>Viewing analysis in the web dashboard</li>
 <li>Sharing visual dashboards with stakeholders</li>
-<li>Publishing reports to internal documentation sites</li>
-<li>Creating interactive reports for management review</li>
+<li>Publishing interactive reports for management review</li>
 <li>Embedding analysis results in web applications</li>
 </ul>
 <h3 id="quick-reference-table"><a class="header" href="#quick-reference-table">Quick Reference Table</a></h3>
@@ -11063,7 +11147,6 @@ debtmap analyze . --summary --min-priority medium
 <tr><td>Terminal</td><td>Development</td><td>No</td><td>Yes</td><td>.txt</td></tr>
 <tr><td>JSON</td><td>Automation</td><td>Yes</td><td>No</td><td>.json</td></tr>
 <tr><td>Markdown</td><td>Documentation</td><td>Partially</td><td>Yes</td><td>.md</td></tr>
-<tr><td>HTML</td><td>Visualization</td><td>Partially</td><td>Yes</td><td>.html</td></tr>
 <tr><td>DOT</td><td>Architecture</td><td>Yes</td><td>Partially</td><td>.dot</td></tr>
 </tbody>
 </table>
@@ -11172,7 +11255,6 @@ fi
 <tr><td><code>--format json</code></td><td>Required - dashboard reads JSON format</td></tr>
 <tr><td><code>--lcov &lt;path&gt;</code></td><td>Coverage data enables coverage gap visualization</td></tr>
 <tr><td><code>--context</code></td><td>Adds git history for churn analysis</td></tr>
-<tr><td><code>--cohesion</code></td><td>Adds module cohesion metrics</td></tr>
 </tbody>
 </table>
 </div>
@@ -11181,8 +11263,7 @@ fi
   --format json \
   -o debtmap.json \
   --lcov target/coverage/lcov.info \
-  --context \
-  --cohesion
+  --context
 </code></pre>
 <h2 id="visualizations"><a class="header" href="#visualizations">Visualizations</a></h2>
 <h3 id="risk-quadrant"><a class="header" href="#risk-quadrant">Risk Quadrant</a></h3>
@@ -11276,14 +11357,11 @@ fi
 <p>Changes to <code>viz-dev/</code> automatically deploy to GitHub Pages.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="tui-results-viewer-guide"><a class="header" href="#tui-results-viewer-guide">TUI Results Viewer Guide</a></h1>
-<p>Debtmap includes an interactive TUI (Text User Interface) results viewer that allows you to explore analysis results in detail without re-running the analysis.</p>
+<p>Debtmap includes an interactive TUI (Text User Interface) results viewer that allows you to explore analysis results in detail.</p>
 <h2 id="launching-the-tui"><a class="header" href="#launching-the-tui">Launching the TUI</a></h2>
-<p>After running an analysis that produces a results file, launch the TUI viewer:</p>
-<pre><code class="language-bash"># Run analysis and save results
-debtmap analyze . -o results.json --format json
-
-# Launch interactive TUI viewer
-debtmap results results.json
+<p>Run analysis without an explicit machine-readable output format to launch the TUI viewer:</p>
+<pre><code class="language-bash"># Launch interactive TUI viewer
+debtmap analyze .
 </code></pre>
 <p>The TUI provides an interactive interface for exploring technical debt items, with detailed views and keyboard navigation.</p>
 <h2 id="navigation"><a class="header" href="#navigation">Navigation</a></h2>
@@ -11484,35 +11562,21 @@ The bottom of the screen shows which page you’re viewing:</p>
 <pre><code>[1/5] Overview   [2/5] Metrics   [3/5] Recommendations   [4/5] Context   [5/5] Data Flow
 </code></pre>
 <h2 id="filtering-and-sorting"><a class="header" href="#filtering-and-sorting">Filtering and Sorting</a></h2>
-<p>The TUI supports filtering results by various criteria:</p>
+<p>Filter results before launching the TUI with <code>analyze</code> options:</p>
 <h3 id="filter-by-debt-type"><a class="header" href="#filter-by-debt-type">Filter by Debt Type</a></h3>
 <pre><code class="language-bash"># Only show complexity issues
-debtmap results results.json --filter complexity
+debtmap analyze . --filter Complexity
 
-# Only show side effect issues
-debtmap results results.json --filter side-effects
+# Only show error handling issues
+debtmap analyze . --filter ErrorHandling
 </code></pre>
 <h3 id="sort-options"><a class="header" href="#sort-options">Sort Options</a></h3>
-<p>Results are pre-sorted by priority score, but you can change the sort order:</p>
-<pre><code class="language-bash"># Sort by cyclomatic complexity
-debtmap results results.json --sort complexity
+<p>Results are sorted by priority score. Use <code>--top</code> or <code>--tail</code> to constrain the list:</p>
+<pre><code class="language-bash"># Show only the highest-priority 100 items
+debtmap analyze . --top 100
 
-# Sort by lines of code
-debtmap results results.json --sort loc
-
-# Sort by file name
-debtmap results results.json --sort file
-</code></pre>
-<h2 id="theme-customization"><a class="header" href="#theme-customization">Theme Customization</a></h2>
-<p>The TUI supports custom color themes for better readability:</p>
-<pre><code class="language-bash"># Use light theme
-debtmap results results.json --theme light
-
-# Use dark theme (default)
-debtmap results results.json --theme dark
-
-# Use high-contrast theme
-debtmap results results.json --theme contrast
+# Show the lowest-priority 50 items
+debtmap analyze . --tail 50
 </code></pre>
 <h2 id="export-from-tui"><a class="header" href="#export-from-tui">Export from TUI</a></h2>
 <p>While viewing results in the TUI, you can export specific items:</p>
@@ -11558,7 +11622,7 @@ cat results.json | jq .
 <p>Some terminals don’t support 256-color mode. Try:</p>
 <pre><code class="language-bash"># Use basic colors
 export TERM=xterm-color
-debtmap results results.json
+debtmap analyze .
 </code></pre>
 <h3 id="navigation-keys-not-working"><a class="header" href="#navigation-keys-not-working">Navigation Keys Not Working</a></h3>
 <p>Ensure your terminal supports the required key codes. Try alternative keys:</p>
@@ -11572,9 +11636,9 @@ debtmap results results.json
 <pre><code class="language-bash"># In CI pipeline
 debtmap analyze . -o ci-results.json --format json
 
-# Download and review locally
+# Download and inspect locally
 scp ci-server:ci-results.json .
-debtmap results ci-results.json
+jq '.summary' ci-results.json
 </code></pre>
 <h3 id="team-review"><a class="header" href="#team-review">Team Review</a></h3>
 <p>Share results files with team members:</p>
@@ -11585,8 +11649,8 @@ debtmap analyze . -o team-review.json --format json
 git add team-review.json
 git commit -m "Add debtmap analysis results for review"
 
-# Team members can view
-debtmap results team-review.json
+# Team members can inspect
+jq '.summary' team-review.json
 </code></pre>
 <h3 id="progressive-refactoring"><a class="header" href="#progressive-refactoring">Progressive Refactoring</a></h3>
 <p>Track progress across refactoring sessions:</p>
@@ -11597,24 +11661,21 @@ debtmap analyze . -o before.json --format json
 debtmap analyze . -o after.json --format json
 
 # Compare results
-debtmap compare before.json after.json
+debtmap compare --before before.json --after after.json
 </code></pre>
 <h2 id="advanced-features-1"><a class="header" href="#advanced-features-1">Advanced Features</a></h2>
 <h3 id="custom-data-retention"><a class="header" href="#custom-data-retention">Custom Data Retention</a></h3>
 <p>Control how much detail is stored in results:</p>
 <pre><code class="language-bash"># Minimal results (scores only)
-debtmap analyze . -o minimal.json --detail-level minimal
+debtmap analyze . -o summary.json --format json --detail-level summary
 
 # Full results (all metrics and context)
-debtmap analyze . -o full.json --detail-level full
+debtmap analyze . -o comprehensive.json --format json --detail-level comprehensive
 </code></pre>
 <h3 id="performance-optimization-1"><a class="header" href="#performance-optimization-1">Performance Optimization</a></h3>
 <p>For large codebases, optimize TUI performance:</p>
 <pre><code class="language-bash"># Limit results to top N items
-debtmap analyze . -o top100.json --top 100
-
-# View subset
-debtmap results top100.json
+debtmap analyze . --top 100
 </code></pre>
 <h2 id="see-also-7"><a class="header" href="#see-also-7">See Also</a></h2>
 <ul>
@@ -11641,15 +11702,15 @@ debtmap results top100.json
     │ Parser │
     └────┬───┘
          │
-    ┌────┼────────────┐
-    │    │            │
-    ▼    ▼            ▼
-┌─────┐ ┌──────────┐ ┌───────────┐
-│ syn │ │rustpython│ │tree-sitter│
-│ AST │ │   AST    │ │    AST    │
-└──┬──┘ └────┬─────┘ └─────┬─────┘
-   │         │             │
-   └─────────┼─────────────┘
+    ┌────┴──────────┐
+    │               │
+    ▼               ▼
+┌─────┐       ┌─────────────┐
+│ syn │       │ tree-sitter │
+│ AST │       │     AST     │
+└──┬──┘       └──────┬──────┘
+   │                 │
+   └────────┬────────┘
              │
              ▼
   ┌──────────────────┐
@@ -11731,9 +11792,9 @@ include_patterns = ["src/**/*.rs", "lib/**/*.py"]
 <li>Handles: async/await, generic types, lifetime annotations</li>
 <li>Performance: ~10-20ms per file</li>
 </ul>
-<p><strong>Python (rustpython):</strong></p>
+<p><strong>Python (tree-sitter):</strong></p>
 <ul>
-<li>Uses rustpython’s parser for Python 3.x syntax</li>
+<li>Uses tree-sitter for Python syntax</li>
 <li>Extracts: functions, classes, methods, decorators</li>
 <li>Handles: comprehensions, async/await, type hints</li>
 <li>Performance: ~5-15ms per file</li>
@@ -11925,15 +11986,14 @@ where:
   Call Graph Depth: 3
   Untested Paths: 2
 
-  Risk = (8.5 * 0.7) + (3 * 2 * 0.3) = 5.95 + 1.8 = 7.75
+  Priority = ((8.5 * 10.0) + dependency impact) * coverage dampening
 <span class="boring">}</span></code></pre>
-<p><strong>Risk Tiers (Unified Score 0-10):</strong></p>
+<p><strong>Risk Tiers (Unified Priority Score):</strong></p>
 <ul>
-<li><strong>Critical (9.0-10.0):</strong> Severe risk requiring immediate attention</li>
-<li><strong>High (7.0-8.9):</strong> Significant risk, address this sprint</li>
-<li><strong>Medium (5.0-6.9):</strong> Moderate risk, plan for next sprint</li>
-<li><strong>Low (3.0-4.9):</strong> Minor risk, monitor</li>
-<li><strong>Minimal (0.0-2.9):</strong> Well-managed code</li>
+<li><strong>Critical (&gt;= 100):</strong> Severe risk requiring immediate attention</li>
+<li><strong>High (&gt;= 50):</strong> Significant risk, address soon</li>
+<li><strong>Medium (&gt;= 20):</strong> Moderate risk, plan for future work</li>
+<li><strong>Low (&lt; 20):</strong> Lower-risk maintenance item</li>
 </ul>
 <h3 id="9-tiered-prioritization"><a class="header" href="#9-tiered-prioritization">9. Tiered Prioritization</a></h3>
 <p><strong>Purpose:</strong> Classify and rank technical debt items by severity.</p>
@@ -14212,39 +14272,39 @@ git rev-parse --git-dir
 
 # If not a git repo, initialize one or disable git_history provider
 # Option 1: Enable context but exclude git_history
-debtmap analyze --context --disable-context git_history
+debtmap analyze . --context --disable-context git_history
 
 # Option 2: Use only specific providers
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 </code></pre>
 <p><strong>Performance issues</strong>: Git history analysis can be slow for large repositories:</p>
 <pre><code class="language-bash"># Use only lightweight providers
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 </code></pre>
 <h2 id="enabling-context-providers"><a class="header" href="#enabling-context-providers">Enabling Context Providers</a></h2>
 <p>Context-aware analysis is disabled by default. Enable it using CLI flags:</p>
 <h3 id="enable-all-providers"><a class="header" href="#enable-all-providers">Enable All Providers</a></h3>
 <pre><code class="language-bash"># Enable all available context providers
-debtmap analyze --context
+debtmap analyze . --context
 # or
-debtmap analyze --enable-context
+debtmap analyze . --enable-context
 </code></pre>
 <h3 id="enable-specific-providers"><a class="header" href="#enable-specific-providers">Enable Specific Providers</a></h3>
 <pre><code class="language-bash"># Enable only critical_path and dependency
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 
 # Enable only git_history
-debtmap analyze --context-providers git_history
+debtmap analyze . --context-providers git_history
 
 # Enable all three explicitly
-debtmap analyze --context-providers critical_path,dependency,git_history
+debtmap analyze . --context-providers critical_path,dependency,git_history
 </code></pre>
 <h3 id="disable-specific-providers"><a class="header" href="#disable-specific-providers">Disable Specific Providers</a></h3>
 <pre><code class="language-bash"># Enable context but disable git_history (useful for non-git repos)
-debtmap analyze --context --disable-context git_history
+debtmap analyze . --context --disable-context git_history
 
 # Enable context but disable dependency analysis
-debtmap analyze --context --disable-context dependency
+debtmap analyze . --context --disable-context dependency
 </code></pre>
 <h3 id="enabling-multiple-providers"><a class="header" href="#enabling-multiple-providers">Enabling Multiple Providers</a></h3>
 <p>Combine providers for comprehensive analysis:</p>
@@ -14417,23 +14477,23 @@ Final Score: 2.8 [LOW]
 <p>Stable, well-tested code gets even lower priority.</p>
 <h3 id="example-4-api-endpoint-prioritization"><a class="header" href="#example-4-api-endpoint-prioritization">Example 4: API Endpoint Prioritization</a></h3>
 <p>Analyze a web service to identify critical API endpoints:</p>
-<pre><code class="language-bash">debtmap analyze --context-providers critical_path --format json
+<pre><code class="language-bash">debtmap analyze . --context-providers critical_path --format json
 </code></pre>
 <p>Functions on API endpoint paths will receive elevated risk scores. Use this to prioritize code review and testing for user-facing functionality.</p>
 <h3 id="example-5-finding-change-prone-code"><a class="header" href="#example-5-finding-change-prone-code">Example 5: Finding Change-Prone Code</a></h3>
 <p>Identify files with high change frequency and bug fixes:</p>
-<pre><code class="language-bash">debtmap analyze --context-providers git_history --top 20
+<pre><code class="language-bash">debtmap analyze . --context-providers git_history --top 20
 </code></pre>
 <p>This highlights unstable areas of the codebase that may benefit from refactoring or increased test coverage.</p>
 <h3 id="example-6-architectural-impact-analysis"><a class="header" href="#example-6-architectural-impact-analysis">Example 6: Architectural Impact Analysis</a></h3>
 <p>Find high-impact modules with large blast radius:</p>
-<pre><code class="language-bash">debtmap analyze --context-providers dependency --format json | \
+<pre><code class="language-bash">debtmap analyze . --context-providers dependency --format json | \
   jq '.[] | select(.blast_radius &gt; 10)'
 </code></pre>
 <p>Use this to identify architectural choke points that require careful change management.</p>
 <h3 id="example-7-comprehensive-risk-assessment"><a class="header" href="#example-7-comprehensive-risk-assessment">Example 7: Comprehensive Risk Assessment</a></h3>
 <p>Combine all providers for holistic risk analysis:</p>
-<pre><code class="language-bash">debtmap analyze --context -v
+<pre><code class="language-bash">debtmap analyze . --context -v
 </code></pre>
 <p>The verbose output shows how each provider contributes to the final risk score:</p>
 <pre><code>function: process_payment
@@ -14568,7 +14628,7 @@ debtmap analyze . --context-providers critical_path,dependency
 <pre><code class="language-bash">debtmap analyze . -vv | grep "Role classification"
 </code></pre>
 <p><strong>Manually verify call graph:</strong></p>
-<pre><code class="language-bash">debtmap analyze . --show-call-graph
+<pre><code class="language-bash">debtmap analyze . --debug-call-graph --call-graph-stats
 </code></pre>
 <h3 id="context-providers-not-available"><a class="header" href="#context-providers-not-available">Context Providers Not Available</a></h3>
 <p><strong>Issue:</strong> <code>--context-providers</code> flag not recognized</p>
@@ -14583,36 +14643,36 @@ debtmap analyze . --context-providers critical_path,dependency
 <p><strong>Issue</strong>: Context providers not affecting scores</p>
 <p><strong>Solution</strong>: Ensure providers are enabled with <code>--context</code> or <code>--context-providers</code></p>
 <pre><code class="language-bash"># Wrong: context flag missing
-debtmap analyze
+debtmap analyze .
 
 # Correct: context enabled
-debtmap analyze --context
+debtmap analyze . --context
 </code></pre>
 <hr>
 <p><strong>Issue</strong>: Git history provider fails with “Not a git repository”</p>
 <p><strong>Solution</strong>: Disable git_history if not using version control</p>
-<pre><code class="language-bash">debtmap analyze --context --disable-context git_history
+<pre><code class="language-bash">debtmap analyze . --context --disable-context git_history
 </code></pre>
 <hr>
 <p><strong>Issue</strong>: Dependency analysis errors</p>
 <p><strong>Solution</strong>: Check for circular dependencies or disable dependency provider</p>
-<pre><code class="language-bash">debtmap analyze --context --disable-context dependency
+<pre><code class="language-bash">debtmap analyze . --context --disable-context dependency
 </code></pre>
 <hr>
 <p><strong>Issue</strong>: Slow analysis with all providers</p>
 <p><strong>Solution</strong>: Use selective providers or increase verbosity to identify bottlenecks</p>
 <pre><code class="language-bash"># Faster: skip git_history
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 
 # Debug: see provider execution times
-debtmap analyze --context -vvv
+debtmap analyze . --context -vvv
 </code></pre>
 <hr>
 <p>For more troubleshooting guidance, see the <a href="troubleshooting.html">Troubleshooting</a> chapter.</p>
 <h2 id="advanced-usage"><a class="header" href="#advanced-usage">Advanced Usage</a></h2>
 <h3 id="interpreting-context-contribution"><a class="header" href="#interpreting-context-contribution">Interpreting Context Contribution</a></h3>
 <p>Enable verbose output to see detailed context contributions:</p>
-<pre><code class="language-bash">debtmap analyze --context -v
+<pre><code class="language-bash">debtmap analyze . --context -v
 </code></pre>
 <p>Each function shows:</p>
 <ul>
@@ -14828,7 +14888,7 @@ Priority 3: Helper Function (MODERATE)
 </code></pre>
 <h3 id="configuring-debtmap"><a class="header" href="#configuring-debtmap">Configuring Debtmap</a></h3>
 <p>Point debtmap to your coverage data:</p>
-<pre><code class="language-bash">debtmap analyze --coverage-path ./coverage/lcov.info
+<pre><code class="language-bash">debtmap analyze . --lcov ./coverage/lcov.info
 </code></pre>
 <p>Or in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[coverage]
@@ -14861,7 +14921,7 @@ lcov_path = "./coverage/lcov.info"
 <h3 id="4-track-progress-over-time"><a class="header" href="#4-track-progress-over-time">4. Track Progress Over Time</a></h3>
 <p>Run debtmap regularly to track coverage improvements:</p>
 <pre><code class="language-bash"># Weekly coverage check
-debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
+debtmap analyze . --lcov ./coverage/lcov.info &gt; weekly-gaps.txt
 </code></pre>
 <p>Compare reports to see gap reduction progress.</p>
 <h2 id="troubleshooting-12"><a class="header" href="#troubleshooting-12">Troubleshooting</a></h2>
@@ -14869,7 +14929,7 @@ debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
 <p><strong>Cause</strong>: Debtmap can’t find or parse LCOV file</p>
 <p><strong>Solutions</strong>:</p>
 <ul>
-<li>Verify <code>--coverage-path</code> points to valid LCOV file</li>
+<li>Verify <code>--lcov</code> points to a valid LCOV file</li>
 <li>Ensure LCOV file was generated recently</li>
 <li>Check file permissions (readable by debtmap)</li>
 <li>Validate LCOV format: <code>head -20 ./coverage/lcov.info</code></li>
@@ -14888,7 +14948,7 @@ debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
 <ul>
 <li>Check function names match exactly (case-sensitive)</li>
 <li>Verify file paths are consistent (relative vs absolute)</li>
-<li>Enable debug logging: <code>debtmap analyze --log-level debug</code></li>
+<li>Use verbose output for diagnostics: <code>debtmap analyze . --lcov ./coverage/lcov.info -vv</code></li>
 </ul>
 <h3 id="missing-functions-in-coverage-report"><a class="header" href="#missing-functions-in-coverage-report">Missing functions in coverage report</a></h3>
 <p><strong>Cause</strong>: Functions not instrumented or filtered out</p>
@@ -16119,16 +16179,16 @@ impl Visitor for ComplexityVisitor {
 <h3 id="cli-options-defined-but-not-yet-active"><a class="header" href="#cli-options-defined-but-not-yet-active">CLI Options (Defined but Not Yet Active)</a></h3>
 <p>The following CLI flags are defined in the codebase (<code>src/cli.rs:228-241</code>) but are not yet fully integrated:</p>
 <pre><code class="language-bash"># Disable all pattern detection (planned)
-debtmap analyze --no-pattern-detection
+debtmap analyze . --no-pattern-detection
 
 # Enable only specific patterns (planned)
-debtmap analyze --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
+debtmap analyze . --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
 
 # Set confidence threshold (planned)
-debtmap analyze --pattern-threshold 0.8
+debtmap analyze . --pattern-threshold 0.8
 
 # Show warnings for uncertain pattern detections (planned)
-debtmap analyze --show-pattern-warnings
+debtmap analyze . --show-pattern-warnings
 </code></pre>
 <p><strong>Planned Patterns for <code>--patterns</code> Flag</strong> (when integration is complete):</p>
 <ul>
@@ -16179,10 +16239,10 @@ debtmap analyze --show-pattern-warnings
 <p><strong>Default Threshold</strong>: 0.7 - Only patterns with 70% or higher confidence are reported by default.</p>
 <p><strong>Adjusting Thresholds</strong>:</p>
 <pre><code class="language-bash"># More strict (fewer patterns, higher confidence)
-debtmap analyze --pattern-threshold 0.85
+debtmap analyze . --pattern-threshold 0.85
 
 # More lenient (more patterns, lower confidence)
-debtmap analyze --pattern-threshold 0.6 --show-pattern-warnings
+debtmap analyze . --pattern-threshold 0.6 --show-pattern-warnings
 </code></pre>
 <p><strong>How Confidence is Calculated</strong>:</p>
 <p>Each pattern detector calculates confidence holistically based on multiple factors:</p>
@@ -16402,15 +16462,15 @@ pub struct HttpClientBuilder {
 <h3 id="3-future-use-case-architecture-documentation-planned"><a class="header" href="#3-future-use-case-architecture-documentation-planned">3. Future Use Case: Architecture Documentation (Planned)</a></h3>
 <p><strong>Problem</strong>: Undocumented design patterns in legacy codebase
 <strong>Solution</strong>: When pattern output is integrated, users will be able to generate architectural pattern reports</p>
-<p><strong>Planned Command</strong>:</p>
-<pre><code class="language-bash">debtmap analyze --show-pattern-warnings --output-format json &gt; architecture-report.json
+<p><strong>Command</strong>:</p>
+<pre><code class="language-bash">debtmap analyze . --show-pattern-warnings --format json &gt; architecture-report.json
 </code></pre>
 <p><strong>Current Workaround</strong>: Review complexity adjustments and god object scoring to infer where patterns are detected</p>
 <h3 id="4-future-use-case-pattern-consistency-validation-planned"><a class="header" href="#4-future-use-case-pattern-consistency-validation-planned">4. Future Use Case: Pattern Consistency Validation (Planned)</a></h3>
 <p><strong>Problem</strong>: Inconsistent Observer implementations across the codebase
 <strong>Solution</strong>: When integrated, users can filter analysis to specific pattern types</p>
-<p><strong>Planned Command</strong>:</p>
-<pre><code class="language-bash">debtmap analyze --patterns observer --output-format json &gt; observers.json
+<p><strong>Command</strong>:</p>
+<pre><code class="language-bash">debtmap analyze . --patterns observer --format json &gt; observers.json
 </code></pre>
 <p><strong>Current Status</strong>: Pattern detection logic exists and works internally, but results aren’t yet exposed in output</p>
 <h2 id="troubleshooting-13"><a class="header" href="#troubleshooting-13">Troubleshooting</a></h2>
@@ -16458,8 +16518,8 @@ pub struct HttpClientBuilder {
 </ol>
 <p><strong>Current Workaround</strong>: Pattern detection cannot currently be disabled or tuned per-file. The <code>--no-pattern-detection</code> flag exists but isn’t yet wired to the detector.</p>
 <p><strong>Future Solution</strong>: When CLI integration is complete:</p>
-<pre><code class="language-bash">debtmap analyze --no-pattern-detection  # Disable all pattern detection
-debtmap analyze --pattern-threshold 0.9  # Require very high confidence
+<pre><code class="language-bash">debtmap analyze . --no-pattern-detection  # Disable all pattern detection
+debtmap analyze . --pattern-threshold 0.9  # Require very high confidence
 </code></pre>
 <h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
 <h3 id="current-recommendations"><a class="header" href="#current-recommendations">Current Recommendations</a></h3>
@@ -17018,11 +17078,11 @@ max_branch_reduction = 0.12
 <tbody>
 <tr><td><strong>Rust</strong></td><td>✅ Full (7 patterns)</td><td>✅ Full (6 patterns)</td><td>✅ Full (5 patterns)</td><td>✅ Full (5 patterns)</td><td>✅ Full (4 patterns)</td></tr>
 <tr><td><strong>Python</strong></td><td>⚠️ Planned</td><td>⚠️ Planned</td><td>N/A</td><td>⚠️ Planned</td><td>⚠️ Planned</td></tr>
-<tr><td><strong>JavaScript/TypeScript</strong></td><td>⚠️ Limited</td><td>⚠️ Limited</td><td>⚠️ Planned</td><td>❌ Not yet</td><td>❌ Not yet</td></tr>
+<tr><td><strong>JavaScript/TypeScript</strong></td><td>⚠️ Partial</td><td>N/A</td><td>⚠️ Partial</td><td>❌ Not yet</td><td>❌ Not yet</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Current Focus:</strong> Rust error handling analysis is fully implemented and production-ready. Python and JavaScript/TypeScript support is limited or planned for future releases.</p>
+<p><strong>Current Focus:</strong> Rust error handling analysis is the most comprehensive. JavaScript and TypeScript include async debt detection for callback hell, unhandled promise chains, and long promise chains. Python error-specific analysis remains limited compared with Rust.</p>
 <h2 id="overview-16"><a class="header" href="#overview-16">Overview</a></h2>
 <p>Error handling issues are classified as <strong>ErrorSwallowing</strong> debt with <strong>Major severity</strong> (weight 4), reflecting their significant impact on code reliability and debuggability.</p>
 <p><strong>Fully Implemented for Rust:</strong></p>
@@ -17440,15 +17500,15 @@ def process_batch(items):
     return results
 </code></pre>
 <h2 id="async-error-handling"><a class="header" href="#async-error-handling">Async Error Handling</a></h2>
-<h3 id="javascripttypescript-async-patterns-planned"><a class="header" href="#javascripttypescript-async-patterns-planned">JavaScript/TypeScript Async Patterns (Planned)</a></h3>
-<p>⚠️ <strong>JavaScript and TypeScript async error detection is planned but not yet fully implemented.</strong></p>
+<h3 id="javascripttypescript-async-patterns"><a class="header" href="#javascripttypescript-async-patterns">JavaScript/TypeScript Async Patterns</a></h3>
+<p>⚠️ <strong>JavaScript and TypeScript async error detection is partially implemented.</strong></p>
 <p><strong>Current Status:</strong></p>
 <ul>
-<li>JavaScript/TypeScript support focuses on complexity analysis and basic error patterns</li>
-<li>Async error handling detection (unhandled promise rejections, missing await) is <strong>fully implemented for Rust only</strong></li>
-<li>Enhanced JavaScript/TypeScript async error detection is planned for future releases</li>
+<li>JavaScript/TypeScript support includes callback hell, unhandled promise chains, and long promise chains</li>
+<li>Rust remains the most comprehensive implementation for async error handling</li>
+<li>Context-loss and propagation analysis are still Rust-focused</li>
 </ul>
-<p>The examples below show intended future behavior:</p>
+<p>The examples below show the kinds of async issues debtmap is intended to surface:</p>
 <pre><code class="language-javascript">// ❌ CRITICAL: Unhandled promise rejection
 async function loadUserData(userId) {
     const response = await fetch(`/api/users/${userId}`);
@@ -17889,7 +17949,7 @@ except Exception as e:  # Not bare except:
 <ol>
 <li>
 <p><strong>Run analysis with error focus</strong></p>
-<pre><code class="language-bash">debtmap analyze --filter-categories ErrorSwallowing
+<pre><code class="language-bash">debtmap analyze . --filter ErrorHandling
 </code></pre>
 <p>Note: This analyzes Rust error patterns. Python and JavaScript/TypeScript support is limited or planned.</p>
 </li>
@@ -17912,13 +17972,13 @@ except Exception as e:  # Not bare except:
 <li>
 <p><strong>Validate improvements</strong></p>
 <pre><code class="language-bash"># Before fixes
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # After fixes
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare
-debtmap compare before.json after.json
+debtmap compare --before before.json --after after.json
 </code></pre>
 </li>
 </ol>
@@ -17942,7 +18002,7 @@ detect_context_loss = false    # Add later
 </code></pre>
 <p>Track progress over time:</p>
 <pre><code class="language-bash"># Weekly error handling health check
-debtmap analyze --filter-categories ErrorSwallowing | tee weekly-error-health.txt
+debtmap analyze . --filter ErrorHandling | tee weekly-error-health.txt
 </code></pre>
 <h2 id="troubleshooting-14"><a class="header" href="#troubleshooting-14">Troubleshooting</a></h2>
 <h3 id="too-many-false-positives-in-test-code"><a class="header" href="#too-many-false-positives-in-test-code">Too Many False Positives in Test Code</a></h3>
@@ -17966,7 +18026,7 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 <ol>
 <li>
 <p><strong>Language support not enabled</strong></p>
-<pre><code class="language-bash">debtmap analyze --languages rust,python,javascript
+<pre><code class="language-bash">debtmap analyze . --languages rust,python,javascript,typescript
 </code></pre>
 </li>
 <li>
@@ -18007,21 +18067,21 @@ severity = "Warning"
 <ol>
 <li>Re-run analysis: <code>debtmap analyze</code></li>
 <li>Search for pattern: <code>rg "\.unwrap\(\)" src/</code></li>
-<li>Enable debug logging: <code>debtmap analyze --log-level debug</code></li>
+<li>Use verbose diagnostics: <code>debtmap analyze . -vv</code></li>
 </ol>
 <h3 id="validating-error-handling-improvements"><a class="header" href="#validating-error-handling-improvements">Validating Error Handling Improvements</a></h3>
 <p><strong>Problem:</strong> Unsure if fixes actually improved code quality</p>
 <p><strong>Solution:</strong> Use compare workflow:</p>
 <pre><code class="language-bash"># Baseline before fixes
 git checkout main
-debtmap analyze --output baseline.json
+debtmap analyze . --format json --output baseline.json
 
 # After fixes
 git checkout feature/improve-errors
-debtmap analyze --output improved.json
+debtmap analyze . --format json --output improved.json
 
 # Compare reports
-debtmap compare baseline.json improved.json
+debtmap compare --before baseline.json --after improved.json
 </code></pre>
 <p>Look for:</p>
 <ul>
@@ -18644,19 +18704,19 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 <span class="boring">}</span></code></pre>
 <h3 id="example-3-using-profiles-for-different-codebases"><a class="header" href="#example-3-using-profiles-for-different-codebases">Example 3: Using Profiles for Different Codebases</a></h3>
 <p><strong>Strict profile</strong> - Catches subtle functional patterns:</p>
-<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/
+<pre><code class="language-bash">$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict src/
 # Detects pipelines with 3+ stages
 # Requires purity ≥ 0.9 for "pure" classification
 # Flags closures with complexity &gt; 3
 </code></pre>
 <p><strong>Balanced profile</strong> - Default for most projects:</p>
-<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced src/
+<pre><code class="language-bash">$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.8 for "pure" classification
 # Flags closures with complexity &gt; 5
 </code></pre>
 <p><strong>Lenient profile</strong> - For legacy code:</p>
-<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient src/
+<pre><code class="language-bash">$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.5 for "pure" classification
 # Flags closures with complexity &gt; 10
@@ -18807,7 +18867,7 @@ let results: Vec&lt;_&gt; = large_dataset.par_iter()
 <ol>
 <li>
 <p><strong>Start with lenient profile</strong> to understand current state:</p>
-<pre><code class="language-bash">debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient .
+<pre><code class="language-bash">debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient .
 </code></pre>
 </li>
 <li>
@@ -18829,10 +18889,10 @@ let results: Vec&lt;_&gt; = large_dataset.par_iter()
 <li>
 <p><strong>Tighten profile</strong> as codebase improves:</p>
 <pre><code class="language-bash"># After refactoring
-debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced .
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced .
 
 # For new modules
-debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/new_module/
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict src/new_module/
 </code></pre>
 </li>
 <li>
@@ -19597,7 +19657,7 @@ debtmap analyze . --attribution
 debtmap analyze . --attribution --detail-level comprehensive
 
 # Output as JSON for tooling integration
-debtmap analyze . --attribution --json
+debtmap analyze . --attribution --format json
 
 # Disable multi-pass for faster single-pass analysis
 debtmap analyze . --no-multi-pass
@@ -19612,7 +19672,7 @@ debtmap analyze . --no-multi-pass
 <tr><td><code>--no-multi-pass</code></td><td>Disable multi-pass analysis (use single-pass for performance)</td></tr>
 <tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires multi-pass)</td></tr>
 <tr><td><code>--detail-level &lt;level&gt;</code></td><td>Set output detail: <code>summary</code>, <code>standard</code>, <code>comprehensive</code>, <code>debug</code> (CLI accepts lowercase values)</td></tr>
-<tr><td><code>--json</code></td><td>Output results in JSON format</td></tr>
+<tr><td><code>--format json</code></td><td>Output results in JSON format</td></tr>
 </tbody>
 </table>
 </div>
@@ -19970,11 +20030,11 @@ Overhead: 121.7% vs single-pass (145ms baseline)
 <p><strong>Use Parallel Processing</strong></p>
 <pre><code class="language-bash"># Parallel analysis amortizes overhead across cores
 # Note: --jobs is a general debtmap flag controlling parallelism for all analysis
-debtmap analyze . --multi-pass --jobs 8
+debtmap analyze . --jobs 8
 </code></pre>
 <p><strong>Target Specific Files</strong></p>
 <pre><code class="language-bash"># Analyze only files that need detailed attribution
-debtmap analyze src/complex_module.rs --multi-pass --attribution
+debtmap analyze src/complex_module.rs --attribution
 </code></pre>
 <h2 id="comparative-analysis"><a class="header" href="#comparative-analysis">Comparative Analysis</a></h2>
 <p>Multi-pass analysis supports comparing code changes to validate refactoring efforts.</p>
@@ -20239,10 +20299,10 @@ let analyzer = MultiPassAnalyzer::new(options);
 <h3 id="jobs---j"><a class="header" href="#jobs---j">–jobs / -j</a></h3>
 <p>Control the number of worker threads for parallel processing:</p>
 <pre><code class="language-bash"># Use all available CPU cores (default)
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Limit to 4 threads
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 debtmap analyze -j 4
 </code></pre>
 <p><strong>Behavior:</strong></p>
@@ -20273,7 +20333,7 @@ debtmap analyze  # Parallel processing enabled (also accepts '1')
 <p>The CLI flags (<code>--jobs</code>, <code>--no-parallel</code>) take precedence over environment variables.</p>
 <h3 id="no-parallel"><a class="header" href="#no-parallel">–no-parallel</a></h3>
 <p>Disable parallel call graph construction entirely:</p>
-<pre><code class="language-bash">debtmap analyze --no-parallel
+<pre><code class="language-bash">debtmap analyze . --no-parallel
 </code></pre>
 <p><strong>When to use:</strong></p>
 <ul>
@@ -20782,13 +20842,13 @@ Call Graph Complete
 <h3 id="configuration-13"><a class="header" href="#configuration-13">Configuration</a></h3>
 <p>Cross-file resolution respects the <code>--jobs</code> flag for thread pool sizing:</p>
 <pre><code class="language-bash"># Use all cores for maximum speedup
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Limit to 4 threads
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 
 # Disable parallelism (debugging)
-debtmap analyze --no-parallel
+debtmap analyze . --no-parallel
 </code></pre>
 <p>The <code>--no-parallel</code> flag disables parallel call graph construction entirely, including cross-file resolution parallelization.</p>
 <h3 id="debugging"><a class="header" href="#debugging">Debugging</a></h3>
@@ -21156,25 +21216,25 @@ debtmap analyze . --jobs 2
 <h2 id="tuning-guidelines-1"><a class="header" href="#tuning-guidelines-1">Tuning Guidelines</a></h2>
 <p><strong>Development Workstations:</strong></p>
 <pre><code class="language-bash"># Use all cores for maximum speed
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 </code></pre>
 <p><strong>CI/CD Environments:</strong></p>
 <pre><code class="language-bash"># Limit threads to avoid resource contention
-debtmap analyze --jobs 2
+debtmap analyze . --jobs 2
 
 # Or disable parallelism on very constrained runners
-debtmap analyze --no-parallel
+debtmap analyze . --no-parallel
 </code></pre>
 <p><strong>Containers:</strong></p>
 <pre><code class="language-bash"># Auto-detection respects cgroup limits
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Or explicitly match container CPU allocation
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 </code></pre>
 <p><strong>Benchmarking:</strong></p>
 <pre><code class="language-bash"># Use fixed thread count for reproducible results
-debtmap analyze --jobs 8
+debtmap analyze . --jobs 8
 </code></pre>
 <h2 id="profiling-and-debugging"><a class="header" href="#profiling-and-debugging">Profiling and Debugging</a></h2>
 <h3 id="measure-analysis-time"><a class="header" href="#measure-analysis-time">Measure Analysis Time</a></h3>
@@ -21201,14 +21261,14 @@ Activity Monitor (View &gt; CPU Usage &gt; Show Threads)
 <h3 id="finding-optimal-settings"><a class="header" href="#finding-optimal-settings">Finding Optimal Settings</a></h3>
 <p><strong>Finding the optimal setting:</strong></p>
 <pre><code class="language-bash"># Benchmark different configurations
-time debtmap analyze --jobs 0  # Auto
-time debtmap analyze --jobs 4  # 4 threads
-time debtmap analyze --jobs 8  # 8 threads
-time debtmap analyze --no-parallel  # Sequential
+time debtmap analyze . --jobs 0  # Auto
+time debtmap analyze . --jobs 4  # 4 threads
+time debtmap analyze . --jobs 8  # 8 threads
+time debtmap analyze . --no-parallel  # Sequential
 </code></pre>
 <p>Monitor memory usage during analysis:</p>
 <pre><code class="language-bash"># Monitor peak memory usage
-/usr/bin/time -v debtmap analyze --jobs 8
+/usr/bin/time -v debtmap analyze . --jobs 8
 </code></pre>
 <h2 id="best-practices-14"><a class="header" href="#best-practices-14">Best Practices</a></h2>
 <ol>
@@ -21237,7 +21297,7 @@ time debtmap analyze --no-parallel  # Sequential
 <li>
 <p><strong>Check thread count:</strong></p>
 <pre><code class="language-bash"># Ensure you're using all cores
-debtmap analyze --jobs 0 -vv | grep "threads"
+debtmap analyze . --jobs 0 -vv | grep "threads"
 </code></pre>
 </li>
 <li>
@@ -21255,7 +21315,7 @@ top -p $(pgrep debtmap)
 <li>
 <p><strong>Try different thread counts:</strong></p>
 <pre><code class="language-bash"># Sometimes less threads = less contention
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 </code></pre>
 </li>
 </ol>
@@ -21270,12 +21330,12 @@ debtmap analyze . --jobs 2
 <ol>
 <li>
 <p><strong>Reduce parallelism:</strong></p>
-<pre><code class="language-bash">debtmap analyze --jobs 2
+<pre><code class="language-bash">debtmap analyze . --jobs 2
 </code></pre>
 </li>
 <li>
 <p><strong>Disable parallel call graph:</strong></p>
-<pre><code class="language-bash">debtmap analyze --no-parallel
+<pre><code class="language-bash">debtmap analyze . --no-parallel
 </code></pre>
 </li>
 <li>
@@ -21298,13 +21358,13 @@ debtmap analyze . --no-parallel
 <ol>
 <li>
 <p><strong>Run sequentially to isolate:</strong></p>
-<pre><code class="language-bash">debtmap analyze --no-parallel
+<pre><code class="language-bash">debtmap analyze . --no-parallel
 </code></pre>
 </li>
 <li>
 <p><strong>Use deterministic mode:</strong></p>
 <pre><code class="language-bash"># Single-threaded = deterministic order
-debtmap analyze --jobs 1
+debtmap analyze . --jobs 1
 </code></pre>
 </li>
 <li>
@@ -21329,7 +21389,7 @@ If behavior differs between <code>--no-parallel</code> and parallel mode, please
 </code></pre>
 <p>This indicates too many threads competing for locks. Try:</p>
 <pre><code class="language-bash"># Reduce thread count
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 </code></pre>
 <h2 id="see-also-12"><a class="header" href="#see-also-12">See Also</a></h2>
 <ul>
@@ -27038,7 +27098,7 @@ max_average_complexity = 10.0
 <h2 id="why-the-distinction-matters"><a class="header" href="#why-the-distinction-matters">Why the Distinction Matters</a></h2>
 <h3 id="for-code-quality-gates"><a class="header" href="#for-code-quality-gates">For Code Quality Gates</a></h3>
 <pre><code class="language-bash"># GOOD: Use measured metrics for CI/CD thresholds
-debtmap validate . --threshold-complexity 15
+debtmap validate . --config .debtmap.toml
 
 # AVOID: Don't use estimated metrics for hard gates
 # (est_branches is not exposed as a threshold flag)
@@ -27207,10 +27267,10 @@ fn cyclomatic_low_cognitive_high(x: i32, y: i32, z: i32) -&gt; bool {
 </ul>
 <h2 id="practical-usage-examples"><a class="header" href="#practical-usage-examples">Practical Usage Examples</a></h2>
 <h3 id="example-1-code-quality-gate"><a class="header" href="#example-1-code-quality-gate">Example 1: Code Quality Gate</a></h3>
-<pre><code class="language-bash"># Fail build if any function exceeds cyclomatic complexity 15
-debtmap validate . --threshold-complexity 15 --max-high 0
+<pre><code class="language-bash"># Fail build when configured thresholds are exceeded
+debtmap validate . --config .debtmap.toml
 
-# Why: Cyclomatic is measured, precise, and repeatable
+# Why: Cyclomatic and cognitive complexity are measured, precise, and repeatable
 </code></pre>
 <h3 id="example-2-prioritize-testing-effort"><a class="header" href="#example-2-prioritize-testing-effort">Example 2: Prioritize Testing Effort</a></h3>
 <pre><code class="language-bash"># Show top 10 functions by risk (uses est_branches in scoring)
@@ -27229,7 +27289,7 @@ debtmap analyze . --verbose
 </code></pre>
 <h3 id="example-4-explaining-metrics-to-team"><a class="header" href="#example-4-explaining-metrics-to-team">Example 4: Explaining Metrics to Team</a></h3>
 <pre><code class="language-bash"># Display comprehensive metric definitions
-debtmap analyze --explain-metrics
+debtmap analyze . --explain-metrics
 
 # Shows:
 # - Measured vs Estimated categories
@@ -27322,7 +27382,7 @@ debtmap analyze --explain-metrics
 </thead>
 <tbody>
 <tr><td>Complexity</td><td>cyclomatic, cognitive, nesting, loc</td><td>How hard code is to understand</td></tr>
-<tr><td>Coverage</td><td>line_percent, branch_percent</td><td>How risky changes are</td></tr>
+<tr><td>Coverage</td><td>coverage, transitive_coverage</td><td>How risky changes are</td></tr>
 <tr><td>Coupling</td><td>fan_in, fan_out, call_depth</td><td>How changes ripple</td></tr>
 <tr><td>Quality</td><td>entropy, purity, dead_code</td><td>False positive reduction</td></tr>
 </tbody>
@@ -27382,7 +27442,7 @@ debtmap analyze . --format markdown --top 5 | claude "Fix the top item"
 <h3 id="basic-rust-analysis"><a class="header" href="#basic-rust-analysis">Basic Rust Analysis</a></h3>
 <p>Start with a simple analysis of your Rust project:</p>
 <pre><code class="language-bash"># Analyze current directory (path defaults to '.' - both commands are identical)
-debtmap analyze
+debtmap analyze .
 
 # Same as above with explicit path
 debtmap analyze .
@@ -28902,7 +28962,7 @@ debtmap analyze . --verbose-macro-warnings --show-macro-stats
 debtmap analyze . -v
 
 # Lower the minimum priority threshold
-debtmap analyze . --min-priority 0
+debtmap analyze . --min-priority low
 
 # Lower the minimum score threshold
 debtmap analyze . --min-score 0
@@ -28914,7 +28974,7 @@ debtmap analyze . -vv 2&gt;&amp;1 | grep "Processing"
 debtmap analyze . --threshold-preset lenient
 
 # Show all items without filtering
-debtmap analyze . --min-priority 0 --top 100
+debtmap analyze . --min-priority low --top 100
 </code></pre>
 <p><strong>Source</strong>: Filtering options in <code>src/cli/args.rs:143-163</code></p>
 <p><strong>Common causes</strong>:</p>
@@ -29046,8 +29106,8 @@ debtmap analyze path/to/large/file.rs -vv
 <h2 id="json-format-parsing-errors"><a class="header" href="#json-format-parsing-errors">JSON Format Parsing Errors</a></h2>
 <p><strong>Problem</strong>: JSON output parsing errors or unexpected structure</p>
 <p><strong>Quick Solutions</strong>:</p>
-<pre><code class="language-bash"># Use unified JSON format (consistent structure, recommended)
-debtmap analyze . --format json --output-format unified
+<pre><code class="language-bash"># JSON output always uses the unified schema
+debtmap analyze . --format json --output results.json
 
 # Validate JSON output with jq
 debtmap analyze . --format json | jq .
@@ -29056,18 +29116,8 @@ debtmap analyze . --format json | jq .
 debtmap analyze . --format json --output results.json
 </code></pre>
 <p><strong>Source</strong>: Output format options from CLI help</p>
-<p><strong>Understanding the two formats</strong>:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Format</th><th>Structure</th><th>Recommended For</th></tr>
-</thead>
-<tbody>
-<tr><td>Legacy (default)</td><td><code>{"File": {...}}</code></td><td>Backwards compatibility</td></tr>
-<tr><td>Unified</td><td><code>{"type": "File", ...}</code></td><td>Tool integration, parsing</td></tr>
-</tbody>
-</table>
-</div>
+<p><strong>Understanding the format</strong>:</p>
+<p>JSON output uses the unified schema. Each item includes a <code>type</code> discriminator such as <code>Function</code> or <code>File</code>, with common top-level <code>metadata</code>, <code>summary</code>, and <code>items</code> fields.</p>
 <p>See <a href="#output-and-command-issues">Output and Command Issues</a> for detailed JSON format documentation.</p>
 <h2 id="context-provider-errors"><a class="header" href="#context-provider-errors">Context Provider Errors</a></h2>
 <p><strong>Problem</strong>: Errors with critical_path, dependency, or git_history providers</p>
@@ -29101,12 +29151,12 @@ debtmap analyze . --context -vvv
 <tbody>
 <tr><td>Slow analysis</td><td><code>--no-multi-pass</code> or <code>--semantic-off</code></td></tr>
 <tr><td>Parse errors</td><td><code>--semantic-off</code> or exclude files</td></tr>
-<tr><td>No output</td><td><code>--min-priority 0</code> or <code>-v</code></td></tr>
+<tr><td>No output</td><td><code>--min-priority low</code> or <code>-v</code></td></tr>
 <tr><td>Coverage issues</td><td><code>explain-coverage</code> command</td></tr>
 <tr><td>Too many warnings</td><td><code>--min-score 5.0</code> or <code>--top 20</code></td></tr>
 <tr><td>Call graph issues</td><td><code>--debug-call-graph -vv</code></td></tr>
 <tr><td>God object false positives</td><td><code>--no-god-object</code></td></tr>
-<tr><td>JSON parsing</td><td><code>--output-format unified</code></td></tr>
+<tr><td>JSON parsing</td><td>`–format json</td></tr>
 <tr><td>Context errors</td><td><code>--no-context-aware</code></td></tr>
 </tbody>
 </table>
@@ -29315,7 +29365,7 @@ Match Strategy Breakdown:
 <pre><code class="language-bash"># Enable timing output
 DEBTMAP_TIMING=1 debtmap analyze .
 </code></pre>
-<p><strong>Source</strong>: <code>src/analyzers/effects.rs:81-99</code>, <code>src/analyzers/rust.rs:211-213</code></p>
+<p><strong>Source</strong>: <code>src/analyzers/effects.rs</code>, <code>src/analyzers/rust/analyzer.rs</code></p>
 <p><strong>Example output</strong>:</p>
 <pre><code>[TIMING] analyze_rust_file src/main.rs: total=0.45s (analysis=0.32s, debt=0.08s, deps=0.05s)
 [TIMING] analyze_rust_file src/lib.rs: total=0.12s (analysis=0.09s, debt=0.02s, deps=0.01s)
@@ -29449,16 +29499,16 @@ debtmap --no-multi-pass
 debtmap --semantic-off
 
 # Plain output: faster terminal rendering
-debtmap --plain
+debtmap analyze . --plain
 
 # Limit files for testing
-debtmap --max-files 100
+debtmap analyze . --max-files 100
 
 # Analyze subdirectory only
-debtmap src/specific/module
+debtmap analyze src/specific/module
 
 # Reduce output with filters
-debtmap --min-priority 4 --top 20
+debtmap analyze . --min-priority medium --top 20
 </code></pre>
 <h3 id="performance-comparison"><a class="header" href="#performance-comparison">Performance Comparison</a></h3>
 <div class="table-wrapper">
@@ -29667,7 +29717,7 @@ debtmap analyze . --context --context-providers critical_path -vvv
 debtmap analyze . -vv | grep "entry point\|Entry"
 
 # Verify call graph is being built
-debtmap analyze . --show-call-graph
+debtmap analyze . --debug-call-graph --call-graph-stats
 </code></pre>
 <h2 id="context-impact-on-scoring"><a class="header" href="#context-impact-on-scoring">Context Impact on Scoring</a></h2>
 <p>Context providers add additional risk factors to the base complexity score. The contribution is calculated in <code>ContextualRisk::new()</code> (see <code>src/risk/context/mod.rs:215-238</code>):</p>
@@ -30178,7 +30228,7 @@ complexity = 0.30
 <p><strong>Solutions</strong>:</p>
 <ul>
 <li>Check threshold values in <code>.debtmap.toml</code> under <code>[thresholds.validation]</code></li>
-<li>Ensure <code>--min-priority</code> is in valid range (0-10)</li>
+<li>Ensure <code>--min-priority</code> is one of <code>low</code>, <code>medium</code>, <code>high</code>, or <code>critical</code></li>
 <li>Use <code>--threshold-preset</code> with a valid preset name</li>
 </ul>
 <p><strong>Validation thresholds example:</strong></p>
@@ -30207,10 +30257,10 @@ debtmap analyze . --max-files 1 path/to/suspected/file
 <p><strong>Meaning</strong>: Failed to load or process coverage data</p>
 <p><strong>Solutions</strong>:</p>
 <pre><code class="language-bash"># Analyze without coverage data
-debtmap analyze . --no-coverage
+debtmap analyze .
 
 # Check coverage file format
-debtmap explain-coverage &lt;coverage-file&gt;
+debtmap diagnose-coverage &lt;coverage-file&gt;
 
 # Verify function name matching
 debtmap analyze . -vvv | grep -i coverage
@@ -30311,9 +30361,9 @@ debtmap analyze . --verbose-macro-warnings --show-macro-stats
 </thead>
 <tbody>
 <tr><td>Rust</td><td>Full</td><td>Primary language, best analysis</td></tr>
-<tr><td>Python</td><td>Stub</td><td>Basic complexity analysis</td></tr>
-<tr><td>JavaScript</td><td>Stub</td><td>Basic complexity analysis</td></tr>
-<tr><td>TypeScript</td><td>Stub</td><td>Basic complexity analysis</td></tr>
+<tr><td>Python</td><td>Full</td><td>Tree-sitter parsing with Python-specific complexity analysis</td></tr>
+<tr><td>JavaScript</td><td>Full</td><td>Tree-sitter parsing with JSX, modules, and async patterns</td></tr>
+<tr><td>TypeScript</td><td>Full</td><td>Tree-sitter parsing with TS/TSX and type-oriented patterns</td></tr>
 </tbody>
 </table>
 </div>
@@ -30626,7 +30676,7 @@ debtmap analyze . --semantic-off
 debtmap analyze . -v
 
 # Lower priority threshold
-debtmap analyze . --min-priority 0
+debtmap analyze . --min-priority low
 
 # Use lenient threshold
 debtmap analyze . --threshold-preset lenient

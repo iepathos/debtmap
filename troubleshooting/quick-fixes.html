@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -234,7 +234,7 @@ debtmap analyze . --verbose-macro-warnings --show-macro-stats
 debtmap analyze . -v
 
 # Lower the minimum priority threshold
-debtmap analyze . --min-priority 0
+debtmap analyze . --min-priority low
 
 # Lower the minimum score threshold
 debtmap analyze . --min-score 0
@@ -246,7 +246,7 @@ debtmap analyze . -vv 2&gt;&amp;1 | grep "Processing"
 debtmap analyze . --threshold-preset lenient
 
 # Show all items without filtering
-debtmap analyze . --min-priority 0 --top 100
+debtmap analyze . --min-priority low --top 100
 </code></pre>
 <p><strong>Source</strong>: Filtering options in <code>src/cli/args.rs:143-163</code></p>
 <p><strong>Common causes</strong>:</p>
@@ -378,8 +378,8 @@ debtmap analyze path/to/large/file.rs -vv
 <h2 id="json-format-parsing-errors"><a class="header" href="#json-format-parsing-errors">JSON Format Parsing Errors</a></h2>
 <p><strong>Problem</strong>: JSON output parsing errors or unexpected structure</p>
 <p><strong>Quick Solutions</strong>:</p>
-<pre><code class="language-bash"># Use unified JSON format (consistent structure, recommended)
-debtmap analyze . --format json --output-format unified
+<pre><code class="language-bash"># JSON output always uses the unified schema
+debtmap analyze . --format json --output results.json
 
 # Validate JSON output with jq
 debtmap analyze . --format json | jq .
@@ -388,18 +388,8 @@ debtmap analyze . --format json | jq .
 debtmap analyze . --format json --output results.json
 </code></pre>
 <p><strong>Source</strong>: Output format options from CLI help</p>
-<p><strong>Understanding the two formats</strong>:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Format</th><th>Structure</th><th>Recommended For</th></tr>
-</thead>
-<tbody>
-<tr><td>Legacy (default)</td><td><code>{"File": {...}}</code></td><td>Backwards compatibility</td></tr>
-<tr><td>Unified</td><td><code>{"type": "File", ...}</code></td><td>Tool integration, parsing</td></tr>
-</tbody>
-</table>
-</div>
+<p><strong>Understanding the format</strong>:</p>
+<p>JSON output uses the unified schema. Each item includes a <code>type</code> discriminator such as <code>Function</code> or <code>File</code>, with common top-level <code>metadata</code>, <code>summary</code>, and <code>items</code> fields.</p>
 <p>See <a href="output-issues.html">Output and Command Issues</a> for detailed JSON format documentation.</p>
 <h2 id="context-provider-errors"><a class="header" href="#context-provider-errors">Context Provider Errors</a></h2>
 <p><strong>Problem</strong>: Errors with critical_path, dependency, or git_history providers</p>
@@ -433,12 +423,12 @@ debtmap analyze . --context -vvv
 <tbody>
 <tr><td>Slow analysis</td><td><code>--no-multi-pass</code> or <code>--semantic-off</code></td></tr>
 <tr><td>Parse errors</td><td><code>--semantic-off</code> or exclude files</td></tr>
-<tr><td>No output</td><td><code>--min-priority 0</code> or <code>-v</code></td></tr>
+<tr><td>No output</td><td><code>--min-priority low</code> or <code>-v</code></td></tr>
 <tr><td>Coverage issues</td><td><code>explain-coverage</code> command</td></tr>
 <tr><td>Too many warnings</td><td><code>--min-score 5.0</code> or <code>--top 20</code></td></tr>
 <tr><td>Call graph issues</td><td><code>--debug-call-graph -vv</code></td></tr>
 <tr><td>God object false positives</td><td><code>--no-god-object</code></td></tr>
-<tr><td>JSON parsing</td><td><code>--output-format unified</code></td></tr>
+<tr><td>JSON parsing</td><td>`–format json</td></tr>
 <tr><td>Context errors</td><td><code>--no-context-aware</code></td></tr>
 </tbody>
 </table>

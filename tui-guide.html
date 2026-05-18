@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -178,14 +178,11 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="tui-results-viewer-guide"><a class="header" href="#tui-results-viewer-guide">TUI Results Viewer Guide</a></h1>
-<p>Debtmap includes an interactive TUI (Text User Interface) results viewer that allows you to explore analysis results in detail without re-running the analysis.</p>
+<p>Debtmap includes an interactive TUI (Text User Interface) results viewer that allows you to explore analysis results in detail.</p>
 <h2 id="launching-the-tui"><a class="header" href="#launching-the-tui">Launching the TUI</a></h2>
-<p>After running an analysis that produces a results file, launch the TUI viewer:</p>
-<pre><code class="language-bash"># Run analysis and save results
-debtmap analyze . -o results.json --format json
-
-# Launch interactive TUI viewer
-debtmap results results.json
+<p>Run analysis without an explicit machine-readable output format to launch the TUI viewer:</p>
+<pre><code class="language-bash"># Launch interactive TUI viewer
+debtmap analyze .
 </code></pre>
 <p>The TUI provides an interactive interface for exploring technical debt items, with detailed views and keyboard navigation.</p>
 <h2 id="navigation"><a class="header" href="#navigation">Navigation</a></h2>
@@ -386,35 +383,21 @@ The bottom of the screen shows which page you’re viewing:</p>
 <pre><code>[1/5] Overview   [2/5] Metrics   [3/5] Recommendations   [4/5] Context   [5/5] Data Flow
 </code></pre>
 <h2 id="filtering-and-sorting"><a class="header" href="#filtering-and-sorting">Filtering and Sorting</a></h2>
-<p>The TUI supports filtering results by various criteria:</p>
+<p>Filter results before launching the TUI with <code>analyze</code> options:</p>
 <h3 id="filter-by-debt-type"><a class="header" href="#filter-by-debt-type">Filter by Debt Type</a></h3>
 <pre><code class="language-bash"># Only show complexity issues
-debtmap results results.json --filter complexity
+debtmap analyze . --filter Complexity
 
-# Only show side effect issues
-debtmap results results.json --filter side-effects
+# Only show error handling issues
+debtmap analyze . --filter ErrorHandling
 </code></pre>
 <h3 id="sort-options"><a class="header" href="#sort-options">Sort Options</a></h3>
-<p>Results are pre-sorted by priority score, but you can change the sort order:</p>
-<pre><code class="language-bash"># Sort by cyclomatic complexity
-debtmap results results.json --sort complexity
+<p>Results are sorted by priority score. Use <code>--top</code> or <code>--tail</code> to constrain the list:</p>
+<pre><code class="language-bash"># Show only the highest-priority 100 items
+debtmap analyze . --top 100
 
-# Sort by lines of code
-debtmap results results.json --sort loc
-
-# Sort by file name
-debtmap results results.json --sort file
-</code></pre>
-<h2 id="theme-customization"><a class="header" href="#theme-customization">Theme Customization</a></h2>
-<p>The TUI supports custom color themes for better readability:</p>
-<pre><code class="language-bash"># Use light theme
-debtmap results results.json --theme light
-
-# Use dark theme (default)
-debtmap results results.json --theme dark
-
-# Use high-contrast theme
-debtmap results results.json --theme contrast
+# Show the lowest-priority 50 items
+debtmap analyze . --tail 50
 </code></pre>
 <h2 id="export-from-tui"><a class="header" href="#export-from-tui">Export from TUI</a></h2>
 <p>While viewing results in the TUI, you can export specific items:</p>
@@ -460,7 +443,7 @@ cat results.json | jq .
 <p>Some terminals don’t support 256-color mode. Try:</p>
 <pre><code class="language-bash"># Use basic colors
 export TERM=xterm-color
-debtmap results results.json
+debtmap analyze .
 </code></pre>
 <h3 id="navigation-keys-not-working"><a class="header" href="#navigation-keys-not-working">Navigation Keys Not Working</a></h3>
 <p>Ensure your terminal supports the required key codes. Try alternative keys:</p>
@@ -474,9 +457,9 @@ debtmap results results.json
 <pre><code class="language-bash"># In CI pipeline
 debtmap analyze . -o ci-results.json --format json
 
-# Download and review locally
+# Download and inspect locally
 scp ci-server:ci-results.json .
-debtmap results ci-results.json
+jq '.summary' ci-results.json
 </code></pre>
 <h3 id="team-review"><a class="header" href="#team-review">Team Review</a></h3>
 <p>Share results files with team members:</p>
@@ -487,8 +470,8 @@ debtmap analyze . -o team-review.json --format json
 git add team-review.json
 git commit -m "Add debtmap analysis results for review"
 
-# Team members can view
-debtmap results team-review.json
+# Team members can inspect
+jq '.summary' team-review.json
 </code></pre>
 <h3 id="progressive-refactoring"><a class="header" href="#progressive-refactoring">Progressive Refactoring</a></h3>
 <p>Track progress across refactoring sessions:</p>
@@ -499,24 +482,21 @@ debtmap analyze . -o before.json --format json
 debtmap analyze . -o after.json --format json
 
 # Compare results
-debtmap compare before.json after.json
+debtmap compare --before before.json --after after.json
 </code></pre>
 <h2 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h2>
 <h3 id="custom-data-retention"><a class="header" href="#custom-data-retention">Custom Data Retention</a></h3>
 <p>Control how much detail is stored in results:</p>
 <pre><code class="language-bash"># Minimal results (scores only)
-debtmap analyze . -o minimal.json --detail-level minimal
+debtmap analyze . -o summary.json --format json --detail-level summary
 
 # Full results (all metrics and context)
-debtmap analyze . -o full.json --detail-level full
+debtmap analyze . -o comprehensive.json --format json --detail-level comprehensive
 </code></pre>
 <h3 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h3>
 <p>For large codebases, optimize TUI performance:</p>
 <pre><code class="language-bash"># Limit results to top N items
-debtmap analyze . -o top100.json --top 100
-
-# View subset
-debtmap results top100.json
+debtmap analyze . --top 100
 </code></pre>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>

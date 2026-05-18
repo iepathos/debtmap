@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -256,7 +256,7 @@ Creates a <code>.debtmap.toml</code> configuration file in the current directory
 <p><em>Configuration &amp; Output:</em></p>
 <ul>
 <li><code>-c, --config &lt;CONFIG&gt;</code> - Configuration file path</li>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, dot</li>
 <li><code>-o, --output &lt;OUTPUT&gt;</code> - Output file path (defaults to stdout)</li>
 </ul>
 <p><em>Coverage &amp; Context:</em></p>
@@ -329,7 +329,7 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 <p>Use one or the other to specify the target location.</p>
 <p><strong>Output Options:</strong></p>
 <ul>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, dot (default: json)</li>
 <li><code>-o, --output &lt;OUTPUT&gt;</code> - Output file (defaults to stdout)</li>
 </ul>
 <p><strong>Description:</strong>
@@ -348,7 +348,7 @@ Compares two analysis results and generates a diff showing improvements or regre
 <li><code>-o, --output &lt;FILE&gt;</code> - Output file path for validation results (default: <code>.prodigy/debtmap-validation.json</code>)</li>
 <li><code>--previous-validation &lt;FILE&gt;</code> - Path to previous validation result for trend tracking</li>
 <li><code>--threshold &lt;N&gt;</code> - Improvement threshold percentage (default: 75.0)</li>
-<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal, dot (default: json)</li>
 <li><code>--quiet</code> - Suppress console output (useful for automation)</li>
 </ul>
 <p><strong>Description:</strong>

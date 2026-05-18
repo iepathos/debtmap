@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -230,7 +230,7 @@
 <h2 id="why-the-distinction-matters"><a class="header" href="#why-the-distinction-matters">Why the Distinction Matters</a></h2>
 <h3 id="for-code-quality-gates"><a class="header" href="#for-code-quality-gates">For Code Quality Gates</a></h3>
 <pre><code class="language-bash"># GOOD: Use measured metrics for CI/CD thresholds
-debtmap validate . --threshold-complexity 15
+debtmap validate . --config .debtmap.toml
 
 # AVOID: Don't use estimated metrics for hard gates
 # (est_branches is not exposed as a threshold flag)
@@ -399,10 +399,10 @@ fn cyclomatic_low_cognitive_high(x: i32, y: i32, z: i32) -&gt; bool {
 </ul>
 <h2 id="practical-usage-examples"><a class="header" href="#practical-usage-examples">Practical Usage Examples</a></h2>
 <h3 id="example-1-code-quality-gate"><a class="header" href="#example-1-code-quality-gate">Example 1: Code Quality Gate</a></h3>
-<pre><code class="language-bash"># Fail build if any function exceeds cyclomatic complexity 15
-debtmap validate . --threshold-complexity 15 --max-high 0
+<pre><code class="language-bash"># Fail build when configured thresholds are exceeded
+debtmap validate . --config .debtmap.toml
 
-# Why: Cyclomatic is measured, precise, and repeatable
+# Why: Cyclomatic and cognitive complexity are measured, precise, and repeatable
 </code></pre>
 <h3 id="example-2-prioritize-testing-effort"><a class="header" href="#example-2-prioritize-testing-effort">Example 2: Prioritize Testing Effort</a></h3>
 <pre><code class="language-bash"># Show top 10 functions by risk (uses est_branches in scoring)
@@ -421,7 +421,7 @@ debtmap analyze . --verbose
 </code></pre>
 <h3 id="example-4-explaining-metrics-to-team"><a class="header" href="#example-4-explaining-metrics-to-team">Example 4: Explaining Metrics to Team</a></h3>
 <pre><code class="language-bash"># Display comprehensive metric definitions
-debtmap analyze --explain-metrics
+debtmap analyze . --explain-metrics
 
 # Shows:
 # - Measured vs Estimated categories
@@ -514,7 +514,7 @@ debtmap analyze --explain-metrics
 </thead>
 <tbody>
 <tr><td>Complexity</td><td>cyclomatic, cognitive, nesting, loc</td><td>How hard code is to understand</td></tr>
-<tr><td>Coverage</td><td>line_percent, branch_percent</td><td>How risky changes are</td></tr>
+<tr><td>Coverage</td><td>coverage, transitive_coverage</td><td>How risky changes are</td></tr>
 <tr><td>Coupling</td><td>fan_in, fan_out, call_depth</td><td>How changes ripple</td></tr>
 <tr><td>Quality</td><td>entropy, purity, dead_code</td><td>False positive reduction</td></tr>
 </tbody>

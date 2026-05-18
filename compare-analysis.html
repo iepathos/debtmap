@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -605,12 +605,12 @@ jobs:
       - name: Analyze main branch
         run: |
           git checkout main
-          debtmap analyze --output before.json
+          debtmap analyze . --format json --output before.json
 
       - name: Analyze PR branch
         run: |
           git checkout ${{ github.head_ref }}
-          debtmap analyze --output after.json
+          debtmap analyze . --format json --output after.json
 
       - name: Compare analyses
         run: |
@@ -678,11 +678,11 @@ jobs:
     # Analyze main branch
     - git fetch origin main
     - git checkout origin/main
-    - debtmap analyze --output before.json
+    - debtmap analyze . --format json --output before.json
 
     # Analyze current branch
     - git checkout $CI_COMMIT_SHA
-    - debtmap analyze --output after.json
+    - debtmap analyze . --format json --output after.json
 
     # Compare and check status
     - debtmap compare --before before.json --after after.json --output comparison.json
@@ -718,12 +718,12 @@ jobs:
 <h3 id="example-1-basic-comparison"><a class="header" href="#example-1-basic-comparison">Example 1: Basic Comparison</a></h3>
 <p>Compare two analyses to track debt changes:</p>
 <pre><code class="language-bash"># Run before analysis
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # Make changes to codebase...
 
 # Run after analysis
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare
 debtmap compare --before before.json --after after.json --output comparison.json
@@ -735,7 +735,7 @@ cat comparison.json | jq '.'
 <h3 id="example-2-validating-function-refactoring"><a class="header" href="#example-2-validating-function-refactoring">Example 2: Validating Function Refactoring</a></h3>
 <p>Validate your refactoring work with target location tracking:</p>
 <pre><code class="language-bash"># Run before analysis
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # Identify critical items to fix
 jq '.items[] | select(.unified_score.final_score &gt;= 60.0)' before.json
@@ -743,7 +743,7 @@ jq '.items[] | select(.unified_score.final_score &gt;= 60.0)' before.json
 # Refactor the high-priority functions...
 
 # Run after analysis
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare and validate with target location
 debtmap compare \
@@ -766,11 +766,11 @@ jq '.improvements[]' comparison.json
 <p>Check if a pull request introduces new critical debt:</p>
 <pre><code class="language-bash"># Analyze base branch
 git checkout main
-debtmap analyze --output main.json
+debtmap analyze . --format json --output main.json
 
 # Analyze PR branch
 git checkout feature/new-feature
-debtmap analyze --output feature.json
+debtmap analyze . --format json --output feature.json
 
 # Compare
 debtmap compare \
@@ -802,11 +802,11 @@ jq '.' comparison.json
 <p>Track overall project health across releases:</p>
 <pre><code class="language-bash"># Analyze release v1.0
 git checkout v1.0
-debtmap analyze --output v1.0.json
+debtmap analyze . --format json --output v1.0.json
 
 # Analyze release v1.1
 git checkout v1.1
-debtmap analyze --output v1.1.json
+debtmap analyze . --format json --output v1.1.json
 
 # Compare
 debtmap compare \
@@ -841,12 +841,12 @@ COMPARISON="comparison.json"
 # Step 1: Analyze baseline (main branch)
 echo "📊 Analyzing baseline..."
 git checkout main
-debtmap analyze --output "$BEFORE"
+debtmap analyze . --format json --output "$BEFORE"
 
 # Step 2: Analyze current branch
 echo "📊 Analyzing current branch..."
 git checkout -
-debtmap analyze --output "$AFTER"
+debtmap analyze . --format json --output "$AFTER"
 
 # Step 3: Run comparison
 echo "🔍 Running comparison..."

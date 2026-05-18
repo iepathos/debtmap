@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -607,16 +607,16 @@ impl Visitor for ComplexityVisitor {
 <h3 id="cli-options-defined-but-not-yet-active"><a class="header" href="#cli-options-defined-but-not-yet-active">CLI Options (Defined but Not Yet Active)</a></h3>
 <p>The following CLI flags are defined in the codebase (<code>src/cli.rs:228-241</code>) but are not yet fully integrated:</p>
 <pre><code class="language-bash"># Disable all pattern detection (planned)
-debtmap analyze --no-pattern-detection
+debtmap analyze . --no-pattern-detection
 
 # Enable only specific patterns (planned)
-debtmap analyze --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
+debtmap analyze . --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
 
 # Set confidence threshold (planned)
-debtmap analyze --pattern-threshold 0.8
+debtmap analyze . --pattern-threshold 0.8
 
 # Show warnings for uncertain pattern detections (planned)
-debtmap analyze --show-pattern-warnings
+debtmap analyze . --show-pattern-warnings
 </code></pre>
 <p><strong>Planned Patterns for <code>--patterns</code> Flag</strong> (when integration is complete):</p>
 <ul>
@@ -667,10 +667,10 @@ debtmap analyze --show-pattern-warnings
 <p><strong>Default Threshold</strong>: 0.7 - Only patterns with 70% or higher confidence are reported by default.</p>
 <p><strong>Adjusting Thresholds</strong>:</p>
 <pre><code class="language-bash"># More strict (fewer patterns, higher confidence)
-debtmap analyze --pattern-threshold 0.85
+debtmap analyze . --pattern-threshold 0.85
 
 # More lenient (more patterns, lower confidence)
-debtmap analyze --pattern-threshold 0.6 --show-pattern-warnings
+debtmap analyze . --pattern-threshold 0.6 --show-pattern-warnings
 </code></pre>
 <p><strong>How Confidence is Calculated</strong>:</p>
 <p>Each pattern detector calculates confidence holistically based on multiple factors:</p>
@@ -890,15 +890,15 @@ pub struct HttpClientBuilder {
 <h3 id="3-future-use-case-architecture-documentation-planned"><a class="header" href="#3-future-use-case-architecture-documentation-planned">3. Future Use Case: Architecture Documentation (Planned)</a></h3>
 <p><strong>Problem</strong>: Undocumented design patterns in legacy codebase
 <strong>Solution</strong>: When pattern output is integrated, users will be able to generate architectural pattern reports</p>
-<p><strong>Planned Command</strong>:</p>
-<pre><code class="language-bash">debtmap analyze --show-pattern-warnings --output-format json &gt; architecture-report.json
+<p><strong>Command</strong>:</p>
+<pre><code class="language-bash">debtmap analyze . --show-pattern-warnings --format json &gt; architecture-report.json
 </code></pre>
 <p><strong>Current Workaround</strong>: Review complexity adjustments and god object scoring to infer where patterns are detected</p>
 <h3 id="4-future-use-case-pattern-consistency-validation-planned"><a class="header" href="#4-future-use-case-pattern-consistency-validation-planned">4. Future Use Case: Pattern Consistency Validation (Planned)</a></h3>
 <p><strong>Problem</strong>: Inconsistent Observer implementations across the codebase
 <strong>Solution</strong>: When integrated, users can filter analysis to specific pattern types</p>
-<p><strong>Planned Command</strong>:</p>
-<pre><code class="language-bash">debtmap analyze --patterns observer --output-format json &gt; observers.json
+<p><strong>Command</strong>:</p>
+<pre><code class="language-bash">debtmap analyze . --patterns observer --format json &gt; observers.json
 </code></pre>
 <p><strong>Current Status</strong>: Pattern detection logic exists and works internally, but results aren’t yet exposed in output</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
@@ -946,8 +946,8 @@ pub struct HttpClientBuilder {
 </ol>
 <p><strong>Current Workaround</strong>: Pattern detection cannot currently be disabled or tuned per-file. The <code>--no-pattern-detection</code> flag exists but isn’t yet wired to the detector.</p>
 <p><strong>Future Solution</strong>: When CLI integration is complete:</p>
-<pre><code class="language-bash">debtmap analyze --no-pattern-detection  # Disable all pattern detection
-debtmap analyze --pattern-threshold 0.9  # Require very high confidence
+<pre><code class="language-bash">debtmap analyze . --no-pattern-detection  # Disable all pattern detection
+debtmap analyze . --pattern-threshold 0.9  # Require very high confidence
 </code></pre>
 <h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
 <h3 id="current-recommendations"><a class="header" href="#current-recommendations">Current Recommendations</a></h3>

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -253,7 +253,7 @@ debtmap analyze . --attribution
 debtmap analyze . --attribution --detail-level comprehensive
 
 # Output as JSON for tooling integration
-debtmap analyze . --attribution --json
+debtmap analyze . --attribution --format json
 
 # Disable multi-pass for faster single-pass analysis
 debtmap analyze . --no-multi-pass
@@ -268,7 +268,7 @@ debtmap analyze . --no-multi-pass
 <tr><td><code>--no-multi-pass</code></td><td>Disable multi-pass analysis (use single-pass for performance)</td></tr>
 <tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires multi-pass)</td></tr>
 <tr><td><code>--detail-level &lt;level&gt;</code></td><td>Set output detail: <code>summary</code>, <code>standard</code>, <code>comprehensive</code>, <code>debug</code> (CLI accepts lowercase values)</td></tr>
-<tr><td><code>--json</code></td><td>Output results in JSON format</td></tr>
+<tr><td><code>--format json</code></td><td>Output results in JSON format</td></tr>
 </tbody>
 </table>
 </div>
@@ -626,11 +626,11 @@ Overhead: 121.7% vs single-pass (145ms baseline)
 <p><strong>Use Parallel Processing</strong></p>
 <pre><code class="language-bash"># Parallel analysis amortizes overhead across cores
 # Note: --jobs is a general debtmap flag controlling parallelism for all analysis
-debtmap analyze . --multi-pass --jobs 8
+debtmap analyze . --jobs 8
 </code></pre>
 <p><strong>Target Specific Files</strong></p>
 <pre><code class="language-bash"># Analyze only files that need detailed attribution
-debtmap analyze src/complex_module.rs --multi-pass --attribution
+debtmap analyze src/complex_module.rs --attribution
 </code></pre>
 <h2 id="comparative-analysis"><a class="header" href="#comparative-analysis">Comparative Analysis</a></h2>
 <p>Multi-pass analysis supports comparing code changes to validate refactoring efforts.</p>

@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -183,7 +183,7 @@
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
-<p>The Rust analyzer (<code>src/analyzers/rust.rs</code>) provides:</p>
+<p>The Rust analyzer (<code>src/analyzers/rust/analyzer.rs</code>) provides:</p>
 <ul>
 <li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, and entropy analysis</li>
 <li><strong>Purity Detection</strong>: Identifies pure functions with confidence scoring</li>
@@ -194,10 +194,10 @@
 <li><strong>Visibility Tracking</strong>: Distinguishes <code>pub</code>, <code>pub(crate)</code>, and private functions</li>
 <li><strong>Test Module Detection</strong>: Identifies <code>#[cfg(test)]</code> modules and <code>#[test]</code> functions</li>
 </ul>
-<p><strong>Source</strong>: Capabilities verified in src/analyzers/rust.rs:1-100</p>
+<p><strong>Source</strong>: Capabilities verified in <code>src/analyzers/rust/analyzer.rs</code> and related modules under <code>src/analyzers/rust/</code>.</p>
 <h3 id="semantic-function-classification"><a class="header" href="#semantic-function-classification">Semantic Function Classification</a></h3>
 <p>The Rust analyzer automatically classifies functions by their role in the system. This classification feeds into the unified scoring system’s role multiplier for accurate technical debt assessment.</p>
-<p><strong>Classification Categories</strong> (src/analyzers/rust.rs):</p>
+<p><strong>Classification Categories</strong> (<code>src/analyzers/rust/</code>):</p>
 <ul>
 <li><strong>Entry Points</strong>: Functions named <code>main</code>, <code>start</code>, or public functions in <code>bin/</code> modules</li>
 <li><strong>Business Logic</strong>: Core domain functions containing complex algorithms and business rules</li>
@@ -271,7 +271,7 @@ debtmap analyze . --languages rust,python,javascript,typescript
 <li><strong>Update <code>from_extension()</code></strong> to recognize the file extension</li>
 <li><strong>Register in <code>AnalyzerFactory</code></strong> to instantiate your analyzer</li>
 </ol>
-<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust.rs</code>, <code>src/analyzers/python/analyzer.rs</code>, and <code>src/analyzers/typescript/analyzer.rs</code> for the current language-specific analyzer implementations.</p>
+<p><strong>Reference Implementation</strong>: See <code>src/analyzers/rust/analyzer.rs</code>, <code>src/analyzers/python/analyzer.rs</code>, and <code>src/analyzers/typescript/analyzer.rs</code> for the current language-specific analyzer implementations.</p>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
 <li><a href="overview.html">Overview</a> - Analysis pipeline and workflow</li>

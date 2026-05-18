@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -1063,7 +1063,7 @@ xdot deps.dot
 <ul>
 <li><strong>DOT</strong>: Best for dependency visualization and architecture understanding</li>
 <li><strong>JSON</strong>: Best for programmatic processing and CI/CD integration</li>
-<li><strong>HTML</strong>: Best for interactive dashboards and metrics overview</li>
+<li><strong>Dashboard</strong>: Load JSON into the web dashboard for interactive metrics overview</li>
 <li><strong>Terminal/Markdown</strong>: Best for readable reports and documentation</li>
 </ul>
 <h2 id="tool-integration"><a class="header" href="#tool-integration">Tool Integration</a></h2>
@@ -1393,12 +1393,11 @@ debtmap analyze . --summary --min-priority medium
 <li>Archiving analysis results</li>
 <li>Producing executive summaries</li>
 </ul>
-<p><strong>Use HTML Format When:</strong></p>
+<p><strong>Use Dashboard JSON When:</strong></p>
 <ul>
-<li>Viewing analysis in a web browser</li>
+<li>Viewing analysis in the web dashboard</li>
 <li>Sharing visual dashboards with stakeholders</li>
-<li>Publishing reports to internal documentation sites</li>
-<li>Creating interactive reports for management review</li>
+<li>Publishing interactive reports for management review</li>
 <li>Embedding analysis results in web applications</li>
 </ul>
 <h3 id="quick-reference-table"><a class="header" href="#quick-reference-table">Quick Reference Table</a></h3>
@@ -1411,7 +1410,6 @@ debtmap analyze . --summary --min-priority medium
 <tr><td>Terminal</td><td>Development</td><td>No</td><td>Yes</td><td>.txt</td></tr>
 <tr><td>JSON</td><td>Automation</td><td>Yes</td><td>No</td><td>.json</td></tr>
 <tr><td>Markdown</td><td>Documentation</td><td>Partially</td><td>Yes</td><td>.md</td></tr>
-<tr><td>HTML</td><td>Visualization</td><td>Partially</td><td>Yes</td><td>.html</td></tr>
 <tr><td>DOT</td><td>Architecture</td><td>Yes</td><td>Partially</td><td>.dot</td></tr>
 </tbody>
 </table>

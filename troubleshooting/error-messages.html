@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -440,7 +440,7 @@ complexity = 0.30
 <p><strong>Solutions</strong>:</p>
 <ul>
 <li>Check threshold values in <code>.debtmap.toml</code> under <code>[thresholds.validation]</code></li>
-<li>Ensure <code>--min-priority</code> is in valid range (0-10)</li>
+<li>Ensure <code>--min-priority</code> is one of <code>low</code>, <code>medium</code>, <code>high</code>, or <code>critical</code></li>
 <li>Use <code>--threshold-preset</code> with a valid preset name</li>
 </ul>
 <p><strong>Validation thresholds example:</strong></p>
@@ -469,10 +469,10 @@ debtmap analyze . --max-files 1 path/to/suspected/file
 <p><strong>Meaning</strong>: Failed to load or process coverage data</p>
 <p><strong>Solutions</strong>:</p>
 <pre><code class="language-bash"># Analyze without coverage data
-debtmap analyze . --no-coverage
+debtmap analyze .
 
 # Check coverage file format
-debtmap explain-coverage &lt;coverage-file&gt;
+debtmap diagnose-coverage &lt;coverage-file&gt;
 
 # Verify function name matching
 debtmap analyze . -vvv | grep -i coverage
@@ -573,9 +573,9 @@ debtmap analyze . --verbose-macro-warnings --show-macro-stats
 </thead>
 <tbody>
 <tr><td>Rust</td><td>Full</td><td>Primary language, best analysis</td></tr>
-<tr><td>Python</td><td>Stub</td><td>Basic complexity analysis</td></tr>
-<tr><td>JavaScript</td><td>Stub</td><td>Basic complexity analysis</td></tr>
-<tr><td>TypeScript</td><td>Stub</td><td>Basic complexity analysis</td></tr>
+<tr><td>Python</td><td>Full</td><td>Tree-sitter parsing with Python-specific complexity analysis</td></tr>
+<tr><td>JavaScript</td><td>Full</td><td>Tree-sitter parsing with JSX, modules, and async patterns</td></tr>
+<tr><td>TypeScript</td><td>Full</td><td>Tree-sitter parsing with TS/TSX and type-oriented patterns</td></tr>
 </tbody>
 </table>
 </div>

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -280,11 +280,11 @@ debtmap analyze . --format terminal
 
 ## Summary
 - Total items: 47
-- Critical: 3, High: 12, Moderate: 20, Low: 12
+- Critical: 3, High: 12, Medium: 20, Low: 12
 
 ## #1 [CRITICAL] parse_complex_input
 **Location:** src/parser.rs:38-85
-**Score:** 8.9/10
+**Score:** 128.4
 
 **Signals:**
 | Metric | Value |
@@ -307,11 +307,10 @@ debtmap analyze . --format terminal
 <tr><th>Tier</th><th>Score</th><th>Meaning</th></tr>
 </thead>
 <tbody>
-<tr><td>CRITICAL</td><td>9.0-10.0</td><td>Severe risk requiring immediate attention</td></tr>
-<tr><td>HIGH</td><td>7.0-8.9</td><td>Significant risk, address this sprint</td></tr>
-<tr><td>MEDIUM</td><td>5.0-6.9</td><td>Moderate risk, plan for next sprint</td></tr>
-<tr><td>LOW</td><td>3.0-4.9</td><td>Minor risk, monitor</td></tr>
-<tr><td>MINIMAL</td><td>0.0-2.9</td><td>Well-managed code</td></tr>
+<tr><td>CRITICAL</td><td>&gt;= 100</td><td>Severe risk requiring immediate attention</td></tr>
+<tr><td>HIGH</td><td>&gt;= 50</td><td>Significant risk, address soon</td></tr>
+<tr><td>MEDIUM</td><td>&gt;= 20</td><td>Moderate risk, plan for future work</td></tr>
+<tr><td>LOW</td><td>&lt; 20</td><td>Lower-risk maintenance item</td></tr>
 </tbody>
 </table>
 </div>

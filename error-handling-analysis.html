@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -188,11 +188,11 @@
 <tbody>
 <tr><td><strong>Rust</strong></td><td>✅ Full (7 patterns)</td><td>✅ Full (6 patterns)</td><td>✅ Full (5 patterns)</td><td>✅ Full (5 patterns)</td><td>✅ Full (4 patterns)</td></tr>
 <tr><td><strong>Python</strong></td><td>⚠️ Planned</td><td>⚠️ Planned</td><td>N/A</td><td>⚠️ Planned</td><td>⚠️ Planned</td></tr>
-<tr><td><strong>JavaScript/TypeScript</strong></td><td>⚠️ Limited</td><td>⚠️ Limited</td><td>⚠️ Planned</td><td>❌ Not yet</td><td>❌ Not yet</td></tr>
+<tr><td><strong>JavaScript/TypeScript</strong></td><td>⚠️ Partial</td><td>N/A</td><td>⚠️ Partial</td><td>❌ Not yet</td><td>❌ Not yet</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Current Focus:</strong> Rust error handling analysis is fully implemented and production-ready. Python and JavaScript/TypeScript support is limited or planned for future releases.</p>
+<p><strong>Current Focus:</strong> Rust error handling analysis is the most comprehensive. JavaScript and TypeScript include async debt detection for callback hell, unhandled promise chains, and long promise chains. Python error-specific analysis remains limited compared with Rust.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p>Error handling issues are classified as <strong>ErrorSwallowing</strong> debt with <strong>Major severity</strong> (weight 4), reflecting their significant impact on code reliability and debuggability.</p>
 <p><strong>Fully Implemented for Rust:</strong></p>
@@ -610,15 +610,15 @@ def process_batch(items):
     return results
 </code></pre>
 <h2 id="async-error-handling"><a class="header" href="#async-error-handling">Async Error Handling</a></h2>
-<h3 id="javascripttypescript-async-patterns-planned"><a class="header" href="#javascripttypescript-async-patterns-planned">JavaScript/TypeScript Async Patterns (Planned)</a></h3>
-<p>⚠️ <strong>JavaScript and TypeScript async error detection is planned but not yet fully implemented.</strong></p>
+<h3 id="javascripttypescript-async-patterns"><a class="header" href="#javascripttypescript-async-patterns">JavaScript/TypeScript Async Patterns</a></h3>
+<p>⚠️ <strong>JavaScript and TypeScript async error detection is partially implemented.</strong></p>
 <p><strong>Current Status:</strong></p>
 <ul>
-<li>JavaScript/TypeScript support focuses on complexity analysis and basic error patterns</li>
-<li>Async error handling detection (unhandled promise rejections, missing await) is <strong>fully implemented for Rust only</strong></li>
-<li>Enhanced JavaScript/TypeScript async error detection is planned for future releases</li>
+<li>JavaScript/TypeScript support includes callback hell, unhandled promise chains, and long promise chains</li>
+<li>Rust remains the most comprehensive implementation for async error handling</li>
+<li>Context-loss and propagation analysis are still Rust-focused</li>
 </ul>
-<p>The examples below show intended future behavior:</p>
+<p>The examples below show the kinds of async issues debtmap is intended to surface:</p>
 <pre><code class="language-javascript">// ❌ CRITICAL: Unhandled promise rejection
 async function loadUserData(userId) {
     const response = await fetch(`/api/users/${userId}`);
@@ -1059,7 +1059,7 @@ except Exception as e:  # Not bare except:
 <ol>
 <li>
 <p><strong>Run analysis with error focus</strong></p>
-<pre><code class="language-bash">debtmap analyze --filter-categories ErrorSwallowing
+<pre><code class="language-bash">debtmap analyze . --filter ErrorHandling
 </code></pre>
 <p>Note: This analyzes Rust error patterns. Python and JavaScript/TypeScript support is limited or planned.</p>
 </li>
@@ -1082,13 +1082,13 @@ except Exception as e:  # Not bare except:
 <li>
 <p><strong>Validate improvements</strong></p>
 <pre><code class="language-bash"># Before fixes
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # After fixes
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare
-debtmap compare before.json after.json
+debtmap compare --before before.json --after after.json
 </code></pre>
 </li>
 </ol>
@@ -1112,7 +1112,7 @@ detect_context_loss = false    # Add later
 </code></pre>
 <p>Track progress over time:</p>
 <pre><code class="language-bash"># Weekly error handling health check
-debtmap analyze --filter-categories ErrorSwallowing | tee weekly-error-health.txt
+debtmap analyze . --filter ErrorHandling | tee weekly-error-health.txt
 </code></pre>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="too-many-false-positives-in-test-code"><a class="header" href="#too-many-false-positives-in-test-code">Too Many False Positives in Test Code</a></h3>
@@ -1136,7 +1136,7 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 <ol>
 <li>
 <p><strong>Language support not enabled</strong></p>
-<pre><code class="language-bash">debtmap analyze --languages rust,python,javascript
+<pre><code class="language-bash">debtmap analyze . --languages rust,python,javascript,typescript
 </code></pre>
 </li>
 <li>
@@ -1177,21 +1177,21 @@ severity = "Warning"
 <ol>
 <li>Re-run analysis: <code>debtmap analyze</code></li>
 <li>Search for pattern: <code>rg "\.unwrap\(\)" src/</code></li>
-<li>Enable debug logging: <code>debtmap analyze --log-level debug</code></li>
+<li>Use verbose diagnostics: <code>debtmap analyze . -vv</code></li>
 </ol>
 <h3 id="validating-error-handling-improvements"><a class="header" href="#validating-error-handling-improvements">Validating Error Handling Improvements</a></h3>
 <p><strong>Problem:</strong> Unsure if fixes actually improved code quality</p>
 <p><strong>Solution:</strong> Use compare workflow:</p>
 <pre><code class="language-bash"># Baseline before fixes
 git checkout main
-debtmap analyze --output baseline.json
+debtmap analyze . --format json --output baseline.json
 
 # After fixes
 git checkout feature/improve-errors
-debtmap analyze --output improved.json
+debtmap analyze . --format json --output improved.json
 
 # Compare reports
-debtmap compare baseline.json improved.json
+debtmap compare --before baseline.json --after improved.json
 </code></pre>
 <p>Look for:</p>
 <ul>

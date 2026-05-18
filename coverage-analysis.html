@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -321,7 +321,7 @@ Priority 3: Helper Function (MODERATE)
 </code></pre>
 <h3 id="configuring-debtmap"><a class="header" href="#configuring-debtmap">Configuring Debtmap</a></h3>
 <p>Point debtmap to your coverage data:</p>
-<pre><code class="language-bash">debtmap analyze --coverage-path ./coverage/lcov.info
+<pre><code class="language-bash">debtmap analyze . --lcov ./coverage/lcov.info
 </code></pre>
 <p>Or in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[coverage]
@@ -354,7 +354,7 @@ lcov_path = "./coverage/lcov.info"
 <h3 id="4-track-progress-over-time"><a class="header" href="#4-track-progress-over-time">4. Track Progress Over Time</a></h3>
 <p>Run debtmap regularly to track coverage improvements:</p>
 <pre><code class="language-bash"># Weekly coverage check
-debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
+debtmap analyze . --lcov ./coverage/lcov.info &gt; weekly-gaps.txt
 </code></pre>
 <p>Compare reports to see gap reduction progress.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
@@ -362,7 +362,7 @@ debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
 <p><strong>Cause</strong>: Debtmap can’t find or parse LCOV file</p>
 <p><strong>Solutions</strong>:</p>
 <ul>
-<li>Verify <code>--coverage-path</code> points to valid LCOV file</li>
+<li>Verify <code>--lcov</code> points to a valid LCOV file</li>
 <li>Ensure LCOV file was generated recently</li>
 <li>Check file permissions (readable by debtmap)</li>
 <li>Validate LCOV format: <code>head -20 ./coverage/lcov.info</code></li>
@@ -381,7 +381,7 @@ debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
 <ul>
 <li>Check function names match exactly (case-sensitive)</li>
 <li>Verify file paths are consistent (relative vs absolute)</li>
-<li>Enable debug logging: <code>debtmap analyze --log-level debug</code></li>
+<li>Use verbose output for diagnostics: <code>debtmap analyze . --lcov ./coverage/lcov.info -vv</code></li>
 </ul>
 <h3 id="missing-functions-in-coverage-report"><a class="header" href="#missing-functions-in-coverage-report">Missing functions in coverage report</a></h3>
 <p><strong>Cause</strong>: Functions not instrumented or filtered out</p>

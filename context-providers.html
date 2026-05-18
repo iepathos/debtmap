@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -673,39 +673,39 @@ git rev-parse --git-dir
 
 # If not a git repo, initialize one or disable git_history provider
 # Option 1: Enable context but exclude git_history
-debtmap analyze --context --disable-context git_history
+debtmap analyze . --context --disable-context git_history
 
 # Option 2: Use only specific providers
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 </code></pre>
 <p><strong>Performance issues</strong>: Git history analysis can be slow for large repositories:</p>
 <pre><code class="language-bash"># Use only lightweight providers
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 </code></pre>
 <h2 id="enabling-context-providers"><a class="header" href="#enabling-context-providers">Enabling Context Providers</a></h2>
 <p>Context-aware analysis is disabled by default. Enable it using CLI flags:</p>
 <h3 id="enable-all-providers"><a class="header" href="#enable-all-providers">Enable All Providers</a></h3>
 <pre><code class="language-bash"># Enable all available context providers
-debtmap analyze --context
+debtmap analyze . --context
 # or
-debtmap analyze --enable-context
+debtmap analyze . --enable-context
 </code></pre>
 <h3 id="enable-specific-providers"><a class="header" href="#enable-specific-providers">Enable Specific Providers</a></h3>
 <pre><code class="language-bash"># Enable only critical_path and dependency
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 
 # Enable only git_history
-debtmap analyze --context-providers git_history
+debtmap analyze . --context-providers git_history
 
 # Enable all three explicitly
-debtmap analyze --context-providers critical_path,dependency,git_history
+debtmap analyze . --context-providers critical_path,dependency,git_history
 </code></pre>
 <h3 id="disable-specific-providers"><a class="header" href="#disable-specific-providers">Disable Specific Providers</a></h3>
 <pre><code class="language-bash"># Enable context but disable git_history (useful for non-git repos)
-debtmap analyze --context --disable-context git_history
+debtmap analyze . --context --disable-context git_history
 
 # Enable context but disable dependency analysis
-debtmap analyze --context --disable-context dependency
+debtmap analyze . --context --disable-context dependency
 </code></pre>
 <h3 id="enabling-multiple-providers"><a class="header" href="#enabling-multiple-providers">Enabling Multiple Providers</a></h3>
 <p>Combine providers for comprehensive analysis:</p>
@@ -878,23 +878,23 @@ Final Score: 2.8 [LOW]
 <p>Stable, well-tested code gets even lower priority.</p>
 <h3 id="example-4-api-endpoint-prioritization"><a class="header" href="#example-4-api-endpoint-prioritization">Example 4: API Endpoint Prioritization</a></h3>
 <p>Analyze a web service to identify critical API endpoints:</p>
-<pre><code class="language-bash">debtmap analyze --context-providers critical_path --format json
+<pre><code class="language-bash">debtmap analyze . --context-providers critical_path --format json
 </code></pre>
 <p>Functions on API endpoint paths will receive elevated risk scores. Use this to prioritize code review and testing for user-facing functionality.</p>
 <h3 id="example-5-finding-change-prone-code"><a class="header" href="#example-5-finding-change-prone-code">Example 5: Finding Change-Prone Code</a></h3>
 <p>Identify files with high change frequency and bug fixes:</p>
-<pre><code class="language-bash">debtmap analyze --context-providers git_history --top 20
+<pre><code class="language-bash">debtmap analyze . --context-providers git_history --top 20
 </code></pre>
 <p>This highlights unstable areas of the codebase that may benefit from refactoring or increased test coverage.</p>
 <h3 id="example-6-architectural-impact-analysis"><a class="header" href="#example-6-architectural-impact-analysis">Example 6: Architectural Impact Analysis</a></h3>
 <p>Find high-impact modules with large blast radius:</p>
-<pre><code class="language-bash">debtmap analyze --context-providers dependency --format json | \
+<pre><code class="language-bash">debtmap analyze . --context-providers dependency --format json | \
   jq '.[] | select(.blast_radius &gt; 10)'
 </code></pre>
 <p>Use this to identify architectural choke points that require careful change management.</p>
 <h3 id="example-7-comprehensive-risk-assessment"><a class="header" href="#example-7-comprehensive-risk-assessment">Example 7: Comprehensive Risk Assessment</a></h3>
 <p>Combine all providers for holistic risk analysis:</p>
-<pre><code class="language-bash">debtmap analyze --context -v
+<pre><code class="language-bash">debtmap analyze . --context -v
 </code></pre>
 <p>The verbose output shows how each provider contributes to the final risk score:</p>
 <pre><code>function: process_payment
@@ -1029,7 +1029,7 @@ debtmap analyze . --context-providers critical_path,dependency
 <pre><code class="language-bash">debtmap analyze . -vv | grep "Role classification"
 </code></pre>
 <p><strong>Manually verify call graph:</strong></p>
-<pre><code class="language-bash">debtmap analyze . --show-call-graph
+<pre><code class="language-bash">debtmap analyze . --debug-call-graph --call-graph-stats
 </code></pre>
 <h3 id="context-providers-not-available"><a class="header" href="#context-providers-not-available">Context Providers Not Available</a></h3>
 <p><strong>Issue:</strong> <code>--context-providers</code> flag not recognized</p>
@@ -1044,36 +1044,36 @@ debtmap analyze . --context-providers critical_path,dependency
 <p><strong>Issue</strong>: Context providers not affecting scores</p>
 <p><strong>Solution</strong>: Ensure providers are enabled with <code>--context</code> or <code>--context-providers</code></p>
 <pre><code class="language-bash"># Wrong: context flag missing
-debtmap analyze
+debtmap analyze .
 
 # Correct: context enabled
-debtmap analyze --context
+debtmap analyze . --context
 </code></pre>
 <hr>
 <p><strong>Issue</strong>: Git history provider fails with “Not a git repository”</p>
 <p><strong>Solution</strong>: Disable git_history if not using version control</p>
-<pre><code class="language-bash">debtmap analyze --context --disable-context git_history
+<pre><code class="language-bash">debtmap analyze . --context --disable-context git_history
 </code></pre>
 <hr>
 <p><strong>Issue</strong>: Dependency analysis errors</p>
 <p><strong>Solution</strong>: Check for circular dependencies or disable dependency provider</p>
-<pre><code class="language-bash">debtmap analyze --context --disable-context dependency
+<pre><code class="language-bash">debtmap analyze . --context --disable-context dependency
 </code></pre>
 <hr>
 <p><strong>Issue</strong>: Slow analysis with all providers</p>
 <p><strong>Solution</strong>: Use selective providers or increase verbosity to identify bottlenecks</p>
 <pre><code class="language-bash"># Faster: skip git_history
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 
 # Debug: see provider execution times
-debtmap analyze --context -vvv
+debtmap analyze . --context -vvv
 </code></pre>
 <hr>
 <p>For more troubleshooting guidance, see the <a href="troubleshooting.html">Troubleshooting</a> chapter.</p>
 <h2 id="advanced-usage"><a class="header" href="#advanced-usage">Advanced Usage</a></h2>
 <h3 id="interpreting-context-contribution"><a class="header" href="#interpreting-context-contribution">Interpreting Context Contribution</a></h3>
 <p>Enable verbose output to see detailed context contributions:</p>
-<pre><code class="language-bash">debtmap analyze --context -v
+<pre><code class="language-bash">debtmap analyze . --context -v
 </code></pre>
 <p>Each function shows:</p>
 <ul>

@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -191,40 +191,47 @@
 <ul>
 <li><strong>Rust</strong> - Full AST parsing with <code>syn</code></li>
 <li><strong>Python</strong> - Full AST parsing with tree-sitter</li>
+<li><strong>JavaScript</strong> - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows</li>
+<li><strong>TypeScript</strong> - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows</li>
 </ul>
-<p><strong>Source</strong>: <code>src/core/types.rs:9-12</code> (Language enum) and <code>src/organization/language.rs:4-7</code></p>
+<p><strong>Source</strong>: <code>src/core/mod.rs</code> (Language enum) and <code>src/config/languages.rs</code> (language-specific configuration fields)</p>
 <p>The <code>Language</code> enum in the codebase currently supports:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/core/types.rs:9-12
+</span>// From src/core/mod.rs
 pub enum Language {
     Rust,
     Python,
+    JavaScript,
+    TypeScript,
+    Unknown,
 }
 <span class="boring">}</span></code></pre>
 <p><strong>Language Detection</strong>: Debtmap determines file language by extension:</p>
 <ul>
 <li><code>.rs</code> files are analyzed as Rust</li>
-<li><code>.py</code> files are analyzed as Python</li>
+<li><code>.py</code> and <code>.pyw</code> files are analyzed as Python</li>
+<li><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, and <code>.jsx</code> files are analyzed as JavaScript</li>
+<li><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, and <code>.tsx</code> files are analyzed as TypeScript</li>
 </ul>
-<p><strong>Source</strong>: <code>src/organization/language.rs:10-17</code></p>
+<p><strong>Source</strong>: <code>src/core/mod.rs</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub fn from_path(path: &amp;Path) -&gt; Option&lt;Language&gt; {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .and_then(|ext| match ext {
-            "rs" =&gt; Some(Language::Rust),
-            "py" =&gt; Some(Language::Python),
-            _ =&gt; None,
-        })
+</span>pub fn from_extension(ext: &amp;str) -&gt; Self {
+    match ext {
+        "rs" =&gt; Language::Rust,
+        "py" | "pyw" =&gt; Language::Python,
+        "js" | "mjs" | "cjs" | "jsx" =&gt; Language::JavaScript,
+        "ts" | "mts" | "cts" | "tsx" =&gt; Language::TypeScript,
+        _ =&gt; Language::Unknown,
+    }
 }
 <span class="boring">}</span></code></pre>
 <h2 id="configuration-structure"><a class="header" href="#configuration-structure">Configuration Structure</a></h2>
 <p>The <code>[languages]</code> section in your <code>debtmap.toml</code> configures language analysis.</p>
 <p><strong>Source</strong>: <code>src/config/languages.rs:4-22</code> (LanguagesConfig struct)</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -232,6 +239,16 @@ detect_complexity = true
 detect_duplication = true
 
 [languages.python]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.typescript]
 detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
@@ -279,12 +296,26 @@ detect_duplication = true
 </code></pre>
 <p>All features enabled by default for Python. Dead code detection is valuable since Python lacks a compiler phase that catches unused code.</p>
 <p><strong>Source</strong>: <code>src/config/accessors.rs:113-115</code></p>
+<h3 id="javascript-configuration"><a class="header" href="#javascript-configuration">JavaScript Configuration</a></h3>
+<pre><code class="language-toml">[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+</code></pre>
+<p>JavaScript analysis covers modern ES syntax, JSX, callbacks, promises, and async workflow patterns.</p>
+<h3 id="typescript-configuration"><a class="header" href="#typescript-configuration">TypeScript Configuration</a></h3>
+<pre><code class="language-toml">[languages.typescript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+</code></pre>
+<p>TypeScript analysis covers TS/TSX syntax, modules, type-oriented patterns, and async workflow patterns.</p>
 <h2 id="enabling-languages"><a class="header" href="#enabling-languages">Enabling Languages</a></h2>
 <p>Specify which languages to analyze with the <code>enabled</code> array:</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 </code></pre>
-<p>The documented and implemented user-facing language set for <code>0.16.0</code> is Rust and Python.</p>
+<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, and TypeScript.</p>
 <h2 id="feature-defaults"><a class="header" href="#feature-defaults">Feature Defaults</a></h2>
 <p><strong>Source</strong>: <code>src/config/languages.rs:40-61</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -321,7 +352,7 @@ detect_duplication = true
 </code></pre>
 <h3 id="multi-language-projects"><a class="header" href="#multi-language-projects">Multi-Language Projects</a></h3>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 
 # Different settings per language
 [languages.rust]
@@ -333,6 +364,16 @@ detect_duplication = true
 detect_dead_code = true         # Python needs this
 detect_complexity = true
 detect_duplication = false      # Skip if not needed
+
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.typescript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
 </code></pre>
 <h2 id="complexity-calculations-by-language"><a class="header" href="#complexity-calculations-by-language">Complexity Calculations by Language</a></h2>
 <p>Debtmap uses language-specific complexity analyzers:</p>
@@ -351,6 +392,20 @@ detect_duplication = false      # Skip if not needed
 <li>Tracks class method complexity</li>
 <li>Analyzes exception handling patterns</li>
 </ul>
+<h3 id="javascript-complexity"><a class="header" href="#javascript-complexity">JavaScript Complexity</a></h3>
+<ul>
+<li>Uses tree-sitter for AST parsing</li>
+<li>Handles ES modules, JSX, callbacks, promises, and async workflows</li>
+<li>Tracks function and class method complexity</li>
+<li>Detects JavaScript-specific functional and async patterns</li>
+</ul>
+<h3 id="typescript-complexity"><a class="header" href="#typescript-complexity">TypeScript Complexity</a></h3>
+<ul>
+<li>Uses tree-sitter for TS/TSX parsing</li>
+<li>Handles modern module syntax and frontend/server patterns</li>
+<li>Tracks type-oriented complexity and async workflows</li>
+<li>Detects broad type-safety and promise-related patterns</li>
+</ul>
 <h2 id="integration-with-other-configuration"><a class="header" href="#integration-with-other-configuration">Integration with Other Configuration</a></h2>
 <p>Language configuration interacts with other debtmap settings:</p>
 <h3 id="ignore-patterns"><a class="header" href="#ignore-patterns">Ignore Patterns</a></h3>
@@ -359,7 +414,7 @@ detect_duplication = false      # Skip if not needed
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
-    "*.min.js",        # Frontend artifacts that are not part of the supported set
+    "*.min.js",        # Minified frontend artifacts
 ]
 </code></pre>
 <p>See <a href="thresholds.html">Thresholds Configuration</a> for complexity thresholds that can be language-aware.</p>
@@ -378,8 +433,8 @@ patterns = [
 <tr><td><code>enabled</code></td><td><code>Vec&lt;String&gt;</code></td><td>Languages to analyze</td></tr>
 <tr><td><code>rust</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Rust-specific settings</td></tr>
 <tr><td><code>python</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Python-specific settings</td></tr>
-<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
-<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>Reserved configuration field</td></tr>
+<tr><td><code>javascript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>JavaScript-specific settings</td></tr>
+<tr><td><code>typescript</code></td><td><code>Option&lt;LanguageFeatures&gt;</code></td><td>TypeScript-specific settings</td></tr>
 </tbody>
 </table>
 </div>
@@ -401,7 +456,7 @@ patterns = [
 <h3 id="language-not-detected"><a class="header" href="#language-not-detected">Language Not Detected</a></h3>
 <p>If files aren’t being analyzed:</p>
 <ol>
-<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>)</li>
+<li>Check the file extension is recognized (<code>.rs</code>, <code>.py</code>, <code>.pyw</code>, <code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.jsx</code>, <code>.ts</code>, <code>.mts</code>, <code>.cts</code>, <code>.tsx</code>)</li>
 <li>Verify the language is in <code>enabled</code> array</li>
 <li>Check ignore patterns aren’t excluding the files</li>
 </ol>
@@ -410,13 +465,14 @@ patterns = [
 <pre><code class="language-toml">[languages.rust]
 detect_dead_code = true  # Override default
 </code></pre>
-<p>For Python: Ensure <code>detect_dead_code = true</code> (the default).</p>
+<p>For Python, JavaScript, and TypeScript: Ensure <code>detect_dead_code = true</code> (the default).</p>
 <h3 id="unexpected-complexity-scores"><a class="header" href="#unexpected-complexity-scores">Unexpected Complexity Scores</a></h3>
 <p>Language-specific complexity varies due to:</p>
 <ul>
 <li>Different control flow constructs</li>
 <li>Pattern matching complexity (Rust)</li>
 <li>Exception handling (Python)</li>
+<li>Async and callback flow (JavaScript/TypeScript)</li>
 </ul>
 <p>See <a href="../entropy-analysis.html">Entropy Analysis</a> for how entropy affects complexity scoring.</p>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -187,6 +187,7 @@
 <li>Example workflows for different AI tools</li>
 <li>Interpreting signals for effective prompts</li>
 </ol>
+<p>Debtmap currently analyzes Rust, Python, JavaScript, and TypeScript. All languages are enabled by default; use <code>--languages rust,python,javascript,typescript</code> when you want to constrain a run.</p>
 <h2 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h2>
 <h3 id="markdown-recommended"><a class="header" href="#markdown-recommended">Markdown (Recommended)</a></h3>
 <p>The <code>markdown</code> format is specifically designed for LLM consumption:</p>
@@ -199,21 +200,21 @@
 - Total items: 47
 - Critical: 3
 - High: 12
-- Moderate: 20
+- Medium: 20
 - Low: 12
 
 ## Top Priority Items
 
 ### #1 [CRITICAL] parse_complex_input
 **Location:** src/parser.rs:38-85
-**Score:** 8.9/10
+**Score:** 128.4
 
 **Signals:**
 | Metric | Value | Threshold |
 |--------|-------|-----------|
 | Cyclomatic | 12 | 10 |
 | Cognitive | 18 | 15 |
-| Coverage | 0% | 80% |
+| Coverage | 0.00 | 0.80 |
 | Nesting | 4 | 3 |
 
 **Context to read:**
@@ -240,49 +241,59 @@
 </code></pre>
 <p><strong>Structure:</strong></p>
 <pre><code class="language-json">{
-  "version": "1.0",
-  "timestamp": "2024-01-15T10:30:00Z",
+  "format_version": "3.0",
+  "metadata": {
+    "debtmap_version": "0.16.5",
+    "generated_at": "2026-05-18T10:30:00Z",
+    "project_root": ".",
+    "analysis_type": "unified"
+  },
   "summary": {
     "total_items": 47,
-    "by_tier": {
+    "total_debt_score": 2140.5,
+    "debt_density": 138.8,
+    "total_loc": 15420,
+    "score_distribution": {
       "critical": 3,
       "high": 12,
-      "moderate": 20,
+      "medium": 20,
       "low": 12
-    },
-    "total_loc": 15420
+    }
   },
   "items": [
     {
-      "rank": 1,
-      "id": "parse_complex_input_38",
-      "tier": "critical",
-      "score": 8.9,
+      "type": "Function",
+      "score": 128.4,
+      "category": "Testing",
+      "priority": "critical",
       "location": {
         "file": "src/parser.rs",
-        "line_start": 38,
-        "line_end": 85,
+        "line": 38,
         "function": "parse_complex_input"
       },
       "metrics": {
-        "cyclomatic": 12,
-        "cognitive": 18,
-        "nesting": 4,
-        "loc": 47
+        "cyclomatic_complexity": 12,
+        "cognitive_complexity": 18,
+        "length": 47,
+        "nesting_depth": 4,
+        "coverage": 0.0
       },
-      "coverage": {
-        "line_percent": 0.0,
-        "branch_percent": 0.0
+      "dependencies": {
+        "upstream_count": 2,
+        "downstream_count": 4,
+        "blast_radius": 6,
+        "critical_path": true
       },
       "context": {
-        "primary": "src/parser.rs:38-85",
-        "callers": [
-          {"file": "src/handler.rs", "lines": "100-120", "calls": 12},
-          {"file": "src/api.rs", "lines": "45-60", "calls": 8}
-        ],
-        "tests": [
-          {"file": "tests/parser_test.rs", "lines": "50-75"}
-        ]
+        "primary": {
+          "file": "src/parser.rs",
+          "start_line": 38,
+          "end_line": 85,
+          "symbol": "parse_complex_input"
+        },
+        "related": [],
+        "total_lines": 48,
+        "completeness_confidence": 0.86
       }
     }
   ]
@@ -291,6 +302,11 @@
 <h3 id="terminal"><a class="header" href="#terminal">Terminal</a></h3>
 <p>For human exploration (not recommended for AI piping):</p>
 <pre><code class="language-bash">debtmap analyze . --format terminal
+</code></pre>
+<h3 id="dot"><a class="header" href="#dot">DOT</a></h3>
+<p>For dependency graph visualization:</p>
+<pre><code class="language-bash">debtmap analyze . --format dot -o deps.dot
+dot -Tsvg deps.dot -o deps.svg
 </code></pre>
 <h2 id="context-suggestions"><a class="header" href="#context-suggestions">Context Suggestions</a></h2>
 <p>Each debt item includes a <code>context</code> field that tells the AI exactly what code to read:</p>
@@ -318,12 +334,12 @@
 </div>
 <h3 id="using-context-effectively"><a class="header" href="#using-context-effectively">Using Context Effectively</a></h3>
 <p><strong>Minimal context (fastest):</strong></p>
-<pre><code class="language-bash"># Just get the primary location
-debtmap analyze . --format json | jq '.items[0].location'
+<pre><code class="language-bash"># Just get the primary location for the first item
+debtmap analyze . --format json --top 1 | jq '.items[0].location'
 </code></pre>
 <p><strong>Full context (most accurate):</strong></p>
 <pre><code class="language-bash"># Read all suggested files
-debtmap analyze . --format markdown --top 1
+debtmap analyze . --context --format markdown --top 1
 # Then have the AI read each file in the context section
 </code></pre>
 <h2 id="example-workflows"><a class="header" href="#example-workflows">Example Workflows</a></h2>
@@ -370,7 +386,7 @@ import subprocess
 
 # Run debtmap analysis
 result = subprocess.run(
-    ["debtmap", "analyze", ".", "--format", "json", "--top", "10"],
+    ["debtmap", "analyze", ".", "--context", "--format", "json", "--top", "10"],
     capture_output=True,
     text=True
 )
@@ -378,28 +394,45 @@ debt_data = json.loads(result.stdout)
 
 # Process each item
 for item in debt_data["items"]:
+    if item["type"] != "Function":
+        continue
+
     # Extract context files
     context_files = []
-    context_files.append(item["context"]["primary"])
-    context_files.extend([c["file"] for c in item["context"].get("callers", [])])
+    if "context" in item:
+        primary = item["context"]["primary"]
+        context_files.append(primary)
+        context_files.extend([related["range"] for related in item["context"].get("related", [])])
+    else:
+        location = item["location"]
+        context_files.append({
+            "file": location["file"],
+            "start_line": location.get("line", 1),
+            "end_line": location.get("line", 1),
+            "symbol": location.get("function")
+        })
 
     # Read context files
     context_content = ""
-    for file_spec in context_files:
-        file_path, lines = parse_file_spec(file_spec)
-        context_content += read_file_lines(file_path, lines)
+    for file_range in context_files:
+        context_content += read_file_lines(
+            file_range["file"],
+            file_range["start_line"],
+            file_range["end_line"]
+        )
 
     # Build prompt
     prompt = f"""
     Fix this technical debt item:
 
-    Location: {item["location"]["file"]}:{item["location"]["line_start"]}
-    Function: {item["location"]["function"]}
-    Score: {item["score"]}/10
+    Location: {item["location"]["file"]}:{item["location"].get("line")}
+    Function: {item["location"].get("function")}
+    Score: {item["score"]} ({item["priority"]})
 
     Signals:
-    - Cyclomatic complexity: {item["metrics"]["cyclomatic"]}
-    - Test coverage: {item["coverage"]["line_percent"]}%
+    - Cyclomatic complexity: {item["metrics"]["cyclomatic_complexity"]}
+    - Cognitive complexity: {item["metrics"]["cognitive_complexity"]}
+    - Test coverage: {item["metrics"].get("coverage", "unknown")}
 
     Context code:
     {context_content}
@@ -437,7 +470,7 @@ jobs:
 
       - name: Check for critical items
         run: |
-          CRITICAL=$(jq '.summary.by_tier.critical' debt.json)
+          CRITICAL=$(jq '.summary.score_distribution.critical' debt.json)
           if [ "$CRITICAL" -gt 0 ]; then
             echo "::warning::Found $CRITICAL critical debt items"
           fi
@@ -449,18 +482,18 @@ jobs:
           path: debt.json
 </code></pre>
 <h2 id="interpreting-signals"><a class="header" href="#interpreting-signals">Interpreting Signals</a></h2>
-<h3 id="severity-score-0-10"><a class="header" href="#severity-score-0-10">Severity Score (0-10)</a></h3>
-<p>The severity score combines multiple signals:</p>
+<h3 id="priority-score"><a class="header" href="#priority-score">Priority Score</a></h3>
+<p>The priority score combines multiple signals:</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Score</th><th>Tier</th><th>Interpretation</th></tr>
 </thead>
 <tbody>
-<tr><td>8.0-10.0</td><td>Critical</td><td>High complexity, no tests, high coupling</td></tr>
-<tr><td>5.0-7.9</td><td>High</td><td>Moderate risk, coverage gaps</td></tr>
-<tr><td>2.0-4.9</td><td>Moderate</td><td>Lower risk, monitor</td></tr>
-<tr><td>0.0-1.9</td><td>Low</td><td>Acceptable state</td></tr>
+<tr><td>&gt;= 100</td><td>Critical</td><td>High-risk debt, often structural or highly coupled</td></tr>
+<tr><td>&gt;= 50</td><td>High</td><td>Meaningful risk, usually worth addressing soon</td></tr>
+<tr><td>&gt;= 20</td><td>Medium</td><td>Moderate priority, useful for planned cleanup</td></tr>
+<tr><td>&lt; 20</td><td>Low</td><td>Lower-risk maintenance item</td></tr>
 </tbody>
 </table>
 </div>
@@ -485,19 +518,14 @@ jobs:
 <li>4+: Strongly consider refactoring</li>
 </ul>
 <h3 id="coverage-signals"><a class="header" href="#coverage-signals">Coverage Signals</a></h3>
-<p><strong>Line coverage:</strong></p>
+<p><strong>Coverage:</strong></p>
 <ul>
-<li>0%: Critical gap, no tests at all</li>
-<li>1-50%: Poor coverage</li>
-<li>51-80%: Moderate coverage</li>
-<li>81%+: Good coverage</li>
+<li><code>0.0</code>: Critical gap, no matching coverage</li>
+<li><code>0.01-0.50</code>: Poor coverage</li>
+<li><code>0.51-0.80</code>: Moderate coverage</li>
+<li><code>0.81+</code>: Good coverage</li>
 </ul>
-<p><strong>Branch coverage:</strong></p>
-<ul>
-<li>More important than line coverage</li>
-<li>Missing branches = missing edge cases</li>
-<li>0% branch = high risk</li>
-</ul>
+<p>Coverage is read from LCOV. When coverage is present, well-tested code is dampened so untested complex code rises in priority.</p>
 <h3 id="coupling-signals"><a class="header" href="#coupling-signals">Coupling Signals</a></h3>
 <p><strong>Fan-in (callers):</strong></p>
 <ul>
@@ -582,8 +610,8 @@ jobs:
 <p><strong>Solution:</strong> Report as a bug with reproducible example</p>
 <h3 id="large-context-suggestions"><a class="header" href="#large-context-suggestions">Large context suggestions</a></h3>
 <p><strong>Cause:</strong> High coupling in codebase</p>
-<p><strong>Solution:</strong> Use <code>--max-context-lines</code> to limit:</p>
-<pre><code class="language-bash">debtmap analyze . --format markdown --max-context-lines 300
+<p><strong>Solution:</strong> Limit the number of reported items or dependency entries:</p>
+<pre><code class="language-bash">debtmap analyze . --context --format markdown --top 1 --max-callers 3 --max-callees 3
 </code></pre>
 <h2 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h2>
 <h3 id="cli-options-for-llm-integration"><a class="header" href="#cli-options-for-llm-integration">CLI Options for LLM Integration</a></h3>
@@ -597,6 +625,9 @@ jobs:
 <tr><td><code>--format json</code></td><td>Structured JSON output</td></tr>
 <tr><td><code>--top N</code></td><td>Limit to top N items</td></tr>
 <tr><td><code>--lcov FILE</code></td><td>Include coverage data</td></tr>
+<tr><td><code>--context</code></td><td>Enable context-aware risk analysis</td></tr>
+<tr><td><code>--context-providers LIST</code></td><td>Select <code>critical_path</code>, <code>dependency</code>, and/or <code>git_history</code></td></tr>
+<tr><td><code>--show-dependencies</code></td><td>Include caller/callee details</td></tr>
 <tr><td><code>--min-score N</code></td><td>Filter items below score N</td></tr>
 <tr><td><code>--output FILE</code></td><td>Write to file instead of stdout</td></tr>
 </tbody>

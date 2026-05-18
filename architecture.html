@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -195,15 +195,15 @@
     │ Parser │
     └────┬───┘
          │
-    ┌────┼────────────┐
-    │    │            │
-    ▼    ▼            ▼
-┌─────┐ ┌──────────┐ ┌───────────┐
-│ syn │ │rustpython│ │tree-sitter│
-│ AST │ │   AST    │ │    AST    │
-└──┬──┘ └────┬─────┘ └─────┬─────┘
-   │         │             │
-   └─────────┼─────────────┘
+    ┌────┴──────────┐
+    │               │
+    ▼               ▼
+┌─────┐       ┌─────────────┐
+│ syn │       │ tree-sitter │
+│ AST │       │     AST     │
+└──┬──┘       └──────┬──────┘
+   │                 │
+   └────────┬────────┘
              │
              ▼
   ┌──────────────────┐
@@ -285,9 +285,9 @@ include_patterns = ["src/**/*.rs", "lib/**/*.py"]
 <li>Handles: async/await, generic types, lifetime annotations</li>
 <li>Performance: ~10-20ms per file</li>
 </ul>
-<p><strong>Python (rustpython):</strong></p>
+<p><strong>Python (tree-sitter):</strong></p>
 <ul>
-<li>Uses rustpython’s parser for Python 3.x syntax</li>
+<li>Uses tree-sitter for Python syntax</li>
 <li>Extracts: functions, classes, methods, decorators</li>
 <li>Handles: comprehensions, async/await, type hints</li>
 <li>Performance: ~5-15ms per file</li>
@@ -479,15 +479,14 @@ where:
   Call Graph Depth: 3
   Untested Paths: 2
 
-  Risk = (8.5 * 0.7) + (3 * 2 * 0.3) = 5.95 + 1.8 = 7.75
+  Priority = ((8.5 * 10.0) + dependency impact) * coverage dampening
 <span class="boring">}</span></code></pre>
-<p><strong>Risk Tiers (Unified Score 0-10):</strong></p>
+<p><strong>Risk Tiers (Unified Priority Score):</strong></p>
 <ul>
-<li><strong>Critical (9.0-10.0):</strong> Severe risk requiring immediate attention</li>
-<li><strong>High (7.0-8.9):</strong> Significant risk, address this sprint</li>
-<li><strong>Medium (5.0-6.9):</strong> Moderate risk, plan for next sprint</li>
-<li><strong>Low (3.0-4.9):</strong> Minor risk, monitor</li>
-<li><strong>Minimal (0.0-2.9):</strong> Well-managed code</li>
+<li><strong>Critical (&gt;= 100):</strong> Severe risk requiring immediate attention</li>
+<li><strong>High (&gt;= 50):</strong> Significant risk, address soon</li>
+<li><strong>Medium (&gt;= 20):</strong> Moderate risk, plan for future work</li>
+<li><strong>Low (&lt; 20):</strong> Lower-risk maintenance item</li>
 </ul>
 <h3 id="9-tiered-prioritization"><a class="header" href="#9-tiered-prioritization">9. Tiered Prioritization</a></h3>
 <p><strong>Purpose:</strong> Classify and rank technical debt items by severity.</p>

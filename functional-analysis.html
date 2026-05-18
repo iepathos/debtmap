@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -782,19 +782,19 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 <span class="boring">}</span></code></pre>
 <h3 id="example-3-using-profiles-for-different-codebases"><a class="header" href="#example-3-using-profiles-for-different-codebases">Example 3: Using Profiles for Different Codebases</a></h3>
 <p><strong>Strict profile</strong> - Catches subtle functional patterns:</p>
-<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/
+<pre><code class="language-bash">$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict src/
 # Detects pipelines with 3+ stages
 # Requires purity ≥ 0.9 for "pure" classification
 # Flags closures with complexity &gt; 3
 </code></pre>
 <p><strong>Balanced profile</strong> - Default for most projects:</p>
-<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced src/
+<pre><code class="language-bash">$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.8 for "pure" classification
 # Flags closures with complexity &gt; 5
 </code></pre>
 <p><strong>Lenient profile</strong> - For legacy code:</p>
-<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient src/
+<pre><code class="language-bash">$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.5 for "pure" classification
 # Flags closures with complexity &gt; 10
@@ -945,7 +945,7 @@ let results: Vec&lt;_&gt; = large_dataset.par_iter()
 <ol>
 <li>
 <p><strong>Start with lenient profile</strong> to understand current state:</p>
-<pre><code class="language-bash">debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient .
+<pre><code class="language-bash">debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient .
 </code></pre>
 </li>
 <li>
@@ -967,10 +967,10 @@ let results: Vec&lt;_&gt; = large_dataset.par_iter()
 <li>
 <p><strong>Tighten profile</strong> as codebase improves:</p>
 <pre><code class="language-bash"># After refactoring
-debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced .
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced .
 
 # For new modules
-debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/new_module/
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict src/new_module/
 </code></pre>
 </li>
 <li>

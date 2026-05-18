@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -340,7 +340,7 @@ debtmap analyze . --context --context-providers critical_path -vvv
 debtmap analyze . -vv | grep "entry point\|Entry"
 
 # Verify call graph is being built
-debtmap analyze . --show-call-graph
+debtmap analyze . --debug-call-graph --call-graph-stats
 </code></pre>
 <h2 id="context-impact-on-scoring"><a class="header" href="#context-impact-on-scoring">Context Impact on Scoring</a></h2>
 <p>Context providers add additional risk factors to the base complexity score. The contribution is calculated in <code>ContextualRisk::new()</code> (see <code>src/risk/context/mod.rs:215-238</code>):</p>

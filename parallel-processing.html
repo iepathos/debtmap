@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ebd6ab1f.js"></script>
@@ -205,10 +205,10 @@
 <h3 id="jobs---j"><a class="header" href="#jobs---j">–jobs / -j</a></h3>
 <p>Control the number of worker threads for parallel processing:</p>
 <pre><code class="language-bash"># Use all available CPU cores (default)
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Limit to 4 threads
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 debtmap analyze -j 4
 </code></pre>
 <p><strong>Behavior:</strong></p>
@@ -239,7 +239,7 @@ debtmap analyze  # Parallel processing enabled (also accepts '1')
 <p>The CLI flags (<code>--jobs</code>, <code>--no-parallel</code>) take precedence over environment variables.</p>
 <h3 id="no-parallel"><a class="header" href="#no-parallel">–no-parallel</a></h3>
 <p>Disable parallel call graph construction entirely:</p>
-<pre><code class="language-bash">debtmap analyze --no-parallel
+<pre><code class="language-bash">debtmap analyze . --no-parallel
 </code></pre>
 <p><strong>When to use:</strong></p>
 <ul>
@@ -748,13 +748,13 @@ Call Graph Complete
 <h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
 <p>Cross-file resolution respects the <code>--jobs</code> flag for thread pool sizing:</p>
 <pre><code class="language-bash"># Use all cores for maximum speedup
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Limit to 4 threads
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 
 # Disable parallelism (debugging)
-debtmap analyze --no-parallel
+debtmap analyze . --no-parallel
 </code></pre>
 <p>The <code>--no-parallel</code> flag disables parallel call graph construction entirely, including cross-file resolution parallelization.</p>
 <h3 id="debugging"><a class="header" href="#debugging">Debugging</a></h3>
@@ -1122,25 +1122,25 @@ debtmap analyze . --jobs 2
 <h2 id="tuning-guidelines"><a class="header" href="#tuning-guidelines">Tuning Guidelines</a></h2>
 <p><strong>Development Workstations:</strong></p>
 <pre><code class="language-bash"># Use all cores for maximum speed
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 </code></pre>
 <p><strong>CI/CD Environments:</strong></p>
 <pre><code class="language-bash"># Limit threads to avoid resource contention
-debtmap analyze --jobs 2
+debtmap analyze . --jobs 2
 
 # Or disable parallelism on very constrained runners
-debtmap analyze --no-parallel
+debtmap analyze . --no-parallel
 </code></pre>
 <p><strong>Containers:</strong></p>
 <pre><code class="language-bash"># Auto-detection respects cgroup limits
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Or explicitly match container CPU allocation
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 </code></pre>
 <p><strong>Benchmarking:</strong></p>
 <pre><code class="language-bash"># Use fixed thread count for reproducible results
-debtmap analyze --jobs 8
+debtmap analyze . --jobs 8
 </code></pre>
 <h2 id="profiling-and-debugging"><a class="header" href="#profiling-and-debugging">Profiling and Debugging</a></h2>
 <h3 id="measure-analysis-time"><a class="header" href="#measure-analysis-time">Measure Analysis Time</a></h3>
@@ -1167,14 +1167,14 @@ Activity Monitor (View &gt; CPU Usage &gt; Show Threads)
 <h3 id="finding-optimal-settings"><a class="header" href="#finding-optimal-settings">Finding Optimal Settings</a></h3>
 <p><strong>Finding the optimal setting:</strong></p>
 <pre><code class="language-bash"># Benchmark different configurations
-time debtmap analyze --jobs 0  # Auto
-time debtmap analyze --jobs 4  # 4 threads
-time debtmap analyze --jobs 8  # 8 threads
-time debtmap analyze --no-parallel  # Sequential
+time debtmap analyze . --jobs 0  # Auto
+time debtmap analyze . --jobs 4  # 4 threads
+time debtmap analyze . --jobs 8  # 8 threads
+time debtmap analyze . --no-parallel  # Sequential
 </code></pre>
 <p>Monitor memory usage during analysis:</p>
 <pre><code class="language-bash"># Monitor peak memory usage
-/usr/bin/time -v debtmap analyze --jobs 8
+/usr/bin/time -v debtmap analyze . --jobs 8
 </code></pre>
 <h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
 <ol>
@@ -1203,7 +1203,7 @@ time debtmap analyze --no-parallel  # Sequential
 <li>
 <p><strong>Check thread count:</strong></p>
 <pre><code class="language-bash"># Ensure you're using all cores
-debtmap analyze --jobs 0 -vv | grep "threads"
+debtmap analyze . --jobs 0 -vv | grep "threads"
 </code></pre>
 </li>
 <li>
@@ -1221,7 +1221,7 @@ top -p $(pgrep debtmap)
 <li>
 <p><strong>Try different thread counts:</strong></p>
 <pre><code class="language-bash"># Sometimes less threads = less contention
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 </code></pre>
 </li>
 </ol>
@@ -1236,12 +1236,12 @@ debtmap analyze . --jobs 2
 <ol>
 <li>
 <p><strong>Reduce parallelism:</strong></p>
-<pre><code class="language-bash">debtmap analyze --jobs 2
+<pre><code class="language-bash">debtmap analyze . --jobs 2
 </code></pre>
 </li>
 <li>
 <p><strong>Disable parallel call graph:</strong></p>
-<pre><code class="language-bash">debtmap analyze --no-parallel
+<pre><code class="language-bash">debtmap analyze . --no-parallel
 </code></pre>
 </li>
 <li>
@@ -1264,13 +1264,13 @@ debtmap analyze . --no-parallel
 <ol>
 <li>
 <p><strong>Run sequentially to isolate:</strong></p>
-<pre><code class="language-bash">debtmap analyze --no-parallel
+<pre><code class="language-bash">debtmap analyze . --no-parallel
 </code></pre>
 </li>
 <li>
 <p><strong>Use deterministic mode:</strong></p>
 <pre><code class="language-bash"># Single-threaded = deterministic order
-debtmap analyze --jobs 1
+debtmap analyze . --jobs 1
 </code></pre>
 </li>
 <li>
@@ -1295,7 +1295,7 @@ If behavior differs between <code>--no-parallel</code> and parallel mode, please
 </code></pre>
 <p>This indicates too many threads competing for locks. Try:</p>
 <pre><code class="language-bash"># Reduce thread count
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 </code></pre>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>

@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -343,10 +343,10 @@ max_lines: 500, max_complexity: 150
 <p>A higher score indicates a more severe god object problem. Scores are used to prioritize which types/files to refactor first.</p>
 <h3 id="viewing-god-object-analysis"><a class="header" href="#viewing-god-object-analysis">Viewing God Object Analysis</a></h3>
 <pre><code class="language-bash"># Show detailed god object information
-debtmap analyze . --show-god-objects
+debtmap analyze . --show-splits
 
 # Include split recommendations
-debtmap analyze . --show-god-objects --verbose
+debtmap analyze . --show-splits --verbose
 </code></pre>
 <h2 id="context-aware-detection"><a class="header" href="#context-aware-detection">Context-Aware Detection</a></h2>
 <p>Context-aware detection reduces false positives by adjusting severity based on code context. Test files, example code, and debug functions receive different treatment than production code.</p>

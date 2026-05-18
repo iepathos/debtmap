@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-abf9e44f.js";
+            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ebd6ab1f.js"></script>
@@ -180,21 +180,20 @@
                         <h1 id="risk-scoring"><a class="header" href="#risk-scoring">Risk Scoring</a></h1>
 <p>Debtmap’s risk scoring identifies code that is both complex AND poorly tested - the true risk hotspots.</p>
 <h2 id="unified-scoring-system"><a class="header" href="#unified-scoring-system">Unified Scoring System</a></h2>
-<p>Debtmap uses a <strong>unified scoring system</strong> (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.</p>
+<p>Debtmap uses a <strong>unified priority scoring system</strong> as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, dependency impact, purity, entropy, context, and debt type adjustments.</p>
 <p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:97-144</a> (UnifiedScore struct)</p>
 <h3 id="score-scale-and-priority-classifications"><a class="header" href="#score-scale-and-priority-classifications">Score Scale and Priority Classifications</a></h3>
-<p>Functions receive scores from 0 (minimal risk) to 10 (critical risk):</p>
+<p>Debt items are classified into severity bands using the unified score:</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Score Range</th><th>Priority</th><th>Description</th><th>Action</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>9.0-10.0</strong></td><td>Critical</td><td>Severe risk requiring immediate attention</td><td>Address immediately</td></tr>
-<tr><td><strong>7.0-8.9</strong></td><td>High</td><td>Significant risk, should be addressed soon</td><td>Plan for this sprint</td></tr>
-<tr><td><strong>5.0-6.9</strong></td><td>Medium</td><td>Moderate risk, plan for future work</td><td>Schedule for next sprint</td></tr>
-<tr><td><strong>3.0-4.9</strong></td><td>Low</td><td>Minor risk, lower priority</td><td>Monitor and address as time permits</td></tr>
-<tr><td><strong>0.0-2.9</strong></td><td>Minimal</td><td>Well-managed code</td><td>Continue monitoring</td></tr>
+<tr><td><strong>&gt;= 100</strong></td><td>Critical</td><td>Severe risk requiring immediate attention</td><td>Address immediately</td></tr>
+<tr><td><strong>&gt;= 50</strong></td><td>High</td><td>Significant risk, should be addressed soon</td><td>Plan soon</td></tr>
+<tr><td><strong>&gt;= 20</strong></td><td>Medium</td><td>Moderate risk, plan for future work</td><td>Schedule when relevant</td></tr>
+<tr><td><strong>&lt; 20</strong></td><td>Low</td><td>Lower-risk maintenance item</td><td>Monitor or batch with related work</td></tr>
 </tbody>
 </table>
 </div>
@@ -202,7 +201,7 @@
 <p>The unified score combines three weighted factors:</p>
 <pre><code>Base Score = (Complexity Factor × Weight) + (Coverage Factor × Weight) + (Dependency Factor × Weight)
 
-Final Score = Base Score × Role Multiplier × Purity Adjustment
+Final Score = Base Score × Role Multiplier × Purity/Refactorability/Pattern Adjustments × Context Adjustments
 </code></pre>
 <p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:300-325</a> (calculate_unified_priority_with_debt)</p>
 <h4 id="dynamic-weight-adjustment"><a class="header" href="#dynamic-weight-adjustment">Dynamic Weight Adjustment</a></h4>
@@ -521,7 +520,7 @@ If this function had 0% coverage AND higher dependency (8 callers):
 <h3 id="legacy-risk-scoring-pre-02x"><a class="header" href="#legacy-risk-scoring-pre-02x">Legacy Risk Scoring (Pre-0.2.x)</a></h3>
 <p>Prior to the unified scoring system, Debtmap used a simpler additive risk formula. This is still available for compatibility but unified scoring is now the default and provides better prioritization.</p>
 <h3 id="risk-categories"><a class="header" href="#risk-categories">Risk Categories</a></h3>
-<p><strong>Note:</strong> The <code>RiskLevel</code> enum (Low, Medium, High, Critical) is used for <strong>legacy risk scoring compatibility</strong>. When using <strong>unified scoring</strong> (0-10 scale), refer to the priority classifications shown in the Unified Scoring System section above.</p>
+<p><strong>Note:</strong> The <code>RiskLevel</code> enum (Low, Medium, High, Critical) is used for <strong>legacy risk scoring compatibility</strong>. When using <strong>unified scoring</strong>, refer to the priority classifications shown in the Unified Scoring System section above.</p>
 <h4 id="legacy-risklevel-enum"><a class="header" href="#legacy-risklevel-enum">Legacy RiskLevel Enum</a></h4>
 <p>For legacy risk scoring, Debtmap classifies functions into four risk levels:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -558,18 +557,17 @@ If this function had 0% coverage AND higher dependency (8 callers):
 <li><strong>Action</strong>: Monitor, low priority</li>
 </ul>
 <h4 id="unified-scoring-priority-levels"><a class="header" href="#unified-scoring-priority-levels">Unified Scoring Priority Levels</a></h4>
-<p>When using unified scoring (default), functions are classified using the 0-10 scale:</p>
+<p>When using unified scoring (default), items are classified using the current severity thresholds:</p>
 <ul>
-<li><strong>Critical</strong> (9.0-10.0): Immediate attention</li>
-<li><strong>High</strong> (7.0-8.9): Address this sprint</li>
-<li><strong>Medium</strong> (5.0-6.9): Plan for next sprint</li>
-<li><strong>Low</strong> (3.0-4.9): Monitor and address as time permits</li>
-<li><strong>Minimal</strong> (0.0-2.9): Well-managed code</li>
+<li><strong>Critical</strong> (&gt;= 100): Immediate attention</li>
+<li><strong>High</strong> (&gt;= 50): Address soon</li>
+<li><strong>Medium</strong> (&gt;= 20): Plan for future work</li>
+<li><strong>Low</strong> (&lt; 20): Monitor or batch with related work</li>
 </ul>
 <p><strong>Well-tested complex code</strong> is an <strong>outcome</strong> in both systems, not a separate category:</p>
 <ul>
 <li>Complex function (cyclomatic 18, cognitive 25) with 95% coverage</li>
-<li>Unified score: ~2.5 (Minimal priority due to coverage dampening)</li>
+<li>Unified score: low priority due to coverage dampening</li>
 <li>Legacy risk score: ~8 (Low risk)</li>
 <li>Falls into low-priority categories because good testing mitigates complexity</li>
 <li>This is the desired state for inherently complex business logic</li>
@@ -615,7 +613,7 @@ Calculation:
 </ul>
 <p><strong>Why unified scoring is better:</strong></p>
 <ul>
-<li>Normalized 0-10 scale is more intuitive</li>
+<li>Current severity bands align with the JSON output and TUI ranking</li>
 <li>Dynamic weights adjust based on coverage data availability</li>
 <li>Role multipliers adjust priority based on function importance</li>
 <li>Coverage propagation reduces false positives for utility functions</li>
@@ -661,20 +659,22 @@ Calculation:
 <h3 id="risk-distribution"><a class="header" href="#risk-distribution">Risk Distribution</a></h3>
 <p>Debtmap provides codebase-wide risk metrics:</p>
 <pre><code class="language-json">{
-  "risk_distribution": {
-    "critical_count": 12,
-    "high_count": 45,
-    "medium_count": 123,
-    "low_count": 456,
-    "minimal_count": 234,
-    "total_functions": 870
+  "summary": {
+    "score_distribution": {
+      "critical": 12,
+      "high": 45,
+      "medium": 123,
+      "low": 456
+    },
+    "total_items": 636,
+    "total_debt_score": 1247.5
   },
-  "codebase_risk_score": 1247.5
+  "items": []
 }
 </code></pre>
 <p><strong>Interpreting distribution:</strong></p>
 <ul>
-<li><strong>Healthy codebase</strong>: Most functions in Low/Minimal priority (unified scoring) or Low/WellTested (legacy)</li>
+<li><strong>Healthy codebase</strong>: Most functions in Low priority (unified scoring) or Low/WellTested (legacy)</li>
 <li><strong>Needs attention</strong>: Many Critical/High priority functions</li>
 <li><strong>Technical debt</strong>: High codebase risk score</li>
 </ul>
@@ -683,14 +683,13 @@ Calculation:
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Unified Scoring (0-10 scale)</th><th>Legacy Scoring (RiskCategory enum)</th></tr>
+<tr><th>Unified Scoring</th><th>Legacy Scoring (RiskCategory enum)</th></tr>
 </thead>
 <tbody>
-<tr><td><code>minimal_count</code> (0-2.9)</td><td>Not present</td></tr>
-<tr><td><code>low_count</code> (3.0-4.9)</td><td><code>low_count</code></td></tr>
-<tr><td><code>medium_count</code> (5.0-6.9)</td><td><code>medium_count</code></td></tr>
-<tr><td><code>high_count</code> (7.0-8.9)</td><td><code>high_count</code></td></tr>
-<tr><td><code>critical_count</code> (9.0-10.0)</td><td><code>critical_count</code></td></tr>
+<tr><td><code>score_distribution.low</code> (&lt; 20)</td><td><code>low_count</code></td></tr>
+<tr><td><code>score_distribution.medium</code> (&gt;= 20)</td><td><code>medium_count</code></td></tr>
+<tr><td><code>score_distribution.high</code> (&gt;= 50)</td><td><code>high_count</code></td></tr>
+<tr><td><code>score_distribution.critical</code> (&gt;= 100)</td><td><code>critical_count</code></td></tr>
 <tr><td>Not present</td><td><code>well_tested_count</code> (legacy outcome)</td></tr>
 </tbody>
 </table>
@@ -700,14 +699,14 @@ Calculation:
 <li>Unified priority tiers: <a href="../../src/priority/tiers/mod.rs">src/priority/tiers/mod.rs</a></li>
 <li>Legacy RiskCategory enum: <a href="../../src/risk/mod.rs">src/risk/mod.rs:36-42</a></li>
 </ul>
-<p><strong>Note on minimal_count:</strong></p>
-<p>In unified scoring (0-10 scale), <code>minimal_count</code> represents functions scoring 0-2.9, which includes:</p>
+<p><strong>Note on low-priority items:</strong></p>
+<p>In unified scoring, low-priority items include:</p>
 <ul>
 <li>Simple utility functions with low complexity</li>
 <li>Helper functions with minimal risk</li>
 <li>Well-tested complex code that scores low due to coverage dampening</li>
 </ul>
-<p>This is not a separate risk category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk.</p>
+<p>This is not a separate risk category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with strong test coverage appropriately receives a low score, reflecting that good testing mitigates complexity risk.</p>
 <p><strong>When using legacy scoring</strong>, there is <strong>NO</strong> <code>minimal_count</code> field. Instead, you’ll see <code>well_tested_count</code> which represents functions that are both complex and well-tested (the desired outcome).</p>
 <h3 id="testing-recommendations"><a class="header" href="#testing-recommendations">Testing Recommendations</a></h3>
 <p>When coverage data is provided, Debtmap generates prioritized testing recommendations with ROI analysis.</p>
