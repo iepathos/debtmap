@@ -21,15 +21,15 @@ Debtmap's analysis follows a multi-stage pipeline that transforms source code in
     │ Parser │
     └────┬───┘
          │
-    ┌────┼────────────┐
-    │    │            │
-    ▼    ▼            ▼
-┌─────┐ ┌──────────┐ ┌───────────┐
-│ syn │ │rustpython│ │tree-sitter│
-│ AST │ │   AST    │ │    AST    │
-└──┬──┘ └────┬─────┘ └─────┬─────┘
-   │         │             │
-   └─────────┼─────────────┘
+    ┌────┴──────────┐
+    │               │
+    ▼               ▼
+┌─────┐       ┌─────────────┐
+│ syn │       │ tree-sitter │
+│ AST │       │     AST     │
+└──┬──┘       └──────┬──────┘
+   │                 │
+   └────────┬────────┘
              │
              ▼
   ┌──────────────────┐
@@ -118,8 +118,8 @@ include_patterns = ["src/**/*.rs", "lib/**/*.py"]
 - Handles: async/await, generic types, lifetime annotations
 - Performance: ~10-20ms per file
 
-**Python (rustpython):**
-- Uses rustpython's parser for Python 3.x syntax
+**Python (tree-sitter):**
+- Uses tree-sitter for Python syntax
 - Extracts: functions, classes, methods, decorators
 - Handles: comprehensions, async/await, type hints
 - Performance: ~5-15ms per file
@@ -314,15 +314,14 @@ fn calculate_risk_score():
   Call Graph Depth: 3
   Untested Paths: 2
 
-  Risk = (8.5 * 0.7) + (3 * 2 * 0.3) = 5.95 + 1.8 = 7.75
+  Priority = ((8.5 * 10.0) + dependency impact) * coverage dampening
 ```
 
-**Risk Tiers (Unified Score 0-10):**
-- **Critical (9.0-10.0):** Severe risk requiring immediate attention
-- **High (7.0-8.9):** Significant risk, address this sprint
-- **Medium (5.0-6.9):** Moderate risk, plan for next sprint
-- **Low (3.0-4.9):** Minor risk, monitor
-- **Minimal (0.0-2.9):** Well-managed code
+**Risk Tiers (Unified Priority Score):**
+- **Critical (>= 100):** Severe risk requiring immediate attention
+- **High (>= 50):** Significant risk, address soon
+- **Medium (>= 20):** Moderate risk, plan for future work
+- **Low (< 20):** Lower-risk maintenance item
 
 ### 9. Tiered Prioritization
 

@@ -492,17 +492,17 @@ git rev-parse --git-dir
 
 # If not a git repo, initialize one or disable git_history provider
 # Option 1: Enable context but exclude git_history
-debtmap analyze --context --disable-context git_history
+debtmap analyze . --context --disable-context git_history
 
 # Option 2: Use only specific providers
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 ```
 
 **Performance issues**: Git history analysis can be slow for large repositories:
 
 ```bash
 # Use only lightweight providers
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 ```
 
 ## Enabling Context Providers
@@ -513,32 +513,32 @@ Context-aware analysis is disabled by default. Enable it using CLI flags:
 
 ```bash
 # Enable all available context providers
-debtmap analyze --context
+debtmap analyze . --context
 # or
-debtmap analyze --enable-context
+debtmap analyze . --enable-context
 ```
 
 ### Enable Specific Providers
 
 ```bash
 # Enable only critical_path and dependency
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 
 # Enable only git_history
-debtmap analyze --context-providers git_history
+debtmap analyze . --context-providers git_history
 
 # Enable all three explicitly
-debtmap analyze --context-providers critical_path,dependency,git_history
+debtmap analyze . --context-providers critical_path,dependency,git_history
 ```
 
 ### Disable Specific Providers
 
 ```bash
 # Enable context but disable git_history (useful for non-git repos)
-debtmap analyze --context --disable-context git_history
+debtmap analyze . --context --disable-context git_history
 
 # Enable context but disable dependency analysis
-debtmap analyze --context --disable-context dependency
+debtmap analyze . --context --disable-context dependency
 ```
 
 ### Enabling Multiple Providers
@@ -756,7 +756,7 @@ Stable, well-tested code gets even lower priority.
 Analyze a web service to identify critical API endpoints:
 
 ```bash
-debtmap analyze --context-providers critical_path --format json
+debtmap analyze . --context-providers critical_path --format json
 ```
 
 Functions on API endpoint paths will receive elevated risk scores. Use this to prioritize code review and testing for user-facing functionality.
@@ -766,7 +766,7 @@ Functions on API endpoint paths will receive elevated risk scores. Use this to p
 Identify files with high change frequency and bug fixes:
 
 ```bash
-debtmap analyze --context-providers git_history --top 20
+debtmap analyze . --context-providers git_history --top 20
 ```
 
 This highlights unstable areas of the codebase that may benefit from refactoring or increased test coverage.
@@ -776,7 +776,7 @@ This highlights unstable areas of the codebase that may benefit from refactoring
 Find high-impact modules with large blast radius:
 
 ```bash
-debtmap analyze --context-providers dependency --format json | \
+debtmap analyze . --context-providers dependency --format json | \
   jq '.[] | select(.blast_radius > 10)'
 ```
 
@@ -787,7 +787,7 @@ Use this to identify architectural choke points that require careful change mana
 Combine all providers for holistic risk analysis:
 
 ```bash
-debtmap analyze --context -v
+debtmap analyze . --context -v
 ```
 
 The verbose output shows how each provider contributes to the final risk score:
@@ -946,7 +946,7 @@ debtmap analyze . -vv | grep "Role classification"
 
 **Manually verify call graph:**
 ```bash
-debtmap analyze . --show-call-graph
+debtmap analyze . --debug-call-graph --call-graph-stats
 ```
 
 ### Context Providers Not Available
@@ -972,10 +972,10 @@ cargo install debtmap --force
 
 ```bash
 # Wrong: context flag missing
-debtmap analyze
+debtmap analyze .
 
 # Correct: context enabled
-debtmap analyze --context
+debtmap analyze . --context
 ```
 
 ---
@@ -985,7 +985,7 @@ debtmap analyze --context
 **Solution**: Disable git_history if not using version control
 
 ```bash
-debtmap analyze --context --disable-context git_history
+debtmap analyze . --context --disable-context git_history
 ```
 
 ---
@@ -995,7 +995,7 @@ debtmap analyze --context --disable-context git_history
 **Solution**: Check for circular dependencies or disable dependency provider
 
 ```bash
-debtmap analyze --context --disable-context dependency
+debtmap analyze . --context --disable-context dependency
 ```
 
 ---
@@ -1006,10 +1006,10 @@ debtmap analyze --context --disable-context dependency
 
 ```bash
 # Faster: skip git_history
-debtmap analyze --context-providers critical_path,dependency
+debtmap analyze . --context-providers critical_path,dependency
 
 # Debug: see provider execution times
-debtmap analyze --context -vvv
+debtmap analyze . --context -vvv
 ```
 
 ---
@@ -1023,7 +1023,7 @@ For more troubleshooting guidance, see the [Troubleshooting](troubleshooting.md)
 Enable verbose output to see detailed context contributions:
 
 ```bash
-debtmap analyze --context -v
+debtmap analyze . --context -v
 ```
 
 Each function shows:

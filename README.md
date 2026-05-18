@@ -22,7 +22,7 @@ Debtmap combines static analysis with git history to score technical debt across
 | **Purity** | Side effects, I/O operations | How testable and predictable code is |
 | **Entropy** | Pattern consistency within a codebase | Reduces false positives from intentional complexity |
 
-These signals combine into a **severity score** (0-10). The result: a ranked list of what to fix first, with the context needed to understand why, whether you're reviewing it yourself or handing it off to automation.
+These signals combine into a unified priority score with severity bands for critical, high, medium, and low risk. The result: a ranked list of what to fix first, with the context needed to understand why, whether you're reviewing it yourself or handing it off to automation.
 
 ## Quick Start
 
@@ -79,7 +79,7 @@ Features:
 Debtmap works well on its own, and the `--format markdown` output is available when you want to feed findings into AI coding assistants. It provides:
 
 - **Context suggestions** - Specific file ranges the LLM should read to understand the problem
-- **Structured metadata** - All scoring factors exposed so the LLM can reason about priorities
+- **Structured metadata** - Scoring factors, dependency context, purity signals, coverage, entropy, and optional git-history risk exposed so the LLM can reason about priorities
 - **Minimal tokens** - Compact format that fits more context into the LLM's window
 - **Deterministic output** - Same input produces same output for reproducible workflows
 
@@ -101,6 +101,9 @@ debtmap analyze . --format json
 
 # Terminal/TUI for direct exploration
 debtmap analyze .
+
+# Graphviz dependency visualization
+debtmap analyze . --format dot -o deps.dot
 ```
 
 ## Visual Dashboard
@@ -234,10 +237,10 @@ xcrun xctrace record --template 'Time Profiler' --launch ./target/debug/debtmap 
 **Linux (perf)**
 ```bash
 # Build with debug symbols
-RUSTFLAGS="-C debuginfo=2" cargo build --release
+cargo build --profile dev
 
 # Record profile
-perf record -g ./target/release/debtmap analyze /path/to/project
+perf record -g ./target/debug/debtmap analyze /path/to/project
 
 # View results
 perf report
@@ -247,7 +250,7 @@ perf report
 
 ## Roadmap
 
-**Current focus:** Rust, Python, and JS/TS analysis quality + AI workflow integration
+**Current focus:** Rust, Python, JavaScript, and TypeScript analysis quality + AI workflow integration
 
 - [x] Cognitive + cyclomatic complexity
 - [x] Test coverage correlation
@@ -258,6 +261,10 @@ perf report
 - [x] Python language support
 - [x] JavaScript language support
 - [x] TypeScript language support
+- [x] Unified JSON output for dashboards and automation
+- [x] Graphviz DOT dependency output
+- [x] Coverage diagnostics and function-level coverage explanation
+- [x] Before/after comparison and improvement validation
 - [ ] Streaming output for large codebases
 - [ ] Go language support
 

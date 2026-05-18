@@ -8,9 +8,9 @@ Debtmap provides comprehensive error handling analysis for Rust codebases, detec
 |----------|------------------|----------------|--------------|--------------|----------------------|
 | **Rust** | ✅ Full (7 patterns) | ✅ Full (6 patterns) | ✅ Full (5 patterns) | ✅ Full (5 patterns) | ✅ Full (4 patterns) |
 | **Python** | ⚠️ Planned | ⚠️ Planned | N/A | ⚠️ Planned | ⚠️ Planned |
-| **JavaScript/TypeScript** | ⚠️ Limited | ⚠️ Limited | ⚠️ Planned | ❌ Not yet | ❌ Not yet |
+| **JavaScript/TypeScript** | ⚠️ Partial | N/A | ⚠️ Partial | ❌ Not yet | ❌ Not yet |
 
-**Current Focus:** Rust error handling analysis is fully implemented and production-ready. Python and JavaScript/TypeScript support is limited or planned for future releases.
+**Current Focus:** Rust error handling analysis is the most comprehensive. JavaScript and TypeScript include async debt detection for callback hell, unhandled promise chains, and long promise chains. Python error-specific analysis remains limited compared with Rust.
 
 ## Overview
 
@@ -461,16 +461,16 @@ def process_batch(items):
 
 ## Async Error Handling
 
-### JavaScript/TypeScript Async Patterns (Planned)
+### JavaScript/TypeScript Async Patterns
 
-⚠️ **JavaScript and TypeScript async error detection is planned but not yet fully implemented.**
+⚠️ **JavaScript and TypeScript async error detection is partially implemented.**
 
 **Current Status:**
-- JavaScript/TypeScript support focuses on complexity analysis and basic error patterns
-- Async error handling detection (unhandled promise rejections, missing await) is **fully implemented for Rust only**
-- Enhanced JavaScript/TypeScript async error detection is planned for future releases
+- JavaScript/TypeScript support includes callback hell, unhandled promise chains, and long promise chains
+- Rust remains the most comprehensive implementation for async error handling
+- Context-loss and propagation analysis are still Rust-focused
 
-The examples below show intended future behavior:
+The examples below show the kinds of async issues debtmap is intended to surface:
 
 ```javascript
 // ❌ CRITICAL: Unhandled promise rejection
@@ -935,7 +935,7 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
 
 1. **Run analysis with error focus**
    ```bash
-   debtmap analyze --filter-categories ErrorSwallowing
+   debtmap analyze . --filter ErrorHandling
    ```
 
    Note: This analyzes Rust error patterns. Python and JavaScript/TypeScript support is limited or planned.
@@ -953,13 +953,13 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
 4. **Validate improvements**
    ```bash
    # Before fixes
-   debtmap analyze --output before.json
+   debtmap analyze . --format json --output before.json
 
    # After fixes
-   debtmap analyze --output after.json
+   debtmap analyze . --format json --output after.json
 
    # Compare
-   debtmap compare before.json after.json
+   debtmap compare --before before.json --after after.json
    ```
 
 ### Migration Strategy for Legacy Code
@@ -986,7 +986,7 @@ detect_context_loss = false    # Add later
 Track progress over time:
 ```bash
 # Weekly error handling health check
-debtmap analyze --filter-categories ErrorSwallowing | tee weekly-error-health.txt
+debtmap analyze . --filter ErrorHandling | tee weekly-error-health.txt
 ```
 
 ## Troubleshooting
@@ -1015,7 +1015,7 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 
 1. **Language support not enabled**
    ```bash
-   debtmap analyze --languages rust,python,javascript
+   debtmap analyze . --languages rust,python,javascript,typescript
    ```
 
 2. **Pattern disabled in config**
@@ -1057,7 +1057,7 @@ severity = "Warning"
 **Solutions:**
 1. Re-run analysis: `debtmap analyze`
 2. Search for pattern: `rg "\.unwrap\(\)" src/`
-3. Enable debug logging: `debtmap analyze --log-level debug`
+3. Use verbose diagnostics: `debtmap analyze . -vv`
 
 ### Validating Error Handling Improvements
 
@@ -1068,14 +1068,14 @@ severity = "Warning"
 ```bash
 # Baseline before fixes
 git checkout main
-debtmap analyze --output baseline.json
+debtmap analyze . --format json --output baseline.json
 
 # After fixes
 git checkout feature/improve-errors
-debtmap analyze --output improved.json
+debtmap analyze . --format json --output improved.json
 
 # Compare reports
-debtmap compare baseline.json improved.json
+debtmap compare --before baseline.json --after improved.json
 ```
 
 Look for:

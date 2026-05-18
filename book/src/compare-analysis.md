@@ -487,12 +487,12 @@ jobs:
       - name: Analyze main branch
         run: |
           git checkout main
-          debtmap analyze --output before.json
+          debtmap analyze . --format json --output before.json
 
       - name: Analyze PR branch
         run: |
           git checkout ${{ github.head_ref }}
-          debtmap analyze --output after.json
+          debtmap analyze . --format json --output after.json
 
       - name: Compare analyses
         run: |
@@ -563,11 +563,11 @@ debt_check:
     # Analyze main branch
     - git fetch origin main
     - git checkout origin/main
-    - debtmap analyze --output before.json
+    - debtmap analyze . --format json --output before.json
 
     # Analyze current branch
     - git checkout $CI_COMMIT_SHA
-    - debtmap analyze --output after.json
+    - debtmap analyze . --format json --output after.json
 
     # Compare and check status
     - debtmap compare --before before.json --after after.json --output comparison.json
@@ -608,12 +608,12 @@ Compare two analyses to track debt changes:
 
 ```bash
 # Run before analysis
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # Make changes to codebase...
 
 # Run after analysis
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare
 debtmap compare --before before.json --after after.json --output comparison.json
@@ -629,7 +629,7 @@ Validate your refactoring work with target location tracking:
 
 ```bash
 # Run before analysis
-debtmap analyze --output before.json
+debtmap analyze . --format json --output before.json
 
 # Identify critical items to fix
 jq '.items[] | select(.unified_score.final_score >= 60.0)' before.json
@@ -637,7 +637,7 @@ jq '.items[] | select(.unified_score.final_score >= 60.0)' before.json
 # Refactor the high-priority functions...
 
 # Run after analysis
-debtmap analyze --output after.json
+debtmap analyze . --format json --output after.json
 
 # Compare and validate with target location
 debtmap compare \
@@ -664,11 +664,11 @@ Check if a pull request introduces new critical debt:
 ```bash
 # Analyze base branch
 git checkout main
-debtmap analyze --output main.json
+debtmap analyze . --format json --output main.json
 
 # Analyze PR branch
 git checkout feature/new-feature
-debtmap analyze --output feature.json
+debtmap analyze . --format json --output feature.json
 
 # Compare
 debtmap compare \
@@ -704,11 +704,11 @@ Track overall project health across releases:
 ```bash
 # Analyze release v1.0
 git checkout v1.0
-debtmap analyze --output v1.0.json
+debtmap analyze . --format json --output v1.0.json
 
 # Analyze release v1.1
 git checkout v1.1
-debtmap analyze --output v1.1.json
+debtmap analyze . --format json --output v1.1.json
 
 # Compare
 debtmap compare \
@@ -747,12 +747,12 @@ COMPARISON="comparison.json"
 # Step 1: Analyze baseline (main branch)
 echo "📊 Analyzing baseline..."
 git checkout main
-debtmap analyze --output "$BEFORE"
+debtmap analyze . --format json --output "$BEFORE"
 
 # Step 2: Analyze current branch
 echo "📊 Analyzing current branch..."
 git checkout -
-debtmap analyze --output "$AFTER"
+debtmap analyze . --format json --output "$AFTER"
 
 # Step 3: Run comparison
 echo "🔍 Running comparison..."

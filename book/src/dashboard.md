@@ -27,7 +27,6 @@ For the best dashboard experience, include these flags:
 | `--format json` | Required - dashboard reads JSON format |
 | `--lcov <path>` | Coverage data enables coverage gap visualization |
 | `--context` | Adds git history for churn analysis |
-| `--cohesion` | Adds module cohesion metrics |
 
 Example with all options:
 
@@ -36,8 +35,7 @@ debtmap analyze . \
   --format json \
   -o debtmap.json \
   --lcov target/coverage/lcov.info \
-  --context \
-  --cohesion
+  --context
 ```
 
 ## Visualizations

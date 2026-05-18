@@ -64,7 +64,7 @@ A: Check verbosity and filtering:
 debtmap analyze . -v
 
 # Lower priority threshold
-debtmap analyze . --min-priority 0
+debtmap analyze . --min-priority low
 
 # Use lenient threshold
 debtmap analyze . --threshold-preset lenient

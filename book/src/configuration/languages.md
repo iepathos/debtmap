@@ -15,34 +15,41 @@ Debtmap analyzes source code for technical debt and complexity issues. Language 
 **Full Support (AST-Based Analysis):**
 - **Rust** - Full AST parsing with `syn`
 - **Python** - Full AST parsing with tree-sitter
+- **JavaScript** - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows
+- **TypeScript** - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows
 
-**Source**: `src/core/types.rs:9-12` (Language enum) and `src/organization/language.rs:4-7`
+**Source**: `src/core/mod.rs` (Language enum) and `src/config/languages.rs` (language-specific configuration fields)
 
 The `Language` enum in the codebase currently supports:
 
 ```rust
-// From src/core/types.rs:9-12
+// From src/core/mod.rs
 pub enum Language {
     Rust,
     Python,
+    JavaScript,
+    TypeScript,
+    Unknown,
 }
 ```
 
 **Language Detection**: Debtmap determines file language by extension:
 - `.rs` files are analyzed as Rust
-- `.py` files are analyzed as Python
+- `.py` and `.pyw` files are analyzed as Python
+- `.js`, `.mjs`, `.cjs`, and `.jsx` files are analyzed as JavaScript
+- `.ts`, `.mts`, `.cts`, and `.tsx` files are analyzed as TypeScript
 
-**Source**: `src/organization/language.rs:10-17`
+**Source**: `src/core/mod.rs`
 
 ```rust
-pub fn from_path(path: &Path) -> Option<Language> {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .and_then(|ext| match ext {
-            "rs" => Some(Language::Rust),
-            "py" => Some(Language::Python),
-            _ => None,
-        })
+pub fn from_extension(ext: &str) -> Self {
+    match ext {
+        "rs" => Language::Rust,
+        "py" | "pyw" => Language::Python,
+        "js" | "mjs" | "cjs" | "jsx" => Language::JavaScript,
+        "ts" | "mts" | "cts" | "tsx" => Language::TypeScript,
+        _ => Language::Unknown,
+    }
 }
 ```
 
@@ -54,7 +61,7 @@ The `[languages]` section in your `debtmap.toml` configures language analysis.
 
 ```toml
 [languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -62,6 +69,16 @@ detect_complexity = true
 detect_duplication = true
 
 [languages.python]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.typescript]
 detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
@@ -117,16 +134,38 @@ All features enabled by default for Python. Dead code detection is valuable sinc
 
 **Source**: `src/config/accessors.rs:113-115`
 
+### JavaScript Configuration
+
+```toml
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+```
+
+JavaScript analysis covers modern ES syntax, JSX, callbacks, promises, and async workflow patterns.
+
+### TypeScript Configuration
+
+```toml
+[languages.typescript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+```
+
+TypeScript analysis covers TS/TSX syntax, modules, type-oriented patterns, and async workflow patterns.
+
 ## Enabling Languages
 
 Specify which languages to analyze with the `enabled` array:
 
 ```toml
 [languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 ```
 
-The documented and implemented user-facing language set for `0.16.0` is Rust and Python.
+The documented and implemented user-facing language set is Rust, Python, JavaScript, and TypeScript.
 
 ## Feature Defaults
 
@@ -176,7 +215,7 @@ detect_duplication = true
 
 ```toml
 [languages]
-enabled = ["rust", "python"]
+enabled = ["rust", "python", "javascript", "typescript"]
 
 # Different settings per language
 [languages.rust]
@@ -188,6 +227,16 @@ detect_duplication = true
 detect_dead_code = true         # Python needs this
 detect_complexity = true
 detect_duplication = false      # Skip if not needed
+
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.typescript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
 ```
 
 ## Complexity Calculations by Language
@@ -210,6 +259,20 @@ Debtmap uses language-specific complexity analyzers:
 - Tracks class method complexity
 - Analyzes exception handling patterns
 
+### JavaScript Complexity
+
+- Uses tree-sitter for AST parsing
+- Handles ES modules, JSX, callbacks, promises, and async workflows
+- Tracks function and class method complexity
+- Detects JavaScript-specific functional and async patterns
+
+### TypeScript Complexity
+
+- Uses tree-sitter for TS/TSX parsing
+- Handles modern module syntax and frontend/server patterns
+- Tracks type-oriented complexity and async workflows
+- Detects broad type-safety and promise-related patterns
+
 ## Integration with Other Configuration
 
 Language configuration interacts with other debtmap settings:
@@ -223,7 +286,7 @@ File exclusions in `[ignore]` apply before language detection:
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
-    "*.min.js",        # Frontend artifacts that are not part of the supported set
+    "*.min.js",        # Minified frontend artifacts
 ]
 ```
 
@@ -246,8 +309,8 @@ See [Advanced Options](advanced.md) for classification configuration.
 | `enabled` | `Vec<String>` | Languages to analyze |
 | `rust` | `Option<LanguageFeatures>` | Rust-specific settings |
 | `python` | `Option<LanguageFeatures>` | Python-specific settings |
-| `javascript` | `Option<LanguageFeatures>` | Reserved configuration field |
-| `typescript` | `Option<LanguageFeatures>` | Reserved configuration field |
+| `javascript` | `Option<LanguageFeatures>` | JavaScript-specific settings |
+| `typescript` | `Option<LanguageFeatures>` | TypeScript-specific settings |
 
 ### LanguageFeatures
 
@@ -265,7 +328,7 @@ See [Advanced Options](advanced.md) for classification configuration.
 
 If files aren't being analyzed:
 
-1. Check the file extension is recognized (`.rs`, `.py`)
+1. Check the file extension is recognized (`.rs`, `.py`, `.pyw`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.mts`, `.cts`, `.tsx`)
 2. Verify the language is in `enabled` array
 3. Check ignore patterns aren't excluding the files
 
@@ -278,7 +341,7 @@ For Rust: Enable dead code detection explicitly if you want debtmap to report it
 detect_dead_code = true  # Override default
 ```
 
-For Python: Ensure `detect_dead_code = true` (the default).
+For Python, JavaScript, and TypeScript: Ensure `detect_dead_code = true` (the default).
 
 ### Unexpected Complexity Scores
 
@@ -286,6 +349,7 @@ Language-specific complexity varies due to:
 - Different control flow constructs
 - Pattern matching complexity (Rust)
 - Exception handling (Python)
+- Async and callback flow (JavaScript/TypeScript)
 
 See [Entropy Analysis](../entropy-analysis.md) for how entropy affects complexity scoring.
 

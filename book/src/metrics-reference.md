@@ -52,7 +52,7 @@ These metrics are:
 
 ```bash
 # GOOD: Use measured metrics for CI/CD thresholds
-debtmap validate . --threshold-complexity 15
+debtmap validate . --config .debtmap.toml
 
 # AVOID: Don't use estimated metrics for hard gates
 # (est_branches is not exposed as a threshold flag)
@@ -221,10 +221,10 @@ Now displayed as `est_branches=X` to:
 ### Example 1: Code Quality Gate
 
 ```bash
-# Fail build if any function exceeds cyclomatic complexity 15
-debtmap validate . --threshold-complexity 15 --max-high 0
+# Fail build when configured thresholds are exceeded
+debtmap validate . --config .debtmap.toml
 
-# Why: Cyclomatic is measured, precise, and repeatable
+# Why: Cyclomatic and cognitive complexity are measured, precise, and repeatable
 ```
 
 ### Example 2: Prioritize Testing Effort
@@ -252,7 +252,7 @@ debtmap analyze . --verbose
 
 ```bash
 # Display comprehensive metric definitions
-debtmap analyze --explain-metrics
+debtmap analyze . --explain-metrics
 
 # Shows:
 # - Measured vs Estimated categories
@@ -368,7 +368,7 @@ Use `est_branches` as a starting point, not an exact requirement.
 | Category | Signals | Purpose |
 |----------|---------|---------|
 | Complexity | cyclomatic, cognitive, nesting, loc | How hard code is to understand |
-| Coverage | line_percent, branch_percent | How risky changes are |
+| Coverage | coverage, transitive_coverage | How risky changes are |
 | Coupling | fan_in, fan_out, call_depth | How changes ripple |
 | Quality | entropy, purity, dead_code | False positive reduction |
 

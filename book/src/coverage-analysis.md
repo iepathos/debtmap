@@ -169,7 +169,7 @@ jest --coverage --coverageReporters=lcov
 Point debtmap to your coverage data:
 
 ```bash
-debtmap analyze --coverage-path ./coverage/lcov.info
+debtmap analyze . --lcov ./coverage/lcov.info
 ```
 
 Or in `.debtmap.toml`:
@@ -209,7 +209,7 @@ Gap severity should be weighted by:
 Run debtmap regularly to track coverage improvements:
 ```bash
 # Weekly coverage check
-debtmap analyze --coverage-path ./coverage/lcov.info > weekly-gaps.txt
+debtmap analyze . --lcov ./coverage/lcov.info > weekly-gaps.txt
 ```
 
 Compare reports to see gap reduction progress.
@@ -221,7 +221,7 @@ Compare reports to see gap reduction progress.
 **Cause**: Debtmap can't find or parse LCOV file
 
 **Solutions**:
-- Verify `--coverage-path` points to valid LCOV file
+- Verify `--lcov` points to a valid LCOV file
 - Ensure LCOV file was generated recently
 - Check file permissions (readable by debtmap)
 - Validate LCOV format: `head -20 ./coverage/lcov.info`
@@ -242,7 +242,7 @@ Compare reports to see gap reduction progress.
 **Solutions**:
 - Check function names match exactly (case-sensitive)
 - Verify file paths are consistent (relative vs absolute)
-- Enable debug logging: `debtmap analyze --log-level debug`
+- Use verbose output for diagnostics: `debtmap analyze . --lcov ./coverage/lcov.info -vv`
 
 ### Missing functions in coverage report
 

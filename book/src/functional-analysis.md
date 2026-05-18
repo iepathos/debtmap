@@ -663,7 +663,7 @@ fn calculate_statistics_functional(data: &[f64]) -> (f64, f64, f64) {
 **Strict profile** - Catches subtle functional patterns:
 
 ```bash
-$ debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/
+$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict src/
 # Detects pipelines with 3+ stages
 # Requires purity ≥ 0.9 for "pure" classification
 # Flags closures with complexity > 3
@@ -672,7 +672,7 @@ $ debtmap analyze --ast-functional-analysis --functional-analysis-profile strict
 **Balanced profile** - Default for most projects:
 
 ```bash
-$ debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced src/
+$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.8 for "pure" classification
 # Flags closures with complexity > 5
@@ -681,7 +681,7 @@ $ debtmap analyze --ast-functional-analysis --functional-analysis-profile balanc
 **Lenient profile** - For legacy code:
 
 ```bash
-$ debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient src/
+$ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.5 for "pure" classification
 # Flags closures with complexity > 10
@@ -823,7 +823,7 @@ To enable functional analysis on existing projects:
 
 1. **Start with lenient profile** to understand current state:
    ```bash
-   debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient .
+   debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient .
    ```
 
 2. **Identify quick wins** - functions that are almost functional:
@@ -839,10 +839,10 @@ To enable functional analysis on existing projects:
 4. **Tighten profile** as codebase improves:
    ```bash
    # After refactoring
-   debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced .
+   debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced .
 
    # For new modules
-   debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/new_module/
+   debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict src/new_module/
    ```
 
 5. **Monitor composition quality trends** over time

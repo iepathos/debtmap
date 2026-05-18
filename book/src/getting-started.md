@@ -130,11 +130,11 @@ When you run `debtmap analyze . --format markdown`, you'll see output like this:
 
 ## Summary
 - Total items: 47
-- Critical: 3, High: 12, Moderate: 20, Low: 12
+- Critical: 3, High: 12, Medium: 20, Low: 12
 
 ## #1 [CRITICAL] parse_complex_input
 **Location:** src/parser.rs:38-85
-**Score:** 8.9/10
+**Score:** 128.4
 
 **Signals:**
 | Metric | Value |
@@ -156,11 +156,10 @@ When you run `debtmap analyze . --format markdown`, you'll see output like this:
 
 | Tier | Score | Meaning |
 |------|-------|---------|
-| CRITICAL | 9.0-10.0 | Severe risk requiring immediate attention |
-| HIGH | 7.0-8.9 | Significant risk, address this sprint |
-| MEDIUM | 5.0-6.9 | Moderate risk, plan for next sprint |
-| LOW | 3.0-4.9 | Minor risk, monitor |
-| MINIMAL | 0.0-2.9 | Well-managed code |
+| CRITICAL | >= 100 | Severe risk requiring immediate attention |
+| HIGH | >= 50 | Significant risk, address soon |
+| MEDIUM | >= 20 | Moderate risk, plan for future work |
+| LOW | < 20 | Lower-risk maintenance item |
 
 ### Key Signals
 

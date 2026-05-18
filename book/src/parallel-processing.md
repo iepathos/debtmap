@@ -34,10 +34,10 @@ Control the number of worker threads for parallel processing:
 
 ```bash
 # Use all available CPU cores (default)
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Limit to 4 threads
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 debtmap analyze -j 4
 ```
 
@@ -80,7 +80,7 @@ The CLI flags (`--jobs`, `--no-parallel`) take precedence over environment varia
 Disable parallel call graph construction entirely:
 
 ```bash
-debtmap analyze --no-parallel
+debtmap analyze . --no-parallel
 ```
 
 **When to use:**
@@ -635,13 +635,13 @@ Cross-file resolution respects the `--jobs` flag for thread pool sizing:
 
 ```bash
 # Use all cores for maximum speedup
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Limit to 4 threads
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 
 # Disable parallelism (debugging)
-debtmap analyze --no-parallel
+debtmap analyze . --no-parallel
 ```
 
 The `--no-parallel` flag disables parallel call graph construction entirely, including cross-file resolution parallelization.
@@ -1050,31 +1050,31 @@ Debtmap maintains high efficiency when problem size scales with core count, maki
 **Development Workstations:**
 ```bash
 # Use all cores for maximum speed
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 ```
 
 **CI/CD Environments:**
 ```bash
 # Limit threads to avoid resource contention
-debtmap analyze --jobs 2
+debtmap analyze . --jobs 2
 
 # Or disable parallelism on very constrained runners
-debtmap analyze --no-parallel
+debtmap analyze . --no-parallel
 ```
 
 **Containers:**
 ```bash
 # Auto-detection respects cgroup limits
-debtmap analyze --jobs 0
+debtmap analyze . --jobs 0
 
 # Or explicitly match container CPU allocation
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 ```
 
 **Benchmarking:**
 ```bash
 # Use fixed thread count for reproducible results
-debtmap analyze --jobs 8
+debtmap analyze . --jobs 8
 ```
 
 ## Profiling and Debugging
@@ -1116,16 +1116,16 @@ Look for:
 
 ```bash
 # Benchmark different configurations
-time debtmap analyze --jobs 0  # Auto
-time debtmap analyze --jobs 4  # 4 threads
-time debtmap analyze --jobs 8  # 8 threads
-time debtmap analyze --no-parallel  # Sequential
+time debtmap analyze . --jobs 0  # Auto
+time debtmap analyze . --jobs 4  # 4 threads
+time debtmap analyze . --jobs 8  # 8 threads
+time debtmap analyze . --no-parallel  # Sequential
 ```
 
 Monitor memory usage during analysis:
 ```bash
 # Monitor peak memory usage
-/usr/bin/time -v debtmap analyze --jobs 8
+/usr/bin/time -v debtmap analyze . --jobs 8
 ```
 
 ## Best Practices
@@ -1156,7 +1156,7 @@ If analysis is slower than expected:
 1. **Check thread count:**
    ```bash
    # Ensure you're using all cores
-   debtmap analyze --jobs 0 -vv | grep "threads"
+   debtmap analyze . --jobs 0 -vv | grep "threads"
    ```
 
 2. **Check I/O bottleneck:**
@@ -1174,7 +1174,7 @@ If analysis is slower than expected:
 4. **Try different thread counts:**
    ```bash
    # Sometimes less threads = less contention
-   debtmap analyze --jobs 4
+   debtmap analyze . --jobs 4
    ```
 
 ### High CPU Usage But No Progress
@@ -1193,12 +1193,12 @@ If debtmap uses too much memory:
 
 1. **Reduce parallelism:**
    ```bash
-   debtmap analyze --jobs 2
+   debtmap analyze . --jobs 2
    ```
 
 2. **Disable parallel call graph:**
    ```bash
-   debtmap analyze --no-parallel
+   debtmap analyze . --no-parallel
    ```
 
 3. **Analyze subdirectories separately:**
@@ -1226,13 +1226,13 @@ If you suspect a concurrency bug:
 
 1. **Run sequentially to isolate:**
    ```bash
-   debtmap analyze --no-parallel
+   debtmap analyze . --no-parallel
    ```
 
 2. **Use deterministic mode:**
    ```bash
    # Single-threaded = deterministic order
-   debtmap analyze --jobs 1
+   debtmap analyze . --jobs 1
    ```
 
 3. **Enable verbose logging:**
@@ -1259,7 +1259,7 @@ This indicates too many threads competing for locks. Try:
 
 ```bash
 # Reduce thread count
-debtmap analyze --jobs 4
+debtmap analyze . --jobs 4
 ```
 
 ## See Also

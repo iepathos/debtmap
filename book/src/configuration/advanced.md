@@ -172,10 +172,10 @@ A higher score indicates a more severe god object problem. Scores are used to pr
 
 ```bash
 # Show detailed god object information
-debtmap analyze . --show-god-objects
+debtmap analyze . --show-splits
 
 # Include split recommendations
-debtmap analyze . --show-god-objects --verbose
+debtmap analyze . --show-splits --verbose
 ```
 
 ## Context-Aware Detection

@@ -248,7 +248,7 @@ complexity = 0.30
 
 **Solutions**:
 - Check threshold values in `.debtmap.toml` under `[thresholds.validation]`
-- Ensure `--min-priority` is in valid range (0-10)
+- Ensure `--min-priority` is one of `low`, `medium`, `high`, or `critical`
 - Use `--threshold-preset` with a valid preset name
 
 **Validation thresholds example:**
@@ -288,10 +288,10 @@ debtmap analyze . --max-files 1 path/to/suspected/file
 **Solutions**:
 ```bash
 # Analyze without coverage data
-debtmap analyze . --no-coverage
+debtmap analyze .
 
 # Check coverage file format
-debtmap explain-coverage <coverage-file>
+debtmap diagnose-coverage <coverage-file>
 
 # Verify function name matching
 debtmap analyze . -vvv | grep -i coverage
@@ -415,9 +415,9 @@ debtmap analyze . --verbose-macro-warnings --show-macro-stats
 | Language | Support Level | Notes |
 |----------|--------------|-------|
 | Rust | Full | Primary language, best analysis |
-| Python | Stub | Basic complexity analysis |
-| JavaScript | Stub | Basic complexity analysis |
-| TypeScript | Stub | Basic complexity analysis |
+| Python | Full | Tree-sitter parsing with Python-specific complexity analysis |
+| JavaScript | Full | Tree-sitter parsing with JSX, modules, and async patterns |
+| TypeScript | Full | Tree-sitter parsing with TS/TSX and type-oriented patterns |
 
 ## See Also
 

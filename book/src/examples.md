@@ -37,7 +37,7 @@ Start with a simple analysis of your Rust project:
 
 ```bash
 # Analyze current directory (path defaults to '.' - both commands are identical)
-debtmap analyze
+debtmap analyze .
 
 # Same as above with explicit path
 debtmap analyze .

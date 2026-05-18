@@ -73,7 +73,7 @@ See [Error Messages Reference](error-messages.md) for detailed parse error expla
 debtmap analyze . -v
 
 # Lower the minimum priority threshold
-debtmap analyze . --min-priority 0
+debtmap analyze . --min-priority low
 
 # Lower the minimum score threshold
 debtmap analyze . --min-score 0
@@ -85,7 +85,7 @@ debtmap analyze . -vv 2>&1 | grep "Processing"
 debtmap analyze . --threshold-preset lenient
 
 # Show all items without filtering
-debtmap analyze . --min-priority 0 --top 100
+debtmap analyze . --min-priority low --top 100
 ```
 
 **Source**: Filtering options in `src/cli/args.rs:143-163`
@@ -254,8 +254,8 @@ See [Advanced Analysis Issues](advanced-analysis.md#god-object-detection) for go
 **Quick Solutions**:
 
 ```bash
-# Use unified JSON format (consistent structure, recommended)
-debtmap analyze . --format json --output-format unified
+# JSON output always uses the unified schema
+debtmap analyze . --format json --output results.json
 
 # Validate JSON output with jq
 debtmap analyze . --format json | jq .
@@ -266,12 +266,9 @@ debtmap analyze . --format json --output results.json
 
 **Source**: Output format options from CLI help
 
-**Understanding the two formats**:
+**Understanding the format**:
 
-| Format | Structure | Recommended For |
-|--------|-----------|-----------------|
-| Legacy (default) | `{"File": {...}}` | Backwards compatibility |
-| Unified | `{"type": "File", ...}` | Tool integration, parsing |
+JSON output uses the unified schema. Each item includes a `type` discriminator such as `Function` or `File`, with common top-level `metadata`, `summary`, and `items` fields.
 
 See [Output and Command Issues](output-issues.md) for detailed JSON format documentation.
 
@@ -310,12 +307,12 @@ See [Context Provider Issues](context-providers.md) for detailed troubleshooting
 |---------|-----------|
 | Slow analysis | `--no-multi-pass` or `--semantic-off` |
 | Parse errors | `--semantic-off` or exclude files |
-| No output | `--min-priority 0` or `-v` |
+| No output | `--min-priority low` or `-v` |
 | Coverage issues | `explain-coverage` command |
 | Too many warnings | `--min-score 5.0` or `--top 20` |
 | Call graph issues | `--debug-call-graph -vv` |
 | God object false positives | `--no-god-object` |
-| JSON parsing | `--output-format unified` |
+| JSON parsing | `--format json | jq .` |
 | Context errors | `--no-context-aware` |
 
 ## When Quick Fixes Don't Work

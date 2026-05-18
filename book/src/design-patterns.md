@@ -479,16 +479,16 @@ The following CLI flags are defined in the codebase (`src/cli.rs:228-241`) but a
 
 ```bash
 # Disable all pattern detection (planned)
-debtmap analyze --no-pattern-detection
+debtmap analyze . --no-pattern-detection
 
 # Enable only specific patterns (planned)
-debtmap analyze --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
+debtmap analyze . --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
 
 # Set confidence threshold (planned)
-debtmap analyze --pattern-threshold 0.8
+debtmap analyze . --pattern-threshold 0.8
 
 # Show warnings for uncertain pattern detections (planned)
-debtmap analyze --show-pattern-warnings
+debtmap analyze . --show-pattern-warnings
 ```
 
 **Planned Patterns for `--patterns` Flag** (when integration is complete):
@@ -548,10 +548,10 @@ Pattern detection uses a confidence scoring system (0.0-1.0) to indicate match q
 **Adjusting Thresholds**:
 ```bash
 # More strict (fewer patterns, higher confidence)
-debtmap analyze --pattern-threshold 0.85
+debtmap analyze . --pattern-threshold 0.85
 
 # More lenient (more patterns, lower confidence)
-debtmap analyze --pattern-threshold 0.6 --show-pattern-warnings
+debtmap analyze . --pattern-threshold 0.6 --show-pattern-warnings
 ```
 
 **How Confidence is Calculated**:
@@ -821,9 +821,9 @@ Debtmap detects the builder pattern (chaining methods returning `Self`, final `b
 **Problem**: Undocumented design patterns in legacy codebase
 **Solution**: When pattern output is integrated, users will be able to generate architectural pattern reports
 
-**Planned Command**:
+**Command**:
 ```bash
-debtmap analyze --show-pattern-warnings --output-format json > architecture-report.json
+debtmap analyze . --show-pattern-warnings --format json > architecture-report.json
 ```
 
 **Current Workaround**: Review complexity adjustments and god object scoring to infer where patterns are detected
@@ -833,9 +833,9 @@ debtmap analyze --show-pattern-warnings --output-format json > architecture-repo
 **Problem**: Inconsistent Observer implementations across the codebase
 **Solution**: When integrated, users can filter analysis to specific pattern types
 
-**Planned Command**:
+**Command**:
 ```bash
-debtmap analyze --patterns observer --output-format json > observers.json
+debtmap analyze . --patterns observer --format json > observers.json
 ```
 
 **Current Status**: Pattern detection logic exists and works internally, but results aren't yet exposed in output
@@ -897,8 +897,8 @@ debtmap analyze --patterns observer --output-format json > observers.json
 
 **Future Solution**: When CLI integration is complete:
 ```bash
-debtmap analyze --no-pattern-detection  # Disable all pattern detection
-debtmap analyze --pattern-threshold 0.9  # Require very high confidence
+debtmap analyze . --no-pattern-detection  # Disable all pattern detection
+debtmap analyze . --pattern-threshold 0.9  # Require very high confidence
 ```
 
 ## Best Practices

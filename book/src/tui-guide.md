@@ -1,17 +1,14 @@
 # TUI Results Viewer Guide
 
-Debtmap includes an interactive TUI (Text User Interface) results viewer that allows you to explore analysis results in detail without re-running the analysis.
+Debtmap includes an interactive TUI (Text User Interface) results viewer that allows you to explore analysis results in detail.
 
 ## Launching the TUI
 
-After running an analysis that produces a results file, launch the TUI viewer:
+Run analysis without an explicit machine-readable output format to launch the TUI viewer:
 
 ```bash
-# Run analysis and save results
-debtmap analyze . -o results.json --format json
-
 # Launch interactive TUI viewer
-debtmap results results.json
+debtmap analyze .
 ```
 
 The TUI provides an interactive interface for exploring technical debt items, with detailed views and keyboard navigation.
@@ -219,46 +216,28 @@ The bottom of the screen shows which page you're viewing:
 
 ## Filtering and Sorting
 
-The TUI supports filtering results by various criteria:
+Filter results before launching the TUI with `analyze` options:
 
 ### Filter by Debt Type
 
 ```bash
 # Only show complexity issues
-debtmap results results.json --filter complexity
+debtmap analyze . --filter Complexity
 
-# Only show side effect issues
-debtmap results results.json --filter side-effects
+# Only show error handling issues
+debtmap analyze . --filter ErrorHandling
 ```
 
 ### Sort Options
 
-Results are pre-sorted by priority score, but you can change the sort order:
+Results are sorted by priority score. Use `--top` or `--tail` to constrain the list:
 
 ```bash
-# Sort by cyclomatic complexity
-debtmap results results.json --sort complexity
+# Show only the highest-priority 100 items
+debtmap analyze . --top 100
 
-# Sort by lines of code
-debtmap results results.json --sort loc
-
-# Sort by file name
-debtmap results results.json --sort file
-```
-
-## Theme Customization
-
-The TUI supports custom color themes for better readability:
-
-```bash
-# Use light theme
-debtmap results results.json --theme light
-
-# Use dark theme (default)
-debtmap results results.json --theme dark
-
-# Use high-contrast theme
-debtmap results results.json --theme contrast
+# Show the lowest-priority 50 items
+debtmap analyze . --tail 50
 ```
 
 ## Export from TUI
@@ -304,7 +283,7 @@ Some terminals don't support 256-color mode. Try:
 ```bash
 # Use basic colors
 export TERM=xterm-color
-debtmap results results.json
+debtmap analyze .
 ```
 
 ### Navigation Keys Not Working
@@ -323,9 +302,9 @@ Generate results in CI and review locally:
 # In CI pipeline
 debtmap analyze . -o ci-results.json --format json
 
-# Download and review locally
+# Download and inspect locally
 scp ci-server:ci-results.json .
-debtmap results ci-results.json
+jq '.summary' ci-results.json
 ```
 
 ### Team Review
@@ -340,8 +319,8 @@ debtmap analyze . -o team-review.json --format json
 git add team-review.json
 git commit -m "Add debtmap analysis results for review"
 
-# Team members can view
-debtmap results team-review.json
+# Team members can inspect
+jq '.summary' team-review.json
 ```
 
 ### Progressive Refactoring
@@ -356,7 +335,7 @@ debtmap analyze . -o before.json --format json
 debtmap analyze . -o after.json --format json
 
 # Compare results
-debtmap compare before.json after.json
+debtmap compare --before before.json --after after.json
 ```
 
 ## Advanced Features
@@ -367,10 +346,10 @@ Control how much detail is stored in results:
 
 ```bash
 # Minimal results (scores only)
-debtmap analyze . -o minimal.json --detail-level minimal
+debtmap analyze . -o summary.json --format json --detail-level summary
 
 # Full results (all metrics and context)
-debtmap analyze . -o full.json --detail-level full
+debtmap analyze . -o comprehensive.json --format json --detail-level comprehensive
 ```
 
 ### Performance Optimization
@@ -379,10 +358,7 @@ For large codebases, optimize TUI performance:
 
 ```bash
 # Limit results to top N items
-debtmap analyze . -o top100.json --top 100
-
-# View subset
-debtmap results top100.json
+debtmap analyze . --top 100
 ```
 
 ## See Also

@@ -937,7 +937,7 @@ digraph debtmap {
 **DOT vs Other Formats:**
 - **DOT**: Best for dependency visualization and architecture understanding
 - **JSON**: Best for programmatic processing and CI/CD integration
-- **HTML**: Best for interactive dashboards and metrics overview
+- **Dashboard**: Load JSON into the web dashboard for interactive metrics overview
 - **Terminal/Markdown**: Best for readable reports and documentation
 
 ## Tool Integration
@@ -1314,11 +1314,10 @@ debtmap analyze . --summary --min-priority medium
 - Archiving analysis results
 - Producing executive summaries
 
-**Use HTML Format When:**
-- Viewing analysis in a web browser
+**Use Dashboard JSON When:**
+- Viewing analysis in the web dashboard
 - Sharing visual dashboards with stakeholders
-- Publishing reports to internal documentation sites
-- Creating interactive reports for management review
+- Publishing interactive reports for management review
 - Embedding analysis results in web applications
 
 ### Quick Reference Table
@@ -1328,7 +1327,6 @@ debtmap analyze . --summary --min-priority medium
 | Terminal | Development | No | Yes | .txt |
 | JSON | Automation | Yes | No | .json |
 | Markdown | Documentation | Partially | Yes | .md |
-| HTML | Visualization | Partially | Yes | .html |
 | DOT | Architecture | Yes | Partially | .dot |
 
 ### Combining Formats

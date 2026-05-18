@@ -11,6 +11,8 @@ Debtmap is designed to provide AI coding assistants with the signals they need t
 3. Example workflows for different AI tools
 4. Interpreting signals for effective prompts
 
+Debtmap currently analyzes Rust, Python, JavaScript, and TypeScript. All languages are enabled by default; use `--languages rust,python,javascript,typescript` when you want to constrain a run.
+
 ## Output Formats
 
 ### Markdown (Recommended)
@@ -29,21 +31,21 @@ debtmap analyze . --format markdown --top 5
 - Total items: 47
 - Critical: 3
 - High: 12
-- Moderate: 20
+- Medium: 20
 - Low: 12
 
 ## Top Priority Items
 
 ### #1 [CRITICAL] parse_complex_input
 **Location:** src/parser.rs:38-85
-**Score:** 8.9/10
+**Score:** 128.4
 
 **Signals:**
 | Metric | Value | Threshold |
 |--------|-------|-----------|
 | Cyclomatic | 12 | 10 |
 | Cognitive | 18 | 15 |
-| Coverage | 0% | 80% |
+| Coverage | 0.00 | 0.80 |
 | Nesting | 4 | 3 |
 
 **Context to read:**
@@ -75,49 +77,59 @@ debtmap analyze . --format json --output debt.json
 **Structure:**
 ```json
 {
-  "version": "1.0",
-  "timestamp": "2024-01-15T10:30:00Z",
+  "format_version": "3.0",
+  "metadata": {
+    "debtmap_version": "0.16.5",
+    "generated_at": "2026-05-18T10:30:00Z",
+    "project_root": ".",
+    "analysis_type": "unified"
+  },
   "summary": {
     "total_items": 47,
-    "by_tier": {
+    "total_debt_score": 2140.5,
+    "debt_density": 138.8,
+    "total_loc": 15420,
+    "score_distribution": {
       "critical": 3,
       "high": 12,
-      "moderate": 20,
+      "medium": 20,
       "low": 12
-    },
-    "total_loc": 15420
+    }
   },
   "items": [
     {
-      "rank": 1,
-      "id": "parse_complex_input_38",
-      "tier": "critical",
-      "score": 8.9,
+      "type": "Function",
+      "score": 128.4,
+      "category": "Testing",
+      "priority": "critical",
       "location": {
         "file": "src/parser.rs",
-        "line_start": 38,
-        "line_end": 85,
+        "line": 38,
         "function": "parse_complex_input"
       },
       "metrics": {
-        "cyclomatic": 12,
-        "cognitive": 18,
-        "nesting": 4,
-        "loc": 47
+        "cyclomatic_complexity": 12,
+        "cognitive_complexity": 18,
+        "length": 47,
+        "nesting_depth": 4,
+        "coverage": 0.0
       },
-      "coverage": {
-        "line_percent": 0.0,
-        "branch_percent": 0.0
+      "dependencies": {
+        "upstream_count": 2,
+        "downstream_count": 4,
+        "blast_radius": 6,
+        "critical_path": true
       },
       "context": {
-        "primary": "src/parser.rs:38-85",
-        "callers": [
-          {"file": "src/handler.rs", "lines": "100-120", "calls": 12},
-          {"file": "src/api.rs", "lines": "45-60", "calls": 8}
-        ],
-        "tests": [
-          {"file": "tests/parser_test.rs", "lines": "50-75"}
-        ]
+        "primary": {
+          "file": "src/parser.rs",
+          "start_line": 38,
+          "end_line": 85,
+          "symbol": "parse_complex_input"
+        },
+        "related": [],
+        "total_lines": 48,
+        "completeness_confidence": 0.86
       }
     }
   ]
@@ -130,6 +142,15 @@ For human exploration (not recommended for AI piping):
 
 ```bash
 debtmap analyze . --format terminal
+```
+
+### DOT
+
+For dependency graph visualization:
+
+```bash
+debtmap analyze . --format dot -o deps.dot
+dot -Tsvg deps.dot -o deps.svg
 ```
 
 ## Context Suggestions
@@ -159,14 +180,14 @@ CONTEXT:
 
 **Minimal context (fastest):**
 ```bash
-# Just get the primary location
-debtmap analyze . --format json | jq '.items[0].location'
+# Just get the primary location for the first item
+debtmap analyze . --format json --top 1 | jq '.items[0].location'
 ```
 
 **Full context (most accurate):**
 ```bash
 # Read all suggested files
-debtmap analyze . --format markdown --top 1
+debtmap analyze . --context --format markdown --top 1
 # Then have the AI read each file in the context section
 ```
 
@@ -229,7 +250,7 @@ import subprocess
 
 # Run debtmap analysis
 result = subprocess.run(
-    ["debtmap", "analyze", ".", "--format", "json", "--top", "10"],
+    ["debtmap", "analyze", ".", "--context", "--format", "json", "--top", "10"],
     capture_output=True,
     text=True
 )
@@ -237,28 +258,45 @@ debt_data = json.loads(result.stdout)
 
 # Process each item
 for item in debt_data["items"]:
+    if item["type"] != "Function":
+        continue
+
     # Extract context files
     context_files = []
-    context_files.append(item["context"]["primary"])
-    context_files.extend([c["file"] for c in item["context"].get("callers", [])])
+    if "context" in item:
+        primary = item["context"]["primary"]
+        context_files.append(primary)
+        context_files.extend([related["range"] for related in item["context"].get("related", [])])
+    else:
+        location = item["location"]
+        context_files.append({
+            "file": location["file"],
+            "start_line": location.get("line", 1),
+            "end_line": location.get("line", 1),
+            "symbol": location.get("function")
+        })
 
     # Read context files
     context_content = ""
-    for file_spec in context_files:
-        file_path, lines = parse_file_spec(file_spec)
-        context_content += read_file_lines(file_path, lines)
+    for file_range in context_files:
+        context_content += read_file_lines(
+            file_range["file"],
+            file_range["start_line"],
+            file_range["end_line"]
+        )
 
     # Build prompt
     prompt = f"""
     Fix this technical debt item:
 
-    Location: {item["location"]["file"]}:{item["location"]["line_start"]}
-    Function: {item["location"]["function"]}
-    Score: {item["score"]}/10
+    Location: {item["location"]["file"]}:{item["location"].get("line")}
+    Function: {item["location"].get("function")}
+    Score: {item["score"]} ({item["priority"]})
 
     Signals:
-    - Cyclomatic complexity: {item["metrics"]["cyclomatic"]}
-    - Test coverage: {item["coverage"]["line_percent"]}%
+    - Cyclomatic complexity: {item["metrics"]["cyclomatic_complexity"]}
+    - Cognitive complexity: {item["metrics"]["cognitive_complexity"]}
+    - Test coverage: {item["metrics"].get("coverage", "unknown")}
 
     Context code:
     {context_content}
@@ -299,7 +337,7 @@ jobs:
 
       - name: Check for critical items
         run: |
-          CRITICAL=$(jq '.summary.by_tier.critical' debt.json)
+          CRITICAL=$(jq '.summary.score_distribution.critical' debt.json)
           if [ "$CRITICAL" -gt 0 ]; then
             echo "::warning::Found $CRITICAL critical debt items"
           fi
@@ -313,16 +351,16 @@ jobs:
 
 ## Interpreting Signals
 
-### Severity Score (0-10)
+### Priority Score
 
-The severity score combines multiple signals:
+The priority score combines multiple signals:
 
 | Score | Tier | Interpretation |
 |-------|------|----------------|
-| 8.0-10.0 | Critical | High complexity, no tests, high coupling |
-| 5.0-7.9 | High | Moderate risk, coverage gaps |
-| 2.0-4.9 | Moderate | Lower risk, monitor |
-| 0.0-1.9 | Low | Acceptable state |
+| >= 100 | Critical | High-risk debt, often structural or highly coupled |
+| >= 50 | High | Meaningful risk, usually worth addressing soon |
+| >= 20 | Medium | Moderate priority, useful for planned cleanup |
+| < 20 | Low | Lower-risk maintenance item |
 
 ### Complexity Signals
 
@@ -344,16 +382,13 @@ The severity score combines multiple signals:
 
 ### Coverage Signals
 
-**Line coverage:**
-- 0%: Critical gap, no tests at all
-- 1-50%: Poor coverage
-- 51-80%: Moderate coverage
-- 81%+: Good coverage
+**Coverage:**
+- `0.0`: Critical gap, no matching coverage
+- `0.01-0.50`: Poor coverage
+- `0.51-0.80`: Moderate coverage
+- `0.81+`: Good coverage
 
-**Branch coverage:**
-- More important than line coverage
-- Missing branches = missing edge cases
-- 0% branch = high risk
+Coverage is read from LCOV. When coverage is present, well-tested code is dampened so untested complex code rises in priority.
 
 ### Coupling Signals
 
@@ -426,9 +461,9 @@ debtmap analyze . -vv  # Verbose mode shows parsing issues
 
 **Cause:** High coupling in codebase
 
-**Solution:** Use `--max-context-lines` to limit:
+**Solution:** Limit the number of reported items or dependency entries:
 ```bash
-debtmap analyze . --format markdown --max-context-lines 300
+debtmap analyze . --context --format markdown --top 1 --max-callers 3 --max-callees 3
 ```
 
 ## API Reference
@@ -441,6 +476,9 @@ debtmap analyze . --format markdown --max-context-lines 300
 | `--format json` | Structured JSON output |
 | `--top N` | Limit to top N items |
 | `--lcov FILE` | Include coverage data |
+| `--context` | Enable context-aware risk analysis |
+| `--context-providers LIST` | Select `critical_path`, `dependency`, and/or `git_history` |
+| `--show-dependencies` | Include caller/callee details |
 | `--min-score N` | Filter items below score N |
 | `--output FILE` | Write to file instead of stdout |
 

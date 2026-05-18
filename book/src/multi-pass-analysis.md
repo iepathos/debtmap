@@ -81,7 +81,7 @@ debtmap analyze . --attribution
 debtmap analyze . --attribution --detail-level comprehensive
 
 # Output as JSON for tooling integration
-debtmap analyze . --attribution --json
+debtmap analyze . --attribution --format json
 
 # Disable multi-pass for faster single-pass analysis
 debtmap analyze . --no-multi-pass
@@ -94,7 +94,7 @@ debtmap analyze . --no-multi-pass
 | `--no-multi-pass` | Disable multi-pass analysis (use single-pass for performance) |
 | `--attribution` | Show detailed complexity attribution breakdown (requires multi-pass) |
 | `--detail-level <level>` | Set output detail: `summary`, `standard`, `comprehensive`, `debug` (CLI accepts lowercase values) |
-| `--json` | Output results in JSON format |
+| `--format json` | Output results in JSON format |
 
 > **Note**: The `--attribution` flag requires multi-pass analysis to be enabled (the default), as attribution depends on comparing raw and normalized analyses. Use `--no-multi-pass` only when performance is critical.
 
@@ -465,13 +465,13 @@ MultiPassOptions {
 ```bash
 # Parallel analysis amortizes overhead across cores
 # Note: --jobs is a general debtmap flag controlling parallelism for all analysis
-debtmap analyze . --multi-pass --jobs 8
+debtmap analyze . --jobs 8
 ```
 
 **Target Specific Files**
 ```bash
 # Analyze only files that need detailed attribution
-debtmap analyze src/complex_module.rs --multi-pass --attribution
+debtmap analyze src/complex_module.rs --attribution
 ```
 
 ## Comparative Analysis

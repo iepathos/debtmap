@@ -105,7 +105,7 @@ Debtmap currently supports Rust, Python, JavaScript, and TypeScript analysis. Th
 - Analyze JavaScript and TypeScript projects with tree-sitter-based parsing and frontend/backend-aware patterns
 - Keep the core AI workflow focused on high-signal, coverage-aware prioritization
 
-Additional language expansion remains possible in future releases, but `0.16.0` ships with Rust, Python, JavaScript, and TypeScript as the documented supported set.
+Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, and TypeScript.
 
 ## Target Audience
 

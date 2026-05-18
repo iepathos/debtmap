@@ -191,7 +191,7 @@ Entry points are classified by function name and file path patterns (see `src/ri
 debtmap analyze . -vv | grep "entry point\|Entry"
 
 # Verify call graph is being built
-debtmap analyze . --show-call-graph
+debtmap analyze . --debug-call-graph --call-graph-stats
 ```
 
 ## Context Impact on Scoring

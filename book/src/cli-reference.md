@@ -93,7 +93,7 @@ debtmap validate <PATH> [OPTIONS]
 
 *Configuration & Output:*
 - `-c, --config <CONFIG>` - Configuration file path
-- `-f, --format <FORMAT>` - Output format: json, markdown, terminal
+- `-f, --format <FORMAT>` - Output format: json, markdown, terminal, dot
 - `-o, --output <OUTPUT>` - Output file path (defaults to stdout)
 
 *Coverage & Context:*
@@ -162,7 +162,7 @@ error: the argument '--plan <FILE>' cannot be used with '--target-location <LOCA
 Use one or the other to specify the target location.
 
 **Output Options:**
-- `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: json)
+- `-f, --format <FORMAT>` - Output format: json, markdown, terminal, dot (default: json)
 - `-o, --output <OUTPUT>` - Output file (defaults to stdout)
 
 **Description:**
@@ -184,7 +184,7 @@ debtmap validate-improvement --comparison <FILE> [OPTIONS]
 - `-o, --output <FILE>` - Output file path for validation results (default: `.prodigy/debtmap-validation.json`)
 - `--previous-validation <FILE>` - Path to previous validation result for trend tracking
 - `--threshold <N>` - Improvement threshold percentage (default: 75.0)
-- `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: json)
+- `-f, --format <FORMAT>` - Output format: json, markdown, terminal, dot (default: json)
 - `--quiet` - Suppress console output (useful for automation)
 
 **Description:**

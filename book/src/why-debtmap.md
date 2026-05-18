@@ -36,7 +36,7 @@ For a developer or AI assistant to effectively fix technical debt, they need:
 
 Not "here are 500 complex functions," but "here are the 10 functions that matter most, ranked by severity."
 
-Debtmap provides a severity score (0-10) that combines:
+Debtmap provides a unified priority score with critical, high, medium, and low severity bands. The score combines:
 - Complexity metrics (cyclomatic, cognitive, nesting)
 - Test coverage gaps
 - Coupling and dependency impact

@@ -10,7 +10,7 @@ Debtmap provides comprehensive analysis for Rust codebases using the `syn` crate
 
 ### Core Capabilities
 
-The Rust analyzer (`src/analyzers/rust.rs`) provides:
+The Rust analyzer (`src/analyzers/rust/analyzer.rs`) provides:
 
 - **Complexity Metrics**: Cyclomatic complexity, cognitive complexity, and entropy analysis
 - **Purity Detection**: Identifies pure functions with confidence scoring
@@ -21,13 +21,13 @@ The Rust analyzer (`src/analyzers/rust.rs`) provides:
 - **Visibility Tracking**: Distinguishes `pub`, `pub(crate)`, and private functions
 - **Test Module Detection**: Identifies `#[cfg(test)]` modules and `#[test]` functions
 
-**Source**: Capabilities verified in src/analyzers/rust.rs:1-100
+**Source**: Capabilities verified in `src/analyzers/rust/analyzer.rs` and related modules under `src/analyzers/rust/`.
 
 ### Semantic Function Classification
 
 The Rust analyzer automatically classifies functions by their role in the system. This classification feeds into the unified scoring system's role multiplier for accurate technical debt assessment.
 
-**Classification Categories** (src/analyzers/rust.rs):
+**Classification Categories** (`src/analyzers/rust/`):
 
 - **Entry Points**: Functions named `main`, `start`, or public functions in `bin/` modules
 - **Business Logic**: Core domain functions containing complex algorithms and business rules
@@ -110,7 +110,7 @@ To add support for a new language:
 3. **Update `from_extension()`** to recognize the file extension
 4. **Register in `AnalyzerFactory`** to instantiate your analyzer
 
-**Reference Implementation**: See `src/analyzers/rust.rs`, `src/analyzers/python/analyzer.rs`, and `src/analyzers/typescript/analyzer.rs` for the current language-specific analyzer implementations.
+**Reference Implementation**: See `src/analyzers/rust/analyzer.rs`, `src/analyzers/python/analyzer.rs`, and `src/analyzers/typescript/analyzer.rs` for the current language-specific analyzer implementations.
 
 ## See Also
 

@@ -4,21 +4,20 @@ Debtmap's risk scoring identifies code that is both complex AND poorly tested - 
 
 ## Unified Scoring System
 
-Debtmap uses a **unified scoring system** (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.
+Debtmap uses a **unified priority scoring system** as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, dependency impact, purity, entropy, context, and debt type adjustments.
 
 **Source**: [src/priority/unified_scorer.rs:97-144](../../src/priority/unified_scorer.rs) (UnifiedScore struct)
 
 ### Score Scale and Priority Classifications
 
-Functions receive scores from 0 (minimal risk) to 10 (critical risk):
+Debt items are classified into severity bands using the unified score:
 
 | Score Range | Priority | Description | Action |
 |-------------|----------|-------------|--------|
-| **9.0-10.0** | Critical | Severe risk requiring immediate attention | Address immediately |
-| **7.0-8.9** | High | Significant risk, should be addressed soon | Plan for this sprint |
-| **5.0-6.9** | Medium | Moderate risk, plan for future work | Schedule for next sprint |
-| **3.0-4.9** | Low | Minor risk, lower priority | Monitor and address as time permits |
-| **0.0-2.9** | Minimal | Well-managed code | Continue monitoring |
+| **>= 100** | Critical | Severe risk requiring immediate attention | Address immediately |
+| **>= 50** | High | Significant risk, should be addressed soon | Plan soon |
+| **>= 20** | Medium | Moderate risk, plan for future work | Schedule when relevant |
+| **< 20** | Low | Lower-risk maintenance item | Monitor or batch with related work |
 
 ### Scoring Formula
 
@@ -27,7 +26,7 @@ The unified score combines three weighted factors:
 ```
 Base Score = (Complexity Factor × Weight) + (Coverage Factor × Weight) + (Dependency Factor × Weight)
 
-Final Score = Base Score × Role Multiplier × Purity Adjustment
+Final Score = Base Score × Role Multiplier × Purity/Refactorability/Pattern Adjustments × Context Adjustments
 ```
 
 **Source**: [src/priority/unified_scorer.rs:300-325](../../src/priority/unified_scorer.rs) (calculate_unified_priority_with_debt)
@@ -354,7 +353,7 @@ Prior to the unified scoring system, Debtmap used a simpler additive risk formul
 
 ### Risk Categories
 
-**Note:** The `RiskLevel` enum (Low, Medium, High, Critical) is used for **legacy risk scoring compatibility**. When using **unified scoring** (0-10 scale), refer to the priority classifications shown in the Unified Scoring System section above.
+**Note:** The `RiskLevel` enum (Low, Medium, High, Critical) is used for **legacy risk scoring compatibility**. When using **unified scoring**, refer to the priority classifications shown in the Unified Scoring System section above.
 
 #### Legacy RiskLevel Enum
 
@@ -391,17 +390,16 @@ pub enum RiskLevel {
 
 #### Unified Scoring Priority Levels
 
-When using unified scoring (default), functions are classified using the 0-10 scale:
+When using unified scoring (default), items are classified using the current severity thresholds:
 
-- **Critical** (9.0-10.0): Immediate attention
-- **High** (7.0-8.9): Address this sprint
-- **Medium** (5.0-6.9): Plan for next sprint
-- **Low** (3.0-4.9): Monitor and address as time permits
-- **Minimal** (0.0-2.9): Well-managed code
+- **Critical** (>= 100): Immediate attention
+- **High** (>= 50): Address soon
+- **Medium** (>= 20): Plan for future work
+- **Low** (< 20): Monitor or batch with related work
 
 **Well-tested complex code** is an **outcome** in both systems, not a separate category:
 - Complex function (cyclomatic 18, cognitive 25) with 95% coverage
-- Unified score: ~2.5 (Minimal priority due to coverage dampening)
+- Unified score: low priority due to coverage dampening
 - Legacy risk score: ~8 (Low risk)
 - Falls into low-priority categories because good testing mitigates complexity
 - This is the desired state for inherently complex business logic
@@ -450,7 +448,7 @@ Calculation:
 - Gradual migration to unified scoring
 
 **Why unified scoring is better:**
-- Normalized 0-10 scale is more intuitive
+- Current severity bands align with the JSON output and TUI ranking
 - Dynamic weights adjust based on coverage data availability
 - Role multipliers adjust priority based on function importance
 - Coverage propagation reduces false positives for utility functions
@@ -494,20 +492,22 @@ Debtmap provides codebase-wide risk metrics:
 
 ```json
 {
-  "risk_distribution": {
-    "critical_count": 12,
-    "high_count": 45,
-    "medium_count": 123,
-    "low_count": 456,
-    "minimal_count": 234,
-    "total_functions": 870
+  "summary": {
+    "score_distribution": {
+      "critical": 12,
+      "high": 45,
+      "medium": 123,
+      "low": 456
+    },
+    "total_items": 636,
+    "total_debt_score": 1247.5
   },
-  "codebase_risk_score": 1247.5
+  "items": []
 }
 ```
 
 **Interpreting distribution:**
-- **Healthy codebase**: Most functions in Low/Minimal priority (unified scoring) or Low/WellTested (legacy)
+- **Healthy codebase**: Most functions in Low priority (unified scoring) or Low/WellTested (legacy)
 - **Needs attention**: Many Critical/High priority functions
 - **Technical debt**: High codebase risk score
 
@@ -515,27 +515,26 @@ Debtmap provides codebase-wide risk metrics:
 
 **IMPORTANT**: The field names differ between legacy and unified scoring systems:
 
-| Unified Scoring (0-10 scale) | Legacy Scoring (RiskCategory enum) |
+| Unified Scoring | Legacy Scoring (RiskCategory enum) |
 |------------------------------|-------------------------------------|
-| `minimal_count` (0-2.9) | Not present |
-| `low_count` (3.0-4.9) | `low_count` |
-| `medium_count` (5.0-6.9) | `medium_count` |
-| `high_count` (7.0-8.9) | `high_count` |
-| `critical_count` (9.0-10.0) | `critical_count` |
+| `score_distribution.low` (< 20) | `low_count` |
+| `score_distribution.medium` (>= 20) | `medium_count` |
+| `score_distribution.high` (>= 50) | `high_count` |
+| `score_distribution.critical` (>= 100) | `critical_count` |
 | Not present | `well_tested_count` (legacy outcome) |
 
 **Sources**:
 - Unified priority tiers: [src/priority/tiers/mod.rs](../../src/priority/tiers/mod.rs)
 - Legacy RiskCategory enum: [src/risk/mod.rs:36-42](../../src/risk/mod.rs)
 
-**Note on minimal_count:**
+**Note on low-priority items:**
 
-In unified scoring (0-10 scale), `minimal_count` represents functions scoring 0-2.9, which includes:
+In unified scoring, low-priority items include:
 - Simple utility functions with low complexity
 - Helper functions with minimal risk
 - Well-tested complex code that scores low due to coverage dampening
 
-This is not a separate risk category but an **outcome** of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk.
+This is not a separate risk category but an **outcome** of the unified scoring system. Complex business logic with strong test coverage appropriately receives a low score, reflecting that good testing mitigates complexity risk.
 
 **When using legacy scoring**, there is **NO** `minimal_count` field. Instead, you'll see `well_tested_count` which represents functions that are both complex and well-tested (the desired outcome).
 
@@ -642,4 +641,3 @@ ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight)
 - **ROI < 1.0**: Low return, consider other priorities
 
 **Key Insight**: The cascade impact calculation means that testing a critical utility function with many dependents can have higher ROI than testing a complex but isolated function. This helps identify "force multiplier" tests that improve coverage across multiple modules.
-

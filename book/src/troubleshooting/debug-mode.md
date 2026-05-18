@@ -225,7 +225,7 @@ Enable timing output to identify slow files or analysis phases:
 DEBTMAP_TIMING=1 debtmap analyze .
 ```
 
-**Source**: `src/analyzers/effects.rs:81-99`, `src/analyzers/rust.rs:211-213`
+**Source**: `src/analyzers/effects.rs`, `src/analyzers/rust/analyzer.rs`
 
 **Example output**:
 ```
@@ -407,16 +407,16 @@ debtmap --no-multi-pass
 debtmap --semantic-off
 
 # Plain output: faster terminal rendering
-debtmap --plain
+debtmap analyze . --plain
 
 # Limit files for testing
-debtmap --max-files 100
+debtmap analyze . --max-files 100
 
 # Analyze subdirectory only
-debtmap src/specific/module
+debtmap analyze src/specific/module
 
 # Reduce output with filters
-debtmap --min-priority 4 --top 20
+debtmap analyze . --min-priority medium --top 20
 ```
 
 ### Performance Comparison

@@ -422,12 +422,12 @@ The unified format includes summary statistics at the top level.
 **JSON Output:**
 ```json
 {
-  "format_version": "1.0.0",
+  "format_version": "3.0",
   "metadata": {
-    "debtmap_version": "0.5.0",
-    "generated_at": "2025-12-04T22:15:00Z",
+    "debtmap_version": "0.16.5",
+    "generated_at": "2026-05-18T22:15:00Z",
     "project_root": "/home/user/myproject",
-    "analysis_type": "full"
+    "analysis_type": "unified"
   },
   "summary": {
     "total_items": 127,
