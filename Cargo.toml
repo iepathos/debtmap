@@ -69,7 +69,7 @@ rustc-demangle = "0.1"
 
 # Parallel processing
 rayon = "1.10"
-dashmap = "6.1"
+dashmap = "6.2"
 crossbeam = "0.8"
 parking_lot = "0.12"
 
