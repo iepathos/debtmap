@@ -1,12 +1,14 @@
 [package]
 name = "debtmap"
-version = "0.16.5"
+version = "0.16.6"
 edition = "2021"
 rust-version = "1.89"
 authors = ["Glen Baker <iepathos@gmail.com>"]
 description = "Code complexity and technical debt analyzer"
 license = "MIT"
 repository = "https://github.com/iepathos/debtmap"
+homepage = "https://iepathos.github.io/debtmap/"
+documentation = "https://docs.rs/debtmap"
 readme = "README.md"
 keywords = ["code-analysis", "technical-debt", "complexity", "static-analysis"]
 categories = ["development-tools", "command-line-utilities"]

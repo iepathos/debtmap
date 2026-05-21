@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.6] - 2026-05-21
+
+### Documentation
+
+- **Analysis Documentation Refresh** - Updated README and mdBook guidance to match current analyzer behavior
+  - Documented Rust, Python, JavaScript, and TypeScript as the implemented user-facing language set
+  - Updated language configuration, recognized extensions, and JS/TS async analysis coverage details
+  - Refreshed priority scoring docs to use current severity thresholds and unified JSON summary fields
+  - Updated LLM integration examples for the current JSON schema, context flags, DOT output, and coverage values
+  - Corrected CLI examples across context providers, comparison workflows, TUI usage, parallel processing, pattern detection, and troubleshooting
+
+### Changed
+
+- **Package Metadata** - Added homepage and docs.rs links to the crate manifest
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.16.6 release
+- dashmap: 6.1.0 -> 6.2.1
+- either: 1.15.0 -> 1.16.0
+- num-conv: 0.2.1 -> 0.2.2
+- openssl-sys: 0.9.115 -> 0.9.116
+- serde_json: 1.0.149 -> 1.0.150
+- winnow: 1.0.2 -> 1.0.3
+
 ## [0.16.5] - 2026-05-13
 
 ### Added
