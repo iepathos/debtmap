@@ -22,6 +22,24 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[cfg(test)]
+fn function_history_git2(
+    repo_path: &Path,
+    file_path: &Path,
+    function_name: &str,
+    line_range: (usize, usize),
+) -> Result<function_level::FunctionHistory> {
+    let repo = git2_provider::Git2Repository::open(repo_path)?;
+    let blame_cache = blame_cache::FileBlameCache::new(repo_path.to_path_buf());
+    function_level::get_function_history_git2(
+        &repo,
+        file_path,
+        function_name,
+        line_range,
+        &blame_cache,
+    )
+}
+
+#[cfg(test)]
 fn test_function_metric(file: PathBuf, name: &str) -> crate::core::FunctionMetrics {
     crate::core::FunctionMetrics {
         name: name.to_string(),
@@ -645,15 +663,7 @@ println!("modified");
 
     // Get function-level history for my_func
     // Use line range (1, 10) to cover the function for git blame
-    let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone(), None);
-    let history = function_level::get_function_history(
-        &repo_path,
-        Path::new("test.rs"),
-        "my_func",
-        (1, 10),
-        &blame_cache,
-        chrono::Utc::now(),
-    )?;
+    let history = function_history_git2(&repo_path, Path::new("test.rs"), "my_func", (1, 10))?;
 
     // my_func was introduced but never modified after introduction
     assert_eq!(
@@ -695,7 +705,7 @@ fn test_function_history_git2_matches_subprocess() -> Result<()> {
         "feat: improve my_func",
     )?;
 
-    let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone(), None);
+    let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone());
     let git2_repo = super::git2_provider::Git2Repository::open(&repo_path)?;
 
     let subprocess = function_level::get_function_history_subprocess(
@@ -855,15 +865,7 @@ fn test_function_level_with_modifications() -> Result<()> {
         "feat: improve my_func",
     )?;
 
-    let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone(), None);
-    let history = function_level::get_function_history(
-        &repo_path,
-        Path::new("test.rs"),
-        "my_func",
-        (1, 5),
-        &blame_cache,
-        chrono::Utc::now(),
-    )?;
+    let history = function_history_git2(&repo_path, Path::new("test.rs"), "my_func", (1, 5))?;
 
     // my_func has 2 modifications after introduction, 1 is a bug fix
     assert_eq!(

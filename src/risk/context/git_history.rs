@@ -71,8 +71,7 @@ impl GitHistoryProvider {
         let batched_history = None;
 
         // Create blame cache for efficient per-file blame lookups (now uses git2)
-        let blame_cache =
-            blame_cache::FileBlameCache::new(canonical_repo_root.clone(), git2_repo.as_ref());
+        let blame_cache = blame_cache::FileBlameCache::new(canonical_repo_root.clone());
 
         Ok(Self {
             repo_root: canonical_repo_root,
@@ -430,24 +429,16 @@ impl GitHistoryProvider {
             }
         }
 
-        if let Some(ref repo) = self.git2_repo {
-            return function_level::get_function_history_git2(
-                repo,
-                relative_path,
-                &target.function_name,
-                target.line_range,
-                &self.blame_cache,
-            )
-            .map(Some);
-        }
+        let Some(ref repo) = self.git2_repo else {
+            return Ok(None);
+        };
 
-        function_level::get_function_history(
-            &self.repo_root,
+        function_level::get_function_history_git2(
+            repo,
             relative_path,
             &target.function_name,
             target.line_range,
             &self.blame_cache,
-            target.reference_time,
         )
         .map(Some)
     }

@@ -22,7 +22,6 @@
 use super::batched::is_bug_fix;
 use super::blame_cache::FileBlameCache;
 use super::git2_provider::{CommitStats, Git2Repository};
-use crate::time_span;
 #[cfg(test)]
 use anyhow::Context as _;
 use anyhow::Result;
@@ -223,20 +222,6 @@ pub fn get_function_history_git2(
         &modification_commits,
         blame_authors,
     ))
-}
-
-/// Get function history from git (git2-backed; subprocess retained for tests).
-pub fn get_function_history(
-    repo_root: &Path,
-    file_path: &Path,
-    function_name: &str,
-    line_range: (usize, usize),
-    blame_cache: &FileBlameCache,
-    _now: DateTime<Utc>,
-) -> Result<FunctionHistory> {
-    time_span!("git_function_history");
-    let repo = Git2Repository::open(repo_root)?;
-    get_function_history_git2(&repo, file_path, function_name, line_range, blame_cache)
 }
 
 fn commit_stats_to_commit_info(stats: &[CommitStats]) -> Vec<CommitInfo> {
@@ -569,8 +554,7 @@ more garbage"#;
         assert!((9..=11).contains(&age), "Expected ~10 days, got {age}");
     }
 
-    // Note: parse_blame_authors tests moved to blame_cache.rs where
-    // the equivalent parse_full_blame_output function is now tested.
+    // Note: porcelain blame parsing tests live in blame_cache.rs.
 
     #[test]
     fn test_calculate_function_history_with_authors() {
