@@ -284,6 +284,7 @@ struct FunctionAnalysisContext<'a> {
     function_pointer_used_functions: Option<&'a HashSet<FunctionId>>,
     risk_analyzer: Option<&'a crate::risk::RiskAnalyzer>,
     project_path: &'a Path,
+    file_line_counts: &'a HashMap<PathBuf, usize>,
     // Shared detectors to avoid per-metric regex compilation (spec 196 optimization)
     context_detector: &'a ContextDetector,
     recommendation_engine: &'a ContextRecommendationEngine,
@@ -842,6 +843,7 @@ impl ParallelUnifiedAnalysisBuilder {
             function_pointer_used_functions,
             risk_analyzer: self.risk_analyzer.as_ref(),
             project_path: &self.project_path,
+            file_line_counts: &self.line_count_index,
             context_detector: &context_detector,
             recommendation_engine: &recommendation_engine,
         };
@@ -962,6 +964,7 @@ impl ParallelUnifiedAnalysisBuilder {
             Some(context.data_flow_graph),
             context.risk_analyzer,
             context.project_path,
+            context.file_line_counts,
             context.context_detector,
             context.recommendation_engine,
         )

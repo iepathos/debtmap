@@ -384,11 +384,10 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
+    file_line_counts: &core::phases::scoring::FileLineCountCache,
     context_detector: &crate::analysis::ContextDetector,
     recommendation_engine: &crate::priority::scoring::ContextRecommendationEngine,
 ) -> Vec<UnifiedDebtItem> {
-    // Create empty cache for backward compatibility (will use fallback reads)
-    let empty_cache = std::collections::HashMap::new();
     core::phases::scoring::create_debt_items_from_metric(
         metric,
         call_graph,
@@ -399,7 +398,7 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         data_flow,
         risk_analyzer,
         project_path,
-        &empty_cache,
+        file_line_counts,
         context_detector,
         recommendation_engine,
     )
@@ -576,6 +575,8 @@ fn create_parallel_analysis(
 
     let enriched_metrics =
         call_graph_integration::populate_call_graph_data(metrics.to_vec(), call_graph);
+    let file_line_counts = core::phases::scoring::build_file_line_count_cache(&enriched_metrics);
+    builder = builder.with_line_count_index(file_line_counts);
 
     let items = builder.execute_phase2_parallel(
         &enriched_metrics,
