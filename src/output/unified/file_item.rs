@@ -5,10 +5,13 @@
 use super::anti_patterns::{build_anti_patterns, AntiPatternOutput};
 use super::cohesion::CohesionOutput;
 use super::coupling::{build_file_dependencies, FileDependencies};
+#[cfg(debug_assertions)]
 use super::format::{assert_ratio_invariants, assert_score_invariants};
 use super::format::{round_ratio, round_score};
 use super::location::UnifiedLocation;
-use super::priority::{assert_priority_invariants, Priority};
+#[cfg(debug_assertions)]
+use super::priority::assert_priority_invariants;
+use super::priority::Priority;
 use crate::priority::{DebtType, FileDebtItem};
 use serde::{Deserialize, Serialize};
 

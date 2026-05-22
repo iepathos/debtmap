@@ -453,7 +453,7 @@ where
 // Spec 213: Call Graph Building from Extracted Data
 // ============================================================================
 
-use crate::extraction::ExtractedFileData;
+use crate::extraction::{ExtractedFileData, ExtractedFunctionData};
 use std::collections::HashMap;
 
 /// Build call graph from pre-extracted file data (spec 213).
@@ -484,6 +484,7 @@ pub fn build_call_graph_from_extracted(
     // Process each file's extracted data in deterministic order (Spec 214 fix)
     let mut sorted_extracted: Vec<_> = extracted.iter().collect();
     sorted_extracted.sort_by(|a, b| a.0.cmp(b.0));
+    let callee_index = CalleeResolutionIndex::from_sorted_extracted(&sorted_extracted);
 
     for (path, file_data) in sorted_extracted {
         // Add functions to call graph
@@ -512,7 +513,7 @@ pub fn build_call_graph_from_extracted(
                     &call_site.callee_name,
                     &call_site.call_type,
                     path,
-                    extracted,
+                    &callee_index,
                 );
 
                 if let Some(callee) = callee_id {
@@ -545,71 +546,180 @@ pub fn build_call_graph_from_extracted(
     (final_graph, framework_exclusions, function_pointer_used)
 }
 
+struct CalleeResolutionIndex {
+    same_file_functions: HashMap<PathBuf, HashMap<String, FunctionId>>,
+    qualified_functions: HashMap<String, FunctionId>,
+    method_functions: HashMap<String, Vec<FunctionId>>,
+}
+
+impl CalleeResolutionIndex {
+    fn from_sorted_extracted(sorted_extracted: &[(&PathBuf, &ExtractedFileData)]) -> Self {
+        sorted_extracted
+            .iter()
+            .fold(Self::empty(), |mut index, item| {
+                index.add_file_functions(item.0, &item.1.functions);
+                index
+            })
+    }
+
+    fn empty() -> Self {
+        Self {
+            same_file_functions: HashMap::new(),
+            qualified_functions: HashMap::new(),
+            method_functions: HashMap::new(),
+        }
+    }
+
+    fn add_file_functions(&mut self, path: &Path, functions: &[ExtractedFunctionData]) {
+        let file_functions = self
+            .same_file_functions
+            .entry(path.to_path_buf())
+            .or_default();
+        for func in functions {
+            let function_id = extracted_function_id(path, func);
+            add_same_file_function(file_functions, func, &function_id);
+            add_first_match(
+                &mut self.qualified_functions,
+                &func.qualified_name,
+                &function_id,
+            );
+            self.method_functions
+                .entry(func.name.clone())
+                .or_default()
+                .push(function_id);
+        }
+    }
+}
+
+fn extracted_function_id(path: &Path, func: &ExtractedFunctionData) -> FunctionId {
+    FunctionId::new(path.to_path_buf(), func.qualified_name.clone(), func.line)
+}
+
+fn add_same_file_function(
+    file_functions: &mut HashMap<String, FunctionId>,
+    func: &ExtractedFunctionData,
+    function_id: &FunctionId,
+) {
+    add_first_match(file_functions, &func.qualified_name, function_id);
+    add_first_match(file_functions, &func.name, function_id);
+}
+
+fn add_first_match(
+    functions: &mut HashMap<String, FunctionId>,
+    key: &str,
+    function_id: &FunctionId,
+) {
+    functions
+        .entry(key.to_string())
+        .or_insert_with(|| function_id.clone());
+}
+
 /// Resolve a callee name to a FunctionId using extracted data.
 fn resolve_callee_from_extracted(
     callee_name: &str,
     call_type: &crate::extraction::CallType,
     caller_file: &Path,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
+    index: &CalleeResolutionIndex,
 ) -> Option<FunctionId> {
     use crate::extraction::CallType;
 
     match call_type {
         CallType::Direct | CallType::StaticMethod | CallType::TraitMethod => {
-            // Look for exact match in same file first
-            if let Some(file_data) = extracted.get(caller_file) {
-                for func in &file_data.functions {
-                    if func.qualified_name == callee_name || func.name == callee_name {
-                        return Some(FunctionId::new(
-                            caller_file.to_path_buf(),
-                            func.qualified_name.clone(),
-                            func.line,
-                        ));
-                    }
-                }
-            }
-
-            // Look in all files for qualified names (e.g., "Module::function")
-            let mut sorted_files: Vec<_> = extracted.iter().collect();
-            sorted_files.sort_by(|a, b| a.0.cmp(b.0));
-
-            for (path, file_data) in sorted_files {
-                for func in &file_data.functions {
-                    if func.qualified_name == callee_name {
-                        return Some(FunctionId::new(
-                            path.clone(),
-                            func.qualified_name.clone(),
-                            func.line,
-                        ));
-                    }
-                }
-            }
-
-            None
+            resolve_direct_callee(callee_name, caller_file, index)
         }
         CallType::Method => {
-            // Method calls are harder to resolve without type information
-            // Just look for matching method names across all types
-            let mut sorted_files: Vec<_> = extracted.iter().collect();
-            sorted_files.sort_by(|a, b| a.0.cmp(b.0));
-
-            for (path, file_data) in sorted_files {
-                for func in &file_data.functions {
-                    // Check if this is an impl method with matching name
-                    if func.name == callee_name {
-                        return Some(FunctionId::new(
-                            path.clone(),
-                            func.qualified_name.clone(),
-                            func.line,
-                        ));
-                    }
-                }
-            }
-            None
+            // Method calls lack type information, so preserve the previous first match.
+            index
+                .method_functions
+                .get(callee_name)
+                .and_then(|matches| matches.first().cloned())
         }
         CallType::Closure | CallType::FunctionPointer => {
             // Cannot resolve closures or function pointers statically
             None
         }
+    }
+}
+
+fn resolve_direct_callee(
+    callee_name: &str,
+    caller_file: &Path,
+    index: &CalleeResolutionIndex,
+) -> Option<FunctionId> {
+    index
+        .same_file_functions
+        .get(caller_file)
+        .and_then(|functions| functions.get(callee_name).cloned())
+        .or_else(|| index.qualified_functions.get(callee_name).cloned())
+}
+
+#[cfg(test)]
+mod extracted_call_resolution_tests {
+    use super::*;
+    use crate::extraction::{CallType, ExtractedFileData, ExtractedFunctionData};
+
+    #[test]
+    fn direct_calls_prefer_same_file_before_qualified_index() {
+        let caller = PathBuf::from("src/caller.rs");
+        let other = PathBuf::from("src/other.rs");
+        let extracted = extracted_files(vec![
+            (
+                caller.clone(),
+                vec![function("helper", "local::helper", 10)],
+            ),
+            (other, vec![function("helper", "helper", 20)]),
+        ]);
+        let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
+
+        let resolved =
+            resolve_callee_from_extracted("helper", &CallType::Direct, &caller, &index).unwrap();
+
+        assert_eq!(resolved.file, caller);
+        assert_eq!(resolved.name, "local::helper");
+        assert_eq!(resolved.line, 10);
+    }
+
+    #[test]
+    fn method_calls_use_first_deterministic_name_match() {
+        let first = PathBuf::from("src/a.rs");
+        let second = PathBuf::from("src/b.rs");
+        let extracted = extracted_files(vec![
+            (second, vec![function("run", "Second::run", 20)]),
+            (first.clone(), vec![function("run", "First::run", 10)]),
+        ]);
+        let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
+
+        let resolved =
+            resolve_callee_from_extracted("run", &CallType::Method, &first, &index).unwrap();
+
+        assert_eq!(resolved.file, first);
+        assert_eq!(resolved.name, "First::run");
+    }
+
+    fn extracted_files(
+        files: Vec<(PathBuf, Vec<ExtractedFunctionData>)>,
+    ) -> HashMap<PathBuf, ExtractedFileData> {
+        files
+            .into_iter()
+            .map(|(path, functions)| {
+                let mut file_data = ExtractedFileData::empty(path.clone());
+                file_data.functions = functions;
+                (path, file_data)
+            })
+            .collect()
+    }
+
+    fn function(name: &str, qualified_name: &str, line: usize) -> ExtractedFunctionData {
+        let mut function = ExtractedFunctionData::minimal(name, line);
+        function.qualified_name = qualified_name.to_string();
+        function
+    }
+
+    fn sorted(
+        extracted: &HashMap<PathBuf, ExtractedFileData>,
+    ) -> Vec<(&PathBuf, &ExtractedFileData)> {
+        let mut sorted: Vec<_> = extracted.iter().collect();
+        sorted.sort_by(|a, b| a.0.cmp(b.0));
+        sorted
     }
 }

@@ -35,6 +35,7 @@ impl Priority {
 
 /// Assert priority matches score thresholds
 #[inline]
+#[cfg(debug_assertions)]
 pub fn assert_priority_invariants(priority: &Priority, score: f64) {
     let expected = Priority::from_score(score);
     debug_assert!(

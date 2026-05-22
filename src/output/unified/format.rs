@@ -28,10 +28,12 @@ pub fn round_ratio(ratio: f64) -> f64 {
 // ============================================================================
 
 /// Maximum reasonable score value
+#[cfg(debug_assertions)]
 pub const MAX_SCORE: f64 = 1000.0;
 
 /// Assert score invariants: non-negative and within reasonable bounds
 #[inline]
+#[cfg(debug_assertions)]
 pub fn assert_score_invariants(score: f64, context: &str) {
     debug_assert!(
         score >= 0.0,
@@ -50,6 +52,7 @@ pub fn assert_score_invariants(score: f64, context: &str) {
 
 /// Assert ratio invariants: value in 0.0..=1.0
 #[inline]
+#[cfg(debug_assertions)]
 pub fn assert_ratio_invariants(ratio: f64, context: &str) {
     debug_assert!(
         (0.0..=1.0).contains(&ratio),

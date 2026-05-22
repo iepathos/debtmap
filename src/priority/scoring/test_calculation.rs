@@ -169,6 +169,7 @@ pub fn calculate_tests_needed(
 /// Extract test count from recommendation text
 ///
 /// Searches for patterns like "Add N tests", "Write N tests", etc.
+#[cfg(any(debug_assertions, test))]
 fn extract_test_count(text: &str) -> Option<u32> {
     use regex::Regex;
 

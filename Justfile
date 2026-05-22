@@ -383,9 +383,36 @@ release:
 
 # Profile the application
 profile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    profiler=""
+    if command -v perf >/dev/null 2>&1; then
+        profiler="perf"
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        if command -v samply >/dev/null 2>&1; then
+            profiler="samply"
+        else
+            echo "No supported profiler found for macOS."
+            echo "Install samply with: cargo install samply"
+            echo "Then rerun: just profile"
+            exit 127
+        fi
+    else
+        echo "No supported profiler found."
+        echo "Install Linux perf or, on macOS, install samply with: cargo install samply"
+        exit 127
+    fi
+
     cargo build --release
-    perf record --call-graph=dwarf ./target/release/$(basename $(pwd))
-    perf report
+
+    binary="./target/release/$(basename "$PWD")"
+    if [[ "$profiler" == "perf" ]]; then
+        perf record --call-graph=dwarf "$binary"
+        perf report
+    elif [[ "$profiler" == "samply" ]]; then
+        samply record "$binary"
+    fi
 
 # Expand macros for debugging
 expand:
