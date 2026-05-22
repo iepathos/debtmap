@@ -10,6 +10,59 @@ use crate::priority::UnifiedAnalysis;
 use anyhow::Result;
 use std::path::Path;
 
+/// Resolve the target item location from a plan file or explicit CLI argument.
+fn resolve_compare_target(
+    plan: Option<&Path>,
+    target_location: Option<String>,
+) -> Result<Option<String>> {
+    plan.map(PlanParser::extract_target_location)
+        .transpose()
+        .map(|from_plan| from_plan.or(target_location))
+}
+
+/// Load a debtmap JSON analysis file and convert it to [`UnifiedAnalysis`].
+fn load_analysis_from_path(path: &Path) -> Result<UnifiedAnalysis> {
+    let content = std::fs::read_to_string(path)?;
+    let json: DebtmapJsonInput = serde_json::from_str(&content)?;
+    Ok(json_to_analysis(json))
+}
+
+/// Serialize a comparison result for JSON or Markdown output.
+fn serialize_comparison(comparison: &ComparisonResult, format: OutputFormat) -> Result<String> {
+    match format {
+        OutputFormat::Json => Ok(serde_json::to_string_pretty(comparison)?),
+        OutputFormat::Markdown => Ok(format_comparison_markdown(comparison)),
+        OutputFormat::Dot | OutputFormat::Terminal => {
+            anyhow::bail!("terminal formats use print_comparison_terminal")
+        }
+    }
+}
+
+/// Write serialized output to a file or stdout.
+fn write_or_print(content: &str, output: Option<&Path>) -> Result<()> {
+    match output {
+        Some(path) => std::fs::write(path, content).map_err(Into::into),
+        None => {
+            println!("{content}");
+            Ok(())
+        }
+    }
+}
+
+/// Emit comparison results in the requested format.
+fn write_comparison_output(
+    comparison: &ComparisonResult,
+    format: OutputFormat,
+    output: Option<&Path>,
+) -> Result<()> {
+    if matches!(format, OutputFormat::Dot | OutputFormat::Terminal) {
+        print_comparison_terminal(comparison);
+        return Ok(());
+    }
+    let output_str = serialize_comparison(comparison, format)?;
+    write_or_print(&output_str, output)
+}
+
 /// Handle the compare command
 pub fn handle_compare_command(
     before: &Path,
@@ -19,51 +72,11 @@ pub fn handle_compare_command(
     format: OutputFormat,
     output: Option<&Path>,
 ) -> Result<()> {
-    use std::fs;
-
-    // Extract target location from plan or use explicit location
-    let target = if let Some(plan_path) = plan {
-        Some(PlanParser::extract_target_location(plan_path)?)
-    } else {
-        target_location
-    };
-
-    // Load JSON output and convert to UnifiedAnalysis
-    let before_content = fs::read_to_string(before)?;
-    let before_json: DebtmapJsonInput = serde_json::from_str(&before_content)?;
-    let before_results = json_to_analysis(before_json);
-
-    let after_content = fs::read_to_string(after)?;
-    let after_json: DebtmapJsonInput = serde_json::from_str(&after_content)?;
-    let after_results = json_to_analysis(after_json);
-
-    // Perform comparison
-    let comparator = Comparator::new(before_results, after_results, target);
-    let comparison = comparator.compare()?;
-
-    // Output results
-    let output_str = match format {
-        OutputFormat::Json => serde_json::to_string_pretty(&comparison)?,
-        OutputFormat::Markdown => format_comparison_markdown(&comparison),
-        OutputFormat::Dot => {
-            // DOT format not applicable for comparison, use terminal
-            print_comparison_terminal(&comparison);
-            return Ok(());
-        }
-        OutputFormat::Terminal => {
-            print_comparison_terminal(&comparison);
-            return Ok(());
-        }
-    };
-
-    // Write to file or stdout
-    if let Some(output_path) = output {
-        std::fs::write(output_path, output_str)?;
-    } else {
-        println!("{}", output_str);
-    }
-
-    Ok(())
+    let target = resolve_compare_target(plan, target_location)?;
+    let before_results = load_analysis_from_path(before)?;
+    let after_results = load_analysis_from_path(after)?;
+    let comparison = Comparator::new(before_results, after_results, target).compare()?;
+    write_comparison_output(&comparison, format, output)
 }
 
 /// Pure function to convert DebtmapJsonInput to UnifiedAnalysis
