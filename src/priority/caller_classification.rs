@@ -119,11 +119,7 @@ pub fn classify_caller(caller: &str, call_graph: Option<&CallGraph>) -> CallerTy
 /// - Exact match: `func_id.name == name`
 /// - Suffix match: `func_id.name` ends with `::name` (e.g., `test::my_func` matches `my_func`)
 fn is_test_function_by_name(name: &str, call_graph: &CallGraph) -> bool {
-    let suffix_pattern = format!("::{}", name);
-    call_graph.get_all_functions().any(|func_id| {
-        let matches = func_id.name == name || func_id.name.ends_with(&suffix_pattern);
-        matches && call_graph.is_test_function(func_id)
-    })
+    call_graph.has_test_function_named(name)
 }
 
 /// Parse a caller string into a FunctionId for call graph lookup.

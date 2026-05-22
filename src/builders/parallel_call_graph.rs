@@ -696,6 +696,54 @@ mod extracted_call_resolution_tests {
         assert_eq!(resolved.name, "First::run");
     }
 
+    #[test]
+    fn build_call_graph_from_extracted_preserves_direct_and_method_edges() {
+        let caller = PathBuf::from("src/caller.rs");
+        let helper = PathBuf::from("src/helper.rs");
+        let mut entry = function("entry", "entry", 5);
+        entry.calls = vec![
+            crate::extraction::CallSite {
+                callee_name: "local_helper".to_string(),
+                call_type: CallType::Direct,
+                line: 6,
+            },
+            crate::extraction::CallSite {
+                callee_name: "Helper::remote".to_string(),
+                call_type: CallType::StaticMethod,
+                line: 7,
+            },
+            crate::extraction::CallSite {
+                callee_name: "run".to_string(),
+                call_type: CallType::Method,
+                line: 8,
+            },
+        ];
+
+        let extracted = extracted_files(vec![
+            (
+                caller.clone(),
+                vec![entry, function("local_helper", "local_helper", 20)],
+            ),
+            (
+                helper.clone(),
+                vec![
+                    function("remote", "Helper::remote", 10),
+                    function("run", "Helper::run", 30),
+                ],
+            ),
+        ]);
+
+        let (graph, _, _) = build_call_graph_from_extracted(CallGraph::new(), &extracted);
+        let entry_id = FunctionId::new(caller.clone(), "entry".to_string(), 5);
+        let callees = graph.get_callees_exact(&entry_id);
+        let callee_names: Vec<_> = callees.iter().map(|id| id.name.as_str()).collect();
+
+        assert_eq!(callees.len(), 3);
+        assert!(callee_names.contains(&"local_helper"));
+        assert!(callee_names.contains(&"Helper::remote"));
+        assert!(callee_names.contains(&"Helper::run"));
+    }
+
     fn extracted_files(
         files: Vec<(PathBuf, Vec<ExtractedFunctionData>)>,
     ) -> HashMap<PathBuf, ExtractedFileData> {

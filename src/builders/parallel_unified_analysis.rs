@@ -934,7 +934,11 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         // Get callee count for triviality check
         let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-        let callee_count = self.call_graph.get_callees(&func_id).len();
+        let callee_count = if self.call_graph.get_function_info(&func_id).is_some() {
+            self.call_graph.get_callees_exact(&func_id).len()
+        } else {
+            self.call_graph.get_callees(&func_id).len()
+        };
 
         // Apply filtering predicates
         if !predicates::should_process_metric(metric, test_only_functions, callee_count) {

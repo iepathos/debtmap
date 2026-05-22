@@ -30,34 +30,16 @@ pub fn populate_call_graph_data(
     for (idx, metric) in function_metrics.iter_mut().enumerate() {
         if let Some(func_id) = metric_to_id_map.get(&idx) {
             // For Python functions, also try with line 0 since the call graph might use that
-            let mut upstream_callers: Vec<String> = call_graph
-                .get_callers(func_id)
-                .into_iter()
-                .map(|caller_id| format_function_name(&caller_id))
-                .collect();
-
-            let mut downstream_callees: Vec<String> = call_graph
-                .get_callees(func_id)
-                .into_iter()
-                .map(|callee_id| format_function_name(&callee_id))
-                .collect();
+            let (mut upstream_callers, mut downstream_callees) =
+                graph_dependencies_for_function(call_graph, func_id);
 
             // If no results and this is a Python file, try with line 0
             if upstream_callers.is_empty() && downstream_callees.is_empty() {
                 let func_id_zero_line =
                     FunctionId::new(func_id.file.clone(), func_id.name.clone(), 0);
 
-                upstream_callers = call_graph
-                    .get_callers(&func_id_zero_line)
-                    .into_iter()
-                    .map(|caller_id| format_function_name(&caller_id))
-                    .collect();
-
-                downstream_callees = call_graph
-                    .get_callees(&func_id_zero_line)
-                    .into_iter()
-                    .map(|callee_id| format_function_name(&callee_id))
-                    .collect();
+                (upstream_callers, downstream_callees) =
+                    graph_dependencies_for_function(call_graph, &func_id_zero_line);
             }
 
             // Update the function metrics with call graph data
@@ -76,6 +58,34 @@ pub fn populate_call_graph_data(
     }
 
     function_metrics
+}
+
+fn graph_dependencies_for_function(
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+) -> (Vec<String>, Vec<String>) {
+    let exact_match = call_graph.get_function_info(func_id).is_some();
+    let callers = if exact_match {
+        call_graph.get_callers_exact(func_id)
+    } else {
+        call_graph.get_callers(func_id)
+    };
+    let callees = if exact_match {
+        call_graph.get_callees_exact(func_id)
+    } else {
+        call_graph.get_callees(func_id)
+    };
+
+    (
+        callers
+            .into_iter()
+            .map(|caller_id| format_function_name(&caller_id))
+            .collect(),
+        callees
+            .into_iter()
+            .map(|callee_id| format_function_name(&callee_id))
+            .collect(),
+    )
 }
 
 /// Format a function ID into a human-readable string
@@ -477,6 +487,41 @@ mod tests {
             callees.iter().any(|c| c.contains("parse_lcov_file")),
             "BUG: diagnose_coverage_file should call parse_lcov_file. Found: {:?}",
             callees
+        );
+    }
+
+    #[test]
+    fn test_populate_call_graph_data_exact_and_fuzzy_paths_match() {
+        let exact_metrics = vec![
+            create_test_function_metric("caller", "src/exact.rs", 5),
+            create_test_function_metric("callee", "src/exact.rs", 15),
+        ];
+        let fuzzy_metrics = vec![
+            create_test_function_metric("caller", "src/exact.rs", 50),
+            create_test_function_metric("callee", "src/exact.rs", 150),
+        ];
+        let mut call_graph = CallGraph::new();
+        let caller_id = FunctionId::new(PathBuf::from("src/exact.rs"), "caller".to_string(), 5);
+        let callee_id = FunctionId::new(PathBuf::from("src/exact.rs"), "callee".to_string(), 15);
+
+        call_graph.add_function(caller_id.clone(), false, false, 1, 10);
+        call_graph.add_function(callee_id.clone(), false, false, 1, 10);
+        call_graph.add_call(crate::priority::call_graph::FunctionCall {
+            caller: caller_id,
+            callee: callee_id,
+            call_type: crate::priority::call_graph::CallType::Direct,
+        });
+
+        let exact_result = populate_call_graph_data(exact_metrics, &call_graph);
+        let fuzzy_result = populate_call_graph_data(fuzzy_metrics, &call_graph);
+
+        assert_eq!(
+            exact_result[0].downstream_callees,
+            fuzzy_result[0].downstream_callees
+        );
+        assert_eq!(
+            exact_result[1].upstream_callers,
+            fuzzy_result[1].upstream_callers
         );
     }
 }

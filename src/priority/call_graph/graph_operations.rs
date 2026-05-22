@@ -98,6 +98,17 @@ impl CallGraph {
         callees
     }
 
+    pub fn get_callees_exact(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        let mut callees: Vec<FunctionId> = self
+            .callee_index
+            .get(func_id)
+            .map(|set| set.iter().cloned().collect())
+            .unwrap_or_default();
+
+        callees.sort();
+        callees
+    }
+
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
@@ -119,6 +130,17 @@ impl CallGraph {
         // Sort for deterministic traversal (Spec 214 fix)
         callers.sort();
 
+        callers
+    }
+
+    pub fn get_callers_exact(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        let mut callers: Vec<FunctionId> = self
+            .caller_index
+            .get(func_id)
+            .map(|set| set.iter().cloned().collect())
+            .unwrap_or_default();
+
+        callers.sort();
         callers
     }
 
@@ -168,6 +190,23 @@ impl CallGraph {
 
     pub fn is_test_function(&self, func_id: &FunctionId) -> bool {
         self.nodes.get(func_id).map(|n| n.is_test).unwrap_or(false)
+    }
+
+    pub fn has_test_function_named(&self, name: &str) -> bool {
+        let normalized_name = FunctionId::normalize_name(name);
+
+        if self
+            .name_index
+            .get(&normalized_name)
+            .is_some_and(|candidates| candidates.iter().any(|id| self.is_test_function(id)))
+        {
+            return true;
+        }
+
+        let suffix_pattern = format!("::{}", normalized_name);
+        self.nodes
+            .keys()
+            .any(|id| id.name.ends_with(&suffix_pattern) && self.is_test_function(id))
     }
 
     // String-based convenience methods for critical path analysis
