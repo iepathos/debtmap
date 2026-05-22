@@ -21,11 +21,16 @@
 
 use super::batched::is_bug_fix;
 use super::blame_cache::FileBlameCache;
+use super::git2_provider::{CommitStats, Git2Repository};
 use crate::time_span;
-use anyhow::{Context as _, Result};
+#[cfg(test)]
+use anyhow::Context as _;
+use anyhow::Result;
 use chrono::{DateTime, Utc};
+use regex::Regex;
 use std::collections::HashSet;
 use std::path::Path;
+#[cfg(test)]
 use std::process::Command;
 
 /// Information about a single commit from git log
@@ -113,6 +118,7 @@ impl FunctionHistory {
 ///
 /// # Returns
 /// * The first (oldest) commit hash, or None if output is empty
+#[cfg(test)]
 pub fn parse_introduction_commit(git_output: &str) -> Option<String> {
     git_output
         .lines()
@@ -131,6 +137,7 @@ pub fn parse_introduction_commit(git_output: &str) -> Option<String> {
 ///
 /// # Returns
 /// * Vector of parsed commits
+#[cfg(test)]
 pub fn parse_modification_commits(git_output: &str) -> Vec<CommitInfo> {
     git_output
         .lines()
@@ -142,6 +149,7 @@ pub fn parse_modification_commits(git_output: &str) -> Vec<CommitInfo> {
 /// Parse a single commit line from formatted output
 ///
 /// Pure function - parses ":::%H:::%cI:::%s:::%ae" format
+#[cfg(test)]
 fn parse_commit_line(line: &str) -> Option<CommitInfo> {
     let parts: Vec<&str> = line.split(":::").collect();
     if parts.len() < 5 {
@@ -169,44 +177,86 @@ pub fn filter_bug_fix_commits(commits: &[CommitInfo]) -> Vec<&CommitInfo> {
 // I/O Wrapper Functions (Imperative Shell)
 // =============================================================================
 
-/// Get function history from git
-///
-/// Uses subprocess calls for pickaxe search (-S and -G flags) which
-/// provide accurate function-level modification tracking.
-/// git2 library doesn't have direct support for these specialized searches.
-///
-/// # Arguments
-/// * `repo_root` - Path to the git repository root
-/// * `file_path` - Path to the file containing the function
-/// * `function_name` - Name of the function to analyze
-/// * `line_range` - (start, end) line numbers of the function for git blame
-/// * `blame_cache` - Cache for file-level git blame data
+/// Pickaxe search pattern for function introduction (`git log -S`).
+pub fn introduction_search_pattern(function_name: &str) -> String {
+    format!("fn {function_name}")
+}
+
+/// Regex for modification search (`git log -G`), matching CLI behavior.
+pub fn modification_search_regex(function_name: &str) -> Result<Regex> {
+    Regex::new(function_name)
+        .or_else(|_| Regex::new(&regex::escape(function_name)))
+        .map_err(|e| anyhow::anyhow!("invalid modification regex for '{function_name}': {e}"))
+}
+
+/// Get function history using git2 (equivalent to subprocess pickaxe search).
+pub fn get_function_history_git2(
+    repo: &Git2Repository,
+    file_path: &Path,
+    function_name: &str,
+    line_range: (usize, usize),
+    blame_cache: &FileBlameCache,
+) -> Result<FunctionHistory> {
+    let intro_pattern = introduction_search_pattern(function_name);
+    let (intro_oid, intro_date) = match repo.find_introduction(file_path, &intro_pattern)? {
+        Some(pair) => pair,
+        None => {
+            return Err(anyhow::anyhow!(
+                "Function '{}' not found in git history for {}",
+                function_name,
+                file_path.display()
+            ));
+        }
+    };
+
+    let mod_regex = modification_search_regex(function_name)?;
+    let modification_stats =
+        repo.find_modifications_with_regex(file_path, &mod_regex, intro_oid)?;
+
+    let modification_commits = commit_stats_to_commit_info(&modification_stats);
+    let (start, end) = line_range;
+    let blame_authors = blame_cache.get_authors(file_path, start, end)?;
+
+    Ok(calculate_function_history_with_authors(
+        Some(intro_oid.to_string()),
+        Some(intro_date),
+        &modification_commits,
+        blame_authors,
+    ))
+}
+
+/// Get function history from git (git2-backed; subprocess retained for tests).
 pub fn get_function_history(
     repo_root: &Path,
     file_path: &Path,
     function_name: &str,
     line_range: (usize, usize),
     blame_cache: &FileBlameCache,
-    now: DateTime<Utc>,
+    _now: DateTime<Utc>,
 ) -> Result<FunctionHistory> {
     time_span!("git_function_history");
-
-    // Use subprocess for pickaxe search - git2 doesn't support -S/-G flags
-    get_function_history_subprocess(
-        repo_root,
-        file_path,
-        function_name,
-        line_range,
-        blame_cache,
-        now,
-    )
+    let repo = Git2Repository::open(repo_root)?;
+    get_function_history_git2(&repo, file_path, function_name, line_range, blame_cache)
 }
 
-/// Get function history using subprocess calls
+fn commit_stats_to_commit_info(stats: &[CommitStats]) -> Vec<CommitInfo> {
+    stats
+        .iter()
+        .map(|s| CommitInfo {
+            hash: s.hash.to_string(),
+            date: Some(s.date),
+            message: s.message.clone(),
+            author: s.author_email.clone(),
+        })
+        .collect()
+}
+
+/// Get function history using subprocess calls (reference implementation for tests).
 ///
 /// Uses git's -S (pickaxe) and -G (regex) flags for accurate
 /// function-level modification tracking.
-fn get_function_history_subprocess(
+#[cfg(test)]
+pub(crate) fn get_function_history_subprocess(
     repo_root: &Path,
     file_path: &Path,
     function_name: &str,
@@ -272,6 +322,7 @@ pub fn calculate_function_history_with_authors(
 /// Run git log -S to find function introduction (I/O)
 ///
 /// Uses pickaxe search to find commits that added the function signature.
+#[cfg(test)]
 fn run_git_log_introduction(
     repo_root: &Path,
     file_path: &Path,
@@ -301,6 +352,7 @@ fn run_git_log_introduction(
 /// Uses `-G` (regex-based diff search) to find commits that modified
 /// lines containing the function name. This is more inclusive than `-S`
 /// (pickaxe) which only finds additions/deletions of the exact string count.
+#[cfg(test)]
 fn run_git_log_modifications(
     repo_root: &Path,
     file_path: &Path,
@@ -328,6 +380,7 @@ fn run_git_log_modifications(
 }
 
 /// Get the date of a specific commit (I/O)
+#[cfg(test)]
 fn get_commit_date(repo_root: &Path, commit_hash: &str) -> Result<Option<DateTime<Utc>>> {
     let output = Command::new("git")
         .args(["log", "-1", "--format=%cI", commit_hash])

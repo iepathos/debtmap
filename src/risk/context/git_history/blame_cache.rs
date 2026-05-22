@@ -30,6 +30,7 @@ use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
 /// Information extracted from a single blame line
 ///
@@ -50,7 +51,7 @@ pub struct BlameLineInfo {
 pub struct FileBlameCache {
     /// Maps file_path -> (line_number -> blame info)
     /// Line numbers are 1-indexed (matching git blame output)
-    cache: DashMap<PathBuf, HashMap<usize, BlameLineInfo>>,
+    cache: DashMap<PathBuf, Arc<HashMap<usize, BlameLineInfo>>>,
     /// Root path of the git repository
     repo_root: PathBuf,
     /// Whether git2 is available for blame operations
@@ -268,26 +269,22 @@ impl FileBlameCache {
     ///
     /// # Returns
     /// Reference to the cached blame data, or error if fetch fails
-    pub fn get_or_fetch(&self, file_path: &Path) -> Result<HashMap<usize, BlameLineInfo>> {
-        // Try cache first (lock-free read)
+    pub fn get_or_fetch(&self, file_path: &Path) -> Result<Arc<HashMap<usize, BlameLineInfo>>> {
         if let Some(cached) = self.cache.get(file_path) {
-            return Ok(cached.clone());
+            return Ok(Arc::clone(&cached));
         }
 
-        // Fetch blame data using git2 (creates fresh repo instance for thread safety)
         let blame_data = if self.use_git2 {
             self.fetch_file_blame_git2(file_path)?
         } else {
-            // Fallback to subprocess
             let blame_output = self.fetch_file_blame_subprocess(file_path)?;
             parse_full_blame_output(&blame_output)
         };
 
-        // Cache for future lookups
-        self.cache
-            .insert(file_path.to_path_buf(), blame_data.clone());
+        let arc = Arc::new(blame_data);
+        self.cache.insert(file_path.to_path_buf(), Arc::clone(&arc));
 
-        Ok(blame_data)
+        Ok(arc)
     }
 
     /// Fetch blame using git2 library

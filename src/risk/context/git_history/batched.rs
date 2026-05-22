@@ -1,4 +1,4 @@
-use super::git2_provider::{CommitStats, Git2Repository};
+use super::git2_provider::{CommitStats, FileCommitScan, Git2Repository};
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use std::collections::{HashMap, HashSet};
@@ -107,6 +107,27 @@ pub struct BatchedGitHistory {
 }
 
 impl BatchedGitHistory {
+    /// Create batched file history from commit scans produced by one repo walk.
+    pub fn from_commit_scans(scans: &[FileCommitScan]) -> Self {
+        let mut file_histories: HashMap<PathBuf, FileHistoryData> = HashMap::new();
+        for scan in scans {
+            let commit_info = CommitInfo {
+                hash: String::new(),
+                date: scan.date,
+                message: scan.message.clone(),
+                author: scan.author_email.clone(),
+                files: Vec::new(),
+            };
+            for (path, churn) in &scan.file_churn {
+                file_histories
+                    .entry(path.clone())
+                    .or_default()
+                    .add_commit(&commit_info, *churn);
+            }
+        }
+        Self { file_histories }
+    }
+
     /// Create a new batched git history using git2 library
     /// This is the primary constructor - uses git2 for reliable path handling
     pub fn new_with_git2(repo: &Git2Repository) -> Result<Self> {
@@ -261,7 +282,7 @@ impl BatchedGitHistory {
     }
 
     /// Pure lookup: Get file history (no I/O after construction)
-    pub fn get_file_history(&self, path: &Path) -> Option<&FileHistoryData> {
+    fn get_file_history(&self, path: &Path) -> Option<&FileHistoryData> {
         self.file_histories.get(path)
     }
 

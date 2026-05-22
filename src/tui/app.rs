@@ -317,10 +317,25 @@ impl App {
         status: StageStatus,
         progress: Option<(usize, usize)>,
     ) {
+        self.update_subtask_labeled(stage_index, subtask_index, status, progress, None);
+    }
+
+    /// Update sub-task status, optionally renaming the subtask label.
+    pub fn update_subtask_labeled(
+        &mut self,
+        stage_index: usize,
+        subtask_index: usize,
+        status: StageStatus,
+        progress: Option<(usize, usize)>,
+        label: Option<&str>,
+    ) {
         if let Some(stage) = self.stages.get_mut(stage_index) {
             if let Some(subtask) = stage.sub_tasks.get_mut(subtask_index) {
                 subtask.status = status;
                 subtask.progress = progress;
+                if let Some(name) = label {
+                    subtask.name = name.to_string();
+                }
             }
         }
     }

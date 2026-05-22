@@ -1,12 +1,15 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
+use crate::core::FunctionMetrics;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Instant;
 
 mod batched;
+pub mod batched_function;
 mod blame_cache;
 mod function_level;
 pub mod git2_provider;
@@ -34,6 +37,7 @@ pub struct GitHistoryProvider {
     repo_root: PathBuf,
     cache: Arc<DashMap<PathBuf, FileHistory>>,
     batched_history: Option<batched::BatchedGitHistory>,
+    batched_functions: Option<batched_function::BatchedFunctionGitHistory>,
     /// Cache for file-level git blame data (uses git2 library)
     blame_cache: blame_cache::FileBlameCache,
     /// Git2 repository wrapper for reliable git operations
@@ -63,24 +67,8 @@ impl GitHistoryProvider {
             .map(|r| r.repo_path().to_path_buf())
             .unwrap_or(repo_root);
 
-        // Create batched history using git2 (fetch all git data upfront)
-        let batched_history = if let Some(ref repo) = git2_repo {
-            match batched::BatchedGitHistory::new_with_git2(repo) {
-                Ok(history) => {
-                    log::debug!("Batched git history loaded successfully via git2");
-                    Some(history)
-                }
-                Err(e) => {
-                    log::warn!(
-                        "Failed to load batched git history via git2, will fall back to direct queries: {}",
-                        e
-                    );
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        // File-level batched history is built during function preload (one commit walk).
+        let batched_history = None;
 
         // Create blame cache for efficient per-file blame lookups (now uses git2)
         let blame_cache =
@@ -90,9 +78,56 @@ impl GitHistoryProvider {
             repo_root: canonical_repo_root,
             cache: Arc::new(DashMap::new()),
             batched_history,
+            batched_functions: None,
             blame_cache,
             git2_repo,
         })
+    }
+
+    /// Preload per-function git histories for all metrics (parallel, single commit walk).
+    pub fn preload_function_histories(&mut self, metrics: &[FunctionMetrics]) -> Result<()> {
+        self.preload_function_histories_with_progress(metrics, None)
+    }
+
+    /// Like `preload_function_histories`, but reports `(processed, total)` commit
+    /// progress via the callback (best-effort, ~every 50 commits).
+    pub fn preload_function_histories_with_progress(
+        &mut self,
+        metrics: &[FunctionMetrics],
+        progress_cb: Option<batched_function::ProgressCallback<'_>>,
+    ) -> Result<()> {
+        let Some(ref repo) = self.git2_repo else {
+            return Ok(());
+        };
+
+        let targets: Vec<batched_function::FunctionPreloadTarget> = metrics
+            .iter()
+            .filter(|m| !m.name.is_empty())
+            .map(|m| batched_function::FunctionPreloadTarget {
+                file: self.to_relative_path(&m.file).into_owned(),
+                name: m.name.clone(),
+                line_range: (m.line, m.line.saturating_add(m.length.max(1))),
+            })
+            .collect();
+
+        let start = Instant::now();
+        let scan = batched_function::BatchedFunctionGitHistory::build(
+            repo,
+            &self.blame_cache,
+            &targets,
+            progress_cb,
+        )?;
+        self.batched_functions = Some(scan.functions);
+        self.batched_history = Some(scan.file_history);
+        log::info!(
+            "Function git history preload: {} functions in {:?}",
+            self.batched_functions
+                .as_ref()
+                .map(batched_function::BatchedFunctionGitHistory::len)
+                .unwrap_or(0),
+            start.elapsed()
+        );
+        Ok(())
     }
 
     /// Convert a path to be relative to the repo root.
@@ -339,37 +374,82 @@ impl GitHistoryProvider {
     /// count only commits that modified that specific function.
     /// Uses cached `git blame` on current lines to identify contributors.
     fn gather_for_function(&self, target: &AnalysisTarget) -> Result<Context> {
-        // Convert to relative path for git commands (git expects paths relative to repo root)
         let relative_path = self.to_relative_path(&target.file_path);
+        let history = self
+            .lookup_function_history(relative_path.as_ref(), target)?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No function history for '{}' in {}",
+                    target.function_name,
+                    relative_path.display()
+                )
+            })?;
 
-        let history = function_level::get_function_history(
+        Ok(Self::context_from_function_history(
+            self.name(),
+            self.weight(),
+            &history,
+            target.reference_time,
+        ))
+    }
+
+    fn context_from_function_history(
+        provider_name: &str,
+        weight: f64,
+        history: &function_level::FunctionHistory,
+        reference_time: DateTime<Utc>,
+    ) -> Context {
+        let contribution = stability::classify_risk_contribution(
+            history.change_frequency(reference_time),
+            history.bug_density(),
+        );
+
+        Context {
+            provider: provider_name.to_string(),
+            weight,
+            contribution,
+            details: ContextDetails::Historical {
+                change_frequency: history.change_frequency(reference_time),
+                bug_density: history.bug_density(),
+                age_days: history.age_days(reference_time),
+                author_count: history.authors.len(),
+                total_commits: history.total_commits_including_introduction() as u32,
+                bug_fix_count: history.bug_fix_count as u32,
+            },
+        }
+    }
+
+    fn lookup_function_history(
+        &self,
+        relative_path: &Path,
+        target: &AnalysisTarget,
+    ) -> Result<Option<function_level::FunctionHistory>> {
+        if let Some(ref batched) = self.batched_functions {
+            if let Some(history) = batched.get(relative_path, &target.function_name) {
+                return Ok(Some(history));
+            }
+        }
+
+        if let Some(ref repo) = self.git2_repo {
+            return function_level::get_function_history_git2(
+                repo,
+                relative_path,
+                &target.function_name,
+                target.line_range,
+                &self.blame_cache,
+            )
+            .map(Some);
+        }
+
+        function_level::get_function_history(
             &self.repo_root,
-            relative_path.as_ref(),
+            relative_path,
             &target.function_name,
             target.line_range,
             &self.blame_cache,
             target.reference_time,
-        )?;
-
-        let contribution = stability::classify_risk_contribution(
-            history.change_frequency(target.reference_time),
-            history.bug_density(),
-        );
-
-        Ok(Context {
-            provider: self.name().to_string(),
-            weight: self.weight(),
-            contribution,
-            details: ContextDetails::Historical {
-                change_frequency: history.change_frequency(target.reference_time),
-                bug_density: history.bug_density(),
-                age_days: history.age_days(target.reference_time),
-                author_count: history.authors.len(),
-                // Use total including introduction for display (not just modifications)
-                total_commits: history.total_commits_including_introduction() as u32,
-                bug_fix_count: history.bug_fix_count as u32,
-            },
-        })
+        )
+        .map(Some)
     }
 
     /// Gather context using file-level git history analysis (fallback)

@@ -22,6 +22,9 @@ pub fn analyze_risk_with_coverage(
         enable_context,
         context_providers,
         disable_context,
+        // Preload runs once inside perform_unified_analysis_with_options
+        // (TUI stage 4); skip here so we don't block before call-graph stage.
+        None,
     ) {
         analyzer = analyzer.with_context_aggregator(aggregator);
     }
@@ -80,6 +83,9 @@ pub fn analyze_risk_without_coverage(
         enable_context,
         context_providers,
         disable_context,
+        // Preload runs once inside perform_unified_analysis_with_options
+        // (TUI stage 4); skip here so we don't block before call-graph stage.
+        None,
     ) {
         analyzer = analyzer.with_context_aggregator(aggregator);
     }
@@ -125,6 +131,7 @@ pub fn build_context_aggregator(
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
+    function_metrics: Option<&[FunctionMetrics]>,
 ) -> Option<risk::context::ContextAggregator> {
     if !enable_context {
         return None;
@@ -138,7 +145,9 @@ pub fn build_context_aggregator(
         .filter(|name| !disabled.contains(name))
         .fold(
             risk::context::ContextAggregator::new(),
-            |acc, provider_name| add_provider_to_aggregator(acc, &provider_name, project_path),
+            |acc, provider_name| {
+                add_provider_to_aggregator(acc, &provider_name, project_path, function_metrics)
+            },
         );
 
     Some(aggregator)
@@ -156,6 +165,7 @@ fn add_provider_to_aggregator(
     aggregator: risk::context::ContextAggregator,
     provider_name: &str,
     project_path: &Path,
+    function_metrics: Option<&[FunctionMetrics]>,
 ) -> risk::context::ContextAggregator {
     // Map provider names to subsection indices (spec 219)
     // 0 = critical_path, 1 = dependency, 2 = git_history
@@ -174,7 +184,7 @@ fn add_provider_to_aggregator(
         }
     }
 
-    let result = match create_provider(provider_name, project_path) {
+    let result = match create_provider(provider_name, project_path, function_metrics) {
         Some(provider) => aggregator.with_provider(provider),
         None => {
             eprintln!("Warning: Unknown context provider: {provider_name}");
@@ -187,6 +197,15 @@ fn add_provider_to_aggregator(
     if let Some(index) = subsection_index {
         if let Some(manager) = crate::progress::ProgressManager::global() {
             manager.tui_update_subtask(4, index, crate::tui::app::StageStatus::Completed, None);
+            if index == 2 {
+                manager.tui_update_subtask_labeled(
+                    4,
+                    2,
+                    crate::tui::app::StageStatus::Completed,
+                    None,
+                    Some("git history"),
+                );
+            }
             // 150ms visibility pause for user feedback
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
@@ -198,11 +217,12 @@ fn add_provider_to_aggregator(
 fn create_provider(
     provider_name: &str,
     project_path: &Path,
+    function_metrics: Option<&[FunctionMetrics]>,
 ) -> Option<Box<dyn risk::context::ContextProvider>> {
     match provider_name {
         "critical_path" => Some(create_critical_path_provider()),
         "dependency" => Some(create_dependency_provider()),
-        "git_history" => create_git_history_provider(project_path),
+        "git_history" => create_git_history_provider(project_path, function_metrics),
         _ => None,
     }
 }
@@ -223,8 +243,56 @@ fn create_dependency_provider() -> Box<dyn risk::context::ContextProvider> {
 
 fn create_git_history_provider(
     project_path: &Path,
+    function_metrics: Option<&[FunctionMetrics]>,
 ) -> Option<Box<dyn risk::context::ContextProvider>> {
-    risk::context::git_history::GitHistoryProvider::new(project_path.to_path_buf())
-        .ok()
-        .map(|provider| Box::new(provider) as Box<dyn risk::context::ContextProvider>)
+    use risk::context::git_history::batched_function::{GitPreloadPhase, ProgressCallback};
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_subtask_labeled(
+            4,
+            2,
+            crate::tui::app::StageStatus::Active,
+            Some((0, 0)),
+            Some("git history · commits"),
+        );
+    }
+
+    let mut provider =
+        risk::context::git_history::GitHistoryProvider::new(project_path.to_path_buf()).ok()?;
+    if let Some(metrics) = function_metrics {
+        let last_logged = std::sync::atomic::AtomicUsize::new(0);
+        let progress = move |phase: GitPreloadPhase, done: usize, total: usize| {
+            let label = match phase {
+                GitPreloadPhase::Commits => Some("git history · commits"),
+                GitPreloadPhase::BlameFiles => Some("git history · authors"),
+            };
+            if let Some(manager) = crate::progress::ProgressManager::global() {
+                manager.tui_update_subtask_labeled(
+                    4,
+                    2,
+                    crate::tui::app::StageStatus::Active,
+                    Some((done, total)),
+                    label,
+                );
+            }
+            let prev = last_logged.load(std::sync::atomic::Ordering::Relaxed);
+            let log_interval = match phase {
+                GitPreloadPhase::Commits => 200,
+                GitPreloadPhase::BlameFiles => 20,
+            };
+            if done == total || done.saturating_sub(prev) >= log_interval {
+                last_logged.store(done, std::sync::atomic::Ordering::Relaxed);
+                let unit = match phase {
+                    GitPreloadPhase::Commits => "commits",
+                    GitPreloadPhase::BlameFiles => "files",
+                };
+                log::info!("Git history {unit}: {done}/{total}");
+            }
+        };
+        let cb: ProgressCallback<'_> = &progress;
+        if let Err(e) = provider.preload_function_histories_with_progress(metrics, Some(cb)) {
+            log::warn!("Function git history preload failed: {e}");
+        }
+    }
+    Some(Box::new(provider) as Box<dyn risk::context::ContextProvider>)
 }

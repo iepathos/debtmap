@@ -1079,6 +1079,7 @@ fn build_risk_analyzer(
         enable_context,
         context_providers,
         disable_context,
+        Some(&results.complexity.metrics),
     )?;
 
     let debt_score = crate::debt::total_debt_score(&results.technical_debt.items) as f64;

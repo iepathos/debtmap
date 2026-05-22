@@ -244,6 +244,7 @@ pub fn load_context<Env: AnalysisEnv>(state: &mut AnalysisState, env: &mut Env) 
         state.config.enable_context,
         state.config.context_providers.clone(),
         state.config.disable_context.clone(),
+        None,
     );
 
     if let Some(aggregator) = context_aggregator {

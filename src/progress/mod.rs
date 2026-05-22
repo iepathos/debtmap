@@ -292,11 +292,23 @@ impl ProgressManager {
         status: crate::tui::app::StageStatus,
         progress: Option<(usize, usize)>,
     ) {
+        self.tui_update_subtask_labeled(stage_index, subtask_index, status, progress, None);
+    }
+
+    /// Update subtask status in TUI, optionally renaming the subtask label.
+    pub fn tui_update_subtask_labeled(
+        &self,
+        stage_index: usize,
+        subtask_index: usize,
+        status: crate::tui::app::StageStatus,
+        progress: Option<(usize, usize)>,
+        label: Option<&str>,
+    ) {
         let guard = self.tui_manager.lock();
         if let Some(ref tui) = *guard {
             let app_arc = tui.app();
             let mut app = app_arc.lock();
-            app.update_subtask(stage_index, subtask_index, status, progress);
+            app.update_subtask_labeled(stage_index, subtask_index, status, progress, label);
         }
     }
 

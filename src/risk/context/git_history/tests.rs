@@ -21,6 +21,39 @@ use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::process::Command;
 
+#[cfg(test)]
+fn test_function_metric(file: PathBuf, name: &str) -> crate::core::FunctionMetrics {
+    crate::core::FunctionMetrics {
+        name: name.to_string(),
+        file,
+        line: 1,
+        length: 1,
+        cyclomatic: 1,
+        cognitive: 1,
+        nesting: 0,
+        is_test: false,
+        in_test_module: false,
+        is_pure: None,
+        visibility: None,
+        is_trait_method: false,
+        entropy_score: None,
+        purity_confidence: None,
+        purity_reason: None,
+        call_dependencies: None,
+        detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+        composition_metrics: None,
+        language_specific: None,
+        purity_level: None,
+        error_swallowing_count: None,
+        error_swallowing_patterns: None,
+        entropy_analysis: None,
+    }
+}
+
 #[test]
 fn test_is_bug_fix_message() {
     use git2_provider::is_bug_fix_message;
@@ -642,8 +675,164 @@ println!("modified");
     Ok(())
 }
 
-/// Test that function-level analysis correctly counts modifications
-/// to a specific function.
+/// git2-backed history must match subprocess pickaxe results (accuracy contract).
+#[test]
+fn test_function_history_git2_matches_subprocess() -> Result<()> {
+    let (_temp, repo_path) = setup_test_repo()?;
+
+    create_test_file(&repo_path, "test.rs", "fn my_func() {}")?;
+    commit_with_message(&repo_path, "Initial commit")?;
+    modify_and_commit(
+        &repo_path,
+        "test.rs",
+        "fn my_func() { println!(\"v2\"); }",
+        "fix: bug in my_func",
+    )?;
+    modify_and_commit(
+        &repo_path,
+        "test.rs",
+        "fn my_func() { println!(\"v3\"); }",
+        "feat: improve my_func",
+    )?;
+
+    let blame_cache = blame_cache::FileBlameCache::new(repo_path.clone(), None);
+    let git2_repo = super::git2_provider::Git2Repository::open(&repo_path)?;
+
+    let subprocess = function_level::get_function_history_subprocess(
+        &repo_path,
+        Path::new("test.rs"),
+        "my_func",
+        (1, 5),
+        &blame_cache,
+        chrono::Utc::now(),
+    )?;
+
+    let git2 = function_level::get_function_history_git2(
+        &git2_repo,
+        Path::new("test.rs"),
+        "my_func",
+        (1, 5),
+        &blame_cache,
+    )?;
+
+    assert_eq!(git2.total_commits, subprocess.total_commits);
+    assert_eq!(git2.bug_fix_count, subprocess.bug_fix_count);
+    assert_eq!(git2.introduced, subprocess.introduced);
+    assert_eq!(git2.bug_density(), subprocess.bug_density());
+
+    Ok(())
+}
+
+#[test]
+fn test_batched_function_preload_matches_direct_lookup() -> Result<()> {
+    let (_temp, repo_path) = setup_test_repo()?;
+
+    create_test_file(&repo_path, "test.rs", "fn alpha() {}\nfn beta() {}")?;
+    commit_with_message(&repo_path, "Initial commit")?;
+    modify_and_commit(
+        &repo_path,
+        "test.rs",
+        "fn alpha() {}\nfn beta() { println!(\"x\"); }",
+        "fix: beta",
+    )?;
+
+    let mut provider = GitHistoryProvider::new(repo_path.clone())?;
+    let metrics = vec![
+        crate::core::FunctionMetrics {
+            name: "alpha".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            length: 1,
+            cyclomatic: 1,
+            cognitive: 1,
+            nesting: 0,
+            is_test: false,
+            in_test_module: false,
+            is_pure: None,
+            visibility: None,
+            is_trait_method: false,
+            entropy_score: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        },
+        crate::core::FunctionMetrics {
+            name: "beta".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 2,
+            length: 3,
+            cyclomatic: 1,
+            cognitive: 1,
+            nesting: 0,
+            is_test: false,
+            in_test_module: false,
+            is_pure: None,
+            visibility: None,
+            is_trait_method: false,
+            entropy_score: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        },
+    ];
+
+    provider.preload_function_histories(&metrics)?;
+
+    let target_alpha = AnalysisTarget {
+        root_path: repo_path.clone(),
+        file_path: PathBuf::from("test.rs"),
+        function_name: "alpha".to_string(),
+        line_range: (1, 1),
+        reference_time: chrono::Utc::now(),
+    };
+    let ctx_alpha = provider.gather(&target_alpha)?;
+    assert_eq!(ctx_alpha.provider, "git_history");
+
+    let target_beta = AnalysisTarget {
+        root_path: repo_path.clone(),
+        file_path: PathBuf::from("test.rs"),
+        function_name: "beta".to_string(),
+        line_range: (2, 4),
+        reference_time: chrono::Utc::now(),
+    };
+    let ctx_beta = provider.gather(&target_beta)?;
+    if let ContextDetails::Historical {
+        total_commits,
+        bug_fix_count,
+        ..
+    } = ctx_beta.details
+    {
+        assert_eq!(total_commits, 2, "beta: intro + one modification");
+        assert_eq!(bug_fix_count, 1);
+    } else {
+        panic!("expected historical context");
+    }
+
+    Ok(())
+}
+
 #[test]
 fn test_function_level_with_modifications() -> Result<()> {
     let (_temp, repo_path) = setup_test_repo()?;
@@ -862,7 +1051,11 @@ fn test_batched_history_path_matching_diagnostic() -> Result<()> {
     let _file_path = create_test_file(&repo_path, "src/test.rs", "fn main() {}")?;
     commit_with_message(&repo_path, "Initial commit")?;
 
-    let provider = GitHistoryProvider::new(repo_path.clone())?;
+    let mut provider = GitHistoryProvider::new(repo_path.clone())?;
+    provider.preload_function_histories(&[test_function_metric(
+        PathBuf::from("src/test.rs"),
+        "main",
+    )])?;
 
     // Debug: Print what paths are stored in batched history
     let stored_paths = provider.batched_paths();
@@ -906,7 +1099,9 @@ fn test_git_history_on_real_repo() -> Result<()> {
     eprintln!("=== REAL REPO TEST ===");
     eprintln!("Current working directory: {:?}", cwd);
 
-    let provider = GitHistoryProvider::new(cwd.clone())?;
+    let mut provider = GitHistoryProvider::new(cwd.clone())?;
+    provider
+        .preload_function_histories(&[test_function_metric(PathBuf::from("src/lib.rs"), "main")])?;
     eprintln!("Provider repo root: {:?}", provider.repo_root());
 
     // List some paths in batched history
@@ -929,7 +1124,6 @@ fn test_git_history_on_real_repo() -> Result<()> {
     );
 
     // Now try to get actual history
-    let mut provider = provider;
     let history = provider.analyze_file(test_path)?;
     eprintln!(
         "History for src/lib.rs: commits={}, authors={}, age_days={}",

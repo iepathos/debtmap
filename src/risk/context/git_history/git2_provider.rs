@@ -91,8 +91,8 @@ impl Git2Repository {
         &self.repo_path
     }
 
-    /// Open a fresh Repository instance (internal helper)
-    fn open_repo(&self) -> Result<Repository> {
+    /// Open a fresh Repository instance (test-visible helper)
+    pub(super) fn open_repo(&self) -> Result<Repository> {
         Repository::open(&self.repo_path)
             .with_context(|| format!("Failed to open repository at {}", self.repo_path.display()))
     }
@@ -410,24 +410,35 @@ impl Git2Repository {
         pattern: &str,
         after_commit: git2::Oid,
     ) -> Result<Vec<CommitStats>> {
+        let regex = regex::Regex::new(pattern)?;
+        self.find_modifications_with_regex(file_path, &regex, after_commit)
+    }
+
+    /// Find commits modifying a file where the diff matches `regex` after `after_commit`.
+    ///
+    /// Equivalent to `git log <after_commit>..HEAD -G "<pattern>" -- <file>`.
+    pub fn find_modifications_with_regex(
+        &self,
+        file_path: &Path,
+        regex: &regex::Regex,
+        after_commit: git2::Oid,
+    ) -> Result<Vec<CommitStats>> {
         let repo = self.open_repo()?;
         let relative_path = self.to_relative_path(file_path);
-        let regex = regex::Regex::new(pattern)?;
 
         let mut revwalk = repo.revwalk()?;
         revwalk.push_head()?;
+        // Equivalent to `git log <after_commit>..HEAD` (exclude intro and its ancestors).
+        if after_commit != Oid::zero() {
+            revwalk.hide(after_commit)?;
+        }
         revwalk.set_sorting(Sort::TIME)?;
 
         let mut results = Vec::new();
 
         for oid in revwalk.filter_map(|r| r.ok()) {
-            // Stop at the introduction commit
-            if oid == after_commit {
-                break;
-            }
-
             let commit = repo.find_commit(oid)?;
-            if self.commit_modifies_pattern(&repo, &commit, &relative_path, &regex)? {
+            if self.commit_modifies_pattern(&repo, &commit, &relative_path, regex)? {
                 if let Some(stats) = self.commit_to_basic_stats(&commit)? {
                     results.push(stats);
                 }
@@ -525,7 +536,7 @@ impl Git2Repository {
         }))
     }
 
-    /// Check if a commit introduces a pattern (pickaxe-style search)
+    /// Check if a commit introduces a pattern (pickaxe `-S` semantics).
     fn commit_introduces_pattern(
         &self,
         repo: &Repository,
@@ -533,42 +544,12 @@ impl Git2Repository {
         file_path: &Path,
         pattern: &str,
     ) -> Result<bool> {
-        let tree = commit.tree()?;
-        let file_str = file_path.to_string_lossy();
-
-        // Check if file exists in this commit
-        let entry = match tree.get_path(Path::new(file_str.as_ref())) {
-            Ok(e) => e,
-            Err(_) => return Ok(false),
-        };
-
-        // Get the blob content
-        let blob = repo.find_blob(entry.id())?;
-        let content = std::str::from_utf8(blob.content()).unwrap_or("");
-
-        // Check if pattern exists in current version
-        if !content.contains(pattern) {
-            return Ok(false);
-        }
-
-        // Check if pattern didn't exist in parent
-        let parent = commit.parents().next();
-        if let Some(parent_commit) = parent {
-            let parent_tree = parent_commit.tree()?;
-            if let Ok(parent_entry) = parent_tree.get_path(Path::new(file_str.as_ref())) {
-                if let Ok(parent_blob) = repo.find_blob(parent_entry.id()) {
-                    let parent_content = std::str::from_utf8(parent_blob.content()).unwrap_or("");
-                    if parent_content.contains(pattern) {
-                        return Ok(false); // Already existed in parent
-                    }
-                }
-            }
-        }
-
-        Ok(true)
+        Ok(commit_pickaxe_changes_pattern(
+            repo, commit, file_path, pattern,
+        )?)
     }
 
-    /// Check if a commit modifies lines matching a regex pattern
+    /// Check if a commit modifies lines matching a regex (`git log -G` semantics).
     fn commit_modifies_pattern(
         &self,
         repo: &Repository,
@@ -576,34 +557,510 @@ impl Git2Repository {
         file_path: &Path,
         regex: &regex::Regex,
     ) -> Result<bool> {
+        commit_diff_matches_regex(repo, commit, file_path, regex)
+    }
+}
+
+/// Count non-overlapping occurrences of `pattern` in `content` (pickaxe `-S` unit).
+pub fn count_pattern_occurrences(content: &str, pattern: &str) -> usize {
+    if pattern.is_empty() {
+        return 0;
+    }
+    content.matches(pattern).count()
+}
+
+/// Occurrences of `pattern` in `file_path` at `commit` (0 if file missing).
+pub fn pattern_occurrences_in_commit(
+    repo: &Repository,
+    commit: &git2::Commit,
+    file_path: &Path,
+    pattern: &str,
+) -> Result<usize> {
+    let tree = commit.tree()?;
+    let file_str = file_path.to_string_lossy();
+    let entry = match tree.get_path(Path::new(file_str.as_ref())) {
+        Ok(e) => e,
+        Err(_) => return Ok(0),
+    };
+    let blob = repo.find_blob(entry.id())?;
+    let content = std::str::from_utf8(blob.content()).unwrap_or("");
+    Ok(count_pattern_occurrences(content, pattern))
+}
+
+/// True when pickaxe `-S` would report a change for this file in `commit`.
+///
+/// Matches `git log -S`: occurrence count of `pattern` in the file changed vs parent.
+pub fn commit_pickaxe_changes_pattern(
+    repo: &Repository,
+    commit: &git2::Commit,
+    file_path: &Path,
+    pattern: &str,
+) -> Result<bool> {
+    let new_count = pattern_occurrences_in_commit(repo, commit, file_path, pattern)?;
+    let old_count = match commit.parents().next() {
+        Some(parent) => pattern_occurrences_in_commit(repo, &parent, file_path, pattern)?,
+        None => 0,
+    };
+    Ok(new_count != old_count)
+}
+
+/// Commit history aggregates for a single function within one file.
+#[derive(Debug, Clone, Default)]
+pub struct FileFunctionRecord {
+    pub introduction_oid: Option<git2::Oid>,
+    pub introduction_date: Option<DateTime<Utc>>,
+    pub modifications: Vec<CommitStats>,
+}
+
+/// Per-commit accounting for `compute_repo_function_histories`.
+#[derive(Debug, Clone)]
+struct CommitFunctionData {
+    oid: Oid,
+    date: DateTime<Utc>,
+    message: String,
+    author_email: String,
+    /// Churn (additions + deletions) per file touched in this commit.
+    file_churn: HashMap<PathBuf, usize>,
+    /// (file, function_name) → (added_count, removed_count, regex_matched)
+    updates: HashMap<(PathBuf, String), (usize, usize, bool)>,
+}
+
+/// File-level commit scan exported for building `BatchedGitHistory`.
+#[derive(Debug, Clone)]
+pub struct FileCommitScan {
+    pub date: DateTime<Utc>,
+    pub message: String,
+    pub author_email: String,
+    pub file_churn: HashMap<PathBuf, usize>,
+}
+
+/// Combined function- and file-level history from one repository walk.
+pub struct RepoHistoryScan {
+    pub functions: HashMap<(PathBuf, String), FileFunctionRecord>,
+    pub file_scans: Vec<FileCommitScan>,
+}
+
+/// Compute per-function histories for many files via one repository-wide commit walk.
+///
+/// Phase 1: collect OIDs sequentially.
+/// Phase 2: process each commit in parallel via rayon, accumulating per-commit
+/// per-(file,function) `-S` add/remove counts and `-G` regex hits.
+/// Phase 3: walk results in commit order to determine the introduction commit
+/// (first non-zero `-S` delta) and modification commits (`-G` matches after
+/// introduction).
+///
+/// `progress_cb` receives `(processed_commits, total_commits)` at most once
+/// per ~50 commits processed. It is called from worker threads; keep it cheap.
+pub fn compute_repo_function_histories(
+    repo_path: &Path,
+    file_targets: &HashMap<PathBuf, Vec<String>>,
+    progress_cb: Option<super::batched_function::ProgressCallback<'_>>,
+) -> Result<RepoHistoryScan> {
+    use super::batched_function::GitPreloadPhase;
+
+    if file_targets.is_empty() {
+        return Ok(RepoHistoryScan {
+            functions: HashMap::new(),
+            file_scans: Vec::new(),
+        });
+    }
+
+    let (intro_patterns, mod_regexes) = build_function_pattern_tables(file_targets);
+    let oids = collect_repo_oids(repo_path)?;
+    let total = oids.len();
+
+    if let Some(cb) = progress_cb {
+        cb(GitPreloadPhase::Commits, 0, total);
+    }
+
+    let processed = std::sync::atomic::AtomicUsize::new(0);
+    let mut commit_data: Vec<CommitFunctionData> = oids
+        .par_iter()
+        .filter_map(|&oid| {
+            let repo = Repository::open(repo_path).ok()?;
+            let data = process_commit_for_function_history(
+                &repo,
+                oid,
+                file_targets,
+                &intro_patterns,
+                &mod_regexes,
+            )
+            .ok()
+            .flatten();
+            let done = processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            if let Some(cb) = progress_cb {
+                if done % 50 == 0 || done == total {
+                    cb(GitPreloadPhase::Commits, done, total);
+                }
+            }
+            data
+        })
+        .collect();
+
+    commit_data.sort_by_key(|d| d.date);
+    let file_scans = commit_data
+        .iter()
+        .map(|d| FileCommitScan {
+            date: d.date,
+            message: d.message.clone(),
+            author_email: d.author_email.clone(),
+            file_churn: d.file_churn.clone(),
+        })
+        .collect();
+    Ok(RepoHistoryScan {
+        functions: reduce_commit_data_to_records(file_targets, &commit_data),
+        file_scans,
+    })
+}
+
+fn build_function_pattern_tables(
+    file_targets: &HashMap<PathBuf, Vec<String>>,
+) -> (
+    HashMap<PathBuf, Vec<(String, String)>>,
+    HashMap<PathBuf, Vec<(String, regex::Regex)>>,
+) {
+    let intro = file_targets
+        .iter()
+        .map(|(file, names)| {
+            let v = names
+                .iter()
+                .map(|n| (n.clone(), format!("fn {n}")))
+                .collect();
+            (file.clone(), v)
+        })
+        .collect();
+
+    let mods = file_targets
+        .iter()
+        .map(|(file, names)| {
+            let v = names
+                .iter()
+                .filter_map(|n| {
+                    regex::Regex::new(n)
+                        .or_else(|_| regex::Regex::new(&regex::escape(n)))
+                        .ok()
+                        .map(|r| (n.clone(), r))
+                })
+                .collect();
+            (file.clone(), v)
+        })
+        .collect();
+
+    (intro, mods)
+}
+
+fn collect_repo_oids(repo_path: &Path) -> Result<Vec<Oid>> {
+    let repo = Repository::open(repo_path)?;
+    let mut revwalk = repo.revwalk()?;
+    revwalk.push_head()?;
+    revwalk.set_sorting(Sort::TIME | Sort::REVERSE)?;
+    Ok(revwalk.filter_map(|r| r.ok()).collect())
+}
+
+fn process_commit_for_function_history(
+    repo: &Repository,
+    oid: Oid,
+    file_targets: &HashMap<PathBuf, Vec<String>>,
+    intro_patterns: &HashMap<PathBuf, Vec<(String, String)>>,
+    mod_regexes: &HashMap<PathBuf, Vec<(String, regex::Regex)>>,
+) -> Result<Option<CommitFunctionData>> {
+    let commit = repo.find_commit(oid)?;
+    let parent = commit.parents().next();
+    let parent_tree = parent.as_ref().and_then(|p| p.tree().ok());
+    let tree = commit.tree()?;
+    let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)?;
+
+    let mut per_file_added: HashMap<PathBuf, Vec<String>> = HashMap::new();
+    let mut per_file_removed: HashMap<PathBuf, Vec<String>> = HashMap::new();
+    let mut file_churn: HashMap<PathBuf, usize> = HashMap::new();
+
+    diff.foreach(
+        &mut |_, _| true,
+        None,
+        None,
+        Some(&mut |delta, _, line| {
+            let Some(path) = delta.new_file().path().or_else(|| delta.old_file().path()) else {
+                return true;
+            };
+            let path_buf = path.to_path_buf();
+            match line.origin() {
+                '+' | '-' => {
+                    *file_churn.entry(path_buf.clone()).or_default() += 1;
+                }
+                _ => return true,
+            }
+            if !file_targets.contains_key(&path_buf) {
+                return true;
+            }
+            let Ok(text) = std::str::from_utf8(line.content()) else {
+                return true;
+            };
+            match line.origin() {
+                '+' => per_file_added
+                    .entry(path_buf)
+                    .or_default()
+                    .push(text.to_string()),
+                '-' => per_file_removed
+                    .entry(path_buf)
+                    .or_default()
+                    .push(text.to_string()),
+                _ => {}
+            }
+            true
+        }),
+    )?;
+
+    if file_churn.is_empty() {
+        return Ok(None);
+    }
+
+    let touched: HashSet<&PathBuf> = per_file_added
+        .keys()
+        .chain(per_file_removed.keys())
+        .collect();
+
+    let mut updates: HashMap<(PathBuf, String), (usize, usize, bool)> = HashMap::new();
+    let empty: Vec<String> = Vec::new();
+    for file in touched {
+        let added = per_file_added.get(file).unwrap_or(&empty);
+        let removed = per_file_removed.get(file).unwrap_or(&empty);
+        if let Some(patterns) = intro_patterns.get(file) {
+            for (name, intro_pat) in patterns {
+                let added_count: usize = added
+                    .iter()
+                    .map(|l| count_pattern_occurrences(l, intro_pat))
+                    .sum();
+                let removed_count: usize = removed
+                    .iter()
+                    .map(|l| count_pattern_occurrences(l, intro_pat))
+                    .sum();
+                let entry = updates.entry((file.clone(), name.clone())).or_default();
+                entry.0 = added_count;
+                entry.1 = removed_count;
+            }
+        }
+        if let Some(regexes) = mod_regexes.get(file) {
+            for (name, regex) in regexes {
+                let matched = added.iter().any(|l| regex.is_match(l))
+                    || removed.iter().any(|l| regex.is_match(l));
+                let entry = updates.entry((file.clone(), name.clone())).or_default();
+                entry.2 = matched;
+            }
+        }
+    }
+
+    let date = Utc
+        .timestamp_opt(commit.time().seconds(), 0)
+        .single()
+        .unwrap_or_else(Utc::now);
+    let message = commit.message().unwrap_or("").to_string();
+    let author_email = commit.author().email().unwrap_or("").to_string();
+    Ok(Some(CommitFunctionData {
+        oid,
+        date,
+        message,
+        author_email,
+        file_churn,
+        updates,
+    }))
+}
+
+fn reduce_commit_data_to_records(
+    file_targets: &HashMap<PathBuf, Vec<String>>,
+    commit_data: &[CommitFunctionData],
+) -> HashMap<(PathBuf, String), FileFunctionRecord> {
+    let mut records: HashMap<(PathBuf, String), FileFunctionRecord> = file_targets
+        .iter()
+        .flat_map(|(file, names)| {
+            names
+                .iter()
+                .map(move |n| ((file.clone(), n.clone()), FileFunctionRecord::default()))
+        })
+        .collect();
+
+    for data in commit_data {
+        for (key, (added, removed, matched)) in &data.updates {
+            let Some(record) = records.get_mut(key) else {
+                continue;
+            };
+            if record.introduction_oid.is_none() {
+                if added != removed {
+                    record.introduction_oid = Some(data.oid);
+                    record.introduction_date = Some(data.date);
+                }
+            } else if *matched && record.introduction_oid != Some(data.oid) {
+                record.modifications.push(CommitStats {
+                    hash: data.oid,
+                    date: data.date,
+                    message: data.message.clone(),
+                    author_email: data.author_email.clone(),
+                    files: Vec::new(),
+                });
+            }
+        }
+    }
+
+    records
+}
+
+/// Compute `-S` introductions and `-G` modifications for many functions
+/// while walking each file's commit history exactly once.
+///
+/// Equivalent to running `git log -S "fn <name>" --reverse -- <file>` and
+/// `git log <intro>..HEAD -G "<name>" -- <file>` for each function, but
+/// shares the commit walk, blob reads, and diff computation across all
+/// functions in the same file.
+pub fn compute_file_function_histories(
+    repo: &Repository,
+    file_path: &Path,
+    function_names: &[String],
+) -> Result<HashMap<String, FileFunctionRecord>> {
+    let mut records: HashMap<String, FileFunctionRecord> = function_names
+        .iter()
+        .map(|n| (n.clone(), FileFunctionRecord::default()))
+        .collect();
+    if function_names.is_empty() {
+        return Ok(records);
+    }
+
+    let intro_patterns: Vec<(String, String)> = function_names
+        .iter()
+        .map(|n| (n.clone(), format!("fn {n}")))
+        .collect();
+    let mod_regexes: Vec<(String, regex::Regex)> = function_names
+        .iter()
+        .filter_map(|n| {
+            regex::Regex::new(n)
+                .or_else(|_| regex::Regex::new(&regex::escape(n)))
+                .ok()
+                .map(|r| (n.clone(), r))
+        })
+        .collect();
+
+    let mut revwalk = repo.revwalk()?;
+    revwalk.push_head()?;
+    revwalk.set_sorting(Sort::TIME | Sort::REVERSE)?;
+    let path_str = file_path.to_string_lossy().to_string();
+
+    for oid in revwalk.filter_map(|r| r.ok()) {
+        let commit = repo.find_commit(oid)?;
         let parent = commit.parents().next();
-        let parent_tree = parent.and_then(|p| p.tree().ok());
+        let parent_tree = parent.as_ref().and_then(|p| p.tree().ok());
         let tree = commit.tree()?;
 
         let mut diff_opts = DiffOptions::new();
-        diff_opts.pathspec(file_path.to_string_lossy().as_ref());
-
+        diff_opts.pathspec(path_str.as_str());
         let diff =
             repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;
+        if diff.deltas().count() == 0 {
+            continue;
+        }
 
-        // Check if any line in the diff matches the pattern
-        let mut found = false;
+        let new_content = read_file_at_tree(repo, &tree, file_path).unwrap_or_default();
+        let old_content = parent_tree
+            .as_ref()
+            .and_then(|t| read_file_at_tree(repo, t, file_path))
+            .unwrap_or_default();
+
+        let commit_time = commit.time();
+        let commit_date = Utc.timestamp_opt(commit_time.seconds(), 0).single();
+
+        for (name, pattern) in &intro_patterns {
+            let record = records.get_mut(name).expect("inserted above");
+            if record.introduction_oid.is_some() {
+                continue;
+            }
+            let new_count = count_pattern_occurrences(&new_content, pattern);
+            let old_count = count_pattern_occurrences(&old_content, pattern);
+            if new_count != old_count {
+                record.introduction_oid = Some(oid);
+                record.introduction_date = commit_date;
+            }
+        }
+
+        let mut added_or_removed: Vec<String> = Vec::new();
         diff.foreach(
             &mut |_, _| true,
             None,
             None,
             Some(&mut |_, _, line| {
-                if let Ok(content) = std::str::from_utf8(line.content()) {
-                    if regex.is_match(content) {
-                        found = true;
+                if matches!(line.origin(), '+' | '-') {
+                    if let Ok(text) = std::str::from_utf8(line.content()) {
+                        added_or_removed.push(text.to_string());
                     }
                 }
                 true
             }),
         )?;
 
-        Ok(found)
+        let stats = CommitStats {
+            hash: oid,
+            date: commit_date.unwrap_or_else(Utc::now),
+            message: commit.message().unwrap_or("").to_string(),
+            author_email: commit.author().email().unwrap_or("").to_string(),
+            files: Vec::new(),
+        };
+
+        for (name, regex) in &mod_regexes {
+            let record = records.get_mut(name).expect("inserted above");
+            let Some(intro_oid) = record.introduction_oid else {
+                continue;
+            };
+            if intro_oid == oid {
+                continue;
+            }
+            if added_or_removed.iter().any(|l| regex.is_match(l)) {
+                record.modifications.push(stats.clone());
+            }
+        }
     }
+
+    Ok(records)
+}
+
+fn read_file_at_tree(repo: &Repository, tree: &git2::Tree, file_path: &Path) -> Option<String> {
+    let file_str = file_path.to_string_lossy();
+    let entry = tree.get_path(Path::new(file_str.as_ref())).ok()?;
+    let blob = repo.find_blob(entry.id()).ok()?;
+    std::str::from_utf8(blob.content()).ok().map(String::from)
+}
+
+/// True when `git log -G` would include this commit for `file_path`.
+///
+/// Only added/removed diff lines are considered (context lines are ignored).
+pub fn commit_diff_matches_regex(
+    repo: &Repository,
+    commit: &git2::Commit,
+    file_path: &Path,
+    regex: &regex::Regex,
+) -> Result<bool> {
+    let parent = commit.parents().next();
+    let parent_tree = parent.and_then(|p| p.tree().ok());
+    let tree = commit.tree()?;
+
+    let mut diff_opts = DiffOptions::new();
+    diff_opts.pathspec(file_path.to_string_lossy().as_ref());
+
+    let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;
+
+    let mut found = false;
+    diff.foreach(
+        &mut |_, _| true,
+        None,
+        None,
+        Some(&mut |_, _, line| {
+            if matches!(line.origin(), '+' | '-') {
+                if let Ok(content) = std::str::from_utf8(line.content()) {
+                    if regex.is_match(content) {
+                        found = true;
+                    }
+                }
+            }
+            true
+        }),
+    )?;
+
+    Ok(found)
 }
 
 // =============================================================================
@@ -999,14 +1456,12 @@ mod tests {
 
         let repo = Git2Repository::open(&repo_path)?;
 
-        // When we pass the latest OID as after_commit, revwalk should immediately
-        // hit the break condition and return no results
+        // Hiding HEAD excludes HEAD and ancestors — no commits in `latest..HEAD`
         let modifications = repo.find_modifications(Path::new("test.rs"), r"let x", latest_oid)?;
 
-        // Should find nothing since we stop at the first commit we encounter
         assert!(
             modifications.is_empty(),
-            "Expected no modifications when stopping at latest commit"
+            "Expected no modifications when range excludes HEAD"
         );
 
         // Verify with zero OID we get all commits
@@ -1047,6 +1502,206 @@ mod tests {
         assert!(result.is_some());
         let (oid, _date) = result.unwrap();
         assert_eq!(oid, expected_oid);
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_introduction_matches_subprocess_pickaxe() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        create_and_commit_file(&repo_path, "test.rs", "fn my_func() {}", "Initial")?;
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn my_func() { println!(\"v2\"); }",
+            "fix",
+        )?;
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn my_func() { println!(\"v3\"); }",
+            "feat",
+        )?;
+
+        let intro_output = std::process::Command::new("git")
+            .args([
+                "log",
+                "-S",
+                "fn my_func",
+                "--format=%H",
+                "--reverse",
+                "--",
+                "test.rs",
+            ])
+            .current_dir(&repo_path)
+            .output()?;
+        let cli_intro = String::from_utf8_lossy(&intro_output.stdout)
+            .lines()
+            .next()
+            .unwrap()
+            .trim()
+            .to_string();
+
+        let repo = Git2Repository::open(&repo_path)?;
+        let git2_intro = repo
+            .find_introduction(Path::new("test.rs"), "fn my_func")?
+            .map(|(oid, _)| oid.to_string());
+
+        assert_eq!(
+            Some(cli_intro),
+            git2_intro,
+            "git2 find_introduction must match git log -S --reverse"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_modifications_matches_subprocess_two_commit_case() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        create_and_commit_file(&repo_path, "test.rs", "fn my_func() {}", "Initial")?;
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn my_func() { println!(\"v2\"); }",
+            "fix",
+        )?;
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn my_func() { println!(\"v3\"); }",
+            "feat",
+        )?;
+
+        let intro_output = std::process::Command::new("git")
+            .args([
+                "log",
+                "-S",
+                "fn my_func",
+                "--format=%H",
+                "--reverse",
+                "--",
+                "test.rs",
+            ])
+            .current_dir(&repo_path)
+            .output()?;
+        let intro_hash = String::from_utf8_lossy(&intro_output.stdout)
+            .lines()
+            .next()
+            .unwrap()
+            .trim()
+            .to_string();
+
+        let mods_output = std::process::Command::new("git")
+            .args([
+                "log",
+                &format!("{intro_hash}..HEAD"),
+                "-G",
+                "my_func",
+                "--format=%H",
+                "--",
+                "test.rs",
+            ])
+            .current_dir(&repo_path)
+            .output()?;
+        let cli_count = String::from_utf8_lossy(&mods_output.stdout)
+            .lines()
+            .filter(|l| !l.is_empty())
+            .count();
+
+        let repo = Git2Repository::open(&repo_path)?;
+        let (intro_oid, _) = repo
+            .find_introduction(Path::new("test.rs"), "fn my_func")?
+            .expect("intro");
+        assert_eq!(
+            intro_oid.to_string(),
+            intro_hash,
+            "intro oid must match git log -S"
+        );
+        let intro_from_cli = git2::Oid::from_str(&intro_hash)?;
+        let regex = regex::Regex::new("my_func")?;
+        let git2_mods =
+            repo.find_modifications_with_regex(Path::new("test.rs"), &regex, intro_oid)?;
+        let git2_mods_cli =
+            repo.find_modifications_with_regex(Path::new("test.rs"), &regex, intro_from_cli)?;
+        assert_eq!(
+            git2_mods.len(),
+            git2_mods_cli.len(),
+            "intro oid source should not matter"
+        );
+
+        let git_repo = repo.open_repo()?;
+        let regex = regex::Regex::new("my_func")?;
+        for hash in String::from_utf8_lossy(&mods_output.stdout)
+            .lines()
+            .filter(|l| !l.is_empty())
+        {
+            let oid = git2::Oid::from_str(hash.trim())?;
+            let commit = git_repo.find_commit(oid)?;
+            let matches =
+                commit_diff_matches_regex(&git_repo, &commit, Path::new("test.rs"), &regex)?;
+            assert!(matches, "commit {hash} should match -G per git CLI");
+        }
+
+        assert_eq!(
+            cli_count,
+            git2_mods.len(),
+            "cli={cli_count} git2={} hashes={:?}",
+            git2_mods.len(),
+            git2_mods
+                .iter()
+                .map(|c| c.hash.to_string())
+                .collect::<Vec<_>>()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pickaxe_ignores_context_only_diff_for_regex() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        let content = "fn my_func() {}\n\nfn other_func() {}\n";
+        create_and_commit_file(&repo_path, "test.rs", content, "Initial")?;
+
+        let content_v2 = "fn my_func() {}\n\nfn other_func() {\nprintln!(\"modified\");\n}\n";
+        create_and_commit_file(&repo_path, "test.rs", content_v2, "fix other")?;
+
+        let repo = Git2Repository::open(&repo_path)?;
+        let git_repo = repo.open_repo()?;
+        let head = git_repo.find_commit(get_head_oid(&repo_path)?)?;
+
+        let regex = regex::Regex::new("my_func")?;
+        assert!(
+            !commit_diff_matches_regex(&git_repo, &head, Path::new("test.rs"), &regex)?,
+            "context-only changes must not match -G"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pickaxe_counts_occurrence_changes_not_substring_presence() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        create_and_commit_file(&repo_path, "test.rs", "fn my_func() {}\n", "Initial")?;
+        create_and_commit_file(
+            &repo_path,
+            "test.rs",
+            "fn my_func() { println!(\"v2\"); }\n",
+            "fix",
+        )?;
+
+        let repo = Git2Repository::open(&repo_path)?;
+        let git_repo = repo.open_repo()?;
+        let head = git_repo.find_commit(get_head_oid(&repo_path)?)?;
+
+        assert!(
+            !commit_pickaxe_changes_pattern(&git_repo, &head, Path::new("test.rs"), "fn my_func")?,
+            "body-only edits keep the same pickaxe count"
+        );
+
         Ok(())
     }
 
