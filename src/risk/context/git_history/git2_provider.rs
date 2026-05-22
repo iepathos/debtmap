@@ -440,9 +440,7 @@ impl Git2Repository {
         file_path: &Path,
         pattern: &str,
     ) -> Result<bool> {
-        Ok(commit_pickaxe_changes_pattern(
-            repo, commit, file_path, pattern,
-        )?)
+        commit_pickaxe_changes_pattern(repo, commit, file_path, pattern)
     }
 
     /// Check if a commit modifies lines matching a regex (`git log -G` semantics).
@@ -609,12 +607,12 @@ pub fn compute_repo_function_histories(
     })
 }
 
+type IntroPatternTable = HashMap<PathBuf, Vec<(String, String)>>;
+type ModRegexTable = HashMap<PathBuf, Vec<(String, regex::Regex)>>;
+
 fn build_function_pattern_tables(
     file_targets: &HashMap<PathBuf, Vec<String>>,
-) -> (
-    HashMap<PathBuf, Vec<(String, String)>>,
-    HashMap<PathBuf, Vec<(String, regex::Regex)>>,
-) {
+) -> (IntroPatternTable, ModRegexTable) {
     let intro = file_targets
         .iter()
         .map(|(file, names)| {

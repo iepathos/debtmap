@@ -157,6 +157,10 @@ impl BatchedFunctionGitHistory {
     pub fn len(&self) -> usize {
         self.histories.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.histories.is_empty()
+    }
 }
 
 type FileTargetMap = HashMap<PathBuf, Vec<(String, (usize, usize))>>;

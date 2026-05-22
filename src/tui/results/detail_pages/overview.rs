@@ -451,39 +451,13 @@ pub fn get_items_at_location<'a>(
         .collect()
 }
 
-/// Format debt type as human-readable name
+/// Format debt type as human-readable name for the overview page.
 pub fn format_debt_type_name(debt_type: &crate::priority::DebtType) -> String {
-    #[allow(unused_imports)]
     use crate::priority::DebtType;
     match debt_type {
+        // TUI-specific label (display_name uses "Complexity Hotspot")
         DebtType::ComplexityHotspot { .. } => "High Complexity".to_string(),
-        DebtType::TestingGap { .. } => "Testing Gap".to_string(),
-        DebtType::DeadCode { .. } => "Dead Code".to_string(),
-        DebtType::Duplication { .. } => "Duplication".to_string(),
-        DebtType::Risk { .. } => "Risk".to_string(),
-        DebtType::TestComplexityHotspot { .. } => "Test Complexity".to_string(),
-        DebtType::TestTodo { .. } => "Test TODO".to_string(),
-        DebtType::TestDuplication { .. } => "Test Duplication".to_string(),
-        DebtType::ErrorSwallowing { .. } => "Error Swallowing".to_string(),
-        DebtType::AllocationInefficiency { .. } => "Allocation Inefficiency".to_string(),
-        DebtType::StringConcatenation { .. } => "String Concatenation".to_string(),
-        DebtType::NestedLoops { .. } => "Nested Loops".to_string(),
-        DebtType::BlockingIO { .. } => "Blocking I/O".to_string(),
-        DebtType::SuboptimalDataStructure { .. } => "Suboptimal Data Structure".to_string(),
-        DebtType::GodObject { .. } => "God Object".to_string(),
-        DebtType::FeatureEnvy { .. } => "Feature Envy".to_string(),
-        DebtType::PrimitiveObsession { .. } => "Primitive Obsession".to_string(),
-        DebtType::MagicValues { .. } => "Magic Values".to_string(),
-        DebtType::AssertionComplexity { .. } => "Assertion Complexity".to_string(),
-        DebtType::FlakyTestPattern { .. } => "Flaky Test Pattern".to_string(),
-        DebtType::AsyncMisuse { .. } => "Async Misuse".to_string(),
-        DebtType::ResourceLeak { .. } => "Resource Leak".to_string(),
-        DebtType::CollectionInefficiency { .. } => "Collection Inefficiency".to_string(),
-        DebtType::ScatteredType { .. } => "Scattered Type".to_string(),
-        DebtType::OrphanedFunctions { .. } => "Orphaned Functions".to_string(),
-        DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl".to_string(),
-        // Default for legacy variants
-        _ => "Other".to_string(),
+        _ => debt_type.display_name().to_string(),
     }
 }
 
@@ -885,6 +859,13 @@ mod tests {
                 god_object_score: 50.0,
             }),
             "God Object"
+        );
+        assert_eq!(
+            format_debt_type_name(&DebtType::Complexity {
+                cyclomatic: 5,
+                cognitive: 3,
+            }),
+            "Complexity"
         );
     }
 
