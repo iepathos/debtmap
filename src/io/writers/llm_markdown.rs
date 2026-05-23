@@ -36,6 +36,25 @@ pub mod format {
     use crate::output::unified::{ContextSuggestionOutput, PurityAnalysis, UnifiedLocation};
     use crate::priority::FunctionRole;
 
+    /// Format all sections for a function item.
+    pub fn function_item_sections(item: &FunctionDebtItemOutput) -> Vec<String> {
+        [
+            Some(identification(&item.location, &item.category)),
+            Some(severity(item.score, &item.priority)),
+            Some(metrics(&item.metrics, item.adjusted_complexity.as_ref())),
+            coverage(&item.metrics),
+            Some(dependencies(&item.dependencies)),
+            purity(item.purity_analysis.as_ref()),
+            pattern_analysis(item.pattern_type.as_ref(), item.pattern_confidence),
+            scoring(item.scoring_details.as_ref(), &item.function_role),
+            context(item.context.as_ref()),
+            git_history(item.git_history.as_ref()),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
     /// Format identification section for a function item
     pub fn identification(location: &UnifiedLocation, category: &str) -> String {
         let mut out = String::new();
@@ -646,63 +665,22 @@ impl<W: Write> LlmMarkdownWriter<W> {
     ///
     /// This is the "imperative shell" - thin I/O that composes pure formatters.
     fn write_function_item(&mut self, item: &FunctionDebtItemOutput) -> anyhow::Result<()> {
-        // Compose all sections from pure formatters
-        write!(
-            self.writer,
-            "{}",
-            format::identification(&item.location, &item.category)
-        )?;
-        writeln!(self.writer)?;
+        self.write_markdown_sections(format::function_item_sections(item))?;
+        self.write_item_separator()
+    }
 
-        write!(
-            self.writer,
-            "{}",
-            format::severity(item.score, &item.priority)
-        )?;
-        writeln!(self.writer)?;
-
-        write!(
-            self.writer,
-            "{}",
-            format::metrics(&item.metrics, item.adjusted_complexity.as_ref())
-        )?;
-        writeln!(self.writer)?;
-
-        if let Some(cov) = format::coverage(&item.metrics) {
-            write!(self.writer, "{}", cov)?;
+    fn write_markdown_sections(
+        &mut self,
+        sections: impl IntoIterator<Item = String>,
+    ) -> anyhow::Result<()> {
+        for section in sections {
+            write!(self.writer, "{}", section)?;
             writeln!(self.writer)?;
         }
+        Ok(())
+    }
 
-        write!(self.writer, "{}", format::dependencies(&item.dependencies))?;
-        writeln!(self.writer)?;
-
-        if let Some(pur) = format::purity(item.purity_analysis.as_ref()) {
-            write!(self.writer, "{}", pur)?;
-            writeln!(self.writer)?;
-        }
-
-        if let Some(pat) =
-            format::pattern_analysis(item.pattern_type.as_ref(), item.pattern_confidence)
-        {
-            write!(self.writer, "{}", pat)?;
-            writeln!(self.writer)?;
-        }
-
-        if let Some(scr) = format::scoring(item.scoring_details.as_ref(), &item.function_role) {
-            write!(self.writer, "{}", scr)?;
-            writeln!(self.writer)?;
-        }
-
-        if let Some(ctx) = format::context(item.context.as_ref()) {
-            write!(self.writer, "{}", ctx)?;
-            writeln!(self.writer)?;
-        }
-
-        if let Some(git) = format::git_history(item.git_history.as_ref()) {
-            write!(self.writer, "{}", git)?;
-            writeln!(self.writer)?;
-        }
-
+    fn write_item_separator(&mut self) -> anyhow::Result<()> {
         writeln!(self.writer, "---")?;
         writeln!(self.writer)?;
         Ok(())
