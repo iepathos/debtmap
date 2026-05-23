@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "debtmap"
-version = "0.16.6"
+version = "0.16.7"
 dependencies = [
  "anyhow",
  "arboard",

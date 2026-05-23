@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.7] - 2026-05-23
+
+### Added
+
+- **Nested Callable Complexity Tracking** - Complexity analysis now records nested callable complexity without inflating parent metrics
+  - Tracks nested callable counts and aggregate complexity for Python and TypeScript analysis paths
+  - Preserves nested callable details through extraction adapters and priority classification
+  - Adds regression coverage for cyclomatic and cognitive complexity boundaries
+
+### Fixed
+
+- **Known Function Call Graph Edges** - Call graph resolution now prefers exact edges for known functions
+  - Avoids imprecise caller classification when extracted call graph data already identifies a function edge
+  - Improves parallel call graph conversion and downstream priority scoring consistency
+
+### Performance
+
+- **Call Graph Resolution Indexing** - Extracted callee resolution now uses indexed lookup data
+  - Reduces repeated resolution work during parallel call graph construction
+  - Adds unified output metadata needed by optimized priority calculations
+
+- **Debt Scoring Line Count Cache** - Debt scoring now reuses the shared line count cache during unified analysis
+  - Avoids repeated file line-count reads while building file-level debt items
+
+- **Git History Preloading** - Function-level git history analysis now preloads histories through the git2 provider
+  - Adds progress reporting for history preloading in analysis and TUI workflows
+  - Reduces repeated history lookups during risk context calculation
+
+### Tech Debt Cleanup
+
+- **Git History Refactors** - Simplified git history internals while preserving git2-backed behavior
+  - Extracted stability logic and shared test helpers into focused modules
+  - Removed subprocess fallback paths now covered by the git2 provider
+
+- **CLI and Output Refactors** - Reduced complexity in compare command and LLM markdown output paths
+  - Extracted compare command helpers for clearer command orchestration
+  - Simplified LLM markdown function writer logic
+  - Reused shared debt type display names in risk and TUI output
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.16.7 release
+
 ## [0.16.6] - 2026-05-21
 
 ### Documentation
