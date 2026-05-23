@@ -328,13 +328,6 @@ Control how analysis results are formatted and displayed.
 - `--no-tui` - Disable TUI progress visualization (use simple progress bars instead)
 - `-q, --quiet` - Suppress progress output (quiet mode)
 
-**Streaming Output:**
-- `--streaming` - Enable streaming output mode for large codebases (Spec 003)
-  - Streams results to output as they're generated with O(1) memory overhead
-  - Useful for processing large codebases that would otherwise exhaust memory
-- `--stream-to <FILE>` - Output file for streaming mode (requires --streaming)
-  - Use "-" for stdout
-
 **Dependency Display Options:**
 - `--show-dependencies` - Show caller/callee information in output
 - `--no-dependencies` - Hide dependency information (conflicts with --show-dependencies)
@@ -882,8 +875,6 @@ debtmap analyze . --explain-metrics -v
 | `--show-filter-stats` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--quiet` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--no-tui` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--streaming` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--stream-to` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--jobs` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
 | `--no-parallel` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
 | `--profile` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |

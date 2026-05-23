@@ -330,8 +330,6 @@ patterns = ["**/target/**", "**/tests/**"]
 | `--no-parallel` | Disable parallel processing |
 | `--max-files <N>` | Limit analysis to N files |
 | `--no-tui` | Disable TUI progress visualization (use simple progress bars) |
-| `--streaming` | Enable streaming output mode for large codebases (O(1) memory) |
-| `--stream-to <FILE>` | Output file for streaming mode (use "-" for stdout) |
 
 ## Troubleshooting
 
@@ -349,7 +347,6 @@ patterns = ["**/target/**", "**/tests/**"]
 - **Empty output**: Check that your project contains supported source files (`.rs`, `.py`, `.js`, `.jsx`, `.ts`, `.tsx`)
 - **Parser failures**: Run with `-vv` for debug output
 - **Performance issues**: Limit parallel jobs with `--jobs 4`
-- **Large codebase slowness**: Use `--streaming` mode for O(1) memory overhead
 
 ### Coverage Issues
 
