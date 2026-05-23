@@ -612,6 +612,32 @@ mod tests {
         assert_eq!(count, 1);
     }
 
+    #[test]
+    fn format_for_output_includes_spec_140_and_domain_distribution() {
+        let classifications = create_test_classifications(10, 3);
+        let metrics = DomainDiversityMetrics::from_struct_classifications(&classifications, true)
+            .expect("Failed to create metrics");
+        let output = metrics.format_for_output();
+
+        assert!(output.contains("DOMAIN DIVERSITY ANALYSIS"));
+        assert!(output.contains("Spec 140"));
+        assert!(output.contains("Severity:"));
+        assert!(output.contains("domains"));
+        assert!(output.contains("Domain Distribution:"));
+        assert!(output.contains("Diversity Score:"));
+    }
+
+    #[test]
+    fn format_for_output_uses_domain_count_not_responsibilities() {
+        let classifications = create_test_classifications(10, 3);
+        let metrics = DomainDiversityMetrics::from_struct_classifications(&classifications, true)
+            .expect("Failed to create metrics");
+        let output = metrics.format_for_output();
+
+        assert!(output.contains("10 structs across 3 domains"));
+        assert!(!output.contains("across 1 responsibilities"));
+    }
+
     // Property-based tests using proptest
     mod property_tests {
         use super::*;
