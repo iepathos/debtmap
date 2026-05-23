@@ -16,8 +16,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
+            window.path_to_searchindex_js = "searchindex-b91ac412.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-ebd6ab1f.js"></script>
+        <script src="toc-41409472.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -797,8 +797,6 @@ patterns = ["**/target/**", "**/tests/**"]
 <tr><td><code>--no-parallel</code></td><td>Disable parallel processing</td></tr>
 <tr><td><code>--max-files &lt;N&gt;</code></td><td>Limit analysis to N files</td></tr>
 <tr><td><code>--no-tui</code></td><td>Disable TUI progress visualization (use simple progress bars)</td></tr>
-<tr><td><code>--streaming</code></td><td>Enable streaming output mode for large codebases (O(1) memory)</td></tr>
-<tr><td><code>--stream-to &lt;FILE&gt;</code></td><td>Output file for streaming mode (use “-” for stdout)</td></tr>
 </tbody>
 </table>
 </div>
@@ -817,7 +815,6 @@ patterns = ["**/target/**", "**/tests/**"]
 <li><strong>Empty output</strong>: Check that your project contains supported source files (<code>.rs</code>, <code>.py</code>, <code>.js</code>, <code>.jsx</code>, <code>.ts</code>, <code>.tsx</code>)</li>
 <li><strong>Parser failures</strong>: Run with <code>-vv</code> for debug output</li>
 <li><strong>Performance issues</strong>: Limit parallel jobs with <code>--jobs 4</code></li>
-<li><strong>Large codebase slowness</strong>: Use <code>--streaming</code> mode for O(1) memory overhead</li>
 </ul>
 <h3 id="coverage-issues"><a class="header" href="#coverage-issues">Coverage Issues</a></h3>
 <ul>
@@ -1269,8 +1266,8 @@ jobs:
 <p><strong>Solution:</strong> Report as a bug with reproducible example</p>
 <h3 id="large-context-suggestions"><a class="header" href="#large-context-suggestions">Large context suggestions</a></h3>
 <p><strong>Cause:</strong> High coupling in codebase</p>
-<p><strong>Solution:</strong> Limit the number of reported items or dependency entries:</p>
-<pre><code class="language-bash">debtmap analyze . --context --format markdown --top 1 --max-callers 3 --max-callees 3
+<p><strong>Solution:</strong> Limit the number of reported items:</p>
+<pre><code class="language-bash">debtmap analyze . --context --format markdown --top 1
 </code></pre>
 <h2 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h2>
 <h3 id="cli-options-for-llm-integration"><a class="header" href="#cli-options-for-llm-integration">CLI Options for LLM Integration</a></h3>
@@ -1286,7 +1283,6 @@ jobs:
 <tr><td><code>--lcov FILE</code></td><td>Include coverage data</td></tr>
 <tr><td><code>--context</code></td><td>Enable context-aware risk analysis</td></tr>
 <tr><td><code>--context-providers LIST</code></td><td>Select <code>critical_path</code>, <code>dependency</code>, and/or <code>git_history</code></td></tr>
-<tr><td><code>--show-dependencies</code></td><td>Include caller/callee details</td></tr>
 <tr><td><code>--min-score N</code></td><td>Filter items below score N</td></tr>
 <tr><td><code>--output FILE</code></td><td>Write to file instead of stdout</td></tr>
 </tbody>
@@ -1425,7 +1421,6 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 <li><code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code> (configure these in <code>.debtmap.toml</code> instead)</li>
 <li><code>--languages</code> (language filtering)</li>
 </ul>
-<p><strong>Note:</strong> The <code>--explain-score</code> flag exists in the <code>validate</code> command but is deprecated (hidden). Use <code>-v</code>, <code>-vv</code>, or <code>-vvv</code> for verbosity instead.</p>
 <p>Configure analysis thresholds in your <code>.debtmap.toml</code> configuration file for use with the <code>validate</code> command.</p>
 <p><strong>Exit Codes:</strong></p>
 <ul>
@@ -1614,35 +1609,11 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <li><code>--show-filter-stats</code> - Show filter statistics (how many items were filtered and why)</li>
 <li><code>--filter &lt;CATEGORIES&gt;</code> - Filter by debt categories (comma-separated)</li>
 <li><code>--aggregate-only</code> - Show only aggregated file-level scores</li>
-<li><code>--group-by-category</code> - Group output by debt category</li>
 </ul>
 <p><strong>Progress Display:</strong></p>
 <ul>
 <li><code>--no-tui</code> - Disable TUI progress visualization (use simple progress bars instead)</li>
 <li><code>-q, --quiet</code> - Suppress progress output (quiet mode)</li>
-</ul>
-<p><strong>Streaming Output:</strong></p>
-<ul>
-<li><code>--streaming</code> - Enable streaming output mode for large codebases (Spec 003)
-<ul>
-<li>Streams results to output as they’re generated with O(1) memory overhead</li>
-<li>Useful for processing large codebases that would otherwise exhaust memory</li>
-</ul>
-</li>
-<li><code>--stream-to &lt;FILE&gt;</code> - Output file for streaming mode (requires –streaming)
-<ul>
-<li>Use “-” for stdout</li>
-</ul>
-</li>
-</ul>
-<p><strong>Dependency Display Options:</strong></p>
-<ul>
-<li><code>--show-dependencies</code> - Show caller/callee information in output</li>
-<li><code>--no-dependencies</code> - Hide dependency information (conflicts with –show-dependencies)</li>
-<li><code>--max-callers &lt;N&gt;</code> - Maximum number of callers to display (default: 5)</li>
-<li><code>--max-callees &lt;N&gt;</code> - Maximum number of callees to display (default: 5)</li>
-<li><code>--show-external-calls</code> - Include external crate calls in dependencies</li>
-<li><code>--show-std-lib-calls</code> - Include standard library calls in dependencies</li>
 </ul>
 <h3 id="analysis-control"><a class="header" href="#analysis-control">Analysis Control</a></h3>
 <p>Configure analysis behavior, thresholds, and language selection.</p>
@@ -1714,7 +1685,6 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <li>Total debt score with coverage ≤ score without coverage</li>
 </ul>
 </li>
-<li><code>--validate-loc</code> - Validate LOC consistency across analysis modes (with/without coverage)</li>
 </ul>
 <h3 id="performance"><a class="header" href="#performance">Performance</a></h3>
 <p>Optimize analysis performance through parallelization.</p>
@@ -1762,11 +1732,6 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <li><code>--explain-metrics</code> - Explain metric definitions and formulas (measured vs estimated)</li>
 <li><code>--verbose-macro-warnings</code> - Show verbose macro parsing warnings (Rust analysis)</li>
 <li><code>--show-macro-stats</code> - Show macro expansion statistics at end of analysis</li>
-<li><code>--detail-level &lt;LEVEL&gt;</code> - Detail level for diagnostic reports
-<ul>
-<li>Options: summary, standard, comprehensive, debug (default: standard)</li>
-</ul>
-</li>
 </ul>
 <p><strong>Call Graph Debugging:</strong></p>
 <ul>
@@ -1805,28 +1770,6 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <li>Suggests how to decompose large files into smaller, focused modules</li>
 </ul>
 </li>
-<li><code>--min-split-methods &lt;N&gt;</code> - Minimum methods per god object split recommendation (default: 10)</li>
-<li><code>--min-split-lines &lt;N&gt;</code> - Minimum lines per god object split recommendation (default: 150)</li>
-</ul>
-<p><strong>Dead Code Analysis:</strong></p>
-<ul>
-<li><code>--no-public-api-detection</code> - Disable public API detection heuristics for dead code analysis</li>
-<li><code>--public-api-threshold &lt;N&gt;</code> - Public API confidence threshold (0.0-1.0, default: 0.7)
-<ul>
-<li>Functions above this threshold are considered public APIs</li>
-</ul>
-</li>
-</ul>
-<p><strong>Pattern Detection:</strong></p>
-<ul>
-<li><code>--no-pattern-detection</code> - Disable pattern recognition</li>
-<li><code>--patterns &lt;PATTERNS&gt;</code> - Enable specific patterns only (comma-separated)
-<ul>
-<li>Available patterns: observer, singleton, factory, strategy, callback, template_method</li>
-</ul>
-</li>
-<li><code>--pattern-threshold &lt;N&gt;</code> - Pattern confidence threshold (0.0-1.0, default: 0.7)</li>
-<li><code>--show-pattern-warnings</code> - Show pattern warnings for uncertain detections</li>
 </ul>
 <h3 id="option-aliases"><a class="header" href="#option-aliases">Option Aliases</a></h3>
 <p>Common option shortcuts and aliases for convenience:</p>
@@ -1840,15 +1783,6 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <li><code>-o</code> is short form for <code>--output</code></li>
 <li><code>-c</code> is short form for <code>--config</code></li>
 <li><code>-j</code> is short form for <code>--jobs</code></li>
-</ul>
-<h3 id="deprecated-options"><a class="header" href="#deprecated-options">Deprecated Options</a></h3>
-<p>The following options are deprecated and should be migrated:</p>
-<ul>
-<li><code>--explain-score</code> (hidden) - <strong>Deprecated:</strong> use <code>-v</code> instead
-<ul>
-<li><strong>Migration:</strong> Use <code>-v</code>, <code>-vv</code>, or <code>-vvv</code> for increasing verbosity levels</li>
-</ul>
-</li>
 </ul>
 <h2 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h2>
 <h3 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h3>
@@ -2032,9 +1966,6 @@ debtmap analyze . --validate-call-graph --debug-format json
 <p>Show macro expansion statistics (Rust):</p>
 <pre><code class="language-bash">debtmap analyze . --show-macro-stats --verbose-macro-warnings
 </code></pre>
-<p>Use detailed diagnostic reports:</p>
-<pre><code class="language-bash">debtmap analyze . --detail-level comprehensive
-</code></pre>
 <p>Analyze functional programming patterns:</p>
 <pre><code class="language-bash"># Enable functional analysis
 debtmap analyze . --ast-functional-analysis
@@ -2083,8 +2014,6 @@ debtmap analyze . --filter complexity,duplication
 # Summary format
 debtmap analyze . --summary
 
-# Group by category
-debtmap analyze . --group-by-category
 </code></pre>
 <h3 id="performance-tuning-1"><a class="header" href="#performance-tuning-1">Performance Tuning</a></h3>
 <pre><code class="language-bash"># Use 8 threads
@@ -2180,34 +2109,18 @@ debtmap analyze . --explain-metrics -v
 <tr><td><code>--show-filter-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--quiet</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--no-tui</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--streaming</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--stream-to</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--jobs</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--no-parallel</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--profile-output</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--verbose</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
 <tr><td><code>--show-splits</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--min-split-methods</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--min-split-lines</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--no-public-api-detection</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--public-api-threshold</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--no-pattern-detection</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--patterns</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--pattern-threshold</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-pattern-warnings</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--explain-metrics</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--debug-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--trace-function</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--call-graph-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--validate-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--debug-format</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--no-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--max-callers</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--max-callees</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-external-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-std-lib-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--ast-functional-analysis</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--functional-analysis-profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--function</code></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
@@ -8170,7 +8083,6 @@ show_name_heuristics = false
 <tr><td><code>verbosity</code></td><td><code>-v</code> (repeatable)</td></tr>
 <tr><td><code>summary</code></td><td><code>--summary</code></td></tr>
 <tr><td><code>compact</code></td><td><code>--compact</code></td></tr>
-<tr><td><code>show_dependencies</code></td><td><code>--show-dependencies</code></td></tr>
 <tr><td><code>show_splits</code></td><td><code>--show-splits</code></td></tr>
 <tr><td><code>tiered</code></td><td><code>--tiered</code></td></tr>
 </tbody>
@@ -8679,10 +8591,7 @@ max = 90.0
 <li><strong>Enable pattern detection</strong> - Identify boilerplate for macro opportunities</li>
 </ol>
 <h3 id="cli-example-2"><a class="header" href="#cli-example-2">CLI Example</a></h3>
-<pre><code class="language-bash"># Analyze with public API detection
-debtmap analyze . --no-public-api-detection=false --public-api-threshold 0.8
-
-# Generate markdown report for documentation
+<pre><code class="language-bash"># Generate markdown report for documentation
 debtmap analyze . --format markdown --output TECH_DEBT.md
 </code></pre>
 <h2 id="cicd-integration-best-practices"><a class="header" href="#cicd-integration-best-practices">CI/CD Integration Best Practices</a></h2>
@@ -11092,10 +11001,7 @@ debtmap analyze . --filter Architecture,Testing
 <li><code>CodeQuality</code>: Code smells, maintainability</li>
 </ul>
 <h3 id="grouping-output"><a class="header" href="#grouping-output">Grouping Output</a></h3>
-<pre><code class="language-bash"># Group results by debt category
-debtmap analyze . --group-by-category
-
-# Combine filters for focused analysis
+<pre><code class="language-bash"># Combine filters for focused analysis
 debtmap analyze . --filter Architecture --min-priority high --top 5
 </code></pre>
 <h3 id="summary-mode"><a class="header" href="#summary-mode">Summary Mode</a></h3>
@@ -11666,11 +11572,11 @@ debtmap compare --before before.json --after after.json
 <h2 id="advanced-features-1"><a class="header" href="#advanced-features-1">Advanced Features</a></h2>
 <h3 id="custom-data-retention"><a class="header" href="#custom-data-retention">Custom Data Retention</a></h3>
 <p>Control how much detail is stored in results:</p>
-<pre><code class="language-bash"># Minimal results (scores only)
-debtmap analyze . -o summary.json --format json --detail-level summary
+<pre><code class="language-bash"># Focused results
+debtmap analyze . -o summary.json --format json --top 10
 
-# Full results (all metrics and context)
-debtmap analyze . -o comprehensive.json --format json --detail-level comprehensive
+# Full JSON results
+debtmap analyze . -o comprehensive.json --format json
 </code></pre>
 <h3 id="performance-optimization-1"><a class="header" href="#performance-optimization-1">Performance Optimization</a></h3>
 <p>For large codebases, optimize TUI performance:</p>
@@ -13603,22 +13509,6 @@ show_std_lib = false
 </code></pre>
 <p><strong>Source</strong>: Configuration fields from src/config/classification.rs:5-50 (CallerCalleeConfig)</p>
 <h2 id="cli-reference-1"><a class="header" href="#cli-reference-1">CLI Reference</a></h2>
-<h3 id="display-control-flags"><a class="header" href="#display-control-flags">Display Control Flags</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>--show-dependencies</code></td><td>false</td><td>Show dependency information (callers/callees) in output</td></tr>
-<tr><td><code>--no-dependencies</code></td><td>false</td><td>Hide dependency information (conflicts with –show-dependencies)</td></tr>
-<tr><td><code>--max-callers &lt;N&gt;</code></td><td>5</td><td>Maximum number of callers to display per function</td></tr>
-<tr><td><code>--max-callees &lt;N&gt;</code></td><td>5</td><td>Maximum number of callees to display per function</td></tr>
-<tr><td><code>--show-external-calls</code></td><td>false</td><td>Show external crate calls in dependencies</td></tr>
-<tr><td><code>--show-std-lib-calls</code></td><td>false</td><td>Show standard library calls in dependencies</td></tr>
-</tbody>
-</table>
-</div>
 <h3 id="analysis-control-flags"><a class="header" href="#analysis-control-flags">Analysis Control Flags</a></h3>
 <div class="table-wrapper">
 <table>
@@ -13651,27 +13541,11 @@ show_std_lib = false
 <pre><code class="language-bash"># Analyze with call graph enabled (default)
 debtmap analyze .
 
-# Show caller/callee relationships in output
-debtmap analyze . --show-dependencies
-
-# Limit displayed relationships
-debtmap analyze . --show-dependencies --max-callers 3 --max-callees 3
+# Show call graph statistics
+debtmap analyze . --call-graph-stats
 </code></pre>
-<h3 id="filtering-external-calls"><a class="header" href="#filtering-external-calls">Filtering External Calls</a></h3>
-<p>By default, Debtmap filters both external crate calls and standard library calls for cleaner output. The call graph contains all edges; filtering only affects display output.</p>
-<pre><code class="language-bash"># Default: external and standard library calls are hidden
-debtmap analyze .
-
-# Show external crate calls (e.g., from dependencies)
-debtmap analyze . --show-dependencies --show-external-calls
-
-# Show standard library calls (std::, core::, alloc::)
-debtmap analyze . --show-dependencies --show-std-lib-calls
-
-# Show both external and standard library calls
-debtmap analyze . --show-dependencies --show-external-calls --show-std-lib-calls
-</code></pre>
-<p><strong>Important</strong>: External call filtering happens at display time, not during graph construction. This means <code>--debug-call-graph</code> may show more calls than regular output.</p>
+<h3 id="inspecting-call-resolution"><a class="header" href="#inspecting-call-resolution">Inspecting Call Resolution</a></h3>
+<p>Use <code>--debug-call-graph</code> for detailed resolver output and <code>--trace-function &lt;NAME&gt;</code> to follow specific functions through call resolution.</p>
 <p><strong>Source</strong>: Filtering logic from src/priority/formatter/dependencies.rs:filter_dependencies</p>
 <h3 id="debugging-call-resolution"><a class="header" href="#debugging-call-resolution">Debugging Call Resolution</a></h3>
 <pre><code class="language-bash"># Enable detailed call graph debugging
@@ -13763,9 +13637,8 @@ debtmap analyze . --no-parallel
 <h3 id="incorrect-callercallee-counts"><a class="header" href="#incorrect-callercallee-counts">Incorrect Caller/Callee Counts</a></h3>
 <p>If counts seem wrong:</p>
 <ol>
-<li><strong>Check filtering</strong> - Use <code>--show-external-calls</code> and <code>--show-std-lib-calls</code> to see all edges</li>
 <li><strong>Validate structure</strong> - Run <code>--validate-call-graph</code> to check for structural issues</li>
-<li><strong>Review debug output</strong> - Use <code>--debug-call-graph</code> to see complete graph before filtering</li>
+<li><strong>Review debug output</strong> - Use <code>--debug-call-graph</code> to see call resolution details</li>
 </ol>
 <h2 id="see-also-9"><a class="header" href="#see-also-9">See Also</a></h2>
 <ul>
@@ -16099,7 +15972,7 @@ class CSVProcessor(DataProcessor):
 <p>Debtmap also detects certain patterns internally for analysis purposes, but these are not exposed as user-facing design pattern detection features. These internal patterns help improve the accuracy of other analyses like god object detection and complexity calculations.</p>
 <h3 id="builder-pattern-internal-use-only"><a class="header" href="#builder-pattern-internal-use-only">Builder Pattern (Internal Use Only)</a></h3>
 <p>The Builder pattern is detected internally during <strong>god object detection</strong> to avoid false positives. Classes that follow the builder pattern are given adjusted scores in god object analysis since builder classes naturally have many methods and fields.</p>
-<p><strong>Note</strong>: Builder pattern detection is <strong>not available</strong> via the <code>--patterns</code> CLI flag. It’s used only internally for scoring adjustments.</p>
+<p><strong>Note</strong>: Builder pattern detection is internal-only and used for scoring adjustments.</p>
 <p><strong>Internal Detection Criteria</strong>:</p>
 <ul>
 <li>Struct with builder suffix or builder-related naming</li>
@@ -16131,7 +16004,7 @@ impl HttpClientBuilder {
 <p><strong>Source</strong>: <code>src/organization/builder_pattern.rs</code> - Used for god object detection score adjustment</p>
 <h3 id="visitor-pattern-internal-use-only"><a class="header" href="#visitor-pattern-internal-use-only">Visitor Pattern (Internal Use Only)</a></h3>
 <p>The Visitor pattern is detected internally for <strong>complexity analysis normalization</strong>. When exhaustive pattern matching is detected (typical of visitor patterns), Debtmap applies logarithmic complexity scaling instead of linear scaling to avoid penalizing idiomatic exhaustive match expressions.</p>
-<p><strong>Note</strong>: Visitor pattern detection is <strong>not available</strong> via the <code>--patterns</code> CLI flag. It’s used only internally for complexity scaling adjustments.</p>
+<p><strong>Note</strong>: Visitor pattern detection is internal-only and used for complexity scaling adjustments.</p>
 <p><strong>Internal Detection Criteria</strong>:</p>
 <ul>
 <li>Trait with visit methods for different types</li>
@@ -16162,12 +16035,10 @@ impl Visitor for ComplexityVisitor {
 <p><strong>Source</strong>: <code>src/complexity/visitor_detector.rs</code> - Used for complexity analysis, not pattern reporting</p>
 <h2 id="configuration-9"><a class="header" href="#configuration-9">Configuration</a></h2>
 <h3 id="current-implementation-status"><a class="header" href="#current-implementation-status">Current Implementation Status</a></h3>
-<p>Pattern detection is currently <strong>internal-only</strong> and used for analysis adjustments. The CLI flags for pattern detection exist in the codebase but are not yet fully integrated into the analysis pipeline.</p>
+<p>Pattern detection is currently <strong>internal-only</strong> and used for analysis adjustments. It is not exposed through <code>analyze</code> CLI flags.</p>
 <p><strong>Status Summary</strong>:</p>
 <ul>
 <li>✅ Pattern detection logic implemented (7 user-facing patterns)</li>
-<li>✅ CLI flags defined (<code>--no-pattern-detection</code>, <code>--patterns</code>, <code>--pattern-threshold</code>, <code>--show-pattern-warnings</code>)</li>
-<li>⚠️ CLI flags not yet wired to analysis pipeline</li>
 <li>⚠️ Pattern detection results not currently exposed in output formats</li>
 </ul>
 <p>Pattern detection is primarily used internally for:</p>
@@ -16176,21 +16047,7 @@ impl Visitor for ComplexityVisitor {
 <li>Informing god object detection (Builder pattern)</li>
 <li>Normalizing exhaustive pattern matching complexity (Visitor pattern)</li>
 </ul>
-<h3 id="cli-options-defined-but-not-yet-active"><a class="header" href="#cli-options-defined-but-not-yet-active">CLI Options (Defined but Not Yet Active)</a></h3>
-<p>The following CLI flags are defined in the codebase (<code>src/cli.rs:228-241</code>) but are not yet fully integrated:</p>
-<pre><code class="language-bash"># Disable all pattern detection (planned)
-debtmap analyze . --no-pattern-detection
-
-# Enable only specific patterns (planned)
-debtmap analyze . --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
-
-# Set confidence threshold (planned)
-debtmap analyze . --pattern-threshold 0.8
-
-# Show warnings for uncertain pattern detections (planned)
-debtmap analyze . --show-pattern-warnings
-</code></pre>
-<p><strong>Planned Patterns for <code>--patterns</code> Flag</strong> (when integration is complete):</p>
+<h3 id="pattern-types-1"><a class="header" href="#pattern-types-1">Pattern Types</a></h3>
 <ul>
 <li><code>observer</code> - Observer pattern detection</li>
 <li><code>singleton</code> - Singleton pattern detection</li>
@@ -16200,7 +16057,7 @@ debtmap analyze . --show-pattern-warnings
 <li><code>template_method</code> - Template method pattern detection</li>
 <li><code>dependency_injection</code> - Dependency injection detection</li>
 </ul>
-<p><strong>Note</strong>: Builder and Visitor patterns are detected internally but will not be available via the <code>--patterns</code> flag. See <a href="#internal-pattern-detection">Internal Pattern Detection</a> for details.</p>
+<p><strong>Note</strong>: Builder and Visitor patterns are detected internally for scoring adjustments. See <a href="#internal-pattern-detection">Internal Pattern Detection</a> for details.</p>
 <h3 id="roadmap-pattern-detection-output"><a class="header" href="#roadmap-pattern-detection-output">Roadmap: Pattern Detection Output</a></h3>
 <p>When fully integrated, pattern detection results will appear in debtmap’s output formats:</p>
 <p><strong>Planned Terminal Format</strong>:</p>
@@ -16221,12 +16078,7 @@ debtmap analyze . --show-pattern-warnings
   ]
 }
 </code></pre>
-<p><strong>Current Workaround</strong>: Pattern detection is used internally during analysis to improve accuracy. To see the effects of pattern detection:</p>
-<ol>
-<li>Run analysis with and without <code>--no-pattern-detection</code> (when implemented)</li>
-<li>Compare complexity scores and god object detection results</li>
-<li>Patterns are being detected, but not explicitly reported in output</li>
-</ol>
+<p><strong>Current Behavior</strong>: Pattern detection is used internally during analysis to improve accuracy. Patterns are being detected, but not explicitly reported in output.</p>
 <h2 id="confidence-scoring"><a class="header" href="#confidence-scoring">Confidence Scoring</a></h2>
 <p>Pattern detection uses a confidence scoring system (0.0-1.0) to indicate match quality:</p>
 <ul>
@@ -16237,13 +16089,6 @@ debtmap analyze . --show-pattern-warnings
 <li><strong>0.5-0.6</strong>: Low - Weak match, may be false positive</li>
 </ul>
 <p><strong>Default Threshold</strong>: 0.7 - Only patterns with 70% or higher confidence are reported by default.</p>
-<p><strong>Adjusting Thresholds</strong>:</p>
-<pre><code class="language-bash"># More strict (fewer patterns, higher confidence)
-debtmap analyze . --pattern-threshold 0.85
-
-# More lenient (more patterns, lower confidence)
-debtmap analyze . --pattern-threshold 0.6 --show-pattern-warnings
-</code></pre>
 <p><strong>How Confidence is Calculated</strong>:</p>
 <p>Each pattern detector calculates confidence holistically based on multiple factors:</p>
 <ol>
@@ -16424,8 +16269,7 @@ class EventDispatcher:
 <pre><code class="language-bash"># Run standard analysis
 debtmap analyze myapp/
 
-# When --no-pattern-detection is fully integrated, compare results
-# (currently this flag exists but isn't fully wired)
+# Pattern detection is applied internally during scoring
 </code></pre>
 <p><strong>Expected Differences</strong>:</p>
 <ul>
@@ -16462,16 +16306,10 @@ pub struct HttpClientBuilder {
 <h3 id="3-future-use-case-architecture-documentation-planned"><a class="header" href="#3-future-use-case-architecture-documentation-planned">3. Future Use Case: Architecture Documentation (Planned)</a></h3>
 <p><strong>Problem</strong>: Undocumented design patterns in legacy codebase
 <strong>Solution</strong>: When pattern output is integrated, users will be able to generate architectural pattern reports</p>
-<p><strong>Command</strong>:</p>
-<pre><code class="language-bash">debtmap analyze . --show-pattern-warnings --format json &gt; architecture-report.json
-</code></pre>
 <p><strong>Current Workaround</strong>: Review complexity adjustments and god object scoring to infer where patterns are detected</p>
 <h3 id="4-future-use-case-pattern-consistency-validation-planned"><a class="header" href="#4-future-use-case-pattern-consistency-validation-planned">4. Future Use Case: Pattern Consistency Validation (Planned)</a></h3>
 <p><strong>Problem</strong>: Inconsistent Observer implementations across the codebase
 <strong>Solution</strong>: When integrated, users can filter analysis to specific pattern types</p>
-<p><strong>Command</strong>:</p>
-<pre><code class="language-bash">debtmap analyze . --patterns observer --format json &gt; observers.json
-</code></pre>
 <p><strong>Current Status</strong>: Pattern detection logic exists and works internally, but results aren’t yet exposed in output</p>
 <h2 id="troubleshooting-13"><a class="header" href="#troubleshooting-13">Troubleshooting</a></h2>
 <h3 id="pattern-detection-not-visible-in-output"><a class="header" href="#pattern-detection-not-visible-in-output">Pattern Detection Not Visible in Output</a></h3>
@@ -16489,25 +16327,15 @@ pub struct HttpClientBuilder {
 <li>Check if complexity scores seem adjusted for factory/callback patterns</li>
 <li>Verify builder classes aren’t flagged as god objects</li>
 </ol>
-<p><strong>Future Integration</strong>: CLI flags and output formatting will be connected when pattern output integration is complete.</p>
-<h3 id="cli-flags-have-no-effect"><a class="header" href="#cli-flags-have-no-effect">CLI Flags Have No Effect</a></h3>
-<p><strong>Symptoms</strong>: Using <code>--patterns</code>, <code>--pattern-threshold</code>, or <code>--show-pattern-warnings</code> doesn’t change results</p>
-<p><strong>Explanation</strong>: These CLI flags are defined in <code>src/cli.rs:228-241</code> but are not yet fully wired to the analysis pipeline.</p>
-<p><strong>Current Status</strong>:</p>
-<ul>
-<li>✅ CLI argument parsing works</li>
-<li>⚠️ Values not passed to pattern detector</li>
-<li>⚠️ Pattern detection runs with default settings regardless of flags</li>
-</ul>
-<p><strong>Workaround</strong>: Pattern detection runs automatically with default settings (threshold 0.7, all 7 patterns enabled).</p>
+<p><strong>Future Integration</strong>: Output formatting can expose pattern details when pattern reporting is implemented.</p>
 <h3 id="builder-or-visitor-pattern-not-available-via-cli"><a class="header" href="#builder-or-visitor-pattern-not-available-via-cli">Builder or Visitor Pattern Not Available via CLI</a></h3>
-<p><strong>Symptoms</strong>: Cannot specify <code>--patterns builder</code> or <code>--patterns visitor</code></p>
+<p><strong>Symptoms</strong>: Builder and Visitor patterns are not shown as user-facing pattern results</p>
 <p><strong>Explanation</strong>: Builder and Visitor patterns are <strong>intentionally internal-only</strong> and will not be available as user-facing pattern detection features:</p>
 <ul>
 <li><strong>Builder</strong>: Used during god object detection to adjust scores for builder classes (see <code>src/organization/builder_pattern.rs</code>)</li>
 <li><strong>Visitor</strong>: Used for complexity analysis to apply logarithmic scaling to exhaustive match expressions (see <code>src/complexity/visitor_detector.rs</code>)</li>
 </ul>
-<p><strong>Solution</strong>: These patterns are automatically detected when needed for internal analyses. They won’t appear in the <code>--patterns</code> flag even when that feature is fully integrated.</p>
+<p><strong>Solution</strong>: These patterns are automatically detected when needed for internal analyses.</p>
 <p><strong>Available user-facing patterns</strong>: <code>observer</code>, <code>singleton</code>, <code>factory</code>, <code>strategy</code>, <code>callback</code>, <code>template_method</code>, <code>dependency_injection</code></p>
 <h3 id="false-positive-complexity-adjustments"><a class="header" href="#false-positive-complexity-adjustments">False Positive Complexity Adjustments</a></h3>
 <p><strong>Symptoms</strong>: Function with <code>create_</code> prefix gets lower complexity score but isn’t actually a factory</p>
@@ -16516,11 +16344,7 @@ pub struct HttpClientBuilder {
 <li>Naming collision (e.g., <code>create_session()</code> that doesn’t create objects)</li>
 <li>Overly broad pattern matching heuristics</li>
 </ol>
-<p><strong>Current Workaround</strong>: Pattern detection cannot currently be disabled or tuned per-file. The <code>--no-pattern-detection</code> flag exists but isn’t yet wired to the detector.</p>
-<p><strong>Future Solution</strong>: When CLI integration is complete:</p>
-<pre><code class="language-bash">debtmap analyze . --no-pattern-detection  # Disable all pattern detection
-debtmap analyze . --pattern-threshold 0.9  # Require very high confidence
-</code></pre>
+<p><strong>Current Workaround</strong>: Pattern detection cannot currently be disabled or tuned per-file.</p>
 <h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
 <h3 id="current-recommendations"><a class="header" href="#current-recommendations">Current Recommendations</a></h3>
 <ol>
@@ -16529,15 +16353,6 @@ debtmap analyze . --pattern-threshold 0.9  # Require very high confidence
 <li><strong>Check builder classes</strong>: If builder classes aren’t flagged as god objects, builder pattern detection is working correctly</li>
 <li><strong>Follow pattern idioms</strong>: Use standard naming conventions (<code>create_</code>, <code>make_</code>, <code>@abstractmethod</code>, etc.) to ensure patterns are recognized</li>
 <li><strong>Structure code clearly</strong>: Well-structured patterns (clear base classes, explicit implementations) have higher confidence scores</li>
-</ol>
-<h3 id="when-cli-integration-is-complete"><a class="header" href="#when-cli-integration-is-complete">When CLI Integration is Complete</a></h3>
-<p>Future best practices when CLI flags are fully wired:</p>
-<ol>
-<li><strong>Start with defaults</strong>: The default 0.7 threshold will work well for most projects</li>
-<li><strong>Use <code>--show-pattern-warnings</code></strong> during initial analysis to see borderline detections</li>
-<li><strong>Tune thresholds per-project</strong>: Adjust <code>--pattern-threshold</code> based on your codebase’s idioms</li>
-<li><strong>Disable selectively</strong>: Use <code>--no-pattern-detection</code> to compare scores with/without adjustments</li>
-<li><strong>Review pattern reports</strong>: Examine detected patterns to understand architectural decisions</li>
 </ol>
 <h2 id="summary-4"><a class="header" href="#summary-4">Summary</a></h2>
 <h3 id="current-state"><a class="header" href="#current-state">Current State</a></h3>
@@ -16554,7 +16369,6 @@ debtmap analyze . --pattern-threshold 0.9  # Require very high confidence
 </ul>
 <p><strong>Partially Implemented</strong>:</p>
 <ul>
-<li>⚠️ <strong>CLI flags</strong>: Defined in <code>src/cli.rs</code> but not wired to pattern detector</li>
 <li>⚠️ <strong>Output formatting</strong>: <code>PatternInstance</code> type exists but not exposed in output</li>
 </ul>
 <p><strong>Not Yet Implemented</strong>:</p>
@@ -16575,7 +16389,6 @@ debtmap analyze . --pattern-threshold 0.9  # Require very high confidence
 <p>When CLI and output integration is complete, users will be able to:</p>
 <ul>
 <li>View detected patterns in analysis output</li>
-<li>Control pattern detection via <code>--patterns</code>, <code>--pattern-threshold</code>, and <code>--show-pattern-warnings</code> flags</li>
 <li>Generate architectural documentation from pattern detection results</li>
 <li>Validate pattern consistency across codebases</li>
 </ul>
@@ -19653,9 +19466,6 @@ debtmap analyze .
 # Multi-pass with detailed attribution breakdown
 debtmap analyze . --attribution
 
-# Control detail level
-debtmap analyze . --attribution --detail-level comprehensive
-
 # Output as JSON for tooling integration
 debtmap analyze . --attribution --format json
 
@@ -19671,7 +19481,6 @@ debtmap analyze . --no-multi-pass
 <tbody>
 <tr><td><code>--no-multi-pass</code></td><td>Disable multi-pass analysis (use single-pass for performance)</td></tr>
 <tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires multi-pass)</td></tr>
-<tr><td><code>--detail-level &lt;level&gt;</code></td><td>Set output detail: <code>summary</code>, <code>standard</code>, <code>comprehensive</code>, <code>debug</code> (CLI accepts lowercase values)</td></tr>
 <tr><td><code>--format json</code></td><td>Output results in JSON format</td></tr>
 </tbody>
 </table>
@@ -19824,7 +19633,7 @@ fn load_config(path: &amp;Path) -&gt; Result&lt;Config&gt; {
 <span class="boring">}</span></code></pre>
 <h2 id="understanding-attribution-output"><a class="header" href="#understanding-attribution-output">Understanding Attribution Output</a></h2>
 <p>When you run with <code>--attribution</code>, you’ll see a detailed breakdown:</p>
-<pre><code class="language-bash">$ debtmap analyze src/main.rs --attribution --detail-level comprehensive
+<pre><code class="language-bash">$ debtmap analyze src/main.rs --attribution
 </code></pre>
 <h3 id="sample-output"><a class="header" href="#sample-output">Sample Output</a></h3>
 <pre><code>Multi-Pass Analysis Results
@@ -20146,7 +19955,6 @@ let analyzer = MultiPassAnalyzer::new(options);
 </thead>
 <tbody>
 <tr><td><code>language</code></td><td><code>Language</code></td><td><code>Rust</code></td><td>Target programming language</td></tr>
-<tr><td><code>detail_level</code></td><td><code>DetailLevel</code></td><td><code>Standard</code></td><td>Output detail: Summary, Standard, Comprehensive, Debug (CLI uses lowercase: <code>--detail-level standard</code>)</td></tr>
 <tr><td><code>enable_recommendations</code></td><td><code>bool</code></td><td><code>true</code></td><td>Generate actionable recommendations</td></tr>
 <tr><td><code>track_source_locations</code></td><td><code>bool</code></td><td><code>true</code></td><td>Include file/line/column in attribution</td></tr>
 <tr><td><code>generate_insights</code></td><td><code>bool</code></td><td><code>true</code></td><td>Automatically generate insights</td></tr>
@@ -27732,10 +27540,10 @@ patterns = [
 <pre><code class="language-bash"># Analyze specific package
 debtmap analyze packages/api --languages typescript
 
-# Analyze all packages, grouped by category
+# Analyze all packages and focus on architecture issues
 debtmap analyze packages \
   --languages typescript \
-  --group-by-category
+  --filter Architecture
 </code></pre>
 <h2 id="ci-integration-1"><a class="header" href="#ci-integration-1">CI Integration</a></h2>
 <h3 id="github-actions-3"><a class="header" href="#github-actions-3">GitHub Actions</a></h3>
@@ -27978,88 +27786,30 @@ debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap"
 <pre><code class="language-bash"># Standard markdown report
 debtmap analyze . --format markdown --output DEBT_REPORT.md
 
-# Summary level for executives (minimal detail)
-debtmap analyze . --format markdown --detail-level summary --output SUMMARY.md
+# Focused report for executives
+debtmap analyze . --format markdown --top 10 --output SUMMARY.md
 
-# Standard level for team review (default)
-debtmap analyze . --format markdown --detail-level standard --output DEBT.md
-
-# Comprehensive level for deep analysis
-debtmap analyze . --format markdown --detail-level comprehensive --output DETAILED.md
-
-# Debug level for troubleshooting
-debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
+# Full markdown report for team review
+debtmap analyze . --format markdown --output DEBT.md
 </code></pre>
-<p><strong>Detail levels:</strong></p>
-<ul>
-<li><strong>summary</strong>: Executive summary with key metrics and top issues only</li>
-<li><strong>standard</strong>: Balanced detail suitable for team reviews (default)</li>
-<li><strong>comprehensive</strong>: Full details including all debt items and analysis</li>
-<li><strong>debug</strong>: Maximum detail including AST information and parser internals</li>
-</ul>
 <p><strong>Use cases:</strong></p>
 <ul>
-<li>Summary: Management reports, PR comments</li>
-<li>Standard: Regular team reviews</li>
-<li>Comprehensive: Deep dives, refactoring planning</li>
-<li>Debug: Troubleshooting debtmap behavior</li>
+<li>Focused reports: Management reports, PR comments</li>
+<li>Full reports: Regular team reviews, deep dives, refactoring planning</li>
 </ul>
 <p>Great for documentation or PR comments.</p>
 <h2 id="advanced-usage-1"><a class="header" href="#advanced-usage-1">Advanced Usage</a></h2>
-<h3 id="design-pattern-detection-1"><a class="header" href="#design-pattern-detection-1">Design Pattern Detection</a></h3>
-<p>Detect design patterns in your codebase to understand architectural choices and identify potential overuse of certain patterns:</p>
-<pre><code class="language-bash"># Detect specific design patterns
-debtmap analyze . --patterns observer,singleton,factory
-
-# Adjust pattern confidence threshold (0.0-1.0, default: 0.7)
-debtmap analyze . --pattern-threshold 0.8
-
-# Show uncertain pattern matches with warnings
-debtmap analyze . --show-pattern-warnings
-
-# Disable pattern detection entirely
-debtmap analyze . --no-pattern-detection
-</code></pre>
-<p><strong>Available patterns:</strong></p>
-<ul>
-<li><code>observer</code> - Event listener registrations, callback patterns</li>
-<li><code>singleton</code> - Static instance management</li>
-<li><code>factory</code> - Object creation methods</li>
-<li><code>strategy</code> - Algorithm selection via traits/interfaces</li>
-<li><code>callback</code> - Function passing and invocation</li>
-<li><code>template_method</code> - Abstract methods with concrete implementations</li>
-</ul>
-<p><strong>Use cases:</strong></p>
-<ul>
-<li>Identify architectural patterns in unfamiliar codebases</li>
-<li>Detect potential overuse of certain patterns (e.g., too many singletons)</li>
-<li>Understand code organization and design decisions</li>
-</ul>
-<h3 id="dead-code-and-public-api-analysis"><a class="header" href="#dead-code-and-public-api-analysis">Dead Code and Public API Analysis</a></h3>
-<p>Control how Debtmap detects public APIs to prevent false positives when analyzing libraries vs CLI tools:</p>
-<pre><code class="language-bash"># Analyze with public API awareness (default for libraries)
+<h3 id="context-aware-analysis-3"><a class="header" href="#context-aware-analysis-3">Context-Aware Analysis</a></h3>
+<pre><code class="language-bash"># Include context-aware risk analysis
 debtmap analyze . --context
-
-# Disable public API heuristics (useful for CLI tools)
-debtmap analyze . --no-public-api-detection
-
-# Adjust public API confidence threshold (default: 0.7)
-debtmap analyze . --public-api-threshold 0.8
 </code></pre>
 <p><strong>When to use:</strong></p>
 <ul>
-<li><strong>Libraries</strong>: Keep default public API detection to avoid flagging exported functions as unused</li>
-<li><strong>CLI tools</strong>: Use <code>--no-public-api-detection</code> since there’s no public API</li>
-<li><strong>Mixed projects</strong>: Adjust threshold based on false positive rate</li>
+<li><strong>High-risk paths</strong>: Prioritize code used in critical flows</li>
+<li><strong>Refactoring planning</strong>: Combine risk and complexity signals</li>
+<li><strong>PR review</strong>: Focus attention on changes with higher context risk</li>
 </ul>
-<p><strong>What it detects:</strong></p>
-<ul>
-<li>Functions exported in <code>lib.rs</code> or <code>api.rs</code></li>
-<li>Public trait implementations</li>
-<li>Functions matching API naming patterns</li>
-<li>Prevents false positives for “unused” library functions</li>
-</ul>
-<h3 id="context-aware-analysis-3"><a class="header" href="#context-aware-analysis-3">Context-Aware Analysis</a></h3>
+<h3 id="context-aware-analysis-1-1"><a class="header" href="#context-aware-analysis-1-1">Context-Aware Analysis</a></h3>
 <p>Enable advanced context providers for more accurate prioritization:</p>
 <pre><code class="language-bash"># Enable all context providers for comprehensive analysis
 debtmap analyze . \
@@ -28128,10 +27878,7 @@ debtmap analyze . --aggregation-method logarithmic_sum
 debtmap analyze . --aggregation-method sum
 </code></pre>
 <h3 id="filtering-and-grouping"><a class="header" href="#filtering-and-grouping">Filtering and Grouping</a></h3>
-<pre><code class="language-bash"># Group results by debt category
-debtmap analyze . --group-by-category
-
-# Filter specific categories
+<pre><code class="language-bash"># Filter specific categories
 debtmap analyze . --filter Architecture,Testing
 
 # Show only high-priority items
@@ -28148,8 +27895,8 @@ debtmap analyze . --trace-function my_function --trace-function another_fn
 # Validate call graph structure (detect orphans and cycles)
 debtmap analyze . --validate-call-graph
 
-# Show detailed caller/callee relationships
-debtmap analyze . --show-dependencies
+# Show call graph statistics
+debtmap analyze . --call-graph-stats
 </code></pre>
 <p><strong>Use cases:</strong></p>
 <p><strong>Troubleshooting resolution failures:</strong></p>
@@ -28157,8 +27904,8 @@ debtmap analyze . --show-dependencies
 debtmap analyze . --debug-call-graph --trace-function problematic_function
 </code></pre>
 <p><strong>Understanding function relationships:</strong></p>
-<pre><code class="language-bash"># See who calls what
-debtmap analyze . --show-dependencies --top 10
+<pre><code class="language-bash"># Inspect call graph resolution
+debtmap analyze . --debug-call-graph --call-graph-stats
 </code></pre>
 <p><strong>Validating call graph integrity:</strong></p>
 <pre><code class="language-bash"># Detect cycles and orphaned nodes
@@ -29072,9 +28819,6 @@ debtmap analyze . --debug-call-graph -vv
 # Validate the call graph consistency
 debtmap analyze . --validate-call-graph
 
-# Include external dependencies if relevant
-debtmap analyze . --show-external-calls --show-std-lib-calls
-
 # Trace specific functions to see their relationships
 debtmap analyze . --trace-function "my_function" -vv
 
@@ -29242,9 +28986,6 @@ debtmap analyze . --show-macro-stats
 <h3 id="semantic-analysis-control"><a class="header" href="#semantic-analysis-control">Semantic Analysis Control</a></h3>
 <pre><code class="language-bash"># Disable semantic analysis (faster fallback mode)
 debtmap analyze . --semantic-off
-
-# Validate LOC consistency
-debtmap analyze . --validate-loc
 </code></pre>
 <p>Use <code>--semantic-off</code> when:</p>
 <ul>
@@ -29264,7 +29005,6 @@ debtmap analyze . --validate-loc
 <li>Priority calculation details</li>
 </ul>
 <p><strong>Source</strong>: <code>src/cli/args.rs:313-314</code></p>
-<p><strong>Note</strong>: The <code>--explain-score</code> flag has been deprecated in favor of granular verbosity levels (<code>-v</code>, <code>-vv</code>, <code>-vvv</code>).</p>
 <h2 id="performance-profiling"><a class="header" href="#performance-profiling">Performance Profiling</a></h2>
 <h3 id="enable-profiling"><a class="header" href="#enable-profiling">Enable Profiling</a></h3>
 <p>Use the <code>--profile</code> flag to identify performance bottlenecks (Spec 001):</p>
@@ -29307,8 +29047,8 @@ debtmap analyze . --semantic-off -v
 # Step 3: Check specific file
 debtmap analyze path/to/file.rs -vvv
 
-# Step 4: Validate results
-debtmap analyze . --validate-loc
+# Step 4: Validate call graph structure
+debtmap analyze . --validate-call-graph
 </code></pre>
 <h2 id="environment-variables-2"><a class="header" href="#environment-variables-2">Environment Variables</a></h2>
 <p>Debtmap supports various environment variables for debugging and diagnostics without command-line flags.</p>
@@ -29845,19 +29585,7 @@ debtmap analyze . --call-graph-stats
 # Validate call graph consistency
 debtmap analyze . --validate-call-graph
 </code></pre>
-<p><strong>Dependency Control Flags</strong>:</p>
-<pre><code class="language-bash"># Show dependency information in results
-debtmap analyze . --show-dependencies
-
-# Limit number of callers shown per function
-debtmap analyze . --max-callers 10
-
-# Include external crate calls in call graph
-debtmap analyze . --show-external-calls
-
-# Include standard library calls
-debtmap analyze . --show-std-lib-calls
-</code></pre>
+<p>Use <code>--debug-call-graph</code>, <code>--trace-function</code>, and <code>--call-graph-stats</code> when you need to inspect dependency resolution details.</p>
 <h2 id="god-object-detection-4"><a class="header" href="#god-object-detection-4">God Object Detection</a></h2>
 <p><strong>Flag</strong>: <code>--no-god-object</code></p>
 <p>Disables god object (large class/module) detection.</p>
@@ -29874,19 +29602,7 @@ debtmap analyze . --no-god-object
 debtmap analyze . -vv
 </code></pre>
 <h2 id="pattern-detection-issues"><a class="header" href="#pattern-detection-issues">Pattern Detection Issues</a></h2>
-<p><strong>Control Pattern Detection</strong>:</p>
-<pre><code class="language-bash"># Disable pattern detection entirely
-debtmap analyze . --no-pattern-detection
-
-# Specify specific patterns to detect
-debtmap analyze . --patterns "god_object,long_function,complex_conditional"
-
-# Adjust pattern detection sensitivity (default: 0.7)
-debtmap analyze . --pattern-threshold 0.6
-
-# Show pattern detection warnings
-debtmap analyze . --show-pattern-warnings
-</code></pre>
+<p>Pattern detection runs internally as part of scoring and is not controlled by <code>analyze</code> flags.</p>
 <p><strong>Detected Patterns</strong>:</p>
 <p><em>Debt patterns</em> (src/cli/args.rs:84):</p>
 <ul>
@@ -29918,14 +29634,6 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenien
 <p>Too many false positives for legitimate imperative code:</p>
 <pre><code class="language-bash"># Use lenient profile
 debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient
-</code></pre>
-<h2 id="public-api-detection-issues"><a class="header" href="#public-api-detection-issues">Public API Detection Issues</a></h2>
-<p><strong>Control Public API Detection</strong>:</p>
-<pre><code class="language-bash"># Disable public API detection
-debtmap analyze . --no-public-api-detection
-
-# Adjust public API detection threshold (default: 0.7)
-debtmap analyze . --public-api-threshold 0.5
 </code></pre>
 <h2 id="attribution-issues"><a class="header" href="#attribution-issues">Attribution Issues</a></h2>
 <p>Attribution analysis tracks where complexity originates in your code, separating logical complexity from formatting artifacts.</p>
@@ -30750,11 +30458,11 @@ debtmap analyze . --threshold-preset lenient
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 

@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
+            window.path_to_searchindex_js = "searchindex-b91ac412.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-ebd6ab1f.js"></script>
+        <script src="toc-41409472.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -259,22 +259,6 @@ show_std_lib = false
 </code></pre>
 <p><strong>Source</strong>: Configuration fields from src/config/classification.rs:5-50 (CallerCalleeConfig)</p>
 <h2 id="cli-reference"><a class="header" href="#cli-reference">CLI Reference</a></h2>
-<h3 id="display-control-flags"><a class="header" href="#display-control-flags">Display Control Flags</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td><code>--show-dependencies</code></td><td>false</td><td>Show dependency information (callers/callees) in output</td></tr>
-<tr><td><code>--no-dependencies</code></td><td>false</td><td>Hide dependency information (conflicts with –show-dependencies)</td></tr>
-<tr><td><code>--max-callers &lt;N&gt;</code></td><td>5</td><td>Maximum number of callers to display per function</td></tr>
-<tr><td><code>--max-callees &lt;N&gt;</code></td><td>5</td><td>Maximum number of callees to display per function</td></tr>
-<tr><td><code>--show-external-calls</code></td><td>false</td><td>Show external crate calls in dependencies</td></tr>
-<tr><td><code>--show-std-lib-calls</code></td><td>false</td><td>Show standard library calls in dependencies</td></tr>
-</tbody>
-</table>
-</div>
 <h3 id="analysis-control-flags"><a class="header" href="#analysis-control-flags">Analysis Control Flags</a></h3>
 <div class="table-wrapper">
 <table>
@@ -307,27 +291,11 @@ show_std_lib = false
 <pre><code class="language-bash"># Analyze with call graph enabled (default)
 debtmap analyze .
 
-# Show caller/callee relationships in output
-debtmap analyze . --show-dependencies
-
-# Limit displayed relationships
-debtmap analyze . --show-dependencies --max-callers 3 --max-callees 3
+# Show call graph statistics
+debtmap analyze . --call-graph-stats
 </code></pre>
-<h3 id="filtering-external-calls"><a class="header" href="#filtering-external-calls">Filtering External Calls</a></h3>
-<p>By default, Debtmap filters both external crate calls and standard library calls for cleaner output. The call graph contains all edges; filtering only affects display output.</p>
-<pre><code class="language-bash"># Default: external and standard library calls are hidden
-debtmap analyze .
-
-# Show external crate calls (e.g., from dependencies)
-debtmap analyze . --show-dependencies --show-external-calls
-
-# Show standard library calls (std::, core::, alloc::)
-debtmap analyze . --show-dependencies --show-std-lib-calls
-
-# Show both external and standard library calls
-debtmap analyze . --show-dependencies --show-external-calls --show-std-lib-calls
-</code></pre>
-<p><strong>Important</strong>: External call filtering happens at display time, not during graph construction. This means <code>--debug-call-graph</code> may show more calls than regular output.</p>
+<h3 id="inspecting-call-resolution"><a class="header" href="#inspecting-call-resolution">Inspecting Call Resolution</a></h3>
+<p>Use <code>--debug-call-graph</code> for detailed resolver output and <code>--trace-function &lt;NAME&gt;</code> to follow specific functions through call resolution.</p>
 <p><strong>Source</strong>: Filtering logic from src/priority/formatter/dependencies.rs:filter_dependencies</p>
 <h3 id="debugging-call-resolution"><a class="header" href="#debugging-call-resolution">Debugging Call Resolution</a></h3>
 <pre><code class="language-bash"># Enable detailed call graph debugging
@@ -419,9 +387,8 @@ debtmap analyze . --no-parallel
 <h3 id="incorrect-callercallee-counts"><a class="header" href="#incorrect-callercallee-counts">Incorrect Caller/Callee Counts</a></h3>
 <p>If counts seem wrong:</p>
 <ol>
-<li><strong>Check filtering</strong> - Use <code>--show-external-calls</code> and <code>--show-std-lib-calls</code> to see all edges</li>
 <li><strong>Validate structure</strong> - Run <code>--validate-call-graph</code> to check for structural issues</li>
-<li><strong>Review debug output</strong> - Use <code>--debug-call-graph</code> to see complete graph before filtering</li>
+<li><strong>Review debug output</strong> - Use <code>--debug-call-graph</code> to see call resolution details</li>
 </ol>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
@@ -476,11 +443,11 @@ debtmap analyze . --no-parallel
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 

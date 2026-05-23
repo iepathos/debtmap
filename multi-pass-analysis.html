@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
+            window.path_to_searchindex_js = "searchindex-b91ac412.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-ebd6ab1f.js"></script>
+        <script src="toc-41409472.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -249,9 +249,6 @@ debtmap analyze .
 # Multi-pass with detailed attribution breakdown
 debtmap analyze . --attribution
 
-# Control detail level
-debtmap analyze . --attribution --detail-level comprehensive
-
 # Output as JSON for tooling integration
 debtmap analyze . --attribution --format json
 
@@ -267,7 +264,6 @@ debtmap analyze . --no-multi-pass
 <tbody>
 <tr><td><code>--no-multi-pass</code></td><td>Disable multi-pass analysis (use single-pass for performance)</td></tr>
 <tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires multi-pass)</td></tr>
-<tr><td><code>--detail-level &lt;level&gt;</code></td><td>Set output detail: <code>summary</code>, <code>standard</code>, <code>comprehensive</code>, <code>debug</code> (CLI accepts lowercase values)</td></tr>
 <tr><td><code>--format json</code></td><td>Output results in JSON format</td></tr>
 </tbody>
 </table>
@@ -420,7 +416,7 @@ fn load_config(path: &amp;Path) -&gt; Result&lt;Config&gt; {
 <span class="boring">}</span></code></pre>
 <h2 id="understanding-attribution-output"><a class="header" href="#understanding-attribution-output">Understanding Attribution Output</a></h2>
 <p>When you run with <code>--attribution</code>, you’ll see a detailed breakdown:</p>
-<pre><code class="language-bash">$ debtmap analyze src/main.rs --attribution --detail-level comprehensive
+<pre><code class="language-bash">$ debtmap analyze src/main.rs --attribution
 </code></pre>
 <h3 id="sample-output"><a class="header" href="#sample-output">Sample Output</a></h3>
 <pre><code>Multi-Pass Analysis Results
@@ -742,7 +738,6 @@ let analyzer = MultiPassAnalyzer::new(options);
 </thead>
 <tbody>
 <tr><td><code>language</code></td><td><code>Language</code></td><td><code>Rust</code></td><td>Target programming language</td></tr>
-<tr><td><code>detail_level</code></td><td><code>DetailLevel</code></td><td><code>Standard</code></td><td>Output detail: Summary, Standard, Comprehensive, Debug (CLI uses lowercase: <code>--detail-level standard</code>)</td></tr>
 <tr><td><code>enable_recommendations</code></td><td><code>bool</code></td><td><code>true</code></td><td>Generate actionable recommendations</td></tr>
 <tr><td><code>track_source_locations</code></td><td><code>bool</code></td><td><code>true</code></td><td>Include file/line/column in attribution</td></tr>
 <tr><td><code>generate_insights</code></td><td><code>bool</code></td><td><code>true</code></td><td>Automatically generate insights</td></tr>
@@ -911,11 +906,11 @@ let analyzer = MultiPassAnalyzer::new(options);
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 

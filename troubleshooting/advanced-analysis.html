@@ -15,8 +15,8 @@
         <link rel="icon" href="../favicon-de23e50b.svg">
         <link rel="shortcut icon" href="../favicon-8114d1fc.png">
         <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-2459343d.css">
-        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/general-0392ca55.css">
+        <link rel="stylesheet" href="../css/chrome-fc474251.css">
         <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5ae72f53.js";
+            window.path_to_searchindex_js = "../searchindex-b91ac412.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-ebd6ab1f.js"></script>
+        <script src="../toc-41409472.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -207,19 +207,7 @@ debtmap analyze . --call-graph-stats
 # Validate call graph consistency
 debtmap analyze . --validate-call-graph
 </code></pre>
-<p><strong>Dependency Control Flags</strong>:</p>
-<pre><code class="language-bash"># Show dependency information in results
-debtmap analyze . --show-dependencies
-
-# Limit number of callers shown per function
-debtmap analyze . --max-callers 10
-
-# Include external crate calls in call graph
-debtmap analyze . --show-external-calls
-
-# Include standard library calls
-debtmap analyze . --show-std-lib-calls
-</code></pre>
+<p>Use <code>--debug-call-graph</code>, <code>--trace-function</code>, and <code>--call-graph-stats</code> when you need to inspect dependency resolution details.</p>
 <h2 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h2>
 <p><strong>Flag</strong>: <code>--no-god-object</code></p>
 <p>Disables god object (large class/module) detection.</p>
@@ -236,19 +224,7 @@ debtmap analyze . --no-god-object
 debtmap analyze . -vv
 </code></pre>
 <h2 id="pattern-detection-issues"><a class="header" href="#pattern-detection-issues">Pattern Detection Issues</a></h2>
-<p><strong>Control Pattern Detection</strong>:</p>
-<pre><code class="language-bash"># Disable pattern detection entirely
-debtmap analyze . --no-pattern-detection
-
-# Specify specific patterns to detect
-debtmap analyze . --patterns "god_object,long_function,complex_conditional"
-
-# Adjust pattern detection sensitivity (default: 0.7)
-debtmap analyze . --pattern-threshold 0.6
-
-# Show pattern detection warnings
-debtmap analyze . --show-pattern-warnings
-</code></pre>
+<p>Pattern detection runs internally as part of scoring and is not controlled by <code>analyze</code> flags.</p>
 <p><strong>Detected Patterns</strong>:</p>
 <p><em>Debt patterns</em> (src/cli/args.rs:84):</p>
 <ul>
@@ -280,14 +256,6 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenien
 <p>Too many false positives for legitimate imperative code:</p>
 <pre><code class="language-bash"># Use lenient profile
 debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient
-</code></pre>
-<h2 id="public-api-detection-issues"><a class="header" href="#public-api-detection-issues">Public API Detection Issues</a></h2>
-<p><strong>Control Public API Detection</strong>:</p>
-<pre><code class="language-bash"># Disable public API detection
-debtmap analyze . --no-public-api-detection
-
-# Adjust public API detection threshold (default: 0.7)
-debtmap analyze . --public-api-threshold 0.5
 </code></pre>
 <h2 id="attribution-issues"><a class="header" href="#attribution-issues">Attribution Issues</a></h2>
 <p>Attribution analysis tracks where complexity originates in your code, separating logical complexity from formatting artifacts.</p>
@@ -371,11 +339,11 @@ debtmap analyze . --no-multi-pass  # DON'T do this
 
         <script src="../elasticlunr-ef4e11c1.min.js"></script>
         <script src="../mark-09e88c2c.min.js"></script>
-        <script src="../searcher-c2a407aa.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
 
         <script src="../clipboard-1626706a.min.js"></script>
         <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-a0b12cfe.js"></script>
+        <script src="../book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 

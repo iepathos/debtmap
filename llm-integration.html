@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
+            window.path_to_searchindex_js = "searchindex-b91ac412.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-ebd6ab1f.js"></script>
+        <script src="toc-41409472.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -610,8 +610,8 @@ jobs:
 <p><strong>Solution:</strong> Report as a bug with reproducible example</p>
 <h3 id="large-context-suggestions"><a class="header" href="#large-context-suggestions">Large context suggestions</a></h3>
 <p><strong>Cause:</strong> High coupling in codebase</p>
-<p><strong>Solution:</strong> Limit the number of reported items or dependency entries:</p>
-<pre><code class="language-bash">debtmap analyze . --context --format markdown --top 1 --max-callers 3 --max-callees 3
+<p><strong>Solution:</strong> Limit the number of reported items:</p>
+<pre><code class="language-bash">debtmap analyze . --context --format markdown --top 1
 </code></pre>
 <h2 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h2>
 <h3 id="cli-options-for-llm-integration"><a class="header" href="#cli-options-for-llm-integration">CLI Options for LLM Integration</a></h3>
@@ -627,7 +627,6 @@ jobs:
 <tr><td><code>--lcov FILE</code></td><td>Include coverage data</td></tr>
 <tr><td><code>--context</code></td><td>Enable context-aware risk analysis</td></tr>
 <tr><td><code>--context-providers LIST</code></td><td>Select <code>critical_path</code>, <code>dependency</code>, and/or <code>git_history</code></td></tr>
-<tr><td><code>--show-dependencies</code></td><td>Include caller/callee details</td></tr>
 <tr><td><code>--min-score N</code></td><td>Filter items below score N</td></tr>
 <tr><td><code>--output FILE</code></td><td>Write to file instead of stdout</td></tr>
 </tbody>
@@ -686,11 +685,11 @@ jobs:
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 

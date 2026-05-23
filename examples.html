@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
+            window.path_to_searchindex_js = "searchindex-b91ac412.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-ebd6ab1f.js"></script>
+        <script src="toc-41409472.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -501,10 +501,10 @@ patterns = [
 <pre><code class="language-bash"># Analyze specific package
 debtmap analyze packages/api --languages typescript
 
-# Analyze all packages, grouped by category
+# Analyze all packages and focus on architecture issues
 debtmap analyze packages \
   --languages typescript \
-  --group-by-category
+  --filter Architecture
 </code></pre>
 <h2 id="ci-integration"><a class="header" href="#ci-integration">CI Integration</a></h2>
 <h3 id="github-actions"><a class="header" href="#github-actions">GitHub Actions</a></h3>
@@ -747,88 +747,30 @@ debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap"
 <pre><code class="language-bash"># Standard markdown report
 debtmap analyze . --format markdown --output DEBT_REPORT.md
 
-# Summary level for executives (minimal detail)
-debtmap analyze . --format markdown --detail-level summary --output SUMMARY.md
+# Focused report for executives
+debtmap analyze . --format markdown --top 10 --output SUMMARY.md
 
-# Standard level for team review (default)
-debtmap analyze . --format markdown --detail-level standard --output DEBT.md
-
-# Comprehensive level for deep analysis
-debtmap analyze . --format markdown --detail-level comprehensive --output DETAILED.md
-
-# Debug level for troubleshooting
-debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
+# Full markdown report for team review
+debtmap analyze . --format markdown --output DEBT.md
 </code></pre>
-<p><strong>Detail levels:</strong></p>
-<ul>
-<li><strong>summary</strong>: Executive summary with key metrics and top issues only</li>
-<li><strong>standard</strong>: Balanced detail suitable for team reviews (default)</li>
-<li><strong>comprehensive</strong>: Full details including all debt items and analysis</li>
-<li><strong>debug</strong>: Maximum detail including AST information and parser internals</li>
-</ul>
 <p><strong>Use cases:</strong></p>
 <ul>
-<li>Summary: Management reports, PR comments</li>
-<li>Standard: Regular team reviews</li>
-<li>Comprehensive: Deep dives, refactoring planning</li>
-<li>Debug: Troubleshooting debtmap behavior</li>
+<li>Focused reports: Management reports, PR comments</li>
+<li>Full reports: Regular team reviews, deep dives, refactoring planning</li>
 </ul>
 <p>Great for documentation or PR comments.</p>
 <h2 id="advanced-usage"><a class="header" href="#advanced-usage">Advanced Usage</a></h2>
-<h3 id="design-pattern-detection"><a class="header" href="#design-pattern-detection">Design Pattern Detection</a></h3>
-<p>Detect design patterns in your codebase to understand architectural choices and identify potential overuse of certain patterns:</p>
-<pre><code class="language-bash"># Detect specific design patterns
-debtmap analyze . --patterns observer,singleton,factory
-
-# Adjust pattern confidence threshold (0.0-1.0, default: 0.7)
-debtmap analyze . --pattern-threshold 0.8
-
-# Show uncertain pattern matches with warnings
-debtmap analyze . --show-pattern-warnings
-
-# Disable pattern detection entirely
-debtmap analyze . --no-pattern-detection
-</code></pre>
-<p><strong>Available patterns:</strong></p>
-<ul>
-<li><code>observer</code> - Event listener registrations, callback patterns</li>
-<li><code>singleton</code> - Static instance management</li>
-<li><code>factory</code> - Object creation methods</li>
-<li><code>strategy</code> - Algorithm selection via traits/interfaces</li>
-<li><code>callback</code> - Function passing and invocation</li>
-<li><code>template_method</code> - Abstract methods with concrete implementations</li>
-</ul>
-<p><strong>Use cases:</strong></p>
-<ul>
-<li>Identify architectural patterns in unfamiliar codebases</li>
-<li>Detect potential overuse of certain patterns (e.g., too many singletons)</li>
-<li>Understand code organization and design decisions</li>
-</ul>
-<h3 id="dead-code-and-public-api-analysis"><a class="header" href="#dead-code-and-public-api-analysis">Dead Code and Public API Analysis</a></h3>
-<p>Control how Debtmap detects public APIs to prevent false positives when analyzing libraries vs CLI tools:</p>
-<pre><code class="language-bash"># Analyze with public API awareness (default for libraries)
+<h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
+<pre><code class="language-bash"># Include context-aware risk analysis
 debtmap analyze . --context
-
-# Disable public API heuristics (useful for CLI tools)
-debtmap analyze . --no-public-api-detection
-
-# Adjust public API confidence threshold (default: 0.7)
-debtmap analyze . --public-api-threshold 0.8
 </code></pre>
 <p><strong>When to use:</strong></p>
 <ul>
-<li><strong>Libraries</strong>: Keep default public API detection to avoid flagging exported functions as unused</li>
-<li><strong>CLI tools</strong>: Use <code>--no-public-api-detection</code> since there’s no public API</li>
-<li><strong>Mixed projects</strong>: Adjust threshold based on false positive rate</li>
+<li><strong>High-risk paths</strong>: Prioritize code used in critical flows</li>
+<li><strong>Refactoring planning</strong>: Combine risk and complexity signals</li>
+<li><strong>PR review</strong>: Focus attention on changes with higher context risk</li>
 </ul>
-<p><strong>What it detects:</strong></p>
-<ul>
-<li>Functions exported in <code>lib.rs</code> or <code>api.rs</code></li>
-<li>Public trait implementations</li>
-<li>Functions matching API naming patterns</li>
-<li>Prevents false positives for “unused” library functions</li>
-</ul>
-<h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
+<h3 id="context-aware-analysis-1"><a class="header" href="#context-aware-analysis-1">Context-Aware Analysis</a></h3>
 <p>Enable advanced context providers for more accurate prioritization:</p>
 <pre><code class="language-bash"># Enable all context providers for comprehensive analysis
 debtmap analyze . \
@@ -897,10 +839,7 @@ debtmap analyze . --aggregation-method logarithmic_sum
 debtmap analyze . --aggregation-method sum
 </code></pre>
 <h3 id="filtering-and-grouping"><a class="header" href="#filtering-and-grouping">Filtering and Grouping</a></h3>
-<pre><code class="language-bash"># Group results by debt category
-debtmap analyze . --group-by-category
-
-# Filter specific categories
+<pre><code class="language-bash"># Filter specific categories
 debtmap analyze . --filter Architecture,Testing
 
 # Show only high-priority items
@@ -917,8 +856,8 @@ debtmap analyze . --trace-function my_function --trace-function another_fn
 # Validate call graph structure (detect orphans and cycles)
 debtmap analyze . --validate-call-graph
 
-# Show detailed caller/callee relationships
-debtmap analyze . --show-dependencies
+# Show call graph statistics
+debtmap analyze . --call-graph-stats
 </code></pre>
 <p><strong>Use cases:</strong></p>
 <p><strong>Troubleshooting resolution failures:</strong></p>
@@ -926,8 +865,8 @@ debtmap analyze . --show-dependencies
 debtmap analyze . --debug-call-graph --trace-function problematic_function
 </code></pre>
 <p><strong>Understanding function relationships:</strong></p>
-<pre><code class="language-bash"># See who calls what
-debtmap analyze . --show-dependencies --top 10
+<pre><code class="language-bash"># Inspect call graph resolution
+debtmap analyze . --debug-call-graph --call-graph-stats
 </code></pre>
 <p><strong>Validating call graph integrity:</strong></p>
 <pre><code class="language-bash"># Detect cycles and orphaned nodes
@@ -1366,11 +1305,11 @@ debtmap compare \
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 

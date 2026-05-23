@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5ae72f53.js";
+            window.path_to_searchindex_js = "searchindex-b91ac412.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-ebd6ab1f.js"></script>
+        <script src="toc-41409472.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -487,11 +487,11 @@ debtmap compare --before before.json --after after.json
 <h2 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h2>
 <h3 id="custom-data-retention"><a class="header" href="#custom-data-retention">Custom Data Retention</a></h3>
 <p>Control how much detail is stored in results:</p>
-<pre><code class="language-bash"># Minimal results (scores only)
-debtmap analyze . -o summary.json --format json --detail-level summary
+<pre><code class="language-bash"># Focused results
+debtmap analyze . -o summary.json --format json --top 10
 
-# Full results (all metrics and context)
-debtmap analyze . -o comprehensive.json --format json --detail-level comprehensive
+# Full JSON results
+debtmap analyze . -o comprehensive.json --format json
 </code></pre>
 <h3 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h3>
 <p>For large codebases, optimize TUI performance:</p>
@@ -549,11 +549,11 @@ debtmap analyze . --top 100
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 
