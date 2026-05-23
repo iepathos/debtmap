@@ -76,9 +76,6 @@ These flags help diagnose Rust macro-related parse issues:
 ```bash
 # Disable semantic analysis (faster fallback mode)
 debtmap analyze . --semantic-off
-
-# Validate LOC consistency
-debtmap analyze . --validate-loc
 ```
 
 Use `--semantic-off` when:
@@ -101,8 +98,6 @@ This shows:
 - Priority calculation details
 
 **Source**: `src/cli/args.rs:313-314`
-
-**Note**: The `--explain-score` flag has been deprecated in favor of granular verbosity levels (`-v`, `-vv`, `-vvv`).
 
 ## Performance Profiling
 
@@ -159,8 +154,8 @@ debtmap analyze . --semantic-off -v
 # Step 3: Check specific file
 debtmap analyze path/to/file.rs -vvv
 
-# Step 4: Validate results
-debtmap analyze . --validate-loc
+# Step 4: Validate call graph structure
+debtmap analyze . --validate-call-graph
 ```
 
 ## Environment Variables

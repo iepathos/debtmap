@@ -207,9 +207,6 @@ debtmap analyze . --debug-call-graph -vv
 # Validate the call graph consistency
 debtmap analyze . --validate-call-graph
 
-# Include external dependencies if relevant
-debtmap analyze . --show-external-calls --show-std-lib-calls
-
 # Trace specific functions to see their relationships
 debtmap analyze . --trace-function "my_function" -vv
 

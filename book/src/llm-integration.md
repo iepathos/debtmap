@@ -461,9 +461,9 @@ debtmap analyze . -vv  # Verbose mode shows parsing issues
 
 **Cause:** High coupling in codebase
 
-**Solution:** Limit the number of reported items or dependency entries:
+**Solution:** Limit the number of reported items:
 ```bash
-debtmap analyze . --context --format markdown --top 1 --max-callers 3 --max-callees 3
+debtmap analyze . --context --format markdown --top 1
 ```
 
 ## API Reference
@@ -478,7 +478,6 @@ debtmap analyze . --context --format markdown --top 1 --max-callers 3 --max-call
 | `--lcov FILE` | Include coverage data |
 | `--context` | Enable context-aware risk analysis |
 | `--context-providers LIST` | Select `critical_path`, `dependency`, and/or `git_history` |
-| `--show-dependencies` | Include caller/callee details |
 | `--min-score N` | Filter items below score N |
 | `--output FILE` | Write to file instead of stdout |
 

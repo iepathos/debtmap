@@ -395,10 +395,10 @@ patterns = [
 # Analyze specific package
 debtmap analyze packages/api --languages typescript
 
-# Analyze all packages, grouped by category
+# Analyze all packages and focus on architecture issues
 debtmap analyze packages \
   --languages typescript \
-  --group-by-category
+  --filter Architecture
 ```
 
 ## CI Integration
@@ -678,91 +678,32 @@ Structure:
 # Standard markdown report
 debtmap analyze . --format markdown --output DEBT_REPORT.md
 
-# Summary level for executives (minimal detail)
-debtmap analyze . --format markdown --detail-level summary --output SUMMARY.md
+# Focused report for executives
+debtmap analyze . --format markdown --top 10 --output SUMMARY.md
 
-# Standard level for team review (default)
-debtmap analyze . --format markdown --detail-level standard --output DEBT.md
-
-# Comprehensive level for deep analysis
-debtmap analyze . --format markdown --detail-level comprehensive --output DETAILED.md
-
-# Debug level for troubleshooting
-debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
+# Full markdown report for team review
+debtmap analyze . --format markdown --output DEBT.md
 ```
 
-**Detail levels:**
-- **summary**: Executive summary with key metrics and top issues only
-- **standard**: Balanced detail suitable for team reviews (default)
-- **comprehensive**: Full details including all debt items and analysis
-- **debug**: Maximum detail including AST information and parser internals
-
 **Use cases:**
-- Summary: Management reports, PR comments
-- Standard: Regular team reviews
-- Comprehensive: Deep dives, refactoring planning
-- Debug: Troubleshooting debtmap behavior
+- Focused reports: Management reports, PR comments
+- Full reports: Regular team reviews, deep dives, refactoring planning
 
 Great for documentation or PR comments.
 
 ## Advanced Usage
 
-### Design Pattern Detection
-
-Detect design patterns in your codebase to understand architectural choices and identify potential overuse of certain patterns:
+### Context-Aware Analysis
 
 ```bash
-# Detect specific design patterns
-debtmap analyze . --patterns observer,singleton,factory
-
-# Adjust pattern confidence threshold (0.0-1.0, default: 0.7)
-debtmap analyze . --pattern-threshold 0.8
-
-# Show uncertain pattern matches with warnings
-debtmap analyze . --show-pattern-warnings
-
-# Disable pattern detection entirely
-debtmap analyze . --no-pattern-detection
-```
-
-**Available patterns:**
-- `observer` - Event listener registrations, callback patterns
-- `singleton` - Static instance management
-- `factory` - Object creation methods
-- `strategy` - Algorithm selection via traits/interfaces
-- `callback` - Function passing and invocation
-- `template_method` - Abstract methods with concrete implementations
-
-**Use cases:**
-- Identify architectural patterns in unfamiliar codebases
-- Detect potential overuse of certain patterns (e.g., too many singletons)
-- Understand code organization and design decisions
-
-### Dead Code and Public API Analysis
-
-Control how Debtmap detects public APIs to prevent false positives when analyzing libraries vs CLI tools:
-
-```bash
-# Analyze with public API awareness (default for libraries)
+# Include context-aware risk analysis
 debtmap analyze . --context
-
-# Disable public API heuristics (useful for CLI tools)
-debtmap analyze . --no-public-api-detection
-
-# Adjust public API confidence threshold (default: 0.7)
-debtmap analyze . --public-api-threshold 0.8
 ```
 
 **When to use:**
-- **Libraries**: Keep default public API detection to avoid flagging exported functions as unused
-- **CLI tools**: Use `--no-public-api-detection` since there's no public API
-- **Mixed projects**: Adjust threshold based on false positive rate
-
-**What it detects:**
-- Functions exported in `lib.rs` or `api.rs`
-- Public trait implementations
-- Functions matching API naming patterns
-- Prevents false positives for "unused" library functions
+- **High-risk paths**: Prioritize code used in critical flows
+- **Refactoring planning**: Combine risk and complexity signals
+- **PR review**: Focus attention on changes with higher context risk
 
 ### Context-Aware Analysis
 
@@ -848,9 +789,6 @@ debtmap analyze . --aggregation-method sum
 ### Filtering and Grouping
 
 ```bash
-# Group results by debt category
-debtmap analyze . --group-by-category
-
 # Filter specific categories
 debtmap analyze . --filter Architecture,Testing
 
@@ -872,8 +810,8 @@ debtmap analyze . --trace-function my_function --trace-function another_fn
 # Validate call graph structure (detect orphans and cycles)
 debtmap analyze . --validate-call-graph
 
-# Show detailed caller/callee relationships
-debtmap analyze . --show-dependencies
+# Show call graph statistics
+debtmap analyze . --call-graph-stats
 ```
 
 **Use cases:**
@@ -886,8 +824,8 @@ debtmap analyze . --debug-call-graph --trace-function problematic_function
 
 **Understanding function relationships:**
 ```bash
-# See who calls what
-debtmap analyze . --show-dependencies --top 10
+# Inspect call graph resolution
+debtmap analyze . --debug-call-graph --call-graph-stats
 ```
 
 **Validating call graph integrity:**

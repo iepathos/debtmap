@@ -345,11 +345,11 @@ debtmap compare --before before.json --after after.json
 Control how much detail is stored in results:
 
 ```bash
-# Minimal results (scores only)
-debtmap analyze . -o summary.json --format json --detail-level summary
+# Focused results
+debtmap analyze . -o summary.json --format json --top 10
 
-# Full results (all metrics and context)
-debtmap analyze . -o comprehensive.json --format json --detail-level comprehensive
+# Full JSON results
+debtmap analyze . -o comprehensive.json --format json
 ```
 
 ### Performance Optimization

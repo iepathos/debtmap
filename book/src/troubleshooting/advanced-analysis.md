@@ -37,21 +37,7 @@ debtmap analyze . --call-graph-stats
 debtmap analyze . --validate-call-graph
 ```
 
-**Dependency Control Flags**:
-
-```bash
-# Show dependency information in results
-debtmap analyze . --show-dependencies
-
-# Limit number of callers shown per function
-debtmap analyze . --max-callers 10
-
-# Include external crate calls in call graph
-debtmap analyze . --show-external-calls
-
-# Include standard library calls
-debtmap analyze . --show-std-lib-calls
-```
+Use `--debug-call-graph`, `--trace-function`, and `--call-graph-stats` when you need to inspect dependency resolution details.
 
 ## God Object Detection
 
@@ -74,21 +60,7 @@ debtmap analyze . -vv
 
 ## Pattern Detection Issues
 
-**Control Pattern Detection**:
-
-```bash
-# Disable pattern detection entirely
-debtmap analyze . --no-pattern-detection
-
-# Specify specific patterns to detect
-debtmap analyze . --patterns "god_object,long_function,complex_conditional"
-
-# Adjust pattern detection sensitivity (default: 0.7)
-debtmap analyze . --pattern-threshold 0.6
-
-# Show pattern detection warnings
-debtmap analyze . --show-pattern-warnings
-```
+Pattern detection runs internally as part of scoring and is not controlled by `analyze` flags.
 
 **Detected Patterns**:
 
@@ -126,18 +98,6 @@ Too many false positives for legitimate imperative code:
 ```bash
 # Use lenient profile
 debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient
-```
-
-## Public API Detection Issues
-
-**Control Public API Detection**:
-
-```bash
-# Disable public API detection
-debtmap analyze . --no-public-api-detection
-
-# Adjust public API detection threshold (default: 0.7)
-debtmap analyze . --public-api-threshold 0.5
 ```
 
 ## Attribution Issues

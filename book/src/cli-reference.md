@@ -130,8 +130,6 @@ The `validate` command supports a focused subset of `analyze` options, primarily
 - `--threshold-complexity`, `--threshold-duplication`, `--threshold-preset` (configure these in `.debtmap.toml` instead)
 - `--languages` (language filtering)
 
-**Note:** The `--explain-score` flag exists in the `validate` command but is deprecated (hidden). Use `-v`, `-vv`, or `-vvv` for verbosity instead.
-
 Configure analysis thresholds in your `.debtmap.toml` configuration file for use with the `validate` command.
 
 **Exit Codes:**
@@ -322,19 +320,10 @@ Control how analysis results are formatted and displayed.
 - `--show-filter-stats` - Show filter statistics (how many items were filtered and why)
 - `--filter <CATEGORIES>` - Filter by debt categories (comma-separated)
 - `--aggregate-only` - Show only aggregated file-level scores
-- `--group-by-category` - Group output by debt category
 
 **Progress Display:**
 - `--no-tui` - Disable TUI progress visualization (use simple progress bars instead)
 - `-q, --quiet` - Suppress progress output (quiet mode)
-
-**Dependency Display Options:**
-- `--show-dependencies` - Show caller/callee information in output
-- `--no-dependencies` - Hide dependency information (conflicts with --show-dependencies)
-- `--max-callers <N>` - Maximum number of callers to display (default: 5)
-- `--max-callees <N>` - Maximum number of callees to display (default: 5)
-- `--show-external-calls` - Include external crate calls in dependencies
-- `--show-std-lib-calls` - Include standard library calls in dependencies
 
 ### Analysis Control
 
@@ -387,7 +376,6 @@ Enable context-aware risk analysis and integrate test coverage data.
   - Coverage data dampens debt scores for well-tested code (multiplier = 1.0 - coverage)
   - Surfaces untested complex functions as higher priority
   - Total debt score with coverage ≤ score without coverage
-- `--validate-loc` - Validate LOC consistency across analysis modes (with/without coverage)
 
 ### Performance
 
@@ -422,8 +410,6 @@ Control diagnostic output and debugging information.
 - `--explain-metrics` - Explain metric definitions and formulas (measured vs estimated)
 - `--verbose-macro-warnings` - Show verbose macro parsing warnings (Rust analysis)
 - `--show-macro-stats` - Show macro expansion statistics at end of analysis
-- `--detail-level <LEVEL>` - Detail level for diagnostic reports
-  - Options: summary, standard, comprehensive, debug (default: standard)
 
 **Call Graph Debugging:**
 - `--debug-call-graph` - Enable detailed call graph debugging with resolution information
@@ -449,20 +435,6 @@ Control file-level aggregation and god object detection.
 **God Object Split Recommendations:**
 - `--show-splits` - Show detailed module split recommendations for god objects and large files (experimental)
   - Suggests how to decompose large files into smaller, focused modules
-- `--min-split-methods <N>` - Minimum methods per god object split recommendation (default: 10)
-- `--min-split-lines <N>` - Minimum lines per god object split recommendation (default: 150)
-
-**Dead Code Analysis:**
-- `--no-public-api-detection` - Disable public API detection heuristics for dead code analysis
-- `--public-api-threshold <N>` - Public API confidence threshold (0.0-1.0, default: 0.7)
-  - Functions above this threshold are considered public APIs
-
-**Pattern Detection:**
-- `--no-pattern-detection` - Disable pattern recognition
-- `--patterns <PATTERNS>` - Enable specific patterns only (comma-separated)
-  - Available patterns: observer, singleton, factory, strategy, callback, template_method
-- `--pattern-threshold <N>` - Pattern confidence threshold (0.0-1.0, default: 0.7)
-- `--show-pattern-warnings` - Show pattern warnings for uncertain detections
 
 ### Option Aliases
 
@@ -477,13 +449,6 @@ Common option shortcuts and aliases for convenience:
 - `-o` is short form for `--output`
 - `-c` is short form for `--config`
 - `-j` is short form for `--jobs`
-
-### Deprecated Options
-
-The following options are deprecated and should be migrated:
-
-- `--explain-score` (hidden) - **Deprecated:** use `-v` instead
-  - **Migration:** Use `-v`, `-vv`, or `-vvv` for increasing verbosity levels
 
 ## Configuration
 
@@ -703,11 +668,6 @@ Show macro expansion statistics (Rust):
 debtmap analyze . --show-macro-stats --verbose-macro-warnings
 ```
 
-Use detailed diagnostic reports:
-```bash
-debtmap analyze . --detail-level comprehensive
-```
-
 Analyze functional programming patterns:
 ```bash
 # Enable functional analysis
@@ -766,8 +726,6 @@ debtmap analyze . --filter complexity,duplication
 # Summary format
 debtmap analyze . --summary
 
-# Group by category
-debtmap analyze . --group-by-category
 ```
 
 ### Performance Tuning
@@ -881,26 +839,12 @@ debtmap analyze . --explain-metrics -v
 | `--profile-output` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--verbose` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ |
 | `--show-splits` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| `--min-split-methods` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--min-split-lines` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--no-public-api-detection` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--public-api-threshold` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--no-pattern-detection` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--patterns` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--pattern-threshold` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--show-pattern-warnings` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--explain-metrics` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--debug-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--trace-function` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--call-graph-stats` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--validate-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--debug-format` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--show-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--no-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--max-callers` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--max-callees` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--show-external-calls` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `--show-std-lib-calls` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--ast-functional-analysis` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--functional-analysis-profile` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `--function` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |

@@ -103,17 +103,6 @@ show_std_lib = false
 
 ## CLI Reference
 
-### Display Control Flags
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--show-dependencies` | false | Show dependency information (callers/callees) in output |
-| `--no-dependencies` | false | Hide dependency information (conflicts with --show-dependencies) |
-| `--max-callers <N>` | 5 | Maximum number of callers to display per function |
-| `--max-callees <N>` | 5 | Maximum number of callees to display per function |
-| `--show-external-calls` | false | Show external crate calls in dependencies |
-| `--show-std-lib-calls` | false | Show standard library calls in dependencies |
-
 ### Analysis Control Flags
 
 | Flag | Default | Description |
@@ -140,32 +129,13 @@ show_std_lib = false
 # Analyze with call graph enabled (default)
 debtmap analyze .
 
-# Show caller/callee relationships in output
-debtmap analyze . --show-dependencies
-
-# Limit displayed relationships
-debtmap analyze . --show-dependencies --max-callers 3 --max-callees 3
+# Show call graph statistics
+debtmap analyze . --call-graph-stats
 ```
 
-### Filtering External Calls
+### Inspecting Call Resolution
 
-By default, Debtmap filters both external crate calls and standard library calls for cleaner output. The call graph contains all edges; filtering only affects display output.
-
-```bash
-# Default: external and standard library calls are hidden
-debtmap analyze .
-
-# Show external crate calls (e.g., from dependencies)
-debtmap analyze . --show-dependencies --show-external-calls
-
-# Show standard library calls (std::, core::, alloc::)
-debtmap analyze . --show-dependencies --show-std-lib-calls
-
-# Show both external and standard library calls
-debtmap analyze . --show-dependencies --show-external-calls --show-std-lib-calls
-```
-
-**Important**: External call filtering happens at display time, not during graph construction. This means `--debug-call-graph` may show more calls than regular output.
+Use `--debug-call-graph` for detailed resolver output and `--trace-function <NAME>` to follow specific functions through call resolution.
 
 **Source**: Filtering logic from src/priority/formatter/dependencies.rs:filter_dependencies
 
@@ -279,9 +249,8 @@ If you see unresolved calls in debug output:
 
 If counts seem wrong:
 
-1. **Check filtering** - Use `--show-external-calls` and `--show-std-lib-calls` to see all edges
-2. **Validate structure** - Run `--validate-call-graph` to check for structural issues
-3. **Review debug output** - Use `--debug-call-graph` to see complete graph before filtering
+1. **Validate structure** - Run `--validate-call-graph` to check for structural issues
+2. **Review debug output** - Use `--debug-call-graph` to see call resolution details
 
 ## See Also
 

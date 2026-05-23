@@ -26,7 +26,6 @@ pub struct ThresholdConfig {
     pub complexity: u32,
     pub duplication: usize,
     pub preset: Option<ThresholdPreset>,
-    pub public_api_threshold: f32,
 }
 
 /// Feature flags for analysis options
@@ -36,16 +35,9 @@ pub struct AnalysisFeatureConfig {
     pub context_providers: Option<Vec<String>>,
     pub disable_context: Option<Vec<String>>,
     pub semantic_off: bool,
-    pub no_pattern_detection: bool,
-    pub patterns: Option<Vec<String>>,
-    pub pattern_threshold: f32,
     pub no_god_object: bool,
-    pub no_public_api_detection: bool,
     pub ast_functional_analysis: bool,
     pub functional_analysis_profile: Option<FunctionalAnalysisProfile>,
-    pub min_split_methods: usize,
-    pub min_split_lines: usize,
-    pub validate_loc: bool,
     pub validate_call_graph: bool,
 }
 
@@ -57,9 +49,7 @@ pub struct DisplayConfig {
     pub summary: bool,
     pub top: Option<usize>,
     pub tail: Option<usize>,
-    pub group_by_category: bool,
     pub show_attribution: bool,
-    pub detail_level: Option<String>,
     pub no_tui: bool,
     pub show_filter_stats: bool,
     pub formatting_config: FormattingConfig,
@@ -85,9 +75,6 @@ pub struct DebugConfig {
     pub trace_functions: Option<Vec<String>>,
     pub call_graph_stats_only: bool,
     pub debug_format: DebugFormatArg,
-    pub show_pattern_warnings: bool,
-    pub show_dependencies: bool,
-    pub no_dependencies: bool,
 }
 
 /// Language-specific settings
@@ -95,10 +82,6 @@ pub struct DebugConfig {
 pub struct LanguageConfig {
     pub languages: Option<Vec<String>>,
     pub aggregation_method: Option<String>,
-    pub max_callers: usize,
-    pub max_callees: usize,
-    pub show_external: bool,
-    pub show_std_lib: bool,
 }
 
 // ============================================================================
@@ -134,13 +117,11 @@ pub fn build_threshold_config(
     complexity: u32,
     duplication: usize,
     preset: Option<ThresholdPreset>,
-    public_api_threshold: f32,
 ) -> ThresholdConfig {
     ThresholdConfig {
         complexity,
         duplication,
         preset,
-        public_api_threshold,
     }
 }
 
@@ -151,16 +132,9 @@ pub fn build_feature_config(
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
     semantic_off: bool,
-    no_pattern_detection: bool,
-    patterns: Option<Vec<String>>,
-    pattern_threshold: f32,
     no_god_object: bool,
-    no_public_api_detection: bool,
     ast_functional_analysis: bool,
     functional_analysis_profile: Option<FunctionalAnalysisProfile>,
-    min_split_methods: usize,
-    min_split_lines: usize,
-    validate_loc: bool,
     validate_call_graph: bool,
 ) -> AnalysisFeatureConfig {
     AnalysisFeatureConfig {
@@ -168,16 +142,9 @@ pub fn build_feature_config(
         context_providers,
         disable_context,
         semantic_off,
-        no_pattern_detection,
-        patterns,
-        pattern_threshold,
         no_god_object,
-        no_public_api_detection,
         ast_functional_analysis,
         functional_analysis_profile,
-        min_split_methods,
-        min_split_lines,
-        validate_loc,
         validate_call_graph,
     }
 }
@@ -190,9 +157,7 @@ pub fn build_display_config(
     summary: bool,
     top: Option<usize>,
     tail: Option<usize>,
-    group_by_category: bool,
     show_attribution: bool,
-    detail_level: Option<String>,
     no_tui: bool,
     show_filter_stats: bool,
     formatting_config: FormattingConfig,
@@ -204,9 +169,7 @@ pub fn build_display_config(
         summary,
         top,
         tail,
-        group_by_category,
         show_attribution,
-        detail_level,
         no_tui,
         show_filter_stats,
         formatting_config,
@@ -240,9 +203,6 @@ pub fn build_debug_config(
     trace_functions: Option<Vec<String>>,
     call_graph_stats_only: bool,
     debug_format: DebugFormatArg,
-    show_pattern_warnings: bool,
-    show_dependencies: bool,
-    no_dependencies: bool,
 ) -> DebugConfig {
     DebugConfig {
         verbose_macro_warnings,
@@ -251,9 +211,6 @@ pub fn build_debug_config(
         trace_functions,
         call_graph_stats_only,
         debug_format,
-        show_pattern_warnings,
-        show_dependencies,
-        no_dependencies,
     }
 }
 
@@ -261,18 +218,10 @@ pub fn build_debug_config(
 pub fn build_language_config(
     languages: Option<Vec<String>>,
     aggregation_method: Option<String>,
-    max_callers: usize,
-    max_callees: usize,
-    show_external: bool,
-    show_std_lib: bool,
 ) -> LanguageConfig {
     LanguageConfig {
         languages,
         aggregation_method,
-        max_callers,
-        max_callees,
-        show_external,
-        show_std_lib,
     }
 }
 
@@ -317,17 +266,7 @@ pub fn compute_multi_pass(no_multi_pass: bool) -> bool {
 
 /// Pure function to create formatting configuration
 #[allow(clippy::too_many_arguments)]
-pub fn create_formatting_config(
-    plain: bool,
-    _show_dependencies: bool,
-    _no_dependencies: bool,
-    max_callers: usize,
-    max_callees: usize,
-    show_external: bool,
-    show_std_lib: bool,
-    show_splits: bool,
-) -> FormattingConfig {
-    use crate::config::CallerCalleeConfig;
+pub fn create_formatting_config(plain: bool, show_splits: bool) -> FormattingConfig {
     use crate::formatting::ColorMode;
 
     let color_mode = if plain {
@@ -338,14 +277,7 @@ pub fn create_formatting_config(
         base_config.color
     };
 
-    let caller_callee = CallerCalleeConfig {
-        max_callers,
-        max_callees,
-        show_external,
-        show_std_lib,
-    };
-
-    FormattingConfig::with_caller_callee(color_mode, caller_callee).with_show_splits(show_splits)
+    FormattingConfig::new(color_mode).with_show_splits(show_splits)
 }
 
 // ============================================================================

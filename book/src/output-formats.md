@@ -1273,9 +1273,6 @@ Available categories:
 ### Grouping Output
 
 ```bash
-# Group results by debt category
-debtmap analyze . --group-by-category
-
 # Combine filters for focused analysis
 debtmap analyze . --filter Architecture --min-priority high --top 5
 ```

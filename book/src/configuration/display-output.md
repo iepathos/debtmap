@@ -334,7 +334,6 @@ Many display settings can be overridden via CLI flags:
 | `verbosity` | `-v` (repeatable) |
 | `summary` | `--summary` |
 | `compact` | `--compact` |
-| `show_dependencies` | `--show-dependencies` |
 | `show_splits` | `--show-splits` |
 | `tiered` | `--tiered` |
 

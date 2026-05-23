@@ -27,7 +27,6 @@ pub struct AnalyzeConfig {
     pub verbosity: u8,
     pub verbose_macro_warnings: bool,
     pub show_macro_stats: bool,
-    pub group_by_category: bool,
     pub min_priority: Option<String>,
     pub min_score: Option<f64>,
     pub filter_categories: Option<Vec<String>>,
@@ -38,35 +37,19 @@ pub struct AnalyzeConfig {
     pub jobs: usize,
     pub multi_pass: bool,
     pub show_attribution: bool,
-    pub detail_level: Option<String>,
     pub aggregate_only: bool,
     pub no_aggregation: bool,
     pub aggregation_method: Option<String>,
     pub min_problematic: Option<usize>,
     pub no_god_object: bool,
     pub max_files: Option<usize>,
-    pub validate_loc: bool,
-    pub no_public_api_detection: bool,
-    pub public_api_threshold: f32,
-    pub no_pattern_detection: bool,
-    pub patterns: Option<Vec<String>>,
-    pub pattern_threshold: f32,
-    pub show_pattern_warnings: bool,
     pub debug_call_graph: bool,
     pub trace_functions: Option<Vec<String>>,
     pub call_graph_stats_only: bool,
     pub debug_format: cli::DebugFormatArg,
     pub validate_call_graph: bool,
-    pub show_dependencies: bool,
-    pub no_dependencies: bool,
-    pub max_callers: usize,
-    pub max_callees: usize,
-    pub show_external: bool,
-    pub show_std_lib: bool,
     pub ast_functional_analysis: bool,
     pub functional_analysis_profile: Option<cli::FunctionalAnalysisProfile>,
-    pub min_split_methods: usize,
-    pub min_split_lines: usize,
     pub no_tui: bool,
     pub show_filter_stats: bool,
     /// Reference time for deterministic analysis (Spec 214)
@@ -111,6 +94,7 @@ fn set_threshold_preset(preset: Option<cli::ThresholdPreset>) {
 /// Set up environment variables from configuration.
 fn setup_env_vars(config: &AnalyzeConfig) {
     setup_max_files(config.max_files);
+    setup_min_priority(config.min_priority.as_deref());
     setup_min_score(config.min_score);
     setup_jobs(config.jobs);
     setup_functional_analysis(config);
@@ -128,6 +112,23 @@ fn setup_min_score(min_score: Option<f64>) {
     if let Some(min_score) = min_score {
         std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", min_score.to_string());
     }
+}
+
+/// Set minimum score threshold from priority if specified.
+fn setup_min_priority(min_priority: Option<&str>) {
+    let Some(priority) = min_priority else {
+        return;
+    };
+
+    let threshold = match priority.to_ascii_lowercase().as_str() {
+        "low" => 0.0,
+        "medium" => 30.0,
+        "high" => 50.0,
+        "critical" => 70.0,
+        _ => return,
+    };
+
+    std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", threshold.to_string());
 }
 
 /// Set jobs environment variable for parallel processing.

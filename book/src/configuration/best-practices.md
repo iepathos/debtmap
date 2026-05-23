@@ -186,9 +186,6 @@ max = 90.0
 ### CLI Example
 
 ```bash
-# Analyze with public API detection
-debtmap analyze . --no-public-api-detection=false --public-api-threshold 0.8
-
 # Generate markdown report for documentation
 debtmap analyze . --format markdown --output TECH_DEBT.md
 ```

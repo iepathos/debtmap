@@ -77,9 +77,6 @@ debtmap analyze .
 # Multi-pass with detailed attribution breakdown
 debtmap analyze . --attribution
 
-# Control detail level
-debtmap analyze . --attribution --detail-level comprehensive
-
 # Output as JSON for tooling integration
 debtmap analyze . --attribution --format json
 
@@ -93,7 +90,6 @@ debtmap analyze . --no-multi-pass
 |------|-------------|
 | `--no-multi-pass` | Disable multi-pass analysis (use single-pass for performance) |
 | `--attribution` | Show detailed complexity attribution breakdown (requires multi-pass) |
-| `--detail-level <level>` | Set output detail: `summary`, `standard`, `comprehensive`, `debug` (CLI accepts lowercase values) |
 | `--format json` | Output results in JSON format |
 
 > **Note**: The `--attribution` flag requires multi-pass analysis to be enabled (the default), as attribution depends on comparing raw and normalized analyses. Use `--no-multi-pass` only when performance is critical.
@@ -248,7 +244,7 @@ fn load_config(path: &Path) -> Result<Config> {
 When you run with `--attribution`, you'll see a detailed breakdown:
 
 ```bash
-$ debtmap analyze src/main.rs --attribution --detail-level comprehensive
+$ debtmap analyze src/main.rs --attribution
 ```
 
 ### Sample Output
@@ -590,7 +586,6 @@ let analyzer = MultiPassAnalyzer::new(options);
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `language` | `Language` | `Rust` | Target programming language |
-| `detail_level` | `DetailLevel` | `Standard` | Output detail: Summary, Standard, Comprehensive, Debug (CLI uses lowercase: `--detail-level standard`) |
 | `enable_recommendations` | `bool` | `true` | Generate actionable recommendations |
 | `track_source_locations` | `bool` | `true` | Include file/line/column in attribution |
 | `generate_insights` | `bool` | `true` | Automatically generate insights |

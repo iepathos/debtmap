@@ -154,10 +154,6 @@ pub enum Commands {
         #[arg(long = "filter", value_delimiter = ',')]
         filter_categories: Option<Vec<String>>,
 
-        /// Group output by debt category
-        #[arg(long = "group-by-category")]
-        group_by_category: bool,
-
         /// Show filter statistics (how many items filtered and why)
         #[arg(long = "show-filter-stats")]
         show_filter_stats: bool,
@@ -176,10 +172,6 @@ pub enum Commands {
         /// Plain output mode: ASCII-only, no colors, no emoji, machine-parseable
         #[arg(long = "plain")]
         plain: bool,
-
-        /// Detail level for diagnostic reports (summary, standard, comprehensive, debug)
-        #[arg(long = "detail-level", default_value = "standard")]
-        detail_level: Option<String>,
 
         /// Disable TUI progress visualization (use simple progress bars)
         #[arg(long = "no-tui")]
@@ -233,39 +225,11 @@ pub enum Commands {
         #[arg(long = "no-god-object")]
         no_god_object: bool,
 
-        /// Minimum methods per god object split recommendation (Spec 190)
-        #[arg(long = "min-split-methods", default_value = "10")]
-        min_split_methods: usize,
-
-        /// Minimum lines per god object split recommendation (Spec 190)
-        #[arg(long = "min-split-lines", default_value = "150")]
-        min_split_lines: usize,
-
         /// Show detailed module split recommendations for god objects and large files.
         /// This experimental feature suggests how to decompose large files into
         /// smaller, focused modules. Hidden by default.
         #[arg(long = "show-splits")]
         show_splits: bool,
-
-        /// Disable public API detection heuristics for dead code analysis
-        #[arg(long = "no-public-api-detection")]
-        no_public_api_detection: bool,
-
-        /// Public API confidence threshold (0.0-1.0) - functions above this are considered public APIs
-        #[arg(long = "public-api-threshold", default_value = "0.7")]
-        public_api_threshold: f32,
-
-        /// Disable pattern recognition
-        #[arg(long = "no-pattern-detection")]
-        no_pattern_detection: bool,
-
-        /// Enable specific patterns only (comma-separated: observer,singleton,factory,strategy,callback,template_method)
-        #[arg(long = "patterns", value_delimiter = ',')]
-        patterns: Option<Vec<String>>,
-
-        /// Pattern confidence threshold (0.0 - 1.0)
-        #[arg(long = "pattern-threshold", default_value = "0.7")]
-        pattern_threshold: f32,
 
         /// Enable AST-based functional composition analysis (spec 111)
         #[arg(long = "ast-functional-analysis")]
@@ -274,30 +238,6 @@ pub enum Commands {
         /// Functional analysis profile (strict, balanced, lenient)
         #[arg(long = "functional-analysis-profile", value_enum)]
         functional_analysis_profile: Option<FunctionalAnalysisProfile>,
-
-        /// Show dependency information (callers/callees) in output
-        #[arg(long = "show-dependencies")]
-        show_dependencies: bool,
-
-        /// Hide dependency information (callers/callees) in output
-        #[arg(long = "no-dependencies", conflicts_with = "show_dependencies")]
-        no_dependencies: bool,
-
-        /// Maximum number of callers to display (default: 5)
-        #[arg(long = "max-callers", default_value = "5")]
-        max_callers: usize,
-
-        /// Maximum number of callees to display (default: 5)
-        #[arg(long = "max-callees", default_value = "5")]
-        max_callees: usize,
-
-        /// Show external crate calls in dependencies
-        #[arg(long = "show-external-calls")]
-        show_external: bool,
-
-        /// Show standard library calls in dependencies
-        #[arg(long = "show-std-lib-calls")]
-        show_std_lib: bool,
 
         /// Explain metric definitions and formulas (measured vs estimated)
         #[arg(long = "explain-metrics")]
@@ -310,14 +250,6 @@ pub enum Commands {
         /// Show macro expansion statistics at the end of analysis
         #[arg(long = "show-macro-stats")]
         show_macro_stats: bool,
-
-        /// Show pattern warnings for uncertain detections
-        #[arg(long = "show-pattern-warnings")]
-        show_pattern_warnings: bool,
-
-        /// Validate LOC consistency across analysis modes (with/without coverage)
-        #[arg(long = "validate-loc")]
-        validate_loc: bool,
 
         /// Enable call graph debugging with detailed resolution information
         #[arg(long = "debug-call-graph")]
@@ -338,10 +270,6 @@ pub enum Commands {
         /// Validate call graph structure and report issues
         #[arg(long = "validate-call-graph")]
         validate_call_graph: bool,
-
-        /// Show score breakdown for debugging (deprecated: use -v instead)
-        #[arg(long = "explain-score", hide = true)]
-        explain_score: bool,
 
         /// Enable profiling to identify performance bottlenecks (Spec 001).
         /// Outputs timing breakdown for each analysis phase when complete.
@@ -427,10 +355,6 @@ pub enum Commands {
         /// Disable semantic analysis (fallback mode)
         #[arg(long = "semantic-off")]
         semantic_off: bool,
-
-        /// Show score breakdown for debugging (deprecated: use -v instead)
-        #[arg(long = "explain-score", hide = true)]
-        explain_score: bool,
 
         /// Increase verbosity level (can be repeated: -v, -vv, -vvv)
         /// -v: Show main score factors
