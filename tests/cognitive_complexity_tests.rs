@@ -211,7 +211,10 @@ fn test_calculate_cognitive_nested_closures() {
     }};
 
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 3, "Nested closures should have complexity 3");
+    assert_eq!(
+        complexity, 1,
+        "Parent complexity should not absorb nested closure bodies"
+    );
 }
 
 #[test]

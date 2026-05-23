@@ -208,6 +208,62 @@ fn test_calculate_cyclomatic_multiple_try() {
 }
 
 #[test]
+fn test_calculate_cyclomatic_linear_fallible_writer_pipeline() {
+    let block: Block = parse_quote! {{
+        write!(writer, "{}", header)?;
+        writeln!(writer)?;
+        write!(writer, "{}", body)?;
+        writeln!(writer)?;
+        write!(writer, "{}", footer)?;
+        writeln!(writer)?;
+        Ok(())
+    }};
+
+    let complexity = calculate_cyclomatic(&block);
+    assert_eq!(
+        complexity, 7,
+        "Linear fallible writer pipelines currently count each ? as one path"
+    );
+}
+
+#[test]
+fn test_calculate_cyclomatic_optional_fallible_sections() {
+    let block: Block = parse_quote! {{
+        write!(writer, "{}", required)?;
+        if let Some(section) = optional_section {
+            write!(writer, "{}", section)?;
+            writeln!(writer)?;
+        }
+        Ok(())
+    }};
+
+    let complexity = calculate_cyclomatic(&block);
+    assert_eq!(
+        complexity, 5,
+        "Optional fallible sections count both the if and each ? expression"
+    );
+}
+
+#[test]
+fn test_calculate_cyclomatic_try_inside_closure_excluded_from_parent() {
+    let block: Block = parse_quote! {{
+        let callback = || {
+            write!(writer, "{}", section)?;
+            writeln!(writer)?;
+            Ok(())
+        };
+        write!(writer, "{}", header)?;
+        callback
+    }};
+
+    let complexity = calculate_cyclomatic(&block);
+    assert_eq!(
+        complexity, 2,
+        "Parent cyclomatic excludes ? expressions inside closure bodies"
+    );
+}
+
+#[test]
 fn test_calculate_cyclomatic_nested_match() {
     let block: Block = parse_quote! {{
         match outer {

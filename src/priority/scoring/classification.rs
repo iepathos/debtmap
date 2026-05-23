@@ -105,8 +105,7 @@ fn check_testing_gap_predicate(
 /// `Some(DebtType::ComplexityHotspot)` with RAW values (for display) if function
 /// exceeds thresholds after dampening. Returns `None` if not a hotspot.
 fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
-    let effective_cyclomatic = get_effective_cyclomatic(func);
-    let effective_cognitive = get_effective_cognitive(func);
+    let (effective_cyclomatic, effective_cognitive) = get_effective_complexity(func);
 
     // Check if function exceeds complexity thresholds using dampened values
     let is_complex = effective_cyclomatic > 10 || effective_cognitive > 15;
@@ -131,28 +130,39 @@ fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
     })
 }
 
-/// Get effective cyclomatic complexity using entropy-adjusted value (spec 201)
+/// Effective cyclomatic and cognitive for hotspot decisions (spec 201).
 ///
-/// Uses `adjusted_complexity` if available (computed during entropy analysis),
-/// otherwise falls back to raw cyclomatic.
-fn get_effective_cyclomatic(func: &FunctionMetrics) -> u32 {
-    func.adjusted_complexity
+/// Rolls in nested callable summaries from `detected_patterns` so hidden callback
+/// complexity still contributes to classification while parent metrics stay bounded.
+fn get_effective_complexity(func: &FunctionMetrics) -> (u32, u32) {
+    let base_cyclomatic = func
+        .adjusted_complexity
         .map(|adj| adj.round() as u32)
-        .unwrap_or(func.cyclomatic)
-}
-
-/// Get effective cognitive complexity using entropy dampening (spec 201)
-///
-/// Applies dampening factor to cognitive complexity based on token entropy.
-/// Low entropy (< 0.2) indicates repetitive patterns (e.g., dispatchers),
-/// which get dampened cognitive scores.
-fn get_effective_cognitive(func: &FunctionMetrics) -> u32 {
-    if let Some(entropy) = &func.entropy_score {
+        .unwrap_or(func.cyclomatic);
+    let base_cognitive = if let Some(entropy) = &func.entropy_score {
         let factor = calculate_cognitive_dampening_factor(entropy.token_entropy);
         (func.cognitive as f64 * factor).round() as u32
     } else {
         func.cognitive
-    }
+    };
+
+    crate::complexity::scoring_complexity(
+        base_cyclomatic,
+        base_cognitive,
+        func.detected_patterns.as_deref(),
+    )
+}
+
+/// Get effective cyclomatic complexity using entropy-adjusted value (spec 201)
+#[cfg(test)]
+fn get_effective_cyclomatic(func: &FunctionMetrics) -> u32 {
+    get_effective_complexity(func).0
+}
+
+/// Get effective cognitive complexity using entropy dampening (spec 201)
+#[cfg(test)]
+fn get_effective_cognitive(func: &FunctionMetrics) -> u32 {
+    get_effective_complexity(func).1
 }
 
 /// Calculate dampening factor for cognitive complexity based on token entropy (spec 68)

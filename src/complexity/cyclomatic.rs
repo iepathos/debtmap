@@ -155,10 +155,7 @@ fn push_control_flow_children<'ast>(
             traversal.push_block(&expr_block.block);
             true
         }
-        Expr::Closure(closure) => {
-            traversal.push_expr(&closure.body, false);
-            true
-        }
+        Expr::Closure(_) => true,
         Expr::Async(async_block) => {
             traversal.push_block(&async_block.block);
             true
@@ -524,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn test_traverses_closure_and_async_children() {
+    fn test_excludes_closure_body_but_traverses_async_children() {
         let block: Block = parse_quote! {{
             let closure = || if ready { work() } else { wait() };
             async {
@@ -536,8 +533,8 @@ mod tests {
 
         assert_eq!(
             calculate_cyclomatic(&block),
-            3,
-            "closure if and async while should both contribute complexity"
+            2,
+            "closure body should be scored separately while async block remains parent complexity"
         );
     }
 

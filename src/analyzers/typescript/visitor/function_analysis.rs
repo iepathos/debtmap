@@ -13,7 +13,7 @@ use tree_sitter::Node;
 
 use super::helpers::{
     calculate_cognitive_complexity, calculate_cyclomatic_complexity, calculate_nesting_depth,
-    count_function_lines, is_test_function,
+    count_function_lines, is_test_function, summarize_nested_functions,
 };
 
 /// Extract all functions from a TypeScript/JavaScript AST
@@ -146,6 +146,7 @@ fn analyze_function_declaration(
     metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
     metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body);
+    metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
     metrics.length = count_function_lines(&body, &ast.source);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
@@ -183,6 +184,7 @@ fn analyze_generator_function(node: &Node, ast: &TypeScriptAst) -> Option<JsFunc
     metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
     metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body);
+    metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
     metrics.length = count_function_lines(&body, &ast.source);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
@@ -225,6 +227,7 @@ fn analyze_arrow_function(
     metrics.cyclomatic = calculate_cyclomatic_complexity(&body_node, &ast.source);
     metrics.cognitive = calculate_cognitive_complexity(&body_node, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body_node);
+    metrics.nested_functions = summarize_nested_functions(&body_node, &ast.source);
     metrics.length = count_function_lines(&body_node, &ast.source);
     metrics.is_async = has_async_modifier(node);
     metrics.is_test = is_test_function(&func_name);
@@ -272,6 +275,7 @@ fn analyze_method_definition(
         metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
         metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
         metrics.nesting = calculate_nesting_depth(&body);
+        metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
         metrics.length = count_function_lines(&body, &ast.source);
         metrics.entropy_score = Some(calculate_entropy(
             &body,
@@ -356,6 +360,7 @@ fn analyze_function_expression(
     metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
     metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body);
+    metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
     metrics.length = count_function_lines(&body, &ast.source);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&func_name);

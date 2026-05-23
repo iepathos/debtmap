@@ -128,6 +128,8 @@ pub struct JsFunctionMetrics {
     pub impurity_reasons: Vec<String>,
     /// Functional map/filter/reduce style chains detected for this function
     pub functional_chains: Vec<FunctionalChain>,
+    /// Summary of nested function/callback bodies excluded from parent complexity.
+    pub nested_functions: NestedFunctionSummary,
 }
 
 impl JsFunctionMetrics {
@@ -153,6 +155,7 @@ impl JsFunctionMetrics {
             purity_confidence: None,
             impurity_reasons: Vec::new(),
             functional_chains: Vec::new(),
+            nested_functions: NestedFunctionSummary::default(),
         }
     }
 
@@ -160,6 +163,19 @@ impl JsFunctionMetrics {
     pub fn is_complex(&self, threshold: u32) -> bool {
         self.cyclomatic > threshold || self.cognitive > threshold
     }
+}
+
+/// Complexity summary for nested functions/callbacks inside a function body.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NestedFunctionSummary {
+    /// Number of nested arrow/function-expression bodies.
+    pub count: u32,
+    /// Sum of bounded cyclomatic complexity for nested function bodies.
+    pub cyclomatic: u32,
+    /// Sum of bounded cognitive complexity for nested function bodies.
+    pub cognitive: u32,
+    /// Maximum bounded nesting depth among nested function bodies.
+    pub max_nesting: u32,
 }
 
 /// TypeScript-specific pattern detection results

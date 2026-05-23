@@ -3,7 +3,7 @@
 //! Provides complexity calculation and conversion utilities.
 
 use crate::analyzers::typescript::parser::node_text;
-use crate::analyzers::typescript::types::{FunctionKind, JsFunctionMetrics};
+use crate::analyzers::typescript::types::{FunctionKind, JsFunctionMetrics, NestedFunctionSummary};
 use crate::complexity::entropy_core::{EntropyAnalysis, EntropyConfig};
 use crate::complexity::threshold_manager::{ComplexityLevel, ComplexityThresholds, FunctionRole};
 use crate::core::FunctionMetrics;
@@ -20,6 +20,10 @@ pub fn calculate_cyclomatic_complexity(node: &Node, source: &str) -> u32 {
 
 /// Recursively traverse nodes to count decision points
 fn traverse_for_cyclomatic(node: &Node, source: &str, complexity: &mut u32) {
+    if is_nested_function_boundary(node) {
+        return;
+    }
+
     match node.kind() {
         // Control flow statements
         "if_statement" => *complexity += 1,
@@ -58,6 +62,13 @@ fn traverse_for_cyclomatic(node: &Node, source: &str, complexity: &mut u32) {
 fn is_default_case(node: &Node, source: &str) -> bool {
     let text = node_text(node, source);
     text.trim_start().starts_with("default")
+}
+
+fn is_nested_function_boundary(node: &Node) -> bool {
+    matches!(
+        node.kind(),
+        "arrow_function" | "function_expression" | "function"
+    ) && node.child_by_field_name("body").is_some()
 }
 
 /// Calculate cognitive complexity for a function body
@@ -144,7 +155,7 @@ fn traverse_for_cognitive(node: &Node, source: &str, complexity: &mut u32, nesti
         // Nested functions/callbacks increase complexity for the PARENT function.
         // We add complexity for the callback's presence but do NOT traverse into its body.
         // The callback's internal complexity is counted when analyzing the callback itself.
-        "arrow_function" | "function_expression" => {
+        "arrow_function" | "function_expression" | "function" => {
             // Callback presence adds complexity based on nesting level
             *complexity += 1 + nesting.min(2);
             // Don't traverse into body - avoids double-counting when callback is analyzed separately
@@ -198,6 +209,10 @@ pub fn calculate_nesting_depth(node: &Node) -> u32 {
 }
 
 fn calculate_nesting_recursive(node: &Node, current_depth: u32) -> u32 {
+    if is_nested_function_boundary(node) {
+        return current_depth;
+    }
+
     // Only control flow structures add to nesting depth.
     // Functions/callbacks are NOT counted - their complexity is captured
     // separately in cognitive complexity, not nesting depth.
@@ -218,6 +233,35 @@ fn calculate_nesting_recursive(node: &Node, current_depth: u32) -> u32 {
     }
 
     max_depth
+}
+
+/// Summarize nested functions/callbacks excluded from parent complexity metrics.
+pub fn summarize_nested_functions(node: &Node, source: &str) -> NestedFunctionSummary {
+    let mut summary = NestedFunctionSummary::default();
+    collect_nested_functions(node, source, &mut summary);
+    summary
+}
+
+fn collect_nested_functions(node: &Node, source: &str, summary: &mut NestedFunctionSummary) {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if is_nested_function_boundary(&child) {
+            add_nested_function_summary(&child, source, summary);
+        } else {
+            collect_nested_functions(&child, source, summary);
+        }
+    }
+}
+
+fn add_nested_function_summary(node: &Node, source: &str, summary: &mut NestedFunctionSummary) {
+    summary.count += 1;
+
+    if let Some(body) = node.child_by_field_name("body") {
+        summary.cyclomatic += calculate_cyclomatic_complexity(&body, source);
+        summary.cognitive += calculate_cognitive_complexity(&body, source);
+        summary.max_nesting = summary.max_nesting.max(calculate_nesting_depth(&body));
+        collect_nested_functions(&body, source, summary);
+    }
 }
 
 /// Count lines in a function body
@@ -322,6 +366,7 @@ fn build_detected_patterns(
         .iter()
         .map(|chain| format!("functional-chain:{}", chain.methods.join("->")))
         .collect();
+    patterns.extend(nested_function_patterns(&js_metrics.nested_functions));
 
     let role = classify_function_role(js_metrics);
     if thresholds.should_flag_function(metrics, role.clone()) {
@@ -347,6 +392,15 @@ fn build_detected_patterns(
     }
 
     patterns
+}
+
+fn nested_function_patterns(summary: &NestedFunctionSummary) -> Vec<String> {
+    crate::complexity::nested_callable_patterns(&crate::complexity::NestedCallableSummary {
+        count: summary.count,
+        cyclomatic: summary.cyclomatic,
+        cognitive: summary.cognitive,
+        max_nesting: summary.max_nesting,
+    })
 }
 
 fn classify_function_role(js_metrics: &JsFunctionMetrics) -> FunctionRole {
@@ -430,6 +484,28 @@ mod tests {
     }
 
     #[test]
+    fn test_parent_cyclomatic_excludes_nested_callback_body() {
+        let source = r#"
+function useThing(flag) {
+    if (flag) {
+        return null;
+    }
+    const callback = () => {
+        if (flag) {
+            return 1;
+        }
+        return 0;
+    };
+    return callback;
+}
+"#;
+        let (tree, source) = parse_and_get_body(source);
+        let root = tree.root_node();
+
+        assert_eq!(calculate_cyclomatic_complexity(&root, &source), 2);
+    }
+
+    #[test]
     fn test_nullish_defaults_do_not_inflate_async_persistence_complexity() {
         let source = r#"
 async function persist(db, input) {
@@ -510,6 +586,56 @@ function foo(a, b, c) {
     }
 
     #[test]
+    fn test_parent_nesting_excludes_nested_callback_body() {
+        let source = r#"
+function useThing(flag) {
+    if (flag) {
+        return null;
+    }
+    const callback = () => {
+        if (flag) {
+            if (flag.ready) {
+                return 1;
+            }
+        }
+        return 0;
+    };
+    return callback;
+}
+"#;
+        let (tree, _source) = parse_and_get_body(source);
+        let root = tree.root_node();
+
+        assert_eq!(calculate_nesting_depth(&root), 1);
+    }
+
+    #[test]
+    fn test_summarize_nested_functions_preserves_callback_complexity() {
+        let source = r#"
+function useThing(flag) {
+    const first = () => {
+        if (flag) {
+            return 1;
+        }
+        return 0;
+    };
+    const second = function(value) {
+        return value ? 1 : 0;
+    };
+    return { first, second };
+}
+"#;
+        let (tree, source) = parse_and_get_body(source);
+        let root = tree.root_node();
+        let summary = summarize_nested_functions(&root, &source);
+
+        assert_eq!(summary.count, 2);
+        assert_eq!(summary.cyclomatic, 4);
+        assert_eq!(summary.cognitive, 2);
+        assert_eq!(summary.max_nesting, 1);
+    }
+
+    #[test]
     fn test_is_test_function() {
         assert!(is_test_function("test_something"));
         assert!(is_test_function("testSomething"));
@@ -579,5 +705,29 @@ function foo(a, b, c) {
             strict_metrics.adjusted_complexity,
             lenient_metrics.adjusted_complexity
         );
+    }
+
+    #[test]
+    fn test_convert_to_function_metrics_preserves_nested_function_patterns() {
+        let mut js_metrics = JsFunctionMetrics::new(
+            "useThing".to_string(),
+            PathBuf::from("test.ts"),
+            5,
+            FunctionKind::Declaration,
+        );
+        js_metrics.nested_functions = NestedFunctionSummary {
+            count: 2,
+            cyclomatic: 4,
+            cognitive: 2,
+            max_nesting: 1,
+        };
+
+        let metrics = convert_to_function_metrics(&js_metrics, &ComplexityThresholds::default());
+        let patterns = metrics.detected_patterns.expect("nested patterns");
+
+        assert!(patterns.contains(&"nested-functions:count=2".to_string()));
+        assert!(patterns.contains(&"nested-functions:cyclomatic=4".to_string()));
+        assert!(patterns.contains(&"nested-functions:cognitive=2".to_string()));
+        assert!(patterns.contains(&"nested-functions:max-nesting=1".to_string()));
     }
 }

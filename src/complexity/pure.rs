@@ -215,7 +215,7 @@ pub fn count_expr_branches(expr: &Expr) -> u32 {
             1 + count_expr_branches(&binary.left) + count_expr_branches(&binary.right)
         }
         Expr::Block(expr_block) => expr_block.block.stmts.iter().map(count_stmt_branches).sum(),
-        Expr::Closure(closure) => count_expr_branches(&closure.body),
+        Expr::Closure(_) => 0,
         Expr::Call(call) => {
             count_expr_branches(&call.func) + call.args.iter().map(count_expr_branches).sum::<u32>()
         }
@@ -383,7 +383,7 @@ fn calculate_expr_cognitive(expr: &Expr, nesting: u32) -> u32 {
         }
         Expr::Closure(closure) => {
             let base = if closure.asyncness.is_some() { 2 } else { 1 };
-            base + nesting.min(1) + calculate_expr_cognitive(&closure.body, nesting + 1)
+            base + nesting.min(1)
         }
         Expr::Await(_) => 1,
         Expr::Unsafe(unsafe_expr) => 2 + calculate_block_cognitive(&unsafe_expr.block, nesting + 1),

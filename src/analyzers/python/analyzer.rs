@@ -3,6 +3,7 @@
 //! The PythonAnalyzer implements the Analyzer trait for Python code.
 
 use crate::analyzers::Analyzer;
+use crate::complexity::nested_callable_patterns;
 use crate::complexity::threshold_manager::{
     ComplexityLevel, ComplexityThresholds, FunctionRole, ThresholdPreset,
 };
@@ -176,8 +177,12 @@ impl PythonAnalyzer {
             .zip(extracted.functions.iter())
             .filter(|(function, _)| !function.is_test)
             .filter(|(function, _)| {
-                function.cyclomatic >= self.complexity_threshold
-                    || function.cognitive >= self.complexity_threshold
+                let (cyclomatic, cognitive) = crate::complexity::scoring_complexity(
+                    function.cyclomatic,
+                    function.cognitive,
+                    function.detected_patterns.as_deref(),
+                );
+                cyclomatic >= self.complexity_threshold || cognitive >= self.complexity_threshold
             })
             .map(|(function, extracted_function)| {
                 complexity_debt_item(
@@ -226,6 +231,10 @@ fn build_detected_patterns(
     if enable_functional_analysis {
         patterns.extend(detect_functional_patterns(extracted_function));
     }
+
+    patterns.extend(nested_callable_patterns(
+        &extracted_function.nested_callables,
+    ));
 
     patterns
 }
@@ -404,6 +413,93 @@ def handle_request(a, b, c, d):
             .debt_items
             .iter()
             .any(|item| item.id.starts_with("python-high-complexity-")));
+    }
+
+    #[test]
+    fn test_python_parent_complexity_excludes_nested_function_body() {
+        let analyzer = PythonAnalyzer::new();
+        let content = r#"
+def outer(flag):
+    if flag:
+        return 1
+
+    def inner(value):
+        if value:
+            if value.ready:
+                return 2
+        return 0
+
+    return inner(flag)
+"#;
+        let ast = analyzer.parse(content, PathBuf::from("nested.py")).unwrap();
+        let result = analyzer.analyze(&ast);
+        let outer = result
+            .complexity
+            .functions
+            .iter()
+            .find(|function| function.name == "outer")
+            .unwrap();
+
+        assert_eq!(outer.cyclomatic, 2);
+        assert_eq!(outer.cognitive, 2);
+        assert_eq!(outer.nesting, 1);
+
+        let patterns = outer.detected_patterns.as_ref().expect("nested patterns");
+        assert!(patterns.contains(&"nested-functions:count=1".to_string()));
+        assert!(patterns.contains(&"nested-functions:cyclomatic=3".to_string()));
+        assert!(patterns.contains(&"nested-functions:cognitive=3".to_string()));
+        assert!(patterns.contains(&"nested-functions:max-nesting=2".to_string()));
+    }
+
+    #[test]
+    fn test_extracted_nested_lambda_summary() {
+        let content = r#"
+def outer(flag):
+    callback = lambda value: 1 if value else 0
+    if flag:
+        return callback(flag)
+    return 0
+"#;
+        let path = PathBuf::from("lambda.py");
+        let py_ast = parse_source(content, &path).unwrap();
+        let extracted = crate::extraction::python::PythonExtractor::extract(&py_ast).unwrap();
+        let outer = extracted
+            .functions
+            .iter()
+            .find(|function| function.name == "outer")
+            .expect("outer");
+
+        assert_eq!(outer.nested_callables.count, 1);
+        assert_eq!(outer.nested_callables.cyclomatic, 2);
+    }
+
+    #[test]
+    fn test_python_parent_complexity_excludes_lambda_body() {
+        let analyzer = PythonAnalyzer::new();
+        let content = r#"
+def outer(flag):
+    callback = lambda value: 1 if value else 0
+    if flag:
+        return callback(flag)
+    return 0
+"#;
+        let ast = analyzer.parse(content, PathBuf::from("lambda.py")).unwrap();
+        let result = analyzer.analyze(&ast);
+        let outer = result
+            .complexity
+            .functions
+            .iter()
+            .find(|function| function.name == "outer")
+            .unwrap();
+
+        assert_eq!(outer.cyclomatic, 2);
+        assert_eq!(outer.cognitive, 2);
+        assert_eq!(outer.nesting, 1);
+
+        let patterns = outer.detected_patterns.as_ref().expect("nested patterns");
+        assert!(patterns.contains(&"nested-functions:count=1".to_string()));
+        assert!(patterns.contains(&"nested-functions:cyclomatic=2".to_string()));
+        assert!(patterns.contains(&"nested-functions:cognitive=1".to_string()));
     }
 
     #[test]

@@ -28,6 +28,7 @@ pub mod if_else_analyzer;
 pub mod languages;
 pub mod match_patterns;
 pub mod message_generator;
+pub mod nested_callables;
 pub mod pattern_adjustments;
 pub mod patterns;
 pub mod pure;
@@ -50,6 +51,10 @@ use crate::core::FunctionMetrics;
 pub use entropy_core::{aggregate_entropy, EntropyAnalysis};
 
 // Re-export weighted complexity types (spec 121)
+pub use nested_callables::{
+    nested_callable_patterns, parse_nested_callable_patterns, scoring_complexity,
+    NestedCallableSummary,
+};
 pub use weighted::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
 
 // Re-export pure complexity functions (spec 196)

@@ -367,6 +367,7 @@ mod tests {
             cyclomatic,
             cognitive: cyclomatic / 2,
             nesting: 2,
+            nested_callables: crate::complexity::NestedCallableSummary::default(),
             entropy_score: None,
             purity_analysis: PurityAnalysisData::pure(),
             io_operations: vec![],

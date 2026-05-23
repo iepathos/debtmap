@@ -123,6 +123,7 @@ impl<'a> PythonExtractor<'a> {
 
         // Simple complexity calculation (count branches)
         let (cyclomatic, cognitive, nesting) = self.calculate_complexity(node);
+        let nested_callables = summarize_nested_callables(node);
 
         // Parameter names for purity analysis
         let parameter_names = self.extract_parameters(node);
@@ -153,6 +154,7 @@ impl<'a> PythonExtractor<'a> {
             cyclomatic,
             cognitive,
             nesting,
+            nested_callables,
             entropy_score,
             purity_analysis,
             io_operations: self.extract_io_operations(node),
@@ -342,7 +344,14 @@ impl<'a> PythonExtractor<'a> {
         let mut cognitive = 0;
         let mut max_nesting = 0;
 
-        traverse_complexity(node, 0, &mut cyclomatic, &mut cognitive, &mut max_nesting);
+        traverse_complexity(
+            node,
+            0,
+            &mut cyclomatic,
+            &mut cognitive,
+            &mut max_nesting,
+            true,
+        );
 
         (cyclomatic, cognitive, max_nesting)
     }
@@ -560,8 +569,14 @@ fn traverse_complexity(
     cyclomatic: &mut u32,
     cognitive: &mut u32,
     max_nesting: &mut u32,
+    is_root: bool,
 ) {
     let kind = node.kind();
+    if !is_root && is_python_callable_boundary(node) {
+        *cognitive += 1 + depth.min(2);
+        return;
+    }
+
     let mut current_depth = depth;
 
     match kind {
@@ -608,10 +623,66 @@ fn traverse_complexity(
                 cyclomatic,
                 cognitive,
                 max_nesting,
+                false,
             );
             if !cursor.goto_next_sibling() {
                 break;
             }
         }
     }
+}
+
+fn is_python_callable_boundary(node: Node) -> bool {
+    match node.kind() {
+        "function_definition" | "async_function_definition" => true,
+        // Ignore bare `lambda` keyword tokens; only count lambda expressions.
+        "lambda" => node.child_by_field_name("parameters").is_some(),
+        _ => false,
+    }
+}
+
+/// Summarize nested callables excluded from parent complexity metrics.
+pub fn summarize_nested_callables(node: Node) -> crate::complexity::NestedCallableSummary {
+    let mut summary = crate::complexity::NestedCallableSummary::default();
+    collect_nested_callables(node, &mut summary);
+    summary
+}
+
+fn collect_nested_callables(node: Node, summary: &mut crate::complexity::NestedCallableSummary) {
+    let mut cursor = node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            let child = cursor.node();
+            if is_python_callable_boundary(child) {
+                add_nested_callable_summary(child, summary);
+            } else {
+                collect_nested_callables(child, summary);
+            }
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+}
+
+fn add_nested_callable_summary(node: Node, summary: &mut crate::complexity::NestedCallableSummary) {
+    summary.count += 1;
+    let (cyclomatic, cognitive, nesting) = {
+        let mut cyclomatic = 1;
+        let mut cognitive = 0;
+        let mut max_nesting = 0;
+        traverse_complexity(
+            node,
+            0,
+            &mut cyclomatic,
+            &mut cognitive,
+            &mut max_nesting,
+            true,
+        );
+        (cyclomatic, cognitive, max_nesting)
+    };
+    summary.cyclomatic += cyclomatic;
+    summary.cognitive += cognitive;
+    summary.max_nesting = summary.max_nesting.max(nesting);
+    collect_nested_callables(node, summary);
 }

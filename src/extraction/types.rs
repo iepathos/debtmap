@@ -110,6 +110,9 @@ pub struct ExtractedFunctionData {
     pub cognitive: u32,
     /// Maximum nesting depth
     pub nesting: u32,
+    /// Nested functions/lambdas inside this body (excluded from parent metrics)
+    #[serde(default)]
+    pub nested_callables: crate::complexity::NestedCallableSummary,
     /// Entropy-based complexity score (optional, calculated during extraction if enabled)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entropy_score: Option<crate::complexity::entropy_core::EntropyScore>,
@@ -459,6 +462,7 @@ impl ExtractedFunctionData {
             cyclomatic: 1,
             cognitive: 0,
             nesting: 0,
+            nested_callables: crate::complexity::NestedCallableSummary::default(),
             entropy_score: None,
             purity_analysis: PurityAnalysisData::default(),
             io_operations: Vec::new(),
@@ -485,6 +489,7 @@ impl Default for ExtractedFunctionData {
             cyclomatic: 1,
             cognitive: 0,
             nesting: 0,
+            nested_callables: crate::complexity::NestedCallableSummary::default(),
             entropy_score: None,
             purity_analysis: PurityAnalysisData::default(),
             io_operations: Vec::new(),
@@ -675,6 +680,7 @@ mod tests {
                 cyclomatic: 5,
                 cognitive: 3,
                 nesting: 2,
+                nested_callables: crate::complexity::NestedCallableSummary::default(),
                 entropy_score: None,
                 purity_analysis: PurityAnalysisData::pure(),
                 io_operations: vec![IoOperation {
