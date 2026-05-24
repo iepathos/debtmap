@@ -33,47 +33,58 @@ pub fn print_validation_failure_with_details(
 }
 
 pub fn print_validation_details(details: &ValidationDetails) {
-    println!("  Primary Quality Metrics:");
+    print_primary_quality_metrics(details);
+    print_codebase_statistics(details);
+    print_deprecated_thresholds(details);
+}
 
-    // Emphasize debt density as THE primary metric
+fn print_primary_quality_metrics(details: &ValidationDetails) {
+    println!("  Primary Quality Metrics:");
+    print_debt_density_metric(details);
+    print_average_complexity_metric(details);
+    print_codebase_risk_metric(details);
+    print_coverage_metric(details);
+}
+
+fn print_debt_density_metric(details: &ValidationDetails) {
     println!(
         "    Debt Density: {:.1} per 1K LOC (threshold: {:.1})",
         details.debt_density, details.max_debt_density
     );
 
-    // Show percentage of threshold used - helps users understand headroom
-    let density_usage = if details.max_debt_density > 0.0 {
-        (details.debt_density / details.max_debt_density) * 100.0
-    } else {
-        0.0
-    };
-    let density_headroom = 100.0 - density_usage;
+    let density_usage = calculate_density_usage(details);
     println!(
         "       └─ Using {:.0}% of max density ({:.0}% headroom)",
-        density_usage, density_headroom
+        density_usage.used_percentage, density_usage.headroom_percentage
     );
+}
 
-    // Show other primary quality metrics
+fn print_average_complexity_metric(details: &ValidationDetails) {
     println!(
         "    Average complexity: {:.1} (threshold: {:.1})",
         details.average_complexity, details.max_average_complexity
     );
+}
 
-    if details.max_codebase_risk_score > 0.0 || details.codebase_risk_score > 0.0 {
+fn print_codebase_risk_metric(details: &ValidationDetails) {
+    if shows_codebase_risk(details) {
         println!(
             "    Codebase risk score: {:.1} (threshold: {:.1})",
             details.codebase_risk_score, details.max_codebase_risk_score
         );
     }
+}
 
-    if details.min_coverage_percentage > 0.0 || details.coverage_percentage > 0.0 {
+fn print_coverage_metric(details: &ValidationDetails) {
+    if shows_coverage(details) {
         println!(
             "    Code coverage: {:.1}% (minimum: {:.1}%)",
             details.coverage_percentage, details.min_coverage_percentage
         );
     }
+}
 
-    // Show absolute counts as informational (not primary validation criteria)
+fn print_codebase_statistics(details: &ValidationDetails) {
     println!("\n  Codebase Statistics (informational):");
     println!(
         "    High complexity functions: {}",
@@ -84,29 +95,75 @@ pub fn print_validation_details(details: &ValidationDetails) {
         "    Total debt score: {} (safety net threshold: {})",
         details.total_debt_score, details.max_total_debt_score
     );
+}
 
-    // Show deprecated metrics only if they are set (non-zero)
-    if details.max_high_complexity_count > 0 || details.max_debt_items > 0 {
-        println!("\n  [WARNING] Deprecated Thresholds (if configured):");
-        if details.max_high_complexity_count > 0 {
-            println!(
-                "    High complexity functions: {} (threshold: {})",
-                details.high_complexity_count, details.max_high_complexity_count
-            );
-        }
-        if details.max_debt_items > 0 {
-            println!(
-                "    Technical debt items: {} (threshold: {})",
-                details.debt_items, details.max_debt_items
-            );
-        }
-        if details.max_high_risk_functions > 0 {
-            println!(
-                "    High-risk functions: {} (threshold: {})",
-                details.high_risk_functions, details.max_high_risk_functions
-            );
-        }
+fn print_deprecated_thresholds(details: &ValidationDetails) {
+    if !shows_deprecated_thresholds(details) {
+        return;
     }
+
+    println!("\n  [WARNING] Deprecated Thresholds (if configured):");
+    print_deprecated_high_complexity_threshold(details);
+    print_deprecated_debt_items_threshold(details);
+    print_deprecated_high_risk_threshold(details);
+}
+
+fn print_deprecated_high_complexity_threshold(details: &ValidationDetails) {
+    if details.max_high_complexity_count > 0 {
+        println!(
+            "    High complexity functions: {} (threshold: {})",
+            details.high_complexity_count, details.max_high_complexity_count
+        );
+    }
+}
+
+fn print_deprecated_debt_items_threshold(details: &ValidationDetails) {
+    if details.max_debt_items > 0 {
+        println!(
+            "    Technical debt items: {} (threshold: {})",
+            details.debt_items, details.max_debt_items
+        );
+    }
+}
+
+fn print_deprecated_high_risk_threshold(details: &ValidationDetails) {
+    if details.max_high_risk_functions > 0 {
+        println!(
+            "    High-risk functions: {} (threshold: {})",
+            details.high_risk_functions, details.max_high_risk_functions
+        );
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct DensityUsage {
+    used_percentage: f64,
+    headroom_percentage: f64,
+}
+
+fn calculate_density_usage(details: &ValidationDetails) -> DensityUsage {
+    let used_percentage = if details.max_debt_density > 0.0 {
+        (details.debt_density / details.max_debt_density) * 100.0
+    } else {
+        0.0
+    };
+
+    DensityUsage {
+        used_percentage,
+        headroom_percentage: 100.0 - used_percentage,
+    }
+}
+
+fn shows_codebase_risk(details: &ValidationDetails) -> bool {
+    details.max_codebase_risk_score > 0.0 || details.codebase_risk_score > 0.0
+}
+
+fn shows_coverage(details: &ValidationDetails) -> bool {
+    details.min_coverage_percentage > 0.0 || details.coverage_percentage > 0.0
+}
+
+fn shows_deprecated_thresholds(details: &ValidationDetails) -> bool {
+    details.max_high_complexity_count > 0 || details.max_debt_items > 0
 }
 
 fn print_failed_validation_checks(details: &ValidationDetails) {
@@ -297,6 +354,27 @@ mod tests {
     use super::*;
     use crate::commands::validate::ValidationDetails;
 
+    fn validation_details() -> ValidationDetails {
+        ValidationDetails {
+            average_complexity: 5.0,
+            max_average_complexity: 10.0,
+            high_complexity_count: 2,
+            max_high_complexity_count: 0,
+            debt_items: 10,
+            max_debt_items: 0,
+            total_debt_score: 50,
+            max_total_debt_score: 100,
+            debt_density: 10.0,
+            max_debt_density: 50.0,
+            codebase_risk_score: 0.0,
+            max_codebase_risk_score: 0.0,
+            high_risk_functions: 0,
+            max_high_risk_functions: 0,
+            coverage_percentage: 0.0,
+            min_coverage_percentage: 0.0,
+        }
+    }
+
     #[test]
     fn test_exceeds_max_threshold() {
         assert!(exceeds_max_threshold(10, 5));
@@ -309,6 +387,53 @@ mod tests {
         assert!(below_min_threshold(5, 10));
         assert!(!below_min_threshold(10, 5));
         assert!(!below_min_threshold(5, 5));
+    }
+
+    #[test]
+    fn test_calculate_density_usage_with_threshold() {
+        let details = validation_details();
+
+        assert_eq!(
+            calculate_density_usage(&details),
+            DensityUsage {
+                used_percentage: 20.0,
+                headroom_percentage: 80.0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_calculate_density_usage_without_threshold() {
+        let details = ValidationDetails {
+            max_debt_density: 0.0,
+            ..validation_details()
+        };
+
+        assert_eq!(
+            calculate_density_usage(&details),
+            DensityUsage {
+                used_percentage: 0.0,
+                headroom_percentage: 100.0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_optional_validation_detail_predicates() {
+        assert!(!shows_codebase_risk(&validation_details()));
+        assert!(!shows_coverage(&validation_details()));
+        assert!(!shows_deprecated_thresholds(&validation_details()));
+
+        let details = ValidationDetails {
+            codebase_risk_score: 1.0,
+            coverage_percentage: 80.0,
+            max_debt_items: 20,
+            ..validation_details()
+        };
+
+        assert!(shows_codebase_risk(&details));
+        assert!(shows_coverage(&details));
+        assert!(shows_deprecated_thresholds(&details));
     }
 
     #[test]
