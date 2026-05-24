@@ -94,33 +94,39 @@ test-pattern PATTERN:
 test-watch:
     cargo watch -x 'nextest run'
 
-# Run tests with coverage using cargo-llvm-cov
-coverage:
+# Run fast coverage using the default local test scope
+coverage: coverage-fast
+
+# Run fast coverage using cargo-llvm-cov and nextest
+coverage-fast:
     #!/usr/bin/env bash
+    set -euo pipefail
     # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
     export PATH="$HOME/.cargo/bin:$PATH"
-    echo "Building debtmap binary for integration tests..."
-    cargo build --bin debtmap
-    echo "Cleaning previous coverage data..."
-    cargo llvm-cov clean
-    echo "Generating code coverage report with cargo-llvm-cov..."
-    cargo llvm-cov --all-features --html --output-dir target/coverage
+    mkdir -p target/coverage
+    find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
+    echo "Generating fast HTML coverage report with cargo-llvm-cov nextest..."
+    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --no-clean --html --output-dir target/coverage \
+        --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
+        --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
     echo "Coverage report generated at target/coverage/html/index.html"
 
 # Run tests with coverage (lcov format)
-coverage-lcov:
+coverage-lcov: coverage-fast-lcov
+
+# Run fast tests with coverage (lcov format)
+coverage-fast-lcov:
     #!/usr/bin/env bash
     set -euo pipefail  # Exit on error, undefined variables, and pipe failures
     # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
     export PATH="$HOME/.cargo/bin:$PATH"
-    echo "Building debtmap binary for integration tests..."
-    cargo build --bin debtmap
-    echo "Cleaning previous coverage data..."
-    cargo llvm-cov clean
     # Ensure target/coverage directory exists
     mkdir -p target/coverage
-    echo "Generating code coverage report with cargo-llvm-cov (lcov format)..."
-    cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
+    find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
+    echo "Generating fast LCOV report with cargo-llvm-cov nextest..."
+    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --no-clean --lcov --output-path target/coverage/lcov.info \
+        --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
+        --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
     echo "Coverage report generated at target/coverage/lcov.info"
     # Verify the file was actually created
     if [ ! -f target/coverage/lcov.info ]; then
@@ -131,6 +137,61 @@ coverage-lcov:
 # Run tests with coverage and check threshold
 coverage-check:
     #!/usr/bin/env bash
+    set -euo pipefail
+    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
+    export PATH="$HOME/.cargo/bin:$PATH"
+    mkdir -p target/coverage
+    find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
+    echo "Checking fast line coverage threshold..."
+    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --no-clean --json --output-path target/coverage/coverage.json \
+        --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
+        --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
+    COVERAGE=$(jq -r '.data[0].totals.lines.percent' target/coverage/coverage.json)
+    echo "Current coverage: ${COVERAGE}%"
+    if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+        echo "⚠️  Coverage is below 80%: $COVERAGE%"
+        exit 1
+    else
+        echo "✅ Coverage meets 80% threshold: $COVERAGE%"
+    fi
+
+# Run exhaustive coverage using all feature combinations in the default cargo test harness
+coverage-full:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
+    export PATH="$HOME/.cargo/bin:$PATH"
+    echo "Building debtmap binary for integration tests..."
+    cargo build --bin debtmap
+    echo "Cleaning previous coverage data..."
+    cargo llvm-cov clean
+    echo "Generating full HTML coverage report with cargo-llvm-cov..."
+    cargo llvm-cov --all-features --html --output-dir target/coverage
+    echo "Coverage report generated at target/coverage/html/index.html"
+
+# Run exhaustive tests with coverage (lcov format)
+coverage-full-lcov:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
+    export PATH="$HOME/.cargo/bin:$PATH"
+    echo "Building debtmap binary for integration tests..."
+    cargo build --bin debtmap
+    echo "Cleaning previous coverage data..."
+    cargo llvm-cov clean
+    mkdir -p target/coverage
+    echo "Generating full LCOV report with cargo-llvm-cov..."
+    cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
+    echo "Coverage report generated at target/coverage/lcov.info"
+    if [ ! -f target/coverage/lcov.info ]; then
+        echo "ERROR: Coverage file was not generated at target/coverage/lcov.info"
+        exit 1
+    fi
+
+# Run exhaustive tests with coverage and check threshold
+coverage-full-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
     echo "Setting up LLVM tools..."

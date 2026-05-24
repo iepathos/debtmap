@@ -57,10 +57,19 @@ jobs:
       with:
         tool: cargo-llvm-cov
 
+    - name: Install cargo-nextest
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-nextest
+
     - name: Generate coverage data
       run: |
         mkdir -p target/coverage
-        cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
+        cargo llvm-cov clean
+        SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --lcov --output-path target/coverage/lcov.info \
+          --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
+          --test debt_tests --test entropy_tests \
+          --status-level fail --final-status-level slow
         echo "Disk space after coverage generation:"
         df -h
 
