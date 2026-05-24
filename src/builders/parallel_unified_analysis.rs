@@ -397,19 +397,21 @@ impl OptimizedTestDetector {
         // Find all functions that are test roots (have no callers and are test functions)
         for func_id in call_graph.get_all_functions() {
             let callers = call_graph.get_callers(func_id);
-            if callers.is_empty() {
-                // Check if this is a test function
-                if func_id.name.starts_with("test_")
-                    || func_id.name.contains("::test")
-                    || func_id.file.to_string_lossy().contains("/tests/")
-                    || func_id.file.to_string_lossy().contains("_test.rs")
-                {
-                    test_roots.insert(func_id.clone());
-                }
+            if callers.is_empty() && Self::is_test_function(func_id) {
+                test_roots.insert(func_id.clone());
             }
         }
 
         test_roots
+    }
+
+    fn is_test_function(func_id: &FunctionId) -> bool {
+        let file = func_id.file.to_string_lossy();
+
+        func_id.name.starts_with("test_")
+            || func_id.name.contains("::test")
+            || file.contains("/tests/")
+            || file.contains("_test.rs")
     }
 
     pub fn is_test_only(&self, func_id: &FunctionId) -> bool {
@@ -447,26 +449,42 @@ impl OptimizedTestDetector {
         let mut queue = vec![func_id.clone()];
 
         while let Some(current) = queue.pop() {
-            if !visited.insert(current.clone()) {
-                continue;
-            }
-
-            let callers = self.call_graph.get_callers(&current);
-            if callers.is_empty() {
-                // Found a root that's not a test
-                if !self.test_roots.contains(&current) {
-                    return false;
-                }
-            } else {
-                for caller in callers {
-                    if !visited.contains(&caller) {
-                        queue.push(caller);
-                    }
-                }
+            if self.reaches_non_test_root(current, &mut visited, &mut queue) {
+                return false;
             }
         }
 
         true
+    }
+
+    fn reaches_non_test_root(
+        &self,
+        current: FunctionId,
+        visited: &mut HashSet<FunctionId>,
+        queue: &mut Vec<FunctionId>,
+    ) -> bool {
+        if !visited.insert(current.clone()) {
+            return false;
+        }
+
+        let callers = self.call_graph.get_callers(&current);
+        if callers.is_empty() {
+            return !self.test_roots.contains(&current);
+        }
+
+        Self::enqueue_unvisited_callers(callers, visited, queue);
+        false
+    }
+
+    fn enqueue_unvisited_callers(
+        callers: Vec<FunctionId>,
+        visited: &HashSet<FunctionId>,
+        queue: &mut Vec<FunctionId>,
+    ) {
+        callers
+            .into_iter()
+            .filter(|caller| !visited.contains(caller))
+            .for_each(|caller| queue.push(caller));
     }
 
     pub fn find_all_test_only_functions(&self) -> HashSet<FunctionId> {
@@ -1724,6 +1742,7 @@ fn enrich_file_item_with_dependencies(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::call_graph::CallType;
 
     fn metric_with_length(length: usize) -> FunctionMetrics {
         FunctionMetrics {
@@ -1805,6 +1824,44 @@ mod tests {
     #[test]
     fn uncovered_lines_applies_uncovered_fraction_to_total_lines() {
         assert_eq!(uncovered_lines(0.75, 200), 50);
+    }
+
+    fn function_id(file: &str, name: &str, line: usize) -> FunctionId {
+        FunctionId::new(PathBuf::from(file), name.to_string(), line)
+    }
+
+    fn graph_with_functions(functions: &[FunctionId]) -> CallGraph {
+        let mut graph = CallGraph::new();
+        functions
+            .iter()
+            .for_each(|func| graph.add_function(func.clone(), false, false, 1, 10));
+        graph
+    }
+
+    #[test]
+    fn test_only_detector_marks_helper_called_only_by_tests() {
+        let test = function_id("tests/integration.rs", "test_parses_input", 10);
+        let helper = function_id("src/parser.rs", "build_fixture", 20);
+        let mut graph = graph_with_functions(&[test.clone(), helper.clone()]);
+        graph.add_call_parts(test, helper.clone(), CallType::Direct);
+
+        let detector = OptimizedTestDetector::new(Arc::new(graph));
+
+        assert!(detector.is_test_only(&helper));
+    }
+
+    #[test]
+    fn test_only_detector_rejects_helper_reachable_from_production_root() {
+        let test = function_id("tests/integration.rs", "test_parses_input", 10);
+        let production = function_id("src/main.rs", "main", 1);
+        let helper = function_id("src/parser.rs", "build_fixture", 20);
+        let mut graph = graph_with_functions(&[test.clone(), production.clone(), helper.clone()]);
+        graph.add_call_parts(test, helper.clone(), CallType::Direct);
+        graph.add_call_parts(production, helper.clone(), CallType::Direct);
+
+        let detector = OptimizedTestDetector::new(Arc::new(graph));
+
+        assert!(!detector.is_test_only(&helper));
     }
 }
 
