@@ -1,4 +1,5 @@
 use debtmap::analyzers::call_graph::CallGraphExtractor;
+use debtmap::analyzers::rust_call_graph::extract_call_graph_multi_file;
 use std::path::PathBuf;
 
 fn parse_rust_code(code: &str) -> syn::File {
@@ -228,6 +229,92 @@ fn test_std_trait_methods_excluded() {
             "process_data should not call std method '{}', found: {:?}",
             method,
             callees
+        );
+    }
+}
+
+#[test]
+fn test_common_library_methods_do_not_resolve_to_unrelated_project_methods() {
+    let formatter_code = r#"
+        pub struct Message {
+            pub details: Vec<String>,
+            pub code_example: Option<String>,
+        }
+
+        pub fn format_enhanced_message(message: &Message) -> String {
+            let mut output = String::new();
+
+            if message.details.is_empty() {
+                output.push_str("empty");
+            }
+
+            for detail in message.details.iter() {
+                output.push_str(detail);
+            }
+
+            let example = message.code_example.as_ref().unwrap();
+            output.push_str(example);
+            output
+        }
+    "#;
+
+    let unrelated_code = r#"
+        pub struct PurityCache;
+
+        impl PurityCache {
+            pub fn is_empty(&self) -> bool {
+                true
+            }
+        }
+
+        pub struct AnalysisMetrics;
+
+        impl AnalysisMetrics {
+            pub fn iter(&self) -> std::vec::IntoIter<String> {
+                Vec::new().into_iter()
+            }
+        }
+
+        pub struct Applicative;
+
+        impl Applicative {
+            pub fn unwrap(self) -> Vec<String> {
+                Vec::new()
+            }
+        }
+    "#;
+
+    let files = vec![
+        (
+            parse_rust_code(formatter_code),
+            PathBuf::from("src/complexity/message_generator.rs"),
+        ),
+        (
+            parse_rust_code(unrelated_code),
+            PathBuf::from("src/support/unrelated.rs"),
+        ),
+    ];
+
+    let graph = extract_call_graph_multi_file(&files);
+    let formatter = graph
+        .get_all_functions()
+        .find(|func| func.name == "format_enhanced_message")
+        .expect("format_enhanced_message should be present");
+
+    let callee_names: Vec<_> = graph
+        .get_callees(formatter)
+        .iter()
+        .map(|func| func.name.clone())
+        .collect();
+
+    for unrelated in [
+        "PurityCache::is_empty",
+        "AnalysisMetrics::iter",
+        "Applicative::unwrap",
+    ] {
+        assert!(
+            !callee_names.iter().any(|name| name == unrelated),
+            "library method call should not resolve to unrelated project method {unrelated}; callees: {callee_names:?}"
         );
     }
 }

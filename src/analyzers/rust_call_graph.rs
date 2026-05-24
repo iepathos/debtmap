@@ -109,28 +109,31 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         );
 
         for (idx, unresolved) in all_unresolved_calls.iter().enumerate() {
-            // Try standard resolution first
-            if let Some(callee) = resolver.resolve_call(unresolved) {
-                resolved_calls.push(crate::priority::call_graph::FunctionCall {
-                    caller: unresolved.caller.clone(),
-                    callee,
-                    call_type: unresolved.call_type.clone(),
-                });
-                call_resolver_hits += 1;
-            } else {
-                // If standard resolution fails, try using PathResolver
-                // This handles both simple names (via imports) and qualified paths
-                if let Some(callee) =
-                    path_resolver.resolve_call(&unresolved.caller.file, &unresolved.callee_name)
-                {
+            match resolver.resolve_call_outcome(unresolved) {
+                crate::analyzers::call_graph::ResolutionOutcome::Resolved(callee) => {
                     resolved_calls.push(crate::priority::call_graph::FunctionCall {
                         caller: unresolved.caller.clone(),
                         callee,
                         call_type: unresolved.call_type.clone(),
                     });
-                    path_resolver_hits += 1;
-                } else {
-                    unresolved_count += 1;
+                    call_resolver_hits += 1;
+                }
+                crate::analyzers::call_graph::ResolutionOutcome::IgnoredLibraryCall => {}
+                crate::analyzers::call_graph::ResolutionOutcome::Unresolved => {
+                    // If standard resolution fails, try using PathResolver.
+                    // This handles both simple names (via imports) and qualified paths.
+                    if let Some(callee) =
+                        path_resolver.resolve_call(&unresolved.caller.file, &unresolved.callee_name)
+                    {
+                        resolved_calls.push(crate::priority::call_graph::FunctionCall {
+                            caller: unresolved.caller.clone(),
+                            callee,
+                            call_type: unresolved.call_type.clone(),
+                        });
+                        path_resolver_hits += 1;
+                    } else {
+                        unresolved_count += 1;
+                    }
                 }
             }
 

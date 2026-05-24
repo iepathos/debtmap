@@ -21,7 +21,7 @@ pub mod trait_handling;
 pub mod validation;
 
 // Re-export main types for backward compatibility
-pub use call_resolution::{CallResolver, UnresolvedCall};
+pub use call_resolution::{CallResolver, ResolutionOutcome, UnresolvedCall};
 pub use debug::{
     CallGraphDebugger, DebugConfig, DebugFormat, ResolutionAttempt, ResolutionStatistics,
     StrategyAttempt,

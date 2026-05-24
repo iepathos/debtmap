@@ -47,6 +47,14 @@ pub struct UnresolvedCall {
     pub same_file_hint: bool, // Hint that this is likely a same-file call
 }
 
+/// Resolution outcome for a call site.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolutionOutcome {
+    Resolved(FunctionId),
+    IgnoredLibraryCall,
+    Unresolved,
+}
+
 /// Handles resolution of function calls
 use std::collections::HashMap;
 
@@ -95,6 +103,14 @@ impl<'a> CallResolver<'a> {
 
     /// Resolve an unresolved call to a concrete function - now O(1) lookup!
     pub fn resolve_call(&self, call: &UnresolvedCall) -> Option<FunctionId> {
+        match self.resolve_call_outcome(call) {
+            ResolutionOutcome::Resolved(func_id) => Some(func_id),
+            ResolutionOutcome::IgnoredLibraryCall | ResolutionOutcome::Unresolved => None,
+        }
+    }
+
+    /// Resolve an unresolved call and preserve whether it was intentionally ignored.
+    pub fn resolve_call_outcome(&self, call: &UnresolvedCall) -> ResolutionOutcome {
         // Exclude standard library trait methods from the call graph
         if let CallSiteType::TraitMethod { trait_name, .. } = &call.call_site_type {
             // Exclude known std traits
@@ -109,7 +125,7 @@ impl<'a> CallResolver<'a> {
                     | "Hash"
                     | "IteratorOrOption"
             ) {
-                return None;
+                return ResolutionOutcome::IgnoredLibraryCall;
             }
         }
 
@@ -118,9 +134,9 @@ impl<'a> CallResolver<'a> {
             receiver_type: None,
         } = &call.call_site_type
         {
-            if Self::is_std_trait_method(&call.callee_name) {
+            if Self::is_common_library_method(&call.callee_name) {
                 // Conservative: assume it's a std library method
-                return None;
+                return ResolutionOutcome::IgnoredLibraryCall;
             }
         }
 
@@ -134,7 +150,11 @@ impl<'a> CallResolver<'a> {
             } else {
                 None
             }
-        })?;
+        });
+
+        let Some(candidates) = candidates else {
+            return ResolutionOutcome::Unresolved;
+        };
 
         // Filter candidates based on call site type
         let matching_candidates: Vec<FunctionId> = match &call.call_site_type {
@@ -177,8 +197,8 @@ impl<'a> CallResolver<'a> {
             } => {
                 // Instance call with unknown receiver: be conservative
                 // Only exclude if it looks like a std trait method
-                if Self::is_std_trait_method(&call.callee_name) {
-                    return None;
+                if Self::is_common_library_method(&call.callee_name) {
+                    return ResolutionOutcome::IgnoredLibraryCall;
                 }
 
                 if call.same_file_hint {
@@ -230,7 +250,7 @@ impl<'a> CallResolver<'a> {
                         .cloned()
                         .collect()
                 } else {
-                    return None;
+                    return ResolutionOutcome::Unresolved;
                 }
             }
             CallSiteType::Indirect => {
@@ -246,11 +266,13 @@ impl<'a> CallResolver<'a> {
         };
 
         if matching_candidates.is_empty() {
-            return None;
+            return ResolutionOutcome::Unresolved;
         }
 
         // Apply resolution strategies
         Self::select_best_candidate(matching_candidates, self.current_file, call.same_file_hint)
+            .map(ResolutionOutcome::Resolved)
+            .unwrap_or(ResolutionOutcome::Unresolved)
     }
 
     /// Pure function to resolve a function call against a list of candidates
@@ -590,6 +612,24 @@ impl<'a> CallResolver<'a> {
             "default" | "eq" | "ne" | "cmp" | "partial_cmp" |
             "hash" | "fmt" | "display"
         )
+    }
+
+    /// Check if an unknown-receiver method call is probably from std/core collections or wrappers.
+    pub fn is_common_library_method(method_name: &str) -> bool {
+        Self::is_std_trait_method(method_name)
+            || matches!(
+                method_name,
+                // Collection and string read methods
+                "iter" | "iter_mut" | "into_iter" | "is_empty" | "len" | "capacity" |
+                "contains" | "get" | "first" | "last" | "as_slice" | "as_str" |
+
+                // Common collection mutation methods
+                "push" | "pop" | "insert" | "remove" | "clear" | "extend" |
+                "retain" | "sort" | "sort_by" | "dedup" |
+
+                // Common Result/Option reference adapters not covered above
+                "as_deref" | "as_deref_mut"
+            )
     }
 
     /// Infer trait name from method name
