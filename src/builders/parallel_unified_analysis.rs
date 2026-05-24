@@ -215,6 +215,87 @@ mod file_analysis {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileAnalysisDecision {
+    cached_line_count: Option<usize>,
+    estimated_lines: usize,
+    skip_god_object_analysis: bool,
+}
+
+fn clone_function_metrics(functions: &[&FunctionMetrics]) -> Vec<FunctionMetrics> {
+    functions.iter().map(|&function| function.clone()).collect()
+}
+
+fn estimate_file_lines(functions: &[FunctionMetrics], cached_line_count: Option<usize>) -> usize {
+    cached_line_count.unwrap_or_else(|| functions.iter().map(|function| function.length).sum())
+}
+
+fn should_skip_god_object_analysis(
+    no_god_object: bool,
+    estimated_lines: usize,
+    function_count: usize,
+) -> bool {
+    no_god_object || (estimated_lines < 500 && function_count < 20)
+}
+
+fn file_analysis_decision(
+    functions: &[FunctionMetrics],
+    function_count: usize,
+    cached_line_count: Option<usize>,
+    no_god_object: bool,
+) -> FileAnalysisDecision {
+    let estimated_lines = estimate_file_lines(functions, cached_line_count);
+
+    FileAnalysisDecision {
+        cached_line_count,
+        estimated_lines,
+        skip_god_object_analysis: should_skip_god_object_analysis(
+            no_god_object,
+            estimated_lines,
+            function_count,
+        ),
+    }
+}
+
+fn uncovered_lines(coverage_percent: f64, total_lines: usize) -> usize {
+    ((1.0 - coverage_percent) * total_lines as f64) as usize
+}
+
+fn update_file_line_metrics(
+    file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
+    total_lines: usize,
+) {
+    file_metrics.total_lines = total_lines;
+    file_metrics.uncovered_lines = uncovered_lines(file_metrics.coverage_percent, total_lines);
+}
+
+fn needs_file_read(decision: FileAnalysisDecision) -> bool {
+    decision.cached_line_count.is_none() || !decision.skip_god_object_analysis
+}
+
+fn contextual_file_item(
+    file_path: &Path,
+    functions: &[FunctionMetrics],
+    file_metrics: crate::priority::file_metrics::FileDebtMetrics,
+) -> FileDebtItem {
+    use crate::analysis::FileContextDetector;
+    use crate::core::Language;
+
+    let detector = FileContextDetector::new(Language::from_path(file_path));
+    let file_context = detector.detect(file_path, functions);
+    crate::priority::FileDebtItem::from_metrics(file_metrics, Some(&file_context))
+}
+
+fn should_emit_file_item(item: &FileDebtItem) -> bool {
+    let has_god_object = item
+        .metrics
+        .god_object_analysis
+        .as_ref()
+        .is_some_and(|analysis| analysis.is_god_object);
+
+    file_analysis::should_include_file(item.score) || has_god_object
+}
+
 /// Options for parallel unified analysis
 #[derive(Debug, Clone)]
 pub struct ParallelUnifiedAnalysisOptions {
@@ -1076,130 +1157,181 @@ impl ParallelUnifiedAnalysisBuilder {
         coverage_data: Option<&LcovData>,
         no_god_object: bool,
     ) -> Option<FileDebtItem> {
-        // Transform to owned functions
-        let functions_owned: Vec<FunctionMetrics> = functions.iter().map(|&f| f.clone()).collect();
+        let functions_owned = clone_function_metrics(functions);
+        let file_metrics =
+            self.analyze_file_metrics(file_path, &functions_owned, coverage_data, no_god_object);
+        let item = contextual_file_item(file_path, &functions_owned, file_metrics);
 
-        // Pure: aggregate function metrics
-        let mut file_metrics =
-            file_analysis::aggregate_file_metrics(&functions_owned, coverage_data);
-
-        // Spec 195: Use cached line count from Phase 1 if available
-        let cached_line_count = self.line_count_index.get(file_path).copied();
-
-        // Early filtering: Skip god object analysis for small files (spec 195)
-        // Uses cached line count when available to avoid unnecessary file I/O
-        let estimated_lines = cached_line_count.unwrap_or_else(|| {
-            // Fallback: estimate from function metrics (less accurate but avoids I/O)
-            functions_owned.iter().map(|f| f.length).sum::<usize>()
-        });
-        let skip_god_object_analysis =
-            no_god_object || (estimated_lines < 500 && file_metrics.function_count < 20);
-
-        // Spec 214: Use extracted data when available (avoids file I/O)
-        let extracted_file_data = self
-            .extracted_data
-            .as_ref()
-            .and_then(|data| data.get(file_path));
-
-        if let Some(extracted) = extracted_file_data {
-            // Use extracted data - no file I/O needed
-            file_metrics.total_lines = extracted.total_lines;
-            file_metrics.uncovered_lines =
-                ((1.0 - file_metrics.coverage_percent) * extracted.total_lines as f64) as usize;
-
-            // Use god object adapter with extracted data
-            file_metrics.god_object_analysis = if skip_god_object_analysis {
-                None
-            } else {
-                crate::extraction::adapters::god_object::analyze_god_object(file_path, extracted)
-            };
-        } else {
-            // Fallback: read file content when extracted data not available
-            let needs_file_read = cached_line_count.is_none() || !skip_god_object_analysis;
-
-            if needs_file_read {
-                if let Ok(content) = std::fs::read_to_string(file_path) {
-                    let actual_line_count = content.lines().count();
-                    file_metrics.total_lines = actual_line_count;
-
-                    // Recalculate uncovered lines based on actual line count
-                    file_metrics.uncovered_lines =
-                        ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
-
-                    // Handle god object detection with accurate line count
-                    file_metrics.god_object_analysis = if skip_god_object_analysis {
-                        None
-                    } else {
-                        let analysis_result =
-                            file_analysis::analyze_god_object(&content, file_path, coverage_data);
-
-                        let analyzed = analysis_result.unwrap_or(None);
-
-                        // Use heuristic fallback if:
-                        // 1. Analysis failed (analyzed is None), OR
-                        // 2. Analysis succeeded but said not god object, BUT heuristic thresholds are met
-                        // This ensures simple god objects (many low-complexity methods) are caught
-                        // (Spec 212: Uses shared heuristics from organization::god_object::heuristics)
-                        if analyzed.as_ref().is_some_and(|a| a.is_god_object) {
-                            // Analysis found a god object, use it
-                            analyzed
-                        } else {
-                            // Try heuristic fallback with preserved analysis data
-                            crate::organization::god_object::heuristics::fallback_with_preserved_analysis(
-                                file_metrics.function_count,
-                                actual_line_count,
-                                file_metrics.total_complexity,
-                                analyzed.as_ref(),
-                            ).or(analyzed)
-                        }
-                    };
-                } else {
-                    // Fallback to estimated metrics if file can't be read
-                    file_metrics.god_object_analysis = if no_god_object {
-                        None
-                    } else {
-                        self.analyze_god_object_with_io(file_path, coverage_data)
-                    };
-                }
-            } else {
-                // Spec 195: Use cached line count - no file I/O needed
-                file_metrics.total_lines = cached_line_count.unwrap_or(estimated_lines);
-                file_metrics.uncovered_lines = ((1.0 - file_metrics.coverage_percent)
-                    * file_metrics.total_lines as f64)
-                    as usize;
-                file_metrics.god_object_analysis = None; // Small files skip god object analysis
-            }
-        } // End of else block for extracted data fallback
-
-        // Calculate function scores from items already created in phase 2
-        // Note: In parallel execution, items are not yet in unified analysis at this point
-        // So function_scores will remain empty, which is consistent with the builder.build() approach
-        // where items are added after file analysis. This maintains functional purity.
-        file_metrics.function_scores = Vec::new();
-
-        // Detect file context for scoring adjustments (spec 166/168)
-        use crate::analysis::FileContextDetector;
-        use crate::core::Language;
-        let language = Language::from_path(file_path);
-        let detector = FileContextDetector::new(language);
-        let file_context = detector.detect(file_path, &functions_owned);
-
-        // Create FileDebtItem with context-aware scoring
-        let item = crate::priority::FileDebtItem::from_metrics(file_metrics, Some(&file_context));
-
-        // Include file if it meets score threshold OR is a god object (spec 207)
-        // God objects should always be included as they represent architectural issues
-        let has_god_object = item
-            .metrics
-            .god_object_analysis
-            .as_ref()
-            .is_some_and(|analysis| analysis.is_god_object);
-
-        if file_analysis::should_include_file(item.score) || has_god_object {
+        if should_emit_file_item(&item) {
             Some(item)
         } else {
             None
         }
+    }
+
+    fn analyze_file_metrics(
+        &self,
+        file_path: &Path,
+        functions: &[FunctionMetrics],
+        coverage_data: Option<&LcovData>,
+        no_god_object: bool,
+    ) -> crate::priority::file_metrics::FileDebtMetrics {
+        let mut file_metrics = file_analysis::aggregate_file_metrics(functions, coverage_data);
+        let decision = file_analysis_decision(
+            functions,
+            file_metrics.function_count,
+            self.line_count_index.get(file_path).copied(),
+            no_god_object,
+        );
+
+        self.populate_file_metrics(
+            file_path,
+            coverage_data,
+            no_god_object,
+            decision,
+            &mut file_metrics,
+        );
+        file_metrics.function_scores = Vec::new();
+        file_metrics
+    }
+
+    fn populate_file_metrics(
+        &self,
+        file_path: &Path,
+        coverage_data: Option<&LcovData>,
+        no_god_object: bool,
+        decision: FileAnalysisDecision,
+        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
+    ) {
+        if let Some(extracted) = self.extracted_file_data(file_path) {
+            self.apply_extracted_file_metrics(file_path, extracted, decision, file_metrics);
+        } else if needs_file_read(decision) {
+            self.apply_source_file_metrics(
+                file_path,
+                coverage_data,
+                no_god_object,
+                decision,
+                file_metrics,
+            );
+        } else {
+            self.apply_cached_line_metrics(decision, file_metrics);
+        }
+    }
+
+    fn extracted_file_data(&self, file_path: &Path) -> Option<&ExtractedFileData> {
+        self.extracted_data
+            .as_ref()
+            .and_then(|data| data.get(file_path))
+    }
+
+    fn apply_extracted_file_metrics(
+        &self,
+        file_path: &Path,
+        extracted: &ExtractedFileData,
+        decision: FileAnalysisDecision,
+        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
+    ) {
+        update_file_line_metrics(file_metrics, extracted.total_lines);
+        file_metrics.god_object_analysis = if decision.skip_god_object_analysis {
+            None
+        } else {
+            crate::extraction::adapters::god_object::analyze_god_object(file_path, extracted)
+        };
+    }
+
+    fn apply_source_file_metrics(
+        &self,
+        file_path: &Path,
+        coverage_data: Option<&LcovData>,
+        no_god_object: bool,
+        decision: FileAnalysisDecision,
+        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
+    ) {
+        match std::fs::read_to_string(file_path) {
+            Ok(content) => self.apply_read_content_metrics(
+                file_path,
+                &content,
+                coverage_data,
+                decision,
+                file_metrics,
+            ),
+            Err(_) => self.apply_read_failure_metrics(
+                file_path,
+                coverage_data,
+                no_god_object,
+                file_metrics,
+            ),
+        }
+    }
+
+    fn apply_read_content_metrics(
+        &self,
+        file_path: &Path,
+        content: &str,
+        coverage_data: Option<&LcovData>,
+        decision: FileAnalysisDecision,
+        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
+    ) {
+        let actual_line_count = content.lines().count();
+        update_file_line_metrics(file_metrics, actual_line_count);
+        file_metrics.god_object_analysis =
+            self.god_object_from_content(file_path, content, coverage_data, decision, file_metrics);
+    }
+
+    fn god_object_from_content(
+        &self,
+        file_path: &Path,
+        content: &str,
+        coverage_data: Option<&LcovData>,
+        decision: FileAnalysisDecision,
+        file_metrics: &crate::priority::file_metrics::FileDebtMetrics,
+    ) -> Option<crate::organization::GodObjectAnalysis> {
+        if decision.skip_god_object_analysis {
+            return None;
+        }
+
+        let analyzed =
+            file_analysis::analyze_god_object(content, file_path, coverage_data).unwrap_or(None);
+        if analyzed
+            .as_ref()
+            .is_some_and(|analysis| analysis.is_god_object)
+        {
+            analyzed
+        } else {
+            crate::organization::god_object::heuristics::fallback_with_preserved_analysis(
+                file_metrics.function_count,
+                file_metrics.total_lines,
+                file_metrics.total_complexity,
+                analyzed.as_ref(),
+            )
+            .or(analyzed)
+        }
+    }
+
+    fn apply_read_failure_metrics(
+        &self,
+        file_path: &Path,
+        coverage_data: Option<&LcovData>,
+        no_god_object: bool,
+        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
+    ) {
+        file_metrics.god_object_analysis = if no_god_object {
+            None
+        } else {
+            self.analyze_god_object_with_io(file_path, coverage_data)
+        };
+    }
+
+    fn apply_cached_line_metrics(
+        &self,
+        decision: FileAnalysisDecision,
+        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
+    ) {
+        let total_lines = decision
+            .cached_line_count
+            .unwrap_or(decision.estimated_lines);
+        update_file_line_metrics(file_metrics, total_lines);
+        file_metrics.god_object_analysis = None;
     }
 
     /// I/O wrapper for god object analysis
@@ -1587,6 +1719,93 @@ fn enrich_file_item_with_dependencies(
     file_item.metrics.dependencies_list = callees.into_iter().take(10).collect();
 
     file_item
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn metric_with_length(length: usize) -> FunctionMetrics {
+        FunctionMetrics {
+            file: PathBuf::from("src/example.rs"),
+            name: "example".to_string(),
+            line: 1,
+            length,
+            cyclomatic: 1,
+            cognitive: 0,
+            nesting: 0,
+            is_test: false,
+            in_test_module: false,
+            visibility: None,
+            is_trait_method: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+            purity_reason: None,
+            call_dependencies: None,
+        }
+    }
+
+    #[test]
+    fn estimate_file_lines_prefers_cached_count() {
+        let functions = vec![metric_with_length(10), metric_with_length(20)];
+
+        assert_eq!(estimate_file_lines(&functions, Some(100)), 100);
+    }
+
+    #[test]
+    fn estimate_file_lines_sums_function_lengths_without_cache() {
+        let functions = vec![metric_with_length(10), metric_with_length(20)];
+
+        assert_eq!(estimate_file_lines(&functions, None), 30);
+    }
+
+    #[test]
+    fn god_object_skip_uses_size_thresholds_and_option() {
+        assert!(should_skip_god_object_analysis(true, 1_000, 50));
+        assert!(should_skip_god_object_analysis(false, 499, 19));
+        assert!(!should_skip_god_object_analysis(false, 500, 19));
+        assert!(!should_skip_god_object_analysis(false, 499, 20));
+    }
+
+    #[test]
+    fn file_read_needed_without_cached_lines_or_when_god_object_runs() {
+        let cached_small = FileAnalysisDecision {
+            cached_line_count: Some(100),
+            estimated_lines: 100,
+            skip_god_object_analysis: true,
+        };
+        let uncached_small = FileAnalysisDecision {
+            cached_line_count: None,
+            estimated_lines: 100,
+            skip_god_object_analysis: true,
+        };
+        let cached_large = FileAnalysisDecision {
+            cached_line_count: Some(600),
+            estimated_lines: 600,
+            skip_god_object_analysis: false,
+        };
+
+        assert!(!needs_file_read(cached_small));
+        assert!(needs_file_read(uncached_small));
+        assert!(needs_file_read(cached_large));
+    }
+
+    #[test]
+    fn uncovered_lines_applies_uncovered_fraction_to_total_lines() {
+        assert_eq!(uncovered_lines(0.75, 200), 50);
+    }
 }
 
 /// Trait for parallel analysis
