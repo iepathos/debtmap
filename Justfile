@@ -122,11 +122,14 @@ coverage-fast-lcov:
     export PATH="$HOME/.cargo/bin:$PATH"
     # Ensure target/coverage directory exists
     mkdir -p target/coverage
-    find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
-    echo "Generating fast LCOV report with cargo-llvm-cov nextest..."
-    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --no-clean --lcov --output-path target/coverage/lcov.info \
+    cargo llvm-cov clean --profraw-only
+    # Use the default libtest harness for LCOV: nextest is fast at running tests,
+    # but source coverage creates one raw profile per test process, which makes
+    # LLVM's final merge/export step dominate this suite.
+    echo "Generating LCOV report with cargo-llvm-cov..."
+    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov --no-clean --lcov --output-path target/coverage/lcov.info \
         --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
+        --test debt_tests --test entropy_tests -- --quiet
     echo "Coverage report generated at target/coverage/lcov.info"
     # Verify the file was actually created
     if [ ! -f target/coverage/lcov.info ]; then
