@@ -318,29 +318,54 @@ impl ResourceOpVisitor {
 
 impl<'ast> Visit<'ast> for ResourceOpVisitor {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if let Expr::Path(path) = &*node.func {
-            let path_str = path
-                .path
-                .segments
-                .iter()
-                .map(|s| s.ident.to_string())
-                .collect::<Vec<_>>()
-                .join("::");
-
-            if RESOURCE_FUNCTIONS.iter().any(|rf| path_str.contains(rf)) {
-                let op_type = if path_str.contains("open") || path_str.contains("new") {
-                    ResourceOperationType::Acquisition
-                } else if path_str.contains("close") || path_str.contains("drop") {
-                    ResourceOperationType::Release
-                } else {
-                    ResourceOperationType::Transfer
-                };
-
-                self.resource_ops
-                    .push((op_type, Expr::Call(node.clone()), self.current_line));
-                self.current_line += 1;
-            }
+        if let Some(operation) = resource_operation_from_call(node, self.current_line) {
+            self.resource_ops.push(operation);
+            self.current_line += 1;
         }
+    }
+}
+
+fn resource_operation_from_call(
+    node: &ExprCall,
+    line: usize,
+) -> Option<(ResourceOperationType, Expr, usize)> {
+    resource_path_from_call(node)
+        .filter(|path| is_resource_function_path(path))
+        .map(|path| {
+            (
+                classify_resource_operation_type(&path),
+                Expr::Call(node.clone()),
+                line,
+            )
+        })
+}
+
+fn resource_path_from_call(node: &ExprCall) -> Option<String> {
+    match &*node.func {
+        Expr::Path(path) => Some(path_to_string(&path.path)),
+        _ => None,
+    }
+}
+
+fn path_to_string(path: &syn::Path) -> String {
+    path.segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("::")
+}
+
+fn is_resource_function_path(path: &str) -> bool {
+    RESOURCE_FUNCTIONS
+        .iter()
+        .any(|resource| path.contains(resource))
+}
+
+fn classify_resource_operation_type(path: &str) -> ResourceOperationType {
+    match () {
+        _ if path.contains("open") || path.contains("new") => ResourceOperationType::Acquisition,
+        _ if path.contains("close") || path.contains("drop") => ResourceOperationType::Release,
+        _ => ResourceOperationType::Transfer,
     }
 }
 
@@ -642,5 +667,63 @@ mod tests {
             AsyncResourceDetector::classify_resource_type_from_path("DatabasePool"),
             ResourceType::DatabaseConnection
         );
+    }
+
+    #[test]
+    fn test_resource_path_from_call_extracts_path_segments() {
+        let call = parse_call_expr("tokio::fs::File::open(path)");
+
+        assert_eq!(
+            resource_path_from_call(&call),
+            Some("tokio::fs::File::open".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resource_path_from_call_ignores_non_path_callee() {
+        let call = parse_call_expr("(factory())(path)");
+
+        assert_eq!(resource_path_from_call(&call), None);
+    }
+
+    #[test]
+    fn test_classify_resource_operation_type() {
+        assert_eq!(
+            classify_resource_operation_type("std::fs::File::open"),
+            ResourceOperationType::Acquisition
+        );
+        assert_eq!(
+            classify_resource_operation_type("resource::drop"),
+            ResourceOperationType::Release
+        );
+        assert_eq!(
+            classify_resource_operation_type("TcpStream::connect"),
+            ResourceOperationType::Transfer
+        );
+    }
+
+    #[test]
+    fn test_resource_operation_from_call_records_resource_function() {
+        let call = parse_call_expr("std::fs::File::open(path)");
+        let operation = resource_operation_from_call(&call, 42);
+
+        assert!(matches!(
+            operation,
+            Some((ResourceOperationType::Acquisition, Expr::Call(_), 42))
+        ));
+    }
+
+    #[test]
+    fn test_resource_operation_from_call_ignores_untracked_function() {
+        let call = parse_call_expr("std::mem::drop(resource)");
+
+        assert!(resource_operation_from_call(&call, 1).is_none());
+    }
+
+    fn parse_call_expr(source: &str) -> ExprCall {
+        match syn::parse_str(source).expect("test expression should parse") {
+            Expr::Call(call) => call,
+            _ => panic!("test expression should be a call"),
+        }
     }
 }
