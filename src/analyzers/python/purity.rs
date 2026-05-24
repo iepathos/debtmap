@@ -6,6 +6,56 @@ use crate::extraction::{PurityAnalysisData, PurityLevel};
 use std::collections::HashSet;
 use tree_sitter::Node;
 
+struct ImpurityReport {
+    reasons: Vec<String>,
+    level: PurityLevel,
+    has_io: bool,
+}
+
+impl ImpurityReport {
+    fn pure() -> Self {
+        Self {
+            reasons: Vec::new(),
+            level: PurityLevel::StrictlyPure,
+            has_io: false,
+        }
+    }
+
+    fn local() -> Self {
+        Self {
+            level: PurityLevel::LocallyPure,
+            ..Self::pure()
+        }
+    }
+
+    fn impure(reason: String) -> Self {
+        Self {
+            reasons: vec![reason],
+            level: PurityLevel::Impure,
+            has_io: false,
+        }
+    }
+
+    fn io(reason: String) -> Self {
+        Self {
+            has_io: true,
+            ..Self::impure(reason)
+        }
+    }
+
+    fn merge(self, other: Self) -> Self {
+        let level = merge_purity_levels(self.level, other.level);
+        let mut reasons = self.reasons;
+        reasons.extend(other.reasons);
+
+        Self {
+            reasons,
+            level,
+            has_io: self.has_io || other.has_io,
+        }
+    }
+}
+
 /// Python purity analyzer
 pub struct PythonPurityAnalyzer<'a> {
     source: &'a str,
@@ -29,31 +79,27 @@ impl<'a> PythonPurityAnalyzer<'a> {
     }
 
     fn analyze_node(&mut self, node: &Node) -> PurityAnalysisData {
-        let mut reasons = Vec::new();
-        let mut level = PurityLevel::StrictlyPure;
-        let mut has_io = false;
-
         self.collect_locals(node);
-        self.find_impurities(node, &mut reasons, &mut level, &mut has_io);
+        let report = self.find_impurities(node);
 
-        let is_pure = reasons.is_empty();
+        let is_pure = report.reasons.is_empty();
         let confidence = if is_pure { 0.8 } else { 0.9 };
 
         PurityAnalysisData {
             is_pure,
-            has_mutations: !is_pure && !has_io,
-            has_io_operations: has_io,
+            has_mutations: !is_pure && !report.has_io,
+            has_io_operations: report.has_io,
             has_unsafe: false,
-            local_mutations: if level == PurityLevel::LocallyPure {
+            local_mutations: if report.level == PurityLevel::LocallyPure {
                 vec!["local".to_string()]
             } else {
                 vec![]
             },
-            upvalue_mutations: reasons,
+            upvalue_mutations: report.reasons,
             total_mutations: if is_pure { 0 } else { 1 },
             var_names: std::collections::HashMap::new(),
             confidence,
-            purity_level: level,
+            purity_level: report.level,
         }
     }
 
@@ -76,104 +122,133 @@ impl<'a> PythonPurityAnalyzer<'a> {
         }
     }
 
-    fn find_impurities(
-        &self,
-        node: &Node,
-        reasons: &mut Vec<String>,
-        level: &mut PurityLevel,
-        has_io: &mut bool,
-    ) {
-        let kind = node.kind();
-        // println!("Node kind: {}, text: {}", kind, &self.source[node.start_byte()..node.end_byte()]);
-
-        match kind {
-            "assignment" => {
-                if let Some(left) = node.child_by_field_name("left") {
-                    match left.kind() {
-                        "attribute" => {
-                            let object = left.child_by_field_name("object").unwrap();
-                            let obj_text = &self.source[object.start_byte()..object.end_byte()];
-                            if obj_text == "self" {
-                                reasons.push("Mutation of 'self' attribute".to_string());
-                                *level = PurityLevel::Impure;
-                            } else if self.params.contains(obj_text) {
-                                reasons
-                                    .push(format!("Mutation of parameter attribute: {}", obj_text));
-                                *level = PurityLevel::Impure;
-                            } else if !self.local_vars.contains(obj_text) {
-                                reasons.push(format!("Mutation of external object: {}", obj_text));
-                                *level = PurityLevel::Impure;
-                            } else if *level == PurityLevel::StrictlyPure {
-                                *level = PurityLevel::LocallyPure;
-                            }
-                        }
-                        "identifier" => {
-                            let name = &self.source[left.start_byte()..left.end_byte()];
-                            if !self.local_vars.contains(name) && !self.params.contains(name) {
-                                reasons.push(format!(
-                                    "Mutation of global/external variable: {}",
-                                    name
-                                ));
-                                *level = PurityLevel::Impure;
-                            } else if *level == PurityLevel::StrictlyPure {
-                                *level = PurityLevel::LocallyPure;
-                            }
-                        }
-
-                        _ => {}
-                    }
-                }
-            }
-            "call" => {
-                if let Some(func) = node.child_by_field_name("function") {
-                    let func_name = if func.kind() == "attribute" {
-                        if let Some(attr) = func.child_by_field_name("attribute") {
-                            &self.source[attr.start_byte()..attr.end_byte()]
-                        } else {
-                            ""
-                        }
-                    } else {
-                        &self.source[func.start_byte()..func.end_byte()]
-                    };
-
-                    if is_io_function(func_name) {
-                        reasons.push(format!("I/O call: {}", func_name));
-                        *level = PurityLevel::Impure;
-                        *has_io = true;
-                    } else if is_mutation_method(func_name) {
-                        // Check if it's called on a non-local object
-                        if func.kind() == "attribute" {
-                            let object = func.child_by_field_name("object").unwrap();
-                            let obj_text = &self.source[object.start_byte()..object.end_byte()];
-                            if !self.local_vars.contains(obj_text) {
-                                reasons.push(format!(
-                                    "Mutation method '{}' on non-local: {}",
-                                    func_name, obj_text
-                                ));
-                                *level = PurityLevel::Impure;
-                            }
-                        } else {
-                            // Direct call like append(x) - might be a global or builtin
-                            reasons.push(format!(
-                                "Direct call to mutation-named function: {}",
-                                func_name
-                            ));
-                            *level = PurityLevel::Impure;
-                        }
-                    }
-                }
-            }
-            "global_statement" | "nonlocal_statement" => {
-                reasons.push("Use of global/nonlocal statement".to_string());
-                *level = PurityLevel::Impure;
-            }
-            _ => {}
-        }
-
+    fn find_impurities(&self, node: &Node) -> ImpurityReport {
+        let report = self.node_impurity(node);
         let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            self.find_impurities(&child, reasons, level, has_io);
+        node.children(&mut cursor)
+            .map(|child| self.find_impurities(&child))
+            .fold(report, ImpurityReport::merge)
+    }
+
+    fn node_impurity(&self, node: &Node) -> ImpurityReport {
+        match node.kind() {
+            "assignment" => self.assignment_impurity(node),
+            "call" => self.call_impurity(node),
+            "global_statement" | "nonlocal_statement" => {
+                ImpurityReport::impure("Use of global/nonlocal statement".to_string())
+            }
+            _ => ImpurityReport::pure(),
         }
+    }
+
+    fn assignment_impurity(&self, node: &Node) -> ImpurityReport {
+        node.child_by_field_name("left")
+            .map(|left| self.assignment_target_impurity(&left))
+            .unwrap_or_else(ImpurityReport::pure)
+    }
+
+    fn assignment_target_impurity(&self, target: &Node) -> ImpurityReport {
+        match target.kind() {
+            "attribute" => self.attribute_assignment_impurity(target),
+            "identifier" => self.identifier_assignment_impurity(target),
+            _ => ImpurityReport::pure(),
+        }
+    }
+
+    fn attribute_assignment_impurity(&self, target: &Node) -> ImpurityReport {
+        target
+            .child_by_field_name("object")
+            .map(|object| self.object_assignment_impurity(self.text(&object)))
+            .unwrap_or_else(ImpurityReport::pure)
+    }
+
+    fn object_assignment_impurity(&self, object: &str) -> ImpurityReport {
+        if object == "self" {
+            ImpurityReport::impure("Mutation of 'self' attribute".to_string())
+        } else if self.params.contains(object) {
+            ImpurityReport::impure(format!("Mutation of parameter attribute: {}", object))
+        } else if self.local_vars.contains(object) {
+            ImpurityReport::local()
+        } else {
+            ImpurityReport::impure(format!("Mutation of external object: {}", object))
+        }
+    }
+
+    fn identifier_assignment_impurity(&self, target: &Node) -> ImpurityReport {
+        let name = self.text(target);
+        if self.local_vars.contains(name) || self.params.contains(name) {
+            ImpurityReport::local()
+        } else {
+            ImpurityReport::impure(format!("Mutation of global/external variable: {}", name))
+        }
+    }
+
+    fn call_impurity(&self, node: &Node) -> ImpurityReport {
+        node.child_by_field_name("function")
+            .map(|function| self.function_call_impurity(&function))
+            .unwrap_or_else(ImpurityReport::pure)
+    }
+
+    fn function_call_impurity(&self, function: &Node) -> ImpurityReport {
+        let name = self.function_name(function);
+        if is_io_function(name) {
+            ImpurityReport::io(format!("I/O call: {}", name))
+        } else if is_mutation_method(name) {
+            self.mutation_call_impurity(function, name)
+        } else {
+            ImpurityReport::pure()
+        }
+    }
+
+    fn mutation_call_impurity(&self, function: &Node, name: &str) -> ImpurityReport {
+        if function.kind() == "attribute" {
+            self.attribute_mutation_call_impurity(function, name)
+        } else {
+            ImpurityReport::impure(format!("Direct call to mutation-named function: {}", name))
+        }
+    }
+
+    fn attribute_mutation_call_impurity(&self, function: &Node, name: &str) -> ImpurityReport {
+        function
+            .child_by_field_name("object")
+            .map(|object| self.non_local_mutation_call(self.text(&object), name))
+            .unwrap_or_else(ImpurityReport::pure)
+    }
+
+    fn non_local_mutation_call(&self, object: &str, name: &str) -> ImpurityReport {
+        if self.local_vars.contains(object) {
+            ImpurityReport::pure()
+        } else {
+            ImpurityReport::impure(format!(
+                "Mutation method '{}' on non-local: {}",
+                name, object
+            ))
+        }
+    }
+
+    fn function_name(&self, function: &Node) -> &str {
+        if function.kind() == "attribute" {
+            function
+                .child_by_field_name("attribute")
+                .map(|attribute| self.text(&attribute))
+                .unwrap_or("")
+        } else {
+            self.text(function)
+        }
+    }
+
+    fn text(&self, node: &Node) -> &str {
+        &self.source[node.start_byte()..node.end_byte()]
+    }
+}
+
+fn merge_purity_levels(left: PurityLevel, right: PurityLevel) -> PurityLevel {
+    if left == PurityLevel::Impure || right == PurityLevel::Impure {
+        PurityLevel::Impure
+    } else if left == PurityLevel::LocallyPure || right == PurityLevel::LocallyPure {
+        PurityLevel::LocallyPure
+    } else {
+        PurityLevel::StrictlyPure
     }
 }
 
@@ -203,15 +278,19 @@ mod tests {
         ast.tree
     }
 
+    fn analyze_py(source: &str, params: Vec<&str>) -> PurityAnalysisData {
+        let tree = parse_py(source);
+        PythonPurityAnalyzer::analyze(
+            &tree.root_node(),
+            source,
+            params.into_iter().map(str::to_string).collect(),
+        )
+    }
+
     #[test]
     fn test_strictly_pure() {
         let source = "def add(a, b): return a + b";
-        let tree = parse_py(source);
-        let analysis = PythonPurityAnalyzer::analyze(
-            &tree.root_node(),
-            source,
-            vec!["a".to_string(), "b".to_string()],
-        );
+        let analysis = analyze_py(source, vec!["a", "b"]);
         assert!(analysis.is_pure);
         assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
     }
@@ -225,9 +304,7 @@ def local_mut(n):
         result += i
     return result
 "#;
-        let tree = parse_py(source);
-        let analysis =
-            PythonPurityAnalyzer::analyze(&tree.root_node(), source, vec!["n".to_string()]);
+        let analysis = analyze_py(source, vec!["n"]);
         assert!(analysis.is_pure);
         assert_eq!(analysis.purity_level, PurityLevel::LocallyPure);
     }
@@ -235,8 +312,7 @@ def local_mut(n):
     #[test]
     fn test_impure_io() {
         let source = "def print_hello(): print('hello')";
-        let tree = parse_py(source);
-        let analysis = PythonPurityAnalyzer::analyze(&tree.root_node(), source, vec![]);
+        let analysis = analyze_py(source, vec![]);
         assert!(!analysis.is_pure);
         assert_eq!(analysis.purity_level, PurityLevel::Impure);
     }
@@ -247,10 +323,51 @@ def local_mut(n):
 def mutate_param(items):
     items.append(1)
 "#;
-        let tree = parse_py(source);
-        let analysis =
-            PythonPurityAnalyzer::analyze(&tree.root_node(), source, vec!["items".to_string()]);
+        let analysis = analyze_py(source, vec!["items"]);
         assert!(!analysis.is_pure);
         assert!(analysis.upvalue_mutations[0].contains("Mutation method"));
+    }
+
+    #[test]
+    fn test_self_attribute_assignment_is_impure() {
+        let source = r#"
+def set_value(self, value):
+    self.value = value
+"#;
+        let analysis = analyze_py(source, vec!["self", "value"]);
+        assert!(!analysis.is_pure);
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+        assert_eq!(
+            analysis.upvalue_mutations[0],
+            "Mutation of 'self' attribute"
+        );
+    }
+
+    #[test]
+    fn test_global_statement_is_impure() {
+        let source = r#"
+def update_global(value):
+    global current
+    current = value
+"#;
+        let analysis = analyze_py(source, vec!["value"]);
+        assert!(!analysis.is_pure);
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+        assert!(analysis
+            .upvalue_mutations
+            .contains(&"Use of global/nonlocal statement".to_string()));
+    }
+
+    #[test]
+    fn test_mutation_method_on_local_collection_stays_pure() {
+        let source = r#"
+def collect(value):
+    items = []
+    items.append(value)
+    return items
+"#;
+        let analysis = analyze_py(source, vec!["value"]);
+        assert!(analysis.is_pure);
+        assert_eq!(analysis.purity_level, PurityLevel::LocallyPure);
     }
 }
