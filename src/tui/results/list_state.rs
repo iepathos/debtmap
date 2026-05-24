@@ -7,13 +7,24 @@
 //!
 //! All methods are pure or have minimal side effects.
 
-/// Manages list selection and scroll position.
+/// Manages list selection, scroll position, and display mode.
 ///
 /// Pure state container with no I/O operations.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ListState {
     selected_index: usize,
     scroll_offset: usize,
+    group_by_location: bool,
+}
+
+impl Default for ListState {
+    fn default() -> Self {
+        Self {
+            selected_index: 0,
+            scroll_offset: 0,
+            group_by_location: true,
+        }
+    }
 }
 
 impl ListState {
@@ -42,6 +53,17 @@ impl ListState {
     /// Set scroll offset.
     pub fn set_scroll_offset(&mut self, offset: usize) {
         self.scroll_offset = offset;
+    }
+
+    /// Returns true when the list displays one row per source location.
+    pub fn is_grouped(&self) -> bool {
+        self.group_by_location
+    }
+
+    /// Toggle between individual item rows and location-grouped rows.
+    pub fn toggle_grouping(&mut self) {
+        self.group_by_location = !self.group_by_location;
+        self.reset();
     }
 
     /// Reset selection and scroll to top.
@@ -84,6 +106,7 @@ mod tests {
         let state = ListState::default();
         assert_eq!(state.selected_index(), 0);
         assert_eq!(state.scroll_offset(), 0);
+        assert!(state.is_grouped());
     }
 
     #[test]
@@ -136,6 +159,19 @@ mod tests {
         let mut state = ListState::new();
         state.set_scroll_offset(10);
         assert_eq!(state.scroll_offset(), 10);
+    }
+
+    #[test]
+    fn test_toggle_grouping_resets_position() {
+        let mut state = ListState::new();
+        state.set_selected_index(5, 10);
+        state.set_scroll_offset(3);
+
+        state.toggle_grouping();
+
+        assert!(!state.is_grouped());
+        assert_eq!(state.selected_index(), 0);
+        assert_eq!(state.scroll_offset(), 0);
     }
 
     #[test]

@@ -177,12 +177,16 @@ impl ResultsApp {
         &self.analysis
     }
 
-    /// Get the currently selected item
-    ///
-    /// Items are always grouped by location. When multiple debt types exist at
-    /// the same location, returns the first item in the group. The overview page
-    /// shows all debt types at the location.
+    /// Get the currently selected item.
     pub fn selected_item(&self) -> Option<&UnifiedDebtItem> {
+        if !self.list.is_grouped() {
+            return self
+                .query
+                .filtered_indices()
+                .get(self.list.selected_index())
+                .and_then(|&idx| self.analysis.items.get(idx));
+        }
+
         let groups =
             super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
         groups
@@ -198,8 +202,12 @@ impl ResultsApp {
             .filter_map(|&idx| self.analysis.items.get(idx))
     }
 
-    /// Get total item count (filtered, grouped by location)
+    /// Get total row count for the current display mode.
     pub fn item_count(&self) -> usize {
+        if !self.list.is_grouped() {
+            return self.query.filtered_indices().len();
+        }
+
         let groups =
             super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
         groups.len()
@@ -274,6 +282,10 @@ impl ResultsApp {
 
     /// Get count display for header
     pub fn count_display(&self) -> String {
+        if !self.list.is_grouped() {
+            return format!("{} issues", self.query.filtered_indices().len());
+        }
+
         let groups =
             super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
         let issue_count = self.query.filtered_indices().len();
@@ -383,11 +395,12 @@ mod tests {
     #[test]
     fn test_count_display_empty() {
         let analysis = create_test_analysis();
-        let app = ResultsApp::new(analysis);
+        let mut app = ResultsApp::new(analysis);
 
-        let display = app.count_display();
-        assert!(display.contains("0 locations"));
-        assert!(display.contains("0 issues"));
+        assert_eq!(app.count_display(), "0 locations (0 issues)");
+
+        app.list_mut().toggle_grouping();
+        assert_eq!(app.count_display(), "0 issues");
     }
 
     #[test]

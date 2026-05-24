@@ -39,6 +39,9 @@ pub enum ListAction {
     /// Move selection down by a page.
     PageDown,
 
+    /// Toggle location grouping.
+    ToggleGrouping,
+
     /// Enter detail view for selected item.
     EnterDetail,
 
@@ -119,9 +122,13 @@ pub fn determine_list_action(key: KeyEvent, ctx: ListActionContext) -> Option<Li
         KeyCode::Up | KeyCode::Char('k') => Some(ListAction::MoveUp),
         KeyCode::Down | KeyCode::Char('j') => Some(ListAction::MoveDown),
         KeyCode::Char('g') | KeyCode::Home => Some(ListAction::JumpToTop),
-        KeyCode::End => Some(ListAction::JumpToBottom),
+        KeyCode::Char('G') | KeyCode::End => Some(ListAction::JumpToBottom),
         KeyCode::PageUp => Some(ListAction::PageUp),
         KeyCode::PageDown => Some(ListAction::PageDown),
+
+        // Grouping toggle - switches between individual score-ranked items
+        // and location-grouped rows.
+        KeyCode::Char('u') => Some(ListAction::ToggleGrouping),
 
         // Detail view - guarded: requires items and selection
         // Enter, Right arrow, and 'l' all open detail view (vim-style navigation)
@@ -264,6 +271,15 @@ mod tests {
     }
 
     #[test]
+    fn toggle_grouping_with_u() {
+        let ctx = ListActionContext::with_selection();
+        assert_eq!(
+            determine_list_action(key(KeyCode::Char('u')), ctx),
+            Some(ListAction::ToggleGrouping)
+        );
+    }
+
+    #[test]
     fn jump_to_top_with_home() {
         let ctx = ListActionContext::with_selection();
         assert_eq!(
@@ -277,6 +293,15 @@ mod tests {
         let ctx = ListActionContext::with_selection();
         assert_eq!(
             determine_list_action(key(KeyCode::End), ctx),
+            Some(ListAction::JumpToBottom)
+        );
+    }
+
+    #[test]
+    fn jump_to_bottom_with_uppercase_g() {
+        let ctx = ListActionContext::with_selection();
+        assert_eq!(
+            determine_list_action(key(KeyCode::Char('G')), ctx),
             Some(ListAction::JumpToBottom)
         );
     }
@@ -518,6 +543,8 @@ mod property_tests {
             Just(KeyCode::Char('k')),
             Just(KeyCode::Char('j')),
             Just(KeyCode::Char('g')),
+            Just(KeyCode::Char('G')),
+            Just(KeyCode::Char('u')),
             Just(KeyCode::Char('l')),
             Just(KeyCode::Char('/')),
             Just(KeyCode::Char('s')),

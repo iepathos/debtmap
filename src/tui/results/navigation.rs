@@ -89,6 +89,16 @@ fn execute_list_action(app: &mut ResultsApp, action: ListAction) -> Result<bool>
             move_selection(app, page_size);
         }
 
+        ListAction::ToggleGrouping => {
+            app.list_mut().toggle_grouping();
+            let mode = if app.list().is_grouped() {
+                "grouped by location"
+            } else {
+                "showing individual items"
+            };
+            app.set_status_message(mode.to_string());
+        }
+
         ListAction::EnterDetail => {
             app.nav_mut().push_and_set_view(ViewMode::Detail);
         }
@@ -583,6 +593,20 @@ mod tests {
         ResultsApp::new(analysis)
     }
 
+    fn create_duplicate_location_app() -> ResultsApp {
+        let mut analysis = UnifiedAnalysis::new(CallGraph::new());
+        analysis
+            .items
+            .push_back(create_test_item("same.rs", "same_fn", 10));
+        analysis
+            .items
+            .push_back(create_test_item("same.rs", "same_fn", 10));
+        analysis
+            .items
+            .push_back(create_test_item("other.rs", "other_fn", 20));
+        ResultsApp::new(analysis)
+    }
+
     // ============================================================================
     // execute_list_action tests
     // ============================================================================
@@ -657,9 +681,23 @@ mod tests {
         assert_eq!(app.list().selected_index(), 0);
 
         execute_list_action(&mut app, ListAction::JumpToBottom).unwrap();
-        // Items are grouped, so we get the actual item count
         let expected_last = app.item_count().saturating_sub(1);
         assert_eq!(app.list().selected_index(), expected_last);
+    }
+
+    #[test]
+    fn test_execute_list_action_toggle_grouping_changes_count() {
+        let mut app = create_duplicate_location_app();
+        assert!(app.list().is_grouped());
+        assert_eq!(app.item_count(), 2);
+        assert_eq!(app.count_display(), "2 locations (3 issues)");
+
+        execute_list_action(&mut app, ListAction::ToggleGrouping).unwrap();
+
+        assert!(!app.list().is_grouped());
+        assert_eq!(app.item_count(), 3);
+        assert_eq!(app.count_display(), "3 issues");
+        assert_eq!(app.list().selected_index(), 0);
     }
 
     #[test]
@@ -742,6 +780,7 @@ mod tests {
             ListAction::JumpToBottom,
             ListAction::PageUp,
             ListAction::PageDown,
+            ListAction::ToggleGrouping,
             ListAction::EnterDetail,
             ListAction::EnterSearch,
             ListAction::OpenSortMenu,

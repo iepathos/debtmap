@@ -56,6 +56,7 @@ pub fn render_help_overlay(frame: &mut Frame, app: &ResultsApp) {
         Line::from("  /           Search"),
         Line::from("  s           Sort menu"),
         Line::from("  f           Filter menu"),
+        Line::from("  u           Group/Ungroup locations"),
         Line::from(""),
         Line::from(vec![Span::styled(
             "Actions",

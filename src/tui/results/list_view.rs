@@ -3,6 +3,7 @@
 use super::app::ResultsApp;
 use super::grouping;
 use crate::priority::classification::Severity;
+use crate::priority::UnifiedDebtItem;
 use crate::tui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -235,12 +236,16 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     frame.render_widget(header, header_area);
 }
 
-/// Render list of items (always grouped by location)
+/// Render list rows for the current display mode.
 fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
     // Apply horizontal margin per DESIGN.md
     let list_area = apply_horizontal_margin(area);
 
-    let items: Vec<ListItem> = render_grouped_list(app, list_area, theme);
+    let items = if app.list().is_grouped() {
+        render_grouped_list(app, list_area, theme)
+    } else {
+        render_ungrouped_list(app, list_area, theme)
+    };
 
     if items.is_empty() {
         let empty_text =
@@ -259,6 +264,19 @@ fn render_list(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
         let list = List::new(items).block(Block::default().borders(Borders::NONE));
         frame.render_widget(list, list_area);
     }
+}
+
+/// Render individual items in score order.
+fn render_ungrouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListItem<'static>> {
+    app.filtered_items()
+        .skip(app.list().scroll_offset())
+        .take(area.height as usize)
+        .enumerate()
+        .map(|(display_index, item)| {
+            let index = display_index + app.list().scroll_offset();
+            format_item(item, index, index == app.list().selected_index(), theme)
+        })
+        .collect()
 }
 
 /// Render grouped list by location
@@ -283,6 +301,70 @@ fn render_grouped_list(app: &ResultsApp, area: Rect, theme: &Theme) -> Vec<ListI
     }
 
     list_items
+}
+
+/// Format a single ungrouped debt item.
+fn format_item(
+    item: &UnifiedDebtItem,
+    index: usize,
+    is_selected: bool,
+    theme: &Theme,
+) -> ListItem<'static> {
+    let score = item.unified_score.final_score;
+    let severity_color = severity_to_color(Severity::from_score_100(score));
+    let indicator = if is_selected { "▸ " } else { "  " };
+    let file_name = item
+        .location
+        .file
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+    let location_display = if item.location.function == "[file-scope]" {
+        file_name.to_string()
+    } else {
+        format!("{}::{}", file_name, item.location.function)
+    };
+    let metrics = item_metrics(item);
+
+    let line = Line::from(vec![
+        Span::styled(indicator, Style::default().fg(theme.accent())),
+        Span::styled(
+            format!("#{:<4}", index + 1),
+            Style::default().fg(theme.muted),
+        ),
+        Span::styled(
+            format!("{:<7.1}", score),
+            Style::default().fg(severity_color),
+        ),
+        Span::raw("  "),
+        Span::styled(location_display, Style::default().fg(theme.secondary())),
+        Span::raw("  "),
+        Span::styled(
+            format!("({})", metrics.join(" ")),
+            Style::default().fg(theme.muted),
+        ),
+    ]);
+
+    ListItem::new(line).style(selected_style(is_selected))
+}
+
+fn item_metrics(item: &UnifiedDebtItem) -> Vec<String> {
+    let mut metric_parts = Vec::new();
+
+    if let Some(cov) = item.transitive_coverage.as_ref() {
+        metric_parts.push(format!("Cov:{:.0}%", cov.direct * 100.0));
+    }
+    if item.cognitive_complexity > 0 {
+        metric_parts.push(format!("Cog:{}", item.cognitive_complexity));
+    }
+    if item.nesting_depth > 0 {
+        metric_parts.push(format!("Nest:{}", item.nesting_depth));
+    }
+    if item.function_length > 0 {
+        metric_parts.push(format!("LOC:{}", item.function_length));
+    }
+
+    metric_parts
 }
 
 /// Format a grouped item with badge and aggregated metrics
@@ -360,13 +442,15 @@ fn format_grouped_item(
         ),
     ]);
 
-    let style = if is_selected {
+    ListItem::new(line).style(selected_style(is_selected))
+}
+
+fn selected_style(is_selected: bool) -> Style {
+    if is_selected {
         Style::default().bg(Color::DarkGray)
     } else {
         Style::default()
-    };
-
-    ListItem::new(line).style(style)
+    }
 }
 
 /// Render footer with navigation hints and status message
@@ -396,6 +480,8 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::raw(":Sort  "),
         Span::styled("f", Style::default().fg(theme.accent())),
         Span::raw(":Filter  "),
+        Span::styled("u", Style::default().fg(theme.accent())),
+        Span::raw(":Group  "),
         Span::styled("?", Style::default().fg(theme.accent())),
         Span::raw(":Help  "),
         Span::styled("q", Style::default().fg(theme.accent())),

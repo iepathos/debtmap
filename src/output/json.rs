@@ -2,6 +2,8 @@ use crate::priority;
 #[cfg(test)]
 use crate::priority::UnifiedAnalysisUtils;
 use anyhow::Result;
+use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -54,12 +56,8 @@ fn apply_filters_to_unified_output(
     top: Option<usize>,
     tail: Option<usize>,
 ) -> crate::output::unified::UnifiedOutput {
-    if let Some(n) = top {
-        output.items.truncate(n);
-    } else if let Some(n) = tail {
-        let total = output.items.len();
-        let skip = total.saturating_sub(n);
-        output.items = output.items.into_iter().skip(skip).collect();
+    if top.is_some() || tail.is_some() {
+        output.items = filter_items_by_location_groups(output.items, top, tail);
     }
 
     // Update summary to reflect filtered items
@@ -67,10 +65,111 @@ fn apply_filters_to_unified_output(
     output
 }
 
+#[derive(Debug, Clone)]
+struct LocationGroupSelection {
+    key: (String, Option<String>, Option<usize>),
+    combined_score: f64,
+    first_index: usize,
+}
+
+fn filter_items_by_location_groups(
+    items: Vec<crate::output::unified::UnifiedDebtItemOutput>,
+    top: Option<usize>,
+    tail: Option<usize>,
+) -> Vec<crate::output::unified::UnifiedDebtItemOutput> {
+    let groups = sorted_function_location_groups(&items);
+    let selected_keys = select_location_group_keys(groups, top, tail);
+
+    items
+        .into_iter()
+        .filter(|item| selected_keys.contains(&item_location_key(item)))
+        .collect()
+}
+
+fn sorted_function_location_groups(
+    items: &[crate::output::unified::UnifiedDebtItemOutput],
+) -> Vec<LocationGroupSelection> {
+    let mut groups = Vec::<LocationGroupSelection>::new();
+
+    for (index, item) in items.iter().enumerate() {
+        let Some(key) = function_location_key(item) else {
+            continue;
+        };
+
+        if let Some(group) = groups.iter_mut().find(|group| group.key == key) {
+            group.combined_score += item.score();
+        } else {
+            groups.push(LocationGroupSelection {
+                key,
+                combined_score: item.score(),
+                first_index: index,
+            });
+        }
+    }
+
+    groups.sort_by(compare_location_groups);
+    groups
+}
+
+fn select_location_group_keys(
+    groups: Vec<LocationGroupSelection>,
+    top: Option<usize>,
+    tail: Option<usize>,
+) -> HashSet<(String, Option<String>, Option<usize>)> {
+    let selected = if let Some(n) = top {
+        groups.into_iter().take(n).collect()
+    } else if let Some(n) = tail {
+        let skip = groups.len().saturating_sub(n);
+        groups.into_iter().skip(skip).collect()
+    } else {
+        groups
+    };
+
+    selected.into_iter().map(|group| group.key).collect()
+}
+
+fn compare_location_groups(a: &LocationGroupSelection, b: &LocationGroupSelection) -> Ordering {
+    b.combined_score
+        .partial_cmp(&a.combined_score)
+        .unwrap_or(Ordering::Equal)
+        .then_with(|| a.first_index.cmp(&b.first_index))
+}
+
+fn item_location_key(
+    item: &crate::output::unified::UnifiedDebtItemOutput,
+) -> (String, Option<String>, Option<usize>) {
+    match item {
+        crate::output::unified::UnifiedDebtItemOutput::Function(function) => (
+            function.location.file.clone(),
+            function.location.function.clone(),
+            function.location.line,
+        ),
+        crate::output::unified::UnifiedDebtItemOutput::File(file) => {
+            (file.location.file.clone(), None, None)
+        }
+    }
+}
+
+fn function_location_key(
+    item: &crate::output::unified::UnifiedDebtItemOutput,
+) -> Option<(String, Option<String>, Option<usize>)> {
+    match item {
+        crate::output::unified::UnifiedDebtItemOutput::Function(function) => Some((
+            function.location.file.clone(),
+            function.location.function.clone(),
+            function.location.line,
+        )),
+        crate::output::unified::UnifiedDebtItemOutput::File(_) => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::output::unified::{UnifiedDebtItemOutput, UnifiedOutput};
+    use crate::output::unified::{
+        DebtSummary, OutputMetadata, ScoreDistribution, TypeBreakdown, UnifiedDebtItemOutput,
+        UnifiedOutput,
+    };
     use crate::priority::{
         call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
         Location, UnifiedDebtItem, UnifiedScore,
@@ -178,12 +277,65 @@ mod tests {
         analysis
     }
 
+    fn create_unified_output(items: Vec<UnifiedDebtItemOutput>) -> UnifiedOutput {
+        UnifiedOutput {
+            format_version: "3.0".to_string(),
+            metadata: OutputMetadata {
+                debtmap_version: "test".to_string(),
+                generated_at: "test".to_string(),
+                project_root: None,
+                analysis_type: "unified".to_string(),
+            },
+            summary: DebtSummary {
+                total_items: items.len(),
+                total_debt_score: items.iter().map(UnifiedDebtItemOutput::score).sum(),
+                debt_density: 0.0,
+                total_loc: 0,
+                by_type: TypeBreakdown {
+                    file: 0,
+                    function: items.len(),
+                },
+                by_category: Default::default(),
+                score_distribution: ScoreDistribution::default(),
+                cohesion: None,
+            },
+            items,
+        }
+    }
+
     /// Helper to extract function name from unified output item
     fn get_function_name(item: &UnifiedDebtItemOutput) -> Option<String> {
         match item {
             UnifiedDebtItemOutput::Function(f) => f.location.function.clone(),
             UnifiedDebtItemOutput::File(_) => None,
         }
+    }
+
+    #[test]
+    fn test_top_filter_selects_complete_highest_location_group() {
+        let items = vec![
+            UnifiedDebtItemOutput::from_debt_item(
+                &crate::priority::DebtItem::Function(Box::new(create_test_item("other", 40.0))),
+                false,
+            ),
+            UnifiedDebtItemOutput::from_debt_item(
+                &crate::priority::DebtItem::Function(Box::new(create_test_item("grouped", 30.0))),
+                false,
+            ),
+            UnifiedDebtItemOutput::from_debt_item(
+                &crate::priority::DebtItem::Function(Box::new(create_test_item("grouped", 29.0))),
+                false,
+            ),
+        ];
+        let output = create_unified_output(items);
+
+        let filtered = apply_filters_to_unified_output(output, Some(1), None);
+
+        assert_eq!(filtered.items.len(), 2);
+        assert!(filtered
+            .items
+            .iter()
+            .all(|item| get_function_name(item) == Some("grouped".to_string())));
     }
 
     #[test]
