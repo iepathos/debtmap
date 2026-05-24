@@ -493,72 +493,103 @@ if is_expired {
 pub fn format_enhanced_message(message: &EnhancedComplexityMessage) -> String {
     let mut output = String::new();
 
-    writeln!(output, "\n{}", message.summary).unwrap();
-    writeln!(output, "{}", "=".repeat(60)).unwrap();
+    append_header(&mut output, &message.summary);
+    append_details(&mut output, &message.details);
+    append_recommendations(&mut output, &message.recommendations);
+    append_code_example(&mut output, message.code_examples.as_ref());
+    append_complexity_breakdown(&mut output, &message.complexity_breakdown);
 
-    // Details section
-    if !message.details.is_empty() {
-        writeln!(output, "\nCOMPLEXITY ISSUES:").unwrap();
-        for (i, detail) in message.details.iter().enumerate() {
-            let severity_icon = match detail.severity {
-                Severity::Low => "[INFO]",
-                Severity::Medium => "[WARNING]",
-                Severity::High => "[ERROR]",
-                Severity::Critical => "[!]",
-            };
-            writeln!(
-                output,
-                "  {}. {} {}",
-                i + 1,
-                severity_icon,
-                detail.description
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "     Location: {}:{}",
-                detail.location.file.display(),
-                detail.location.line
-            )
-            .unwrap();
-        }
+    output
+}
+
+fn append_header(output: &mut String, summary: &str) {
+    writeln!(output, "\n{summary}").expect("writing to String cannot fail");
+    writeln!(output, "{}", "=".repeat(60)).expect("writing to String cannot fail");
+}
+
+fn append_details(output: &mut String, details: &[ComplexityDetail]) {
+    if details.is_empty() {
+        return;
     }
 
-    // Recommendations section
-    if !message.recommendations.is_empty() {
-        writeln!(output, "\n[TIP] RECOMMENDATIONS:").unwrap();
-        for rec in &message.recommendations {
-            writeln!(output, "  • {}", rec.title).unwrap();
-            writeln!(output, "    {}", rec.description).unwrap();
-            writeln!(output, "    Effort: {:?}", rec.effort).unwrap();
-        }
+    writeln!(output, "\nCOMPLEXITY ISSUES:").expect("writing to String cannot fail");
+    details
+        .iter()
+        .enumerate()
+        .for_each(|(index, detail)| append_detail(output, index, detail));
+}
+
+fn append_detail(output: &mut String, index: usize, detail: &ComplexityDetail) {
+    writeln!(
+        output,
+        "  {}. {} {}",
+        index + 1,
+        severity_icon(&detail.severity),
+        detail.description
+    )
+    .expect("writing to String cannot fail");
+    writeln!(
+        output,
+        "     Location: {}:{}",
+        detail.location.file.display(),
+        detail.location.line
+    )
+    .expect("writing to String cannot fail");
+}
+
+fn severity_icon(severity: &Severity) -> &'static str {
+    match severity {
+        Severity::Low => "[INFO]",
+        Severity::Medium => "[WARNING]",
+        Severity::High => "[ERROR]",
+        Severity::Critical => "[!]",
+    }
+}
+
+fn append_recommendations(output: &mut String, recommendations: &[ActionableRecommendation]) {
+    if recommendations.is_empty() {
+        return;
     }
 
-    // Code example
-    if let Some(example) = &message.code_examples {
-        writeln!(output, "\n[REFACTORING EXAMPLE]").unwrap();
-        writeln!(output, "  {}", example.explanation).unwrap();
-        writeln!(output, "\n  Before:").unwrap();
-        for line in example.before.lines() {
-            writeln!(output, "    {}", line).unwrap();
-        }
-        writeln!(output, "\n  After:").unwrap();
-        for line in example.after.lines() {
-            writeln!(output, "    {}", line).unwrap();
-        }
-    }
+    writeln!(output, "\n[TIP] RECOMMENDATIONS:").expect("writing to String cannot fail");
+    recommendations
+        .iter()
+        .for_each(|rec| append_recommendation(output, rec));
+}
 
-    // Complexity breakdown
-    writeln!(output, "\n📈 COMPLEXITY BREAKDOWN:").unwrap();
+fn append_recommendation(output: &mut String, rec: &ActionableRecommendation) {
+    writeln!(output, "  • {}", rec.title).expect("writing to String cannot fail");
+    writeln!(output, "    {}", rec.description).expect("writing to String cannot fail");
+    writeln!(output, "    Effort: {:?}", rec.effort).expect("writing to String cannot fail");
+}
+
+fn append_code_example(output: &mut String, example: Option<&RefactoringExample>) {
+    let Some(example) = example else {
+        return;
+    };
+
+    writeln!(output, "\n[REFACTORING EXAMPLE]").expect("writing to String cannot fail");
+    writeln!(output, "  {}", example.explanation).expect("writing to String cannot fail");
+    writeln!(output, "\n  Before:").expect("writing to String cannot fail");
+    append_indented_lines(output, &example.before);
+    writeln!(output, "\n  After:").expect("writing to String cannot fail");
+    append_indented_lines(output, &example.after);
+}
+
+fn append_indented_lines(output: &mut String, text: &str) {
+    text.lines().for_each(|line| {
+        writeln!(output, "    {line}").expect("writing to String cannot fail");
+    });
+}
+
+fn append_complexity_breakdown(output: &mut String, breakdown: &ComplexityBreakdown) {
+    writeln!(output, "\n📈 COMPLEXITY BREAKDOWN:").expect("writing to String cannot fail");
     writeln!(
         output,
         "  Total: {} (Cyclomatic: {}, Cognitive: {})",
-        message.complexity_breakdown.total_complexity,
-        message.complexity_breakdown.match_complexity
-            + message.complexity_breakdown.if_else_complexity,
-        message.complexity_breakdown.nesting_penalty
+        breakdown.total_complexity,
+        breakdown.match_complexity + breakdown.if_else_complexity,
+        breakdown.nesting_penalty
     )
-    .unwrap();
-
-    output
+    .expect("writing to String cannot fail");
 }

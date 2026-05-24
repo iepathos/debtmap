@@ -1,5 +1,10 @@
 use debtmap::complexity::if_else_analyzer::IfElseChainAnalyzer;
-use debtmap::complexity::message_generator::generate_enhanced_message;
+use debtmap::complexity::if_else_analyzer::RefactoringPattern;
+use debtmap::complexity::message_generator::{
+    format_enhanced_message, generate_enhanced_message, ActionableRecommendation,
+    ComplexityBreakdown, ComplexityDetail, ComplexityIssueType, EnhancedComplexityMessage,
+    EstimatedEffort, RefactoringExample, Severity, SourceLocation,
+};
 use debtmap::complexity::recursive_detector::RecursiveMatchDetector;
 use debtmap::complexity::threshold_manager::{ComplexityThresholds, FunctionRole, ThresholdPreset};
 use debtmap::core::FunctionMetrics;
@@ -243,6 +248,59 @@ fn test_enhanced_message_generation() {
 
     // Should identify high complexity
     assert!(message.summary.contains("complex") || message.summary.contains("Complex"));
+}
+
+#[test]
+fn test_format_enhanced_message_includes_all_sections() {
+    let message = EnhancedComplexityMessage {
+        summary: "Function 'sample' has high complexity".to_string(),
+        details: vec![ComplexityDetail {
+            issue_type: ComplexityIssueType::HighCyclomaticComplexity {
+                value: 12,
+                sources: vec!["if/else statements".to_string()],
+            },
+            location: SourceLocation {
+                file: PathBuf::from("src/sample.rs"),
+                line: 17,
+                column: None,
+            },
+            description: "High cyclomatic complexity of 12".to_string(),
+            severity: Severity::High,
+        }],
+        recommendations: vec![ActionableRecommendation {
+            title: "Reduce Branching Complexity".to_string(),
+            description: "Extract complex conditions into named functions.".to_string(),
+            effort: EstimatedEffort::Medium,
+            pattern: RefactoringPattern::GuardClauses,
+            code_example: None,
+        }],
+        code_examples: Some(RefactoringExample {
+            before: "if condition {\n    work();\n}".to_string(),
+            after: "if !condition {\n    return;\n}\nwork();".to_string(),
+            explanation: "Guard clauses reduce nesting".to_string(),
+            estimated_effort: EstimatedEffort::Low,
+        }),
+        complexity_breakdown: ComplexityBreakdown {
+            cyclomatic_sources: vec!["if/else statements".to_string()],
+            cognitive_sources: vec!["nested control flow".to_string()],
+            match_complexity: 3,
+            if_else_complexity: 4,
+            loop_complexity: 0,
+            nesting_penalty: 2,
+            total_complexity: 21,
+        },
+    };
+
+    let formatted = format_enhanced_message(&message);
+
+    assert!(formatted.contains("Function 'sample' has high complexity"));
+    assert!(formatted.contains("COMPLEXITY ISSUES:"));
+    assert!(formatted.contains("1. [ERROR] High cyclomatic complexity of 12"));
+    assert!(formatted.contains("Location: src/sample.rs:17"));
+    assert!(formatted.contains("[TIP] RECOMMENDATIONS:"));
+    assert!(formatted.contains("Reduce Branching Complexity"));
+    assert!(formatted.contains("[REFACTORING EXAMPLE]"));
+    assert!(formatted.contains("Total: 21 (Cyclomatic: 7, Cognitive: 2)"));
 }
 
 #[test]
