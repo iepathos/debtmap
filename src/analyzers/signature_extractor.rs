@@ -138,12 +138,15 @@ impl SignatureExtractor {
 
     /// Detect builder patterns in registered methods
     fn detect_builder_patterns(&mut self) {
-        self.registry
+        let builders = self
+            .registry
             .get_all_methods()
             .filter_map(|(type_name, methods)| Self::detect_builder(type_name, methods))
-            .collect::<Vec<_>>()
-            .into_iter()
-            .for_each(|builder| self.registry.register_builder(builder));
+            .collect::<Vec<_>>();
+
+        for builder in builders {
+            self.registry.register_builder(builder);
+        }
     }
 
     fn detect_builder(type_name: &str, methods: &[MethodSignature]) -> Option<BuilderInfo> {
