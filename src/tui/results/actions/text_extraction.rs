@@ -243,7 +243,7 @@ pub fn extract_item_as_llm_markdown(item: &UnifiedDebtItem) -> String {
     let mut result = String::new();
 
     // Header (no item number since we're extracting a single item)
-    result.push_str("### Debt Item\n\n");
+    result.push_str("# Debt Item\n\n");
 
     // Identification section (debt-type-aware: god-object items render as
     // `Type: GodObject` rather than `Type: Function`).

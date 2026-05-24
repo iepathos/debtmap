@@ -271,7 +271,7 @@ fn write_location_group<W: Write>(
     // The Type label is derived from the representative item's debt_type so
     // that god-object groups render as `Type: GodObject` rather than the
     // legacy hard-coded `Type: Function`.
-    writeln!(writer, "#### Identification")?;
+    writeln!(writer, "## Identification")?;
     writeln!(
         writer,
         "- ID: {}",
@@ -295,7 +295,7 @@ fn write_location_group<W: Write>(
     writeln!(writer)?;
 
     // Severity section with combined score
-    writeln!(writer, "#### Severity")?;
+    writeln!(writer, "## Severity")?;
     writeln!(writer, "- Combined Score: {:.2}", group.combined_score)?;
     writeln!(writer, "- Max Priority: {:?}", group.max_priority())?;
     writeln!(
@@ -306,7 +306,7 @@ fn write_location_group<W: Write>(
     writeln!(writer)?;
 
     // Debt types at this location
-    writeln!(writer, "#### Debt Types")?;
+    writeln!(writer, "## Debt Types")?;
     for item in &group.items {
         writeln!(
             writer,

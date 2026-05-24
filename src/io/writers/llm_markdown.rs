@@ -36,6 +36,10 @@ pub mod format {
     use crate::output::unified::{ContextSuggestionOutput, PurityAnalysis, UnifiedLocation};
     use crate::priority::{DebtType, FunctionRole};
 
+    fn write_section_heading(out: &mut String, label: &str) {
+        writeln!(out, "## {}", label).unwrap();
+    }
+
     /// Format all sections for a function item.
     pub fn function_item_sections(item: &FunctionDebtItemOutput) -> Vec<String> {
         [
@@ -82,7 +86,7 @@ pub mod format {
         debt_type: &DebtType,
     ) -> String {
         let mut out = String::new();
-        writeln!(out, "#### Identification").unwrap();
+        write_section_heading(&mut out, "Identification");
         writeln!(
             out,
             "- ID: {}",
@@ -107,7 +111,7 @@ pub mod format {
     /// Format severity section
     pub fn severity(score: f64, priority: &crate::output::unified::Priority) -> String {
         let mut out = String::new();
-        writeln!(out, "#### Severity").unwrap();
+        write_section_heading(&mut out, "Severity");
         writeln!(out, "- Score: {}", score).unwrap();
         writeln!(out, "- Priority: {:?}", priority).unwrap();
         writeln!(out, "- Tier: {}", super::priority_tier(score)).unwrap();
@@ -120,7 +124,7 @@ pub mod format {
         adj: Option<&crate::output::unified::AdjustedComplexity>,
     ) -> String {
         let mut out = String::new();
-        writeln!(out, "#### Metrics").unwrap();
+        write_section_heading(&mut out, "Metrics");
         writeln!(out, "- Cyclomatic Complexity: {}", m.cyclomatic_complexity).unwrap();
 
         // Cognitive complexity with entropy-adjusted notation
@@ -168,7 +172,7 @@ pub mod format {
             return None;
         }
         let mut out = String::new();
-        writeln!(out, "#### Coverage").unwrap();
+        write_section_heading(&mut out, "Coverage");
         if let Some(cov) = m.coverage {
             writeln!(out, "- Direct Coverage: {:.0}%", cov * 100.0).unwrap();
         }
@@ -181,7 +185,7 @@ pub mod format {
     /// Format dependencies section
     pub fn dependencies(deps: &Dependencies) -> String {
         let mut out = String::new();
-        writeln!(out, "#### Dependencies").unwrap();
+        write_section_heading(&mut out, "Dependencies");
 
         // Spec 267: Show both production and test caller counts
         if deps.production_upstream_count > 0 || deps.test_upstream_count > 0 {
@@ -292,7 +296,7 @@ pub mod format {
     pub fn purity(purity: Option<&PurityAnalysis>) -> Option<String> {
         let p = purity?;
         let mut out = String::new();
-        writeln!(out, "#### Purity Analysis").unwrap();
+        write_section_heading(&mut out, "Purity Analysis");
         writeln!(out, "- Is Pure: {}", p.is_pure).unwrap();
         if let Some(ref level) = p.purity_level {
             writeln!(out, "- Purity Level: {}", level).unwrap();
@@ -318,7 +322,7 @@ pub mod format {
             return None;
         }
         let mut out = String::new();
-        writeln!(out, "#### Pattern Analysis").unwrap();
+        write_section_heading(&mut out, "Pattern Analysis");
         if let Some(pt) = pattern_type {
             writeln!(out, "- Pattern Type: {}", pt).unwrap();
         }
@@ -335,7 +339,7 @@ pub mod format {
     ) -> Option<String> {
         let s = scoring?;
         let mut out = String::new();
-        writeln!(out, "#### Scoring Breakdown").unwrap();
+        write_section_heading(&mut out, "Scoring Breakdown");
         writeln!(out, "- Base Score: {:.2}", s.base_score).unwrap();
         writeln!(
             out,
@@ -404,7 +408,7 @@ pub mod format {
     pub fn context(ctx: Option<&ContextSuggestionOutput>) -> Option<String> {
         let c = ctx?;
         let mut out = String::new();
-        writeln!(out, "#### Context to Read").unwrap();
+        write_section_heading(&mut out, "Context to Read");
         writeln!(out, "- Total Lines: {}", c.total_lines).unwrap();
         writeln!(
             out,
@@ -440,7 +444,7 @@ pub mod format {
     pub fn git_history(git: Option<&GitHistoryOutput>) -> Option<String> {
         let g = git?;
         let mut out = String::new();
-        writeln!(out, "#### Git History").unwrap();
+        write_section_heading(&mut out, "Git History");
         // Show commits with frequency for clarity
         let commit_label = if g.total_commits == 1 {
             "commit"
@@ -482,7 +486,7 @@ pub mod format {
     /// Format identification section for a file item
     pub fn file_identification(file: &str, category: &str) -> String {
         let mut out = String::new();
-        writeln!(out, "#### Identification").unwrap();
+        write_section_heading(&mut out, "Identification");
         writeln!(out, "- ID: {}", super::generate_item_id(file, None)).unwrap();
         writeln!(out, "- Type: File").unwrap();
         writeln!(out, "- Location: {}", file).unwrap();
@@ -493,7 +497,7 @@ pub mod format {
     /// Format file metrics section
     pub fn file_metrics(m: &crate::output::unified::FileMetricsOutput) -> String {
         let mut out = String::new();
-        writeln!(out, "#### Metrics").unwrap();
+        write_section_heading(&mut out, "Metrics");
         writeln!(out, "- Total Cyclomatic Complexity: {}", m.total_complexity).unwrap();
 
         // Show distribution metrics if available (Spec 268)
@@ -541,7 +545,7 @@ pub mod format {
     pub fn god_object(god: Option<&GodObjectIndicators>) -> Option<String> {
         let g = god?;
         let mut out = String::new();
-        writeln!(out, "#### God Object Analysis").unwrap();
+        write_section_heading(&mut out, "God Object Analysis");
         writeln!(out, "- Is God Object: {}", g.is_god_object).unwrap();
         writeln!(out, "- Method Count: {}", g.methods_count).unwrap();
         writeln!(out, "- Field Count: {}", g.fields_count).unwrap();
@@ -554,7 +558,7 @@ pub mod format {
     pub fn cohesion(cohesion: Option<&crate::output::unified::CohesionOutput>) -> Option<String> {
         let c = cohesion?;
         let mut out = String::new();
-        writeln!(out, "#### Cohesion Analysis").unwrap();
+        write_section_heading(&mut out, "Cohesion Analysis");
         writeln!(out, "- Cohesion Score: {:.2}", c.score).unwrap();
         writeln!(out, "- Classification: {:?}", c.classification).unwrap();
         writeln!(out, "- Functions Analyzed: {}", c.functions_analyzed).unwrap();
@@ -567,7 +571,7 @@ pub mod format {
     pub fn file_scoring(scoring: Option<&FileScoringDetails>) -> Option<String> {
         let s = scoring?;
         let mut out = String::new();
-        writeln!(out, "#### Scoring Breakdown").unwrap();
+        write_section_heading(&mut out, "Scoring Breakdown");
         writeln!(out, "- File Size Score: {}", s.file_size_score).unwrap();
         writeln!(out, "- Function Count Score: {}", s.function_count_score).unwrap();
         writeln!(out, "- Complexity Score: {}", s.complexity_score).unwrap();
@@ -1234,7 +1238,7 @@ mod tests {
 
         // Check git history section is present
         assert!(
-            markdown.contains("#### Git History"),
+            markdown.contains("## Git History"),
             "Should have Git History header: {}",
             markdown
         );
