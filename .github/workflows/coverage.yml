@@ -59,12 +59,33 @@ jobs:
         mkdir -p target/coverage
         cargo llvm-cov clean
         SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --html --output-dir target/coverage \
-          --fail-under-lines 80 \
           --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
           --test debt_tests --test entropy_tests \
           --status-level fail --final-status-level slow
+        cargo llvm-cov report --json --summary-only --output-path target/coverage/coverage-summary.json
+        python3 - <<'PY'
+        import json
+        import sys
+
+        threshold = 80.0
+        with open("target/coverage/coverage-summary.json", encoding="utf-8") as coverage_file:
+            totals = json.load(coverage_file)["data"][0]["totals"]["lines"]
+
+        percent = float(totals["percent"])
+        covered = int(totals["covered"])
+        count = int(totals["count"])
+        print(f"Line coverage: {percent:.2f}% ({covered}/{count})")
+
+        if percent < threshold:
+            print(
+                f"::error::Line coverage {percent:.2f}% is below the required "
+                f"{threshold:.2f}% threshold"
+            )
+            sys.exit(1)
+        PY
 
     - name: Archive code coverage results
+      if: always()
       uses: actions/upload-artifact@v7
       with:
         name: code-coverage-report
