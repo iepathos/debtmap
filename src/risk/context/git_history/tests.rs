@@ -1095,6 +1095,7 @@ fn test_batched_history_path_matching_diagnostic() -> Result<()> {
 /// Test against the actual debtmap codebase to see if git history works
 /// This is the real scenario that's failing
 #[test]
+#[ignore]
 fn test_git_history_on_real_repo() -> Result<()> {
     // Use the actual debtmap repo (the repo we're in)
     let cwd = std::env::current_dir()?;
@@ -1144,6 +1145,7 @@ fn test_git_history_on_real_repo() -> Result<()> {
 /// Test that simulates analysis flow with file paths from different origins
 /// This tests the exact scenario where paths come from analysis results
 #[test]
+#[ignore]
 fn test_git_history_with_analysis_style_paths() -> Result<()> {
     let cwd = std::env::current_dir()?;
     eprintln!("=== ANALYSIS STYLE PATHS TEST ===");
@@ -1224,6 +1226,7 @@ fn test_git_history_with_analysis_style_paths() -> Result<()> {
 /// function-level git history fails (function not found), it falls back
 /// to file-level history which should have commit data.
 #[test]
+#[ignore]
 fn test_git_history_via_context_aggregator() -> Result<()> {
     use crate::risk::context::{AnalysisTarget, ContextAggregator, ContextDetails};
 

@@ -1,6 +1,18 @@
 use std::process::Command;
 use tempfile::TempDir;
 
+fn debtmap_command() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_debtmap"))
+}
+
+fn run_validate(temp_dir: &TempDir, args: &[&str]) -> std::process::Output {
+    let mut command = debtmap_command();
+    command.arg("validate").args(args).arg(temp_dir.path());
+    command
+        .output()
+        .expect("Failed to execute validate command")
+}
+
 /// Test that validate command runs with parallel processing enabled by default
 #[test]
 fn test_validate_parallel_enabled_by_default() {
@@ -21,12 +33,7 @@ fn test_validate_parallel_enabled_by_default() {
     )
     .unwrap();
 
-    // Run validate command without --no-parallel flag (parallel should be default)
-    let output = Command::new("cargo")
-        .args(["run", "--bin", "debtmap", "--", "validate"])
-        .arg(temp_dir.path())
-        .output()
-        .expect("Failed to execute validate command");
+    let output = run_validate(&temp_dir, &[]);
 
     // Command should succeed
     assert!(
@@ -52,12 +59,7 @@ fn test_validate_no_parallel_flag() {
     )
     .unwrap();
 
-    // Run validate command with --no-parallel flag
-    let output = Command::new("cargo")
-        .args(["run", "--bin", "debtmap", "--", "validate", "--no-parallel"])
-        .arg(temp_dir.path())
-        .output()
-        .expect("Failed to execute validate command");
+    let output = run_validate(&temp_dir, &["--no-parallel"]);
 
     // Command should succeed
     assert!(
@@ -83,12 +85,7 @@ fn test_validate_jobs_parameter() {
     )
     .unwrap();
 
-    // Run validate command with --jobs parameter
-    let output = Command::new("cargo")
-        .args(["run", "--bin", "debtmap", "--", "validate", "--jobs", "4"])
-        .arg(temp_dir.path())
-        .output()
-        .expect("Failed to execute validate command");
+    let output = run_validate(&temp_dir, &["--jobs", "4"]);
 
     // Command should succeed
     assert!(
@@ -142,19 +139,8 @@ fn test_parallel_sequential_equivalence() {
     )
     .unwrap();
 
-    // Run with parallel processing
-    let parallel_output = Command::new("cargo")
-        .args(["run", "--bin", "debtmap", "--", "validate"])
-        .arg(temp_dir.path())
-        .output()
-        .expect("Failed to execute parallel validate");
-
-    // Run with sequential processing
-    let sequential_output = Command::new("cargo")
-        .args(["run", "--bin", "debtmap", "--", "validate", "--no-parallel"])
-        .arg(temp_dir.path())
-        .output()
-        .expect("Failed to execute sequential validate");
+    let parallel_output = run_validate(&temp_dir, &[]);
+    let sequential_output = run_validate(&temp_dir, &["--no-parallel"]);
 
     // Both should succeed
     assert!(
@@ -192,9 +178,8 @@ fn test_debtmap_jobs_env_var() {
     )
     .unwrap();
 
-    // Run validate command with DEBTMAP_JOBS environment variable
-    let output = Command::new("cargo")
-        .args(["run", "--bin", "debtmap", "--", "validate"])
+    let output = debtmap_command()
+        .arg("validate")
         .arg(temp_dir.path())
         .env("DEBTMAP_JOBS", "2")
         .output()
@@ -237,12 +222,7 @@ fn test_validate_parallel_large_project() {
         .unwrap();
     }
 
-    // Run validate command with parallel processing
-    let output = Command::new("cargo")
-        .args(["run", "--bin", "debtmap", "--", "validate"])
-        .arg(temp_dir.path())
-        .output()
-        .expect("Failed to execute validate command");
+    let output = run_validate(&temp_dir, &[]);
 
     // Command should succeed
     assert!(

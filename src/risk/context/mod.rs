@@ -298,6 +298,7 @@ mod tests {
     /// Stress test that simulates analyzing a large codebase like debtmap itself.
     /// This should reproduce stack overflow if recursive DFS is used.
     #[test]
+    #[ignore]
     fn test_large_call_graph_no_stack_overflow() {
         use crate::priority::call_graph::CallGraph;
         use crate::risk::context::critical_path::{CriticalPathAnalyzer, CriticalPathProvider};
@@ -345,6 +346,7 @@ mod tests {
 
     /// Test the full context aggregator with all providers on a large graph
     #[test]
+    #[ignore]
     fn test_context_aggregator_large_codebase() {
         use crate::risk::context::critical_path::{CriticalPathAnalyzer, CriticalPathProvider};
         use crate::risk::context::dependency::{DependencyGraph, DependencyRiskProvider};

@@ -53,13 +53,11 @@ clean:
 
 # Run all tests with nextest for faster execution
 test:
-    cargo build
     @echo "Running tests with cargo nextest..."
-    SKIP_INTEGRATION_TESTS=1 cargo nextest run --lib
-    @echo "Running safe integration tests..."
-    SKIP_INTEGRATION_TESTS=1 cargo nextest run --test analyzer_tests \
-        --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests
+    SKIP_INTEGRATION_TESTS=1 cargo nextest run --lib \
+        --test analyzer_tests --test complexity_tests --test core_metrics_tests \
+        --test debt_tests --test entropy_tests \
+        --status-level fail --final-status-level slow
 
 # Run only the integration tests that don't hang
 test-safe:
@@ -188,6 +186,10 @@ bench:
 # Run ignored tests (including performance tests)
 test-ignored:
     cargo nextest run --run-ignored ignored-only
+
+# Run slow git/context regression tests explicitly
+test-slow:
+    cargo nextest run --run-ignored ignored-only 'risk::context'
 
 # Run performance tests only
 test-perf:
