@@ -138,42 +138,49 @@ impl SignatureExtractor {
 
     /// Detect builder patterns in registered methods
     fn detect_builder_patterns(&mut self) {
-        let mut builders = Vec::new();
+        self.registry
+            .get_all_methods()
+            .filter_map(|(type_name, methods)| Self::detect_builder(type_name, methods))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|builder| self.registry.register_builder(builder));
+    }
 
-        // Find types that have methods returning Self and a build() method
-        for (type_name, methods) in self.registry.get_all_methods() {
-            let chain_methods: Vec<String> = methods
-                .iter()
-                .filter(|m| {
-                    m.return_type.type_name == *type_name || m.return_type.type_name == "Self"
-                })
-                .map(|m| m.name.clone())
-                .collect();
+    fn detect_builder(type_name: &str, methods: &[MethodSignature]) -> Option<BuilderInfo> {
+        let chain_methods = Self::chain_method_names(type_name, methods);
+        let build_method = methods
+            .iter()
+            .find(|method| Self::is_build_method(method))?;
+        let target_type = build_method.return_type.type_name.clone();
 
-            let build_method = methods
-                .iter()
-                .find(|m| m.name == "build" || m.name == "finish" || m.name == "complete");
+        (!chain_methods.is_empty() && Self::returns_distinct_target(type_name, &target_type)).then(
+            || BuilderInfo {
+                builder_type: type_name.to_string(),
+                target_type,
+                build_method: build_method.name.clone(),
+                chain_methods,
+            },
+        )
+    }
 
-            if !chain_methods.is_empty() {
-                if let Some(build_method) = build_method {
-                    let target_type = build_method.return_type.type_name.clone();
+    fn chain_method_names(type_name: &str, methods: &[MethodSignature]) -> Vec<String> {
+        methods
+            .iter()
+            .filter(|method| Self::returns_builder_type(method, type_name))
+            .map(|method| method.name.clone())
+            .collect()
+    }
 
-                    if target_type != *type_name && target_type != "Self" {
-                        builders.push(BuilderInfo {
-                            builder_type: type_name.clone(),
-                            target_type,
-                            build_method: build_method.name.clone(),
-                            chain_methods,
-                        });
-                    }
-                }
-            }
-        }
+    fn returns_builder_type(method: &MethodSignature, type_name: &str) -> bool {
+        method.return_type.type_name == type_name || method.return_type.type_name == "Self"
+    }
 
-        // Register detected builders
-        for builder in builders {
-            self.registry.register_builder(builder);
-        }
+    fn is_build_method(method: &MethodSignature) -> bool {
+        matches!(method.name.as_str(), "build" | "finish" | "complete")
+    }
+
+    fn returns_distinct_target(type_name: &str, target_type: &str) -> bool {
+        target_type != type_name && target_type != "Self"
     }
 
     /// Get the type name from a Type
