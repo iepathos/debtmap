@@ -243,40 +243,67 @@ impl HiddenTypeExtractor {
     /// Analyzes return types from method signatures to find tuples.
     /// Uses syn AST instead of string parsing for correctness.
     pub fn find_tuple_returns(&self, ast: &syn::File) -> Vec<TupleReturn> {
-        let mut tuple_returns = Vec::new();
+        ast.items
+            .iter()
+            .filter_map(Self::as_impl_block)
+            .flat_map(Self::tuple_returns_from_impl)
+            .collect()
+    }
 
-        // Extract from impl blocks
-        for item in &ast.items {
-            if let syn::Item::Impl(impl_block) = item {
-                for impl_item in &impl_block.items {
-                    if let syn::ImplItem::Fn(method) = impl_item {
-                        if let syn::ReturnType::Type(_, ty) = &method.sig.output {
-                            if let syn::Type::Tuple(tuple_type) = ty.as_ref() {
-                                // Found a tuple return
-                                let components =
-                                    tuple_type.elems.iter().map(Self::type_to_string).collect();
-
-                                tuple_returns.push(TupleReturn {
-                                    method_name: method.sig.ident.to_string(),
-                                    tuple_type: format!(
-                                        "({})",
-                                        tuple_type
-                                            .elems
-                                            .iter()
-                                            .map(Self::type_to_string)
-                                            .collect::<Vec<_>>()
-                                            .join(", ")
-                                    ),
-                                    components,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
+    fn as_impl_block(item: &syn::Item) -> Option<&syn::ItemImpl> {
+        match item {
+            syn::Item::Impl(impl_block) => Some(impl_block),
+            _ => None,
         }
+    }
 
-        tuple_returns
+    fn tuple_returns_from_impl(
+        impl_block: &syn::ItemImpl,
+    ) -> impl Iterator<Item = TupleReturn> + '_ {
+        impl_block
+            .items
+            .iter()
+            .filter_map(Self::tuple_return_from_impl_item)
+    }
+
+    fn tuple_return_from_impl_item(impl_item: &syn::ImplItem) -> Option<TupleReturn> {
+        match impl_item {
+            syn::ImplItem::Fn(method) => Self::tuple_return_from_method(method),
+            _ => None,
+        }
+    }
+
+    fn tuple_return_from_method(method: &syn::ImplItemFn) -> Option<TupleReturn> {
+        Self::tuple_type_from_return(&method.sig.output)
+            .map(|tuple_type| Self::build_tuple_return(&method.sig.ident, tuple_type))
+    }
+
+    fn tuple_type_from_return(output: &syn::ReturnType) -> Option<&syn::TypeTuple> {
+        match output {
+            syn::ReturnType::Type(_, ty) => match ty.as_ref() {
+                syn::Type::Tuple(tuple_type) => Some(tuple_type),
+                _ => None,
+            },
+            syn::ReturnType::Default => None,
+        }
+    }
+
+    fn build_tuple_return(method_name: &syn::Ident, tuple_type: &syn::TypeTuple) -> TupleReturn {
+        let components = Self::tuple_components(tuple_type);
+
+        TupleReturn {
+            method_name: method_name.to_string(),
+            tuple_type: Self::format_tuple_components(&components),
+            components,
+        }
+    }
+
+    fn tuple_components(tuple_type: &syn::TypeTuple) -> Vec<String> {
+        tuple_type.elems.iter().map(Self::type_to_string).collect()
+    }
+
+    fn format_tuple_components(components: &[String]) -> String {
+        format!("({})", components.join(", "))
     }
 
     /// Convert syn::Type to string representation
@@ -772,6 +799,56 @@ mod tests {
         assert_eq!(clumps.len(), 1);
         assert_eq!(clumps[0].methods.len(), 3);
         assert_eq!(clumps[0].params.len(), 2);
+    }
+
+    #[test]
+    fn test_find_tuple_returns_from_impl_methods() {
+        let ast = syn::parse_file(
+            r#"
+            fn free_function() -> (usize, String) { todo!() }
+
+            impl Analyzer {
+                fn analyze(&self) -> (f64, Vec<String>, DomainDiversity) {
+                    todo!()
+                }
+
+                fn summarize(&self) -> Summary {
+                    todo!()
+                }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let tuples = HiddenTypeExtractor::new().find_tuple_returns(&ast);
+
+        assert_eq!(tuples.len(), 1);
+        assert_eq!(tuples[0].method_name, "analyze");
+        assert_eq!(
+            tuples[0].tuple_type,
+            "(f64, Vec < String >, DomainDiversity)"
+        );
+        assert_eq!(
+            tuples[0].components,
+            vec!["f64", "Vec < String >", "DomainDiversity"]
+        );
+    }
+
+    #[test]
+    fn test_find_tuple_returns_ignores_non_tuple_outputs() {
+        let ast = syn::parse_file(
+            r#"
+            impl Analyzer {
+                fn default_return(&self) {}
+                fn named_return(&self) -> AnalysisResult { todo!() }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let tuples = HiddenTypeExtractor::new().find_tuple_returns(&ast);
+
+        assert!(tuples.is_empty());
     }
 
     #[test]
