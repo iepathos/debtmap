@@ -6,6 +6,7 @@ use super::limits::apply_limits;
 use super::tests_ctx::extract_test_contexts;
 use super::types::{ContextRelationship, ContextSuggestion, FileRange, RelatedContext};
 use super::types_ctx::extract_type_contexts;
+use crate::organization::DetectionType;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::UnifiedDebtItem;
 use serde::{Deserialize, Serialize};
@@ -50,21 +51,17 @@ pub fn generate_context_suggestion(
     config: &ContextConfig,
 ) -> Option<ContextSuggestion> {
     let primary = extract_primary_scope(item);
-
-    let func_id = FunctionId::new(
-        item.location.file.clone(),
-        item.location.function.clone(),
-        item.location.line,
-    );
+    let scope = collect_scope_function_ids(item, call_graph);
 
     let mut related = Vec::new();
 
     related.push(create_module_header_context(&item.location.file));
 
-    let callers = extract_caller_contexts(&func_id, call_graph, config.max_callers);
+    let callers =
+        extract_caller_contexts(&scope, &item.location.file, call_graph, config.max_callers);
     related.extend(callers.clone());
 
-    let callees = extract_callee_contexts(&func_id, call_graph, config.max_callees);
+    let callees = extract_callee_contexts(&scope, call_graph, config.max_callees);
     related.extend(callees.clone());
 
     if config.include_types {
@@ -97,14 +94,77 @@ pub fn generate_context_suggestion(
     Some(limited)
 }
 
+/// Build the call-graph scope for a debt item.
+///
+/// Function-level items resolve to a single `FunctionId` at
+/// `(file, function, line)` (matched fuzzily by `CallGraph::get_callers` /
+/// `get_callees`). God-object items have no node at the struct's declaration
+/// line, so the scope is built by enumerating member functions instead:
+///
+/// - `GodClass`: every function in the item's file whose name starts with
+///   `"{struct_name}::"` (the qualified-method naming convention used by
+///   the function visitor).
+/// - `GodFile` / `GodModule`: every function in the item's file.
+fn collect_scope_function_ids(item: &UnifiedDebtItem, call_graph: &CallGraph) -> Vec<FunctionId> {
+    use crate::organization::DetectionType;
+
+    if let Some(god) = item.god_object_indicators.as_ref() {
+        match god.detection_type {
+            DetectionType::GodClass => {
+                if let Some(struct_name) =
+                    god.struct_name.as_deref().filter(|name| !name.is_empty())
+                {
+                    let prefix = format!("{}::", struct_name);
+                    let scope: Vec<FunctionId> = call_graph
+                        .get_all_functions()
+                        .filter(|f| f.file == item.location.file && f.name.starts_with(&prefix))
+                        .cloned()
+                        .collect();
+                    if !scope.is_empty() {
+                        return scope;
+                    }
+                }
+                fallback_single_function_id(item)
+            }
+            DetectionType::GodFile | DetectionType::GodModule => {
+                let scope: Vec<FunctionId> = call_graph
+                    .get_all_functions()
+                    .filter(|f| f.file == item.location.file)
+                    .cloned()
+                    .collect();
+                if scope.is_empty() {
+                    fallback_single_function_id(item)
+                } else {
+                    scope
+                }
+            }
+        }
+    } else {
+        fallback_single_function_id(item)
+    }
+}
+
+fn fallback_single_function_id(item: &UnifiedDebtItem) -> Vec<FunctionId> {
+    vec![FunctionId::new(
+        item.location.file.clone(),
+        item.location.function.clone(),
+        item.location.line,
+    )]
+}
+
 fn extract_primary_scope(item: &UnifiedDebtItem) -> FileRange {
-    let start_line = item.location.line.saturating_sub(2) as u32;
+    if let Some(scope) = extract_god_class_primary_scope(item) {
+        return scope;
+    }
+
+    let start_line = item.location.line.saturating_sub(2).max(1) as u32;
 
     let end_line = if item.function_length > 0 {
         start_line + item.function_length as u32 + 2
     } else {
         start_line + (item.cyclomatic_complexity * 3).max(20)
     };
+    let end_line = clamp_to_file_line_count(end_line, item.file_line_count);
 
     FileRange {
         file: item.location.file.clone(),
@@ -112,6 +172,32 @@ fn extract_primary_scope(item: &UnifiedDebtItem) -> FileRange {
         end_line,
         symbol: Some(item.location.function.clone()),
     }
+}
+
+fn extract_god_class_primary_scope(item: &UnifiedDebtItem) -> Option<FileRange> {
+    let god_object = item.god_object_indicators.as_ref()?;
+    if god_object.detection_type != DetectionType::GodClass {
+        return None;
+    }
+
+    let location = god_object.struct_location.as_ref()?;
+    let start_line = location.line.saturating_sub(2).max(1) as u32;
+    let end_line = location.end_line.unwrap_or(location.line) as u32 + 2;
+    let end_line = clamp_to_file_line_count(end_line, item.file_line_count);
+
+    Some(FileRange {
+        file: item.location.file.clone(),
+        start_line,
+        end_line,
+        symbol: Some(item.location.function.clone()),
+    })
+}
+
+fn clamp_to_file_line_count(end_line: u32, file_line_count: Option<usize>) -> u32 {
+    file_line_count
+        .and_then(|count| u32::try_from(count).ok())
+        .filter(|count| *count > 0)
+        .map_or(end_line, |count| end_line.min(count))
 }
 
 fn create_module_header_context(file: &std::path::Path) -> RelatedContext {

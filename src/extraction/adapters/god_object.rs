@@ -17,6 +17,7 @@
 //!   type/trait names as responsibilities.
 //! - **Composable pipeline**: Pure helper functions that can be unit tested independently.
 
+use crate::common::{LocationConfidence, SourceLocation};
 use crate::extraction::responsibilities::file_responsibility_groups;
 use crate::extraction::types::{ExtractedFileData, ExtractedImplData, ExtractedStructData};
 use crate::organization::god_object::classifier::{
@@ -221,6 +222,7 @@ fn build_file_level_splits(responsibilities: &HashMap<String, Vec<String>>) -> V
 /// Spec 217: Includes trait method summary for recommendations.
 fn build_god_object_analysis(
     struct_data: &ExtractedStructData,
+    impl_blocks: &[&ExtractedImplData],
     metrics: &StructMetrics,
     responsibilities: HashMap<String, Vec<String>>,
     production_lines: usize,
@@ -283,7 +285,7 @@ fn build_god_object_analysis(
         detection_type: DetectionType::GodClass,
         struct_name: Some(struct_data.name.clone()),
         struct_line: Some(struct_data.line),
-        struct_location: None,
+        struct_location: Some(god_class_source_location(struct_data, impl_blocks)),
         visibility_breakdown: None, // Would need per-struct visibility tracking
         domain_count: 0,
         domain_diversity: 0.0,
@@ -302,6 +304,27 @@ fn build_god_object_analysis(
         } else {
             None
         }, // Spec 217
+    }
+}
+
+fn god_class_source_location(
+    struct_data: &ExtractedStructData,
+    impl_blocks: &[&ExtractedImplData],
+) -> SourceLocation {
+    let end_line = impl_blocks
+        .iter()
+        .flat_map(|block| {
+            std::iter::once(block.line).chain(block.methods.iter().map(|method| method.line))
+        })
+        .max()
+        .filter(|line| *line > struct_data.line);
+
+    SourceLocation {
+        line: struct_data.line,
+        column: None,
+        end_line,
+        end_column: None,
+        confidence: LocationConfidence::Approximate,
     }
 }
 
@@ -379,6 +402,7 @@ pub fn analyze_god_objects_with_thresholds(
             // Spec 214: Use production LOC (excluding test code)
             Some(build_god_object_analysis(
                 struct_data,
+                impl_blocks,
                 &metrics,
                 responsibilities,
                 extracted.production_lines(),
@@ -1168,6 +1192,18 @@ mod tests {
         // Should be ActualGodObject, not FirstButSmall
         assert_eq!(results[0].struct_name, Some("ActualGodObject".to_string()));
         assert_eq!(results[0].struct_line, Some(200));
+        assert_eq!(
+            results[0].struct_location.as_ref().map(|loc| loc.line),
+            Some(200)
+        );
+        assert_eq!(
+            results[0]
+                .struct_location
+                .as_ref()
+                .and_then(|loc| loc.end_line),
+            Some(395),
+            "GodClass source span should end at the last method line for the detected struct"
+        );
     }
 
     #[test]

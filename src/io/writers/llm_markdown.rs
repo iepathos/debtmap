@@ -34,12 +34,16 @@ use std::io::Write;
 pub mod format {
     use super::*;
     use crate::output::unified::{ContextSuggestionOutput, PurityAnalysis, UnifiedLocation};
-    use crate::priority::FunctionRole;
+    use crate::priority::{DebtType, FunctionRole};
 
     /// Format all sections for a function item.
     pub fn function_item_sections(item: &FunctionDebtItemOutput) -> Vec<String> {
         [
-            Some(identification(&item.location, &item.category)),
+            Some(identification(
+                &item.location,
+                &item.category,
+                &item.debt_type,
+            )),
             Some(severity(item.score, &item.priority)),
             Some(metrics(&item.metrics, item.adjusted_complexity.as_ref())),
             coverage(&item.metrics),
@@ -55,8 +59,28 @@ pub mod format {
         .collect()
     }
 
-    /// Format identification section for a function item
-    pub fn identification(location: &UnifiedLocation, category: &str) -> String {
+    /// Pure helper: derive the `Type:` label for the Identification section
+    /// from the item's `DebtType`.
+    ///
+    /// God-object debt items are architectural debt scoped to a struct or
+    /// file/module, not a single function. Emitting `Function` for them
+    /// misleads downstream consumers; this returns `"GodObject"` instead.
+    pub fn identification_type_label(debt_type: &DebtType) -> &'static str {
+        match debt_type {
+            DebtType::GodObject { .. } => "GodObject",
+            _ => "Function",
+        }
+    }
+
+    /// Format identification section for a function item.
+    ///
+    /// `debt_type` is used to derive the `Type:` label so that god-object
+    /// items render as `Type: GodObject` rather than `Type: Function`.
+    pub fn identification(
+        location: &UnifiedLocation,
+        category: &str,
+        debt_type: &DebtType,
+    ) -> String {
         let mut out = String::new();
         writeln!(out, "#### Identification").unwrap();
         writeln!(
@@ -65,7 +89,7 @@ pub mod format {
             super::generate_item_id(&location.file, location.line)
         )
         .unwrap();
-        writeln!(out, "- Type: Function").unwrap();
+        writeln!(out, "- Type: {}", identification_type_label(debt_type)).unwrap();
         writeln!(
             out,
             "- Location: {}:{}",
@@ -1315,5 +1339,109 @@ mod tests {
         assert_eq!(format::architectural_insight("Unknown"), None);
         assert_eq!(format::architectural_insight("SomeOtherClass"), None);
         assert_eq!(format::architectural_insight(""), None);
+    }
+
+    // =========================================================================
+    // Tests for debt-type-aware Identification rendering
+    //
+    // The Identification block previously hard-coded `- Type: Function` for
+    // every debt item, including god objects (which are architectural,
+    // file/struct-level debt). That mislabel makes downstream consumers (LLMs,
+    // dashboards) treat a 1750-line GodClass item as if it were a single
+    // 1750-line function with cyclomatic complexity 157.
+    // =========================================================================
+
+    fn make_test_function_item(debt_type: crate::priority::DebtType) -> FunctionDebtItemOutput {
+        use crate::output::unified::{
+            Dependencies, FunctionImpactOutput, FunctionMetricsOutput, Priority, UnifiedLocation,
+        };
+        use crate::priority::FunctionRole;
+
+        FunctionDebtItemOutput {
+            score: 80.0,
+            category: "Architecture".to_string(),
+            priority: Priority::High,
+            location: UnifiedLocation {
+                file: "src/builders/parallel_unified_analysis.rs".to_string(),
+                line: Some(503),
+                function: Some("ParallelUnifiedAnalysisBuilder".to_string()),
+                file_context_label: None,
+            },
+            metrics: FunctionMetricsOutput {
+                cyclomatic_complexity: 12,
+                cognitive_complexity: 18,
+                length: 1750,
+                nesting_depth: 2,
+                ..Default::default()
+            },
+            debt_type,
+            function_role: FunctionRole::PureLogic,
+            purity_analysis: None,
+            dependencies: Dependencies::default(),
+            impact: FunctionImpactOutput {
+                coverage_improvement: 0.0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            scoring_details: None,
+            adjusted_complexity: None,
+            complexity_pattern: None,
+            pattern_type: None,
+            pattern_confidence: None,
+            pattern_details: None,
+            context: None,
+            git_history: None,
+        }
+    }
+
+    #[test]
+    fn identification_emits_godobject_type_for_god_object_debt_items() {
+        use crate::priority::DebtType;
+
+        let item = make_test_function_item(DebtType::GodObject {
+            methods: 50,
+            fields: Some(10),
+            responsibilities: 5,
+            god_object_score: 89.0,
+            lines: 1750,
+        });
+
+        let mut buffer = Vec::new();
+        let mut writer = LlmMarkdownWriter::new(&mut buffer);
+        writer.write_function_item(&item).unwrap();
+        let markdown = String::from_utf8(buffer).unwrap();
+
+        assert!(
+            markdown.contains("- Type: GodObject"),
+            "GodObject debt items must be labeled `Type: GodObject`, got:\n{markdown}"
+        );
+        assert!(
+            !markdown.contains("- Type: Function"),
+            "GodObject debt items must not be mislabeled as Function:\n{markdown}"
+        );
+    }
+
+    #[test]
+    fn identification_keeps_function_type_for_function_level_debt() {
+        use crate::priority::DebtType;
+
+        let item = make_test_function_item(DebtType::ComplexityHotspot {
+            cyclomatic: 25,
+            cognitive: 30,
+        });
+
+        let mut buffer = Vec::new();
+        let mut writer = LlmMarkdownWriter::new(&mut buffer);
+        writer.write_function_item(&item).unwrap();
+        let markdown = String::from_utf8(buffer).unwrap();
+
+        assert!(
+            markdown.contains("- Type: Function"),
+            "Function-level debt items must remain labeled `Type: Function`, got:\n{markdown}"
+        );
+        assert!(
+            !markdown.contains("- Type: GodObject"),
+            "Non-god-object items must not be labeled GodObject:\n{markdown}"
+        );
     }
 }

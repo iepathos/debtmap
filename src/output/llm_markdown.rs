@@ -267,14 +267,21 @@ fn write_location_group<W: Write>(
     writeln!(writer, "### Item {}", index)?;
     writeln!(writer)?;
 
-    // Identification section (shared across all items at this location)
+    // Identification section (shared across all items at this location).
+    // The Type label is derived from the representative item's debt_type so
+    // that god-object groups render as `Type: GodObject` rather than the
+    // legacy hard-coded `Type: Function`.
     writeln!(writer, "#### Identification")?;
     writeln!(
         writer,
         "- ID: {}",
         generate_item_id(&rep.location.file, rep.location.line)
     )?;
-    writeln!(writer, "- Type: Function")?;
+    writeln!(
+        writer,
+        "- Type: {}",
+        format::identification_type_label(&rep.debt_type)
+    )?;
     writeln!(
         writer,
         "- Location: {}:{}",

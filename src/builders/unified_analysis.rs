@@ -792,16 +792,16 @@ fn build_god_object_item(
     call_graph: &CallGraph,
 ) -> (UnifiedDebtItem, crate::organization::GodObjectAnalysis) {
     use crate::priority::context::{generate_context_suggestion, ContextConfig};
-    use crate::priority::god_object_aggregation::{
-        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
-    };
+    use crate::priority::god_object_aggregation::aggregate_god_object_metrics_with_coverage;
 
-    let mut aggregated = aggregate_from_raw_metrics(&processed.raw_functions);
-
-    if let Some(lcov) = coverage_data {
-        aggregated.weighted_coverage =
-            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
-    }
+    // Scope aggregation to the detected god object's methods (GodClass) or
+    // keep file-wide aggregation for GodFile/GodModule. See
+    // `filter_god_object_member_metrics` for the scoping rule.
+    let mut aggregated = aggregate_god_object_metrics_with_coverage(
+        &processed.raw_functions,
+        god_analysis,
+        coverage_data,
+    );
 
     if let Some(analyzer) = risk_analyzer {
         aggregated.aggregated_contextual_risk = core::phases::god_object::analyze_file_git_context(

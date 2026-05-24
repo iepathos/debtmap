@@ -1,24 +1,40 @@
 //! Callee context extraction (Spec 263).
+//!
+//! See `callers.rs` for the rationale behind taking a scope (`&[FunctionId]`)
+//! instead of a single `FunctionId`. Edges that stay inside the scope are
+//! filtered as they represent internal cohesion, not external dependency.
 
 use super::types::{ContextRelationship, FileRange, RelatedContext};
 use crate::priority::call_graph::{CallGraph, FunctionId};
+use std::collections::HashSet;
 
+/// Extract callee context entries for a debt item's call-graph scope.
+///
+/// `scope` is the set of `FunctionId`s the debt item represents. Trivial
+/// callees (e.g. simple accessors, `clone`/`unwrap`) are filtered, and
+/// internal cross-edges are excluded so that god-object items only surface
+/// genuinely external dependencies.
 pub fn extract_callee_contexts(
-    func_id: &FunctionId,
+    scope: &[FunctionId],
     call_graph: &CallGraph,
     max_callees: u32,
 ) -> Vec<RelatedContext> {
-    let callees = call_graph.get_callees(func_id);
+    let scope_set: HashSet<&FunctionId> = scope.iter().collect();
 
-    let non_trivial: Vec<_> = callees
+    let mut external_callees: Vec<FunctionId> = scope
         .iter()
-        .filter(|callee_id| !is_trivial_callee(callee_id))
+        .flat_map(|fid| call_graph.get_callees(fid))
+        .filter(|callee| !scope_set.contains(callee))
+        .filter(|callee| !is_trivial_callee(callee))
         .collect();
 
-    non_trivial
+    external_callees.sort();
+    external_callees.dedup();
+
+    external_callees
         .into_iter()
         .take(max_callees as usize)
-        .map(create_callee_context)
+        .map(|callee| create_callee_context(&callee))
         .collect()
 }
 

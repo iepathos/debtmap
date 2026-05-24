@@ -245,10 +245,12 @@ pub fn extract_item_as_llm_markdown(item: &UnifiedDebtItem) -> String {
     // Header (no item number since we're extracting a single item)
     result.push_str("### Debt Item\n\n");
 
-    // Identification section
+    // Identification section (debt-type-aware: god-object items render as
+    // `Type: GodObject` rather than `Type: Function`).
     result.push_str(&format::identification(
         &output_item.location,
         &output_item.category,
+        &output_item.debt_type,
     ));
     result.push('\n');
 

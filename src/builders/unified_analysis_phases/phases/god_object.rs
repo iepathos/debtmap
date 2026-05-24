@@ -134,7 +134,7 @@ pub fn create_god_object_debt_item(
         language_specific: None,
         detected_pattern: None,
         contextual_risk: aggregated_metrics.aggregated_contextual_risk,
-        file_line_count: Some(god_analysis.lines_of_code),
+        file_line_count: Some(file_metrics.total_lines),
         responsibility_category: god_analysis.responsibilities.first().cloned(),
         error_swallowing_count: None,
         error_swallowing_patterns: None,
@@ -672,6 +672,33 @@ mod tests {
             score.final_score < 200.0,
             "contextual risk should amplify the composite score, not the raw detector score: {}",
             score.final_score
+        );
+    }
+
+    #[test]
+    fn test_god_object_item_uses_file_total_lines_for_context_bounds() {
+        let mut analysis = create_test_god_analysis();
+        analysis.lines_of_code = 1750;
+        let file_metrics = FileDebtMetrics {
+            total_lines: 1874,
+            ..Default::default()
+        };
+        let aggregated_metrics = create_test_aggregated_metrics(157, 106);
+
+        let item = create_god_object_debt_item(
+            Path::new("src/builders/parallel_unified_analysis.rs"),
+            &file_metrics,
+            &analysis,
+            aggregated_metrics,
+            None,
+            None,
+        );
+
+        assert_eq!(item.function_length, 1750);
+        assert_eq!(
+            item.file_line_count,
+            Some(1874),
+            "Context bounds must use source file lines, not production LOC"
         );
     }
 

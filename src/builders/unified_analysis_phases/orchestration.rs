@@ -253,18 +253,16 @@ fn process_god_object(
     ctx: &GodObjectProcessingContext<'_>,
 ) -> GodObjectProcessingResult {
     use crate::priority::context::{generate_context_suggestion, ContextConfig};
-    use crate::priority::god_object_aggregation::{
-        aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
-    };
+    use crate::priority::god_object_aggregation::aggregate_god_object_metrics_with_coverage;
 
-    // Aggregate metrics from raw functions (pure)
-    let mut aggregated_metrics = aggregate_from_raw_metrics(&processed.raw_functions);
-
-    // Aggregate coverage
-    if let Some(lcov) = ctx.coverage_data {
-        aggregated_metrics.weighted_coverage =
-            aggregate_coverage_from_raw_metrics(&processed.raw_functions, lcov);
-    }
+    // Aggregate metrics from raw functions (pure), scoped to the god object's
+    // detection type. GodClass scopes to the detected struct's methods;
+    // GodFile/GodModule continue to aggregate file-wide.
+    let mut aggregated_metrics = aggregate_god_object_metrics_with_coverage(
+        &processed.raw_functions,
+        god_analysis,
+        ctx.coverage_data,
+    );
 
     // Analyze file git context
     if let Some(analyzer) = ctx.risk_analyzer {

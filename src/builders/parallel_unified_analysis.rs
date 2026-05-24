@@ -1486,6 +1486,7 @@ impl ParallelUnifiedAnalysisBuilder {
             unified,
             &file_item.metrics.path,
             raw_functions,
+            god_analysis,
             coverage_data,
         );
         let god_analysis = crate::builders::unified_analysis_phases::phases::god_object::
@@ -1511,17 +1512,20 @@ impl ParallelUnifiedAnalysisBuilder {
         unified: &UnifiedAnalysis,
         file_path: &Path,
         raw_functions: &[FunctionMetrics],
+        god_analysis: &crate::organization::GodObjectAnalysis,
         coverage_data: Option<&LcovData>,
     ) -> crate::priority::god_object_aggregation::GodObjectAggregatedMetrics {
-        use crate::priority::god_object_aggregation::{
-            aggregate_coverage_from_raw_metrics, aggregate_from_raw_metrics,
-        };
-
-        let mut aggregated = aggregate_from_raw_metrics(raw_functions);
-
-        if let Some(lcov) = coverage_data {
-            aggregated.weighted_coverage = aggregate_coverage_from_raw_metrics(raw_functions, lcov);
-        }
+        // Scope aggregation to the detected god object:
+        // - GodClass: only methods of the detected struct.
+        // - GodFile/GodModule: every function in the file.
+        // Without this scoping, GodClass items inflate complexity, dependencies,
+        // and coverage with unrelated functions in the same file.
+        let mut aggregated =
+            crate::priority::god_object_aggregation::aggregate_god_object_metrics_with_coverage(
+                raw_functions,
+                god_analysis,
+                coverage_data,
+            );
 
         aggregated.aggregated_contextual_risk = self
             .file_contextual_risk(file_path)

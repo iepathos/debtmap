@@ -432,15 +432,27 @@ pub fn aggregate_error_swallowing(functions: &[FunctionMetrics]) -> (u32, Vec<St
 pub fn aggregate_dependency_metrics_from_raw(
     functions: &[FunctionMetrics],
 ) -> (Vec<String>, Vec<String>, usize, usize) {
+    let internal_members = build_internal_member_set(functions);
+
     let mut unique_callers: HashSet<String> = HashSet::new();
     let mut unique_callees: HashSet<String> = HashSet::new();
 
     for func in functions {
         if let Some(ref callers) = func.upstream_callers {
-            unique_callers.extend(callers.iter().cloned());
+            unique_callers.extend(
+                callers
+                    .iter()
+                    .filter(|caller| !internal_members.contains(*caller))
+                    .cloned(),
+            );
         }
         if let Some(ref callees) = func.downstream_callees {
-            unique_callees.extend(callees.iter().cloned());
+            unique_callees.extend(
+                callees
+                    .iter()
+                    .filter(|callee| !internal_members.contains(*callee))
+                    .cloned(),
+            );
         }
     }
 
@@ -453,6 +465,23 @@ pub fn aggregate_dependency_metrics_from_raw(
         upstream_count,
         downstream_count,
     )
+}
+
+/// Build the set of caller/callee strings that point to scope members.
+///
+/// Caller and callee strings produced by `format_function_name` follow the
+/// `{file_basename}:{name}` convention. For a god-object scope, every member
+/// function in the scope produces such a string, and any caller/callee
+/// matching one of those strings is internal cohesion (not external coupling)
+/// and must be filtered from the architectural dependency view.
+fn build_internal_member_set(functions: &[FunctionMetrics]) -> HashSet<String> {
+    functions
+        .iter()
+        .filter_map(|func| {
+            let basename = func.file.file_name().and_then(|n| n.to_str())?;
+            Some(format!("{}:{}", basename, func.name))
+        })
+        .collect()
 }
 
 /// Compute weighted average from (value, weight) pairs.
@@ -697,6 +726,110 @@ pub fn aggregate_coverage_from_raw_metrics(
     })
 }
 
+/// Filter raw FunctionMetrics to those that belong to the god object's scope.
+///
+/// For [`DetectionType::GodClass`](crate::organization::DetectionType::GodClass)
+/// detections, this returns only the methods (and any closures defined inside
+/// those methods) that belong to the detected struct, identified by the
+/// qualified-name prefix `"{struct_name}::"`.
+///
+/// For [`DetectionType::GodFile`](crate::organization::DetectionType::GodFile)
+/// and [`DetectionType::GodModule`](crate::organization::DetectionType::GodModule),
+/// the entire function set is returned because the scope of those detections is
+/// already file/module-level.
+///
+/// Without this filter, a `GodClass` would aggregate cyclomatic/cognitive
+/// complexity, dependencies, coverage, and distribution metrics across every
+/// function in the same file — including unrelated structs and free functions.
+/// That conflates per-struct architectural debt with file-level totals and
+/// inflates the reported metrics for a `GodClass` debt item.
+///
+/// # Examples
+///
+/// ```ignore
+/// // file containing struct `Builder` plus an unrelated helper struct and free fn
+/// let scoped = filter_god_object_member_metrics(&all_funcs, &god_analysis);
+/// // For GodClass(struct_name = "Builder"), `scoped` contains only Builder::*.
+/// ```
+pub fn filter_god_object_member_metrics<'a>(
+    functions: &'a [FunctionMetrics],
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) -> Vec<&'a FunctionMetrics> {
+    use crate::organization::DetectionType;
+
+    match god_analysis.detection_type {
+        DetectionType::GodClass => match god_analysis.struct_name.as_deref() {
+            Some(struct_name) if !struct_name.is_empty() => {
+                let prefix = format!("{}::", struct_name);
+                functions
+                    .iter()
+                    .filter(|f| f.name.starts_with(&prefix))
+                    .collect()
+            }
+            // Defensive: if struct_name is missing for a GodClass, fall back to
+            // file-wide aggregation rather than dropping all metrics silently.
+            _ => functions.iter().collect(),
+        },
+        DetectionType::GodFile | DetectionType::GodModule => functions.iter().collect(),
+    }
+}
+
+/// Aggregate metrics directly from raw FunctionMetrics scoped to the god object.
+///
+/// This is the preferred entry point for god-object metric aggregation: it first
+/// filters `functions` via [`filter_god_object_member_metrics`] so that
+/// `GodClass` detections aggregate only over the detected struct's methods, and
+/// `GodFile`/`GodModule` detections continue to aggregate file-wide.
+///
+/// Coverage is NOT aggregated here. Pair this with
+/// [`aggregate_coverage_from_raw_metrics`] using the same scoped slice (see
+/// [`scoped_member_metrics`]) — or use
+/// [`aggregate_god_object_metrics_with_coverage`] which does both passes
+/// together.
+pub fn aggregate_god_object_from_raw_metrics(
+    functions: &[FunctionMetrics],
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) -> GodObjectAggregatedMetrics {
+    let scoped = scoped_member_metrics(functions, god_analysis);
+    aggregate_from_raw_metrics(&scoped)
+}
+
+/// Aggregate scoped god-object metrics including coverage, using a single
+/// scoped slice for both the structural aggregation and the coverage pass.
+///
+/// This is the recommended entry point for god-object debt item construction.
+/// It guarantees that complexity, dependencies, and coverage are all computed
+/// against the same scoped function set (`GodClass` -> struct methods,
+/// `GodFile`/`GodModule` -> all file functions).
+pub fn aggregate_god_object_metrics_with_coverage(
+    functions: &[FunctionMetrics],
+    god_analysis: &crate::organization::GodObjectAnalysis,
+    coverage_data: Option<&LcovData>,
+) -> GodObjectAggregatedMetrics {
+    let scoped = scoped_member_metrics(functions, god_analysis);
+    let mut aggregated = aggregate_from_raw_metrics(&scoped);
+    if let Some(lcov) = coverage_data {
+        aggregated.weighted_coverage = aggregate_coverage_from_raw_metrics(&scoped, lcov);
+    }
+    aggregated
+}
+
+/// Convenience helper that returns owned, scoped function metrics for use with
+/// both [`aggregate_from_raw_metrics`] and [`aggregate_coverage_from_raw_metrics`].
+///
+/// Equivalent to `filter_god_object_member_metrics(...).cloned().collect()` but
+/// expresses intent at call sites that need to share the scoped slice across
+/// multiple aggregation passes.
+pub fn scoped_member_metrics(
+    functions: &[FunctionMetrics],
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) -> Vec<FunctionMetrics> {
+    filter_god_object_member_metrics(functions, god_analysis)
+        .into_iter()
+        .cloned()
+        .collect()
+}
+
 /// Aggregate metrics directly from raw FunctionMetrics (for ALL functions including tests).
 ///
 /// This function aggregates complexity and dependencies from raw function metrics
@@ -707,6 +840,13 @@ pub fn aggregate_coverage_from_raw_metrics(
 ///
 /// Note: Coverage is NOT aggregated here. Use `aggregate_coverage_from_raw_metrics`
 /// separately with LCOV data for coverage metrics.
+///
+/// **Note on god-object aggregation**: callers that already know they are
+/// aggregating over a god object should prefer
+/// [`aggregate_god_object_from_raw_metrics`] (or first scope the slice with
+/// [`scoped_member_metrics`]). Passing all file functions to this function for
+/// a `GodClass` detection conflates the struct's metrics with unrelated
+/// functions in the same file.
 pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAggregatedMetrics {
     let total_cyclomatic = functions.iter().map(|f| f.cyclomatic).sum();
     let total_cognitive = functions.iter().map(|f| f.cognitive).sum();
@@ -1606,6 +1746,119 @@ mod tests {
     }
 
     #[test]
+    fn test_aggregate_dependency_metrics_filters_internal_callers() {
+        // GodFile aggregation must not surface internal cross-edges as
+        // external callers/callees: a function inside the scope calling
+        // another function inside the same scope is cohesion, not coupling.
+        // Caller/callee strings follow the `{file_basename}:{name}` format
+        // produced by `format_function_name`.
+        let functions = vec![
+            FunctionMetrics {
+                name: "func1".to_string(),
+                file: PathBuf::from("src/foo/classifier.rs"),
+                line: 10,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 1,
+                length: 50,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: Some(vec![
+                    // Internal: same file, scope member
+                    "classifier.rs:func2".to_string(),
+                    // External: different file
+                    "external.rs:caller".to_string(),
+                ]),
+                downstream_callees: Some(vec![
+                    // Internal: same file, scope member
+                    "classifier.rs:func2".to_string(),
+                    // External: different file
+                    "lib.rs:helper".to_string(),
+                ]),
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+                entropy_analysis: None,
+            },
+            FunctionMetrics {
+                name: "func2".to_string(),
+                file: PathBuf::from("src/foo/classifier.rs"),
+                line: 30,
+                cyclomatic: 3,
+                cognitive: 5,
+                nesting: 1,
+                length: 30,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                // Internal back-reference; must not count as external caller.
+                upstream_callers: Some(vec!["classifier.rs:func1".to_string()]),
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+                error_swallowing_count: None,
+                error_swallowing_patterns: None,
+                entropy_analysis: None,
+            },
+        ];
+
+        let (callers, callees, upstream_count, downstream_count) =
+            aggregate_dependency_metrics_from_raw(&functions);
+
+        assert!(
+            !callers.contains(&"classifier.rs:func1".to_string()),
+            "Internal scope-member caller must be filtered, got {callers:?}"
+        );
+        assert!(
+            !callers.contains(&"classifier.rs:func2".to_string()),
+            "Internal scope-member caller must be filtered, got {callers:?}"
+        );
+        assert!(
+            callers.contains(&"external.rs:caller".to_string()),
+            "External callers must be retained, got {callers:?}"
+        );
+        assert_eq!(
+            upstream_count, 1,
+            "Only the external caller should be counted, got {upstream_count}"
+        );
+
+        assert!(
+            !callees.contains(&"classifier.rs:func2".to_string()),
+            "Internal scope-member callee must be filtered, got {callees:?}"
+        );
+        assert!(
+            callees.contains(&"lib.rs:helper".to_string()),
+            "External callees must be retained, got {callees:?}"
+        );
+        assert_eq!(
+            downstream_count, 1,
+            "Only the external callee should be counted, got {downstream_count}"
+        );
+    }
+
+    #[test]
     fn test_aggregate_from_raw_metrics_includes_dependencies() {
         let functions = vec![FunctionMetrics {
             name: "func1".to_string(),
@@ -2020,5 +2273,280 @@ mod tests {
         assert_eq!(dist.function_count, 1);
         assert_eq!(dist.max_complexity, 10);
         assert_eq!(dist.production_loc, 100);
+    }
+
+    // =========================================================================
+    // Tests for god-object scoping (filter_god_object_member_metrics)
+    //
+    // These tests demonstrate that GodClass aggregation must be scoped to the
+    // detected struct's methods. Without scoping, metrics for a GodClass debt
+    // item include cyclomatic/cognitive/dependencies of every other function
+    // in the same file, inflating reported complexity and blast radius.
+    // =========================================================================
+
+    /// Build a minimal `FunctionMetrics` with only the fields the scoping
+    /// filter and aggregator inspect.
+    fn raw_fn(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("src/foo.rs"),
+            line: 1,
+            cyclomatic,
+            cognitive,
+            nesting: 1,
+            length: 20,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        }
+    }
+
+    fn raw_fn_with_deps(
+        name: &str,
+        cyclomatic: u32,
+        cognitive: u32,
+        upstream: Vec<&str>,
+        downstream: Vec<&str>,
+    ) -> FunctionMetrics {
+        let mut metrics = raw_fn(name, cyclomatic, cognitive);
+        metrics.upstream_callers = Some(upstream.into_iter().map(String::from).collect());
+        metrics.downstream_callees = Some(downstream.into_iter().map(String::from).collect());
+        metrics
+    }
+
+    fn god_class_for(struct_name: &str) -> crate::organization::GodObjectAnalysis {
+        use crate::organization::{
+            DetectionType, GodObjectAnalysis, GodObjectConfidence, SplitAnalysisMethod,
+        };
+        GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 0,
+            weighted_method_count: None,
+            field_count: 0,
+            responsibility_count: 0,
+            lines_of_code: 0,
+            complexity_sum: 0,
+            god_object_score: 0.0,
+            recommended_splits: Vec::new(),
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: Vec::new(),
+            responsibility_method_counts: std::collections::HashMap::new(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodClass,
+            struct_name: Some(struct_name.to_string()),
+            struct_line: Some(1),
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        }
+    }
+
+    fn god_file() -> crate::organization::GodObjectAnalysis {
+        use crate::organization::DetectionType;
+        let mut analysis = god_class_for("ignored");
+        analysis.detection_type = DetectionType::GodFile;
+        analysis.struct_name = None;
+        analysis
+    }
+
+    #[test]
+    fn filter_godclass_keeps_only_struct_methods() {
+        let functions = vec![
+            raw_fn("Builder::new", 2, 3),
+            raw_fn("Builder::execute_phase1", 15, 30),
+            // Closures inside Builder methods preserve the parent prefix
+            // (see analyzers/rust/visitor/closure_analysis::generate_closure_name).
+            raw_fn("Builder::execute_phase1::<closure@0>", 5, 8),
+            raw_fn("OtherStruct::heavy_method", 200, 300),
+            raw_fn("free_helper", 50, 60),
+            raw_fn("module::nested::helper", 12, 15),
+        ];
+        let analysis = god_class_for("Builder");
+
+        let scoped = filter_god_object_member_metrics(&functions, &analysis);
+
+        let names: Vec<&str> = scoped.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec![
+                "Builder::new",
+                "Builder::execute_phase1",
+                "Builder::execute_phase1::<closure@0>",
+            ],
+            "GodClass scoping must keep only methods of the detected struct"
+        );
+    }
+
+    #[test]
+    fn filter_godclass_does_not_match_substring_or_other_struct_with_shared_prefix() {
+        let functions = vec![
+            raw_fn("BuilderExtra::work", 9, 9), // shares 'Builder' prefix but is a different type
+            raw_fn("Builder::ok", 1, 1),
+        ];
+        let analysis = god_class_for("Builder");
+
+        let scoped = filter_god_object_member_metrics(&functions, &analysis);
+
+        let names: Vec<&str> = scoped.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["Builder::ok"],
+            "Scoping must require an exact `Struct::` separator, not a substring"
+        );
+    }
+
+    #[test]
+    fn filter_godfile_returns_all_functions() {
+        let functions = vec![
+            raw_fn("A::method", 1, 1),
+            raw_fn("free_fn", 2, 2),
+            raw_fn("B::other", 3, 3),
+        ];
+        let analysis = god_file();
+
+        let scoped = filter_god_object_member_metrics(&functions, &analysis);
+
+        assert_eq!(
+            scoped.len(),
+            functions.len(),
+            "GodFile detection aggregates over the whole file"
+        );
+    }
+
+    #[test]
+    fn filter_godclass_without_struct_name_falls_back_to_all() {
+        let mut analysis = god_class_for("Builder");
+        analysis.struct_name = None;
+
+        let functions = vec![raw_fn("anything", 1, 1)];
+
+        let scoped = filter_god_object_member_metrics(&functions, &analysis);
+
+        assert_eq!(
+            scoped.len(),
+            1,
+            "Defensive fallback when struct_name is missing must not drop all metrics"
+        );
+    }
+
+    /// Demonstrates the bug: a `GodClass` should report only the struct's
+    /// cyclomatic complexity, not the file-wide sum.
+    ///
+    /// With unscoped aggregation (the previous behavior of feeding every raw
+    /// `FunctionMetrics` to `aggregate_from_raw_metrics`), a GodClass for
+    /// `Builder` whose only method has cyclomatic=10 would report 260 because
+    /// the file also contains an unrelated `OtherStruct::heavy_method` with
+    /// cyclomatic=200 and a free helper with cyclomatic=50.
+    #[test]
+    fn aggregate_god_object_scoped_to_godclass_struct_methods() {
+        let functions = vec![
+            raw_fn("Builder::method_one", 10, 12),
+            raw_fn("OtherStruct::heavy_method", 200, 250),
+            raw_fn("free_helper", 50, 60),
+        ];
+        let analysis = god_class_for("Builder");
+
+        let aggregated = aggregate_god_object_from_raw_metrics(&functions, &analysis);
+
+        assert_eq!(
+            aggregated.total_cyclomatic, 10,
+            "GodClass cyclomatic must scope to struct methods (not 260 from whole file)"
+        );
+        assert_eq!(
+            aggregated.total_cognitive, 12,
+            "GodClass cognitive must scope to struct methods (not 322 from whole file)"
+        );
+    }
+
+    #[test]
+    fn aggregate_god_object_scoped_dependencies_exclude_other_structs() {
+        let functions = vec![
+            raw_fn_with_deps(
+                "Builder::run",
+                4,
+                5,
+                vec!["caller_a"],
+                vec!["callee_a", "callee_b"],
+            ),
+            raw_fn_with_deps(
+                "OtherStruct::unrelated",
+                40,
+                50,
+                vec!["external_caller_1", "external_caller_2"],
+                vec!["external_callee_1"],
+            ),
+            raw_fn_with_deps("free_helper", 9, 9, vec!["caller_z"], vec!["callee_z"]),
+        ];
+        let analysis = god_class_for("Builder");
+
+        let aggregated = aggregate_god_object_from_raw_metrics(&functions, &analysis);
+
+        assert_eq!(
+            aggregated.upstream_dependencies, 1,
+            "Upstream dependencies must scope to struct methods only"
+        );
+        assert_eq!(
+            aggregated.downstream_dependencies, 2,
+            "Downstream dependencies must scope to struct methods only"
+        );
+        assert!(aggregated
+            .unique_upstream_callers
+            .iter()
+            .all(|c| c == "caller_a"));
+        assert!(!aggregated
+            .unique_downstream_callees
+            .iter()
+            .any(|c| c.starts_with("external_")));
+    }
+
+    #[test]
+    fn aggregate_god_object_godfile_keeps_file_wide_metrics() {
+        let functions = vec![
+            raw_fn("A::method", 5, 7),
+            raw_fn("free_fn", 3, 4),
+            raw_fn("B::other", 2, 1),
+        ];
+        let analysis = god_file();
+
+        let aggregated = aggregate_god_object_from_raw_metrics(&functions, &analysis);
+
+        assert_eq!(
+            aggregated.total_cyclomatic, 10,
+            "GodFile must continue to aggregate file-wide cyclomatic"
+        );
+        assert_eq!(
+            aggregated.total_cognitive, 12,
+            "GodFile must continue to aggregate file-wide cognitive"
+        );
     }
 }

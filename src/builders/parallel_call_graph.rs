@@ -628,6 +628,10 @@ fn resolve_callee_from_extracted(
             resolve_direct_callee(callee_name, caller_file, index)
         }
         CallType::Method => {
+            if crate::analyzers::call_graph::CallResolver::is_common_library_method(callee_name) {
+                return None;
+            }
+
             // Method calls lack type information, so preserve the previous first match.
             index
                 .method_functions
@@ -694,6 +698,35 @@ mod extracted_call_resolution_tests {
 
         assert_eq!(resolved.file, first);
         assert_eq!(resolved.name, "First::run");
+    }
+
+    #[test]
+    fn common_library_methods_do_not_resolve_by_simple_method_name() {
+        let caller = PathBuf::from("src/builders/parallel_unified_analysis.rs");
+        let support = PathBuf::from("src/support.rs");
+        let extracted = extracted_files(vec![
+            (caller.clone(), vec![function("entry", "entry", 5)]),
+            (
+                support,
+                vec![
+                    function("filter", "LazyPipeline::filter", 10),
+                    function("map", "LazyPipeline::map", 20),
+                    function("take", "LazyPipeline::take", 30),
+                    function("get", "PurityCache::get", 40),
+                ],
+            ),
+        ]);
+        let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
+
+        for method in ["filter", "map", "take", "get"] {
+            let resolved =
+                resolve_callee_from_extracted(method, &CallType::Method, &caller, &index);
+
+            assert!(
+                resolved.is_none(),
+                "common library method {method} should not resolve to unrelated project method {resolved:?}"
+            );
+        }
     }
 
     #[test]
