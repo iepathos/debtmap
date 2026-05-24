@@ -426,11 +426,29 @@ pub fn aggregate_error_swallowing(functions: &[FunctionMetrics]) -> (u32, Vec<St
 
 /// Aggregate dependency metrics from raw FunctionMetrics.
 ///
+/// How aggressively to treat caller/callee strings as internal cohesion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DependencyScope {
+    /// Match only against the scoped member list (used by unit tests).
+    MemberListOnly,
+    /// GodFile/GodModule: any dependency in the same file basename is internal.
+    SameFile,
+    /// GodClass: same-file dependencies whose name belongs to the struct prefix.
+    StructPrefix(String),
+}
+
 /// This provides a complete architectural view of dependencies by aggregating
 /// from ALL functions in the file, not just those that became debt items.
 /// This ensures god objects show their true blast radius.
 pub fn aggregate_dependency_metrics_from_raw(
     functions: &[FunctionMetrics],
+) -> (Vec<String>, Vec<String>, usize, usize) {
+    aggregate_dependency_metrics_from_raw_with_scope(functions, DependencyScope::MemberListOnly)
+}
+
+fn aggregate_dependency_metrics_from_raw_with_scope(
+    functions: &[FunctionMetrics],
+    scope: DependencyScope,
 ) -> (Vec<String>, Vec<String>, usize, usize) {
     let internal_members = build_internal_member_set(functions);
 
@@ -442,7 +460,9 @@ pub fn aggregate_dependency_metrics_from_raw(
             unique_callers.extend(
                 callers
                     .iter()
-                    .filter(|caller| !internal_members.contains(*caller))
+                    .filter(|caller| {
+                        !is_internal_dependency(caller, &internal_members, functions, &scope)
+                    })
                     .cloned(),
             );
         }
@@ -450,7 +470,9 @@ pub fn aggregate_dependency_metrics_from_raw(
             unique_callees.extend(
                 callees
                     .iter()
-                    .filter(|callee| !internal_members.contains(*callee))
+                    .filter(|callee| {
+                        !is_internal_dependency(callee, &internal_members, functions, &scope)
+                    })
                     .cloned(),
             );
         }
@@ -467,6 +489,20 @@ pub fn aggregate_dependency_metrics_from_raw(
     )
 }
 
+fn dependency_scope(god_analysis: &crate::organization::GodObjectAnalysis) -> DependencyScope {
+    use crate::organization::DetectionType;
+
+    match god_analysis.detection_type {
+        DetectionType::GodFile | DetectionType::GodModule => DependencyScope::SameFile,
+        DetectionType::GodClass => god_analysis
+            .struct_name
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .map(|name| DependencyScope::StructPrefix(name.to_string()))
+            .unwrap_or(DependencyScope::MemberListOnly),
+    }
+}
+
 /// Build the set of caller/callee strings that point to scope members.
 ///
 /// Caller and callee strings produced by `format_function_name` follow the
@@ -474,14 +510,88 @@ pub fn aggregate_dependency_metrics_from_raw(
 /// function in the scope produces such a string, and any caller/callee
 /// matching one of those strings is internal cohesion (not external coupling)
 /// and must be filtered from the architectural dependency view.
+///
+/// Impl methods are indexed twice: once with the full `Type::method` name and
+/// once with the method-only suffix so call-graph strings still match when
+/// naming conventions diverge between metrics extraction and graph resolution.
 fn build_internal_member_set(functions: &[FunctionMetrics]) -> HashSet<String> {
     functions
         .iter()
         .filter_map(|func| {
             let basename = func.file.file_name().and_then(|n| n.to_str())?;
-            Some(format!("{}:{}", basename, func.name))
+            Some((basename, func.name.as_str()))
         })
+        .flat_map(|(basename, name)| internal_member_keys(basename, name))
         .collect()
+}
+
+fn internal_member_keys(basename: &str, name: &str) -> Vec<String> {
+    let full = format!("{basename}:{name}");
+    let method_only = name.rsplit("::").next().unwrap_or(name);
+    if method_only == name {
+        vec![full]
+    } else {
+        vec![full, format!("{basename}:{method_only}")]
+    }
+}
+
+fn scope_file_basenames(functions: &[FunctionMetrics]) -> HashSet<&str> {
+    functions
+        .iter()
+        .filter_map(|func| func.file.file_name().and_then(|n| n.to_str()))
+        .collect()
+}
+
+fn names_match(member_name: &str, dep_name: &str) -> bool {
+    member_name == dep_name
+        || member_name.ends_with(&format!("::{dep_name}"))
+        || dep_name.ends_with(&format!("::{member_name}"))
+        || member_name
+            .rsplit("::")
+            .next()
+            .is_some_and(|member_method| {
+                dep_name
+                    .rsplit("::")
+                    .next()
+                    .is_some_and(|dep_method| member_method == dep_method)
+            })
+}
+
+fn is_internal_dependency(
+    dep: &str,
+    internal: &HashSet<String>,
+    functions: &[FunctionMetrics],
+    scope: &DependencyScope,
+) -> bool {
+    if internal.contains(dep) {
+        return true;
+    }
+
+    let Some((file, name)) = dep.split_once(':') else {
+        return false;
+    };
+
+    if let Some(method) = name.rsplit("::").next() {
+        if internal.contains(&format!("{file}:{method}")) {
+            return true;
+        }
+    }
+
+    if functions.iter().any(|func| {
+        func.file.file_name().and_then(|n| n.to_str()) == Some(file)
+            && names_match(&func.name, name)
+    }) {
+        return true;
+    }
+
+    match scope {
+        DependencyScope::MemberListOnly => false,
+        DependencyScope::SameFile => scope_file_basenames(functions).contains(file),
+        DependencyScope::StructPrefix(prefix) => {
+            scope_file_basenames(functions).contains(file)
+                && (name.starts_with(&format!("{prefix}::")) || name == prefix.as_str())
+        }
+    }
 }
 
 /// Compute weighted average from (value, weight) pairs.
@@ -791,7 +901,7 @@ pub fn aggregate_god_object_from_raw_metrics(
     god_analysis: &crate::organization::GodObjectAnalysis,
 ) -> GodObjectAggregatedMetrics {
     let scoped = scoped_member_metrics(functions, god_analysis);
-    aggregate_from_raw_metrics(&scoped)
+    aggregate_from_raw_metrics_with_scope(&scoped, dependency_scope(god_analysis))
 }
 
 /// Aggregate scoped god-object metrics including coverage, using a single
@@ -807,7 +917,8 @@ pub fn aggregate_god_object_metrics_with_coverage(
     coverage_data: Option<&LcovData>,
 ) -> GodObjectAggregatedMetrics {
     let scoped = scoped_member_metrics(functions, god_analysis);
-    let mut aggregated = aggregate_from_raw_metrics(&scoped);
+    let mut aggregated =
+        aggregate_from_raw_metrics_with_scope(&scoped, dependency_scope(god_analysis));
     if let Some(lcov) = coverage_data {
         aggregated.weighted_coverage = aggregate_coverage_from_raw_metrics(&scoped, lcov);
     }
@@ -848,6 +959,13 @@ pub fn scoped_member_metrics(
 /// a `GodClass` detection conflates the struct's metrics with unrelated
 /// functions in the same file.
 pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAggregatedMetrics {
+    aggregate_from_raw_metrics_with_scope(functions, DependencyScope::MemberListOnly)
+}
+
+fn aggregate_from_raw_metrics_with_scope(
+    functions: &[FunctionMetrics],
+    scope: DependencyScope,
+) -> GodObjectAggregatedMetrics {
     let total_cyclomatic = functions.iter().map(|f| f.cyclomatic).sum();
     let total_cognitive = functions.iter().map(|f| f.cognitive).sum();
     let max_nesting = functions.iter().map(|f| f.nesting).max().unwrap_or(0);
@@ -864,7 +982,7 @@ pub fn aggregate_from_raw_metrics(functions: &[FunctionMetrics]) -> GodObjectAgg
         unique_downstream_callees,
         upstream_dependencies,
         downstream_dependencies,
-    ) = aggregate_dependency_metrics_from_raw(functions);
+    ) = aggregate_dependency_metrics_from_raw_with_scope(functions, scope);
 
     // Aggregate distribution metrics with production/test LOC separation (Spec 268)
     let distribution_metrics = aggregate_distribution_metrics_from_raw(functions);
@@ -1856,6 +1974,146 @@ mod tests {
             downstream_count, 1,
             "Only the external callee should be counted, got {downstream_count}"
         );
+    }
+
+    #[test]
+    fn test_internal_member_set_indexes_method_only_names() {
+        let set = build_internal_member_set(&[FunctionMetrics {
+            name: "SelfUsageVisitor::check_body".to_string(),
+            file: PathBuf::from("src/foo/classifier.rs"),
+            line: 404,
+            cyclomatic: 1,
+            cognitive: 0,
+            nesting: 0,
+            length: 5,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        }]);
+
+        assert!(set.contains("classifier.rs:SelfUsageVisitor::check_body"));
+        assert!(set.contains("classifier.rs:check_body"));
+    }
+
+    #[test]
+    fn test_god_file_scope_filters_same_file_impl_callee_not_in_member_list() {
+        // Callee is in the same file but absent from the scoped member list
+        // (e.g. filtered before aggregation). GodFile scope must still treat it
+        // as internal cohesion.
+        let functions = vec![FunctionMetrics {
+            name: "infer_method_domain".to_string(),
+            file: PathBuf::from("src/organization/god_object/classifier.rs"),
+            line: 1243,
+            cyclomatic: 5,
+            cognitive: 5,
+            nesting: 2,
+            length: 40,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: Some(vec![
+                "classifier.rs:SelfUsageVisitor::check_body".to_string(),
+                "classifier.rs:DomainContext::primary_domain_name".to_string(),
+                "detail_page.rs:DetailPage::next".to_string(),
+            ]),
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        }];
+
+        let (_, callees, _, downstream_count) =
+            aggregate_dependency_metrics_from_raw_with_scope(&functions, DependencyScope::SameFile);
+
+        assert!(
+            !callees.iter().any(|c| c.starts_with("classifier.rs:")),
+            "Same-file callees must be filtered for GodFile scope, got {callees:?}"
+        );
+        assert!(
+            callees.contains(&"detail_page.rs:DetailPage::next".to_string()),
+            "External callees must remain, got {callees:?}"
+        );
+        assert_eq!(downstream_count, 1);
+    }
+
+    #[test]
+    fn test_god_class_scope_keeps_same_file_non_struct_callee() {
+        let functions = vec![FunctionMetrics {
+            name: "Builder::build".to_string(),
+            file: PathBuf::from("src/foo.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 5,
+            nesting: 1,
+            length: 20,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: Some(vec![
+                "foo.rs:Helper::run".to_string(),
+                "other.rs:external".to_string(),
+            ]),
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            entropy_analysis: None,
+        }];
+
+        let (_, callees, _, downstream_count) = aggregate_dependency_metrics_from_raw_with_scope(
+            &functions,
+            DependencyScope::StructPrefix("Builder".to_string()),
+        );
+
+        assert!(
+            callees.contains(&"foo.rs:Helper::run".to_string()),
+            "Same-file non-struct callees must remain for GodClass scope, got {callees:?}"
+        );
+        assert!(
+            callees.contains(&"other.rs:external".to_string()),
+            "External callees must remain, got {callees:?}"
+        );
+        assert_eq!(downstream_count, 2);
     }
 
     #[test]
