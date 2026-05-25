@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-05-25
+
+### Added
+
+- **TUI Result Grouping** - Results view now supports toggling grouped output
+  - Groups related findings for easier navigation in the interactive results browser
+  - Extends JSON output with grouping metadata for downstream tooling
+
+### Fixed
+
+- **God Object Scoped Metrics** - God object analysis now scopes metrics and dependencies to the analyzed file
+  - Prevents cross-file metric bleed that inflated god-object scores and priority context
+  - Aligns LLM markdown, priority context, and parallel analysis builders with file-scoped aggregation
+  - Adds regression coverage for scoped god-object priority calculations
+
+- **Call Graph Library Callees** - Call graph resolution now ignores library callees when building project edges
+  - Reduces false caller/callee relationships from standard library and external crate symbols
+  - Improves disambiguation for known function edges in Rust call graph analysis
+
+- **Closure Capture Data Flow** - Data-flow analysis now records mutated closure captures
+  - Tracks assignment, method call, and nested capture mutations in CFG closure handling
+  - Adds regression coverage for closure capture side effects
+
+- **CLI Analyze Flags** - Removed stale and unimplemented analyze flags
+  - Drops unused streaming and dependency-display options that no longer matched runtime behavior
+  - Updates call graph documentation to reflect the current CLI surface
+
+- **LLM Markdown Headings** - Normalizes heading levels in LLM markdown output
+  - Keeps generated markdown structure consistent for downstream LLM consumption
+
+- **Analyzer Iterator Usage** - Replaced disallowed `for_each` patterns with explicit iteration
+  - Restores clippy compliance without changing analysis behavior
+
+### Performance
+
+- **LCOV Report Generation** - Speeds up local and CI LCOV report generation
+  - Streamlines coverage report commands in the development workflow
+
+- **Test Execution** - Faster default test and coverage-check cycles
+  - Adopts nextest for coverage threshold checks
+  - Reduces default test-cycle overhead for local development
+
+### Changed
+
+- **Coverage CI Workflow** - Coverage threshold failures now print measured coverage
+  - Uploads coverage artifacts even when threshold checks fail for easier CI debugging
+
+### Tech Debt Cleanup
+
+- **Parallel Analysis Refactors** - Simplified parallel file analysis and test reachability detection
+  - Reduces builder complexity while preserving unified analysis behavior
+
+- **Complexity Message Formatting** - Split enhanced complexity message formatting into focused helpers
+  - Improves maintainability of priority and complexity output paths
+
+- **Analyzer Refactors** - Simplified builder pattern detection, tuple return extraction, purity traversal, and async resource call visitors
+  - Extracted focused helpers across organization, Python, and resource analysis modules
+
+- **Validation and Iterator Refactors** - Simplified validation details printing and iterator side-effect handling
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.17.0 release
+
 ## [0.16.7] - 2026-05-23
 
 ### Added
