@@ -513,10 +513,9 @@ fn append_details(output: &mut String, details: &[ComplexityDetail]) {
     }
 
     writeln!(output, "\nCOMPLEXITY ISSUES:").expect("writing to String cannot fail");
-    details
-        .iter()
-        .enumerate()
-        .for_each(|(index, detail)| append_detail(output, index, detail));
+    for (index, detail) in details.iter().enumerate() {
+        append_detail(output, index, detail);
+    }
 }
 
 fn append_detail(output: &mut String, index: usize, detail: &ComplexityDetail) {
@@ -552,9 +551,9 @@ fn append_recommendations(output: &mut String, recommendations: &[ActionableReco
     }
 
     writeln!(output, "\n[TIP] RECOMMENDATIONS:").expect("writing to String cannot fail");
-    recommendations
-        .iter()
-        .for_each(|rec| append_recommendation(output, rec));
+    for rec in recommendations.iter() {
+        append_recommendation(output, rec);
+    }
 }
 
 fn append_recommendation(output: &mut String, rec: &ActionableRecommendation) {
@@ -577,9 +576,9 @@ fn append_code_example(output: &mut String, example: Option<&RefactoringExample>
 }
 
 fn append_indented_lines(output: &mut String, text: &str) {
-    text.lines().for_each(|line| {
+    for line in text.lines() {
         writeln!(output, "    {line}").expect("writing to String cannot fail");
-    });
+    }
 }
 
 fn append_complexity_breakdown(output: &mut String, breakdown: &ComplexityBreakdown) {

@@ -197,7 +197,8 @@ fn clamp_to_file_line_count(end_line: u32, file_line_count: Option<usize>) -> u3
     file_line_count
         .and_then(|count| u32::try_from(count).ok())
         .filter(|count| *count > 0)
-        .map_or(end_line, |count| end_line.min(count))
+        .map(|count| end_line.min(count))
+        .unwrap_or(end_line)
 }
 
 fn create_module_header_context(file: &std::path::Path) -> RelatedContext {

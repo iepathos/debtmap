@@ -481,10 +481,12 @@ impl OptimizedTestDetector {
         visited: &HashSet<FunctionId>,
         queue: &mut Vec<FunctionId>,
     ) {
-        callers
+        for caller in callers
             .into_iter()
             .filter(|caller| !visited.contains(caller))
-            .for_each(|caller| queue.push(caller));
+        {
+            queue.push(caller);
+        }
     }
 
     pub fn find_all_test_only_functions(&self) -> HashSet<FunctionId> {
@@ -1743,6 +1745,14 @@ fn enrich_file_item_with_dependencies(
     file_item
 }
 
+/// Trait for parallel analysis
+pub trait ParallelAnalyzer {
+    fn analyze_parallel(
+        &self,
+        options: ParallelUnifiedAnalysisOptions,
+    ) -> Result<UnifiedAnalysis, anyhow::Error>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1836,9 +1846,9 @@ mod tests {
 
     fn graph_with_functions(functions: &[FunctionId]) -> CallGraph {
         let mut graph = CallGraph::new();
-        functions
-            .iter()
-            .for_each(|func| graph.add_function(func.clone(), false, false, 1, 10));
+        for func in functions.iter() {
+            graph.add_function(func.clone(), false, false, 1, 10);
+        }
         graph
     }
 
@@ -1867,12 +1877,4 @@ mod tests {
 
         assert!(!detector.is_test_only(&helper));
     }
-}
-
-/// Trait for parallel analysis
-pub trait ParallelAnalyzer {
-    fn analyze_parallel(
-        &self,
-        options: ParallelUnifiedAnalysisOptions,
-    ) -> Result<UnifiedAnalysis, anyhow::Error>;
 }
