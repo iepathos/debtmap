@@ -163,45 +163,16 @@ pub(crate) fn format_function_debt_item(
     }
 }
 
-pub(crate) fn format_file_debt_item(output: &mut String, item: &FileDebtItem, verbosity: u8) {
-    let score = item.score;
-    let file_name = item
-        .metrics
-        .path
-        .file_name()
+fn file_display_name(path: &std::path::Path) -> &str {
+    path.file_name()
         .and_then(|s| s.to_str())
-        .unwrap_or("unknown");
+        .unwrap_or("unknown")
+}
 
-    writeln!(output, "#### {} - Score: {:.1}", file_name, score).unwrap();
-
-    writeln!(
-        output,
-        "**File:** `{}` ({} lines, {} functions)",
-        item.metrics.path.display(),
-        item.metrics.total_lines,
-        item.metrics.function_count
-    )
-    .unwrap();
-
-    let is_god_object = item
-        .metrics
-        .god_object_analysis
-        .as_ref()
-        .is_some_and(|a| a.is_god_object);
-
-    if is_god_object {
-        let god_analysis = item.metrics.god_object_analysis.as_ref().unwrap();
-        writeln!(output, "**Type:** GOD OBJECT").unwrap();
-        writeln!(
-            output,
-            "**Metrics:** {} methods, {} fields, {} responsibilities",
-            god_analysis.method_count, god_analysis.field_count, god_analysis.responsibility_count
-        )
-        .unwrap();
-    } else {
-        // Use context-aware threshold if available (spec 135)
-        let type_str = if let Some(ref file_type) = item.metrics.file_type {
-            use crate::organization::get_threshold;
+fn build_file_type_label(item: &FileDebtItem) -> String {
+    use crate::organization::get_threshold;
+    match &item.metrics.file_type {
+        Some(file_type) => {
             let threshold = get_threshold(
                 file_type,
                 item.metrics.function_count,
@@ -212,20 +183,215 @@ pub(crate) fn format_file_debt_item(output: &mut String, item: &FileDebtItem, ve
             } else {
                 format!("**Type:** COMPLEX FILE ({:?})", file_type)
             }
-        } else {
-            // Legacy behavior if no file type
-            if item.metrics.total_lines > 500 {
-                "**Type:** LARGE FILE".to_string()
-            } else {
-                "**Type:** COMPLEX FILE".to_string()
-            }
-        };
-        writeln!(output, "{}", type_str).unwrap();
+        }
+        None if item.metrics.total_lines > 500 => "**Type:** LARGE FILE".to_string(),
+        None => "**Type:** COMPLEX FILE".to_string(),
     }
+}
 
+fn write_god_object_section(
+    output: &mut String,
+    analysis: &crate::organization::GodObjectAnalysis,
+) {
+    writeln!(output, "**Type:** GOD OBJECT").unwrap();
+    writeln!(
+        output,
+        "**Metrics:** {} methods, {} fields, {} responsibilities",
+        analysis.method_count, analysis.field_count, analysis.responsibility_count
+    )
+    .unwrap();
+}
+
+fn write_file_type_section(output: &mut String, item: &FileDebtItem) {
+    match item
+        .metrics
+        .god_object_analysis
+        .as_ref()
+        .filter(|a| a.is_god_object)
+    {
+        Some(analysis) => write_god_object_section(output, analysis),
+        None => writeln!(output, "{}", build_file_type_label(item)).unwrap(),
+    }
+}
+
+pub(crate) fn format_file_debt_item(output: &mut String, item: &FileDebtItem, verbosity: u8) {
+    writeln!(
+        output,
+        "#### {} - Score: {:.1}",
+        file_display_name(&item.metrics.path),
+        item.score
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "**File:** `{}` ({} lines, {} functions)",
+        item.metrics.path.display(),
+        item.metrics.total_lines,
+        item.metrics.function_count
+    )
+    .unwrap();
+    write_file_type_section(output, item);
     writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
-
     if verbosity >= 1 {
         writeln!(output, "**Impact:** {}", format_file_impact(&item.impact)).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::{FileDebtItem, FileDebtMetrics};
+    use std::path::PathBuf;
+
+    fn make_god_analysis(
+        is_god_object: bool,
+        method_count: usize,
+        field_count: usize,
+        responsibility_count: usize,
+    ) -> crate::organization::GodObjectAnalysis {
+        crate::organization::GodObjectAnalysis {
+            is_god_object,
+            method_count,
+            weighted_method_count: None,
+            field_count,
+            responsibility_count,
+            lines_of_code: 500,
+            complexity_sum: 100,
+            god_object_score: 0.8,
+            recommended_splits: Vec::new(),
+            confidence: crate::organization::GodObjectConfidence::Definite,
+            responsibilities: Vec::new(),
+            responsibility_method_counts: Default::default(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: crate::organization::DetectionType::GodClass,
+            struct_name: None,
+            struct_line: None,
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::organization::SplitAnalysisMethod::default(),
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        }
+    }
+
+    fn make_file_item(
+        path: &str,
+        total_lines: usize,
+        function_count: usize,
+        god_analysis: Option<crate::organization::GodObjectAnalysis>,
+        file_type: Option<crate::organization::FileType>,
+    ) -> FileDebtItem {
+        FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from(path),
+                total_lines,
+                function_count,
+                god_object_analysis: god_analysis,
+                file_type,
+                ..Default::default()
+            },
+            score: 42.0,
+            priority_rank: 1,
+            recommendation: "Refactor this file".to_string(),
+            impact: Default::default(),
+        }
+    }
+
+    #[test]
+    fn file_display_name_returns_filename_from_path() {
+        let path = std::path::Path::new("/some/deep/path/my_file.rs");
+        assert_eq!(file_display_name(path), "my_file.rs");
+    }
+
+    #[test]
+    fn file_display_name_falls_back_for_empty_path() {
+        let path = std::path::Path::new("");
+        assert_eq!(file_display_name(path), "unknown");
+    }
+
+    #[test]
+    fn build_file_type_label_large_file_when_over_500_lines_no_type() {
+        let item = make_file_item("big.rs", 600, 20, None, None);
+        assert_eq!(build_file_type_label(&item), "**Type:** LARGE FILE");
+    }
+
+    #[test]
+    fn build_file_type_label_complex_file_when_under_500_lines_no_type() {
+        let item = make_file_item("small.rs", 200, 10, None, None);
+        assert_eq!(build_file_type_label(&item), "**Type:** COMPLEX FILE");
+    }
+
+    #[test]
+    fn format_file_debt_item_includes_heading_and_score() {
+        let item = make_file_item("src/foo.rs", 300, 15, None, None);
+        let mut output = String::new();
+        format_file_debt_item(&mut output, &item, 0);
+        assert!(output.contains("#### foo.rs - Score: 42.0"));
+    }
+
+    #[test]
+    fn format_file_debt_item_includes_file_metadata() {
+        let item = make_file_item("src/foo.rs", 300, 15, None, None);
+        let mut output = String::new();
+        format_file_debt_item(&mut output, &item, 0);
+        assert!(output.contains("300 lines"));
+        assert!(output.contains("15 functions"));
+    }
+
+    #[test]
+    fn format_file_debt_item_god_object_shows_metrics() {
+        let analysis = make_god_analysis(true, 45, 12, 7);
+        let item = make_file_item("src/god.rs", 1000, 45, Some(analysis), None);
+        let mut output = String::new();
+        format_file_debt_item(&mut output, &item, 0);
+        assert!(output.contains("GOD OBJECT"));
+        assert!(output.contains("45 methods"));
+        assert!(output.contains("12 fields"));
+        assert!(output.contains("7 responsibilities"));
+    }
+
+    #[test]
+    fn format_file_debt_item_non_god_object_shows_complex_file() {
+        let analysis = make_god_analysis(false, 5, 2, 1);
+        let item = make_file_item("src/small.rs", 150, 5, Some(analysis), None);
+        let mut output = String::new();
+        format_file_debt_item(&mut output, &item, 0);
+        assert!(output.contains("COMPLEX FILE"));
+        assert!(!output.contains("GOD OBJECT"));
+    }
+
+    #[test]
+    fn format_file_debt_item_impact_hidden_at_verbosity_zero() {
+        let item = make_file_item("src/foo.rs", 200, 10, None, None);
+        let mut output = String::new();
+        format_file_debt_item(&mut output, &item, 0);
+        assert!(!output.contains("**Impact:**"));
+    }
+
+    #[test]
+    fn format_file_debt_item_impact_shown_at_verbosity_one() {
+        let item = make_file_item("src/foo.rs", 200, 10, None, None);
+        let mut output = String::new();
+        format_file_debt_item(&mut output, &item, 1);
+        assert!(output.contains("**Impact:**"));
+    }
+
+    #[test]
+    fn format_file_debt_item_recommendation_always_shown() {
+        let item = make_file_item("src/foo.rs", 200, 10, None, None);
+        let mut output = String::new();
+        format_file_debt_item(&mut output, &item, 0);
+        assert!(output.contains("**Recommendation:** Refactor this file"));
     }
 }
