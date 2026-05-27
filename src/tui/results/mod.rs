@@ -76,9 +76,13 @@ fn poll_key_event(timeout_ms: u64) -> Result<Option<KeyEvent>> {
         return Ok(None);
     }
 
-    match event::read()? {
-        Event::Key(key) => Ok(Some(key)),
-        _ => Ok(None),
+    Ok(read_press_key_event(event::read()?))
+}
+
+fn read_press_key_event(event: Event) -> Option<KeyEvent> {
+    match event {
+        Event::Key(key) if key.is_press() => Some(key),
+        _ => None,
     }
 }
 
@@ -204,10 +208,18 @@ mod tests {
     use crossterm::event::KeyEventKind;
 
     fn make_key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+        make_key_event_with_kind(code, modifiers, KeyEventKind::Press)
+    }
+
+    fn make_key_event_with_kind(
+        code: KeyCode,
+        modifiers: KeyModifiers,
+        kind: KeyEventKind,
+    ) -> KeyEvent {
         KeyEvent {
             code,
             modifiers,
-            kind: KeyEventKind::Press,
+            kind,
             state: crossterm::event::KeyEventState::NONE,
         }
     }
@@ -244,5 +256,32 @@ mod tests {
             KeyModifiers::CONTROL | KeyModifiers::SHIFT,
         );
         assert!(is_quit_key(&key));
+    }
+
+    #[test]
+    fn read_press_key_event_accepts_press() {
+        let key = make_key_event(KeyCode::Down, KeyModifiers::NONE);
+
+        assert_eq!(read_press_key_event(Event::Key(key)), Some(key));
+    }
+
+    #[test]
+    fn read_press_key_event_ignores_release() {
+        let key =
+            make_key_event_with_kind(KeyCode::Down, KeyModifiers::NONE, KeyEventKind::Release);
+
+        assert_eq!(read_press_key_event(Event::Key(key)), None);
+    }
+
+    #[test]
+    fn read_press_key_event_ignores_repeat() {
+        let key = make_key_event_with_kind(KeyCode::Down, KeyModifiers::NONE, KeyEventKind::Repeat);
+
+        assert_eq!(read_press_key_event(Event::Key(key)), None);
+    }
+
+    #[test]
+    fn read_press_key_event_ignores_non_key_events() {
+        assert_eq!(read_press_key_event(Event::Resize(80, 24)), None);
     }
 }
