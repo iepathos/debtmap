@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-05-27
+
+### Fixed
+
+- **Windows TUI Key Events** - Results navigation now ignores non-press key events
+  - Prevents arrow, `j`, and `k` navigation from moving twice on Windows terminals
+  - Adds regression coverage for press, repeat, release, and non-key terminal events
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.17.1 release
+
 ## [0.17.0] - 2026-05-25
 
 ### Added
