@@ -3,7 +3,7 @@
 //! Formats individual mixed priority items (function-level and file-level debt)
 
 use crate::formatting::FormattingConfig;
-use crate::priority::{DebtItem, FileDebtItem};
+use crate::priority::{DebtItem, FileDebtItem, FileDebtMetrics};
 use std::fmt::Write;
 
 use super::details::format_priority_item_markdown;
@@ -42,50 +42,36 @@ pub(crate) fn format_file_priority_item_markdown(
     verbosity: u8,
     show_splits: bool,
 ) {
-    let severity = get_severity_label(item.score);
+    format_file_priority_header(output, rank, item);
+    format_god_object_metrics(output, &item.metrics);
 
-    // Determine file type using context-aware thresholds (spec 135)
-    let is_god_object = item
-        .metrics
-        .god_object_analysis
-        .as_ref()
-        .is_some_and(|a| a.is_god_object);
+    format_split_recommendations_markdown(output, item, verbosity, show_splits);
 
-    let type_label = if is_god_object {
-        "FILE - GOD OBJECT"
-    } else if let Some(ref file_type) = item.metrics.file_type {
-        use crate::organization::get_threshold;
-        let threshold = get_threshold(
-            file_type,
-            item.metrics.function_count,
-            item.metrics.total_lines,
-        );
-        if item.metrics.total_lines > threshold.base_threshold {
-            "FILE - HIGH COMPLEXITY"
-        } else {
-            "FILE"
-        }
-    } else {
-        // Legacy behavior if no file type
-        if item.metrics.total_lines > 500 {
-            "FILE - HIGH COMPLEXITY"
-        } else {
-            "FILE"
-        }
-    };
+    writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
 
-    // File items (god objects) are always T1 Critical Architecture
-    let tier_label = "[T1] ";
+    writeln!(output, "**Impact:** {}", format_file_impact(&item.impact)).unwrap();
 
-    // Header with rank, tier, and score
+    if verbosity >= 1 {
+        format_file_scoring_breakdown(output, &item.metrics);
+    }
+}
+
+fn format_file_priority_header(output: &mut String, rank: usize, item: &FileDebtItem) {
     writeln!(
         output,
-        "### #{} {}Score: {:.1} [{}]",
-        rank, tier_label, item.score, severity
+        "### #{} [T1] Score: {:.1} [{}]",
+        rank,
+        item.score,
+        get_severity_label(item.score)
     )
     .unwrap();
 
-    writeln!(output, "**Type:** {}", type_label).unwrap();
+    writeln!(
+        output,
+        "**Type:** {}",
+        file_priority_type_label(&item.metrics)
+    )
+    .unwrap();
     writeln!(
         output,
         "**File:** `{}` ({} lines, {} functions)",
@@ -94,73 +80,101 @@ pub(crate) fn format_file_priority_item_markdown(
         item.metrics.function_count
     )
     .unwrap();
+}
 
-    // God object details if applicable
-    if let Some(ref god_analysis) = item.metrics.god_object_analysis {
-        if god_analysis.is_god_object {
-            writeln!(output, "**God Object Metrics:**").unwrap();
-            writeln!(output, "- Methods: {}", god_analysis.method_count).unwrap();
-            writeln!(output, "- Fields: {}", god_analysis.field_count).unwrap();
-            writeln!(
-                output,
-                "- Responsibilities: {}",
-                god_analysis.responsibility_count
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "- God Object Score: {:.1}",
-                god_analysis.god_object_score
-            )
-            .unwrap();
-
-            // Show coverage data if available
-            if item.metrics.coverage_percent > 0.0 {
-                writeln!(
-                    output,
-                    "- Test Coverage: {:.1}% ({} uncovered lines)",
-                    item.metrics.coverage_percent, item.metrics.uncovered_lines
-                )
-                .unwrap();
-            }
-        }
+fn file_priority_type_label(metrics: &FileDebtMetrics) -> &'static str {
+    if is_god_object(metrics) {
+        return "FILE - GOD OBJECT";
     }
 
-    // Show split recommendations if available (Spec 208)
-    format_split_recommendations_markdown(output, item, verbosity, show_splits);
+    if exceeds_contextual_file_threshold(metrics) {
+        "FILE - HIGH COMPLEXITY"
+    } else {
+        "FILE"
+    }
+}
 
-    writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
+fn is_god_object(metrics: &FileDebtMetrics) -> bool {
+    metrics
+        .god_object_analysis
+        .as_ref()
+        .is_some_and(|analysis| analysis.is_god_object)
+}
 
-    writeln!(output, "**Impact:** {}", format_file_impact(&item.impact)).unwrap();
-
-    if verbosity >= 1 {
-        writeln!(output, "\n**Scoring Breakdown:**").unwrap();
-        writeln!(
-            output,
-            "- File size: {}",
-            score_category(item.metrics.total_lines)
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "- Functions: {}",
-            function_category(item.metrics.function_count)
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "- Complexity: {}",
-            complexity_category(item.metrics.avg_complexity)
-        )
-        .unwrap();
-        if item.metrics.function_count > 0 {
-            writeln!(
-                output,
-                "- Dependencies: {} functions may have complex interdependencies",
-                item.metrics.function_count
-            )
-            .unwrap();
+fn exceeds_contextual_file_threshold(metrics: &FileDebtMetrics) -> bool {
+    match &metrics.file_type {
+        Some(file_type) => {
+            use crate::organization::get_threshold;
+            let threshold = get_threshold(file_type, metrics.function_count, metrics.total_lines);
+            metrics.total_lines > threshold.base_threshold
         }
+        None => metrics.total_lines > 500,
+    }
+}
+
+fn format_god_object_metrics(output: &mut String, metrics: &FileDebtMetrics) {
+    let Some(god_analysis) = metrics.god_object_analysis.as_ref() else {
+        return;
+    };
+
+    if !god_analysis.is_god_object {
+        return;
+    }
+
+    writeln!(output, "**God Object Metrics:**").unwrap();
+    writeln!(output, "- Methods: {}", god_analysis.method_count).unwrap();
+    writeln!(output, "- Fields: {}", god_analysis.field_count).unwrap();
+    writeln!(
+        output,
+        "- Responsibilities: {}",
+        god_analysis.responsibility_count
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "- God Object Score: {:.1}",
+        god_analysis.god_object_score
+    )
+    .unwrap();
+
+    if metrics.coverage_percent > 0.0 {
+        writeln!(
+            output,
+            "- Test Coverage: {:.1}% ({} uncovered lines)",
+            metrics.coverage_percent, metrics.uncovered_lines
+        )
+        .unwrap();
+    }
+}
+
+fn format_file_scoring_breakdown(output: &mut String, metrics: &FileDebtMetrics) {
+    writeln!(output, "\n**Scoring Breakdown:**").unwrap();
+    writeln!(
+        output,
+        "- File size: {}",
+        score_category(metrics.total_lines)
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "- Functions: {}",
+        function_category(metrics.function_count)
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "- Complexity: {}",
+        complexity_category(metrics.avg_complexity)
+    )
+    .unwrap();
+
+    if metrics.function_count > 0 {
+        writeln!(
+            output,
+            "- Dependencies: {} functions may have complex interdependencies",
+            metrics.function_count
+        )
+        .unwrap();
     }
 }
 
@@ -402,8 +416,101 @@ mod tests {
     use crate::analysis::multi_signal_aggregation::{
         AggregatedClassification, ResponsibilityCategory, SignalEvidence, SignalType,
     };
+    use crate::organization::file_classifier::FileType;
     use crate::organization::god_object::ModuleSplit;
     use crate::organization::Priority;
+    use std::path::PathBuf;
+
+    fn test_file_metrics(total_lines: usize) -> FileDebtMetrics {
+        FileDebtMetrics {
+            path: PathBuf::from("src/example.rs"),
+            total_lines,
+            function_count: 12,
+            avg_complexity: 4.0,
+            coverage_percent: 75.0,
+            uncovered_lines: 25,
+            ..Default::default()
+        }
+    }
+
+    fn test_god_analysis(is_god_object: bool) -> crate::organization::GodObjectAnalysis {
+        crate::organization::GodObjectAnalysis {
+            is_god_object,
+            method_count: 40,
+            weighted_method_count: None,
+            field_count: 8,
+            responsibility_count: 3,
+            lines_of_code: 500,
+            complexity_sum: 100,
+            god_object_score: 82.0,
+            recommended_splits: Vec::new(),
+            confidence: crate::organization::GodObjectConfidence::Definite,
+            responsibilities: Vec::new(),
+            responsibility_method_counts: Default::default(),
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: crate::organization::DetectionType::GodClass,
+            struct_name: None,
+            struct_line: None,
+            struct_location: None,
+            visibility_breakdown: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::organization::SplitAnalysisMethod::default(),
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+            aggregated_entropy: None,
+            aggregated_error_swallowing_count: None,
+            aggregated_error_swallowing_patterns: None,
+            layering_impact: None,
+            anti_pattern_report: None,
+            complexity_metrics: None,
+            trait_method_summary: None,
+        }
+    }
+
+    #[test]
+    fn file_priority_type_label_uses_legacy_threshold_without_file_type() {
+        assert_eq!(file_priority_type_label(&test_file_metrics(500)), "FILE");
+        assert_eq!(
+            file_priority_type_label(&test_file_metrics(501)),
+            "FILE - HIGH COMPLEXITY"
+        );
+    }
+
+    #[test]
+    fn file_priority_type_label_uses_contextual_threshold() {
+        let mut metrics = test_file_metrics(401);
+        metrics.function_count = 100;
+        metrics.file_type = Some(FileType::BusinessLogic);
+
+        assert_eq!(file_priority_type_label(&metrics), "FILE - HIGH COMPLEXITY");
+    }
+
+    #[test]
+    fn file_priority_type_label_prefers_god_object() {
+        let mut metrics = test_file_metrics(50);
+        metrics.god_object_analysis = Some(test_god_analysis(true));
+
+        assert_eq!(file_priority_type_label(&metrics), "FILE - GOD OBJECT");
+    }
+
+    #[test]
+    fn format_god_object_metrics_includes_coverage_when_available() {
+        let mut output = String::new();
+        let mut metrics = test_file_metrics(600);
+        metrics.god_object_analysis = Some(test_god_analysis(true));
+
+        format_god_object_metrics(&mut output, &metrics);
+
+        assert!(output.contains("God Object Metrics"));
+        assert!(output.contains("- Methods: 40"));
+        assert!(output.contains("- Fields: 8"));
+        assert!(output.contains("- Responsibilities: 3"));
+        assert!(output.contains("- God Object Score: 82.0"));
+        assert!(output.contains("- Test Coverage: 75.0% (25 uncovered lines)"));
+    }
 
     #[test]
     fn format_split_methods_shows_sample_when_many() {
