@@ -701,7 +701,6 @@ dependencies = [
  "log",
  "num_cpus",
  "once_cell",
- "openssl-src",
  "openssl-sys",
  "parking_lot",
  "pathdiff",
