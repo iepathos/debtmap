@@ -1,5 +1,5 @@
 use crate::priority::classification::CoverageLevel;
-use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
+use crate::priority::{DebtType, TransitiveCoverage, UnifiedDebtItem};
 use colored::*;
 use std::fmt::Write;
 
@@ -88,77 +88,79 @@ fn format_detailed_coverage_analysis(
 
 /// Analyze coverage gaps to provide specific testing recommendations
 fn analyze_coverage_gaps(uncovered_lines: &[usize], item: &UnifiedDebtItem) -> Vec<String> {
-    let mut recommendations = Vec::new();
-
-    // Check for patterns in uncovered lines
     let line_count = uncovered_lines.len();
+    let max_consecutive = max_consecutive_lines(uncovered_lines);
 
-    // Large contiguous blocks suggest untested branches
-    let mut max_consecutive = 0;
-    let mut current_consecutive = 1;
-    for i in 1..uncovered_lines.len() {
-        if uncovered_lines[i] == uncovered_lines[i - 1] + 1 {
-            current_consecutive += 1;
-            max_consecutive = max_consecutive.max(current_consecutive);
-        } else {
-            current_consecutive = 1;
-        }
-    }
+    [
+        uncovered_shape_recommendation(line_count, max_consecutive),
+        branch_coverage_recommendation(line_count, item.cyclomatic_complexity),
+        debt_type_coverage_recommendation(line_count, &item.debt_type),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
 
+fn max_consecutive_lines(lines: &[usize]) -> usize {
+    line_ranges(lines)
+        .map(|(start, end)| end - start + 1)
+        .max()
+        .unwrap_or(0)
+}
+
+fn line_ranges(lines: &[usize]) -> impl Iterator<Item = (usize, usize)> + '_ {
+    lines
+        .chunk_by(|left, right| *right == *left + 1)
+        .map(|chunk| (chunk[0], chunk[chunk.len() - 1]))
+}
+
+fn uncovered_shape_recommendation(line_count: usize, max_consecutive: usize) -> Option<String> {
     if max_consecutive >= 5 {
-        recommendations.push(format!(
+        return Some(format!(
             "Large uncovered block ({} consecutive lines) - likely an entire conditional branch",
             max_consecutive
         ));
     }
 
-    // Many scattered lines suggest missing edge cases
-    if line_count > 10 && max_consecutive < 3 {
-        recommendations.push(
-            "Scattered uncovered lines - consider testing edge cases and error conditions"
-                .to_string(),
-        );
+    (line_count > 10 && max_consecutive < 3).then(|| {
+        "Scattered uncovered lines - consider testing edge cases and error conditions".to_string()
+    })
+}
+
+fn branch_coverage_recommendation(line_count: usize, cyclomatic: u32) -> Option<String> {
+    let has_complex_uncovered_branches = cyclomatic > 10
+        && line_count > 0
+        && estimated_branch_coverage(line_count, cyclomatic) < 0.5;
+
+    has_complex_uncovered_branches.then(|| {
+        format!(
+            "Low branch coverage (est. <50%) with {} branches - prioritize testing main paths",
+            cyclomatic
+        )
+    })
+}
+
+fn estimated_branch_coverage(line_count: usize, cyclomatic: u32) -> f32 {
+    1.0 - (line_count as f32 / (cyclomatic * 2) as f32)
+}
+
+fn debt_type_coverage_recommendation(line_count: usize, debt_type: &DebtType) -> Option<String> {
+    if line_count == 0 {
+        return None;
     }
 
-    // Check complexity vs coverage
-    if item.cyclomatic_complexity > 10 && line_count > 0 {
-        let branch_coverage_estimate =
-            1.0 - (line_count as f32 / (item.cyclomatic_complexity * 2) as f32);
-        if branch_coverage_estimate < 0.5 {
-            recommendations.push(format!(
-                "Low branch coverage (est. <50%) with {} branches - prioritize testing main paths",
-                item.cyclomatic_complexity
-            ));
+    match debt_type {
+        DebtType::ComplexityHotspot { .. } => Some(
+            "Complex function - focus tests on boundary conditions and error paths".to_string(),
+        ),
+        DebtType::Risk { .. } => {
+            Some("High-risk function - ensure all error handling paths are tested".to_string())
         }
+        DebtType::TestingGap { .. } => {
+            Some("Testing gap - add tests covering the uncovered branches".to_string())
+        }
+        _ => None,
     }
-
-    // Specific recommendations based on debt type
-    match &item.debt_type {
-        crate::priority::DebtType::ComplexityHotspot { .. } => {
-            if line_count > 0 {
-                recommendations.push(
-                    "Complex function - focus tests on boundary conditions and error paths"
-                        .to_string(),
-                );
-            }
-        }
-        crate::priority::DebtType::Risk { .. } => {
-            if line_count > 0 {
-                recommendations.push(
-                    "High-risk function - ensure all error handling paths are tested".to_string(),
-                );
-            }
-        }
-        crate::priority::DebtType::TestingGap { .. } => {
-            if line_count > 0 {
-                recommendations
-                    .push("Testing gap - add tests covering the uncovered branches".to_string());
-            }
-        }
-        _ => {}
-    }
-
-    recommendations
 }
 
 /// Pure function to group consecutive lines into ranges
@@ -278,5 +280,81 @@ mod tests {
         // Test with single line
         let ranges = group_lines_into_ranges(&[5]);
         assert_eq!(ranges, vec![(5, 5)]);
+    }
+
+    #[test]
+    fn max_consecutive_lines_finds_longest_block() {
+        let lines = vec![2, 3, 7, 8, 9, 20, 21];
+
+        assert_eq!(max_consecutive_lines(&lines), 3);
+    }
+
+    #[test]
+    fn max_consecutive_lines_handles_empty_input() {
+        assert_eq!(max_consecutive_lines(&[]), 0);
+    }
+
+    #[test]
+    fn uncovered_shape_recommendation_prioritizes_large_blocks() {
+        let recommendation = uncovered_shape_recommendation(12, 6);
+
+        assert_eq!(
+            recommendation,
+            Some(
+                "Large uncovered block (6 consecutive lines) - likely an entire conditional branch"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn uncovered_shape_recommendation_detects_scattered_lines() {
+        let recommendation = uncovered_shape_recommendation(11, 2);
+
+        assert_eq!(
+            recommendation,
+            Some(
+                "Scattered uncovered lines - consider testing edge cases and error conditions"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn branch_coverage_recommendation_requires_complex_uncovered_code() {
+        let recommendation = branch_coverage_recommendation(14, 12);
+
+        assert_eq!(
+            recommendation,
+            Some(
+                "Low branch coverage (est. <50%) with 12 branches - prioritize testing main paths"
+                    .to_string()
+            )
+        );
+        assert_eq!(branch_coverage_recommendation(0, 12), None);
+        assert_eq!(branch_coverage_recommendation(14, 10), None);
+    }
+
+    #[test]
+    fn debt_type_coverage_recommendation_matches_known_debt_types() {
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 8,
+            cognitive: 10,
+        };
+        let risk = DebtType::Risk {
+            risk_score: 0.8,
+            factors: vec![],
+        };
+
+        assert_eq!(
+            debt_type_coverage_recommendation(3, &testing_gap),
+            Some("Testing gap - add tests covering the uncovered branches".to_string())
+        );
+        assert_eq!(
+            debt_type_coverage_recommendation(3, &risk),
+            Some("High-risk function - ensure all error handling paths are tested".to_string())
+        );
+        assert_eq!(debt_type_coverage_recommendation(0, &testing_gap), None);
     }
 }
