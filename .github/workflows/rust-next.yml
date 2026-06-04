@@ -53,6 +53,18 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
+      - name: Configure vendored OpenSSL prerequisites (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $perl = "C:\Strawberry\perl\bin\perl.exe"
+          if (-not (Test-Path $perl)) {
+            choco install strawberryperl --no-progress -y
+          }
+          & $perl -MLocale::Maketext::Simple -e 1
+          "PERL=$perl" >> $env:GITHUB_ENV
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+
       - name: Build
         run: cargo test --workspace --no-run
 

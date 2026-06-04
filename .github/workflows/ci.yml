@@ -53,16 +53,30 @@ jobs:
       if: runner.os != 'Windows'
       run: just test
 
+    - name: Configure vendored OpenSSL prerequisites (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $perl = "C:\Strawberry\perl\bin\perl.exe"
+        if (-not (Test-Path $perl)) {
+          choco install strawberryperl --no-progress -y
+        }
+        & $perl -MLocale::Maketext::Simple -e 1
+        "PERL=$perl" >> $env:GITHUB_ENV
+        "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+
     - name: Run tests (Windows)
       if: runner.os == 'Windows'
-      shell: bash
+      shell: pwsh
+      env:
+        SKIP_INTEGRATION_TESTS: 1
       run: |
-        echo "Running tests with cargo nextest..."
-        SKIP_INTEGRATION_TESTS=1 cargo nextest run --lib \
-            --test analyzer_tests \
-            --test complexity_tests --test core_metrics_tests \
-            --test debt_tests --test entropy_tests \
-            --status-level fail --final-status-level slow
+        Write-Output "Running tests with cargo nextest..."
+        cargo nextest run --lib `
+          --test analyzer_tests `
+          --test complexity_tests --test core_metrics_tests `
+          --test debt_tests --test entropy_tests `
+          --status-level fail --final-status-level slow
 
   lint:
     name: Lint

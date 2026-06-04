@@ -118,6 +118,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y musl-tools pkg-config
 
+    - name: Configure vendored OpenSSL prerequisites (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $perl = "C:\Strawberry\perl\bin\perl.exe"
+        if (-not (Test-Path $perl)) {
+          choco install strawberryperl --no-progress -y
+        }
+        & $perl -MLocale::Maketext::Simple -e 1
+        "PERL=$perl" >> $env:GITHUB_ENV
+        "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+
     - name: Build release binary
       run: cargo build --release --target ${{ matrix.target }}
       env:
