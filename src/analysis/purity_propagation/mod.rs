@@ -97,6 +97,14 @@ pub struct PurityPropagator {
     purity_analyzer: PurityAnalyzer,
 }
 
+struct DependencyPuritySummary {
+    all_deps_pure: bool,
+    aggregated_confidence: f64,
+    impure_reasons: Vec<String>,
+    max_depth: usize,
+    unknown_count: usize,
+}
+
 impl PurityPropagator {
     /// Create a new purity propagator
     pub fn new(call_graph: PurityCallGraphAdapter, purity_analyzer: PurityAnalyzer) -> Self {
@@ -155,109 +163,279 @@ impl PurityPropagator {
     /// Uses call graph and known pure std functions (Spec 261) to propagate
     /// purity information from callees to callers.
     fn propagate_for_function(&mut self, func_id: &FunctionId) -> Result<()> {
-        // Get current purity result
-        let mut result = self
-            .cache
-            .get(func_id)
-            .ok_or_else(|| anyhow!("Function not in cache"))?
-            .clone();
-
-        // Get all dependencies
+        let result = self.cached_result(func_id)?;
         let deps = self.call_graph.get_dependencies(func_id);
-
-        // Check if function is in a cycle (recursive)
-        if self.call_graph.is_in_cycle(func_id) {
-            // Distinguish between pure recursion and recursion with side effects
-            if result.level == PurityLevel::StrictlyPure || result.level == PurityLevel::LocallyPure
-            {
-                // Pure structural recursion (e.g., factorial, tree traversal)
-                // Keep pure but reduce confidence due to recursion complexity
-                result.reason = PurityReason::RecursivePure;
-                result.confidence *= 0.7; // Penalty for recursion
-            } else {
-                // Recursion with side effects is impure
-                result.level = PurityLevel::Impure;
-                result.reason = PurityReason::RecursiveWithSideEffects;
-                result.confidence = 0.95;
-            }
-            self.cache.insert(func_id.clone(), result);
-            return Ok(());
-        }
-
-        // Build callee evidence using known pure functions (Spec 261)
-        let mut callee_evidence = Vec::new();
-
-        for dep_id in &deps {
-            // Get cached purity if available
-            let cached_purity = self.cache.get(dep_id).map(|r| {
-                let is_pure = r.level == PurityLevel::StrictlyPure;
-                (is_pure, r.confidence)
-            });
-
-            // Resolve callee purity using known pure std functions
-            let callee_purity = resolve_callee_purity(&dep_id.name, None, cached_purity);
-
-            callee_evidence.push(CalleeEvidence {
-                callee_name: dep_id.name.clone(),
-                callee_purity,
-            });
-        }
-
-        // Aggregate purity from all callees
-        let (all_deps_pure, aggregated_confidence, impure_reasons) =
-            aggregate_callee_purity(&callee_evidence);
-
-        // Track propagation depth for pure deps
-        let max_depth = deps
-            .iter()
-            .filter_map(|dep_id| self.cache.get(dep_id))
-            .filter_map(|r| {
-                if let PurityReason::PropagatedFromDeps { depth } = r.reason {
-                    Some(depth)
-                } else {
-                    None
-                }
-            })
-            .max()
-            .unwrap_or(0);
-
-        // Count unknown dependencies (not in cache and not known pure)
-        let unknown_count = callee_evidence
-            .iter()
-            .filter(|e| matches!(e.callee_purity, CalleePurity::Unknown))
-            .count();
-
-        // Update purity based on callee analysis
-        if all_deps_pure && result.level != PurityLevel::Impure && impure_reasons.is_empty() {
-            result.level = PurityLevel::StrictlyPure;
-            result.reason = PurityReason::PropagatedFromDeps {
-                depth: max_depth + 1,
-            };
-
-            // Combine confidence from depth and callee analysis
-            let depth_confidence = 0.9_f64.powi((max_depth + 1) as i32);
-            result.confidence =
-                (result.confidence * depth_confidence * aggregated_confidence).clamp(0.5, 1.0);
-        } else if !impure_reasons.is_empty() {
-            // Has impure callees
-            result.level = PurityLevel::Impure;
-            result.reason = PurityReason::SideEffects {
-                effects: impure_reasons,
-            };
-            result.confidence = aggregated_confidence;
-        } else if unknown_count > 0 {
-            result.reason = PurityReason::UnknownDeps {
-                count: unknown_count,
-            };
-            result.confidence = (result.confidence * aggregated_confidence).clamp(0.3, 1.0);
-        }
+        let result = if self.call_graph.is_in_cycle(func_id) {
+            propagate_recursive_result(result)
+        } else {
+            let callee_evidence = self.callee_evidence(&deps);
+            let summary = self.dependency_summary(&deps, &callee_evidence);
+            propagate_dependency_result(result, summary)
+        };
 
         self.cache.insert(func_id.clone(), result);
         Ok(())
     }
 
+    fn cached_result(&self, func_id: &FunctionId) -> Result<PurityResult> {
+        self.cache
+            .get(func_id)
+            .map(|result| result.clone())
+            .ok_or_else(|| anyhow!("Function not in cache"))
+    }
+
+    fn callee_evidence(&self, deps: &[FunctionId]) -> Vec<CalleeEvidence> {
+        deps.iter()
+            .map(|dep_id| CalleeEvidence {
+                callee_name: dep_id.name.clone(),
+                callee_purity: resolve_callee_purity(
+                    &dep_id.name,
+                    None,
+                    self.cached_callee_purity(dep_id),
+                ),
+            })
+            .collect()
+    }
+
+    fn cached_callee_purity(&self, dep_id: &FunctionId) -> Option<(bool, f64)> {
+        self.cache.get(dep_id).map(|result| {
+            let is_pure = result.level == PurityLevel::StrictlyPure;
+            (is_pure, result.confidence)
+        })
+    }
+
+    fn dependency_summary(
+        &self,
+        deps: &[FunctionId],
+        evidence: &[CalleeEvidence],
+    ) -> DependencyPuritySummary {
+        let (all_deps_pure, aggregated_confidence, impure_reasons) =
+            aggregate_callee_purity(evidence);
+
+        DependencyPuritySummary {
+            all_deps_pure,
+            aggregated_confidence,
+            impure_reasons,
+            max_depth: self.max_dependency_depth(deps),
+            unknown_count: count_unknown_dependencies(evidence),
+        }
+    }
+
+    fn max_dependency_depth(&self, deps: &[FunctionId]) -> usize {
+        deps.iter()
+            .filter_map(|dep_id| self.cache.get(dep_id))
+            .filter_map(|result| propagated_depth(&result.reason))
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Get the purity result for a function
     pub fn get_result(&self, func_id: &FunctionId) -> Option<PurityResult> {
         self.cache.get(func_id).map(|r| r.clone())
+    }
+}
+
+fn propagate_recursive_result(mut result: PurityResult) -> PurityResult {
+    if is_recursion_eligible_pure(&result.level) {
+        result.reason = PurityReason::RecursivePure;
+        result.confidence *= 0.7;
+        return result;
+    }
+
+    result.level = PurityLevel::Impure;
+    result.reason = PurityReason::RecursiveWithSideEffects;
+    result.confidence = 0.95;
+    result
+}
+
+fn propagate_dependency_result(
+    result: PurityResult,
+    summary: DependencyPuritySummary,
+) -> PurityResult {
+    if has_pure_dependencies(&result, &summary) {
+        return propagated_pure_result(result, &summary);
+    }
+
+    if !summary.impure_reasons.is_empty() {
+        return propagated_impure_result(summary);
+    }
+
+    if summary.unknown_count > 0 {
+        return propagated_unknown_result(result, &summary);
+    }
+
+    result
+}
+
+fn is_recursion_eligible_pure(level: &PurityLevel) -> bool {
+    matches!(level, PurityLevel::StrictlyPure | PurityLevel::LocallyPure)
+}
+
+fn has_pure_dependencies(result: &PurityResult, summary: &DependencyPuritySummary) -> bool {
+    summary.all_deps_pure
+        && result.level != PurityLevel::Impure
+        && summary.impure_reasons.is_empty()
+}
+
+fn propagated_pure_result(
+    mut result: PurityResult,
+    summary: &DependencyPuritySummary,
+) -> PurityResult {
+    let depth = summary.max_depth + 1;
+    let depth_confidence = 0.9_f64.powi(depth as i32);
+
+    result.level = PurityLevel::StrictlyPure;
+    result.reason = PurityReason::PropagatedFromDeps { depth };
+    result.confidence =
+        (result.confidence * depth_confidence * summary.aggregated_confidence).clamp(0.5, 1.0);
+    result
+}
+
+fn propagated_impure_result(summary: DependencyPuritySummary) -> PurityResult {
+    PurityResult {
+        level: PurityLevel::Impure,
+        confidence: summary.aggregated_confidence,
+        reason: PurityReason::SideEffects {
+            effects: summary.impure_reasons,
+        },
+    }
+}
+
+fn propagated_unknown_result(
+    mut result: PurityResult,
+    summary: &DependencyPuritySummary,
+) -> PurityResult {
+    result.reason = PurityReason::UnknownDeps {
+        count: summary.unknown_count,
+    };
+    result.confidence = (result.confidence * summary.aggregated_confidence).clamp(0.3, 1.0);
+    result
+}
+
+fn propagated_depth(reason: &PurityReason) -> Option<usize> {
+    match reason {
+        PurityReason::PropagatedFromDeps { depth } => Some(*depth),
+        _ => None,
+    }
+}
+
+fn count_unknown_dependencies(evidence: &[CalleeEvidence]) -> usize {
+    evidence
+        .iter()
+        .filter(|entry| matches!(entry.callee_purity, CalleePurity::Unknown))
+        .count()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn result(level: PurityLevel, confidence: f64) -> PurityResult {
+        PurityResult {
+            level,
+            confidence,
+            reason: PurityReason::Intrinsic,
+        }
+    }
+
+    fn summary(
+        all_deps_pure: bool,
+        aggregated_confidence: f64,
+        impure_reasons: Vec<String>,
+        max_depth: usize,
+        unknown_count: usize,
+    ) -> DependencyPuritySummary {
+        DependencyPuritySummary {
+            all_deps_pure,
+            aggregated_confidence,
+            impure_reasons,
+            max_depth,
+            unknown_count,
+        }
+    }
+
+    #[test]
+    fn recursive_pure_result_keeps_purity_with_penalty() {
+        let propagated = propagate_recursive_result(result(PurityLevel::StrictlyPure, 0.9));
+
+        assert_eq!(propagated.level, PurityLevel::StrictlyPure);
+        assert_eq!(propagated.reason, PurityReason::RecursivePure);
+        assert!((propagated.confidence - 0.63).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn recursive_impure_result_marks_side_effect_cycle() {
+        let propagated = propagate_recursive_result(result(PurityLevel::Impure, 0.4));
+
+        assert_eq!(propagated.level, PurityLevel::Impure);
+        assert_eq!(propagated.reason, PurityReason::RecursiveWithSideEffects);
+        assert!((propagated.confidence - 0.95).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn pure_dependencies_set_depth_and_confidence() {
+        let propagated = propagate_dependency_result(
+            result(PurityLevel::LocallyPure, 0.95),
+            summary(true, 0.9, Vec::new(), 2, 0),
+        );
+
+        assert_eq!(propagated.level, PurityLevel::StrictlyPure);
+        assert_eq!(
+            propagated.reason,
+            PurityReason::PropagatedFromDeps { depth: 3 }
+        );
+        assert!(propagated.confidence < 0.95);
+    }
+
+    #[test]
+    fn impure_dependencies_override_current_result() {
+        let propagated = propagate_dependency_result(
+            result(PurityLevel::StrictlyPure, 0.95),
+            summary(
+                false,
+                0.95,
+                vec!["Calls impure function: write".into()],
+                0,
+                0,
+            ),
+        );
+
+        assert_eq!(propagated.level, PurityLevel::Impure);
+        assert_eq!(
+            propagated.reason,
+            PurityReason::SideEffects {
+                effects: vec!["Calls impure function: write".into()]
+            }
+        );
+    }
+
+    #[test]
+    fn unknown_dependencies_reduce_confidence_without_changing_level() {
+        let propagated = propagate_dependency_result(
+            result(PurityLevel::StrictlyPure, 0.8),
+            summary(true, 0.9, Vec::new(), 0, 2),
+        );
+
+        assert_eq!(propagated.level, PurityLevel::StrictlyPure);
+        assert_eq!(
+            propagated.reason,
+            PurityReason::PropagatedFromDeps { depth: 1 }
+        );
+    }
+
+    #[test]
+    fn counts_unknown_dependencies_from_evidence() {
+        let evidence = vec![
+            CalleeEvidence {
+                callee_name: "external".into(),
+                callee_purity: CalleePurity::Unknown,
+            },
+            CalleeEvidence {
+                callee_name: "len".into(),
+                callee_purity: CalleePurity::KnownPure,
+            },
+        ];
+
+        assert_eq!(count_unknown_dependencies(&evidence), 1);
     }
 }
