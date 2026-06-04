@@ -48,11 +48,118 @@
 
 use super::diagnostics::{track_match_attempt, track_match_success, track_match_zero};
 use super::types::{FunctionCoverage, LcovData};
-use crate::risk::function_name_matching::{find_matching_function, MatchableFunction};
-use crate::risk::path_normalization::find_matching_path;
+use crate::risk::function_name_matching::{
+    find_matching_function, MatchConfidence, MatchableFunction,
+};
+use crate::risk::path_normalization::{find_matching_path, MatchStrategy};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+type FunctionCoverageMatch = (f64, MatchConfidence);
+
+fn coverage_debug_mode() -> bool {
+    std::env::var("DEBTMAP_COVERAGE_DEBUG").is_ok()
+}
+
+fn track_coverage_attempt(debug_mode: bool) {
+    if debug_mode {
+        track_match_attempt();
+    }
+}
+
+fn sorted_coverage_paths(functions: &HashMap<PathBuf, Vec<FunctionCoverage>>) -> Vec<PathBuf> {
+    let mut available_paths: Vec<PathBuf> = functions.keys().cloned().collect();
+    available_paths.sort();
+    available_paths
+}
+
+fn zero_coverage_result(debug_mode: bool) -> Option<f64> {
+    if debug_mode {
+        track_match_zero();
+        Some(0.0)
+    } else {
+        None
+    }
+}
+
+fn log_path_match(
+    debug_mode: bool,
+    file: &Path,
+    function_name: &str,
+    path_match: Option<(&PathBuf, MatchStrategy)>,
+    available_path_count: usize,
+) {
+    if !debug_mode {
+        return;
+    }
+
+    match path_match {
+        Some((_matched_path, strategy)) => eprintln!(
+            "[COVERAGE] {}::{} Path:✓ Strategy:{:?}",
+            file.display(),
+            function_name,
+            strategy
+        ),
+        None => eprintln!(
+            "[COVERAGE] {}::{} Path:✗ (not found in {} paths)",
+            file.display(),
+            function_name,
+            available_path_count
+        ),
+    }
+}
+
+fn find_function_coverage(
+    function_name: &str,
+    functions: &[FunctionCoverage],
+) -> Option<FunctionCoverageMatch> {
+    let matchable_funcs: Vec<MatchableFunction<&FunctionCoverage>> = functions
+        .iter()
+        .map(|f| MatchableFunction {
+            name: f.name.clone(),
+            data: f,
+        })
+        .collect();
+
+    find_matching_function(function_name, &matchable_funcs).map(|(matched_func, confidence)| {
+        (matched_func.data.coverage_percentage / 100.0, confidence)
+    })
+}
+
+fn log_function_match(
+    debug_mode: bool,
+    function_match: Option<FunctionCoverageMatch>,
+    function_count: usize,
+) {
+    if !debug_mode {
+        return;
+    }
+
+    match function_match {
+        Some((coverage, confidence)) => eprintln!(
+            "[COVERAGE]   Func:✓ Confidence:{:?} Coverage:{:.1}%",
+            confidence,
+            coverage * 100.0
+        ),
+        None => eprintln!(
+            "[COVERAGE]   Func:✗ (not found in {} functions)",
+            function_count
+        ),
+    }
+}
+
+fn track_coverage_result(debug_mode: bool, coverage: f64) {
+    if !debug_mode {
+        return;
+    }
+
+    if coverage > 0.0 {
+        track_match_success();
+    } else {
+        track_match_zero();
+    }
+}
 
 impl LcovData {
     /// Set the LOC counter to use for consistent line counting.
@@ -177,81 +284,34 @@ impl LcovData {
         _start_line: usize,
         _end_line: usize,
     ) -> Option<f64> {
-        let debug_mode = std::env::var("DEBTMAP_COVERAGE_DEBUG").is_ok();
+        let debug_mode = coverage_debug_mode();
+        track_coverage_attempt(debug_mode);
 
-        // Track statistics for diagnostic mode (Spec 203 FR3)
-        if debug_mode {
-            track_match_attempt();
-        }
-
-        // Phase 1: Path matching using Spec 201
-        let mut available_paths: Vec<PathBuf> = self.functions.keys().cloned().collect();
-        // Sort available paths to ensure deterministic matching when multiple candidates match (Spec 214)
-        available_paths.sort();
+        let available_paths = sorted_coverage_paths(&self.functions);
         let path_match = find_matching_path(file, &available_paths);
+        log_path_match(
+            debug_mode,
+            file,
+            function_name,
+            path_match,
+            available_paths.len(),
+        );
 
-        if debug_mode {
-            if let Some((_matched_path, strategy)) = &path_match {
-                eprintln!(
-                    "[COVERAGE] {}::{} Path:✓ Strategy:{:?}",
-                    file.display(),
-                    function_name,
-                    strategy
-                );
-            } else {
-                eprintln!(
-                    "[COVERAGE] {}::{} Path:✗ (not found in {} paths)",
-                    file.display(),
-                    function_name,
-                    available_paths.len()
-                );
-                track_match_zero();
-                return Some(0.0); // Return 0% not None when LCOV provided
-            }
-        }
+        let (matched_path, _path_strategy) = match path_match {
+            Some(path_match) => path_match,
+            None => return zero_coverage_result(debug_mode),
+        };
 
-        let (matched_path, _path_strategy) = path_match?;
-
-        // Phase 2: Function matching using Spec 202
         let functions = self.functions.get(matched_path)?;
+        let function_match = find_function_coverage(function_name, functions);
+        log_function_match(debug_mode, function_match, functions.len());
 
-        // Convert to MatchableFunction for the matching algorithm
-        let matchable_funcs: Vec<MatchableFunction<&FunctionCoverage>> = functions
-            .iter()
-            .map(|f| MatchableFunction {
-                name: f.name.clone(),
-                data: f,
-            })
-            .collect();
+        let (coverage, _confidence) = match function_match {
+            Some(function_match) => function_match,
+            None => return zero_coverage_result(debug_mode),
+        };
 
-        let func_match = find_matching_function(function_name, &matchable_funcs);
-
-        if debug_mode {
-            if let Some((matched_func, confidence)) = &func_match {
-                eprintln!(
-                    "[COVERAGE]   Func:✓ Confidence:{:?} Coverage:{:.1}%",
-                    confidence, matched_func.data.coverage_percentage
-                );
-            } else {
-                eprintln!(
-                    "[COVERAGE]   Func:✗ (not found in {} functions)",
-                    functions.len()
-                );
-                track_match_zero();
-                return Some(0.0); // Return 0% not None when LCOV provided
-            }
-        }
-
-        let (matched_func, _confidence) = func_match?;
-        let coverage = matched_func.data.coverage_percentage / 100.0;
-
-        // Track successful match in debug mode (Spec 203 FR3)
-        if debug_mode && coverage > 0.0 {
-            track_match_success();
-        } else if debug_mode {
-            track_match_zero();
-        }
-
+        track_coverage_result(debug_mode, coverage);
         Some(coverage)
     }
 
