@@ -170,3 +170,34 @@ class CharacterHandler:
     assert_eq!(get_func.parameter_names, vec!["self", "character_id"]);
     assert!(post_func.is_async);
 }
+
+#[test]
+fn test_python_extraction_finds_unique_class_fields() {
+    let source = r#"
+class Account:
+    def __init__(self, name):
+        self.name = name
+        self._balance = 0
+        self.name = name.strip()
+
+    def rename(self, name):
+        self.name = name
+"#;
+    let path = Path::new("account.py");
+    let data = UnifiedFileExtractor::extract(path, source).expect("Failed to extract");
+
+    let account = data
+        .structs
+        .iter()
+        .find(|s| s.name == "Account")
+        .expect("Account class should be extracted");
+    let field_names = account
+        .fields
+        .iter()
+        .map(|field| field.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(field_names, vec!["name", "_balance"]);
+    assert!(account.fields[0].is_public);
+    assert!(!account.fields[1].is_public);
+}

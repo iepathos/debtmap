@@ -477,33 +477,51 @@ impl<'a> PythonExtractor<'a> {
     }
 
     fn find_fields(&self, node: Node, fields: &mut Vec<FieldInfo>) {
-        // Look for self.x = ...
-        if node.kind() == "assignment" {
-            let left_node = node.child_by_field_name("left").unwrap();
-            if left_node.kind() == "attribute" {
-                let object_node = left_node.child_by_field_name("object").unwrap();
-                if self.node_text(object_node) == "self" {
-                    let attr_node = left_node.child_by_field_name("attribute").unwrap();
-                    let field_name = self.node_text(attr_node).to_string();
-                    if !fields.iter().any(|f| f.name == field_name) {
-                        fields.push(FieldInfo {
-                            name: field_name,
-                            type_str: "Any".to_string(), // Type inference is hard
-                            is_public: !self.node_text(attr_node).starts_with('_'),
-                        });
-                    }
-                }
-            }
+        if let Some(field) = self.field_from_assignment(node) {
+            Self::push_unique_field(fields, field);
         }
 
+        self.find_fields_in_children(node, fields);
+    }
+
+    fn field_from_assignment(&self, node: Node) -> Option<FieldInfo> {
+        let left_node = Self::assignment_left(node)?;
+        let attr_node = self.self_attribute(left_node)?;
+        let field_name = self.node_text(attr_node).to_string();
+
+        Some(FieldInfo {
+            name: field_name,
+            type_str: "Any".to_string(), // Type inference is hard
+            is_public: !self.node_text(attr_node).starts_with('_'),
+        })
+    }
+
+    fn assignment_left<'tree>(node: Node<'tree>) -> Option<Node<'tree>> {
+        (node.kind() == "assignment")
+            .then(|| node.child_by_field_name("left"))
+            .flatten()
+    }
+
+    fn self_attribute<'tree>(&self, node: Node<'tree>) -> Option<Node<'tree>> {
+        (node.kind() == "attribute")
+            .then(|| {
+                node.child_by_field_name("object")
+                    .filter(|object| self.node_text(*object) == "self")
+                    .and_then(|_| node.child_by_field_name("attribute"))
+            })
+            .flatten()
+    }
+
+    fn push_unique_field(fields: &mut Vec<FieldInfo>, field: FieldInfo) {
+        if !fields.iter().any(|existing| existing.name == field.name) {
+            fields.push(field);
+        }
+    }
+
+    fn find_fields_in_children(&self, node: Node, fields: &mut Vec<FieldInfo>) {
         let mut cursor = node.walk();
-        if cursor.goto_first_child() {
-            loop {
-                self.find_fields(cursor.node(), fields);
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
-            }
+        for child in node.children(&mut cursor) {
+            self.find_fields(child, fields);
         }
     }
 
