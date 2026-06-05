@@ -20,7 +20,9 @@ use crate::priority::classification::CoverageLevel;
 use crate::priority::formatted_output::{FormattedPriorityItem, FormattedSection};
 use crate::priority::score_formatter;
 use colored::*;
+use std::fmt::Display;
 use std::io::{self, Write};
+use std::path::Path;
 
 /// Renders a formatted priority item to a writer.
 ///
@@ -67,6 +69,18 @@ pub fn write_priority_item(writer: &mut dyn Write, item: &FormattedPriorityItem)
 
 /// Writes a single section to the writer.
 fn write_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Result<()> {
+    if write_intro_section(writer, section)? {
+        return Ok(());
+    }
+
+    if write_metric_section(writer, section)? {
+        return Ok(());
+    }
+
+    write_text_section(writer, section)
+}
+
+fn write_intro_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Result<bool> {
     match section {
         FormattedSection::Header {
             rank,
@@ -79,59 +93,21 @@ fn write_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Resu
             file,
             line,
             function,
-        } => {
-            writeln!(
-                writer,
-                "{} {}:{} {}()",
-                "├─ LOCATION:".bright_blue(),
-                file.display(),
-                line,
-                function.bright_green()
-            )?;
-        }
+        } => write_location_section(writer, file, *line, function)?,
 
         FormattedSection::ContextDampening {
             description,
             dampening_percentage,
-        } => {
-            writeln!(
-                writer,
-                "{} {} ({}% dampening applied)",
-                "├─ CONTEXT:".bright_blue(),
-                description.bright_cyan(),
-                dampening_percentage
-            )?;
-        }
+        } => write_context_dampening_section(writer, description, *dampening_percentage)?,
 
-        FormattedSection::Action { action } => {
-            writeln!(
-                writer,
-                "{} {}",
-                "├─ ACTION:".bright_blue(),
-                action.bright_yellow()
-            )?;
-        }
+        _ => return Ok(false),
+    }
 
-        FormattedSection::Impact {
-            complexity_reduction,
-            risk_reduction,
-        } => {
-            writeln!(
-                writer,
-                "{} {}",
-                "├─ IMPACT:".bright_blue(),
-                format!(
-                    "-{} complexity, -{:.1} risk",
-                    complexity_reduction, risk_reduction
-                )
-                .bright_cyan()
-            )?;
-        }
+    Ok(true)
+}
 
-        FormattedSection::Evidence { text } => {
-            writeln!(writer, "{} {}", "├─ EVIDENCE:".bright_blue(), text)?;
-        }
-
+fn write_metric_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Result<bool> {
+    match section {
         FormattedSection::Complexity {
             cyclomatic,
             cognitive,
@@ -147,9 +123,7 @@ fn write_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Resu
         } => write_pattern_section(writer, pattern_type, icon, metrics, *confidence)?,
 
         FormattedSection::Coverage {
-            percentage,
-            level,
-            details: _,
+            percentage, level, ..
         } => write_coverage_section(writer, *percentage, level)?,
 
         FormattedSection::Dependencies {
@@ -158,10 +132,6 @@ fn write_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Resu
             callers,
             callees,
         } => write_dependencies_section(writer, *upstream, *downstream, callers, callees)?,
-
-        FormattedSection::DebtSpecific { text } => {
-            writeln!(writer, "{} {}", "├─ DETAILS:".bright_blue(), text)?;
-        }
 
         FormattedSection::ContextualRisk {
             base_risk,
@@ -176,17 +146,85 @@ fn write_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Resu
             providers,
         )?,
 
-        FormattedSection::Rationale { text } => {
-            writeln!(
-                writer,
-                "{} {}",
-                "└─ RATIONALE:".bright_blue(),
-                text.dimmed()
-            )?;
-        }
+        _ => return Ok(false),
     }
 
-    Ok(())
+    Ok(true)
+}
+
+fn write_text_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Result<()> {
+    match section {
+        FormattedSection::Action { action } => {
+            write_labeled_value(writer, "├─ ACTION:", action.bright_yellow())
+        }
+        FormattedSection::Impact {
+            complexity_reduction,
+            risk_reduction,
+        } => write_impact_section(writer, *complexity_reduction, *risk_reduction),
+        FormattedSection::Evidence { text } => write_labeled_value(writer, "├─ EVIDENCE:", text),
+        FormattedSection::DebtSpecific { text } => write_labeled_value(writer, "├─ DETAILS:", text),
+        FormattedSection::Rationale { text } => {
+            write_labeled_value(writer, "└─ RATIONALE:", text.dimmed())
+        }
+        FormattedSection::Header { .. }
+        | FormattedSection::Location { .. }
+        | FormattedSection::ContextDampening { .. }
+        | FormattedSection::Complexity { .. }
+        | FormattedSection::Pattern { .. }
+        | FormattedSection::Coverage { .. }
+        | FormattedSection::Dependencies { .. }
+        | FormattedSection::ContextualRisk { .. } => Ok(()),
+    }
+}
+
+fn write_labeled_value(writer: &mut dyn Write, label: &str, value: impl Display) -> io::Result<()> {
+    writeln!(writer, "{} {}", label.bright_blue(), value)
+}
+
+fn write_location_section(
+    writer: &mut dyn Write,
+    file: &Path,
+    line: u32,
+    function: &str,
+) -> io::Result<()> {
+    writeln!(
+        writer,
+        "{} {}:{} {}()",
+        "├─ LOCATION:".bright_blue(),
+        file.display(),
+        line,
+        function.bright_green()
+    )
+}
+
+fn write_context_dampening_section(
+    writer: &mut dyn Write,
+    description: &str,
+    dampening_percentage: i32,
+) -> io::Result<()> {
+    writeln!(
+        writer,
+        "{} {} ({}% dampening applied)",
+        "├─ CONTEXT:".bright_blue(),
+        description.bright_cyan(),
+        dampening_percentage
+    )
+}
+
+fn write_impact_section(
+    writer: &mut dyn Write,
+    complexity_reduction: u32,
+    risk_reduction: f64,
+) -> io::Result<()> {
+    write_labeled_value(
+        writer,
+        "├─ IMPACT:",
+        format!(
+            "-{} complexity, -{:.1} risk",
+            complexity_reduction, risk_reduction
+        )
+        .bright_cyan(),
+    )
 }
 
 /// Writes the header section with rank, score, coverage, and severity.
@@ -499,6 +537,42 @@ mod tests {
         assert!(output_str.contains("cognitive: 15"));
         assert!(output_str.contains("nesting: 3"));
         assert!(output_str.contains("entropy: 2.50"));
+    }
+
+    #[test]
+    fn write_simple_sections() {
+        let sections = vec![
+            FormattedSection::ContextDampening {
+                description: "Stable, low-churn code".to_string(),
+                dampening_percentage: 46,
+            },
+            FormattedSection::Impact {
+                complexity_reduction: 8,
+                risk_reduction: 2.5,
+            },
+            FormattedSection::Evidence {
+                text: "Repeated branching pattern".to_string(),
+            },
+            FormattedSection::DebtSpecific {
+                text: "Split formatting branches".to_string(),
+            },
+            FormattedSection::Rationale {
+                text: "Reduces dispatcher complexity".to_string(),
+            },
+        ];
+
+        let mut output = Vec::new();
+        for section in &sections {
+            super::write_section(&mut output, section).unwrap();
+        }
+
+        let output_str = String::from_utf8(output).unwrap();
+        assert!(output_str.contains("Stable, low-churn code"));
+        assert!(output_str.contains("46% dampening applied"));
+        assert!(output_str.contains("-8 complexity, -2.5 risk"));
+        assert!(output_str.contains("Repeated branching pattern"));
+        assert!(output_str.contains("Split formatting branches"));
+        assert!(output_str.contains("Reduces dispatcher complexity"));
     }
 
     // Unit tests for extracted helper functions

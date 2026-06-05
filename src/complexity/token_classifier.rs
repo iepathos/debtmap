@@ -209,6 +209,111 @@ pub struct TokenClassifier {
     cache: HashMap<(String, bool, bool), TokenClass>,
 }
 
+fn classify_control_flow(token: &str) -> Option<TokenClass> {
+    match token {
+        "if" | "else" | "elif" => Some(TokenClass::ControlFlow(FlowType::If)),
+        "match" => Some(TokenClass::ControlFlow(FlowType::Match)),
+        "loop" => Some(TokenClass::ControlFlow(FlowType::Loop)),
+        "while" => Some(TokenClass::ControlFlow(FlowType::While)),
+        "for" => Some(TokenClass::ControlFlow(FlowType::For)),
+        "return" => Some(TokenClass::ControlFlow(FlowType::Return)),
+        "break" => Some(TokenClass::ControlFlow(FlowType::Break)),
+        "continue" => Some(TokenClass::ControlFlow(FlowType::Continue)),
+        _ => None,
+    }
+}
+
+fn classify_method_call_context(
+    classifier: &TokenClassifier,
+    token: &str,
+    context: &TokenContext,
+) -> Option<TokenClass> {
+    context
+        .is_method_call
+        .then(|| classifier.classify_method_call(token, context))
+}
+
+fn classify_field_access_context(
+    classifier: &TokenClassifier,
+    token: &str,
+    context: &TokenContext,
+) -> Option<TokenClass> {
+    context
+        .is_field_access
+        .then(|| classifier.classify_field_access(token, context))
+}
+
+fn classify_local_var_context(
+    classifier: &TokenClassifier,
+    token: &str,
+    context: &TokenContext,
+) -> Option<TokenClass> {
+    (!context.is_external && is_identifier_token(token))
+        .then(|| classifier.classify_local_var(token))
+}
+
+fn is_identifier_token(token: &str) -> bool {
+    token.chars().all(|c| c.is_alphanumeric() || c == '_')
+}
+
+fn classify_literal(token: &str) -> Option<TokenClass> {
+    if token.parse::<f64>().is_ok() {
+        Some(TokenClass::Literal(LiteralCategory::Numeric))
+    } else {
+        classify_named_literal(token)
+    }
+}
+
+fn classify_named_literal(token: &str) -> Option<TokenClass> {
+    match token {
+        "true" | "false" => Some(TokenClass::Literal(LiteralCategory::Boolean)),
+        "null" | "None" | "nil" => Some(TokenClass::Literal(LiteralCategory::Null)),
+        _ if is_string_literal(token) => Some(TokenClass::Literal(LiteralCategory::String)),
+        _ if is_char_literal(token) => Some(TokenClass::Literal(LiteralCategory::Char)),
+        _ => None,
+    }
+}
+
+fn is_string_literal(token: &str) -> bool {
+    token.starts_with('"') && token.ends_with('"')
+}
+
+fn is_char_literal(token: &str) -> bool {
+    token.starts_with('\'') && token.ends_with('\'') && token.len() == 3
+}
+
+fn classify_keyword(token: &str) -> Option<TokenClass> {
+    is_keyword(token).then(|| TokenClass::Keyword(token.to_string()))
+}
+
+fn is_keyword(token: &str) -> bool {
+    matches!(
+        token,
+        "fn" | "let"
+            | "const"
+            | "mut"
+            | "pub"
+            | "struct"
+            | "enum"
+            | "trait"
+            | "impl"
+            | "mod"
+            | "use"
+            | "async"
+            | "await"
+            | "self"
+            | "Self"
+    )
+}
+
+fn classify_operator(token: &str) -> Option<TokenClass> {
+    is_operator(token).then(|| TokenClass::Operator(token.to_string()))
+}
+
+fn is_operator(token: &str) -> bool {
+    token.chars().all(|c| "+-*/%=<>!&|^~?.".contains(c))
+}
+
 impl TokenClassifier {
     pub fn new(config: ClassificationConfig) -> Self {
         Self {
@@ -244,91 +349,18 @@ impl TokenClassifier {
     }
 
     fn classify_internal(&self, token: &str, context: &TokenContext) -> TokenClass {
-        // Control flow keywords
-        if matches!(token, "if" | "else" | "elif") {
-            return TokenClass::ControlFlow(FlowType::If);
-        }
-        if token == "match" {
-            return TokenClass::ControlFlow(FlowType::Match);
-        }
-        if token == "loop" {
-            return TokenClass::ControlFlow(FlowType::Loop);
-        }
-        if token == "while" {
-            return TokenClass::ControlFlow(FlowType::While);
-        }
-        if token == "for" {
-            return TokenClass::ControlFlow(FlowType::For);
-        }
-        if token == "return" {
-            return TokenClass::ControlFlow(FlowType::Return);
-        }
-        if token == "break" {
-            return TokenClass::ControlFlow(FlowType::Break);
-        }
-        if token == "continue" {
-            return TokenClass::ControlFlow(FlowType::Continue);
-        }
+        self.classify_contextual_token(token, context)
+            .or_else(|| classify_literal(token))
+            .or_else(|| classify_keyword(token))
+            .or_else(|| classify_operator(token))
+            .unwrap_or_else(|| TokenClass::Unknown(token.to_string()))
+    }
 
-        // Method calls
-        if context.is_method_call {
-            return self.classify_method_call(token, context);
-        }
-
-        // Field access
-        if context.is_field_access {
-            return self.classify_field_access(token, context);
-        }
-
-        // Local variables
-        if !context.is_external && token.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            return self.classify_local_var(token);
-        }
-
-        // Literals
-        if token.parse::<f64>().is_ok() {
-            return TokenClass::Literal(LiteralCategory::Numeric);
-        }
-        if token == "true" || token == "false" {
-            return TokenClass::Literal(LiteralCategory::Boolean);
-        }
-        if token.starts_with('"') && token.ends_with('"') {
-            return TokenClass::Literal(LiteralCategory::String);
-        }
-        if token.starts_with('\'') && token.ends_with('\'') && token.len() == 3 {
-            return TokenClass::Literal(LiteralCategory::Char);
-        }
-        if token == "null" || token == "None" || token == "nil" {
-            return TokenClass::Literal(LiteralCategory::Null);
-        }
-
-        // Keywords
-        if matches!(
-            token,
-            "fn" | "let"
-                | "const"
-                | "mut"
-                | "pub"
-                | "struct"
-                | "enum"
-                | "trait"
-                | "impl"
-                | "mod"
-                | "use"
-                | "async"
-                | "await"
-                | "self"
-                | "Self"
-        ) {
-            return TokenClass::Keyword(token.to_string());
-        }
-
-        // Operators
-        if token.chars().all(|c| "+-*/%=<>!&|^~?.".contains(c)) {
-            return TokenClass::Operator(token.to_string());
-        }
-
-        TokenClass::Unknown(token.to_string())
+    fn classify_contextual_token(&self, token: &str, context: &TokenContext) -> Option<TokenClass> {
+        classify_control_flow(token)
+            .or_else(|| classify_method_call_context(self, token, context))
+            .or_else(|| classify_field_access_context(self, token, context))
+            .or_else(|| classify_local_var_context(self, token, context))
     }
 
     fn classify_method_call(&self, token: &str, context: &TokenContext) -> TokenClass {

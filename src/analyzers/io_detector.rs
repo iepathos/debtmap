@@ -377,6 +377,30 @@ impl IoDetectorVisitor {
         vars
     }
 
+    fn operation_type_from_call_path(&self, path_str: &str) -> Option<&'static str> {
+        if self.is_io_module_path(path_str) {
+            return self.operation_type_from_path(path_str);
+        }
+
+        associated_call_parts(path_str).and_then(|(type_name, method_name)| {
+            self.check_method_patterns(method_name, Some(type_name))
+        })
+    }
+
+    fn io_operation_from_call(&self, call: &ExprCall) -> Option<IoOperation> {
+        let Expr::Path(path) = &*call.func else {
+            return None;
+        };
+
+        let path_str = quote::quote!(#path).to_string();
+        self.operation_type_from_call_path(&path_str)
+            .map(|op_type| IoOperation {
+                operation_type: op_type.to_string(),
+                variables: self.extract_variables_from_args(&call.args),
+                line: self.extract_line(path.span()),
+            })
+    }
+
     /// Extract variables from macro tokens (heuristic-based)
     fn extract_variables_from_macro(&self, mac: &Macro) -> Vec<String> {
         let mut vars = Vec::new();
@@ -461,41 +485,8 @@ impl<'ast> Visit<'ast> for IoDetectorVisitor {
     }
 
     fn visit_expr_call(&mut self, call: &'ast ExprCall) {
-        // Check if this is a function call to an I/O API
-        if let Expr::Path(path) = &*call.func {
-            let path_str = quote::quote!(#path).to_string();
-
-            // Check for module-based I/O calls
-            if self.is_io_module_path(&path_str) {
-                if let Some(op_type) = self.operation_type_from_path(&path_str) {
-                    let line = self.extract_line(path.span());
-                    let variables = self.extract_variables_from_args(&call.args);
-                    self.operations.push(IoOperation {
-                        operation_type: op_type.to_string(),
-                        variables,
-                        line,
-                    });
-                }
-            } else {
-                // Check for type-associated functions like File::create
-                // Note: quote adds spaces around ::, so we need to trim each segment
-                let segments: Vec<&str> = path_str.split("::").map(|s| s.trim()).collect();
-                if segments.len() >= 2 {
-                    let type_name = segments[segments.len() - 2];
-                    let method_name = segments[segments.len() - 1];
-
-                    if let Some(op_type) = self.check_method_patterns(method_name, Some(type_name))
-                    {
-                        let line = self.extract_line(path.span());
-                        let variables = self.extract_variables_from_args(&call.args);
-                        self.operations.push(IoOperation {
-                            operation_type: op_type.to_string(),
-                            variables,
-                            line,
-                        });
-                    }
-                }
-            }
+        if let Some(operation) = self.io_operation_from_call(call) {
+            self.operations.push(operation);
         }
 
         // Continue visiting nested expressions
@@ -578,6 +569,15 @@ fn collect_variables_from_expr(expr: &Expr, vars: &mut Vec<String>, depth: usize
         // Stop at literals, blocks, closures
         _ => {}
     }
+}
+
+fn associated_call_parts(path_str: &str) -> Option<(&str, &str)> {
+    // quote adds spaces around ::, so each segment needs trimming.
+    let segments: Vec<&str> = path_str.split("::").map(str::trim).collect();
+    let method_name = segments.last()?;
+    let type_name = segments.iter().rev().nth(1)?;
+
+    Some((type_name, method_name))
 }
 
 /// Check if a string is a valid Rust identifier
@@ -1045,6 +1045,34 @@ mod tests {
         assert_eq!(
             vars.len(),
             vars.iter().collect::<std::collections::HashSet<_>>().len()
+        );
+    }
+
+    #[test]
+    fn test_operation_type_from_module_call_path() {
+        let visitor = IoDetectorVisitor::new();
+
+        assert_eq!(
+            visitor.operation_type_from_call_path("std :: fs :: read_to_string"),
+            Some("file_io")
+        );
+    }
+
+    #[test]
+    fn test_operation_type_from_associated_call_path() {
+        let visitor = IoDetectorVisitor::new();
+
+        assert_eq!(
+            visitor.operation_type_from_call_path("File :: create"),
+            Some("file_io")
+        );
+    }
+
+    #[test]
+    fn test_associated_call_parts_trims_quoted_segments() {
+        assert_eq!(
+            associated_call_parts("std :: fs :: File :: create"),
+            Some(("File", "create"))
         );
     }
 

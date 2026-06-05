@@ -12,6 +12,23 @@ mod tests {
         TokenClassifier::new(config)
     }
 
+    fn expression_context() -> TokenContext {
+        TokenContext {
+            is_method_call: false,
+            is_field_access: false,
+            is_external: false,
+            scope_depth: 0,
+            parent_node_type: NodeType::Expression,
+        }
+    }
+
+    fn external_expression_context() -> TokenContext {
+        TokenContext {
+            is_external: true,
+            ..expression_context()
+        }
+    }
+
     #[test]
     fn test_method_call_classification() {
         let mut classifier = create_test_classifier(true);
@@ -108,6 +125,67 @@ mod tests {
 
         let class = classifier.classify("return", &context);
         assert!(matches!(class, TokenClass::ControlFlow(FlowType::Return)));
+    }
+
+    #[test]
+    fn test_contextual_classification_precedence() {
+        let mut classifier = create_test_classifier(true);
+        let method_context = TokenContext {
+            is_method_call: true,
+            ..expression_context()
+        };
+        let field_context = TokenContext {
+            is_field_access: true,
+            ..expression_context()
+        };
+
+        assert_eq!(
+            classifier.classify("if", &method_context),
+            TokenClass::ControlFlow(FlowType::If)
+        );
+        assert_eq!(
+            classifier.classify("get_value", &method_context),
+            TokenClass::MethodCall(CallType::Getter)
+        );
+        assert_eq!(
+            classifier.classify("anything", &field_context),
+            TokenClass::FieldAccess(AccessType::Getter)
+        );
+    }
+
+    #[test]
+    fn test_literal_keyword_and_operator_classification() {
+        let mut classifier = create_test_classifier(true);
+        let external_context = external_expression_context();
+
+        let cases = [
+            ("42", TokenClass::Literal(LiteralCategory::Numeric)),
+            ("true", TokenClass::Literal(LiteralCategory::Boolean)),
+            ("\"text\"", TokenClass::Literal(LiteralCategory::String)),
+            ("'x'", TokenClass::Literal(LiteralCategory::Char)),
+            ("None", TokenClass::Literal(LiteralCategory::Null)),
+            ("fn", TokenClass::Keyword("fn".to_string())),
+            ("&&", TokenClass::Operator("&&".to_string())),
+        ];
+
+        for (token, expected) in cases {
+            assert_eq!(classifier.classify(token, &external_context), expected);
+        }
+    }
+
+    #[test]
+    fn test_local_identifier_classification_precedes_literals_and_keywords() {
+        let mut classifier = create_test_classifier(true);
+        let context = expression_context();
+
+        assert_eq!(
+            classifier.classify("true", &context),
+            TokenClass::LocalVar(VarType::Other)
+        );
+        assert_eq!(
+            classifier.classify("fn", &context),
+            TokenClass::LocalVar(VarType::Other)
+        );
     }
 
     #[test]
