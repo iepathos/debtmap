@@ -113,33 +113,22 @@ impl ConfigLoaderDetector {
         (self.has_file_read || self.has_env_read)
             && (self.has_toml_parse || self.has_json_parse || self.has_config_type)
     }
+
+    fn record_path_call(&mut self, path_str: &str) {
+        let signals = detect_config_call_signals(path_str);
+
+        self.has_file_read |= signals.has_file_read;
+        self.has_env_read |= signals.has_env_read;
+        self.has_toml_parse |= signals.has_toml_parse;
+        self.has_json_parse |= signals.has_json_parse;
+    }
 }
 
 impl<'ast> Visit<'ast> for ConfigLoaderDetector {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if let Expr::Path(path) = &*node.func {
             let path_str = path_to_string(&path.path);
-
-            // Check for file operations
-            if path_str.contains("read_to_string")
-                || path_str.contains("File::open")
-                || path_str.contains("fs::read")
-            {
-                self.has_file_read = true;
-            }
-
-            // Check for env operations
-            if path_str.contains("env::var") || path_str.contains("std::env") {
-                self.has_env_read = true;
-            }
-
-            // Check for parsing operations
-            if path_str.contains("toml::from_str") || path_str.contains("toml::parse") {
-                self.has_toml_parse = true;
-            }
-            if path_str.contains("serde_json::from_str") || path_str.contains("json::parse") {
-                self.has_json_parse = true;
-            }
+            self.record_path_call(&path_str);
         }
 
         syn::visit::visit_expr_call(self, node);
@@ -161,6 +150,47 @@ impl<'ast> Visit<'ast> for ConfigLoaderDetector {
 
         syn::visit::visit_expr_method_call(self, node);
     }
+}
+
+#[derive(Default)]
+struct ConfigCallSignals {
+    has_file_read: bool,
+    has_env_read: bool,
+    has_toml_parse: bool,
+    has_json_parse: bool,
+}
+
+fn detect_config_call_signals(path_str: &str) -> ConfigCallSignals {
+    ConfigCallSignals {
+        has_file_read: is_file_read_call(path_str),
+        has_env_read: is_env_read_call(path_str),
+        has_toml_parse: is_toml_parse_call(path_str),
+        has_json_parse: is_json_parse_call(path_str),
+    }
+}
+
+fn is_file_read_call(path_str: &str) -> bool {
+    ["read_to_string", "File::open", "fs::read"]
+        .iter()
+        .any(|pattern| path_str.contains(pattern))
+}
+
+fn is_env_read_call(path_str: &str) -> bool {
+    ["env::var", "std::env"]
+        .iter()
+        .any(|pattern| path_str.contains(pattern))
+}
+
+fn is_toml_parse_call(path_str: &str) -> bool {
+    ["toml::from_str", "toml::parse"]
+        .iter()
+        .any(|pattern| path_str.contains(pattern))
+}
+
+fn is_json_parse_call(path_str: &str) -> bool {
+    ["serde_json::from_str", "json::parse"]
+        .iter()
+        .any(|pattern| path_str.contains(pattern))
 }
 
 impl<'ast> Visit<'ast> for ContextDetector {
@@ -387,5 +417,24 @@ mod tests {
         let config_ctx = detector.get_context("load_config").unwrap();
         assert_eq!(config_ctx.role, FunctionRole::ConfigLoader);
         assert!(config_ctx.allows_blocking_io());
+    }
+
+    #[test]
+    fn config_call_signals_detect_file_env_and_parse_calls() {
+        let file_signals = detect_config_call_signals("std::fs::read_to_string");
+        assert!(file_signals.has_file_read);
+        assert!(!file_signals.has_env_read);
+
+        let env_signals = detect_config_call_signals("std::env::var");
+        assert!(env_signals.has_env_read);
+        assert!(!env_signals.has_file_read);
+
+        let toml_signals = detect_config_call_signals("toml::from_str");
+        assert!(toml_signals.has_toml_parse);
+        assert!(!toml_signals.has_json_parse);
+
+        let json_signals = detect_config_call_signals("serde_json::from_str");
+        assert!(json_signals.has_json_parse);
+        assert!(!json_signals.has_toml_parse);
     }
 }
