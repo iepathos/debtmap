@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use syn::{
     visit::Visit, Block, Expr, ExprAsync, ExprAwait, ExprBlock, ExprCall, ExprClosure,
-    ExprMethodCall, Item, ItemFn, Stmt, UseTree,
+    ExprMethodCall, Item, ItemFn, Path, Stmt, UseTree,
 };
 
 /// Detects async boundaries where blocking I/O would be problematic
@@ -222,6 +222,24 @@ impl AsyncBoundaryDetector {
         }
         has_await
     }
+
+    fn record_blocking_method_call(&mut self, node: &ExprMethodCall) {
+        if !self.is_in_async() {
+            return;
+        }
+
+        let method_name = node.method.to_string();
+        let receiver_str = receiver_type_hint(&node.receiver);
+
+        if self.is_blocking_io(&receiver_str, &method_name) {
+            self.blocking_in_async.push(BlockingCall {
+                function_name: format!("{receiver_str}.{method_name}"),
+                is_blocking: true,
+                in_async_context: true,
+                line: 0,
+            });
+        }
+    }
 }
 
 impl ImportTracker {
@@ -278,6 +296,33 @@ fn is_async_command_module(path: &str) -> bool {
 
 fn is_std_command_module(path: &str) -> bool {
     path == "std::process"
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.segments
+        .iter()
+        .map(|s| s.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("::")
+}
+
+fn receiver_type_hint(receiver: &Expr) -> String {
+    match receiver {
+        Expr::Path(path) => path_to_string(&path.path),
+        Expr::Call(call) => call_receiver_type_hint(call),
+        _ => String::new(),
+    }
+}
+
+fn call_receiver_type_hint(call: &ExprCall) -> String {
+    match &*call.func {
+        Expr::Path(path) => constructor_receiver_type(&path_to_string(&path.path)),
+        _ => String::new(),
+    }
+}
+
+fn constructor_receiver_type(path: &str) -> String {
+    path.strip_suffix("::new").unwrap_or(path).to_string()
 }
 
 impl<'ast> Visit<'ast> for AsyncBoundaryDetector {
@@ -348,56 +393,7 @@ impl<'ast> Visit<'ast> for AsyncBoundaryDetector {
     }
 
     fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
-        if self.is_in_async() {
-            let method_name = node.method.to_string();
-
-            // Check receiver for type hints
-            let receiver_str = match &*node.receiver {
-                Expr::Path(path) => path
-                    .path
-                    .segments
-                    .iter()
-                    .map(|s| s.ident.to_string())
-                    .collect::<Vec<_>>()
-                    .join("::"),
-                Expr::Call(call) => {
-                    // Handle chained calls like Command::new("echo").output()
-                    if let Expr::Path(path) = &*call.func {
-                        let full_path = path
-                            .path
-                            .segments
-                            .iter()
-                            .map(|s| s.ident.to_string())
-                            .collect::<Vec<_>>()
-                            .join("::");
-
-                        // Extract just the type name (e.g., "Command" from "Command::new")
-                        if full_path.ends_with("::new") {
-                            full_path
-                                .strip_suffix("::new")
-                                .unwrap_or(&full_path)
-                                .to_string()
-                        } else {
-                            full_path
-                        }
-                    } else {
-                        String::new()
-                    }
-                }
-                _ => String::new(),
-            };
-
-            // Check if this is a blocking I/O call
-            if self.is_blocking_io(&receiver_str, &method_name) {
-                self.blocking_in_async.push(BlockingCall {
-                    function_name: format!("{}.{}", receiver_str, method_name),
-                    is_blocking: true,
-                    in_async_context: true,
-                    line: 0,
-                });
-            }
-        }
-
+        self.record_blocking_method_call(node);
         syn::visit::visit_expr_method_call(self, node);
     }
 
@@ -510,5 +506,29 @@ mod tests {
 
         assert!(detector.imports.has_async_command);
         assert!(!detector.imports.has_std_command);
+    }
+
+    #[test]
+    fn method_receiver_path_is_normalized() {
+        let expr: Expr = syn::parse_str("std::fs::File.open()").unwrap();
+
+        let receiver = match expr {
+            Expr::MethodCall(call) => call.receiver,
+            _ => panic!("expected method call"),
+        };
+
+        assert_eq!(receiver_type_hint(&receiver), "std::fs::File");
+    }
+
+    #[test]
+    fn constructor_method_receiver_is_normalized_to_type() {
+        let expr: Expr = syn::parse_str("Command::new(\"echo\").output()").unwrap();
+
+        let receiver = match expr {
+            Expr::MethodCall(call) => call.receiver,
+            _ => panic!("expected method call"),
+        };
+
+        assert_eq!(receiver_type_hint(&receiver), "Command");
     }
 }
