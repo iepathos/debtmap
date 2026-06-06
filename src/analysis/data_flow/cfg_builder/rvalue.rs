@@ -11,96 +11,38 @@ use super::CfgBuilder;
 impl CfgBuilder {
     /// Convert an expression to an Rvalue, extracting actual variables.
     pub(super) fn expr_to_rvalue(&mut self, expr: &Expr) -> Rvalue {
+        self.convert_wrapped_expr_to_rvalue(expr)
+            .or_else(|| self.convert_leaf_expr_to_rvalue(expr))
+            .unwrap_or(Rvalue::Constant)
+    }
+
+    fn convert_wrapped_expr_to_rvalue(&mut self, expr: &Expr) -> Option<Rvalue> {
         match expr {
-            // Simple variable use
-            Expr::Path(path) => {
-                if let Some(var) = self.extract_primary_var(&Expr::Path(path.clone())) {
-                    Rvalue::Use(var)
-                } else {
-                    Rvalue::Constant
-                }
-            }
-
-            // Binary operation
-            Expr::Binary(binary) => self.convert_binary_to_rvalue(binary),
-
-            // Unary operation
-            Expr::Unary(unary) => {
-                if let Some(operand) = self.extract_primary_var(&unary.expr) {
-                    Rvalue::UnaryOp {
-                        op: convert_un_op(&unary.op),
-                        operand,
-                    }
-                } else {
-                    Rvalue::Constant
-                }
-            }
-
-            // Field access
-            Expr::Field(field) => self.convert_field_to_rvalue(field),
-
-            // Reference
-            Expr::Reference(reference) => {
-                if let Some(var) = self.extract_primary_var(&reference.expr) {
-                    Rvalue::Ref {
-                        var,
-                        mutable: reference.mutability.is_some(),
-                    }
-                } else {
-                    Rvalue::Constant
-                }
-            }
-
-            // Function call
-            Expr::Call(call) => {
-                let func_name = extract_func_name(&call.func);
-                let args = call
-                    .args
-                    .iter()
-                    .filter_map(|arg| self.extract_primary_var(arg))
-                    .collect();
-                Rvalue::Call {
-                    func: func_name,
-                    args,
-                }
-            }
-
-            // Method call
-            Expr::MethodCall(method) => self.convert_method_call_to_rvalue(method),
-
-            // Paren: (expr) - unwrap
-            Expr::Paren(paren) => self.expr_to_rvalue(&paren.expr),
-
-            // Cast: x as T - preserve the variable
-            Expr::Cast(cast) => self.expr_to_rvalue(&cast.expr),
-
-            // Block: { expr } - use final expression
-            Expr::Block(block) => {
-                if let Some(Stmt::Expr(expr, _)) = block.block.stmts.last() {
-                    self.expr_to_rvalue(expr)
-                } else {
-                    Rvalue::Constant
-                }
-            }
-
-            // Index: arr[i]
-            Expr::Index(index) => {
-                if let Some(base) = self.extract_primary_var(&index.expr) {
-                    Rvalue::FieldAccess {
-                        base,
-                        field: "[index]".to_string(),
-                    }
-                } else {
-                    Rvalue::Constant
-                }
-            }
-
-            // Literals and other constant expressions
-            Expr::Lit(_) => Rvalue::Constant,
-
-            // Default fallback
-            _ => Rvalue::Constant,
+            Expr::Paren(paren) => Some(self.expr_to_rvalue(&paren.expr)),
+            Expr::Cast(cast) => Some(self.expr_to_rvalue(&cast.expr)),
+            Expr::Block(block) => Some(self.convert_block_to_rvalue(block)),
+            _ => None,
         }
+    }
+
+    fn convert_leaf_expr_to_rvalue(&mut self, expr: &Expr) -> Option<Rvalue> {
+        match expr {
+            Expr::Path(path) => self.convert_path_to_rvalue(path),
+            Expr::Binary(binary) => Some(self.convert_binary_to_rvalue(binary)),
+            Expr::Unary(unary) => Some(self.convert_unary_to_rvalue(unary)),
+            Expr::Field(field) => Some(self.convert_field_to_rvalue(field)),
+            Expr::Reference(reference) => Some(self.convert_reference_to_rvalue(reference)),
+            Expr::Call(call) => Some(self.convert_call_to_rvalue(call)),
+            Expr::MethodCall(method) => Some(self.convert_method_call_to_rvalue(method)),
+            Expr::Index(index) => Some(self.convert_index_to_rvalue(index)),
+            Expr::Lit(_) => Some(Rvalue::Constant),
+            _ => None,
+        }
+    }
+
+    fn convert_path_to_rvalue(&mut self, path: &syn::ExprPath) -> Option<Rvalue> {
+        self.extract_primary_var(&Expr::Path(path.clone()))
+            .map(Rvalue::Use)
     }
 
     /// Convert a binary expression to an Rvalue.
@@ -120,6 +62,15 @@ impl CfgBuilder {
         }
     }
 
+    fn convert_unary_to_rvalue(&mut self, unary: &syn::ExprUnary) -> Rvalue {
+        self.extract_primary_var(&unary.expr)
+            .map(|operand| Rvalue::UnaryOp {
+                op: convert_un_op(&unary.op),
+                operand,
+            })
+            .unwrap_or(Rvalue::Constant)
+    }
+
     /// Convert a field access expression to an Rvalue.
     fn convert_field_to_rvalue(&mut self, field: &syn::ExprField) -> Rvalue {
         if let Some(base) = self.extract_primary_var(&field.base) {
@@ -133,6 +84,22 @@ impl CfgBuilder {
             }
         } else {
             Rvalue::Constant
+        }
+    }
+
+    fn convert_reference_to_rvalue(&mut self, reference: &syn::ExprReference) -> Rvalue {
+        self.extract_primary_var(&reference.expr)
+            .map(|var| Rvalue::Ref {
+                var,
+                mutable: reference.mutability.is_some(),
+            })
+            .unwrap_or(Rvalue::Constant)
+    }
+
+    fn convert_call_to_rvalue(&mut self, call: &syn::ExprCall) -> Rvalue {
+        Rvalue::Call {
+            func: extract_func_name(&call.func),
+            args: self.extract_call_args(call.args.iter()),
         }
     }
 
@@ -156,6 +123,37 @@ impl CfgBuilder {
             func: func_name,
             args,
         }
+    }
+
+    fn convert_block_to_rvalue(&mut self, block: &syn::ExprBlock) -> Rvalue {
+        block
+            .block
+            .stmts
+            .last()
+            .and_then(final_block_expr)
+            .map(|expr| self.expr_to_rvalue(expr))
+            .unwrap_or(Rvalue::Constant)
+    }
+
+    fn convert_index_to_rvalue(&mut self, index: &syn::ExprIndex) -> Rvalue {
+        self.extract_primary_var(&index.expr)
+            .map(|base| Rvalue::FieldAccess {
+                base,
+                field: "[index]".to_string(),
+            })
+            .unwrap_or(Rvalue::Constant)
+    }
+
+    fn extract_call_args<'a>(&mut self, args: impl Iterator<Item = &'a Expr>) -> Vec<VarId> {
+        args.filter_map(|arg| self.extract_primary_var(arg))
+            .collect()
+    }
+}
+
+fn final_block_expr(stmt: &Stmt) -> Option<&Expr> {
+    match stmt {
+        Stmt::Expr(expr, _) => Some(expr),
+        _ => None,
     }
 }
 
