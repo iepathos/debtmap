@@ -29,6 +29,19 @@ mod tests {
         }
     }
 
+    fn assert_local_var_classifies_as(
+        classifier: &mut TokenClassifier,
+        context: &TokenContext,
+        token: &str,
+        expected: VarType,
+    ) {
+        assert_eq!(
+            classifier.classify(token, context),
+            TokenClass::LocalVar(expected),
+            "local variable classification failed for {token}"
+        );
+    }
+
     #[test]
     fn test_method_call_classification() {
         let mut classifier = create_test_classifier(true);
@@ -68,37 +81,46 @@ mod tests {
     #[test]
     fn test_local_var_classification() {
         let mut classifier = create_test_classifier(true);
+        let context = expression_context();
+        let cases = [
+            ("i", VarType::Iterator),
+            ("cursor", VarType::Iterator),
+            ("total_items", VarType::Counter),
+            ("item_count", VarType::Counter),
+            ("tmp", VarType::Temporary),
+            ("RESULT", VarType::Temporary),
+            ("parser_config", VarType::Configuration),
+            ("settings_path", VarType::Configuration),
+            ("file_handle", VarType::Resource),
+            ("socket_stream", VarType::Resource),
+            ("node_entry", VarType::Data),
+            ("value_element", VarType::Data),
+            ("domain", VarType::Other),
+        ];
 
-        let context = TokenContext {
-            is_method_call: false,
-            is_field_access: false,
-            is_external: false,
-            scope_depth: 1,
-            parent_node_type: NodeType::Expression,
-        };
+        for (token, expected) in cases {
+            assert_local_var_classifies_as(&mut classifier, &context, token, expected);
+        }
+    }
 
-        // Test iterator classification
-        let class = classifier.classify("i", &context);
-        assert!(matches!(class, TokenClass::LocalVar(VarType::Iterator)));
+    #[test]
+    fn test_local_var_classification_precedence() {
+        let mut classifier = create_test_classifier(true);
+        let context = expression_context();
 
-        // Test counter classification
-        let class = classifier.classify("count", &context);
-        assert!(matches!(class, TokenClass::LocalVar(VarType::Counter)));
-
-        // Test temporary classification
-        let class = classifier.classify("tmp", &context);
-        assert!(matches!(class, TokenClass::LocalVar(VarType::Temporary)));
-
-        // Test configuration classification
-        let class = classifier.classify("config", &context);
-        assert!(matches!(
-            class,
-            TokenClass::LocalVar(VarType::Configuration)
-        ));
-
-        // Test resource classification
-        let class = classifier.classify("file_handle", &context);
-        assert!(matches!(class, TokenClass::LocalVar(VarType::Resource)));
+        assert_local_var_classifies_as(
+            &mut classifier,
+            &context,
+            "count_config_file",
+            VarType::Counter,
+        );
+        assert_local_var_classifies_as(
+            &mut classifier,
+            &context,
+            "config_file_value",
+            VarType::Configuration,
+        );
+        assert_local_var_classifies_as(&mut classifier, &context, "file_value", VarType::Resource);
     }
 
     #[test]

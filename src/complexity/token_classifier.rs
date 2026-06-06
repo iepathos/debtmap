@@ -209,6 +209,39 @@ pub struct TokenClassifier {
     cache: HashMap<(String, bool, bool), TokenClass>,
 }
 
+const ITERATOR_VARS: &[&str] = &["i", "j", "k", "n", "idx", "index", "iter", "it", "cursor"];
+const COUNTER_PARTS: &[&str] = &["count", "num", "total"];
+const TEMPORARY_VARS: &[&str] = &["temp", "tmp", "result", "res", "ret", "val"];
+const CONFIG_PARTS: &[&str] = &["config", "setting", "option", "param"];
+const RESOURCE_PARTS: &[&str] = &["file", "conn", "client", "socket", "stream", "handle"];
+const DATA_PARTS: &[&str] = &["data", "value", "item", "element", "node", "entry"];
+
+const LOCAL_VAR_RULES: &[(VarType, LocalVarPattern)] = &[
+    (VarType::Iterator, LocalVarPattern::Exact(ITERATOR_VARS)),
+    (VarType::Counter, LocalVarPattern::Contains(COUNTER_PARTS)),
+    (VarType::Temporary, LocalVarPattern::Exact(TEMPORARY_VARS)),
+    (
+        VarType::Configuration,
+        LocalVarPattern::Contains(CONFIG_PARTS),
+    ),
+    (VarType::Resource, LocalVarPattern::Contains(RESOURCE_PARTS)),
+    (VarType::Data, LocalVarPattern::Contains(DATA_PARTS)),
+];
+
+enum LocalVarPattern {
+    Exact(&'static [&'static str]),
+    Contains(&'static [&'static str]),
+}
+
+impl LocalVarPattern {
+    fn matches(&self, token: &str) -> bool {
+        match self {
+            Self::Exact(names) => names.contains(&token),
+            Self::Contains(parts) => parts.iter().any(|part| token.contains(part)),
+        }
+    }
+}
+
 fn classify_control_flow(token: &str) -> Option<TokenClass> {
     match token {
         "if" | "else" | "elif" => Some(TokenClass::ControlFlow(FlowType::If)),
@@ -457,60 +490,11 @@ impl TokenClassifier {
 
     fn classify_local_var(&self, token: &str) -> TokenClass {
         let lower = token.to_lowercase();
-
-        // Iterators
-        if matches!(
-            lower.as_str(),
-            "i" | "j" | "k" | "n" | "idx" | "index" | "iter" | "it" | "cursor"
-        ) {
-            return TokenClass::LocalVar(VarType::Iterator);
-        }
-
-        // Counters
-        if lower.contains("count") || lower.contains("num") || lower.contains("total") {
-            return TokenClass::LocalVar(VarType::Counter);
-        }
-
-        // Temporary
-        if matches!(
-            lower.as_str(),
-            "temp" | "tmp" | "result" | "res" | "ret" | "val"
-        ) {
-            return TokenClass::LocalVar(VarType::Temporary);
-        }
-
-        // Configuration
-        if lower.contains("config")
-            || lower.contains("setting")
-            || lower.contains("option")
-            || lower.contains("param")
-        {
-            return TokenClass::LocalVar(VarType::Configuration);
-        }
-
-        // Resources
-        if lower.contains("file")
-            || lower.contains("conn")
-            || lower.contains("client")
-            || lower.contains("socket")
-            || lower.contains("stream")
-            || lower.contains("handle")
-        {
-            return TokenClass::LocalVar(VarType::Resource);
-        }
-
-        // Data
-        if lower.contains("data")
-            || lower.contains("value")
-            || lower.contains("item")
-            || lower.contains("element")
-            || lower.contains("node")
-            || lower.contains("entry")
-        {
-            return TokenClass::LocalVar(VarType::Data);
-        }
-
-        TokenClass::LocalVar(VarType::Other)
+        LOCAL_VAR_RULES
+            .iter()
+            .find(|(_, pattern)| pattern.matches(&lower))
+            .map(|(var_type, _)| TokenClass::LocalVar(var_type.clone()))
+            .unwrap_or(TokenClass::LocalVar(VarType::Other))
     }
 
     pub fn get_weight(&self, class: &TokenClass) -> f64 {
