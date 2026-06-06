@@ -79,247 +79,85 @@ pub fn perform_unified_analysis(
 pub fn perform_unified_analysis_with_options(
     options: UnifiedAnalysisOptions,
 ) -> Result<UnifiedAnalysis> {
-    let UnifiedAnalysisOptions {
-        results,
-        coverage_file,
-        semantic_off: _,
-        project_path,
-        verbose_macro_warnings,
-        show_macro_stats,
-        parallel,
-        jobs,
-        multi_pass: _,
-        show_attribution: _,
-        aggregate_only: _,
-        no_aggregation,
-        aggregation_method,
-        min_problematic,
-        no_god_object,
-        suppress_coverage_tip,
-        _formatting_config,
-        enable_context,
-        context_providers,
-        disable_context,
-        rust_files,
-        extracted_data,
-        reference_time,
-    } = options;
-
     time_span!("unified_analysis");
 
     // Create top-level span for unified analysis (spec 208)
     let span = info_span!(
         "unified_analysis",
-        project = %project_path.display(),
-        file_count = results.complexity.metrics.len(),
-        parallel = parallel,
+        project = %options.project_path.display(),
+        file_count = options.results.complexity.metrics.len(),
+        parallel = options.parallel,
     );
     let _guard = span.enter();
 
     info!(
-        file_count = results.complexity.metrics.len(),
+        file_count = options.results.complexity.metrics.len(),
         "Starting unified analysis"
     );
 
     // Set total file count for crash report progress tracking (spec 207)
-    set_progress(0, results.complexity.metrics.len());
+    set_progress(0, options.results.complexity.metrics.len());
 
-    // Build call graph with progress reporting
-    let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
-
-    // Progress: Call graph stage
-    report_stage_start(1);
-    let call_graph_start = std::time::Instant::now();
-
-    let (framework_exclusions, function_pointer_used_functions) = {
-        time_span!("call_graph_building", parent: "unified_analysis");
-        let _span = info_span!("call_graph_building").entered();
-        info!("Building call graph");
-
-        // Spec 214: Use extraction adapters when extracted data is available
-        let result = if let Some(ref extracted) = extracted_data {
-            info!("Building call graph from extracted data (spec 214)");
-            let (graph, exclusions, fn_pointers) =
-                parallel_call_graph::build_call_graph_from_extracted(call_graph.clone(), extracted);
-            call_graph = graph;
-            (exclusions, fn_pointers)
-        } else if parallel {
-            build_call_graph_with_progress(
-                project_path,
-                &mut call_graph,
-                jobs,
-                true,
-                rust_files.as_deref(),
-            )?
-        } else {
-            build_call_graph_with_progress_sequential(
-                project_path,
-                &mut call_graph,
-                verbose_macro_warnings,
-                show_macro_stats,
-                rust_files.as_deref(),
-            )?
-        };
-
-        debug!(functions = call_graph.node_count(), "Call graph built");
-        result
-    };
-
-    // Process TypeScript/JavaScript files for call graph
-    {
-        // Collect JS/TS files from the analysis results
-        let js_ts_files: Vec<PathBuf> = results
-            .complexity
-            .metrics
-            .iter()
-            .filter(|m| {
-                let ext = m.file.extension().and_then(|e| e.to_str()).unwrap_or("");
-                matches!(
-                    ext,
-                    "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "mts" | "cts"
-                )
-            })
-            .map(|m| m.file.clone())
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-
-        if !js_ts_files.is_empty() {
-            time_span!("typescript_call_graph", parent: "unified_analysis");
-            let _span = info_span!("typescript_call_graph_building").entered();
-
-            info!(
-                "Processing {} JS/TS files for call graph",
-                js_ts_files.len()
-            );
-            if let Err(e) = call_graph::process_typescript_files_for_call_graph(
-                project_path,
-                &mut call_graph,
-                Some(&js_ts_files),
-            ) {
-                warn!("Failed to process TypeScript call graph: {}", e);
-            }
-        }
-    }
-
-    let call_graph_time = call_graph_start.elapsed();
-    report_stage_complete(1, format!("{} functions", call_graph.node_count()));
+    let CallGraphStageResult {
+        mut call_graph,
+        framework_exclusions,
+        function_pointer_used_functions,
+        elapsed: call_graph_time,
+    } = build_call_graph_stage(
+        options.results,
+        CallGraphStageOptions {
+            project_path: options.project_path,
+            parallel: options.parallel,
+            jobs: options.jobs,
+            verbose_macro_warnings: options.verbose_macro_warnings,
+            show_macro_stats: options.show_macro_stats,
+            rust_files: options.rust_files.as_deref(),
+            extracted_data: options.extracted_data.as_ref(),
+        },
+    )?;
 
     // Apply trait patterns
     core::phases::call_graph::apply_trait_patterns(&mut call_graph);
 
-    // Progress: Coverage stage
-    report_stage_start(2);
-    let coverage_start = std::time::Instant::now();
+    let (coverage_data, coverage_time) = load_coverage_stage(options.coverage_file)?;
 
-    let coverage_data = {
-        time_span!("coverage_loading", parent: "unified_analysis");
-        let _span = info_span!("coverage_loading").entered();
-        info!("Loading coverage data");
-        let data = core::phases::coverage::load_coverage_data(coverage_file.cloned())?;
-        if data.is_some() {
-            debug!("Coverage data loaded");
-        } else {
-            debug!("No coverage data provided");
-        }
-        data
-    };
-
-    // Update TUI with coverage percentage
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        let coverage_percent =
-            core::phases::coverage::calculate_coverage_percent(coverage_data.as_ref());
-        manager.tui_update_coverage(coverage_percent);
-    }
-
-    emit_coverage_tip(coverage_data.is_none(), suppress_coverage_tip);
-
-    let coverage_time = coverage_start.elapsed();
-    let coverage_metric = if coverage_data.is_some() {
-        "loaded"
-    } else {
-        "skipped"
-    };
-    report_stage_complete(2, coverage_metric);
+    emit_coverage_tip(coverage_data.is_none(), options.suppress_coverage_tip);
 
     // Enrich metrics with call graph data
     let enriched_metrics = call_graph_integration::populate_call_graph_data(
-        results.complexity.metrics.clone(),
+        options.results.complexity.metrics.clone(),
         &call_graph,
     );
 
-    // Progress: Purity stage
-    report_stage_start(3);
-    let enriched_metrics = {
-        time_span!("purity_analysis", parent: "unified_analysis");
-        let _span = info_span!("purity_analysis").entered();
-        info!("Analyzing function purity");
-        let result = core::orchestration::run_purity_propagation(&enriched_metrics, &call_graph);
-        debug!(functions = result.len(), "Purity analysis complete");
-        result
-    };
-    report_stage_complete(3, format!("{} functions analyzed", enriched_metrics.len()));
-
-    // Progress: Context stage
-    report_stage_start(4);
-    let risk_analyzer = {
-        time_span!("context_loading", parent: "unified_analysis");
-        let _span = info_span!("context_loading").entered();
-        info!("Loading context providers");
-        let risk_analyzer = build_risk_analyzer(
-            project_path,
-            enable_context,
-            context_providers,
-            disable_context,
-            results,
-            reference_time,
-        );
-        if risk_analyzer.is_some() {
-            debug!("Context providers loaded");
-        } else {
-            debug!("Context analysis disabled or not available");
-        }
-        risk_analyzer
-    };
-    let context_metric = if enable_context { "loaded" } else { "skipped" };
-    report_stage_complete(4, context_metric);
-
-    // Progress: Debt scoring stage
-    report_stage_start(5);
-
-    let result = {
-        time_span!("debt_scoring", parent: "unified_analysis");
-        let _span = info_span!("debt_scoring").entered();
-        info!("Scoring technical debt items");
-        let result = create_unified_analysis_with_exclusions_and_timing(
-            &enriched_metrics,
-            &call_graph,
-            coverage_data.as_ref(),
-            &framework_exclusions,
-            Some(&function_pointer_used_functions),
-            Some(&results.technical_debt.items),
-            no_aggregation,
-            aggregation_method,
-            min_problematic,
-            no_god_object,
-            call_graph_time,
-            coverage_time,
-            risk_analyzer,
-            project_path,
-            parallel,
-            jobs,
-            extracted_data,
-            reference_time,
-        );
-        debug!(
-            item_count = result.items.len(),
-            file_items = result.file_items.len(),
-            "Debt scoring complete"
-        );
-        result
-    };
-
-    report_stage_complete(5, format!("{} items scored", result.items.len()));
+    let enriched_metrics = run_purity_stage(&enriched_metrics, &call_graph);
+    let risk_analyzer = load_context_stage(ContextStageOptions {
+        project_path: options.project_path,
+        enable_context: options.enable_context,
+        context_providers: options.context_providers,
+        disable_context: options.disable_context,
+        results: options.results,
+        reference_time: options.reference_time,
+    });
+    let result = run_debt_scoring_stage(DebtScoringOptions {
+        enriched_metrics: &enriched_metrics,
+        call_graph: &call_graph,
+        coverage_data: coverage_data.as_ref(),
+        framework_exclusions: &framework_exclusions,
+        function_pointer_used_functions: &function_pointer_used_functions,
+        debt_items: &options.results.technical_debt.items,
+        no_aggregation: options.no_aggregation,
+        aggregation_method: options.aggregation_method,
+        min_problematic: options.min_problematic,
+        no_god_object: options.no_god_object,
+        call_graph_time,
+        coverage_time,
+        risk_analyzer,
+        project_path: options.project_path,
+        parallel: options.parallel,
+        jobs: options.jobs,
+        extracted_data: options.extracted_data,
+        reference_time: options.reference_time,
+    });
 
     info!(
         total_items = result.items.len(),
@@ -328,6 +166,294 @@ pub fn perform_unified_analysis_with_options(
     );
 
     Ok(result)
+}
+
+struct CallGraphStageOptions<'a> {
+    project_path: &'a Path,
+    parallel: bool,
+    jobs: usize,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+    rust_files: Option<&'a [PathBuf]>,
+    extracted_data:
+        Option<&'a std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
+}
+
+struct CallGraphStageResult {
+    call_graph: CallGraph,
+    framework_exclusions: HashSet<FunctionId>,
+    function_pointer_used_functions: HashSet<FunctionId>,
+    elapsed: std::time::Duration,
+}
+
+fn build_call_graph_stage(
+    results: &AnalysisResults,
+    options: CallGraphStageOptions<'_>,
+) -> Result<CallGraphStageResult> {
+    let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
+
+    report_stage_start(1);
+    let start = std::time::Instant::now();
+    let (framework_exclusions, function_pointer_used_functions) =
+        build_rust_call_graph(&mut call_graph, &options)?;
+    process_js_ts_call_graph(results, options.project_path, &mut call_graph);
+
+    let elapsed = start.elapsed();
+    report_stage_complete(1, format!("{} functions", call_graph.node_count()));
+
+    Ok(CallGraphStageResult {
+        call_graph,
+        framework_exclusions,
+        function_pointer_used_functions,
+        elapsed,
+    })
+}
+
+fn build_rust_call_graph(
+    call_graph: &mut CallGraph,
+    options: &CallGraphStageOptions<'_>,
+) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    time_span!("call_graph_building", parent: "unified_analysis");
+    let _span = info_span!("call_graph_building").entered();
+    info!("Building call graph");
+
+    let result = match options.extracted_data {
+        Some(extracted) => build_extracted_call_graph(call_graph, extracted),
+        None if options.parallel => build_call_graph_with_progress(
+            options.project_path,
+            call_graph,
+            options.jobs,
+            true,
+            options.rust_files,
+        )?,
+        None => build_call_graph_with_progress_sequential(
+            options.project_path,
+            call_graph,
+            options.verbose_macro_warnings,
+            options.show_macro_stats,
+            options.rust_files,
+        )?,
+    };
+
+    debug!(functions = call_graph.node_count(), "Call graph built");
+    Ok(result)
+}
+
+fn build_extracted_call_graph(
+    call_graph: &mut CallGraph,
+    extracted: &std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+) -> (HashSet<FunctionId>, HashSet<FunctionId>) {
+    info!("Building call graph from extracted data (spec 214)");
+    let (graph, exclusions, fn_pointers) =
+        parallel_call_graph::build_call_graph_from_extracted(call_graph.clone(), extracted);
+    *call_graph = graph;
+    (exclusions, fn_pointers)
+}
+
+fn process_js_ts_call_graph(
+    results: &AnalysisResults,
+    project_path: &Path,
+    call_graph: &mut CallGraph,
+) {
+    let js_ts_files = collect_js_ts_files(results);
+    if js_ts_files.is_empty() {
+        return;
+    }
+
+    time_span!("typescript_call_graph", parent: "unified_analysis");
+    let _span = info_span!("typescript_call_graph_building").entered();
+    info!(
+        "Processing {} JS/TS files for call graph",
+        js_ts_files.len()
+    );
+
+    if let Err(e) = call_graph::process_typescript_files_for_call_graph(
+        project_path,
+        call_graph,
+        Some(&js_ts_files),
+    ) {
+        warn!("Failed to process TypeScript call graph: {}", e);
+    }
+}
+
+fn collect_js_ts_files(results: &AnalysisResults) -> Vec<PathBuf> {
+    results
+        .complexity
+        .metrics
+        .iter()
+        .filter(|m| is_js_ts_file(&m.file))
+        .map(|m| m.file.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn is_js_ts_file(file: &Path) -> bool {
+    let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+    matches!(
+        ext,
+        "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "mts" | "cts"
+    )
+}
+
+fn load_coverage_stage(
+    coverage_file: Option<&PathBuf>,
+) -> Result<(Option<risk::lcov::LcovData>, std::time::Duration)> {
+    report_stage_start(2);
+    let start = std::time::Instant::now();
+    let coverage_data = load_coverage_data(coverage_file)?;
+
+    update_tui_coverage(coverage_data.as_ref());
+    report_stage_complete(2, coverage_stage_metric(coverage_data.as_ref()));
+
+    Ok((coverage_data, start.elapsed()))
+}
+
+fn load_coverage_data(coverage_file: Option<&PathBuf>) -> Result<Option<risk::lcov::LcovData>> {
+    time_span!("coverage_loading", parent: "unified_analysis");
+    let _span = info_span!("coverage_loading").entered();
+    info!("Loading coverage data");
+
+    let data = core::phases::coverage::load_coverage_data(coverage_file.cloned())?;
+    if data.is_some() {
+        debug!("Coverage data loaded");
+    } else {
+        debug!("No coverage data provided");
+    }
+    Ok(data)
+}
+
+fn update_tui_coverage(coverage_data: Option<&risk::lcov::LcovData>) {
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        let coverage_percent = core::phases::coverage::calculate_coverage_percent(coverage_data);
+        manager.tui_update_coverage(coverage_percent);
+    }
+}
+
+fn coverage_stage_metric(coverage_data: Option<&risk::lcov::LcovData>) -> &'static str {
+    if coverage_data.is_some() {
+        "loaded"
+    } else {
+        "skipped"
+    }
+}
+
+fn run_purity_stage(
+    enriched_metrics: &[crate::core::FunctionMetrics],
+    call_graph: &CallGraph,
+) -> Vec<crate::core::FunctionMetrics> {
+    report_stage_start(3);
+    let enriched_metrics = {
+        time_span!("purity_analysis", parent: "unified_analysis");
+        let _span = info_span!("purity_analysis").entered();
+        info!("Analyzing function purity");
+        let result = core::orchestration::run_purity_propagation(enriched_metrics, call_graph);
+        debug!(functions = result.len(), "Purity analysis complete");
+        result
+    };
+    report_stage_complete(3, format!("{} functions analyzed", enriched_metrics.len()));
+    enriched_metrics
+}
+
+struct ContextStageOptions<'a> {
+    project_path: &'a Path,
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
+    results: &'a AnalysisResults,
+    reference_time: chrono::DateTime<chrono::Utc>,
+}
+
+fn load_context_stage(options: ContextStageOptions<'_>) -> Option<risk::RiskAnalyzer> {
+    report_stage_start(4);
+    let risk_analyzer = {
+        time_span!("context_loading", parent: "unified_analysis");
+        let _span = info_span!("context_loading").entered();
+        info!("Loading context providers");
+        let risk_analyzer = build_risk_analyzer(
+            options.project_path,
+            options.enable_context,
+            options.context_providers,
+            options.disable_context,
+            options.results,
+            options.reference_time,
+        );
+        if risk_analyzer.is_some() {
+            debug!("Context providers loaded");
+        } else {
+            debug!("Context analysis disabled or not available");
+        }
+        risk_analyzer
+    };
+    report_stage_complete(4, context_stage_metric(options.enable_context));
+    risk_analyzer
+}
+
+fn context_stage_metric(enable_context: bool) -> &'static str {
+    if enable_context {
+        "loaded"
+    } else {
+        "skipped"
+    }
+}
+
+struct DebtScoringOptions<'a> {
+    enriched_metrics: &'a [crate::core::FunctionMetrics],
+    call_graph: &'a CallGraph,
+    coverage_data: Option<&'a risk::lcov::LcovData>,
+    framework_exclusions: &'a HashSet<FunctionId>,
+    function_pointer_used_functions: &'a HashSet<FunctionId>,
+    debt_items: &'a [crate::core::DebtItem],
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
+    min_problematic: Option<usize>,
+    no_god_object: bool,
+    call_graph_time: std::time::Duration,
+    coverage_time: std::time::Duration,
+    risk_analyzer: Option<risk::RiskAnalyzer>,
+    project_path: &'a Path,
+    parallel: bool,
+    jobs: usize,
+    extracted_data:
+        Option<std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
+    reference_time: chrono::DateTime<chrono::Utc>,
+}
+
+fn run_debt_scoring_stage(options: DebtScoringOptions<'_>) -> UnifiedAnalysis {
+    report_stage_start(5);
+    let result = {
+        time_span!("debt_scoring", parent: "unified_analysis");
+        let _span = info_span!("debt_scoring").entered();
+        info!("Scoring technical debt items");
+        let result = create_unified_analysis_with_exclusions_and_timing(
+            options.enriched_metrics,
+            options.call_graph,
+            options.coverage_data,
+            options.framework_exclusions,
+            Some(options.function_pointer_used_functions),
+            Some(options.debt_items),
+            options.no_aggregation,
+            options.aggregation_method,
+            options.min_problematic,
+            options.no_god_object,
+            options.call_graph_time,
+            options.coverage_time,
+            options.risk_analyzer,
+            options.project_path,
+            options.parallel,
+            options.jobs,
+            options.extracted_data,
+            options.reference_time,
+        );
+        debug!(
+            item_count = result.items.len(),
+            file_items = result.file_items.len(),
+            "Debt scoring complete"
+        );
+        result
+    };
+    report_stage_complete(5, format!("{} items scored", result.items.len()));
+    result
 }
 
 /// Create unified analysis with exclusions (compatibility wrapper).
