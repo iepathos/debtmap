@@ -229,43 +229,77 @@ impl PatternAnalysis {
 
 /// Aggregate purity metrics from function analyses
 fn aggregate_purity_metrics(functions: &[crate::priority::FunctionAnalysis]) -> PurityMetrics {
-    let mut strictly_pure = 0;
-    let mut locally_pure = 0;
-    let mut read_only = 0;
-    let mut impure = 0;
-    let almost_pure = Vec::new();
+    functions
+        .iter()
+        .map(classify_purity_bucket)
+        .fold(PurityCounts::default(), PurityCounts::with_bucket)
+        .into_metrics()
+}
 
-    for func in functions {
-        if let Some(is_pure) = func.is_pure {
-            if is_pure {
-                // Distinguish between strictly pure and locally pure based on confidence
-                if func.purity_confidence.unwrap_or(0.0) >= 0.9 {
-                    strictly_pure += 1;
-                } else {
-                    locally_pure += 1;
-                }
-            } else {
-                // Check if function is "almost pure" (has 1-2 violations)
-                // For now, we'll use a heuristic: low complexity impure functions
-                if func.cyclomatic_complexity <= 5 && func.cognitive_complexity <= 7 {
-                    read_only += 1;
-                } else {
-                    impure += 1;
-                }
-            }
-        } else {
-            // Unknown purity - count as impure
-            impure += 1;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PurityBucket {
+    StrictlyPure,
+    LocallyPure,
+    ReadOnly,
+    Impure,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct PurityCounts {
+    strictly_pure: usize,
+    locally_pure: usize,
+    read_only: usize,
+    impure: usize,
+}
+
+impl PurityCounts {
+    fn with_bucket(self, bucket: PurityBucket) -> Self {
+        match bucket {
+            PurityBucket::StrictlyPure => Self {
+                strictly_pure: self.strictly_pure + 1,
+                ..self
+            },
+            PurityBucket::LocallyPure => Self {
+                locally_pure: self.locally_pure + 1,
+                ..self
+            },
+            PurityBucket::ReadOnly => Self {
+                read_only: self.read_only + 1,
+                ..self
+            },
+            PurityBucket::Impure => Self {
+                impure: self.impure + 1,
+                ..self
+            },
         }
     }
 
-    PurityMetrics {
-        strictly_pure,
-        locally_pure,
-        read_only,
-        impure,
-        almost_pure,
+    fn into_metrics(self) -> PurityMetrics {
+        PurityMetrics {
+            strictly_pure: self.strictly_pure,
+            locally_pure: self.locally_pure,
+            read_only: self.read_only,
+            impure: self.impure,
+            almost_pure: Vec::new(),
+        }
     }
+}
+
+fn classify_purity_bucket(func: &crate::priority::FunctionAnalysis) -> PurityBucket {
+    match func.is_pure {
+        Some(true) if has_strict_purity_confidence(func) => PurityBucket::StrictlyPure,
+        Some(true) => PurityBucket::LocallyPure,
+        Some(false) if is_read_only_candidate(func) => PurityBucket::ReadOnly,
+        _ => PurityBucket::Impure,
+    }
+}
+
+fn has_strict_purity_confidence(func: &crate::priority::FunctionAnalysis) -> bool {
+    func.purity_confidence.unwrap_or(0.0) >= 0.9
+}
+
+fn is_read_only_candidate(func: &crate::priority::FunctionAnalysis) -> bool {
+    func.cyclomatic_complexity <= 5 && func.cognitive_complexity <= 7
 }
 
 /// Aggregate framework patterns from function analyses
@@ -379,6 +413,29 @@ impl fmt::Display for PurityViolation {
 mod tests {
     use super::*;
     use crate::analysis::purity_analysis::PurityViolation;
+    use crate::priority::{FunctionAnalysis, FunctionVisibility};
+    use std::path::PathBuf;
+
+    fn function_analysis(
+        is_pure: Option<bool>,
+        purity_confidence: Option<f32>,
+        cyclomatic_complexity: u32,
+        cognitive_complexity: u32,
+    ) -> FunctionAnalysis {
+        FunctionAnalysis {
+            file: PathBuf::from("src/lib.rs"),
+            function: "analyze".to_string(),
+            line: 1,
+            function_length: 10,
+            cyclomatic_complexity,
+            cognitive_complexity,
+            is_pure,
+            purity_confidence,
+            nesting_depth: 0,
+            is_test: false,
+            visibility: FunctionVisibility::Private,
+        }
+    }
 
     #[test]
     fn test_purity_metrics_total_functions() {
@@ -589,6 +646,71 @@ mod tests {
             rust_patterns: RustPatternMetrics::default(),
         };
         assert!(with_purity.has_patterns());
+    }
+
+    #[test]
+    fn test_classify_purity_bucket_strictly_pure() {
+        let function = function_analysis(Some(true), Some(0.9), 1, 1);
+
+        assert_eq!(
+            classify_purity_bucket(&function),
+            PurityBucket::StrictlyPure
+        );
+    }
+
+    #[test]
+    fn test_classify_purity_bucket_locally_pure() {
+        let function = function_analysis(Some(true), Some(0.89), 1, 1);
+
+        assert_eq!(classify_purity_bucket(&function), PurityBucket::LocallyPure);
+    }
+
+    #[test]
+    fn test_classify_purity_bucket_read_only() {
+        let function = function_analysis(Some(false), None, 5, 7);
+
+        assert_eq!(classify_purity_bucket(&function), PurityBucket::ReadOnly);
+    }
+
+    #[test]
+    fn test_classify_purity_bucket_impure_when_complexity_exceeds_read_only_threshold() {
+        let high_cyclomatic = function_analysis(Some(false), None, 6, 7);
+        let high_cognitive = function_analysis(Some(false), None, 5, 8);
+
+        assert_eq!(
+            classify_purity_bucket(&high_cyclomatic),
+            PurityBucket::Impure
+        );
+        assert_eq!(
+            classify_purity_bucket(&high_cognitive),
+            PurityBucket::Impure
+        );
+    }
+
+    #[test]
+    fn test_classify_purity_bucket_unknown_purity_as_impure() {
+        let function = function_analysis(None, None, 1, 1);
+
+        assert_eq!(classify_purity_bucket(&function), PurityBucket::Impure);
+    }
+
+    #[test]
+    fn test_aggregate_purity_metrics_counts_all_buckets() {
+        let functions = vec![
+            function_analysis(Some(true), Some(0.95), 1, 1),
+            function_analysis(Some(true), Some(0.5), 1, 1),
+            function_analysis(Some(false), None, 5, 7),
+            function_analysis(Some(false), None, 9, 9),
+            function_analysis(None, None, 1, 1),
+        ];
+
+        let metrics = aggregate_purity_metrics(&functions);
+
+        assert_eq!(metrics.strictly_pure, 1);
+        assert_eq!(metrics.locally_pure, 1);
+        assert_eq!(metrics.read_only, 1);
+        assert_eq!(metrics.impure, 2);
+        assert!(metrics.almost_pure.is_empty());
     }
 
     #[test]
