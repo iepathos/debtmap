@@ -30,58 +30,7 @@ impl TestComplexityDetector {
 
 impl TestingDetector for TestComplexityDetector {
     fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<TestingAntiPattern> {
-        let mut patterns = Vec::new();
-
-        for item in &file.items {
-            if let Item::Fn(function) = item {
-                if is_test_function(function) {
-                    let analysis = analyze_test_complexity(function);
-
-                    if is_overly_complex(&analysis, self) {
-                        let line = function.sig.ident.span().start().line;
-
-                        patterns.push(TestingAntiPattern::OverlyComplexTest {
-                            test_name: function.sig.ident.to_string(),
-                            file: path.to_path_buf(),
-                            line,
-                            complexity_score: analysis.total_complexity,
-                            complexity_sources: analysis.sources.clone(),
-                            suggested_simplification: suggest_simplification(&analysis, self),
-                        });
-                    }
-                }
-            }
-
-            // Also check test modules
-            if let Item::Mod(module) = item {
-                if let Some((_, items)) = &module.content {
-                    for mod_item in items {
-                        if let Item::Fn(function) = mod_item {
-                            if is_test_function(function) {
-                                let analysis = analyze_test_complexity(function);
-
-                                if is_overly_complex(&analysis, self) {
-                                    let line = function.sig.ident.span().start().line;
-
-                                    patterns.push(TestingAntiPattern::OverlyComplexTest {
-                                        test_name: function.sig.ident.to_string(),
-                                        file: path.to_path_buf(),
-                                        line,
-                                        complexity_score: analysis.total_complexity,
-                                        complexity_sources: analysis.sources.clone(),
-                                        suggested_simplification: suggest_simplification(
-                                            &analysis, self,
-                                        ),
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        patterns
+        extract_complexity_patterns(&file.items, path, self)
     }
 
     fn detector_name(&self) -> &'static str {
@@ -101,6 +50,55 @@ impl TestingDetector for TestComplexityDetector {
             }
             _ => TestQualityImpact::Medium,
         }
+    }
+}
+
+fn extract_complexity_patterns(
+    items: &[Item],
+    path: &Path,
+    detector: &TestComplexityDetector,
+) -> Vec<TestingAntiPattern> {
+    items
+        .iter()
+        .flat_map(|item| match item {
+            Item::Fn(function) if is_test_function(function) => {
+                detect_complex_test(function, path, detector)
+                    .into_iter()
+                    .collect()
+            }
+            Item::Mod(module) => module
+                .content
+                .as_ref()
+                .map(|(_, items)| extract_complexity_patterns(items, path, detector))
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        })
+        .collect()
+}
+
+fn detect_complex_test(
+    function: &ItemFn,
+    path: &Path,
+    detector: &TestComplexityDetector,
+) -> Option<TestingAntiPattern> {
+    let analysis = analyze_test_complexity(function);
+    is_overly_complex(&analysis, detector)
+        .then(|| create_complexity_pattern(function, path, &analysis, detector))
+}
+
+fn create_complexity_pattern(
+    function: &ItemFn,
+    path: &Path,
+    analysis: &TestComplexityAnalysis,
+    detector: &TestComplexityDetector,
+) -> TestingAntiPattern {
+    TestingAntiPattern::OverlyComplexTest {
+        test_name: function.sig.ident.to_string(),
+        file: path.to_path_buf(),
+        line: function.sig.ident.span().start().line,
+        complexity_score: analysis.total_complexity,
+        complexity_sources: analysis.sources.clone(),
+        suggested_simplification: suggest_simplification(analysis, detector),
     }
 }
 
