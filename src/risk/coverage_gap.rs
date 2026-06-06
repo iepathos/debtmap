@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use super::lcov::{FunctionCoverage, LcovData};
+
 /// Coverage gap with different precision levels
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoverageGap {
@@ -175,50 +177,78 @@ pub fn calculate_coverage_gap(
     file: &Path,
     function_name: &str,
     start_line: usize,
-    coverage_data: Option<&super::lcov::LcovData>,
+    coverage_data: Option<&LcovData>,
 ) -> CoverageGap {
-    // Try to get line-level data first
-    if let Some(data) = coverage_data {
-        if let Some(line_cov) = data.get_function_uncovered_lines(file, function_name, start_line) {
-            // We have precise line-level data
-            let uncovered_count = line_cov.len();
-
-            // Calculate instrumented lines (covered + uncovered)
-            // We can infer covered lines from the function's coverage data
-            if let Some(funcs) = data.functions.get(file) {
-                if let Some(func) = funcs
-                    .iter()
-                    .find(|f| f.name == function_name || f.start_line == start_line)
-                {
-                    let instrumented_lines = func.uncovered_lines.len() as u32
-                        + ((func.coverage_percentage / 100.0
-                            * (func.uncovered_lines.len() as f64 + uncovered_count as f64))
-                            as u32);
-
-                    let instrumented_lines = instrumented_lines.max(uncovered_count as u32);
-
-                    let gap_percentage = if instrumented_lines > 0 {
-                        (uncovered_count as f64 / instrumented_lines as f64) * 100.0
-                    } else {
-                        0.0
-                    };
-
-                    return CoverageGap::Precise {
-                        uncovered_lines: line_cov,
-                        instrumented_lines,
-                        percentage: gap_percentage,
-                    };
-                }
-            }
-        }
+    if let Some(gap) = precise_coverage_gap(coverage_data, file, function_name, start_line) {
+        return gap;
     }
 
-    // Fallback to percentage-based estimate
-    let gap_pct = (1.0 - coverage_pct) * 100.0;
-    let estimated_uncovered = (function_length as f64 * (gap_pct / 100.0)) as u32;
+    estimated_coverage_gap(coverage_pct, function_length)
+}
+
+fn precise_coverage_gap(
+    coverage_data: Option<&LcovData>,
+    file: &Path,
+    function_name: &str,
+    start_line: usize,
+) -> Option<CoverageGap> {
+    let data = coverage_data?;
+    let uncovered_lines = data.get_function_uncovered_lines(file, function_name, start_line)?;
+    let function = find_function_coverage(data, file, function_name, start_line)?;
+
+    Some(build_precise_gap(uncovered_lines, function))
+}
+
+fn find_function_coverage<'a>(
+    data: &'a LcovData,
+    file: &Path,
+    function_name: &str,
+    start_line: usize,
+) -> Option<&'a FunctionCoverage> {
+    data.functions
+        .get(file)?
+        .iter()
+        .find(|function| function_matches(function, function_name, start_line))
+}
+
+fn function_matches(function: &FunctionCoverage, function_name: &str, start_line: usize) -> bool {
+    function.name == function_name || function.start_line == start_line
+}
+
+fn build_precise_gap(uncovered_lines: Vec<usize>, function: &FunctionCoverage) -> CoverageGap {
+    let uncovered_count = uncovered_lines.len();
+    let instrumented_lines = instrumented_lines(function, uncovered_count);
+    let percentage = gap_percentage(uncovered_count, instrumented_lines);
+
+    CoverageGap::Precise {
+        uncovered_lines,
+        instrumented_lines,
+        percentage,
+    }
+}
+
+fn instrumented_lines(function: &FunctionCoverage, uncovered_count: usize) -> u32 {
+    let known_uncovered = function.uncovered_lines.len() as u32;
+    let estimated_covered = (function.coverage_percentage / 100.0
+        * (function.uncovered_lines.len() as f64 + uncovered_count as f64))
+        as u32;
+
+    (known_uncovered + estimated_covered).max(uncovered_count as u32)
+}
+
+fn gap_percentage(uncovered_count: usize, instrumented_lines: u32) -> f64 {
+    match instrumented_lines {
+        0 => 0.0,
+        total => (uncovered_count as f64 / total as f64) * 100.0,
+    }
+}
+
+fn estimated_coverage_gap(coverage_pct: f64, function_length: u32) -> CoverageGap {
+    let percentage = (1.0 - coverage_pct) * 100.0;
+    let estimated_uncovered = (function_length as f64 * (percentage / 100.0)) as u32;
 
     CoverageGap::Estimated {
-        percentage: gap_pct,
+        percentage,
         total_lines: function_length,
         estimated_uncovered,
     }
@@ -227,6 +257,21 @@ pub fn calculate_coverage_gap(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::risk::lcov::NormalizedFunctionName;
+
+    fn test_function_coverage(
+        coverage_percentage: f64,
+        uncovered_lines: Vec<usize>,
+    ) -> FunctionCoverage {
+        FunctionCoverage {
+            name: "target".to_string(),
+            start_line: 10,
+            execution_count: 1,
+            coverage_percentage,
+            uncovered_lines,
+            normalized: NormalizedFunctionName::simple("target"),
+        }
+    }
 
     #[test]
     fn test_format_line_ranges_single() {
@@ -354,6 +399,35 @@ mod tests {
         assert_eq!(gap.percentage(), 100.0);
         assert_eq!(gap.uncovered_count(), 15);
         assert_eq!(gap.uncovered_lines(), None);
+    }
+
+    #[test]
+    fn test_estimated_coverage_gap_from_function_percentage() {
+        let gap = estimated_coverage_gap(0.75, 40);
+
+        assert_eq!(
+            gap,
+            CoverageGap::Estimated {
+                percentage: 25.0,
+                total_lines: 40,
+                estimated_uncovered: 10,
+            }
+        );
+    }
+
+    #[test]
+    fn test_build_precise_gap_uses_instrumented_lines() {
+        let function = test_function_coverage(50.0, vec![12, 13]);
+        let gap = build_precise_gap(vec![12, 13], &function);
+
+        assert_eq!(
+            gap,
+            CoverageGap::Precise {
+                uncovered_lines: vec![12, 13],
+                instrumented_lines: 4,
+                percentage: 50.0,
+            }
+        );
     }
 }
 
