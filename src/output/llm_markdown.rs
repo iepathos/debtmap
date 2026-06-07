@@ -367,6 +367,12 @@ fn write_location_group<W: Write>(
         writeln!(writer)?;
     }
 
+    // Contextual risk impact (optional)
+    if let Some(risk) = format::contextual_risk(rep.contextual_risk.as_ref()) {
+        write!(writer, "{}", risk)?;
+        writeln!(writer)?;
+    }
+
     writeln!(writer, "---")?;
     writeln!(writer)?;
     Ok(())
@@ -439,6 +445,7 @@ mod tests {
             pattern_details: None,
             context: None,
             git_history: None,
+            contextual_risk: None,
         }
     }
 

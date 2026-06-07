@@ -263,7 +263,8 @@ fn render_instability_bar(
 
 /// Render a dependency list section (spec 203).
 ///
-/// Displays up to 5 items with a truncation indicator if more exist.
+/// Displays every item. The detail view is scrollable, and callers/callees are
+/// analysis context that should not be hidden behind a summary count.
 fn render_dependency_list(
     lines: &mut Vec<Line<'static>>,
     items: &[String],
@@ -279,21 +280,12 @@ fn render_dependency_list(
     lines.push(Line::from(""));
     add_section_header(lines, title, theme);
 
-    let max_display = 5;
-    for item in items.iter().take(max_display) {
+    for item in items {
         // Shorten path for display (show just filename or last component)
         let display_name = shorten_path(item);
         lines.push(Line::from(vec![Span::styled(
             format!("  {} {}", "\u{2022}", display_name), // bullet point
             Style::default().fg(theme.text),
-        )]));
-    }
-
-    // Show truncation indicator
-    if items.len() > max_display {
-        lines.push(Line::from(vec![Span::styled(
-            format!("    (+{} more)", items.len() - max_display),
-            Style::default().fg(theme.muted),
         )]));
     }
 }
@@ -320,5 +312,119 @@ fn derive_coupling_classification(afferent: usize, efferent: usize, instability:
         "Leaf Module".to_string()
     } else {
         "Utility Module".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::{
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedDebtItem,
+        UnifiedScore,
+    };
+    use std::path::PathBuf;
+
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
+    fn create_item_with_dependencies() -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("src/main.rs"),
+                line: 10,
+                function: "target".to_string(),
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 20,
+                cognitive: 25,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 50.0,
+                coverage_factor: 20.0,
+                dependency_factor: 30.0,
+                role_multiplier: 1.0,
+                final_score: 50.0,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+                purity_factor: None,
+                refactorability_factor: None,
+                pattern_factor: None,
+                debt_adjustment: None,
+                pre_normalization_score: None,
+                structural_multiplier: None,
+                has_coverage_data: false,
+                contextual_risk_multiplier: None,
+                pre_contextual_score: None,
+                debt_type_multiplier: None,
+            },
+            function_role: FunctionRole::Unknown,
+            recommendation: ActionableRecommendation::default(),
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            file_context: None,
+            upstream_dependencies: 6,
+            downstream_dependencies: 6,
+            upstream_callers: (1..=6)
+                .map(|n| format!("src/callers/caller{n}.rs:caller{n}"))
+                .collect(),
+            downstream_callees: (1..=6)
+                .map(|n| format!("src/callees/callee{n}.rs:callee{n}"))
+                .collect(),
+            upstream_production_callers: vec![],
+            upstream_test_callers: vec![],
+            production_blast_radius: 0,
+            nesting_depth: 1,
+            function_length: 20,
+            cyclomatic_complexity: 20,
+            cognitive_complexity: 25,
+            entropy_analysis: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
+            language_specific: None,
+            detected_pattern: None,
+            contextual_risk: None,
+            file_line_count: None,
+            responsibility_category: None,
+            error_swallowing_count: None,
+            error_swallowing_patterns: None,
+            context_suggestion: None,
+        }
+    }
+
+    #[test]
+    fn dependencies_page_lists_all_callers_and_callees() {
+        let item = create_item_with_dependencies();
+        let theme = Theme::default();
+        let text = build_page_lines(&item, &theme, 100)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(text.contains("caller6.rs:caller6"), "{text}");
+        assert!(text.contains("callee6.rs:callee6"), "{text}");
+        assert!(!text.contains("(+"), "{text}");
     }
 }

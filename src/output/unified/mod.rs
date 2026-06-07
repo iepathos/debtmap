@@ -46,9 +46,9 @@ pub use file_item::{
 };
 pub use format::{round_ratio, round_score};
 pub use func_item::{
-    AdjustedComplexity, ContextSuggestionOutput, FileRangeOutput, FunctionDebtItemOutput,
-    FunctionImpactOutput, FunctionMetricsOutput, FunctionScoringDetails, GitHistoryOutput,
-    RelatedContextOutput,
+    AdjustedComplexity, ContextSuggestionOutput, ContextualRiskImpactOutput, FileRangeOutput,
+    FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput, FunctionScoringDetails,
+    GitHistoryOutput, RelatedContextOutput,
 };
 pub use location::UnifiedLocation;
 pub use priority::Priority;

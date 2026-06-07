@@ -83,6 +83,9 @@ pub struct FunctionDebtItemOutput {
     /// Git history context for understanding code stability
     #[serde(skip_serializing_if = "Option::is_none")]
     pub git_history: Option<GitHistoryOutput>,
+    /// Contextual risk impact from providers such as git history.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contextual_risk: Option<ContextualRiskImpactOutput>,
 }
 
 impl FunctionDebtItemOutput {
@@ -303,6 +306,10 @@ impl FunctionDebtItemOutput {
                 .contextual_risk
                 .as_ref()
                 .and_then(GitHistoryOutput::from_contextual_risk),
+            contextual_risk: item
+                .contextual_risk
+                .as_ref()
+                .map(ContextualRiskImpactOutput::from_contextual_risk),
         }
     }
 }
@@ -407,6 +414,30 @@ pub struct FunctionImpactOutput {
     pub coverage_improvement: f64,
     pub complexity_reduction: f64,
     pub risk_reduction: f64,
+}
+
+/// Contextual risk impact for display in LLM-oriented output.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextualRiskImpactOutput {
+    pub base_risk: f64,
+    pub contextual_risk: f64,
+    pub multiplier: f64,
+}
+
+impl ContextualRiskImpactOutput {
+    fn from_contextual_risk(risk: &crate::risk::context::ContextualRisk) -> Self {
+        let multiplier = if risk.base_risk > 0.0 {
+            risk.contextual_risk / risk.base_risk
+        } else {
+            1.0
+        };
+
+        Self {
+            base_risk: round_score(risk.base_risk),
+            contextual_risk: round_score(risk.contextual_risk),
+            multiplier: round_ratio(multiplier),
+        }
+    }
 }
 
 /// Function scoring details
@@ -640,6 +671,7 @@ mod tests {
             pattern_details: None,
             context: None,
             git_history: None,
+            contextual_risk: None,
         };
 
         // Serialize and deserialize
@@ -704,6 +736,7 @@ mod tests {
             pattern_details: None,
             context: None,
             git_history: None,
+            contextual_risk: None,
         };
 
         let json = serde_json::to_string(&item).unwrap();

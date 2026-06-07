@@ -159,6 +159,7 @@ mod tests {
             pattern_details: None,
             context: None,
             git_history: None,
+            contextual_risk: None,
         }))
     }
 

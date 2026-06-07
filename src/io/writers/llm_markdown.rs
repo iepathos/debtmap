@@ -14,9 +14,9 @@
 use crate::core::AnalysisResults;
 use crate::io::output::OutputWriter;
 use crate::output::unified::{
-    Dependencies, FileDebtItemOutput, FileScoringDetails, FunctionDebtItemOutput,
-    FunctionMetricsOutput, FunctionScoringDetails, GitHistoryOutput, UnifiedDebtItemOutput,
-    UnifiedOutput,
+    ContextualRiskImpactOutput, Dependencies, FileDebtItemOutput, FileScoringDetails,
+    FunctionDebtItemOutput, FunctionMetricsOutput, FunctionScoringDetails, GitHistoryOutput,
+    UnifiedDebtItemOutput, UnifiedOutput,
 };
 use crate::priority::GodObjectIndicators;
 use crate::risk::RiskInsight;
@@ -57,6 +57,7 @@ pub mod format {
             scoring(item.scoring_details.as_ref(), &item.function_role),
             context(item.context.as_ref()),
             git_history(item.git_history.as_ref()),
+            contextual_risk(item.contextual_risk.as_ref()),
         ]
         .into_iter()
         .flatten()
@@ -240,9 +241,9 @@ pub mod format {
         format_caller_list(&mut out, "Test Callers", &deps.upstream_test_callers);
         // Fallback to legacy callers if new fields are empty
         if deps.upstream_production_callers.is_empty() && deps.upstream_test_callers.is_empty() {
-            format_caller_list(&mut out, "Top Callers", &deps.upstream_callers);
+            format_caller_list(&mut out, "All Callers", &deps.upstream_callers);
         }
-        format_caller_list(&mut out, "Top Callees", &deps.downstream_callees);
+        format_caller_list(&mut out, "All Callees", &deps.downstream_callees);
         out
     }
 
@@ -251,11 +252,8 @@ pub mod format {
             return;
         }
         writeln!(out, "- {}:", label).unwrap();
-        for item in items.iter().take(5) {
+        for item in items {
             writeln!(out, "  - {}", item).unwrap();
-        }
-        if items.len() > 5 {
-            writeln!(out, "  - (+{} more)", items.len() - 5).unwrap();
         }
     }
 
@@ -429,12 +427,16 @@ pub mod format {
         if !c.related.is_empty() {
             writeln!(out, "- Related:").unwrap();
             for rel in &c.related {
-                writeln!(
+                write!(
                     out,
                     "  - {}:{}-{} ({})",
                     rel.range.file, rel.range.start_line, rel.range.end_line, rel.relationship
                 )
                 .unwrap();
+                if !rel.reason.is_empty() {
+                    write!(out, " - {}", rel.reason).unwrap();
+                }
+                writeln!(out).unwrap();
             }
         }
         Some(out)
@@ -476,6 +478,17 @@ pub mod format {
         writeln!(out, "- Age: {} days", g.age_days).unwrap();
         writeln!(out, "- Authors: {}", g.author_count).unwrap();
         writeln!(out, "- Stability: {}", g.stability).unwrap();
+        Some(out)
+    }
+
+    /// Format contextual risk impact (returns None if no contextual risk data)
+    pub fn contextual_risk(risk: Option<&ContextualRiskImpactOutput>) -> Option<String> {
+        let r = risk?;
+        let mut out = String::new();
+        write_section_heading(&mut out, "Contextual Risk");
+        writeln!(out, "- Base Risk: {:.1}", r.base_risk).unwrap();
+        writeln!(out, "- Contextual Risk: {:.1}", r.contextual_risk).unwrap();
+        writeln!(out, "- Risk Multiplier: {:.2}x", r.multiplier).unwrap();
         Some(out)
     }
 
@@ -996,7 +1009,7 @@ mod tests {
                 upstream_count: 8,
                 downstream_count: 12,
                 upstream_callers: vec!["caller1".to_string(), "caller2".to_string()],
-                downstream_callees: vec!["callee1".to_string(), "callee2".to_string()],
+                downstream_callees: (1..=6).map(|n| format!("callee{n}")).collect(),
                 blast_radius: 20,
                 critical_path: true,
                 coupling_classification: Some("Hub".to_string()),
@@ -1021,6 +1034,7 @@ mod tests {
             pattern_details: None,
             context: None,
             git_history: None,
+            contextual_risk: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1070,6 +1084,16 @@ mod tests {
         assert!(
             markdown.contains("Instability: 0.60 (I=Ce/(Ca+Ce))"),
             "Should show instability metric"
+        );
+        assert!(
+            markdown.contains("All Callees:") && markdown.contains("callee6"),
+            "Should show the complete downstream callee list: {}",
+            markdown
+        );
+        assert!(
+            !markdown.contains("(+1 more)"),
+            "Should not truncate dependency context for LLM markdown: {}",
+            markdown
         );
     }
 
@@ -1137,6 +1161,7 @@ mod tests {
             pattern_details: None,
             context: None,
             git_history: None,
+            contextual_risk: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1229,6 +1254,7 @@ mod tests {
                 bug_fix_count: 5,
                 stability: "Frequently Changed".to_string(),
             }),
+            contextual_risk: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1267,6 +1293,38 @@ mod tests {
             "Should show stability: {}",
             markdown
         );
+    }
+
+    #[test]
+    fn test_context_section_includes_related_reason() {
+        use crate::output::unified::{
+            ContextSuggestionOutput, FileRangeOutput, RelatedContextOutput,
+        };
+
+        let context = ContextSuggestionOutput {
+            primary: FileRangeOutput {
+                file: "src/main.rs".to_string(),
+                start_line: 10,
+                end_line: 40,
+                symbol: Some("target_fn".to_string()),
+            },
+            related: vec![RelatedContextOutput {
+                range: FileRangeOutput {
+                    file: "src/helper.rs".to_string(),
+                    start_line: 5,
+                    end_line: 12,
+                    symbol: Some("helper_fn".to_string()),
+                },
+                relationship: "callee".to_string(),
+                reason: "Called by target_fn".to_string(),
+            }],
+            total_lines: 38,
+            completeness_confidence: 0.8,
+        };
+
+        let markdown = format::context(Some(&context)).unwrap();
+
+        assert!(markdown.contains("src/helper.rs:5-12 (callee) - Called by target_fn"));
     }
 
     #[test]
@@ -1395,6 +1453,7 @@ mod tests {
             pattern_details: None,
             context: None,
             git_history: None,
+            contextual_risk: None,
         }
     }
 
