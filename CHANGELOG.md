@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-06-08
+
+### Added
+
+- **Complete Dependency Context Output** - LLM markdown and TUI detail views now include complete dependency context
+  - Preserves dependency metadata through unified output construction and deduplication
+  - Extends output validation coverage for dependency context rendering
+
+### Fixed
+
+- **Vendored OpenSSL CI Builds** - CI and release workflows now configure Windows Perl for vendored OpenSSL builds
+  - Keeps OpenSSL builds self-contained across CI, release, and Rust-next workflows
+  - Removes redundant platform package setup where vendored OpenSSL is used
+
+### Tech Debt Cleanup
+
+- **Analysis and Output Refactors** - Simplified async receiver detection, unified analysis orchestration, local variable classification, coverage gap calculation, data-flow rvalue conversion, purity metric aggregation, Python field discovery, LCOV bounds lookup, and priority markdown formatting
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.17.2 release
+
 ## [0.17.1] - 2026-05-27
 
 ### Fixed
