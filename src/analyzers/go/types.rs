@@ -1,3 +1,4 @@
+use crate::core::PurityLevel;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +20,9 @@ pub struct GoFunction {
     pub is_test: bool,
     pub visibility: Option<String>,
     pub calls: Vec<String>,
+    pub purity_level: PurityLevel,
+    pub purity_confidence: f32,
+    pub purity_patterns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]

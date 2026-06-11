@@ -385,6 +385,102 @@ func Serve(ctx context.Context, ok bool) error {
     assert!(metrics.complexity.functions[0].cyclomatic > 1);
 }
 
+#[test]
+fn test_go_same_package_cross_file_calls_resolve() {
+    let files = vec![
+        (
+            "service/handler.go",
+            r#"package service
+
+func Serve() {
+    helper()
+}
+"#,
+        ),
+        (
+            "service/helper.go",
+            r#"package service
+
+func helper() {}
+"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let serve = results
+        .iter()
+        .flat_map(|result| result.metrics.complexity.functions.iter())
+        .find(|function| function.name == "Serve")
+        .unwrap();
+    let helper = results
+        .iter()
+        .flat_map(|result| result.metrics.complexity.functions.iter())
+        .find(|function| function.name == "helper")
+        .unwrap();
+
+    assert_eq!(serve.downstream_callees, Some(vec!["helper".to_string()]));
+    assert_eq!(helper.upstream_callers, Some(vec!["Serve".to_string()]));
+}
+
+#[test]
+fn test_go_external_calls_do_not_resolve_as_internal_edges() {
+    let files = vec![(
+        "service/handler.go",
+        r#"package service
+
+import "fmt"
+
+func Serve() {
+    fmt.Println("hello")
+}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let serve = &results[0].metrics.complexity.functions[0];
+
+    assert_eq!(serve.call_dependencies, None);
+    assert_eq!(serve.downstream_callees, None);
+}
+
+#[test]
+fn test_go_test_package_does_not_resolve_to_internal_package() {
+    let files = vec![
+        (
+            "service/handler.go",
+            r#"package service
+
+func helper() {}
+"#,
+        ),
+        (
+            "service/handler_test.go",
+            r#"package service_test
+
+func TestServe() {
+    helper()
+}
+"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let test_fn = results
+        .iter()
+        .flat_map(|result| result.metrics.complexity.functions.iter())
+        .find(|function| function.name == "TestServe")
+        .unwrap();
+
+    assert_eq!(test_fn.call_dependencies, None);
+    assert_eq!(test_fn.downstream_callees, None);
+}
+
 // ============================================================================
 // Edge Cases
 // ============================================================================

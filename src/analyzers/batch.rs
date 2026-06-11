@@ -28,6 +28,7 @@
 
 use crate::analyzers::get_analyzer;
 use crate::config::{BatchAnalysisConfig, ParallelConfig};
+use crate::core::ast::Ast;
 use crate::core::{DebtItem, FileMetrics, Language};
 use crate::effects::{
     validation_failure, validation_failures, validation_success, AnalysisEffect, AnalysisValidation,
@@ -36,6 +37,7 @@ use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use stillwater::effect::prelude::*;
@@ -58,6 +60,10 @@ pub struct FileAnalysisResult {
     /// Time taken to analyze this file (if timing was enabled)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub analysis_time: Option<Duration>,
+
+    /// Language-specific package/module name when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_name: Option<String>,
 }
 
 impl FileAnalysisResult {
@@ -68,6 +74,7 @@ impl FileAnalysisResult {
             metrics,
             debt_items,
             analysis_time: None,
+            package_name: None,
         }
     }
 
@@ -83,6 +90,7 @@ impl FileAnalysisResult {
             metrics,
             debt_items,
             analysis_time: Some(analysis_time),
+            package_name: None,
         }
     }
 }
@@ -384,35 +392,38 @@ fn analyze_files_parallel(
     config: &ParallelConfig,
     collect_timing: bool,
 ) -> Result<Vec<FileAnalysisResult>, AnalysisError> {
-    if !config.enabled || paths.len() <= 1 {
-        // Sequential processing
-        paths
-            .iter()
-            .map(|path| analyze_file_from_path(path, collect_timing))
-            .collect()
-    } else {
-        // Parallel processing with rayon
-        let batch_size = config.effective_batch_size();
-
-        if paths.len() <= batch_size {
-            // Single batch
+    let results: Result<Vec<FileAnalysisResult>, AnalysisError> =
+        if !config.enabled || paths.len() <= 1 {
+            // Sequential processing
             paths
-                .par_iter()
+                .iter()
                 .map(|path| analyze_file_from_path(path, collect_timing))
                 .collect()
         } else {
-            // Chunked processing for large codebases
-            paths
-                .chunks(batch_size)
-                .flat_map(|chunk| {
-                    chunk
-                        .par_iter()
-                        .map(|path| analyze_file_from_path(path, collect_timing))
-                        .collect::<Vec<_>>()
-                })
-                .collect()
-        }
-    }
+            // Parallel processing with rayon
+            let batch_size = config.effective_batch_size();
+
+            if paths.len() <= batch_size {
+                // Single batch
+                paths
+                    .par_iter()
+                    .map(|path| analyze_file_from_path(path, collect_timing))
+                    .collect()
+            } else {
+                // Chunked processing for large codebases
+                paths
+                    .chunks(batch_size)
+                    .flat_map(|chunk| {
+                        chunk
+                            .par_iter()
+                            .map(|path| analyze_file_from_path(path, collect_timing))
+                            .collect::<Vec<_>>()
+                    })
+                    .collect()
+            }
+        };
+
+    results.map(resolve_go_cross_file_calls)
 }
 
 /// Analyze a file from its path.
@@ -445,6 +456,7 @@ fn analyze_file_content(
         .parse(content, path.to_path_buf())
         .map_err(|e| AnalysisError::parse_with_path(format!("Parse failed: {}", e), path))?;
 
+    let package_name = package_name_for_ast(&ast);
     let metrics = analyzer.analyze(&ast);
     let debt_items = metrics.debt_items.clone();
 
@@ -459,12 +471,110 @@ fn analyze_file_content(
         metrics,
         debt_items,
         analysis_time,
+        package_name,
     })
+}
+
+fn package_name_for_ast(ast: &Ast) -> Option<String> {
+    match ast {
+        Ast::Go(go_ast) => crate::analyzers::go::visitor::package_name_from_ast(go_ast),
+        _ => None,
+    }
 }
 
 /// Analyze a pre-validated file.
 fn analyze_validated_file(file: &ValidatedFile) -> Result<FileAnalysisResult, AnalysisError> {
     analyze_file_content(&file.path, &file.content, false)
+}
+
+fn resolve_go_cross_file_calls(mut results: Vec<FileAnalysisResult>) -> Vec<FileAnalysisResult> {
+    let symbol_index = go_symbol_index(&results);
+
+    for result in results.iter_mut().filter(|result| is_go_result(result)) {
+        let package = go_package_key(result);
+        let symbols = symbol_index.get(&package).cloned().unwrap_or_default();
+
+        for function in &mut result.metrics.complexity.functions {
+            let resolved = function
+                .call_dependencies
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|call| symbols.contains(call))
+                .collect::<Vec<_>>();
+
+            function.call_dependencies = (!resolved.is_empty()).then_some(resolved.clone());
+            function.downstream_callees = (!resolved.is_empty()).then_some(resolved);
+        }
+    }
+
+    let upstream = go_upstream_callers(&results);
+    for result in results.iter_mut().filter(|result| is_go_result(result)) {
+        for function in &mut result.metrics.complexity.functions {
+            function.upstream_callers = upstream.get(&function.name).cloned();
+        }
+    }
+
+    results
+}
+
+fn go_symbol_index(results: &[FileAnalysisResult]) -> HashMap<GoPackageKey, HashSet<String>> {
+    results.iter().filter(|result| is_go_result(result)).fold(
+        HashMap::new(),
+        |mut index, result| {
+            let package = go_package_key(result);
+            let symbols = result
+                .metrics
+                .complexity
+                .functions
+                .iter()
+                .map(|function| go_short_name(&function.name));
+
+            index.entry(package).or_default().extend(symbols);
+            index
+        },
+    )
+}
+
+fn go_upstream_callers(results: &[FileAnalysisResult]) -> HashMap<String, Vec<String>> {
+    results
+        .iter()
+        .filter(|result| is_go_result(result))
+        .flat_map(|result| result.metrics.complexity.functions.iter())
+        .fold(HashMap::new(), |mut upstream, caller| {
+            for callee in caller.downstream_callees.clone().unwrap_or_default() {
+                upstream
+                    .entry(callee)
+                    .or_default()
+                    .push(caller.name.clone());
+            }
+            upstream
+        })
+}
+
+fn is_go_result(result: &FileAnalysisResult) -> bool {
+    result.metrics.language == Language::Go
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct GoPackageKey {
+    directory: PathBuf,
+    package_name: Option<String>,
+}
+
+fn go_package_key(result: &FileAnalysisResult) -> GoPackageKey {
+    GoPackageKey {
+        directory: result
+            .path
+            .parent()
+            .unwrap_or_else(|| Path::new(""))
+            .to_path_buf(),
+        package_name: result.package_name.clone(),
+    }
+}
+
+fn go_short_name(name: &str) -> String {
+    name.rsplit('.').next().unwrap_or(name).to_string()
 }
 
 /// Combine validations while preserving successful values.

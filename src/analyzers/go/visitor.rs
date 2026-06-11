@@ -1,22 +1,27 @@
 use crate::analyzers::go::parser::{node_line, node_text};
+use crate::analyzers::go::purity::analyze_purity;
 use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
 use crate::core::ast::GoAst;
+use crate::core::PurityLevel;
 use std::path::Path;
 use tree_sitter::Node;
 
 pub fn analyze_ast(ast: &GoAst) -> GoAnalysis {
     let root = ast.tree.root_node();
     let mut analysis = GoAnalysis {
-        package_name: package_name(root, ast),
+        package_name: package_name_from_ast(ast),
         functions: Vec::new(),
     };
 
     collect_functions(root, ast, &mut analysis.functions);
-    resolve_same_file_calls(&mut analysis.functions);
     analysis
         .functions
         .sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
     analysis
+}
+
+pub fn package_name_from_ast(ast: &GoAst) -> Option<String> {
+    package_name(ast.tree.root_node(), ast)
 }
 
 fn collect_functions(node: Node, ast: &GoAst, functions: &mut Vec<GoFunction>) {
@@ -59,6 +64,7 @@ fn build_function(node: Node, ast: &GoAst, name: String, kind: GoFunctionKind) -
     let cyclomatic = body.map(cyclomatic_complexity).unwrap_or(1);
     let cognitive = body.map(|node| cognitive_complexity(node, 0)).unwrap_or(0);
     let nesting = body.map(|node| max_nesting(node, 0)).unwrap_or(0);
+    let purity = body.map(|node| analyze_purity(node, &ast.source));
 
     GoFunction {
         visibility: visibility_for(&name),
@@ -74,6 +80,15 @@ fn build_function(node: Node, ast: &GoAst, name: String, kind: GoFunctionKind) -
         calls: body
             .map(|node| collect_calls(node, ast))
             .unwrap_or_default(),
+        purity_level: purity
+            .as_ref()
+            .map(|purity| purity.level)
+            .unwrap_or(PurityLevel::Impure),
+        purity_confidence: purity
+            .as_ref()
+            .map(|purity| purity.confidence)
+            .unwrap_or(0.0),
+        purity_patterns: purity.map(|purity| purity.patterns).unwrap_or_default(),
     }
 }
 
@@ -280,26 +295,6 @@ fn normalize_call_name(text: &str) -> String {
     text.rsplit('.').next().unwrap_or(text).to_string()
 }
 
-fn resolve_same_file_calls(functions: &mut [GoFunction]) {
-    let names: Vec<String> = functions
-        .iter()
-        .map(|function| short_name(&function.name))
-        .collect();
-
-    for function in functions {
-        function.calls = function
-            .calls
-            .iter()
-            .filter(|call| names.contains(call))
-            .cloned()
-            .collect();
-    }
-}
-
-fn short_name(name: &str) -> String {
-    name.rsplit('.').next().unwrap_or(name).to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,6 +376,9 @@ func helper() {}
             .find(|function| function.name == "Serve")
             .unwrap();
 
-        assert_eq!(serve.calls, vec!["helper".to_string()]);
+        assert_eq!(
+            serve.calls,
+            vec!["helper".to_string(), "Println".to_string()]
+        );
     }
 }

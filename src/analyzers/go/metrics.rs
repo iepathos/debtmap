@@ -1,6 +1,6 @@
 use crate::analyzers::go::types::GoFunction;
+use crate::core::Dependency;
 use crate::core::{ComplexityMetrics, DebtItem, FileMetrics, FunctionMetrics, Language};
-use crate::core::{Dependency, PurityLevel};
 use std::path::PathBuf;
 
 pub fn build_file_metrics(
@@ -50,20 +50,32 @@ pub fn to_function_metrics(function: &GoFunction) -> FunctionMetrics {
         is_trait_method: false,
         in_test_module: function.is_test,
         entropy_score: None,
-        is_pure: None,
-        purity_confidence: None,
-        purity_reason: None,
+        is_pure: Some(is_pure(function.purity_level)),
+        purity_confidence: Some(function.purity_confidence),
+        purity_reason: purity_reason(function),
         call_dependencies: (!function.calls.is_empty()).then_some(function.calls.clone()),
-        detected_patterns: None,
+        detected_patterns: (!function.purity_patterns.is_empty())
+            .then_some(function.purity_patterns.clone()),
         upstream_callers: None,
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
-        purity_level: Some(PurityLevel::Impure),
+        purity_level: Some(function.purity_level),
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
     }
+}
+
+fn purity_reason(function: &GoFunction) -> Option<String> {
+    (!function.purity_patterns.is_empty()).then(|| function.purity_patterns.join(", "))
+}
+
+fn is_pure(level: crate::core::PurityLevel) -> bool {
+    matches!(
+        level,
+        crate::core::PurityLevel::StrictlyPure | crate::core::PurityLevel::LocallyPure
+    )
 }

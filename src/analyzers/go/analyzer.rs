@@ -197,12 +197,13 @@ func Generated(a bool) int {
     }
 
     #[test]
-    fn test_same_file_call_dependencies() {
+    fn test_go_analyzer_records_raw_call_dependencies() {
         let analyzer = GoAnalyzer::new();
         let source = r#"package service
 
 func Serve() {
     helper()
+    fmt.Println("hello")
 }
 
 func helper() {}
@@ -216,6 +217,47 @@ func helper() {}
             .find(|function| function.name == "Serve")
             .unwrap();
 
-        assert_eq!(serve.call_dependencies, Some(vec!["helper".to_string()]));
+        assert_eq!(
+            serve.call_dependencies,
+            Some(vec!["helper".to_string(), "Println".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_go_purity_signals() {
+        let analyzer = GoAnalyzer::new();
+        let source = r#"package service
+
+func add(a int) int {
+    return a + 1
+}
+
+func run(ch chan int) {
+    go add(1)
+    ch <- 1
+}
+"#;
+        let ast = analyzer.parse(source, PathBuf::from("service.go")).unwrap();
+        let metrics = analyzer.analyze(&ast);
+        let add = metrics
+            .complexity
+            .functions
+            .iter()
+            .find(|function| function.name == "add")
+            .unwrap();
+        let run = metrics
+            .complexity
+            .functions
+            .iter()
+            .find(|function| function.name == "run")
+            .unwrap();
+
+        assert_eq!(add.is_pure, Some(true));
+        assert_eq!(run.is_pure, Some(false));
+        assert!(run
+            .detected_patterns
+            .as_ref()
+            .unwrap()
+            .contains(&"go-statement".to_string()));
     }
 }
