@@ -191,6 +191,13 @@ impl FileContextDetector {
                     0.0
                 }
             }
+            Language::Go => {
+                if filename.ends_with("_test.go") {
+                    0.9
+                } else {
+                    0.0
+                }
+            }
             Language::Unknown => 0.0,
         }
     }

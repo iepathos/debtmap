@@ -19,6 +19,10 @@ pub struct LanguagesConfig {
     /// TypeScript-specific configuration
     #[serde(default)]
     pub typescript: Option<LanguageFeatures>,
+
+    /// Go-specific configuration
+    #[serde(default)]
+    pub go: Option<LanguageFeatures>,
 }
 
 /// Language-specific feature configuration

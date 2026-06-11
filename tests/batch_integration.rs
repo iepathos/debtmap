@@ -333,13 +333,17 @@ fn test_analysis_multiple_languages() {
         ("lib.rs", "pub fn rust_fn() { let x = 1; }"),
         ("script.py", "def python_fn():\n    x = 1"),
         ("app.js", "function jsFn() { let x = 1; }"),
+        (
+            "main.go",
+            "package main\n\nfunc goFn() { println(\"hello\") }",
+        ),
     ];
     let (_temp_dir, paths) = create_test_project(&files);
 
     let config = DebtmapConfig::default();
     let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
 
-    assert_eq!(results.len(), 3, "Should analyze all 3 files");
+    assert_eq!(results.len(), 4, "Should analyze all 4 files");
 
     // Each file should have at least one function detected
     for result in &results {
@@ -351,6 +355,34 @@ fn test_analysis_multiple_languages() {
             "Should complete analysis without error"
         );
     }
+}
+
+#[test]
+fn test_analysis_go_file() {
+    let files = vec![(
+        "service.go",
+        r#"package service
+
+import "context"
+
+func Serve(ctx context.Context, ok bool) error {
+    if ok {
+        return nil
+    }
+    return nil
+}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let metrics = &results[0].metrics;
+
+    assert_eq!(metrics.language, debtmap::core::Language::Go);
+    assert_eq!(metrics.dependencies[0].name, "context");
+    assert_eq!(metrics.complexity.functions[0].name, "Serve");
+    assert!(metrics.complexity.functions[0].cyclomatic > 1);
 }
 
 // ============================================================================

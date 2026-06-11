@@ -433,6 +433,7 @@ pub enum Language {
     Python,
     JavaScript,
     TypeScript,
+    Go,
     Unknown,
 }
 
@@ -443,6 +444,7 @@ impl Language {
             (&["py", "pyw"], Language::Python),
             (&["js", "mjs", "cjs", "jsx"], Language::JavaScript),
             (&["ts", "mts", "cts", "tsx"], Language::TypeScript),
+            (&["go"], Language::Go),
         ];
 
         EXTENSION_MAP
@@ -472,6 +474,7 @@ impl std::fmt::Display for Language {
             (Language::Python, "Python"),
             (Language::JavaScript, "JavaScript"),
             (Language::TypeScript, "TypeScript"),
+            (Language::Go, "Go"),
             (Language::Unknown, "Unknown"),
         ];
 

@@ -48,10 +48,17 @@ fn test_parse_single_language_typescript() {
 }
 
 #[test]
+fn test_parse_single_language_go() {
+    assert_eq!(parse_single_language("go"), Some(Language::Go));
+    assert_eq!(parse_single_language("golang"), Some(Language::Go));
+    assert_eq!(parse_single_language("GO"), Some(Language::Go));
+    assert_eq!(parse_single_language("Golang"), Some(Language::Go));
+}
+
+#[test]
 fn test_parse_single_language_unknown() {
     assert_eq!(parse_single_language("java"), None);
     assert_eq!(parse_single_language("c++"), None);
-    assert_eq!(parse_single_language("go"), None);
     assert_eq!(parse_single_language(""), None);
 }
 
@@ -89,9 +96,10 @@ fn test_parse_languages_empty_vec_returns_empty() {
 #[test]
 fn test_default_languages() {
     let defaults = default_languages();
-    assert_eq!(defaults.len(), 4);
+    assert_eq!(defaults.len(), 5);
     assert!(defaults.contains(&Language::Rust));
     assert!(defaults.contains(&Language::Python));
     assert!(defaults.contains(&Language::JavaScript));
     assert!(defaults.contains(&Language::TypeScript));
+    assert!(defaults.contains(&Language::Go));
 }

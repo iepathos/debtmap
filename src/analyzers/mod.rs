@@ -32,6 +32,7 @@ pub mod effects;
 pub mod enhanced_analyzer;
 pub mod file_analyzer;
 pub mod function_registry;
+pub mod go;
 pub mod io_detector;
 pub mod macro_definition_collector;
 pub mod purity_detector;
@@ -139,6 +140,7 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
             }
             Box::new(analyzer)
         }),
+        (Language::Go, || Box::new(go::GoAnalyzer::new())),
     ];
 
     ANALYZER_MAP

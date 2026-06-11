@@ -688,6 +688,27 @@ interface_weight = 0.15
     }
 
     #[test]
+    fn test_go_language_config_deserializes() {
+        let config: DebtmapConfig = toml::from_str(
+            r#"
+[languages]
+enabled = ["go"]
+
+[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = false
+"#,
+        )
+        .unwrap();
+
+        let go = config.languages.and_then(|languages| languages.go).unwrap();
+        assert!(go.detect_dead_code);
+        assert!(go.detect_complexity);
+        assert!(!go.detect_duplication);
+    }
+
+    #[test]
     fn test_default_entropy_functions() {
         use crate::config::languages::*;
         assert!(default_entropy_enabled());

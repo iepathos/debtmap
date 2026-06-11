@@ -208,10 +208,22 @@ fn validate_single_source_parseable(file: &FileContent) -> AnalysisValidation<Fi
         Language::Rust => validate_rust_parseable(file),
         Language::Python => validate_python_parseable(file),
         Language::JavaScript | Language::TypeScript => validate_js_ts_parseable(file),
+        Language::Go => validate_go_parseable(file),
         Language::Unknown => {
             // Unknown languages pass through - we can't validate them
             validation_success(file.clone())
         }
+    }
+}
+
+fn validate_go_parseable(file: &FileContent) -> AnalysisValidation<FileContent> {
+    match crate::analyzers::go::parser::parse_source(&file.content, &file.path) {
+        Ok(_) => validation_success(file.clone()),
+        Err(e) => validation_failure(AnalysisError::parse_with_context(
+            format!("Go parse error: {}", e),
+            &file.path,
+            0,
+        )),
     }
 }
 

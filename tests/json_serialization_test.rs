@@ -1,3 +1,4 @@
+use debtmap::core::Language;
 use debtmap::data_flow::DataFlowGraph;
 use debtmap::priority::{CallGraph, FilterStatistics, ImpactMetrics, UnifiedAnalysis};
 use im::Vector;
@@ -54,4 +55,10 @@ fn test_data_flow_graph_serialization() {
         "DataFlowGraph serialization failed: {:?}",
         result.err()
     );
+}
+
+#[test]
+fn test_go_language_json_serialization() {
+    let json = serde_json::to_string(&Language::Go).unwrap();
+    assert_eq!(json, "\"Go\"");
 }

@@ -117,6 +117,9 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
             // JS/TS also uses defaults (dead code: false)
             LanguageFeatures::default()
         }
+        Language::Go => languages_config
+            .and_then(|lc| lc.go.clone())
+            .unwrap_or_default(),
         Language::Unknown => LanguageFeatures::default(),
     }
 }

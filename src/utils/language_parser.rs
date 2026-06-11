@@ -17,6 +17,7 @@ pub fn parse_single_language(lang_str: &str) -> Option<Language> {
         "python" | "py" => Some(Language::Python),
         "javascript" | "js" => Some(Language::JavaScript),
         "typescript" | "ts" => Some(Language::TypeScript),
+        "go" | "golang" => Some(Language::Go),
         _ => None,
     }
 }
@@ -27,5 +28,6 @@ pub fn default_languages() -> Vec<Language> {
         Language::Python,
         Language::JavaScript,
         Language::TypeScript,
+        Language::Go,
     ]
 }

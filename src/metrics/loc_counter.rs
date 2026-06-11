@@ -23,6 +23,7 @@
 //! - Rust: `//`, `/* */` (nestable), and attributes `#[...]` (counted as code, not comments)
 //! - Python: `#` comments
 //! - JavaScript/TypeScript: `//` and `/* */` comments
+//! - Go: `//` and `/* */` comments
 //!
 //! ## Limitations
 //!
@@ -44,6 +45,8 @@ pub enum LocLanguage {
     JavaScript,
     /// TypeScript: `//` and `/* */` comments
     TypeScript,
+    /// Go: `//` and `/* */` comments
+    Go,
     /// Unknown language - uses conservative comment detection
     #[default]
     Unknown,
@@ -57,6 +60,7 @@ impl LocLanguage {
             Some("py") | Some("pyi") => Self::Python,
             Some("js") | Some("jsx") | Some("mjs") | Some("cjs") => Self::JavaScript,
             Some("ts") | Some("tsx") | Some("mts") | Some("cts") => Self::TypeScript,
+            Some("go") => Self::Go,
             _ => Self::Unknown,
         }
     }
@@ -733,9 +737,32 @@ fn main() {
             LocLanguage::TypeScript
         );
         assert_eq!(
+            LocLanguage::from_path(Path::new("main.go")),
+            LocLanguage::Go
+        );
+        assert_eq!(
             LocLanguage::from_path(Path::new("unknown.xyz")),
             LocLanguage::Unknown
         );
+    }
+
+    #[test]
+    fn test_go_comment_counting() {
+        let counter = LocCounter::default();
+        let code = r#"package main
+
+// main starts the program.
+func main() {
+    /* setup */
+    println("hello")
+}
+"#;
+        let count = counter.count_content_with_language(code, Some(LocLanguage::Go));
+
+        assert_eq!(count.code_lines, 4);
+        assert_eq!(count.comment_lines, 2);
+        assert_eq!(count.blank_lines, 1);
+        assert_eq!(count.physical_lines, 7);
     }
 
     #[test]

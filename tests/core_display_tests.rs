@@ -142,10 +142,18 @@ fn test_language_display_unknown() {
 }
 
 #[test]
+fn test_language_display_go() {
+    assert_eq!(format!("{}", Language::Go), "Go");
+}
+
+#[test]
 fn test_language_display_all_variants() {
     let languages = vec![
         (Language::Rust, "Rust"),
         (Language::Python, "Python"),
+        (Language::JavaScript, "JavaScript"),
+        (Language::TypeScript, "TypeScript"),
+        (Language::Go, "Go"),
         (Language::Unknown, "Unknown"),
     ];
 
@@ -180,6 +188,11 @@ fn test_language_from_extension_typescript() {
     assert_eq!(Language::from_extension("tsx"), Language::TypeScript);
     assert_eq!(Language::from_extension("mts"), Language::TypeScript);
     assert_eq!(Language::from_extension("cts"), Language::TypeScript);
+}
+
+#[test]
+fn test_language_from_extension_go() {
+    assert_eq!(Language::from_extension("go"), Language::Go);
 }
 
 #[test]

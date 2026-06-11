@@ -316,6 +316,12 @@ fn validate_syntax(content: &str, language: Language, path: &Path) -> Result<(),
             })?;
             Ok(())
         }
+        Language::Go => {
+            crate::analyzers::go::parser::parse_source(content, path).map_err(|e| {
+                AnalysisError::parse_with_path(format!("Go syntax error: {}", e), path)
+            })?;
+            Ok(())
+        }
         Language::Unknown => Err(AnalysisError::validation_with_path(
             "Cannot validate unknown language",
             path,
@@ -738,6 +744,20 @@ mod tests {
         let content = "def hello():\n    pass";
         let result = validate_syntax(content, Language::Python, Path::new("test.py"));
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_syntax_go_valid() {
+        let content = "package main\n\nfunc main() {}";
+        let result = validate_syntax(content, Language::Go, Path::new("main.go"));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_syntax_go_invalid() {
+        let content = "package main\n\nfunc main( {}";
+        let result = validate_syntax(content, Language::Go, Path::new("main.go"));
+        assert!(result.is_err());
     }
 
     #[test]

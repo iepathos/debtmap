@@ -18,6 +18,7 @@ impl FileWalker {
                 Language::Python,
                 Language::JavaScript,
                 Language::TypeScript,
+                Language::Go,
             ],
             ignore_patterns: vec![],
         }
@@ -178,6 +179,9 @@ mod tests {
         let mut lib_file = fs::File::create(root.join("src/lib.rs")).unwrap();
         writeln!(lib_file, "pub fn hello() {{}}").unwrap();
 
+        let mut go_file = fs::File::create(root.join("src/main.go")).unwrap();
+        writeln!(go_file, "package main\n\nfunc main() {{}}").unwrap();
+
         // Test files
         let mut test_file = fs::File::create(root.join("tests/test_main.rs")).unwrap();
         writeln!(test_file, "#[test] fn test() {{}}").unwrap();
@@ -217,6 +221,21 @@ mod tests {
         assert!(file_names.contains(&"test_main.rs".to_string()));
         assert!(file_names.contains(&"foo.test.rs".to_string()));
         assert!(file_names.contains(&"bench.rs".to_string()));
+    }
+
+    #[test]
+    fn test_find_go_files_by_language() {
+        let (_temp_dir, root) = create_test_project();
+
+        let walker = FileWalker::new(root.clone()).with_languages(vec![Language::Go]);
+        let files = walker.walk().unwrap();
+        let file_names: Vec<String> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert_eq!(files.len(), 1);
+        assert!(file_names.contains(&"main.go".to_string()));
     }
 
     #[test]
