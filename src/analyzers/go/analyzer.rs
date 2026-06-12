@@ -219,7 +219,7 @@ func helper() {}
 
         assert_eq!(
             serve.call_dependencies,
-            Some(vec!["helper".to_string(), "Println".to_string()])
+            Some(vec!["helper".to_string(), "fmt.Println".to_string()])
         );
     }
 

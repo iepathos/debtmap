@@ -3,17 +3,19 @@ use crate::analyzers::go::purity::analyze_purity;
 use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
 use crate::core::ast::GoAst;
 use crate::core::PurityLevel;
+use std::collections::HashMap;
 use std::path::Path;
 use tree_sitter::Node;
 
 pub fn analyze_ast(ast: &GoAst) -> GoAnalysis {
     let root = ast.tree.root_node();
+    let return_types = function_return_types(root, ast);
     let mut analysis = GoAnalysis {
         package_name: package_name_from_ast(ast),
         functions: Vec::new(),
     };
 
-    collect_functions(root, ast, &mut analysis.functions);
+    collect_functions(root, ast, &return_types, &mut analysis.functions);
     analysis
         .functions
         .sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
@@ -24,47 +26,84 @@ pub fn package_name_from_ast(ast: &GoAst) -> Option<String> {
     package_name(ast.tree.root_node(), ast)
 }
 
-fn collect_functions(node: Node, ast: &GoAst, functions: &mut Vec<GoFunction>) {
-    if let Some(function) = function_from_node(node, ast) {
+fn collect_functions(
+    node: Node,
+    ast: &GoAst,
+    return_types: &HashMap<String, String>,
+    functions: &mut Vec<GoFunction>,
+) {
+    if let Some(function) = function_from_node(node, ast, return_types) {
         functions.push(function);
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_functions(child, ast, functions);
+        collect_functions(child, ast, return_types, functions);
     }
 }
 
-fn function_from_node(node: Node, ast: &GoAst) -> Option<GoFunction> {
+fn function_from_node(
+    node: Node,
+    ast: &GoAst,
+    return_types: &HashMap<String, String>,
+) -> Option<GoFunction> {
     match node.kind() {
-        "function_declaration" => named_function(node, ast),
-        "method_declaration" => method_function(node, ast),
+        "function_declaration" => named_function(node, ast, return_types),
+        "method_declaration" => method_function(node, ast, return_types),
         _ => None,
     }
 }
 
-fn named_function(node: Node, ast: &GoAst) -> Option<GoFunction> {
+fn named_function(
+    node: Node,
+    ast: &GoAst,
+    return_types: &HashMap<String, String>,
+) -> Option<GoFunction> {
     let name = child_text(node, "name", ast)?;
-    Some(build_function(node, ast, name, GoFunctionKind::Function))
-}
-
-fn method_function(node: Node, ast: &GoAst) -> Option<GoFunction> {
-    let name = child_text(node, "name", ast)?;
-    let receiver = receiver_type(node, ast).unwrap_or_else(|| "?".to_string());
     Some(build_function(
         node,
         ast,
-        format!("{receiver}.{name}"),
-        GoFunctionKind::Method,
+        name,
+        GoFunctionKind::Function,
+        FunctionContext::new(return_types, None),
     ))
 }
 
-fn build_function(node: Node, ast: &GoAst, name: String, kind: GoFunctionKind) -> GoFunction {
+fn method_function(
+    node: Node,
+    ast: &GoAst,
+    return_types: &HashMap<String, String>,
+) -> Option<GoFunction> {
+    let name = child_text(node, "name", ast)?;
+    let receiver = receiver_info(node, ast);
+    let receiver_type = receiver
+        .as_ref()
+        .map(|receiver| receiver.type_name.clone())
+        .unwrap_or_else(|| "?".to_string());
+    Some(build_function(
+        node,
+        ast,
+        format!("{receiver_type}.{name}"),
+        GoFunctionKind::Method,
+        FunctionContext::new(return_types, receiver),
+    ))
+}
+
+fn build_function(
+    node: Node,
+    ast: &GoAst,
+    name: String,
+    kind: GoFunctionKind,
+    context: FunctionContext<'_>,
+) -> GoFunction {
     let body = node.child_by_field_name("body");
     let cyclomatic = body.map(cyclomatic_complexity).unwrap_or(1);
     let cognitive = body.map(|node| cognitive_complexity(node, 0)).unwrap_or(0);
     let nesting = body.map(|node| max_nesting(node, 0)).unwrap_or(0);
     let purity = body.map(|node| analyze_purity(node, &ast.source));
+    let local_types = body
+        .map(|node| local_type_environment(node, ast, &context))
+        .unwrap_or_default();
 
     GoFunction {
         visibility: visibility_for(&name),
@@ -78,7 +117,7 @@ fn build_function(node: Node, ast: &GoAst, name: String, kind: GoFunctionKind) -
         nesting,
         kind,
         calls: body
-            .map(|node| collect_calls(node, ast))
+            .map(|node| collect_calls(node, ast, &local_types))
             .unwrap_or_default(),
         purity_level: purity
             .as_ref()
@@ -98,11 +137,91 @@ fn package_name(root: Node, ast: &GoAst) -> Option<String> {
         .or_else(|| first_child_text(root, "package_identifier", ast))
 }
 
-fn receiver_type(node: Node, ast: &GoAst) -> Option<String> {
+#[derive(Debug, Clone)]
+struct ReceiverInfo {
+    name: Option<String>,
+    type_name: String,
+}
+
+struct FunctionContext<'a> {
+    return_types: &'a HashMap<String, String>,
+    receiver: Option<ReceiverInfo>,
+}
+
+impl<'a> FunctionContext<'a> {
+    fn new(return_types: &'a HashMap<String, String>, receiver: Option<ReceiverInfo>) -> Self {
+        Self {
+            return_types,
+            receiver,
+        }
+    }
+}
+
+fn receiver_info(node: Node, ast: &GoAst) -> Option<ReceiverInfo> {
     let receiver = node.child_by_field_name("receiver")?;
-    first_child_text(receiver, "type_identifier", ast)
-        .or_else(|| first_child_text(receiver, "pointer_type", ast))
-        .map(|text| text.trim_start_matches('*').to_string())
+    let text = node_text(&receiver, &ast.source);
+    let parts = receiver_parts(text);
+    receiver_type_from_parts(&parts).map(|type_name| ReceiverInfo {
+        name: receiver_name_from_parts(&parts),
+        type_name,
+    })
+}
+
+fn receiver_parts(text: &str) -> Vec<&str> {
+    text.trim_matches(|ch| ch == '(' || ch == ')')
+        .split_whitespace()
+        .collect()
+}
+
+fn receiver_name_from_parts(parts: &[&str]) -> Option<String> {
+    (parts.len() > 1).then(|| parts[0].to_string())
+}
+
+fn receiver_type_from_parts(parts: &[&str]) -> Option<String> {
+    parts
+        .last()
+        .map(|part| normalize_go_type(part))
+        .filter(|part| !part.is_empty())
+}
+
+fn normalize_go_type(text: &str) -> String {
+    text.trim()
+        .trim_start_matches('*')
+        .trim_start_matches('&')
+        .trim_end_matches("{}")
+        .split('[')
+        .next()
+        .unwrap_or("")
+        .to_string()
+}
+
+fn function_return_types(root: Node, ast: &GoAst) -> HashMap<String, String> {
+    children(root)
+        .into_iter()
+        .filter_map(|child| function_return_type(child, ast))
+        .collect()
+}
+
+fn function_return_type(node: Node, ast: &GoAst) -> Option<(String, String)> {
+    if node.kind() != "function_declaration" {
+        return None;
+    }
+
+    let name = child_text(node, "name", ast)?;
+    declaration_return_type(node, ast).map(|type_name| (name, type_name))
+}
+
+fn declaration_return_type(node: Node, ast: &GoAst) -> Option<String> {
+    node.child_by_field_name("result")
+        .map(|result| normalize_go_type(node_text(&result, &ast.source)))
+        .or_else(|| signature_return_type(node_text(&node, &ast.source)))
+        .filter(|type_name| !type_name.is_empty())
+}
+
+fn signature_return_type(text: &str) -> Option<String> {
+    let signature = text.split('{').next()?.trim();
+    let result = signature.rsplit_once(')')?.1.trim();
+    (!result.is_empty()).then(|| normalize_go_type(result))
 }
 
 fn child_text(node: Node, field: &str, ast: &GoAst) -> Option<String> {
@@ -265,13 +384,13 @@ fn children(node: Node) -> Vec<Node> {
     node.children(&mut cursor).collect()
 }
 
-fn collect_calls(node: Node, ast: &GoAst) -> Vec<String> {
+fn collect_calls(node: Node, ast: &GoAst, local_types: &HashMap<String, String>) -> Vec<String> {
     if is_nested_callable(node) {
         return Vec::new();
     }
 
     let current = if node.kind() == "call_expression" {
-        call_name(node, ast).into_iter().collect()
+        call_name(node, ast, local_types).into_iter().collect()
     } else {
         Vec::new()
     };
@@ -281,18 +400,131 @@ fn collect_calls(node: Node, ast: &GoAst) -> Vec<String> {
         .chain(
             children(node)
                 .into_iter()
-                .flat_map(|child| collect_calls(child, ast)),
+                .flat_map(|child| collect_calls(child, ast, local_types)),
         )
         .collect()
 }
 
-fn call_name(node: Node, ast: &GoAst) -> Option<String> {
+fn call_name(node: Node, ast: &GoAst, local_types: &HashMap<String, String>) -> Option<String> {
     node.child_by_field_name("function")
-        .map(|function| normalize_call_name(node_text(&function, &ast.source)))
+        .map(|function| normalize_call_name(function, ast, local_types))
 }
 
-fn normalize_call_name(text: &str) -> String {
-    text.rsplit('.').next().unwrap_or(text).to_string()
+fn normalize_call_name(
+    function: Node,
+    ast: &GoAst,
+    local_types: &HashMap<String, String>,
+) -> String {
+    let text = node_text(&function, &ast.source);
+    selector_call_name(text, local_types).unwrap_or_else(|| text.to_string())
+}
+
+fn selector_call_name(text: &str, local_types: &HashMap<String, String>) -> Option<String> {
+    let (receiver, method) = text.rsplit_once('.')?;
+    local_types
+        .get(receiver)
+        .map(|type_name| format!("{type_name}.{method}"))
+        .or_else(|| Some(format!("{receiver}.{method}")))
+}
+
+fn local_type_environment(
+    body: Node,
+    ast: &GoAst,
+    context: &FunctionContext<'_>,
+) -> HashMap<String, String> {
+    let initial = context
+        .receiver
+        .as_ref()
+        .and_then(receiver_binding)
+        .into_iter()
+        .collect();
+
+    collect_local_types(body, ast, context.return_types, initial)
+}
+
+fn receiver_binding(receiver: &ReceiverInfo) -> Option<(String, String)> {
+    receiver
+        .name
+        .as_ref()
+        .map(|name| (name.clone(), receiver.type_name.clone()))
+}
+
+fn collect_local_types(
+    node: Node,
+    ast: &GoAst,
+    return_types: &HashMap<String, String>,
+    mut types: HashMap<String, String>,
+) -> HashMap<String, String> {
+    if let Some((name, type_name)) = local_type_binding(node, ast, return_types) {
+        types.insert(name, type_name);
+    }
+
+    children(node).into_iter().fold(types, |types, child| {
+        collect_local_types(child, ast, return_types, types)
+    })
+}
+
+fn local_type_binding(
+    node: Node,
+    ast: &GoAst,
+    return_types: &HashMap<String, String>,
+) -> Option<(String, String)> {
+    match node.kind() {
+        "short_var_declaration" => short_var_binding(node, ast, return_types),
+        "var_spec" => var_spec_binding(node, ast),
+        _ => None,
+    }
+}
+
+fn short_var_binding(
+    node: Node,
+    ast: &GoAst,
+    return_types: &HashMap<String, String>,
+) -> Option<(String, String)> {
+    let text = node_text(&node, &ast.source);
+    let (left, right) = text.split_once(":=")?;
+    let name = single_identifier(left)?;
+    inferred_type(right.trim(), return_types).map(|type_name| (name.to_string(), type_name))
+}
+
+fn var_spec_binding(node: Node, ast: &GoAst) -> Option<(String, String)> {
+    let name = first_child_text(node, "identifier", ast)?;
+    explicit_var_type(node, ast).map(|type_name| (name, type_name))
+}
+
+fn explicit_var_type(node: Node, ast: &GoAst) -> Option<String> {
+    first_child_text(node, "type_identifier", ast)
+        .or_else(|| first_child_text(node, "pointer_type", ast))
+        .map(|text| normalize_go_type(&text))
+}
+
+fn single_identifier(text: &str) -> Option<&str> {
+    let name = text.trim();
+    name.chars()
+        .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        .then_some(name)
+        .filter(|name| !name.is_empty() && !name.contains(','))
+}
+
+fn inferred_type(text: &str, return_types: &HashMap<String, String>) -> Option<String> {
+    composite_literal_type(text)
+        .or_else(|| constructor_return_type(text, return_types))
+        .map(|type_name| normalize_go_type(&type_name))
+}
+
+fn composite_literal_type(text: &str) -> Option<String> {
+    let text = text.trim_start_matches('&');
+    text.contains('{')
+        .then(|| text.split('{').next())
+        .flatten()
+        .map(str::trim)
+        .filter(|name| starts_exported(name))
+        .map(str::to_string)
+}
+
+fn constructor_return_type(text: &str, return_types: &HashMap<String, String>) -> Option<String> {
+    let name = text.split('(').next()?.trim();
+    return_types.get(name).cloned()
 }
 
 #[cfg(test)]
@@ -378,7 +610,7 @@ func helper() {}
 
         assert_eq!(
             serve.calls,
-            vec!["helper".to_string(), "Println".to_string()]
+            vec!["helper".to_string(), "fmt.Println".to_string()]
         );
     }
 }

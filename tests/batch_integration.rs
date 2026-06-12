@@ -481,6 +481,191 @@ func TestServe() {
     assert_eq!(test_fn.downstream_callees, None);
 }
 
+#[test]
+fn test_go_selector_calls_resolve_to_inferred_receiver_type() {
+    let files = vec![(
+        "service/handler.go",
+        r#"package service
+
+type Service struct{}
+type Logger struct{}
+
+func Serve() {
+    svc := &Service{}
+    svc.Handle()
+}
+
+func (s *Service) Handle() {}
+func (l *Logger) Handle() {}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let serve = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Serve")
+        .unwrap();
+    let service_handle = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Service.Handle")
+        .unwrap();
+    let logger_handle = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Logger.Handle")
+        .unwrap();
+
+    assert_eq!(
+        serve.downstream_callees,
+        Some(vec!["Service.Handle".to_string()])
+    );
+    assert_eq!(
+        service_handle.upstream_callers,
+        Some(vec!["Serve".to_string()])
+    );
+    assert_eq!(logger_handle.upstream_callers, None);
+}
+
+#[test]
+fn test_go_direct_receiver_method_calls_resolve_to_same_type() {
+    let files = vec![(
+        "service/handler.go",
+        r#"package service
+
+type Handler struct{}
+type Other struct{}
+
+func (h *Handler) Serve() {
+    h.validate()
+}
+
+func (h *Handler) validate() {}
+func (o *Other) validate() {}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let serve = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Handler.Serve")
+        .unwrap();
+    let other_validate = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Other.validate")
+        .unwrap();
+
+    assert_eq!(
+        serve.downstream_callees,
+        Some(vec!["Handler.validate".to_string()])
+    );
+    assert_eq!(other_validate.upstream_callers, None);
+}
+
+#[test]
+fn test_go_constructor_assignment_resolves_receiver_method_call() {
+    let files = vec![(
+        "service/handler.go",
+        r#"package service
+
+type Service struct{}
+
+func Serve() {
+    svc := NewService()
+    svc.Handle()
+}
+
+func NewService() *Service {
+    return &Service{}
+}
+
+func (s *Service) Handle() {}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let serve = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Serve")
+        .unwrap();
+    let service_handle = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Service.Handle")
+        .unwrap();
+
+    assert_eq!(
+        serve.downstream_callees,
+        Some(vec!["NewService".to_string(), "Service.Handle".to_string()])
+    );
+    assert_eq!(
+        service_handle.upstream_callers,
+        Some(vec!["Serve".to_string()])
+    );
+}
+
+#[test]
+fn test_go_unknown_selector_calls_do_not_resolve_by_method_name() {
+    let files = vec![(
+        "service/handler.go",
+        r#"package service
+
+type Service struct{}
+
+func Serve(handler interface{ Handle() }) {
+    handler.Handle()
+}
+
+func (s *Service) Handle() {}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let serve = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Serve")
+        .unwrap();
+    let service_handle = results[0]
+        .metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "Service.Handle")
+        .unwrap();
+
+    assert_eq!(serve.downstream_callees, None);
+    assert_eq!(service_handle.upstream_callers, None);
+}
+
 // ============================================================================
 // Edge Cases
 // ============================================================================

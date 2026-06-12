@@ -518,19 +518,42 @@ fn resolve_go_cross_file_calls(mut results: Vec<FileAnalysisResult>) -> Vec<File
     results
 }
 
-fn go_symbol_index(results: &[FileAnalysisResult]) -> HashMap<GoPackageKey, HashSet<String>> {
+#[derive(Debug, Clone, Default)]
+struct GoPackageSymbols {
+    free_functions: HashSet<String>,
+    methods: HashSet<String>,
+}
+
+impl GoPackageSymbols {
+    fn insert(&mut self, name: &str) {
+        if name.contains('.') {
+            self.methods.insert(name.to_string());
+        } else {
+            self.free_functions.insert(name.to_string());
+        }
+    }
+
+    fn contains(&self, call: &str) -> bool {
+        if call.contains('.') {
+            self.methods.contains(call)
+        } else {
+            self.free_functions.contains(call)
+        }
+    }
+}
+
+fn go_symbol_index(results: &[FileAnalysisResult]) -> HashMap<GoPackageKey, GoPackageSymbols> {
     results.iter().filter(|result| is_go_result(result)).fold(
         HashMap::new(),
         |mut index, result| {
             let package = go_package_key(result);
-            let symbols = result
+            let package_symbols = index.entry(package).or_default();
+            result
                 .metrics
                 .complexity
                 .functions
                 .iter()
-                .map(|function| go_short_name(&function.name));
-
-            index.entry(package).or_default().extend(symbols);
+                .for_each(|function| package_symbols.insert(&function.name));
             index
         },
     )
@@ -571,10 +594,6 @@ fn go_package_key(result: &FileAnalysisResult) -> GoPackageKey {
             .to_path_buf(),
         package_name: result.package_name.clone(),
     }
-}
-
-fn go_short_name(name: &str) -> String {
-    name.rsplit('.').next().unwrap_or(name).to_string()
 }
 
 /// Combine validations while preserving successful values.
