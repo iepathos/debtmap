@@ -4,6 +4,7 @@
 
 use crate::core::ast::{JsLanguageVariant, TypeScriptAst};
 use anyhow::{Context, Result};
+use std::borrow::Cow;
 use std::path::Path;
 use tree_sitter::{Language as TsLanguage, Parser, Tree};
 
@@ -35,6 +36,21 @@ pub fn parse_source(
         .parse(content, None)
         .context("Failed to parse source code")?;
 
+    let (tree, source) = if has_parse_errors(&tree) {
+        let normalized = normalize_import_attributes(content);
+        match normalized {
+            Cow::Borrowed(_) => (tree, Cow::Borrowed(content)),
+            Cow::Owned(normalized_source) => {
+                let retry_tree = parser
+                    .parse(&normalized_source, None)
+                    .context("Failed to parse normalized source code")?;
+                (retry_tree, Cow::Owned(normalized_source))
+            }
+        }
+    } else {
+        (tree, Cow::Borrowed(content))
+    };
+
     if has_parse_errors(&tree) {
         anyhow::bail!(
             "TypeScript/JavaScript parse tree contains syntax errors for {}",
@@ -45,9 +61,68 @@ pub fn parse_source(
     Ok(TypeScriptAst {
         tree,
         path: path.to_path_buf(),
-        source: content.to_string(),
+        source: source.into_owned(),
         language_variant: variant,
     })
+}
+
+fn normalize_import_attributes(content: &str) -> Cow<'_, str> {
+    let mut normalized = content.as_bytes().to_vec();
+    let bytes = content.as_bytes();
+    let mut index = 0;
+    let mut changed = false;
+
+    while let Some(relative_start) = content[index..].find(" with") {
+        let start = index + relative_start;
+        let Some(open_brace) = find_attribute_open_brace(bytes, start) else {
+            index = start + " with".len();
+            continue;
+        };
+        let Some(end) = find_balanced_brace_end(bytes, open_brace) else {
+            index = open_brace + 1;
+            continue;
+        };
+
+        replace_range_with_spaces(&mut normalized, start, end);
+        changed = true;
+        index = end;
+    }
+
+    if changed {
+        Cow::Owned(String::from_utf8(normalized).expect("ASCII spaces preserve UTF-8 validity"))
+    } else {
+        Cow::Borrowed(content)
+    }
+}
+
+fn find_attribute_open_brace(bytes: &[u8], start: usize) -> Option<usize> {
+    let mut index = start + " with".len();
+    while matches!(bytes.get(index), Some(b' ' | b'\t')) {
+        index += 1;
+    }
+    matches!(bytes.get(index), Some(b'{')).then_some(index)
+}
+
+fn find_balanced_brace_end(bytes: &[u8], open_brace: usize) -> Option<usize> {
+    let mut depth = 0u32;
+    for (index, byte) in bytes.iter().enumerate().skip(open_brace) {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(index + 1);
+                }
+            }
+            b';' | b'\n' if depth == 0 => return None,
+            _ => {}
+        }
+    }
+    None
+}
+
+fn replace_range_with_spaces(source: &mut [u8], start: usize, end: usize) {
+    source[start..end].fill(b' ');
 }
 
 /// Determine language variant from file path
@@ -154,6 +229,16 @@ mod tests {
 
         let ast = result.unwrap();
         assert_eq!(ast.language_variant, JsLanguageVariant::Tsx);
+    }
+
+    #[test]
+    fn test_parse_import_attributes() {
+        let source = r#"export * from "./entry.js" with { imports: "bare-node-runtime/imports" };"#;
+        let path = PathBuf::from("index.js");
+        let result = parse_source(source, &path, JsLanguageVariant::JavaScript);
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().source.len(), source.len());
     }
 
     #[test]

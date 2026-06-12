@@ -238,10 +238,22 @@ pub fn analyze_single_file_with_timeout(
     let (tx, rx) = mpsc::channel();
     let path_clone = file_path.to_path_buf();
 
-    let handle = thread::spawn(move || {
-        let result = analyze_single_file_direct(&path_clone);
-        let _ = tx.send(result); // Ignore if main thread has timed out
-    });
+    let handle = match thread::Builder::new()
+        .stack_size(crate::cli::MAIN_STACK_SIZE)
+        .spawn(move || {
+            let result = analyze_single_file_direct(&path_clone);
+            let _ = tx.send(result); // Ignore if main thread has timed out
+        }) {
+        Ok(handle) => handle,
+        Err(e) => {
+            eprintln!(
+                "Warning: Failed to start analyzer thread for {}: {}",
+                file_path.display(),
+                e
+            );
+            return None;
+        }
+    };
 
     // Wait for result or timeout
     match rx.recv_timeout(Duration::from_secs(effective_timeout)) {
