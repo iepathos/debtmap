@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-06-13
+
+### Added
+
+- **Initial Go Analysis Support** - Debtmap now recognizes and analyzes Go source files
+  - Adds Go parsing, AST mapping, metrics collection, dependency extraction, generated-file detection, and debt detection
+  - Integrates Go into batch analysis, validated analysis output, language configuration, file discovery, LOC counting, and JSON/display coverage
+
+- **Go Call Resolution** - Go analysis now resolves package calls and receiver method calls
+  - Tracks package-qualified function calls for dependency and call graph output
+  - Resolves method calls through receiver type information, including pointer receivers
+  - Adds batch integration coverage for package calls and receiver-based method edges
+
+- **Go Purity Signals** - Go analysis now reports purity-related function signals
+  - Detects impure operations from assignments, mutations, channel sends, defers, goroutines, panics, and external calls
+  - Includes purity metadata in Go function metrics and batch analysis output
+
+### Fixed
+
+- **JavaScript and TypeScript Analysis Stack Usage** - JS/TS parsing now avoids stack overflows on deeply nested syntax
+  - Adds parser traversal guards for nested expressions and statements
+  - Keeps analysis from aborting on large or deeply nested JavaScript and TypeScript inputs
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.18.0 release
+
 ## [0.17.2] - 2026-06-08
 
 ### Added
