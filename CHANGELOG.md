@@ -30,6 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Adds parser traversal guards for nested expressions and statements
   - Keeps analysis from aborting on large or deeply nested JavaScript and TypeScript inputs
 
+- **Analyzer Clippy Compliance** - Replaced a disallowed iterator side-effect pattern in batch analysis
+  - Restores `cargo clippy --all-targets --all-features -- -D warnings` compliance
+  - Keeps Go package symbol indexing behavior unchanged
+
+### Changed
+
+- **Rust 2024 Edition** - Migrated the crate, examples, fixtures, tests, and benches to Rust 2024
+  - Applies Cargo edition migration fixes across all targets
+  - Updates clippy-driven let-chain and edition-idiom rewrites required under the stricter lint gate
+  - Keeps the existing `rust-version = "1.89"` MSRV
+
+### Tech Debt Cleanup
+
+- Removed the stale test-suite evaluation document after cleanup
+- Ignored local Firecrawl scrape output artifacts
+
 ### Dependencies
 
 - Refreshed the Cargo lockfile for the 0.18.0 release
