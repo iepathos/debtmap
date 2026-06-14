@@ -1,5 +1,5 @@
-use debtmap::analyzers::{rust::RustAnalyzer, Analyzer};
-use debtmap::config::{get_language_features, LanguageFeatures};
+use debtmap::analyzers::{Analyzer, rust::RustAnalyzer};
+use debtmap::config::{LanguageFeatures, get_language_features};
 use debtmap::core::Language;
 use std::path::PathBuf;
 

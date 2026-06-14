@@ -2,7 +2,7 @@
 //!
 //! Validates that clustering overhead is <15% of total analysis time.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::organization::{GodObjectDetector, OrganizationDetector};
 use std::hint::black_box;
 
@@ -51,19 +51,19 @@ fn benchmark_clustering_scalability(c: &mut Criterion) {
     ];
 
     for (file_path, size_label) in test_files {
-        if let Ok(source_code) = std::fs::read_to_string(file_path) {
-            if let Ok(ast) = syn::parse_file(&source_code) {
-                group.bench_function(format!("clustering_{}", size_label), |b| {
-                    b.iter(|| {
-                        let detector = GodObjectDetector::with_source_content(&source_code);
-                        let patterns = detector.detect_anti_patterns(black_box(&ast));
-                        for pattern in &patterns {
-                            let _impact = detector.estimate_maintainability_impact(pattern);
-                        }
-                        black_box(patterns);
-                    });
+        if let Ok(source_code) = std::fs::read_to_string(file_path)
+            && let Ok(ast) = syn::parse_file(&source_code)
+        {
+            group.bench_function(format!("clustering_{}", size_label), |b| {
+                b.iter(|| {
+                    let detector = GodObjectDetector::with_source_content(&source_code);
+                    let patterns = detector.detect_anti_patterns(black_box(&ast));
+                    for pattern in &patterns {
+                        let _impact = detector.estimate_maintainability_impact(pattern);
+                    }
+                    black_box(patterns);
                 });
-            }
+            });
         }
     }
 

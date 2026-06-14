@@ -9,9 +9,9 @@
 //! - Complex real-world patterns
 //! - Consistency across all nesting implementations
 
+use debtmap::Analyzer;
 use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::complexity::pure::calculate_max_nesting_depth;
-use debtmap::Analyzer;
 use std::path::PathBuf;
 
 // =============================================================================

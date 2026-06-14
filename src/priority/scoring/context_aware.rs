@@ -414,10 +414,12 @@ mod tests {
 
         assert_eq!(recommendation.context, FunctionContext::Parser);
         assert!(recommendation.explanation.contains("parser"));
-        assert!(recommendation
-            .suggestions
-            .iter()
-            .any(|s| s.contains("combinator")));
+        assert!(
+            recommendation
+                .suggestions
+                .iter()
+                .any(|s| s.contains("combinator"))
+        );
         assert!(!recommendation.examples.is_empty());
     }
 
@@ -431,10 +433,12 @@ mod tests {
 
         assert_eq!(recommendation.context, FunctionContext::CliHandler);
         assert!(recommendation.explanation.contains("CLI"));
-        assert!(recommendation
-            .suggestions
-            .iter()
-            .any(|s| s.contains("command pattern")));
+        assert!(
+            recommendation
+                .suggestions
+                .iter()
+                .any(|s| s.contains("command pattern"))
+        );
     }
 
     #[test]
@@ -459,10 +463,12 @@ mod tests {
 
         assert_eq!(recommendation.context, FunctionContext::StateMachine);
         assert!(recommendation.explanation.contains("state"));
-        assert!(recommendation
-            .suggestions
-            .iter()
-            .any(|s| s.contains("state machine")));
+        assert!(
+            recommendation
+                .suggestions
+                .iter()
+                .any(|s| s.contains("state machine"))
+        );
     }
 
     #[test]

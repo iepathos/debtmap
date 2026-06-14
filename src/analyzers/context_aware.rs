@@ -3,11 +3,11 @@
 use crate::analyzers::Analyzer;
 use crate::context::rules::DebtPattern;
 use crate::context::{
-    detect_file_type, ContextDetector, ContextRuleEngine, FileType, FunctionContext, RuleAction,
+    ContextDetector, ContextRuleEngine, FileType, FunctionContext, RuleAction, detect_file_type,
 };
 use crate::core::{
-    ast::{Ast, RustAst},
     DebtItem, DebtType, FileMetrics, Language, Priority,
+    ast::{Ast, RustAst},
 };
 use anyhow::Result;
 use std::path::{Path, PathBuf};

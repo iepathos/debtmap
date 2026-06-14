@@ -7,7 +7,7 @@
 //! - Field injection via decorators
 
 use super::{Implementation, PatternInstance, PatternRecognizer, PatternType};
-use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
+use crate::core::{FileMetrics, FunctionMetrics, ast::ClassDef};
 use std::path::Path;
 
 pub struct DependencyInjectionRecognizer;
@@ -289,7 +289,7 @@ impl PatternRecognizer for DependencyInjectionRecognizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ast::MethodDef, ComplexityMetrics, Language};
+    use crate::core::{ComplexityMetrics, Language, ast::MethodDef};
     use std::path::PathBuf;
 
     fn create_class_with_constructor_injection() -> ClassDef {

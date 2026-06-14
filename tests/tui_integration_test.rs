@@ -454,7 +454,7 @@ fn create_test_unified_debt_item(
 #[test]
 fn test_data_flow_page_rendering_with_mutations() {
     use debtmap::data_flow::{DataFlowGraph, MutationInfo};
-    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
+    use debtmap::priority::{DebtType, Location, call_graph::FunctionId};
     use std::path::PathBuf;
 
     // Create test data flow graph
@@ -500,7 +500,7 @@ fn test_data_flow_page_rendering_with_mutations() {
 #[test]
 fn test_data_flow_page_rendering_with_io_operations() {
     use debtmap::data_flow::{DataFlowGraph, IoOperation};
-    use debtmap::priority::{call_graph::FunctionId, DebtType, Location};
+    use debtmap::priority::{DebtType, Location, call_graph::FunctionId};
     use std::path::PathBuf;
 
     let mut data_flow = DataFlowGraph::new();
@@ -557,7 +557,7 @@ fn test_data_flow_page_rendering_with_io_operations() {
 #[test]
 fn test_data_flow_markdown_formatting() {
     use debtmap::data_flow::{DataFlowGraph, IoOperation, MutationInfo};
-    use debtmap::priority::{call_graph::FunctionId, Location};
+    use debtmap::priority::{Location, call_graph::FunctionId};
     use std::path::PathBuf;
 
     let mut data_flow = DataFlowGraph::new();

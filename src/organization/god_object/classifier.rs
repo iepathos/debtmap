@@ -2119,9 +2119,11 @@ mod tests {
         assert_eq!(context.domain_suffix, Some("tracker".to_string()));
         // Secondary keywords should include field names
         assert!(context.secondary_keywords.contains(&"modules".to_string()));
-        assert!(context
-            .secondary_keywords
-            .contains(&"boundaries".to_string()));
+        assert!(
+            context
+                .secondary_keywords
+                .contains(&"boundaries".to_string())
+        );
     }
 
     #[test]
@@ -2725,14 +2727,14 @@ mod tests {
             }
         "#;
         let file: syn::File = syn::parse_str(code).unwrap();
-        if let syn::Item::Impl(impl_block) = &file.items[0] {
-            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
-                assert_eq!(
-                    classify_self_usage(method),
-                    MethodSelfUsage::PureAssociated,
-                    "Method without self should be PureAssociated"
-                );
-            }
+        if let syn::Item::Impl(impl_block) = &file.items[0]
+            && let syn::ImplItem::Fn(method) = &impl_block.items[0]
+        {
+            assert_eq!(
+                classify_self_usage(method),
+                MethodSelfUsage::PureAssociated,
+                "Method without self should be PureAssociated"
+            );
         }
     }
 
@@ -2745,14 +2747,14 @@ mod tests {
             }
         "#;
         let file: syn::File = syn::parse_str(code).unwrap();
-        if let syn::Item::Impl(impl_block) = &file.items[0] {
-            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
-                assert_eq!(
-                    classify_self_usage(method),
-                    MethodSelfUsage::InstanceMethod,
-                    "Method using self.field should be InstanceMethod"
-                );
-            }
+        if let syn::Item::Impl(impl_block) = &file.items[0]
+            && let syn::ImplItem::Fn(method) = &impl_block.items[0]
+        {
+            assert_eq!(
+                classify_self_usage(method),
+                MethodSelfUsage::InstanceMethod,
+                "Method using self.field should be InstanceMethod"
+            );
         }
     }
 
@@ -2765,14 +2767,14 @@ mod tests {
             }
         "#;
         let file: syn::File = syn::parse_str(code).unwrap();
-        if let syn::Item::Impl(impl_block) = &file.items[0] {
-            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
-                assert_eq!(
-                    classify_self_usage(method),
-                    MethodSelfUsage::InstanceMethod,
-                    "Method calling self.method() should be InstanceMethod"
-                );
-            }
+        if let syn::Item::Impl(impl_block) = &file.items[0]
+            && let syn::ImplItem::Fn(method) = &impl_block.items[0]
+        {
+            assert_eq!(
+                classify_self_usage(method),
+                MethodSelfUsage::InstanceMethod,
+                "Method calling self.method() should be InstanceMethod"
+            );
         }
     }
 
@@ -2785,14 +2787,14 @@ mod tests {
             }
         "#;
         let file: syn::File = syn::parse_str(code).unwrap();
-        if let syn::Item::Impl(impl_block) = &file.items[0] {
-            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
-                assert_eq!(
-                    classify_self_usage(method),
-                    MethodSelfUsage::UnusedSelf,
-                    "Method with unused self should be UnusedSelf"
-                );
-            }
+        if let syn::Item::Impl(impl_block) = &file.items[0]
+            && let syn::ImplItem::Fn(method) = &impl_block.items[0]
+        {
+            assert_eq!(
+                classify_self_usage(method),
+                MethodSelfUsage::UnusedSelf,
+                "Method with unused self should be UnusedSelf"
+            );
         }
     }
 
@@ -2805,14 +2807,14 @@ mod tests {
             }
         "#;
         let file: syn::File = syn::parse_str(code).unwrap();
-        if let syn::Item::Impl(impl_block) = &file.items[0] {
-            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
-                assert_eq!(
-                    classify_self_usage(method),
-                    MethodSelfUsage::UnusedSelf,
-                    "Method calling Self::method() (not self) should be UnusedSelf"
-                );
-            }
+        if let syn::Item::Impl(impl_block) = &file.items[0]
+            && let syn::ImplItem::Fn(method) = &impl_block.items[0]
+        {
+            assert_eq!(
+                classify_self_usage(method),
+                MethodSelfUsage::UnusedSelf,
+                "Method calling Self::method() (not self) should be UnusedSelf"
+            );
         }
     }
 
@@ -2829,14 +2831,14 @@ mod tests {
             }
         "#;
         let file: syn::File = syn::parse_str(code).unwrap();
-        if let syn::Item::Impl(impl_block) = &file.items[0] {
-            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
-                assert_eq!(
-                    classify_self_usage(method),
-                    MethodSelfUsage::UnusedSelf,
-                    "Self in closure should not count as self usage"
-                );
-            }
+        if let syn::Item::Impl(impl_block) = &file.items[0]
+            && let syn::ImplItem::Fn(method) = &impl_block.items[0]
+        {
+            assert_eq!(
+                classify_self_usage(method),
+                MethodSelfUsage::UnusedSelf,
+                "Self in closure should not count as self usage"
+            );
         }
     }
 
@@ -2849,14 +2851,14 @@ mod tests {
             }
         "#;
         let file: syn::File = syn::parse_str(code).unwrap();
-        if let syn::Item::Impl(impl_block) = &file.items[0] {
-            if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
-                assert_eq!(
-                    classify_self_usage(method),
-                    MethodSelfUsage::InstanceMethod,
-                    "Method with &mut self that mutates should be InstanceMethod"
-                );
-            }
+        if let syn::Item::Impl(impl_block) = &file.items[0]
+            && let syn::ImplItem::Fn(method) = &impl_block.items[0]
+        {
+            assert_eq!(
+                classify_self_usage(method),
+                MethodSelfUsage::InstanceMethod,
+                "Method with &mut self that mutates should be InstanceMethod"
+            );
         }
     }
 
@@ -3004,15 +3006,13 @@ mod tests {
                 r#"impl Foo { fn debug(&self) { println!("x"); } }"#.to_string()
             };
 
-            if let Ok(file) = syn::parse_str::<syn::File>(&code) {
-                if let syn::Item::Impl(impl_block) = &file.items[0] {
-                    if let syn::ImplItem::Fn(method) = &impl_block.items[0] {
+            if let Ok(file) = syn::parse_str::<syn::File>(&code)
+                && let syn::Item::Impl(impl_block) = &file.items[0]
+                    && let syn::ImplItem::Fn(method) = &impl_block.items[0] {
                         let c1 = classify_self_usage(method);
                         let c2 = classify_self_usage(method);
                         prop_assert_eq!(c1, c2);
                     }
-                }
-            }
         }
 
         /// Verify combined weight is always in [0.0, 1.0]

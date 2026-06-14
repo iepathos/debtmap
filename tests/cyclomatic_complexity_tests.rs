@@ -1,7 +1,7 @@
 use debtmap::complexity::cyclomatic::{
     calculate_cyclomatic, calculate_cyclomatic_for_function, combine_cyclomatic,
 };
-use syn::{parse_quote, Block};
+use syn::{Block, parse_quote};
 
 #[test]
 fn test_calculate_cyclomatic_simple_block() {

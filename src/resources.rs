@@ -42,7 +42,7 @@ use indicatif::ProgressBar;
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use stillwater::effect::prelude::*;
-use stillwater::{bracket, Effect, EffectExt};
+use stillwater::{Effect, EffectExt, bracket};
 
 // =============================================================================
 // Lock File Resource
@@ -515,8 +515,8 @@ mod tests {
     use super::*;
     use crate::config::DebtmapConfig;
     use crate::effects::{effect_fail, effect_pure};
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use tempfile::TempDir as TempFileDir;
 
     // Helper to run effects in tests

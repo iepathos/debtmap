@@ -259,9 +259,11 @@ mod tests {
         let mut detector = FlakyDetector::new();
         let indicators = detector.detect_flaky_patterns(&func);
         assert!(!indicators.is_empty());
-        assert!(indicators
-            .iter()
-            .any(|i| matches!(i.flakiness_type, RustFlakinessType::TimingDependency)));
+        assert!(
+            indicators
+                .iter()
+                .any(|i| matches!(i.flakiness_type, RustFlakinessType::TimingDependency))
+        );
     }
 
     #[test]
@@ -277,9 +279,11 @@ mod tests {
 
         let mut detector = FlakyDetector::new();
         let indicators = detector.detect_flaky_patterns(&func);
-        assert!(indicators
-            .iter()
-            .any(|i| matches!(i.flakiness_type, RustFlakinessType::RandomValue)));
+        assert!(
+            indicators
+                .iter()
+                .any(|i| matches!(i.flakiness_type, RustFlakinessType::RandomValue))
+        );
     }
 
     #[test]
@@ -294,9 +298,11 @@ mod tests {
 
         let mut detector = FlakyDetector::new();
         let indicators = detector.detect_flaky_patterns(&func);
-        assert!(indicators
-            .iter()
-            .any(|i| matches!(i.flakiness_type, RustFlakinessType::ExternalDependency)));
+        assert!(
+            indicators
+                .iter()
+                .any(|i| matches!(i.flakiness_type, RustFlakinessType::ExternalDependency))
+        );
     }
 
     #[test]
@@ -311,9 +317,11 @@ mod tests {
 
         let mut detector = FlakyDetector::new();
         let indicators = detector.detect_flaky_patterns(&func);
-        assert!(indicators
-            .iter()
-            .any(|i| matches!(i.flakiness_type, RustFlakinessType::FileSystemDependency)));
+        assert!(
+            indicators
+                .iter()
+                .any(|i| matches!(i.flakiness_type, RustFlakinessType::FileSystemDependency))
+        );
     }
 
     #[test]
@@ -330,9 +338,11 @@ mod tests {
 
         let mut detector = FlakyDetector::new();
         let indicators = detector.detect_flaky_patterns(&func);
-        assert!(indicators
-            .iter()
-            .any(|i| matches!(i.flakiness_type, RustFlakinessType::ThreadingIssue)));
+        assert!(
+            indicators
+                .iter()
+                .any(|i| matches!(i.flakiness_type, RustFlakinessType::ThreadingIssue))
+        );
     }
 
     #[test]

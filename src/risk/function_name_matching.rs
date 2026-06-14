@@ -37,26 +37,29 @@ pub fn generate_function_name_variants(name: &str) -> Vec<String> {
     variants.push(name.to_string());
 
     // Strip generics: func<T> → func
-    if let Some(without_generics) = name.split('<').next() {
-        if without_generics != name && !without_generics.is_empty() {
-            variants.push(without_generics.to_string());
-        }
+    if let Some(without_generics) = name.split('<').next()
+        && without_generics != name
+        && !without_generics.is_empty()
+    {
+        variants.push(without_generics.to_string());
     }
 
     // Extract method name: Type::method → method
-    if let Some(method_name) = name.rsplit("::").next() {
-        if method_name != name && !method_name.is_empty() {
-            // Add method name with its generics if present
-            if !variants.contains(&method_name.to_string()) {
-                variants.push(method_name.to_string());
-            }
+    if let Some(method_name) = name.rsplit("::").next()
+        && method_name != name
+        && !method_name.is_empty()
+    {
+        // Add method name with its generics if present
+        if !variants.contains(&method_name.to_string()) {
+            variants.push(method_name.to_string());
+        }
 
-            // Also strip generics from method name
-            if let Some(method_no_generics) = method_name.split('<').next() {
-                if method_no_generics != method_name && !method_no_generics.is_empty() {
-                    variants.push(method_no_generics.to_string());
-                }
-            }
+        // Also strip generics from method name
+        if let Some(method_no_generics) = method_name.split('<').next()
+            && method_no_generics != method_name
+            && !method_no_generics.is_empty()
+        {
+            variants.push(method_no_generics.to_string());
         }
     }
 
@@ -126,17 +129,17 @@ pub fn function_names_match(query: &str, lcov: &str) -> (bool, MatchConfidence) 
     }
 
     // Check closure parent attribution
-    if let Some(parent) = extract_closure_parent(lcov) {
-        if query == parent {
-            return (true, MatchConfidence::High);
-        }
+    if let Some(parent) = extract_closure_parent(lcov)
+        && query == parent
+    {
+        return (true, MatchConfidence::High);
     }
 
     // Check if query is closure and lcov matches its parent
-    if let Some(parent) = extract_closure_parent(query) {
-        if parent == lcov {
-            return (true, MatchConfidence::High);
-        }
+    if let Some(parent) = extract_closure_parent(query)
+        && parent == lcov
+    {
+        return (true, MatchConfidence::High);
     }
 
     // Generate variants for both query and LCOV

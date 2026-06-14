@@ -132,7 +132,8 @@ pub fn analyze_project_with_extraction(
 /// Set up parallel processing environment variable.
 fn setup_parallel_env(parallel_enabled: bool) {
     if parallel_enabled {
-        std::env::set_var("DEBTMAP_PARALLEL", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
     }
 }
 
@@ -305,7 +306,8 @@ fn log_massive_project(file_count: usize) {
 /// Configure environment for large projects.
 fn configure_large_project_env(file_count: usize) {
     if file_count > 500 {
-        std::env::set_var("RUST_BACKTRACE", "0");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("RUST_BACKTRACE", "0") };
     }
 }
 

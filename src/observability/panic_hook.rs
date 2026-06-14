@@ -13,7 +13,7 @@
 //! The panic hook automatically exits TUI mode (alternate screen, raw mode)
 //! before printing the crash report, ensuring it's visible to users.
 
-use super::context::{get_current_context, get_progress, AnalysisContext};
+use super::context::{AnalysisContext, get_current_context, get_progress};
 use super::tracing::set_tui_active;
 use std::panic::PanicHookInfo;
 use std::sync::OnceLock;

@@ -1,7 +1,7 @@
 //! Test to reproduce false positive for async Command::output() being flagged as blocking I/O
 
 use debtmap::context::async_detector::AsyncBoundaryDetector;
-use syn::{parse_str, File};
+use syn::{File, parse_str};
 
 #[test]
 fn test_tokio_command_output_not_blocking() {

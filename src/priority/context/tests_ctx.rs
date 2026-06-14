@@ -11,11 +11,11 @@ pub fn detect_test_files(source_file: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
     // Try {filename}_test.rs in same directory
-    if let Some(stem) = source_file.file_stem() {
-        if let Some(parent) = source_file.parent() {
-            let test_name = format!("{}_test.rs", stem.to_string_lossy());
-            candidates.push(parent.join(test_name));
-        }
+    if let Some(stem) = source_file.file_stem()
+        && let Some(parent) = source_file.parent()
+    {
+        let test_name = format!("{}_test.rs", stem.to_string_lossy());
+        candidates.push(parent.join(test_name));
     }
 
     // Try tests/ directory mirror path

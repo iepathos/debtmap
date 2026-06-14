@@ -1,4 +1,4 @@
-use super::{is_test_function, TestQualityImpact, TestingAntiPattern, TestingDetector};
+use super::{TestQualityImpact, TestingAntiPattern, TestingDetector, is_test_function};
 use std::path::Path;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, File, Item, ItemFn, Stmt};
@@ -22,46 +22,46 @@ impl TestingDetector for AssertionDetector {
         let mut patterns = Vec::new();
 
         for item in &file.items {
-            if let Item::Fn(function) = item {
-                if is_test_function(function) {
-                    let analysis = analyze_test_structure(function);
+            if let Item::Fn(function) = item
+                && is_test_function(function)
+            {
+                let analysis = analyze_test_structure(function);
 
-                    if !analysis.has_assertions {
-                        let line = function.sig.ident.span().start().line;
+                if !analysis.has_assertions {
+                    let line = function.sig.ident.span().start().line;
 
-                        patterns.push(TestingAntiPattern::TestWithoutAssertions {
-                            test_name: function.sig.ident.to_string(),
-                            file: path.to_path_buf(),
-                            line,
-                            has_setup: analysis.has_setup,
-                            has_action: analysis.has_action,
-                            suggested_assertions: suggest_assertions(&analysis),
-                        });
-                    }
+                    patterns.push(TestingAntiPattern::TestWithoutAssertions {
+                        test_name: function.sig.ident.to_string(),
+                        file: path.to_path_buf(),
+                        line,
+                        has_setup: analysis.has_setup,
+                        has_action: analysis.has_action,
+                        suggested_assertions: suggest_assertions(&analysis),
+                    });
                 }
             }
 
             // Also check for test modules
-            if let Item::Mod(module) = item {
-                if let Some((_, items)) = &module.content {
-                    for mod_item in items {
-                        if let Item::Fn(function) = mod_item {
-                            if is_test_function(function) {
-                                let analysis = analyze_test_structure(function);
+            if let Item::Mod(module) = item
+                && let Some((_, items)) = &module.content
+            {
+                for mod_item in items {
+                    if let Item::Fn(function) = mod_item
+                        && is_test_function(function)
+                    {
+                        let analysis = analyze_test_structure(function);
 
-                                if !analysis.has_assertions {
-                                    let line = function.sig.ident.span().start().line;
+                        if !analysis.has_assertions {
+                            let line = function.sig.ident.span().start().line;
 
-                                    patterns.push(TestingAntiPattern::TestWithoutAssertions {
-                                        test_name: function.sig.ident.to_string(),
-                                        file: path.to_path_buf(),
-                                        line,
-                                        has_setup: analysis.has_setup,
-                                        has_action: analysis.has_action,
-                                        suggested_assertions: suggest_assertions(&analysis),
-                                    });
-                                }
-                            }
+                            patterns.push(TestingAntiPattern::TestWithoutAssertions {
+                                test_name: function.sig.ident.to_string(),
+                                file: path.to_path_buf(),
+                                line,
+                                has_setup: analysis.has_setup,
+                                has_action: analysis.has_action,
+                                suggested_assertions: suggest_assertions(&analysis),
+                            });
                         }
                     }
                 }
@@ -205,10 +205,10 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
     }
 
     fn visit_stmt(&mut self, node: &'ast Stmt) {
-        if let Stmt::Local(_) = node {
-            if !self.analysis.has_setup {
-                self.analysis.has_setup = true;
-            }
+        if let Stmt::Local(_) = node
+            && !self.analysis.has_setup
+        {
+            self.analysis.has_setup = true;
         }
 
         syn::visit::visit_stmt(self, node);

@@ -90,10 +90,10 @@ impl SuppressionContext {
                 break;
             }
             let check_line = function_start_line - offset;
-            if let Some(allow) = self.function_allows.get(&check_line) {
-                if debt_type_matches(debt_type, &allow.debt_types) {
-                    return Some(&allow.reason);
-                }
+            if let Some(allow) = self.function_allows.get(&check_line)
+                && debt_type_matches(debt_type, &allow.debt_types)
+            {
+                return Some(&allow.reason);
             }
         }
         None

@@ -4,8 +4,8 @@
 //! introductions and `-G` modifications, matching `git log` semantics
 //! without per-function subprocess fan-out.
 
-use super::blame_cache::{extract_authors_for_range, FileBlameCache};
-use super::function_level::{calculate_function_history_with_authors, CommitInfo, FunctionHistory};
+use super::blame_cache::{FileBlameCache, extract_authors_for_range};
+use super::function_level::{CommitInfo, FunctionHistory, calculate_function_history_with_authors};
 use super::git2_provider::{self, Git2Repository};
 use crate::time_span;
 use anyhow::Result;
@@ -125,10 +125,10 @@ impl BatchedFunctionGitHistory {
             }
 
             let done = processed_files.fetch_add(1, Ordering::Relaxed) + 1;
-            if let Some(cb) = progress_cb {
-                if done % 10 == 0 || done == file_count {
-                    cb(GitPreloadPhase::BlameFiles, done, file_count);
-                }
+            if let Some(cb) = progress_cb
+                && (done % 10 == 0 || done == file_count)
+            {
+                cb(GitPreloadPhase::BlameFiles, done, file_count);
             }
         });
 

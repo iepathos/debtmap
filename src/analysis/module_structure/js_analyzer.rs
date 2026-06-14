@@ -228,22 +228,22 @@ fn collect_reexports(
     ast: &crate::core::ast::TypeScriptAst,
     reexports: &mut Vec<PathDeclaration>,
 ) {
-    if node.kind() == "export_statement" {
-        if let Some(source) = node.child_by_field_name("source") {
-            let file_path = node_text(&source, &ast.source)
-                .trim_matches(|character| character == '"' || character == '\'' || character == '`')
-                .to_string();
-            let module_name = Path::new(&file_path)
-                .file_stem()
-                .and_then(|name| name.to_str())
-                .unwrap_or(file_path.as_str())
-                .to_string();
-            reexports.push(PathDeclaration {
-                module_name,
-                file_path,
-                line: node_line(node),
-            });
-        }
+    if node.kind() == "export_statement"
+        && let Some(source) = node.child_by_field_name("source")
+    {
+        let file_path = node_text(&source, &ast.source)
+            .trim_matches(|character| character == '"' || character == '\'' || character == '`')
+            .to_string();
+        let module_name = Path::new(&file_path)
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .unwrap_or(file_path.as_str())
+            .to_string();
+        reexports.push(PathDeclaration {
+            module_name,
+            file_path,
+            line: node_line(node),
+        });
     }
 
     let mut cursor = node.walk();
@@ -329,16 +329,20 @@ export function run() {
 "#;
         let structure = analyze_typescript_file(source, Path::new("index.ts"));
 
-        assert!(structure
-            .dependencies
-            .edges
-            .iter()
-            .any(|(_, dependency)| dependency == "./helper"));
-        assert!(structure
-            .dependencies
-            .edges
-            .iter()
-            .any(|(_, dependency)| dependency == "./foo"));
+        assert!(
+            structure
+                .dependencies
+                .edges
+                .iter()
+                .any(|(_, dependency)| dependency == "./helper")
+        );
+        assert!(
+            structure
+                .dependencies
+                .edges
+                .iter()
+                .any(|(_, dependency)| dependency == "./foo")
+        );
         let facade_info = structure
             .facade_info
             .as_ref()

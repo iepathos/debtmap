@@ -1,7 +1,7 @@
 use crate::analysis::multi_signal_aggregation::ResponsibilityCategory;
 use crate::analysis::rust_patterns::context::RustFunctionContext;
 use serde::{Deserialize, Serialize};
-use syn::{visit::Visit, Expr, ExprTry, ReturnType, Type};
+use syn::{Expr, ExprTry, ReturnType, Type, visit::Visit};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ErrorPatternType {
@@ -56,10 +56,10 @@ impl<'ast> Visit<'ast> for ErrorPatternVisitor {
         match method_name.as_str() {
             "unwrap" => {
                 // Check if this is part of .ok().unwrap() chain
-                if let Expr::MethodCall(inner) = &*method.receiver {
-                    if inner.method == "ok" {
-                        self.ok_unwrap_chain_count += 1;
-                    }
+                if let Expr::MethodCall(inner) = &*method.receiver
+                    && inner.method == "ok"
+                {
+                    self.ok_unwrap_chain_count += 1;
                 }
                 self.unwrap_count += 1;
             }
@@ -186,24 +186,24 @@ impl RustErrorDetector {
         }
 
         // Check return type for Result
-        if let ReturnType::Type(_, ty) = &context.item_fn.sig.output {
-            if Self::is_result_type(ty) {
-                patterns.push(ErrorPattern {
-                    pattern_type: ErrorPatternType::CustomErrorType,
-                    count: 1,
-                    evidence: "Returns Result type".into(),
-                });
-            }
+        if let ReturnType::Type(_, ty) = &context.item_fn.sig.output
+            && Self::is_result_type(ty)
+        {
+            patterns.push(ErrorPattern {
+                pattern_type: ErrorPatternType::CustomErrorType,
+                count: 1,
+                evidence: "Returns Result type".into(),
+            });
         }
 
         patterns
     }
 
     fn is_result_type(ty: &Type) -> bool {
-        if let Type::Path(type_path) = ty {
-            if let Some(segment) = type_path.path.segments.last() {
-                return segment.ident == "Result";
-            }
+        if let Type::Path(type_path) = ty
+            && let Some(segment) = type_path.path.segments.last()
+        {
+            return segment.ident == "Result";
         }
         false
     }
@@ -267,9 +267,11 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == ErrorPatternType::QuestionMarkOperator));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == ErrorPatternType::QuestionMarkOperator)
+        );
     }
 
     #[test]
@@ -282,9 +284,11 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == ErrorPatternType::UnwrapUsage));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == ErrorPatternType::UnwrapUsage)
+        );
     }
 
     #[test]
@@ -297,9 +301,11 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == ErrorPatternType::ExpectUsage));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == ErrorPatternType::ExpectUsage)
+        );
     }
 
     #[test]
@@ -312,8 +318,10 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == ErrorPatternType::PanicUsage));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == ErrorPatternType::PanicUsage)
+        );
     }
 }

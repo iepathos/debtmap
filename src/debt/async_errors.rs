@@ -40,10 +40,10 @@ impl<'a> AsyncErrorDetector<'a> {
             context: Some(context.to_string()),
         };
 
-        if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &debt_type) {
-                return;
-            }
+        if let Some(checker) = self.suppression
+            && checker.is_suppressed(line, &debt_type)
+        {
+            return;
         }
 
         let priority = self.determine_priority(&pattern);

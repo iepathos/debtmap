@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use syn::{visit::Visit, Block, Expr, ExprIf, Stmt};
+use syn::{Block, Expr, ExprIf, Stmt, visit::Visit};
 
 /// Information about an if-else chain
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -188,29 +188,29 @@ impl IfElseChainAnalyzer {
                 .push(Self::analyze_block_return(&expr_if.then_branch));
 
             // Check if the variable being tested is consistent
-            if let Some(var) = Self::extract_tested_variable(&expr_if.cond) {
-                if builder.variable_tested.is_none() {
-                    builder.variable_tested = Some(var);
-                }
+            if let Some(var) = Self::extract_tested_variable(&expr_if.cond)
+                && builder.variable_tested.is_none()
+            {
+                builder.variable_tested = Some(var);
             }
         }
     }
 
     fn finalize_current_chain(&mut self) {
-        if let Some(builder) = self.current_chain.take() {
-            if builder.length >= 2 {
-                // Only record chains with at least 2 conditions
-                let return_pattern = Self::determine_return_pattern(&builder.return_types);
+        if let Some(builder) = self.current_chain.take()
+            && builder.length >= 2
+        {
+            // Only record chains with at least 2 conditions
+            let return_pattern = Self::determine_return_pattern(&builder.return_types);
 
-                self.chains.push(IfElseChain {
-                    start_line: builder.start_line,
-                    length: builder.length,
-                    variable_tested: builder.variable_tested,
-                    condition_types: builder.condition_types,
-                    has_final_else: builder.has_final_else,
-                    return_pattern,
-                });
-            }
+            self.chains.push(IfElseChain {
+                start_line: builder.start_line,
+                length: builder.length,
+                variable_tested: builder.variable_tested,
+                condition_types: builder.condition_types,
+                has_final_else: builder.has_final_else,
+                return_pattern,
+            });
         }
     }
 

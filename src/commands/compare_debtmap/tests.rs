@@ -12,8 +12,8 @@ use super::scoring::{
     score_high_priority_progress, score_overall_improvement, score_regression_penalty,
 };
 use super::types::{
-    is_critical, is_score_unchanged, AnalysisSummary, DebtmapJsonInput, ImprovedItems, ItemInfo,
-    NewItems, ResolvedItems, UnchangedCritical, CRITICAL_SCORE_THRESHOLD,
+    AnalysisSummary, CRITICAL_SCORE_THRESHOLD, DebtmapJsonInput, ImprovedItems, ItemInfo, NewItems,
+    ResolvedItems, UnchangedCritical, is_critical, is_score_unchanged,
 };
 use crate::output::unified::{
     Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput, Priority,
@@ -193,10 +193,12 @@ fn test_perform_validation_resolved_high_priority() {
     let result = perform_validation(&before, &after).unwrap();
 
     assert_eq!(result.status, "complete");
-    assert!(result
-        .improvements
-        .iter()
-        .any(|i| i.contains("Resolved 1 high-priority")));
+    assert!(
+        result
+            .improvements
+            .iter()
+            .any(|i| i.contains("Resolved 1 high-priority"))
+    );
     assert_eq!(result.remaining_issues.len(), 0);
     assert!(result.completion_percentage >= 75.0);
 }
@@ -222,10 +224,12 @@ fn test_perform_validation_complexity_reduction() {
 
     let result = perform_validation(&before, &after).unwrap();
 
-    assert!(result
-        .improvements
-        .iter()
-        .any(|i| i.contains("Reduced average cyclomatic complexity")));
+    assert!(
+        result
+            .improvements
+            .iter()
+            .any(|i| i.contains("Reduced average cyclomatic complexity"))
+    );
 }
 
 #[test]
@@ -249,10 +253,12 @@ fn test_perform_validation_coverage_improvement() {
 
     let result = perform_validation(&before, &after).unwrap();
 
-    assert!(result
-        .improvements
-        .iter()
-        .any(|i| i.contains("Added test coverage")));
+    assert!(
+        result
+            .improvements
+            .iter()
+            .any(|i| i.contains("Added test coverage"))
+    );
 }
 
 #[test]
@@ -276,10 +282,12 @@ fn test_perform_validation_unchanged_critical() {
 
     let result = perform_validation(&before, &after).unwrap();
 
-    assert!(result
-        .remaining_issues
-        .iter()
-        .any(|i| i.contains("critical debt item")));
+    assert!(
+        result
+            .remaining_issues
+            .iter()
+            .any(|i| i.contains("critical debt item"))
+    );
     assert!(result.gaps.contains_key("critical_debt_remaining_0"));
 }
 
@@ -297,10 +305,12 @@ fn test_perform_validation_new_critical_regression() {
 
     let result = perform_validation(&before, &after).unwrap();
 
-    assert!(result
-        .remaining_issues
-        .iter()
-        .any(|i| i.contains("new critical debt items")));
+    assert!(
+        result
+            .remaining_issues
+            .iter()
+            .any(|i| i.contains("new critical debt items"))
+    );
     assert!(result.gaps.contains_key("regression_detected"));
     assert_eq!(result.status, "failed");
 }
@@ -324,10 +334,12 @@ fn test_perform_validation_combined_improvements() {
 
     assert!(result.improvements.len() >= 2);
     assert!(result.improvements.iter().any(|i| i.contains("Resolved")));
-    assert!(result
-        .improvements
-        .iter()
-        .any(|i| i.contains("complexity") || i.contains("coverage")));
+    assert!(
+        result
+            .improvements
+            .iter()
+            .any(|i| i.contains("complexity") || i.contains("coverage"))
+    );
     assert_eq!(result.status, "complete");
 }
 
@@ -432,10 +444,12 @@ fn test_perform_validation_multiple_unchanged_critical() {
 
     let result = perform_validation(&before, &after).unwrap();
 
-    assert!(result
-        .remaining_issues
-        .iter()
-        .any(|i| i.contains("3 critical debt items")));
+    assert!(
+        result
+            .remaining_issues
+            .iter()
+            .any(|i| i.contains("3 critical debt items"))
+    );
     assert_eq!(result.gaps.len(), 2); // Only first 2 are added
     assert!(result.gaps.contains_key("critical_debt_remaining_0"));
     assert!(result.gaps.contains_key("critical_debt_remaining_1"));

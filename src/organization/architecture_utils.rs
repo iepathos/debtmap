@@ -91,15 +91,15 @@ pub fn extract_base_type(type_name: &str) -> String {
         .trim();
 
     // Extract from generics
-    if let Some(start) = working.find('<') {
-        if let Some(end) = working.rfind('>') {
-            let inner = &working[start + 1..end];
-            // For multi-generic types, take first
-            if let Some(comma) = inner.find(',') {
-                return inner[..comma].trim().to_string();
-            }
-            return inner.trim().to_string();
+    if let Some(start) = working.find('<')
+        && let Some(end) = working.rfind('>')
+    {
+        let inner = &working[start + 1..end];
+        // For multi-generic types, take first
+        if let Some(comma) = inner.find(',') {
+            return inner[..comma].trim().to_string();
         }
+        return inner.trim().to_string();
     }
 
     working.to_string()

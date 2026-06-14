@@ -418,9 +418,11 @@ mod tests {
         let filtered = filter_by_priority(items, Priority::Medium);
 
         assert_eq!(filtered.len(), 3);
-        assert!(filtered
-            .iter()
-            .all(|item| item.priority >= Priority::Medium));
+        assert!(
+            filtered
+                .iter()
+                .all(|item| item.priority >= Priority::Medium)
+        );
     }
 
     #[test]

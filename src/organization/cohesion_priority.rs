@@ -155,11 +155,13 @@ mod tests {
 
         assert_eq!(splits[0].priority, Priority::Low);
         assert!(splits[0].warning.is_some());
-        assert!(splits[0]
-            .warning
-            .as_ref()
-            .unwrap()
-            .contains("circular dependency"));
+        assert!(
+            splits[0]
+                .warning
+                .as_ref()
+                .unwrap()
+                .contains("circular dependency")
+        );
     }
 
     #[test]

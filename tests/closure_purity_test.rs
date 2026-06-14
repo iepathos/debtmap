@@ -1,6 +1,6 @@
 use debtmap::analyzers::purity_detector::{ImpurityReason, PurityDetector};
 use debtmap::core::PurityLevel;
-use syn::{parse_str, ItemFn};
+use syn::{ItemFn, parse_str};
 
 fn analyze_function_str(code: &str) -> (PurityLevel, Vec<ImpurityReason>, f32) {
     let item_fn = parse_str::<ItemFn>(code).unwrap();

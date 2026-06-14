@@ -69,11 +69,11 @@ impl SignatureExtractor {
         let mut return_type = ReturnTypeInfo::from_syn_return(&impl_fn.sig.output);
 
         // Handle methods that return Self
-        if return_type.is_self {
-            if let Some(impl_type) = &self.current_impl_type {
-                return_type.type_name = impl_type.clone();
-                return_type.is_self = false;
-            }
+        if return_type.is_self
+            && let Some(impl_type) = &self.current_impl_type
+        {
+            return_type.type_name = impl_type.clone();
+            return_type.is_self = false;
         }
 
         let generic_params = impl_fn

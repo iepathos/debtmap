@@ -14,11 +14,11 @@ use std::path::PathBuf;
 pub use cascade::{CascadeCalculator, CascadeImpact};
 pub use effort::{AdvancedEffortModel, EffortEstimate, EffortModel};
 pub use learning::{ROILearningSystem, ROIOutcome};
-pub use models::{ROIBreakdown, ROIComponent, ROI};
+pub use models::{ROI, ROIBreakdown, ROIComponent};
 pub use reduction::{RiskReduction, RiskReductionModel};
 
-use super::priority::TestTarget;
 use super::RiskAnalyzer;
+use super::priority::TestTarget;
 
 pub struct ROICalculator {
     effort_model: Box<dyn EffortModel>,

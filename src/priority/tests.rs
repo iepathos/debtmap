@@ -284,8 +284,10 @@ fn test_unified_analysis_initializes_density_fields() {
 #[test]
 fn test_filter_below_cyclomatic_threshold() {
     // Set minimum cyclomatic complexity threshold to 3
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -308,15 +310,19 @@ fn test_filter_below_cyclomatic_threshold() {
     assert_eq!(analysis.items.len(), 0);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 #[test]
 fn test_filter_below_cognitive_threshold() {
     // Set minimum cognitive complexity threshold to 5
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -339,15 +345,19 @@ fn test_filter_below_cognitive_threshold() {
     assert_eq!(analysis.items.len(), 0);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 #[test]
 fn test_keep_at_threshold() {
     // Set thresholds
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -370,15 +380,19 @@ fn test_keep_at_threshold() {
     assert_eq!(analysis.items.len(), 1);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 #[test]
 fn test_untested_trivial_function_filtered() {
     // Set minimum cyclomatic complexity threshold to 3
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -402,15 +416,19 @@ fn test_untested_trivial_function_filtered() {
     assert_eq!(analysis.items.len(), 0);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 #[test]
 fn test_test_items_exempt_from_filtering() {
     // Set high thresholds
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "10");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "20");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "10") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "20") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -433,15 +451,19 @@ fn test_test_items_exempt_from_filtering() {
     assert_eq!(analysis.items.len(), 1);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 #[test]
 fn test_both_thresholds_must_be_satisfied() {
     // Set both thresholds
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -495,8 +517,10 @@ fn test_both_thresholds_must_be_satisfied() {
     assert_eq!(analysis.items.len(), 1);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 #[test]
@@ -504,10 +528,13 @@ fn test_single_stage_filtering_by_score() {
     use crate::priority::call_graph::CallGraph;
 
     // Set minimum score threshold for single-stage filtering (spec 243)
-    std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "3.0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "3.0") };
     // Set complexity thresholds to 0 to isolate score filtering
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -564,9 +591,12 @@ fn test_single_stage_filtering_by_score() {
     assert_eq!(analysis.total_debt_score, 15.0); // 10.0 + 5.0
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 #[test]
@@ -574,10 +604,13 @@ fn test_single_stage_filtering_calculates_correct_density() {
     use crate::priority::call_graph::CallGraph;
 
     // Set threshold for single-stage filtering (spec 243)
-    std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "5.0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "5.0") };
     // Set complexity thresholds to 0 to isolate score filtering
-    std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0");
-    std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0") };
 
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
@@ -623,9 +656,12 @@ fn test_single_stage_filtering_calculates_correct_density() {
     assert_eq!(analysis.debt_density, 10.0);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
-    std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
-    std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_COGNITIVE") };
 }
 
 // Tests for DebtType Display implementation (Spec 005)

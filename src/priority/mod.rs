@@ -58,25 +58,25 @@ pub mod view_pipeline;
 use serde::{Deserialize, Serialize};
 
 pub use call_graph::{CallGraph, FunctionCall};
-pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage};
+pub use coverage_propagation::{TransitiveCoverage, calculate_transitive_coverage};
 pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
 pub use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
 pub use filter_predicates::FilterStatistics;
 pub use filtering::{
-    filter_with_metrics, ClassifiedItem, FilterConfig, FilterMetrics, FilterResult,
+    ClassifiedItem, FilterConfig, FilterMetrics, FilterResult, filter_with_metrics,
 };
-pub use formatter::{format_priorities, OutputFormat};
+pub use formatter::{OutputFormat, format_priorities};
 pub use formatter_markdown::{
     format_priorities_categorical_markdown, format_priorities_markdown,
     format_priorities_tiered_markdown,
 };
-pub use god_object_aggregation::{aggregate_god_object_metrics, GodObjectAggregatedMetrics};
+pub use god_object_aggregation::{GodObjectAggregatedMetrics, aggregate_god_object_metrics};
 pub use pipeline::{analyze_and_filter, filter_sort_limit, sort_by_score, take_top};
-pub use semantic_classifier::{classify_function_role, FunctionRole};
-pub use tiers::{classify_tier, RecommendationTier, TierConfig};
+pub use semantic_classifier::{FunctionRole, classify_function_role};
+pub use tiers::{RecommendationTier, TierConfig, classify_tier};
 pub use unified_analysis_queries::UnifiedAnalysisQueries;
 pub use unified_analysis_utils::UnifiedAnalysisUtils;
-pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, UnifiedScore};
+pub use unified_scorer::{Location, UnifiedDebtItem, UnifiedScore, calculate_unified_priority};
 pub use view::{
     CategoryCounts, ItemLocation, LocationGroup, PreparedDebtView, ScoreDistribution, SortCriteria,
     ViewConfig, ViewItem, ViewSummary,

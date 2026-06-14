@@ -213,10 +213,10 @@ impl TraitImplementationTracker {
 
         // Check blanket implementations
         for blanket in &self.blanket_impls {
-            if blanket.trait_name == bound.trait_name {
-                if let Some(method) = blanket.methods.get(method_name) {
-                    implementations.push_back(method.function_id.clone());
-                }
+            if blanket.trait_name == bound.trait_name
+                && let Some(method) = blanket.methods.get(method_name)
+            {
+                implementations.push_back(method.function_id.clone());
             }
         }
 

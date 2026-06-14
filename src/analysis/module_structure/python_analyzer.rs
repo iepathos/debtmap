@@ -10,8 +10,8 @@ use super::types::{
     OrganizationQuality, PathDeclaration,
 };
 use crate::analyzers::python::parser::parse_source;
-use crate::extraction::python::PythonExtractor;
 use crate::extraction::ImportInfo;
+use crate::extraction::python::PythonExtractor;
 
 /// Analyze a Python source file to extract module structure
 pub fn analyze_python_file(content: &str, file_path: &Path) -> ModuleStructure {
@@ -270,11 +270,13 @@ from reports import ReportService
 "#;
         let structure = analyze_python_file(source, Path::new("__init__.py"));
 
-        assert!(structure
-            .dependencies
-            .edges
-            .iter()
-            .any(|(_, dependency)| dependency == "users.UserService"));
+        assert!(
+            structure
+                .dependencies
+                .edges
+                .iter()
+                .any(|(_, dependency)| dependency == "users.UserService")
+        );
         let facade_info = structure
             .facade_info
             .as_ref()

@@ -47,24 +47,24 @@ pub mod validation;
 
 // Re-export scoring types for backward compatibility
 pub use scoring::{
-    default_benchmarks_multiplier, default_build_scripts_multiplier, default_cognitive_weight,
-    default_complexity_weight, default_coverage_weight, default_cyclomatic_weight,
-    default_data_flow_enabled, default_debug_coverage_weight, default_debug_multiplier,
-    default_dependency_weight, default_documentation_multiplier, default_enable_context_dampening,
-    default_enable_role_clamping, default_entry_point_coverage_weight,
-    default_entry_point_multiplier, default_examples_multiplier,
-    default_io_wrapper_coverage_weight, default_io_wrapper_multiplier, default_linear_threshold,
-    default_log_multiplier, default_logarithmic_threshold, default_max_cognitive,
-    default_max_cyclomatic, default_orchestrator_coverage_weight, default_orchestrator_multiplier,
-    default_organization_weight, default_pattern_match_coverage_weight,
-    default_pattern_match_multiplier, default_pattern_weight, default_pure_logic_coverage_weight,
-    default_pure_logic_multiplier, default_purity_weight, default_refactorability_weight,
-    default_role_clamp_max, default_role_clamp_min, default_security_weight,
-    default_semantic_weight, default_show_raw_scores, default_sqrt_multiplier,
-    default_tests_multiplier, default_unknown_coverage_weight, default_unknown_multiplier,
     ComplexityWeightsConfig, ContextMultipliers, DataFlowScoringConfig, NormalizationConfig,
     RebalancedScoringConfig, RoleCoverageWeights, RoleMultiplierConfig, RoleMultipliers,
-    ScoringWeights,
+    ScoringWeights, default_benchmarks_multiplier, default_build_scripts_multiplier,
+    default_cognitive_weight, default_complexity_weight, default_coverage_weight,
+    default_cyclomatic_weight, default_data_flow_enabled, default_debug_coverage_weight,
+    default_debug_multiplier, default_dependency_weight, default_documentation_multiplier,
+    default_enable_context_dampening, default_enable_role_clamping,
+    default_entry_point_coverage_weight, default_entry_point_multiplier,
+    default_examples_multiplier, default_io_wrapper_coverage_weight, default_io_wrapper_multiplier,
+    default_linear_threshold, default_log_multiplier, default_logarithmic_threshold,
+    default_max_cognitive, default_max_cyclomatic, default_orchestrator_coverage_weight,
+    default_orchestrator_multiplier, default_organization_weight,
+    default_pattern_match_coverage_weight, default_pattern_match_multiplier,
+    default_pattern_weight, default_pure_logic_coverage_weight, default_pure_logic_multiplier,
+    default_purity_weight, default_refactorability_weight, default_role_clamp_max,
+    default_role_clamp_min, default_security_weight, default_semantic_weight,
+    default_show_raw_scores, default_sqrt_multiplier, default_tests_multiplier,
+    default_unknown_coverage_weight, default_unknown_multiplier,
 };
 
 // Re-export threshold types for backward compatibility
@@ -113,26 +113,26 @@ pub use loader::{
 
 // Re-export multi-source config types (spec 201)
 pub use multi_source::{
-    display_config_sources, load_multi_source_config, load_multi_source_config_from,
-    load_multi_source_config_validated, user_config_path, ConfigSource, TracedConfig, TracedValue,
+    ConfigSource, TracedConfig, TracedValue, display_config_sources, load_multi_source_config,
+    load_multi_source_config_from, load_multi_source_config_validated, user_config_path,
 };
 
 // Re-export accessor functions
 pub use accessors::*;
 
 // Re-export preset types (spec 205)
-pub use presets::{merge_preset_with_config, PresetLevel};
+pub use presets::{PresetLevel, merge_preset_with_config};
 
 // Re-export analysis config types (spec 201)
 pub use analysis_config::{
-    format_config_errors, AnalysisConfig, AnalysisConfigBuilder, ConfigValidationError,
-    TracedAnalysisValue,
+    AnalysisConfig, AnalysisConfigBuilder, ConfigValidationError, TracedAnalysisValue,
+    format_config_errors,
 };
 
 // Re-export CLI validation types (spec 201)
 pub use cli_validation::{
-    build_analysis_config_from_cli, format_cli_errors, validate_analyze_args, CliValidationError,
-    CliValidationResult,
+    CliValidationError, CliValidationResult, build_analysis_config_from_cli, format_cli_errors,
+    validate_analyze_args,
 };
 
 #[cfg(test)]
@@ -778,16 +778,20 @@ detect_duplication = false
         // Test invalid sum (too high)
         let result = ScoringWeights::validate_active_weights_sum(0.6, 0.5, 0.3);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("must sum to 1.0, but sum to 1.400"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("must sum to 1.0, but sum to 1.400")
+        );
 
         // Test invalid sum (too low)
         let result = ScoringWeights::validate_active_weights_sum(0.2, 0.2, 0.2);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("must sum to 1.0, but sum to 0.600"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("must sum to 1.0, but sum to 0.600")
+        );
     }
 
     #[test]

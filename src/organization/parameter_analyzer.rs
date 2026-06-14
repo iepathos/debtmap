@@ -2,7 +2,7 @@ use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, Parameter,
     ParameterGroup, ParameterRefactoring,
 };
-use crate::common::{capitalize_first, SourceLocation};
+use crate::common::{SourceLocation, capitalize_first};
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -238,18 +238,18 @@ impl FunctionVisitor {
         let mut position = 0;
 
         for input in inputs {
-            if let syn::FnArg::Typed(pat_type) = input {
-                if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
-                    let name = pat_ident.ident.to_string();
-                    let type_name = self.extract_type_name(&pat_type.ty);
+            if let syn::FnArg::Typed(pat_type) = input
+                && let syn::Pat::Ident(pat_ident) = &*pat_type.pat
+            {
+                let name = pat_ident.ident.to_string();
+                let type_name = self.extract_type_name(&pat_type.ty);
 
-                    parameters.push(Parameter {
-                        name,
-                        type_name,
-                        position,
-                    });
-                    position += 1;
-                }
+                parameters.push(Parameter {
+                    name,
+                    type_name,
+                    position,
+                });
+                position += 1;
             }
         }
 

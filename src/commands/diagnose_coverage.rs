@@ -7,8 +7,8 @@
 //! - Pure functions: data collection and transformation
 //! - I/O functions: output formatting at the boundaries
 
-use crate::risk::lcov::{parse_lcov_file, LcovData};
-use anyhow::{bail, Result};
+use crate::risk::lcov::{LcovData, parse_lcov_file};
+use anyhow::{Result, bail};
 use serde::Serialize;
 use std::path::Path;
 

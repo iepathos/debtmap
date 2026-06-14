@@ -5,7 +5,7 @@
 //! propagation for higher-order functions and iterator chains.
 
 use std::collections::HashSet;
-use syn::{visit::Visit, Expr, ExprClosure};
+use syn::{Expr, ExprClosure, visit::Visit};
 
 use super::purity_detector::{MutationScope, PurityDetector};
 use super::scope_tracker::ScopeTracker;
@@ -250,23 +250,23 @@ struct CaptureDetector<'a> {
 
 impl<'ast, 'a> Visit<'ast> for CaptureDetector<'a> {
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        if let Expr::Path(path) = expr {
-            if let Some(ident) = path.path.get_ident() {
-                let name = ident.to_string();
+        if let Expr::Path(path) = expr
+            && let Some(ident) = path.path.get_ident()
+        {
+            let name = ident.to_string();
 
-                // Not a parameter and not a standard construct?
-                if !self.params.contains(&name) && name != "self" && name != "Self" {
-                    // Check if it's in parent scope (captured)
-                    if self.parent_scope.is_local(&name) || self.parent_scope.is_self(&name) {
-                        // Add if not already captured
-                        if !self.captures.iter().any(|c| c.var_name == name) {
-                            self.captures.push(Capture {
-                                var_name: name,
-                                mode: CaptureMode::ByRef, // Default, refined later
-                                is_mutated: false,
-                                scope: MutationScope::Local,
-                            });
-                        }
+            // Not a parameter and not a standard construct?
+            if !self.params.contains(&name) && name != "self" && name != "Self" {
+                // Check if it's in parent scope (captured)
+                if self.parent_scope.is_local(&name) || self.parent_scope.is_self(&name) {
+                    // Add if not already captured
+                    if !self.captures.iter().any(|c| c.var_name == name) {
+                        self.captures.push(Capture {
+                            var_name: name,
+                            mode: CaptureMode::ByRef, // Default, refined later
+                            is_mutated: false,
+                            scope: MutationScope::Local,
+                        });
                     }
                 }
             }

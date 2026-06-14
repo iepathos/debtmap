@@ -25,9 +25,9 @@ use crate::organization::god_object::classifier::{
 };
 use crate::organization::god_object::scoring::calculate_god_object_score_weighted;
 use crate::organization::god_object::{
-    classify_all_methods, DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis,
-    GodObjectThresholds, KnownTraitRegistry, ModuleSplit, Priority, SplitAnalysisMethod,
-    TraitImplInfo, TraitMethodSummary,
+    DetectionType, FunctionVisibilityBreakdown, GodObjectAnalysis, GodObjectThresholds,
+    KnownTraitRegistry, ModuleSplit, Priority, SplitAnalysisMethod, TraitImplInfo,
+    TraitMethodSummary, classify_all_methods,
 };
 
 use std::collections::HashMap;

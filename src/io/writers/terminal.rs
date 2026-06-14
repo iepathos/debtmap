@@ -202,9 +202,9 @@ fn get_refactoring_action_message(level: &ComplexityLevel) -> Option<&'static st
         ComplexityLevel::High => {
             Some("     ACTION: Extract 3-5 pure functions using decompose-then-transform strategy")
         }
-        ComplexityLevel::Severe => {
-            Some("     ACTION: Extract 5+ pure functions into modules with functional core/imperative shell")
-        }
+        ComplexityLevel::Severe => Some(
+            "     ACTION: Extract 5+ pure functions into modules with functional core/imperative shell",
+        ),
     }
 }
 
@@ -284,10 +284,10 @@ fn format_hotspot_entry(index: usize, func: &FunctionMetrics) -> Vec<String> {
         lines.push(format!("     {}", pattern_info.format_terminal()));
     }
 
-    if let Some(ref entropy_analysis) = func.entropy_analysis {
-        if let Some(entropy_lines) = format_entropy_info(entropy_analysis) {
-            lines.extend(entropy_lines);
-        }
+    if let Some(ref entropy_analysis) = func.entropy_analysis
+        && let Some(entropy_lines) = format_entropy_info(entropy_analysis)
+    {
+        lines.extend(entropy_lines);
     }
 
     if let Some(guidance_lines) = format_refactoring_guidance(func.cyclomatic) {
@@ -674,9 +674,11 @@ mod tests {
         assert!(lines.iter().any(|l| l.contains("map/filter/fold")));
 
         // Verify contains benefit
-        assert!(lines
-            .iter()
-            .any(|l| l.contains("Pure functions are easily testable")));
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("Pure functions are easily testable"))
+        );
     }
 
     #[test]
@@ -691,9 +693,11 @@ mod tests {
         assert!(lines[0].contains("3-5 pure functions"));
 
         // Verify contains appropriate patterns
-        assert!(lines
-            .iter()
-            .any(|l| l.contains("Decompose into logical units")));
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("Decompose into logical units"))
+        );
     }
 
     #[test]

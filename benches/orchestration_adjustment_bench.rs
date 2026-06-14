@@ -3,11 +3,11 @@
 //! Validates that the orchestration adjustment has minimal performance overhead
 //! (target: < 5% of total scoring time)
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use debtmap::priority::scoring::orchestration_adjustment::{
-    adjust_score, extract_composition_metrics, OrchestrationAdjustmentConfig,
+    OrchestrationAdjustmentConfig, adjust_score, extract_composition_metrics,
 };
 use debtmap::priority::semantic_classifier::FunctionRole;
 use std::hint::black_box;

@@ -1,11 +1,11 @@
 use super::{
+    RustFlakinessType, RustTestFramework, RustTestIssueType, RustTestQualityIssue,
+    RustTestSeverity,
     assertion_detector::AssertionDetector,
     complexity_scorer::{ComplexityScorer, TestComplexityScore},
     flaky_detector::FlakyDetector,
     framework_detector::FrameworkDetector,
     test_classifier::TestClassifier,
-    RustFlakinessType, RustTestFramework, RustTestIssueType, RustTestQualityIssue,
-    RustTestSeverity,
 };
 use std::path::Path;
 use syn::visit::Visit;
@@ -287,9 +287,11 @@ mod tests {
         let issues = analyzer.analyze_test_function(&func, path);
 
         assert!(!issues.is_empty());
-        assert!(issues
-            .iter()
-            .any(|i| matches!(i.issue_type, RustTestIssueType::NoAssertions)));
+        assert!(
+            issues
+                .iter()
+                .any(|i| matches!(i.issue_type, RustTestIssueType::NoAssertions))
+        );
     }
 
     #[test]
@@ -312,9 +314,11 @@ mod tests {
         let path = Path::new("test.rs");
         let issues = analyzer.analyze_test_function(&func, path);
 
-        assert!(issues
-            .iter()
-            .any(|i| matches!(i.issue_type, RustTestIssueType::TooComplex(_))));
+        assert!(
+            issues
+                .iter()
+                .any(|i| matches!(i.issue_type, RustTestIssueType::TooComplex(_)))
+        );
     }
 
     #[test]
@@ -331,9 +335,11 @@ mod tests {
         let path = Path::new("test.rs");
         let issues = analyzer.analyze_test_function(&func, path);
 
-        assert!(issues
-            .iter()
-            .any(|i| matches!(i.issue_type, RustTestIssueType::FlakyPattern(_))));
+        assert!(
+            issues
+                .iter()
+                .any(|i| matches!(i.issue_type, RustTestIssueType::FlakyPattern(_)))
+        );
     }
 
     #[test]
@@ -370,8 +376,10 @@ mod tests {
 
         // Should not flag missing assertions for property tests
         // (though this simple example might not be detected as property test)
-        assert!(issues
-            .iter()
-            .any(|i| matches!(i.issue_type, RustTestIssueType::NoAssertions)));
+        assert!(
+            issues
+                .iter()
+                .any(|i| matches!(i.issue_type, RustTestIssueType::NoAssertions))
+        );
     }
 }

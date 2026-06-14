@@ -11,8 +11,8 @@ use syn::{Expr, ExprAssign, ExprClosure, ExprIf, ExprMatch, ExprReturn, ExprWhil
 use super::super::types::{
     BlockId, CapturedVar, ExprKind, MatchArm, Rvalue, Statement, Terminator, VarId,
 };
-use super::closure::{CaptureInfo, ClosureCaptureVisitor};
 use super::CfgBuilder;
+use super::closure::{CaptureInfo, ClosureCaptureVisitor};
 
 impl CfgBuilder {
     /// Process an if expression, creating branch blocks.

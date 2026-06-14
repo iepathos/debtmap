@@ -149,12 +149,16 @@ fn test_builder_pattern_detection() {
     let builder_info = extractor.registry.get_builder("ServiceBuilder").unwrap();
     assert_eq!(builder_info.target_type, "Service");
     assert_eq!(builder_info.build_method, "build");
-    assert!(builder_info
-        .chain_methods
-        .contains(&"with_config".to_string()));
-    assert!(builder_info
-        .chain_methods
-        .contains(&"with_timeout".to_string()));
+    assert!(
+        builder_info
+            .chain_methods
+            .contains(&"with_config".to_string())
+    );
+    assert!(
+        builder_info
+            .chain_methods
+            .contains(&"with_timeout".to_string())
+    );
 }
 
 #[test]

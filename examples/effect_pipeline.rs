@@ -8,7 +8,7 @@
 use debtmap::analyzers::effects::analyze_file_effect;
 use debtmap::config::DebtmapConfig;
 use debtmap::core::Language;
-use debtmap::effects::{run_effect, AnalysisEffect};
+use debtmap::effects::{AnalysisEffect, run_effect};
 use debtmap::io::effects::read_file_effect;
 use std::path::PathBuf;
 use stillwater::EffectExt;

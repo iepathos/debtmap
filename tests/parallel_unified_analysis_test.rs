@@ -312,7 +312,8 @@ fn test_parallel_vs_sequential_consistency() {
     );
 
     // Run parallel analysis
-    std::env::set_var("DEBTMAP_PARALLEL", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
     let parallel_result = unified_analysis::create_unified_analysis_with_exclusions(
         &metrics,
         &call_graph,
@@ -326,7 +327,8 @@ fn test_parallel_vs_sequential_consistency() {
         false,
         chrono::Utc::now(),
     );
-    std::env::remove_var("DEBTMAP_PARALLEL");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_PARALLEL") };
 
     // Compare results - they should produce the same number of items
     assert_eq!(sequential_result.items.len(), parallel_result.items.len());
@@ -1330,10 +1332,10 @@ fn test_extraction_pipeline_speedup() {
     let extraction_start = Instant::now();
     let mut extracted_count = 0;
     for path in &rust_files {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            if debtmap::extraction::UnifiedFileExtractor::extract(path, &content).is_ok() {
-                extracted_count += 1;
-            }
+        if let Ok(content) = std::fs::read_to_string(path)
+            && debtmap::extraction::UnifiedFileExtractor::extract(path, &content).is_ok()
+        {
+            extracted_count += 1;
         }
     }
     let extraction_time = extraction_start.elapsed();

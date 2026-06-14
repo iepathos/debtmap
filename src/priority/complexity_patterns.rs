@@ -224,47 +224,47 @@ impl ComplexityPattern {
 
         // Check for repetitive validation pattern FIRST (low entropy + high branching)
         // This prevents validation boilerplate from being misclassified as high complexity
-        if let Some(entropy) = metrics.entropy_score {
-            if is_repetitive_validation(metrics.cyclomatic, entropy, &metrics.validation_signals) {
-                return ComplexityPattern::RepetitiveValidation {
-                    validation_count: metrics
-                        .validation_signals
-                        .as_ref()
-                        .map(|v| v.check_count)
-                        .unwrap_or(metrics.cyclomatic),
-                    entropy,
-                    cyclomatic: metrics.cyclomatic,
-                };
-            }
+        if let Some(entropy) = metrics.entropy_score
+            && is_repetitive_validation(metrics.cyclomatic, entropy, &metrics.validation_signals)
+        {
+            return ComplexityPattern::RepetitiveValidation {
+                validation_count: metrics
+                    .validation_signals
+                    .as_ref()
+                    .map(|v| v.check_count)
+                    .unwrap_or(metrics.cyclomatic),
+                entropy,
+                cyclomatic: metrics.cyclomatic,
+            };
         }
 
         // Check for state machine pattern (highest priority - specific, high-value)
-        if let Some(ref state_signals) = metrics.state_signals {
-            if state_signals.confidence >= 0.7 && metrics.cyclomatic >= 6 && metrics.cognitive >= 12
-            {
-                return ComplexityPattern::StateMachine {
-                    state_transitions: state_signals.transition_count,
-                    match_expression_count: state_signals.match_expression_count,
-                    cyclomatic: metrics.cyclomatic,
-                    cognitive: metrics.cognitive,
-                    nesting: metrics.nesting,
-                };
-            }
+        if let Some(ref state_signals) = metrics.state_signals
+            && state_signals.confidence >= 0.7
+            && metrics.cyclomatic >= 6
+            && metrics.cognitive >= 12
+        {
+            return ComplexityPattern::StateMachine {
+                state_transitions: state_signals.transition_count,
+                match_expression_count: state_signals.match_expression_count,
+                cyclomatic: metrics.cyclomatic,
+                cognitive: metrics.cognitive,
+                nesting: metrics.nesting,
+            };
         }
 
         // Check for coordinator pattern (second priority - specific, high-value)
-        if let Some(ref coord_signals) = metrics.coordinator_signals {
-            if coord_signals.confidence >= 0.7
-                && coord_signals.actions >= 3
-                && coord_signals.comparisons >= 2
-            {
-                return ComplexityPattern::Coordinator {
-                    action_count: coord_signals.actions,
-                    comparison_count: coord_signals.comparisons,
-                    cyclomatic: metrics.cyclomatic,
-                    cognitive: metrics.cognitive,
-                };
-            }
+        if let Some(ref coord_signals) = metrics.coordinator_signals
+            && coord_signals.confidence >= 0.7
+            && coord_signals.actions >= 3
+            && coord_signals.comparisons >= 2
+        {
+            return ComplexityPattern::Coordinator {
+                action_count: coord_signals.actions,
+                comparison_count: coord_signals.comparisons,
+                cyclomatic: metrics.cyclomatic,
+                cognitive: metrics.cognitive,
+            };
         }
 
         // Check for dispatcher pattern (after coordinator, before chaotic)
@@ -297,13 +297,13 @@ impl ComplexityPattern {
 
         // Chaotic: high token entropy (check before generic patterns - requires standardization)
         // Note: entropy_score here is token_entropy (Shannon entropy), not effective_complexity
-        if let Some(token_entropy) = metrics.entropy_score {
-            if token_entropy >= 0.45 {
-                return ComplexityPattern::ChaoticStructure {
-                    entropy: token_entropy,
-                    cyclomatic: metrics.cyclomatic,
-                };
-            }
+        if let Some(token_entropy) = metrics.entropy_score
+            && token_entropy >= 0.45
+        {
+            return ComplexityPattern::ChaoticStructure {
+                entropy: token_entropy,
+                cyclomatic: metrics.cyclomatic,
+            };
         }
 
         // High nesting: cognitive dominates
@@ -907,7 +907,7 @@ mod tests {
         } = pattern
         {
             assert!(inline_logic_branches > 0); // Has inline logic
-                                                // Expected: 45, actual: 55, diff: 10, branches: ceil(10/4) = 3
+            // Expected: 45, actual: 55, diff: 10, branches: ceil(10/4) = 3
             assert_eq!(inline_logic_branches, 3);
         }
     }

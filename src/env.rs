@@ -50,8 +50,8 @@
 use crate::config::DebtmapConfig;
 use crate::io::real::{MemoryCache, NoOpCache, RealCoverageLoader, RealFileSystem};
 use crate::io::traits::{Cache, CoverageLoader, FileSystem};
-use crate::progress::traits::{HasProgress, ProgressSink};
 use crate::progress::SilentProgressSink;
+use crate::progress::traits::{HasProgress, ProgressSink};
 use std::sync::Arc;
 
 /// Environment trait defining all I/O capabilities for analysis operations.

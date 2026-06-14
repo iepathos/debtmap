@@ -308,18 +308,18 @@ pub fn calculate_cyclomatic_adjusted(block: &Block) -> u32 {
 
     // Check for match expressions that should use logarithmic scaling
     for stmt in &block.stmts {
-        if let Stmt::Expr(expr, _) = stmt {
-            if let Some(info) = detect_match_expression(expr) {
-                // Calculate the match's original contribution: (arms - 1)
-                let original_match_contribution = info.condition_count.saturating_sub(1) as u32;
+        if let Stmt::Expr(expr, _) = stmt
+            && let Some(info) = detect_match_expression(expr)
+        {
+            // Calculate the match's original contribution: (arms - 1)
+            let original_match_contribution = info.condition_count.saturating_sub(1) as u32;
 
-                // Calculate the adjusted contribution using logarithmic scaling
-                let adjusted_match = (info.condition_count as f32).log2().ceil() as u32;
-                let default_penalty = if !info.has_default { 1 } else { 0 };
+            // Calculate the adjusted contribution using logarithmic scaling
+            let adjusted_match = (info.condition_count as f32).log2().ceil() as u32;
+            let default_penalty = if !info.has_default { 1 } else { 0 };
 
-                // Replace just the match's contribution, preserving other complexity
-                return base - original_match_contribution + adjusted_match + default_penalty;
-            }
+            // Replace just the match's contribution, preserving other complexity
+            return base - original_match_contribution + adjusted_match + default_penalty;
         }
     }
 

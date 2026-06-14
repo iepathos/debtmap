@@ -22,8 +22,8 @@ use crate::analyzers::state_field_detector::{
 };
 use crate::priority::complexity_patterns::{CoordinatorSignals, StateMachineSignals};
 use syn::{
-    visit::Visit, Arm, Block, Expr, ExprBinary, ExprField, ExprMatch, ExprMethodCall, Pat,
-    PatTupleStruct, Stmt,
+    Arm, Block, Expr, ExprBinary, ExprField, ExprMatch, ExprMethodCall, Pat, PatTupleStruct, Stmt,
+    visit::Visit,
 };
 
 /// Detector for state machine and coordinator patterns
@@ -506,10 +506,10 @@ impl<'ast> Visit<'ast> for StateMachineVisitor {
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
         // Count state comparisons in if expressions
-        if let Expr::If(if_expr) = expr {
-            if self.has_state_field_access(&if_expr.cond) {
-                self.state_comparison_count += 1;
-            }
+        if let Expr::If(if_expr) = expr
+            && self.has_state_field_access(&if_expr.cond)
+        {
+            self.state_comparison_count += 1;
         }
 
         // NEW (spec 202): Collect field accesses for enhanced detection

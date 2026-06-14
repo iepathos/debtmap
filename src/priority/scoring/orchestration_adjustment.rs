@@ -23,7 +23,7 @@
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::semantic_classifier::FunctionRole;
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================

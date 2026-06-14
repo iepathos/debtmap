@@ -1,6 +1,6 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::builders::unified_analysis::{
-    perform_unified_analysis_with_options, UnifiedAnalysisOptions,
+    UnifiedAnalysisOptions, perform_unified_analysis_with_options,
 };
 use debtmap::core::Language;
 use debtmap::utils::analysis_helpers::analyze_project;

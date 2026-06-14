@@ -259,14 +259,14 @@ impl DomainPatternDetector {
         scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Return highest scoring pattern if above threshold
-        if let Some((pattern, score, evidence)) = scores.first() {
-            if *score >= DOMAIN_PATTERN_THRESHOLD {
-                return Some(DomainPatternMatch {
-                    pattern: pattern.clone(),
-                    confidence: *score,
-                    evidence: evidence.clone(),
-                });
-            }
+        if let Some((pattern, score, evidence)) = scores.first()
+            && *score >= DOMAIN_PATTERN_THRESHOLD
+        {
+            return Some(DomainPatternMatch {
+                pattern: pattern.clone(),
+                confidence: *score,
+                evidence: evidence.clone(),
+            });
         }
 
         None

@@ -207,19 +207,19 @@ fn extract_pattern_name(location: &str) -> Option<String> {
     // or "error_swallowing_patterns.rs:7 (in pattern_1)"
 
     // Try direct format first: "...:pattern_name"
-    if let Some(last_part) = location.split(':').next_back() {
-        if last_part.starts_with("pattern_") {
-            return Some(last_part.trim().to_string());
-        }
+    if let Some(last_part) = location.split(':').next_back()
+        && last_part.starts_with("pattern_")
+    {
+        return Some(last_part.trim().to_string());
     }
 
     // Try parenthesized format: "... (in pattern_name)"
-    if let Some(start) = location.find("(in ") {
-        if let Some(end) = location[start..].find(')') {
-            let name = &location[start + 4..start + end];
-            if name.starts_with("pattern_") {
-                return Some(name.trim().to_string());
-            }
+    if let Some(start) = location.find("(in ")
+        && let Some(end) = location[start..].find(')')
+    {
+        let name = &location[start + 4..start + end];
+        if name.starts_with("pattern_") {
+            return Some(name.trim().to_string());
         }
     }
 

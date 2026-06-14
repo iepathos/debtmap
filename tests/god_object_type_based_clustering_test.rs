@@ -1,9 +1,9 @@
+use debtmap::extraction::UnifiedFileExtractor;
 /// Integration tests for type-based clustering (Spec 181)
 ///
 /// Tests that type-based clustering works correctly on real codebases
 /// and produces recommendations with type ownership principles.
 use debtmap::extraction::adapters::god_object::analyze_god_objects;
-use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::organization::SplitAnalysisMethod;
 use std::fs;
 use std::path::Path;

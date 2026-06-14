@@ -66,26 +66,25 @@ impl PatternRecognizer for SingletonPatternRecognizer {
             return None;
         };
 
-        if let Some(module_scope) = &file_metrics.module_scope {
-            if module_scope
+        if let Some(module_scope) = &file_metrics.module_scope
+            && module_scope
                 .singleton_instances
                 .iter()
                 .any(|s| s.class_name == class_name)
-            {
-                return Some(PatternInstance {
-                    pattern_type: PatternType::Singleton,
-                    confidence: 0.85,
-                    base_class: Some(class_name.to_string()),
-                    implementations: vec![Implementation {
-                        file: file_metrics.path.clone(),
-                        class_name: Some(class_name.to_string()),
-                        function_name: function.name.clone(),
-                        line: function.line,
-                    }],
-                    usage_sites: Vec::new(),
-                    reasoning: format!("Method on singleton class {}", class_name),
-                });
-            }
+        {
+            return Some(PatternInstance {
+                pattern_type: PatternType::Singleton,
+                confidence: 0.85,
+                base_class: Some(class_name.to_string()),
+                implementations: vec![Implementation {
+                    file: file_metrics.path.clone(),
+                    class_name: Some(class_name.to_string()),
+                    function_name: function.name.clone(),
+                    line: function.line,
+                }],
+                usage_sites: Vec::new(),
+                reasoning: format!("Method on singleton class {}", class_name),
+            });
         }
 
         None
@@ -96,7 +95,7 @@ impl PatternRecognizer for SingletonPatternRecognizer {
 mod tests {
     use super::*;
     use crate::core::{
-        ast::ModuleScopeAnalysis, ast::SingletonInstance, ComplexityMetrics, Language,
+        ComplexityMetrics, Language, ast::ModuleScopeAnalysis, ast::SingletonInstance,
     };
     use std::path::PathBuf;
 

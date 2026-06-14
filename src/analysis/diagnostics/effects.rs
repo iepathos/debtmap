@@ -21,8 +21,8 @@
 //! ```
 
 use super::{
-    generate_detailed_attribution, generate_summary, DetailLevel, DiagnosticReport,
-    DiagnosticReporter, OutputFormat,
+    DetailLevel, DiagnosticReport, DiagnosticReporter, OutputFormat, generate_detailed_attribution,
+    generate_summary,
 };
 use crate::analysis::effects::{analyze_with_config, lift_pure, query_config};
 use crate::analysis::multi_pass::MultiPassResult;
@@ -109,16 +109,16 @@ pub fn generate_detailed_attribution_effect(
 /// Query the detail level from configuration.
 ///
 /// Returns the configured detail level or `DetailLevel::Standard` as default.
-pub fn get_detail_level_effect(
-) -> impl Effect<Output = DetailLevel, Error = AnalysisError, Env = RealEnv> {
+pub fn get_detail_level_effect()
+-> impl Effect<Output = DetailLevel, Error = AnalysisError, Env = RealEnv> {
     query_config(get_detail_level_from_config)
 }
 
 /// Query the output format from configuration.
 ///
 /// Returns the configured output format or `OutputFormat::Json` as default.
-pub fn get_output_format_effect(
-) -> impl Effect<Output = OutputFormat, Error = AnalysisError, Env = RealEnv> {
+pub fn get_output_format_effect()
+-> impl Effect<Output = OutputFormat, Error = AnalysisError, Env = RealEnv> {
     query_config(get_output_format_from_config)
 }
 

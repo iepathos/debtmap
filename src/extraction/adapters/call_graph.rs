@@ -105,14 +105,14 @@ fn resolve_call(
     extracted: &HashMap<PathBuf, ExtractedFileData>,
 ) -> Option<FunctionId> {
     // Try same file first (most common case)
-    if let Some(file_data) = extracted.get(caller_file) {
-        if let Some(func) = find_function_by_name(file_data, &call.callee_name) {
-            return Some(FunctionId::new(
-                caller_file.clone(),
-                func.name.clone(),
-                func.line,
-            ));
-        }
+    if let Some(file_data) = extracted.get(caller_file)
+        && let Some(func) = find_function_by_name(file_data, &call.callee_name)
+    {
+        return Some(FunctionId::new(
+            caller_file.clone(),
+            func.name.clone(),
+            func.line,
+        ));
     }
 
     // Try cross-file resolution for direct and static method calls

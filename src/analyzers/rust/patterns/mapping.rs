@@ -3,8 +3,8 @@
 //! Detects pure mapping patterns and calculates adjusted complexity.
 
 use crate::complexity::pure_mapping_patterns::{
-    calculate_adjusted_complexity, MappingPatternConfig, MappingPatternDetector,
-    MappingPatternResult,
+    MappingPatternConfig, MappingPatternDetector, MappingPatternResult,
+    calculate_adjusted_complexity,
 };
 
 /// Detect mapping patterns and calculate adjusted complexity (spec 118)

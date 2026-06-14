@@ -3,8 +3,8 @@
 //! Validates that the new clustering module achieves <5% unclustered rate
 //! and integrates properly with god object detection.
 
-use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use debtmap::extraction::UnifiedFileExtractor;
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use std::path::Path;
 
 /// Test that clustering achieves <5% unclustered rate on god_object/detector.rs

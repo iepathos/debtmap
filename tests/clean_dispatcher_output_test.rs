@@ -97,24 +97,24 @@ fn test_clean_dispatcher_not_in_json_output() {
         }
 
         // Check location to see if it's the clean dispatcher
-        if let Some(location) = item.get("location") {
-            if let Some(function_name) = location.get("function") {
-                let func_str = function_name.as_str().unwrap();
+        if let Some(location) = item.get("location")
+            && let Some(function_name) = location.get("function")
+        {
+            let func_str = function_name.as_str().unwrap();
 
-                // If this is the handle_command function (our clean dispatcher)
-                if func_str == "handle_command" {
-                    // It should NOT be present at all for being a clean dispatcher
-                    // Only other debt types (like testing gaps) might be valid
-                    if let Some(category) = item.get("category") {
-                        let cat_str = category.as_str().unwrap();
+            // If this is the handle_command function (our clean dispatcher)
+            if func_str == "handle_command" {
+                // It should NOT be present at all for being a clean dispatcher
+                // Only other debt types (like testing gaps) might be valid
+                if let Some(category) = item.get("category") {
+                    let cat_str = category.as_str().unwrap();
 
-                        // If it's categorized as complexity, that's wrong for a clean dispatcher
-                        assert!(
-                            cat_str != "complexity" && cat_str != "maintainability",
-                            "Clean dispatcher handle_command should not appear as complexity debt: {:?}",
-                            item
-                        );
-                    }
+                    // If it's categorized as complexity, that's wrong for a clean dispatcher
+                    assert!(
+                        cat_str != "complexity" && cat_str != "maintainability",
+                        "Clean dispatcher handle_command should not appear as complexity debt: {:?}",
+                        item
+                    );
                 }
             }
         }

@@ -74,17 +74,17 @@ impl OrganizationDetector for FeatureEnvyDetector {
         for method in visitor.methods {
             let analysis = self.analyze_method_calls(&method);
 
-            if self.should_report_feature_envy(&analysis) {
-                if let Some((envied_type, external_count)) = self.find_envied_type(&analysis) {
-                    patterns.push(OrganizationAntiPattern::FeatureEnvy {
-                        method_name: method.name.clone(),
-                        envied_type,
-                        external_calls: external_count,
-                        internal_calls: analysis.internal_calls,
-                        suggested_move: external_count > analysis.internal_calls * 2,
-                        location: SourceLocation::default(), // TODO: Extract actual location
-                    });
-                }
+            if self.should_report_feature_envy(&analysis)
+                && let Some((envied_type, external_count)) = self.find_envied_type(&analysis)
+            {
+                patterns.push(OrganizationAntiPattern::FeatureEnvy {
+                    method_name: method.name.clone(),
+                    envied_type,
+                    external_calls: external_count,
+                    internal_calls: analysis.internal_calls,
+                    suggested_move: external_count > analysis.internal_calls * 2,
+                    location: SourceLocation::default(), // TODO: Extract actual location
+                });
             }
         }
 
@@ -204,29 +204,29 @@ impl<'ast> Visit<'ast> for MethodVisitor {
     }
 
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
-        if let Some(ref mut method) = self.current_method {
-            if let syn::Expr::Path(path) = &*node.func {
-                let is_self_call = path
+        if let Some(ref mut method) = self.current_method
+            && let syn::Expr::Path(path) = &*node.func
+        {
+            let is_self_call = path
+                .path
+                .segments
+                .first()
+                .map(|seg| seg.ident == "Self" || seg.ident == "self")
+                .unwrap_or(false);
+
+            if !is_self_call {
+                // Track static function calls as external
+                let receiver_type = path
                     .path
                     .segments
                     .first()
-                    .map(|seg| seg.ident == "Self" || seg.ident == "self")
-                    .unwrap_or(false);
+                    .map(|seg| seg.ident.to_string())
+                    .unwrap_or_else(|| "Unknown".to_string());
 
-                if !is_self_call {
-                    // Track static function calls as external
-                    let receiver_type = path
-                        .path
-                        .segments
-                        .first()
-                        .map(|seg| seg.ident.to_string())
-                        .unwrap_or_else(|| "Unknown".to_string());
-
-                    method.calls.push(CallInfo {
-                        receiver_type,
-                        is_self_call: false,
-                    });
-                }
+                method.calls.push(CallInfo {
+                    receiver_type,
+                    is_self_call: false,
+                });
             }
         }
 

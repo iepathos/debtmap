@@ -58,8 +58,8 @@ pub fn collect_file_metrics_with_errors(files: &[PathBuf]) -> AnalysisResults<Fi
     };
 
     // Use atomic counter for live progress updates
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     let processed_count = Arc::new(AtomicUsize::new(0));
     let processed_count_clone = Arc::clone(&processed_count);
@@ -84,15 +84,15 @@ pub fn collect_file_metrics_with_errors(files: &[PathBuf]) -> AnalysisResults<Fi
 
             // Update TUI progress (throttled to reduce lock contention)
             // Update on interval, first file, and last file
-            if current % tui_update_interval == 0 || current == 1 || current == total_files {
-                if let Some(manager) = crate::progress::ProgressManager::global() {
-                    manager.tui_update_subtask(
-                        0,
-                        1,
-                        crate::tui::app::StageStatus::Active,
-                        Some((current, total_files)),
-                    );
-                }
+            if (current % tui_update_interval == 0 || current == 1 || current == total_files)
+                && let Some(manager) = crate::progress::ProgressManager::global()
+            {
+                manager.tui_update_subtask(
+                    0,
+                    1,
+                    crate::tui::app::StageStatus::Active,
+                    Some((current, total_files)),
+                );
             }
 
             result
@@ -541,8 +541,10 @@ mod tests {
     #[test]
     fn test_collect_file_metrics_no_limit_by_default() {
         // When DEBTMAP_MAX_FILES is not set, all files should be processed
-        env::remove_var("DEBTMAP_MAX_FILES");
-        env::set_var("DEBTMAP_QUIET", "1");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("DEBTMAP_MAX_FILES") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("DEBTMAP_QUIET", "1") };
 
         let files: Vec<PathBuf> = (0..5)
             .map(|i| PathBuf::from(format!("test_file_{}.rs", i)))
@@ -555,14 +557,17 @@ mod tests {
         // Result will be empty since files don't exist, but no panic means logic is correct
         assert!(result.is_empty());
 
-        env::remove_var("DEBTMAP_QUIET");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("DEBTMAP_QUIET") };
     }
 
     #[test]
     fn test_collect_file_metrics_with_zero_means_no_limit() {
         // DEBTMAP_MAX_FILES=0 should mean "no limit"
-        env::set_var("DEBTMAP_MAX_FILES", "0");
-        env::set_var("DEBTMAP_QUIET", "1");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("DEBTMAP_MAX_FILES", "0") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("DEBTMAP_QUIET", "1") };
 
         let files: Vec<PathBuf> = (0..5)
             .map(|i| PathBuf::from(format!("test_file_{}.rs", i)))
@@ -572,15 +577,19 @@ mod tests {
         // Result will be empty since files don't exist, but no panic means logic is correct
         assert!(result.is_empty());
 
-        env::remove_var("DEBTMAP_MAX_FILES");
-        env::remove_var("DEBTMAP_QUIET");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("DEBTMAP_MAX_FILES") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("DEBTMAP_QUIET") };
     }
 
     #[test]
     fn test_collect_file_metrics_respects_explicit_limit() {
         // When DEBTMAP_MAX_FILES is set to a positive number, it should limit processing
-        env::set_var("DEBTMAP_MAX_FILES", "3");
-        env::set_var("DEBTMAP_QUIET", "1");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("DEBTMAP_MAX_FILES", "3") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("DEBTMAP_QUIET", "1") };
 
         let files: Vec<PathBuf> = (0..5)
             .map(|i| PathBuf::from(format!("test_file_{}.rs", i)))
@@ -590,7 +599,9 @@ mod tests {
         // Result will be empty since files don't exist, but no panic means logic is correct
         assert!(result.is_empty());
 
-        env::remove_var("DEBTMAP_MAX_FILES");
-        env::remove_var("DEBTMAP_QUIET");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("DEBTMAP_MAX_FILES") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::remove_var("DEBTMAP_QUIET") };
     }
 }

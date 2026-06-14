@@ -5,7 +5,7 @@
 
 use crate::complexity::pattern_adjustments::{PatternMatchRecognizer, PatternRecognizer};
 use crate::priority::complexity_patterns::ValidationSignals;
-use syn::{visit::Visit, Block, Expr, ExprReturn, Stmt};
+use syn::{Block, Expr, ExprReturn, Stmt, visit::Visit};
 
 /// Detector for repetitive validation patterns
 pub struct ValidationPatternDetector {
@@ -138,10 +138,10 @@ impl ValidationVisitor {
             match &**expr {
                 // Err(...) pattern
                 Expr::Call(call) => {
-                    if let Expr::Path(path) = &*call.func {
-                        if let Some(segment) = path.path.segments.last() {
-                            return segment.ident == "Err";
-                        }
+                    if let Expr::Path(path) = &*call.func
+                        && let Some(segment) = path.path.segments.last()
+                    {
+                        return segment.ident == "Err";
                     }
                     false
                 }
@@ -165,14 +165,14 @@ impl ValidationVisitor {
 impl<'ast> Visit<'ast> for ValidationVisitor {
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         // Only count top-level if statements (not nested)
-        if self.depth == 0 {
-            if let Stmt::Expr(Expr::If(if_expr), _) = stmt {
-                self.if_count += 1;
+        if self.depth == 0
+            && let Stmt::Expr(Expr::If(if_expr), _) = stmt
+        {
+            self.if_count += 1;
 
-                // Check if then branch has early return
-                if self.has_early_return(&if_expr.then_branch) {
-                    self.early_return_count += 1;
-                }
+            // Check if then branch has early return
+            if self.has_early_return(&if_expr.then_branch) {
+                self.early_return_count += 1;
             }
         }
 

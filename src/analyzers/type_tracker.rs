@@ -177,14 +177,14 @@ impl TypeTracker {
                 if path.segments.len() == 1 {
                     let ident = path.segments.first()?.ident.to_string();
                     // Special handling for "self"
-                    if ident == "self" {
-                        if let Some(impl_type) = self.current_impl_type() {
-                            return Some(ResolvedType {
-                                type_name: impl_type,
-                                source: TypeSource::Annotation,
-                                generics: Vec::new(),
-                            });
-                        }
+                    if ident == "self"
+                        && let Some(impl_type) = self.current_impl_type()
+                    {
+                        return Some(ResolvedType {
+                            type_name: impl_type,
+                            source: TypeSource::Annotation,
+                            generics: Vec::new(),
+                        });
                     }
 
                     // Try to resolve as a variable first
@@ -370,48 +370,46 @@ impl TypeTracker {
 
         // Check if it's a constructor pattern FIRST (before requiring registry)
         // This handles Type::new(), Type::default(), etc. even without full type information
-        if let Some((type_name, method_name)) = Self::parse_function_path(&func_path) {
-            if Self::is_constructor_method(&method_name) {
-                // If we have a registry, check if it has specific return type info
-                if let Some(registry) = &self.function_registry {
-                    if let Some(return_info) =
-                        registry.resolve_method_return(&type_name, &method_name)
-                    {
-                        let resolved_type_name = if return_info.is_self {
-                            type_name
-                        } else {
-                            return_info.type_name.clone()
-                        };
-                        return Some(Self::create_resolved_type(
-                            resolved_type_name,
-                            TypeSource::Constructor,
-                            return_info.generic_args.clone(),
-                        ));
-                    }
-                }
+        if let Some((type_name, method_name)) = Self::parse_function_path(&func_path)
+            && Self::is_constructor_method(&method_name)
+        {
+            // If we have a registry, check if it has specific return type info
+            if let Some(registry) = &self.function_registry
+                && let Some(return_info) = registry.resolve_method_return(&type_name, &method_name)
+            {
+                let resolved_type_name = if return_info.is_self {
+                    type_name
+                } else {
+                    return_info.type_name.clone()
+                };
+                return Some(Self::create_resolved_type(
+                    resolved_type_name,
+                    TypeSource::Constructor,
+                    return_info.generic_args.clone(),
+                ));
+            }
 
-                // For common constructors (new, default), assume they return the type itself
-                // This is a reasonable heuristic that works in most cases
-                if matches!(method_name.as_str(), "new" | "default" | "from") {
-                    return Some(Self::create_resolved_type(
-                        type_name,
-                        TypeSource::Constructor,
-                        Vec::new(),
-                    ));
-                }
+            // For common constructors (new, default), assume they return the type itself
+            // This is a reasonable heuristic that works in most cases
+            if matches!(method_name.as_str(), "new" | "default" | "from") {
+                return Some(Self::create_resolved_type(
+                    type_name,
+                    TypeSource::Constructor,
+                    Vec::new(),
+                ));
             }
         }
 
         // Try to resolve via registry (if available)
-        if let Some(registry) = &self.function_registry {
-            if let Some(return_info) = registry.resolve_function_return(&func_path, &[]) {
-                let type_name = self.resolve_type_name(&return_info);
-                return Some(Self::create_resolved_type(
-                    type_name,
-                    TypeSource::FunctionReturn,
-                    return_info.generic_args.clone(),
-                ));
-            }
+        if let Some(registry) = &self.function_registry
+            && let Some(return_info) = registry.resolve_function_return(&func_path, &[])
+        {
+            let type_name = self.resolve_type_name(&return_info);
+            return Some(Self::create_resolved_type(
+                type_name,
+                TypeSource::FunctionReturn,
+                return_info.generic_args.clone(),
+            ));
         }
 
         None
@@ -443,19 +441,19 @@ impl TypeTracker {
             }
 
             // Check if this is a builder pattern
-            if registry.is_builder(&receiver_type.type_name) {
-                if let Some(builder_info) = registry.get_builder(&receiver_type.type_name) {
-                    if method_name == builder_info.build_method {
-                        // This is the terminal build method
-                        return Some(ResolvedType {
-                            type_name: builder_info.target_type.clone(),
-                            source: TypeSource::FunctionReturn,
-                            generics: Vec::new(),
-                        });
-                    } else if builder_info.chain_methods.contains(&method_name) {
-                        // This is a chaining method, returns the builder itself
-                        return Some(receiver_type);
-                    }
+            if registry.is_builder(&receiver_type.type_name)
+                && let Some(builder_info) = registry.get_builder(&receiver_type.type_name)
+            {
+                if method_name == builder_info.build_method {
+                    // This is the terminal build method
+                    return Some(ResolvedType {
+                        type_name: builder_info.target_type.clone(),
+                        source: TypeSource::FunctionReturn,
+                        generics: Vec::new(),
+                    });
+                } else if builder_info.chain_methods.contains(&method_name) {
+                    // This is a chaining method, returns the builder itself
+                    return Some(receiver_type);
                 }
             }
         }
@@ -468,30 +466,28 @@ impl TypeTracker {
     /// Track self parameter in a function
     pub fn track_self_param(&mut self, fn_item: Option<&ItemFn>, impl_fn: Option<&ImplItemFn>) {
         // Handle impl method
-        if let Some(impl_fn) = impl_fn {
-            if let Some(_self_param) = extract_self_param(&impl_fn.sig) {
-                if let Some(impl_type) = self.current_impl_type() {
-                    let resolved_type = ResolvedType {
-                        type_name: impl_type,
-                        source: TypeSource::Annotation,
-                        generics: Vec::new(),
-                    };
-                    self.record_variable("self".to_string(), resolved_type);
-                }
-            }
+        if let Some(impl_fn) = impl_fn
+            && let Some(_self_param) = extract_self_param(&impl_fn.sig)
+            && let Some(impl_type) = self.current_impl_type()
+        {
+            let resolved_type = ResolvedType {
+                type_name: impl_type,
+                source: TypeSource::Annotation,
+                generics: Vec::new(),
+            };
+            self.record_variable("self".to_string(), resolved_type);
         }
         // Handle regular function (shouldn't have self, but check anyway)
-        if let Some(fn_item) = fn_item {
-            if let Some(_self_param) = extract_self_param(&fn_item.sig) {
-                if let Some(impl_type) = self.current_impl_type() {
-                    let resolved_type = ResolvedType {
-                        type_name: impl_type,
-                        source: TypeSource::Annotation,
-                        generics: Vec::new(),
-                    };
-                    self.record_variable("self".to_string(), resolved_type);
-                }
-            }
+        if let Some(fn_item) = fn_item
+            && let Some(_self_param) = extract_self_param(&fn_item.sig)
+            && let Some(impl_type) = self.current_impl_type()
+        {
+            let resolved_type = ResolvedType {
+                type_name: impl_type,
+                source: TypeSource::Annotation,
+                generics: Vec::new(),
+            };
+            self.record_variable("self".to_string(), resolved_type);
         }
     }
 }

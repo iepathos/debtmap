@@ -1,6 +1,6 @@
-use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::analyzers::Analyzer;
-use debtmap::core::{ast::Ast, Language};
+use debtmap::analyzers::rust::RustAnalyzer;
+use debtmap::core::{Language, ast::Ast};
 use std::path::PathBuf;
 
 #[cfg(test)]
@@ -140,11 +140,13 @@ mod rust_analyzer_tests {
         assert_eq!(metrics.language, Language::Rust);
         // Should analyze all functions including test functions
         assert!(metrics.complexity.functions.iter().any(|f| f.name == "add"));
-        assert!(metrics
-            .complexity
-            .functions
-            .iter()
-            .any(|f| f.name == "test_add"));
+        assert!(
+            metrics
+                .complexity
+                .functions
+                .iter()
+                .any(|f| f.name == "test_add")
+        );
 
         // Verify test function is marked as test
         let test_fn = metrics

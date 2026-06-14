@@ -1,8 +1,8 @@
+use debtmap::core::FunctionMetrics;
 use debtmap::core::metrics::{
     calculate_average_complexity, calculate_length_penalty, calculate_nesting_penalty,
     count_high_complexity, find_max_complexity, group_by_file, sort_by_complexity,
 };
-use debtmap::core::FunctionMetrics;
 use std::path::PathBuf;
 
 #[test]

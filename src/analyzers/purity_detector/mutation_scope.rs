@@ -30,12 +30,11 @@ pub fn determine_mutation_scope(expr: &Expr, scope: &ScopeTracker) -> MutationSc
 
         // Index: arr[i] = value
         Expr::Index(index) => {
-            if let Expr::Path(path) = &*index.expr {
-                if let Some(ident) = path.path.get_ident() {
-                    if scope.is_local(&ident.to_string()) {
-                        return MutationScope::Local;
-                    }
-                }
+            if let Expr::Path(path) = &*index.expr
+                && let Some(ident) = path.path.get_ident()
+                && scope.is_local(&ident.to_string())
+            {
+                return MutationScope::Local;
             }
             MutationScope::External
         }

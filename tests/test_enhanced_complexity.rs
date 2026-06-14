@@ -1,9 +1,9 @@
 use debtmap::complexity::if_else_analyzer::IfElseChainAnalyzer;
 use debtmap::complexity::if_else_analyzer::RefactoringPattern;
 use debtmap::complexity::message_generator::{
-    format_enhanced_message, generate_enhanced_message, ActionableRecommendation,
-    ComplexityBreakdown, ComplexityDetail, ComplexityIssueType, EnhancedComplexityMessage,
-    EstimatedEffort, RefactoringExample, Severity, SourceLocation,
+    ActionableRecommendation, ComplexityBreakdown, ComplexityDetail, ComplexityIssueType,
+    EnhancedComplexityMessage, EstimatedEffort, RefactoringExample, Severity, SourceLocation,
+    format_enhanced_message, generate_enhanced_message,
 };
 use debtmap::complexity::recursive_detector::RecursiveMatchDetector;
 use debtmap::complexity::threshold_manager::{ComplexityThresholds, FunctionRole, ThresholdPreset};
@@ -318,20 +318,20 @@ fn test_depth_limit_protection() {
     code.push_str(" }");
 
     // This should not panic due to depth limits
-    if let Ok(file) = syn::parse_str::<syn::File>(&code) {
-        if let syn::Item::Fn(func) = &file.items[0] {
-            let mut detector = RecursiveMatchDetector::new();
-            let matches = detector.find_matches_in_block(&func.block);
-            // Should complete without stack overflow and find some matches
-            assert!(!matches.is_empty(), "Should find at least some matches");
-            // Should find a reasonable number of matches
-            assert!(
-                matches.len() >= 10,
-                "Should find a reasonable number of matches"
-            );
-            // The exact count depends on how depth is tracked
-            eprintln!("Found {} matches out of 45 nested levels", matches.len());
-        }
+    if let Ok(file) = syn::parse_str::<syn::File>(&code)
+        && let syn::Item::Fn(func) = &file.items[0]
+    {
+        let mut detector = RecursiveMatchDetector::new();
+        let matches = detector.find_matches_in_block(&func.block);
+        // Should complete without stack overflow and find some matches
+        assert!(!matches.is_empty(), "Should find at least some matches");
+        // Should find a reasonable number of matches
+        assert!(
+            matches.len() >= 10,
+            "Should find a reasonable number of matches"
+        );
+        // The exact count depends on how depth is tracked
+        eprintln!("Found {} matches out of 45 nested levels", matches.len());
     }
 }
 

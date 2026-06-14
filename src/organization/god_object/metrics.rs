@@ -7,11 +7,10 @@
 use super::TypeVisitor;
 use crate::analysis::FunctionCounts;
 use crate::organization::{
-    aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_weight,
-    calculate_god_object_score, calculate_god_object_score_weighted,
-    group_methods_by_responsibility, DetectionType, FunctionComplexityInfo,
-    FunctionVisibilityBreakdown, GodObjectThresholds, PurityAnalyzer, PurityDistribution,
-    PurityLevel, StructMetrics,
+    DetectionType, FunctionComplexityInfo, FunctionVisibilityBreakdown, GodObjectThresholds,
+    PurityAnalyzer, PurityDistribution, PurityLevel, StructMetrics, aggregate_weighted_complexity,
+    calculate_avg_complexity, calculate_complexity_weight, calculate_god_object_score,
+    calculate_god_object_score_weighted, group_methods_by_responsibility,
 };
 use std::collections::HashMap;
 
@@ -220,15 +219,15 @@ pub fn calculate_final_god_object_score(
     };
 
     // Apply facade scoring adjustment (Spec 170)
-    if let Some(structure) = module_structure {
-        if let Some(facade_info) = &structure.facade_info {
-            god_object_score = crate::priority::scoring::adjust_score_for_facade(
-                god_object_score,
-                facade_info,
-                total_methods,
-                lines_of_code,
-            );
-        }
+    if let Some(structure) = module_structure
+        && let Some(facade_info) = &structure.facade_info
+    {
+        god_object_score = crate::priority::scoring::adjust_score_for_facade(
+            god_object_score,
+            facade_info,
+            total_methods,
+            lines_of_code,
+        );
     }
 
     // With complexity weighting, use the god_object_score to determine if it's a god object

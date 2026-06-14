@@ -40,42 +40,42 @@ impl RustBuilderDetector {
         }
 
         // Check return type for Self
-        if let ReturnType::Type(_, ty) = &context.item_fn.sig.output {
-            if Self::returns_self(ty) {
-                // with_* pattern
-                if fn_name.starts_with("with_") {
-                    patterns.push(BuilderPattern {
-                        pattern_type: BuilderPatternType::WithMethod,
-                        confidence: 0.95,
-                        evidence: format!("Builder with_* method: {}", fn_name),
-                    });
-                    patterns.push(BuilderPattern {
-                        pattern_type: BuilderPatternType::BuilderMethod,
-                        confidence: 0.9,
-                        evidence: "Returns Self for chaining".into(),
-                    });
-                }
-                // set_* pattern
-                else if fn_name.starts_with("set_") {
-                    patterns.push(BuilderPattern {
-                        pattern_type: BuilderPatternType::SetterMethod,
-                        confidence: 0.85,
-                        evidence: format!("Builder set_* method: {}", fn_name),
-                    });
-                    patterns.push(BuilderPattern {
-                        pattern_type: BuilderPatternType::BuilderMethod,
-                        confidence: 0.85,
-                        evidence: "Returns Self for chaining".into(),
-                    });
-                }
-                // Generic builder method returning Self
-                else if Self::takes_self_param(context.item_fn) {
-                    patterns.push(BuilderPattern {
-                        pattern_type: BuilderPatternType::BuilderMethod,
-                        confidence: 0.75,
-                        evidence: "Method returns Self for chaining".into(),
-                    });
-                }
+        if let ReturnType::Type(_, ty) = &context.item_fn.sig.output
+            && Self::returns_self(ty)
+        {
+            // with_* pattern
+            if fn_name.starts_with("with_") {
+                patterns.push(BuilderPattern {
+                    pattern_type: BuilderPatternType::WithMethod,
+                    confidence: 0.95,
+                    evidence: format!("Builder with_* method: {}", fn_name),
+                });
+                patterns.push(BuilderPattern {
+                    pattern_type: BuilderPatternType::BuilderMethod,
+                    confidence: 0.9,
+                    evidence: "Returns Self for chaining".into(),
+                });
+            }
+            // set_* pattern
+            else if fn_name.starts_with("set_") {
+                patterns.push(BuilderPattern {
+                    pattern_type: BuilderPatternType::SetterMethod,
+                    confidence: 0.85,
+                    evidence: format!("Builder set_* method: {}", fn_name),
+                });
+                patterns.push(BuilderPattern {
+                    pattern_type: BuilderPatternType::BuilderMethod,
+                    confidence: 0.85,
+                    evidence: "Returns Self for chaining".into(),
+                });
+            }
+            // Generic builder method returning Self
+            else if Self::takes_self_param(context.item_fn) {
+                patterns.push(BuilderPattern {
+                    pattern_type: BuilderPatternType::BuilderMethod,
+                    confidence: 0.75,
+                    evidence: "Method returns Self for chaining".into(),
+                });
             }
         }
 
@@ -93,10 +93,10 @@ impl RustBuilderDetector {
 
     /// Check if return type is Self
     fn returns_self(ty: &Type) -> bool {
-        if let Type::Path(type_path) = ty {
-            if let Some(segment) = type_path.path.segments.last() {
-                return segment.ident == "Self";
-            }
+        if let Type::Path(type_path) = ty
+            && let Some(segment) = type_path.path.segments.last()
+        {
+            return segment.ident == "Self";
         }
         false
     }
@@ -179,9 +179,11 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == BuilderPatternType::Constructor));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == BuilderPatternType::Constructor)
+        );
     }
 
     #[test]
@@ -195,9 +197,11 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == BuilderPatternType::WithMethod));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == BuilderPatternType::WithMethod)
+        );
     }
 
     #[test]
@@ -211,9 +215,11 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == BuilderPatternType::SetterMethod));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == BuilderPatternType::SetterMethod)
+        );
     }
 
     #[test]
@@ -226,8 +232,10 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == BuilderPatternType::BuildFinalization));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == BuilderPatternType::BuildFinalization)
+        );
     }
 }

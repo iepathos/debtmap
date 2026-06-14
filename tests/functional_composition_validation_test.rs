@@ -7,9 +7,9 @@
 /// - tests/fixtures/functional_patterns/positive/ - functions with functional patterns
 /// - tests/fixtures/functional_patterns/negative/ - functions without functional patterns
 /// - tests/fixtures/functional_patterns/edge_cases/ - boundary cases
-use debtmap::analysis::functional_composition::{analyze_composition, FunctionalAnalysisConfig};
-use debtmap::analyzers::rust::RustAnalyzer;
+use debtmap::analysis::functional_composition::{FunctionalAnalysisConfig, analyze_composition};
 use debtmap::analyzers::Analyzer;
+use debtmap::analyzers::rust::RustAnalyzer;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -413,23 +413,22 @@ fn test_full_corpus_accuracy() {
             let entry = entry.unwrap();
             let path = entry.path();
 
-            if path.extension().map(|e| e == "rs").unwrap_or(false) {
-                if let Ok(code) = fs::read_to_string(&path) {
-                    if let Ok(ast) = analyzer.parse(&code, path.clone()) {
-                        let result = analyzer.analyze(&ast);
+            if path.extension().map(|e| e == "rs").unwrap_or(false)
+                && let Ok(code) = fs::read_to_string(&path)
+                && let Ok(ast) = analyzer.parse(&code, path.clone())
+            {
+                let result = analyzer.analyze(&ast);
 
-                        if let Some(func) = result.complexity.functions.first() {
-                            if let Some(comp) = &func.composition_metrics {
-                                // Functional pattern detected if has pipelines or good quality
-                                if !comp.pipelines.is_empty() || comp.composition_quality > 0.5 {
-                                    metrics.true_positives += 1;
-                                } else {
-                                    metrics.false_negatives += 1;
-                                }
-                            } else {
-                                metrics.false_negatives += 1;
-                            }
+                if let Some(func) = result.complexity.functions.first() {
+                    if let Some(comp) = &func.composition_metrics {
+                        // Functional pattern detected if has pipelines or good quality
+                        if !comp.pipelines.is_empty() || comp.composition_quality > 0.5 {
+                            metrics.true_positives += 1;
+                        } else {
+                            metrics.false_negatives += 1;
                         }
+                    } else {
+                        metrics.false_negatives += 1;
                     }
                 }
             }
@@ -443,23 +442,22 @@ fn test_full_corpus_accuracy() {
             let entry = entry.unwrap();
             let path = entry.path();
 
-            if path.extension().map(|e| e == "rs").unwrap_or(false) {
-                if let Ok(code) = fs::read_to_string(&path) {
-                    if let Ok(ast) = analyzer.parse(&code, path.clone()) {
-                        let result = analyzer.analyze(&ast);
+            if path.extension().map(|e| e == "rs").unwrap_or(false)
+                && let Ok(code) = fs::read_to_string(&path)
+                && let Ok(ast) = analyzer.parse(&code, path.clone())
+            {
+                let result = analyzer.analyze(&ast);
 
-                        if let Some(func) = result.complexity.functions.first() {
-                            if let Some(comp) = &func.composition_metrics {
-                                // Correctly classified if no pipelines and low quality
-                                if comp.pipelines.is_empty() && comp.composition_quality < 0.3 {
-                                    metrics.true_negatives += 1;
-                                } else {
-                                    metrics.false_positives += 1;
-                                }
-                            } else {
-                                metrics.true_negatives += 1;
-                            }
+                if let Some(func) = result.complexity.functions.first() {
+                    if let Some(comp) = &func.composition_metrics {
+                        // Correctly classified if no pipelines and low quality
+                        if comp.pipelines.is_empty() && comp.composition_quality < 0.3 {
+                            metrics.true_negatives += 1;
+                        } else {
+                            metrics.false_positives += 1;
                         }
+                    } else {
+                        metrics.true_negatives += 1;
                     }
                 }
             }
@@ -533,30 +531,30 @@ fn test_analysis_profiles() {
     let path = PathBuf::from("test.rs");
 
     // Parse once
-    if let Ok(_ast) = analyzer.parse(code, path) {
-        if let Ok(item_fn) = syn::parse_str::<syn::ItemFn>(code) {
-            // Test strict profile
-            let strict = FunctionalAnalysisConfig::strict();
-            let strict_metrics = analyze_composition(&item_fn, &strict);
+    if let Ok(_ast) = analyzer.parse(code, path)
+        && let Ok(item_fn) = syn::parse_str::<syn::ItemFn>(code)
+    {
+        // Test strict profile
+        let strict = FunctionalAnalysisConfig::strict();
+        let strict_metrics = analyze_composition(&item_fn, &strict);
 
-            // Test balanced profile
-            let balanced = FunctionalAnalysisConfig::balanced();
-            let balanced_metrics = analyze_composition(&item_fn, &balanced);
+        // Test balanced profile
+        let balanced = FunctionalAnalysisConfig::balanced();
+        let balanced_metrics = analyze_composition(&item_fn, &balanced);
 
-            // Test lenient profile
-            let lenient = FunctionalAnalysisConfig::lenient();
-            let lenient_metrics = analyze_composition(&item_fn, &lenient);
+        // Test lenient profile
+        let lenient = FunctionalAnalysisConfig::lenient();
+        let lenient_metrics = analyze_composition(&item_fn, &lenient);
 
-            // Lenient should find more patterns than strict
-            assert!(
-                lenient_metrics.pipelines.len() >= strict_metrics.pipelines.len(),
-                "Lenient profile should detect at least as many patterns as strict"
-            );
+        // Lenient should find more patterns than strict
+        assert!(
+            lenient_metrics.pipelines.len() >= strict_metrics.pipelines.len(),
+            "Lenient profile should detect at least as many patterns as strict"
+        );
 
-            // All should complete without errors
-            assert!(strict_metrics.composition_quality >= 0.0);
-            assert!(balanced_metrics.composition_quality >= 0.0);
-            assert!(lenient_metrics.composition_quality >= 0.0);
-        }
+        // All should complete without errors
+        assert!(strict_metrics.composition_quality >= 0.0);
+        assert!(balanced_metrics.composition_quality >= 0.0);
+        assert!(lenient_metrics.composition_quality >= 0.0);
     }
 }

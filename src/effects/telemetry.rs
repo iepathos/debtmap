@@ -36,7 +36,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use stillwater::effect::writer::{tell, WriterEffect};
+use stillwater::effect::writer::{WriterEffect, tell};
 use stillwater::{Monoid, Semigroup};
 
 use crate::core::types::Severity;
@@ -653,9 +653,11 @@ mod tests {
         let (_, metrics) = effect.run_writer(&()).await;
 
         assert_eq!(metrics.len(), 1);
-        assert!(metrics
-            .iter()
-            .any(|e| matches!(e, AnalysisEvent::FileStarted { .. })));
+        assert!(
+            metrics
+                .iter()
+                .any(|e| matches!(e, AnalysisEvent::FileStarted { .. }))
+        );
     }
 
     #[tokio::test]

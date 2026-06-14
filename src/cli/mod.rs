@@ -25,8 +25,8 @@ pub use config_builder::{
     PerformanceConfig, ThresholdConfig,
 };
 pub use setup::{
-    apply_environment_setup, configure_thread_pool, get_worker_count, is_automation_mode,
-    print_metrics_explanation, show_config_sources, MAIN_STACK_SIZE,
+    MAIN_STACK_SIZE, apply_environment_setup, configure_thread_pool, get_worker_count,
+    is_automation_mode, print_metrics_explanation, show_config_sources,
 };
 
 /// Parse CLI arguments using Clap

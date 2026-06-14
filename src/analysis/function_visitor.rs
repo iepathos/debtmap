@@ -31,7 +31,7 @@ impl FunctionVisitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::{parse_quote, Block};
+    use syn::{Block, parse_quote};
 
     #[test]
     fn test_visit_body_with_local_variable() {

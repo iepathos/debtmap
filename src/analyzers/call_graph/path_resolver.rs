@@ -112,17 +112,17 @@ impl PathResolver {
     /// Strategy 1: Exact match resolution
     fn resolve_exact_match(&self, caller_file: &Path, callee_name: &str) -> Option<FunctionId> {
         // Try exact name match in same file first
-        if !callee_name.contains("::") {
-            if let Some(resolved) = self.find_in_same_file(caller_file, callee_name) {
-                return Some(resolved);
-            }
+        if !callee_name.contains("::")
+            && let Some(resolved) = self.find_in_same_file(caller_file, callee_name)
+        {
+            return Some(resolved);
         }
 
         // Try exact qualified path match
-        if callee_name.contains("::") {
-            if let Some(resolved) = self.find_function_by_path(callee_name) {
-                return Some(resolved);
-            }
+        if callee_name.contains("::")
+            && let Some(resolved) = self.find_function_by_path(callee_name)
+        {
+            return Some(resolved);
         }
 
         None
@@ -187,16 +187,16 @@ impl PathResolver {
         let normalized_name = CallResolver::strip_generic_params(callee_name);
 
         // Try simple name lookup with fuzzy matching
-        if let Some(simple_name) = normalized_name.split("::").last() {
-            if let Some(candidates) = self.function_index.get(simple_name) {
-                for func in candidates {
-                    let normalized_func_name = CallResolver::strip_generic_params(&func.name);
-                    if normalized_func_name == normalized_name {
-                        return Some(func.clone());
-                    }
-                    if normalized_func_name.ends_with(&normalized_name) {
-                        return Some(func.clone());
-                    }
+        if let Some(simple_name) = normalized_name.split("::").last()
+            && let Some(candidates) = self.function_index.get(simple_name)
+        {
+            for func in candidates {
+                let normalized_func_name = CallResolver::strip_generic_params(&func.name);
+                if normalized_func_name == normalized_name {
+                    return Some(func.clone());
+                }
+                if normalized_func_name.ends_with(&normalized_name) {
+                    return Some(func.clone());
                 }
             }
         }
@@ -246,15 +246,13 @@ impl PathResolver {
                         .collect::<Vec<_>>();
 
                     // Resolve super/self/crate if present in the imported path
-                    if let Some(current_module) = self.module_tree.get_module(caller_file) {
-                        if let Some(resolved) = self
+                    if let Some(current_module) = self.module_tree.get_module(caller_file)
+                        && let Some(resolved) = self
                             .module_tree
                             .resolve_path(current_module, &full_path_segments)
-                        {
-                            // Use the resolved path instead of the raw import path
-                            full_path_segments =
-                                resolved.split("::").map(|s| s.to_string()).collect();
-                        }
+                    {
+                        // Use the resolved path instead of the raw import path
+                        full_path_segments = resolved.split("::").map(|s| s.to_string()).collect();
                     }
 
                     full_path_segments.extend_from_slice(&segments[1..]);
@@ -276,19 +274,18 @@ impl PathResolver {
         }
 
         // Strategy 2: Try using module tree resolution
-        if let Some(current_module) = self.module_tree.get_module(caller_file) {
-            if let Some(resolved_path) = self.module_tree.resolve_path(current_module, &segments) {
-                if let Some(func) = self.find_function_by_path(&resolved_path) {
-                    return Some(func);
-                }
-            }
+        if let Some(current_module) = self.module_tree.get_module(caller_file)
+            && let Some(resolved_path) = self.module_tree.resolve_path(current_module, &segments)
+            && let Some(func) = self.find_function_by_path(&resolved_path)
+        {
+            return Some(func);
         }
 
         // Strategy 3: Try direct lookup (for crate::... paths)
-        if let Some(resolved) = self.import_map.resolve_qualified_path(&segments) {
-            if let Some(func) = self.find_function_by_path(&resolved) {
-                return Some(func);
-            }
+        if let Some(resolved) = self.import_map.resolve_qualified_path(&segments)
+            && let Some(func) = self.find_function_by_path(&resolved)
+        {
+            return Some(func);
         }
 
         None
@@ -344,13 +341,13 @@ impl PathResolver {
         }
 
         // Try matching by simple name and filtering
-        if let Some(base_name) = path.split("::").last() {
-            if let Some(candidates) = self.function_index.get(base_name) {
-                // Filter candidates that match the full path
-                for func in candidates {
-                    if func.name == path || func.name.ends_with(&format!("::{}", path)) {
-                        return Some(func.clone());
-                    }
+        if let Some(base_name) = path.split("::").last()
+            && let Some(candidates) = self.function_index.get(base_name)
+        {
+            // Filter candidates that match the full path
+            for func in candidates {
+                if func.name == path || func.name.ends_with(&format!("::{}", path)) {
+                    return Some(func.clone());
                 }
             }
         }
@@ -366,10 +363,10 @@ impl PathResolver {
         }
 
         // Base name match (Type::method matches method)
-        if let Some(base) = full_name.split("::").last() {
-            if base == search_name {
-                return true;
-            }
+        if let Some(base) = full_name.split("::").last()
+            && base == search_name
+        {
+            return true;
         }
 
         false
@@ -419,11 +416,11 @@ impl PathResolverBuilder {
 
         // Check for re-exports
         for item in &ast.items {
-            if let syn::Item::Use(use_item) = item {
-                if let syn::Visibility::Public(_) = use_item.vis {
-                    // This is a re-export
-                    self.analyze_reexport(&file_path, use_item);
-                }
+            if let syn::Item::Use(use_item) = item
+                && let syn::Visibility::Public(_) = use_item.vis
+            {
+                // This is a re-export
+                self.analyze_reexport(&file_path, use_item);
             }
         }
 
@@ -572,14 +569,18 @@ mod tests {
             .analyze_file(file2, &ast2)
             .build();
 
-        assert!(resolver
-            .module_tree()
-            .get_module(&PathBuf::from("src/lib.rs"))
-            .is_some());
-        assert!(resolver
-            .module_tree()
-            .get_module(&PathBuf::from("src/commands/mod.rs"))
-            .is_some());
+        assert!(
+            resolver
+                .module_tree()
+                .get_module(&PathBuf::from("src/lib.rs"))
+                .is_some()
+        );
+        assert!(
+            resolver
+                .module_tree()
+                .get_module(&PathBuf::from("src/commands/mod.rs"))
+                .is_some()
+        );
     }
 
     #[test]

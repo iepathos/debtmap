@@ -4,10 +4,10 @@
 //! actual code quality issues (complexity + coverage gaps) over pure file size concerns.
 
 use debtmap::core::FunctionMetrics;
+use debtmap::priority::DebtType;
 use debtmap::priority::scoring::rebalanced::{
     DebtScore, ScoreComponents, ScoreWeights, ScoringRationale, Severity,
 };
-use debtmap::priority::DebtType;
 use std::path::PathBuf;
 
 #[test]

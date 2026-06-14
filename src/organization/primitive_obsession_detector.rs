@@ -1,7 +1,7 @@
 use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, PrimitiveUsageContext,
 };
-use crate::common::{capitalize_first, SourceLocation};
+use crate::common::{SourceLocation, capitalize_first};
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -226,17 +226,17 @@ impl<'ast> Visit<'ast> for TypeUsageVisitor {
     }
 
     fn visit_fn_arg(&mut self, node: &'ast syn::FnArg) {
-        if let syn::FnArg::Typed(pat_type) = node {
-            if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
-                let type_name = self.extract_type_name(&pat_type.ty);
+        if let syn::FnArg::Typed(pat_type) = node
+            && let syn::Pat::Ident(pat_ident) = &*pat_type.pat
+        {
+            let type_name = self.extract_type_name(&pat_type.ty);
 
-                // Track primitive types
-                if is_primitive_type(&type_name) {
-                    self.type_usages.push(TypeUsage {
-                        type_name,
-                        context: pat_ident.ident.to_string(),
-                    });
-                }
+            // Track primitive types
+            if is_primitive_type(&type_name) {
+                self.type_usages.push(TypeUsage {
+                    type_name,
+                    context: pat_ident.ident.to_string(),
+                });
             }
         }
 
@@ -244,17 +244,17 @@ impl<'ast> Visit<'ast> for TypeUsageVisitor {
     }
 
     fn visit_local(&mut self, node: &'ast syn::Local) {
-        if let syn::Pat::Ident(pat_ident) = &node.pat {
-            if let Some(init) = &node.init {
-                // Try to infer type from initialization
-                let type_name = self.infer_type_from_expr(&init.expr);
+        if let syn::Pat::Ident(pat_ident) = &node.pat
+            && let Some(init) = &node.init
+        {
+            // Try to infer type from initialization
+            let type_name = self.infer_type_from_expr(&init.expr);
 
-                if is_primitive_type(&type_name) {
-                    self.type_usages.push(TypeUsage {
-                        type_name,
-                        context: pat_ident.ident.to_string(),
-                    });
-                }
+            if is_primitive_type(&type_name) {
+                self.type_usages.push(TypeUsage {
+                    type_name,
+                    context: pat_ident.ident.to_string(),
+                });
             }
         }
 

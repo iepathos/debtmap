@@ -90,17 +90,17 @@ impl FormattingConfig {
         }
 
         // Check CLICOLOR environment variable
-        if let Ok(val) = env::var("CLICOLOR") {
-            if val == "0" {
-                config.color = ColorMode::Never;
-            }
+        if let Ok(val) = env::var("CLICOLOR")
+            && val == "0"
+        {
+            config.color = ColorMode::Never;
         }
 
         // Check CLICOLOR_FORCE environment variable
-        if let Ok(val) = env::var("CLICOLOR_FORCE") {
-            if val == "1" {
-                config.color = ColorMode::Always;
-            }
+        if let Ok(val) = env::var("CLICOLOR_FORCE")
+            && val == "1"
+        {
+            config.color = ColorMode::Always;
         }
 
         config
@@ -241,10 +241,10 @@ impl OutputFormatter for PlainFormatter {
 
 fn detect_color_support() -> bool {
     // Check if we're in a dumb terminal
-    if let Ok(term) = env::var("TERM") {
-        if term == "dumb" {
-            return false;
-        }
+    if let Ok(term) = env::var("TERM")
+        && term == "dumb"
+    {
+        return false;
     }
 
     // Check if stdout is a TTY

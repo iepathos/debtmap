@@ -12,13 +12,13 @@
 use crate::analysis::ContextDetector;
 use crate::core::{DebtItem, FunctionMetrics, Language};
 use crate::data_flow::DataFlowGraph;
-use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::debt::suppression::{SuppressionContext, parse_suppression_comments};
+use crate::priority::UnifiedDebtItem;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
-use crate::priority::scoring::{debt_item, ContextRecommendationEngine};
-use crate::priority::UnifiedDebtItem;
-use crate::risk::lcov::LcovData;
+use crate::priority::scoring::{ContextRecommendationEngine, debt_item};
 use crate::risk::RiskAnalyzer;
+use crate::risk::lcov::LcovData;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -525,8 +525,8 @@ fn run() {}"#;
         debt_type: crate::priority::DebtType,
     ) -> crate::priority::UnifiedDebtItem {
         use crate::priority::{
-            semantic_classifier::FunctionRole, ActionableRecommendation, ImpactMetrics, Location,
-            UnifiedScore,
+            ActionableRecommendation, ImpactMetrics, Location, UnifiedScore,
+            semantic_classifier::FunctionRole,
         };
 
         crate::priority::UnifiedDebtItem {

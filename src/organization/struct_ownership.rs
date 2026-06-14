@@ -5,7 +5,7 @@
 /// is used to generate more accurate module split recommendations based on struct ownership
 /// rather than just method name patterns.
 use std::collections::HashMap;
-use syn::{self, visit::Visit, File, ImplItem, Item, ItemFn, ItemImpl, ItemStruct};
+use syn::{self, File, ImplItem, Item, ItemFn, ItemImpl, ItemStruct, visit::Visit};
 
 /// Tracks struct ownership relationships in a Rust file.
 ///

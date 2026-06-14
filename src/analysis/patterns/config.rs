@@ -297,10 +297,12 @@ mod tests {
         let config = PatternConfig::default();
         assert!(config.enabled);
         assert_eq!(config.confidence_threshold, 0.7);
-        assert!(config
-            .observer
-            .interface_markers
-            .contains(&"ABC".to_string()));
+        assert!(
+            config
+                .observer
+                .interface_markers
+                .contains(&"ABC".to_string())
+        );
     }
 
     #[test]

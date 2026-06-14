@@ -10,11 +10,11 @@
 //! - Hidden type extraction (Spec 184)
 
 use crate::organization::{
+    GodObjectAnalysis, ModuleSplit, SplitAnalysisMethod,
     anti_pattern_detector::{AntiPattern, AntiPatternDetector, AntiPatternSeverity},
     data_flow_analyzer::DataFlowAnalyzer,
     hidden_type_extractor::{HiddenType, HiddenTypeExtractor},
     type_based_clustering::{MethodSignature, TypeAffinityAnalyzer},
-    GodObjectAnalysis, ModuleSplit, SplitAnalysisMethod,
 };
 
 use std::collections::{HashMap, HashSet};
@@ -372,14 +372,14 @@ impl IntegratedArchitectureAnalyzer {
         splits: Vec<ModuleSplit>,
         anti_pattern_report: Option<&AntiPatternReport>,
     ) -> Vec<ModuleSplit> {
-        if let Some(report) = anti_pattern_report {
-            if report.quality_score < self.config.min_quality_score {
-                // Filter out splits with critical anti-patterns
-                return splits
-                    .into_iter()
-                    .filter(|split| !has_critical_anti_pattern(split, &report.anti_patterns))
-                    .collect();
-            }
+        if let Some(report) = anti_pattern_report
+            && report.quality_score < self.config.min_quality_score
+        {
+            // Filter out splits with critical anti-patterns
+            return splits
+                .into_iter()
+                .filter(|split| !has_critical_anti_pattern(split, &report.anti_patterns))
+                .collect();
         }
         splits
     }

@@ -85,14 +85,12 @@ fn calculate_facade_score(
 /// external submodule files.
 pub fn extract_path_attribute(module: &syn::ItemMod) -> Option<String> {
     for attr in &module.attrs {
-        if attr.path().is_ident("path") {
-            if let syn::Meta::NameValue(meta) = &attr.meta {
-                if let syn::Expr::Lit(expr_lit) = &meta.value {
-                    if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-                        return Some(lit_str.value());
-                    }
-                }
-            }
+        if attr.path().is_ident("path")
+            && let syn::Meta::NameValue(meta) = &attr.meta
+            && let syn::Expr::Lit(expr_lit) = &meta.value
+            && let syn::Lit::Str(lit_str) = &expr_lit.lit
+        {
+            return Some(lit_str.value());
         }
     }
     None

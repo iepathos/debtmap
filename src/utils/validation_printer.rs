@@ -25,10 +25,11 @@ pub fn print_validation_failure_with_details(
     println!("\n  Failed checks:");
     print_failed_validation_checks(details);
 
-    if verbosity > 1 && risk_insights.is_some() {
-        if let Some(insights) = risk_insights {
-            print_risk_metrics(insights);
-        }
+    if verbosity > 1
+        && risk_insights.is_some()
+        && let Some(insights) = risk_insights
+    {
+        print_risk_metrics(insights);
     }
 }
 
@@ -588,9 +589,11 @@ mod tests {
         // Verify that primary metrics are present
         assert!(checks.iter().any(|c| c.metric_name == "Average complexity"));
         assert!(checks.iter().any(|c| c.metric_name == "Debt density"));
-        assert!(checks
-            .iter()
-            .any(|c| c.metric_name == "Total debt score (safety net)"));
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.metric_name == "Total debt score (safety net)")
+        );
     }
 
     #[test]

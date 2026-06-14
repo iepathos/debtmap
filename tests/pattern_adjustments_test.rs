@@ -1,7 +1,7 @@
 use debtmap::complexity::calculate_cognitive_for_block;
 use debtmap::complexity::pattern_adjustments::{
-    calculate_cognitive_adjusted, PatternMatchRecognizer, PatternRecognizer, PatternType,
-    SimpleDelegationRecognizer,
+    PatternMatchRecognizer, PatternRecognizer, PatternType, SimpleDelegationRecognizer,
+    calculate_cognitive_adjusted,
 };
 
 #[test]
@@ -179,8 +179,8 @@ fn test_mixed_conditions_not_pattern() {
 
 #[test]
 fn test_logarithmic_scaling_for_many_conditions() {
-    use syn::parse_quote;
     use syn::Block;
+    use syn::parse_quote;
 
     // Test with 16 conditions
     let block: Block = parse_quote! {{
@@ -219,8 +219,8 @@ fn test_logarithmic_scaling_for_many_conditions() {
 
 #[test]
 fn test_analyze_if_chain_simple_pattern() {
-    use syn::parse_quote;
     use syn::ExprIf;
+    use syn::parse_quote;
 
     // Test simple if-else chain with same variable
     let if_expr: ExprIf = parse_quote! {
@@ -250,8 +250,8 @@ fn test_analyze_if_chain_simple_pattern() {
 
 #[test]
 fn test_analyze_if_chain_no_immediate_return() {
-    use syn::parse_quote;
     use syn::ExprIf;
+    use syn::parse_quote;
 
     // Test if-else chain without immediate returns
     let if_expr: ExprIf = parse_quote! {
@@ -276,8 +276,8 @@ fn test_analyze_if_chain_no_immediate_return() {
 
 #[test]
 fn test_analyze_if_chain_different_variables() {
-    use syn::parse_quote;
     use syn::ExprIf;
+    use syn::parse_quote;
 
     // Test if-else chain with different variables (not pattern matching)
     let if_expr: ExprIf = parse_quote! {
@@ -300,8 +300,8 @@ fn test_analyze_if_chain_different_variables() {
 
 #[test]
 fn test_analyze_if_chain_no_else() {
-    use syn::parse_quote;
     use syn::ExprIf;
+    use syn::parse_quote;
 
     // Test if-else chain without final else
     let if_expr: ExprIf = parse_quote! {
@@ -325,8 +325,8 @@ fn test_analyze_if_chain_no_else() {
 
 #[test]
 fn test_analyze_if_chain_method_calls() {
-    use syn::parse_quote;
     use syn::ExprIf;
+    use syn::parse_quote;
 
     // Test with method calls on same variable
     let if_expr: ExprIf = parse_quote! {
@@ -346,15 +346,17 @@ fn test_analyze_if_chain_method_calls() {
     assert!(result.is_some(), "Should recognize method call patterns");
     let (conditions, pattern_types, _) = result.unwrap();
     assert_eq!(conditions.len(), 3, "Should detect 3 conditions");
-    assert!(pattern_types
-        .iter()
-        .any(|pt| matches!(pt, PatternType::StringMatching)));
+    assert!(
+        pattern_types
+            .iter()
+            .any(|pt| matches!(pt, PatternType::StringMatching))
+    );
 }
 
 #[test]
 fn test_analyze_if_chain_field_access() {
-    use syn::parse_quote;
     use syn::ExprIf;
+    use syn::parse_quote;
 
     // Test with field access patterns
     let if_expr: ExprIf = parse_quote! {
@@ -380,8 +382,8 @@ fn test_analyze_if_chain_field_access() {
 
 #[test]
 fn test_analyze_if_chain_single_expression() {
-    use syn::parse_quote;
     use syn::ExprIf;
+    use syn::parse_quote;
 
     // Test with single expressions in branches (not returns)
     let if_expr: ExprIf = parse_quote! {
@@ -407,8 +409,8 @@ fn test_analyze_if_chain_single_expression() {
 
 #[test]
 fn test_extract_tested_variable_various_forms() {
-    use syn::parse_quote;
     use syn::Expr;
+    use syn::parse_quote;
 
     let recognizer = PatternMatchRecognizer::new();
 
@@ -462,8 +464,8 @@ fn test_extract_tested_variable_various_forms() {
 
 #[test]
 fn test_detect_pattern_type_classification() {
-    use syn::parse_quote;
     use syn::Expr;
+    use syn::parse_quote;
 
     let recognizer = PatternMatchRecognizer::new();
 
@@ -515,8 +517,8 @@ fn test_detect_pattern_type_classification() {
 
 #[test]
 fn test_has_immediate_return() {
-    use syn::parse_quote;
     use syn::Block;
+    use syn::parse_quote;
 
     let recognizer = PatternMatchRecognizer::new();
 
@@ -557,8 +559,8 @@ fn test_has_immediate_return() {
 
 #[test]
 fn test_extract_field_path() {
-    use syn::parse_quote;
     use syn::Expr;
+    use syn::parse_quote;
 
     let recognizer = PatternMatchRecognizer::new();
 

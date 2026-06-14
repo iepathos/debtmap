@@ -1,9 +1,9 @@
 //! Handler for assigning unclustered methods to existing clusters
 
+use super::Method;
 use super::hierarchical::Cluster;
 use super::quality_metrics::ClusterQuality;
 use super::similarity::{CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider};
-use super::Method;
 
 /// Handler for assigning methods that don't fit into any cluster
 pub struct UnclusteredMethodHandler<C, F> {
@@ -45,12 +45,12 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> UnclusteredMethodHandler<C, F
                     sim1.partial_cmp(sim2).unwrap_or(std::cmp::Ordering::Equal)
                 });
 
-            if let Some((idx, similarity)) = best_match {
-                if similarity > self.min_similarity_for_merge {
-                    // Add to most similar cluster
-                    clusters[idx].methods.push(method);
-                    continue;
-                }
+            if let Some((idx, similarity)) = best_match
+                && similarity > self.min_similarity_for_merge
+            {
+                // Add to most similar cluster
+                clusters[idx].methods.push(method);
+                continue;
             }
 
             // No similar cluster found
@@ -94,10 +94,10 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> UnclusteredMethodHandler<C, F
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::organization::clustering::Visibility;
     use crate::organization::clustering::similarity::{
         CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider,
     };
-    use crate::organization::clustering::Visibility;
     use std::collections::{HashMap, HashSet};
 
     struct MockCallGraph {

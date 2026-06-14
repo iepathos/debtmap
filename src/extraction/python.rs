@@ -179,10 +179,9 @@ impl<'a> PythonExtractor<'a> {
         }
 
         let mut cursor = node.walk();
-        let has_async_child = node
-            .children(&mut cursor)
-            .any(|child| child.kind() == "async");
-        has_async_child
+
+        node.children(&mut cursor)
+            .any(|child| child.kind() == "async")
     }
 
     fn extract_class_name(&self, node: Node) -> Result<String> {
@@ -258,13 +257,13 @@ impl<'a> PythonExtractor<'a> {
             "function_definition" | "async_function_definition" => Some(node),
             "decorated_definition" => {
                 let mut cursor = node.walk();
-                let function = node.children(&mut cursor).find(|child| {
+
+                node.children(&mut cursor).find(|child| {
                     matches!(
                         child.kind(),
                         "function_definition" | "async_function_definition"
                     )
-                });
-                function
+                })
             }
             _ => None,
         }

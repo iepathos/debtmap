@@ -190,14 +190,18 @@ mod tests {
         let filtered = filter_metrics(metrics, |f| f.cognitive > 9);
 
         assert_eq!(filtered.functions.len(), 2);
-        assert!(filtered
-            .functions
-            .iter()
-            .any(|f| f.name == "high_cognitive"));
-        assert!(filtered
-            .functions
-            .iter()
-            .any(|f| f.name == "medium_cognitive"));
+        assert!(
+            filtered
+                .functions
+                .iter()
+                .any(|f| f.name == "high_cognitive")
+        );
+        assert!(
+            filtered
+                .functions
+                .iter()
+                .any(|f| f.name == "medium_cognitive")
+        );
     }
 
     #[test]

@@ -285,10 +285,10 @@ fn extract_tokens_inner(node: &Node, source: &str, tokens: &mut Vec<JsEntropyTok
 /// Get JSX element tag name
 fn get_jsx_tag_name(node: &Node, source: &str) -> String {
     // For jsx_element, get the opening element's name
-    if let Some(opening) = node.child_by_field_name("open_tag") {
-        if let Some(name_node) = opening.child_by_field_name("name") {
-            return node_text(&name_node, source).to_string();
-        }
+    if let Some(opening) = node.child_by_field_name("open_tag")
+        && let Some(name_node) = opening.child_by_field_name("name")
+    {
+        return node_text(&name_node, source).to_string();
     }
     // For jsx_self_closing_element, get name directly
     if let Some(name_node) = node.child_by_field_name("name") {

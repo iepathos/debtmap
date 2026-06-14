@@ -30,8 +30,8 @@ pub fn output_markdown(
     // Get the main output with optional filter metrics
     let output = if display_config.tiered {
         if show_filter_stats {
-            use priority::tiers::TierConfig;
             use priority::UnifiedAnalysisQueries;
+            use priority::tiers::TierConfig;
             let tier_config = TierConfig::default();
             let result =
                 filtered_analysis.get_top_mixed_priorities_with_metrics(limit, &tier_config);
@@ -46,8 +46,8 @@ pub fn output_markdown(
             priority::format_priorities_tiered_markdown(&filtered_analysis, limit, verbosity)
         }
     } else if show_filter_stats {
-        use priority::tiers::TierConfig;
         use priority::UnifiedAnalysisQueries;
+        use priority::tiers::TierConfig;
         let tier_config = TierConfig::default();
         let result = filtered_analysis.get_top_mixed_priorities_with_metrics(limit, &tier_config);
         let base_output = priority::format_priorities_markdown(
@@ -121,8 +121,8 @@ mod tests {
     use super::*;
 
     use crate::priority::{
-        call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
-        Location, UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location,
+        UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore, call_graph::CallGraph,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;

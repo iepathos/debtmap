@@ -1,10 +1,10 @@
 //! Core rendering logic for TUI components.
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout},
     text::{Line, Span},
     widgets::Paragraph,
-    Frame,
 };
 
 use super::app::{App, StageStatus, SubTask};

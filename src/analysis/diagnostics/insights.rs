@@ -274,8 +274,8 @@ impl Default for InsightThresholds {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::attribution::source_tracker::ComplexitySourceType;
     use crate::analysis::attribution::LogicalConstruct;
+    use crate::analysis::attribution::source_tracker::ComplexitySourceType;
     use crate::analysis::attribution::{AttributedComplexity, CodeLocation, ComplexityComponent};
 
     #[test]

@@ -37,24 +37,24 @@ fn detect_patterns_recursive(node: &Node, ast: &TypeScriptAst, patterns: &mut Ve
 }
 
 fn detect_promise_all(node: &Node, ast: &TypeScriptAst) -> Option<AsyncPattern> {
-    if let Some(func) = node.child_by_field_name("function") {
-        if func.kind() == "member_expression" {
-            let object = func.child_by_field_name("object")?;
-            let property = func.child_by_field_name("property")?;
+    if let Some(func) = node.child_by_field_name("function")
+        && func.kind() == "member_expression"
+    {
+        let object = func.child_by_field_name("object")?;
+        let property = func.child_by_field_name("property")?;
 
-            let obj_text = node_text(&object, &ast.source);
-            let prop_text = node_text(&property, &ast.source);
+        let obj_text = node_text(&object, &ast.source);
+        let prop_text = node_text(&property, &ast.source);
 
-            if obj_text == "Promise" {
-                let method = prop_text.to_string();
-                if matches!(method.as_str(), "all" | "allSettled" | "race" | "any") {
-                    // Count promises in the array argument
-                    let count = count_array_elements(node);
-                    return Some(AsyncPattern::PromiseAll {
-                        promise_count: count,
-                        method,
-                    });
-                }
+        if obj_text == "Promise" {
+            let method = prop_text.to_string();
+            if matches!(method.as_str(), "all" | "allSettled" | "race" | "any") {
+                // Count promises in the array argument
+                let count = count_array_elements(node);
+                return Some(AsyncPattern::PromiseAll {
+                    promise_count: count,
+                    method,
+                });
             }
         }
     }
@@ -62,35 +62,33 @@ fn detect_promise_all(node: &Node, ast: &TypeScriptAst) -> Option<AsyncPattern> 
 }
 
 fn detect_promise_chain(node: &Node, ast: &TypeScriptAst) -> Option<AsyncPattern> {
-    if let Some(func) = node.child_by_field_name("function") {
-        if func.kind() == "member_expression" {
-            if let Some(property) = func.child_by_field_name("property") {
-                let prop_text = node_text(&property, &ast.source);
-                // Only detect at the end of the chain (then, catch, or finally)
-                // Check if this node is the outermost by ensuring parent is not a method call on this
-                if matches!(prop_text, "then" | "catch" | "finally") {
-                    // Check if parent is also a chained call - if so, skip this node
-                    if let Some(parent) = node.parent() {
-                        // If our node is the object of a member_expression, we're not at the end
-                        if parent.kind() == "member_expression" {
-                            if let Some(obj) = parent.child_by_field_name("object") {
-                                if obj.id() == node.id() {
-                                    return None; // Not at the end of chain
-                                }
-                            }
-                        }
-                    }
-
-                    // We're at the outermost call - analyze the full chain
-                    let (chain_length, has_catch, has_finally) = analyze_chain(node, ast);
-                    if chain_length > 0 {
-                        return Some(AsyncPattern::PromiseChain {
-                            chain_length,
-                            has_catch,
-                            has_finally,
-                        });
-                    }
+    if let Some(func) = node.child_by_field_name("function")
+        && func.kind() == "member_expression"
+        && let Some(property) = func.child_by_field_name("property")
+    {
+        let prop_text = node_text(&property, &ast.source);
+        // Only detect at the end of the chain (then, catch, or finally)
+        // Check if this node is the outermost by ensuring parent is not a method call on this
+        if matches!(prop_text, "then" | "catch" | "finally") {
+            // Check if parent is also a chained call - if so, skip this node
+            if let Some(parent) = node.parent() {
+                // If our node is the object of a member_expression, we're not at the end
+                if parent.kind() == "member_expression"
+                    && let Some(obj) = parent.child_by_field_name("object")
+                    && obj.id() == node.id()
+                {
+                    return None; // Not at the end of chain
                 }
+            }
+
+            // We're at the outermost call - analyze the full chain
+            let (chain_length, has_catch, has_finally) = analyze_chain(node, ast);
+            if chain_length > 0 {
+                return Some(AsyncPattern::PromiseChain {
+                    chain_length,
+                    has_catch,
+                    has_finally,
+                });
             }
         }
     }
@@ -134,9 +132,11 @@ mod tests {
 
         let patterns = detect_promise_patterns(&ast.tree.root_node(), &ast);
 
-        assert!(patterns
-            .iter()
-            .any(|p| matches!(p, AsyncPattern::PromiseAll { method, .. } if method == "all")));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| matches!(p, AsyncPattern::PromiseAll { method, .. } if method == "all"))
+        );
     }
 
     #[test]

@@ -4,7 +4,7 @@
 //! into combined effects.
 
 use crate::core::AnalysisResults;
-use crate::effects::{effect_from_fn, effect_pure, AnalysisEffect};
+use crate::effects::{AnalysisEffect, effect_from_fn, effect_pure};
 use crate::env::RealEnv;
 use stillwater::effect::prelude::*;
 

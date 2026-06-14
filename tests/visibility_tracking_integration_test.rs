@@ -1,10 +1,10 @@
+use debtmap::extraction::UnifiedFileExtractor;
 /// Integration test for Spec 140: Visibility Tracking System Integration
 ///
 /// This test verifies that visibility breakdown from GodObjectAnalysis
 /// correctly flows into ModuleStructure.function_counts, ensuring that
 /// terminal output shows accurate visibility counts without contradictions.
 use debtmap::extraction::adapters::god_object::analyze_god_objects;
-use debtmap::extraction::UnifiedFileExtractor;
 use std::path::Path;
 
 #[test]
@@ -66,7 +66,9 @@ fn test_visibility_breakdown_integrates_with_module_structure() {
     // Get the first analysis result, or skip if no god object detected
     // (per-struct analysis may not detect simple structs with low complexity methods)
     if analyses.is_empty() {
-        eprintln!("Note: Test struct not detected as god object with per-struct analysis. This is acceptable for simple test cases.");
+        eprintln!(
+            "Note: Test struct not detected as god object with per-struct analysis. This is acceptable for simple test cases."
+        );
         return;
     }
     let analysis = &analyses[0];
@@ -108,8 +110,7 @@ fn test_visibility_breakdown_integrates_with_module_structure() {
         {
             // KEY TEST: Verify function_counts are sourced from visibility_breakdown
             assert_eq!(
-                module_structure.function_counts.public_functions,
-                breakdown.public,
+                module_structure.function_counts.public_functions, breakdown.public,
                 "module_structure.function_counts.public_functions should match visibility_breakdown.public"
             );
 

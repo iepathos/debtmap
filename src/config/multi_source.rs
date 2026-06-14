@@ -56,7 +56,7 @@ use super::validation::validate_config;
 ///
 /// Following Stillwater philosophy: composition over complexity, DRY principle.
 macro_rules! merge_optional_field {
-    ($target:expr, $source:expr, $field:ident, $field_name:literal, $source_id:expr, $field_sources:expr) => {
+    ($target:expr_2021, $source:expr_2021, $field:ident, $field_name:literal, $source_id:expr_2021, $field_sources:expr_2021) => {
         if $source.$field.is_some() {
             $target.$field = $source.$field.clone();
             $field_sources.insert($field_name.to_string(), $source_id.clone());
@@ -64,7 +64,7 @@ macro_rules! merge_optional_field {
     };
 }
 use crate::effects::{
-    validation_failure, validation_failures, validation_success, AnalysisValidation,
+    AnalysisValidation, validation_failure, validation_failures, validation_success,
 };
 use crate::errors::AnalysisError;
 
@@ -506,57 +506,57 @@ fn apply_env_overrides(
     let mut any_env_override = false;
 
     // DEBTMAP_COMPLEXITY_THRESHOLD
-    if let Ok(value) = env::var("DEBTMAP_COMPLEXITY_THRESHOLD") {
-        if let Ok(threshold) = value.parse::<u32>() {
-            let thresholds = config
-                .thresholds
-                .get_or_insert_with(ThresholdsConfig::default);
-            thresholds.complexity = Some(threshold);
-            field_sources.insert(
-                "thresholds.complexity".to_string(),
-                ConfigSource::Environment("DEBTMAP_COMPLEXITY_THRESHOLD".to_string()),
-            );
-            any_env_override = true;
-        }
+    if let Ok(value) = env::var("DEBTMAP_COMPLEXITY_THRESHOLD")
+        && let Ok(threshold) = value.parse::<u32>()
+    {
+        let thresholds = config
+            .thresholds
+            .get_or_insert_with(ThresholdsConfig::default);
+        thresholds.complexity = Some(threshold);
+        field_sources.insert(
+            "thresholds.complexity".to_string(),
+            ConfigSource::Environment("DEBTMAP_COMPLEXITY_THRESHOLD".to_string()),
+        );
+        any_env_override = true;
     }
 
     // DEBTMAP_COVERAGE_WEIGHT
-    if let Ok(value) = env::var("DEBTMAP_COVERAGE_WEIGHT") {
-        if let Ok(weight) = value.parse::<f64>() {
-            let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
-            scoring.coverage = weight;
-            field_sources.insert(
-                "scoring.coverage".to_string(),
-                ConfigSource::Environment("DEBTMAP_COVERAGE_WEIGHT".to_string()),
-            );
-            any_env_override = true;
-        }
+    if let Ok(value) = env::var("DEBTMAP_COVERAGE_WEIGHT")
+        && let Ok(weight) = value.parse::<f64>()
+    {
+        let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
+        scoring.coverage = weight;
+        field_sources.insert(
+            "scoring.coverage".to_string(),
+            ConfigSource::Environment("DEBTMAP_COVERAGE_WEIGHT".to_string()),
+        );
+        any_env_override = true;
     }
 
     // DEBTMAP_COMPLEXITY_WEIGHT
-    if let Ok(value) = env::var("DEBTMAP_COMPLEXITY_WEIGHT") {
-        if let Ok(weight) = value.parse::<f64>() {
-            let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
-            scoring.complexity = weight;
-            field_sources.insert(
-                "scoring.complexity".to_string(),
-                ConfigSource::Environment("DEBTMAP_COMPLEXITY_WEIGHT".to_string()),
-            );
-            any_env_override = true;
-        }
+    if let Ok(value) = env::var("DEBTMAP_COMPLEXITY_WEIGHT")
+        && let Ok(weight) = value.parse::<f64>()
+    {
+        let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
+        scoring.complexity = weight;
+        field_sources.insert(
+            "scoring.complexity".to_string(),
+            ConfigSource::Environment("DEBTMAP_COMPLEXITY_WEIGHT".to_string()),
+        );
+        any_env_override = true;
     }
 
     // DEBTMAP_DEPENDENCY_WEIGHT
-    if let Ok(value) = env::var("DEBTMAP_DEPENDENCY_WEIGHT") {
-        if let Ok(weight) = value.parse::<f64>() {
-            let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
-            scoring.dependency = weight;
-            field_sources.insert(
-                "scoring.dependency".to_string(),
-                ConfigSource::Environment("DEBTMAP_DEPENDENCY_WEIGHT".to_string()),
-            );
-            any_env_override = true;
-        }
+    if let Ok(value) = env::var("DEBTMAP_DEPENDENCY_WEIGHT")
+        && let Ok(weight) = value.parse::<f64>()
+    {
+        let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
+        scoring.dependency = weight;
+        field_sources.insert(
+            "scoring.dependency".to_string(),
+            ConfigSource::Environment("DEBTMAP_DEPENDENCY_WEIGHT".to_string()),
+        );
+        any_env_override = true;
     }
 
     if any_env_override {
@@ -769,7 +769,8 @@ complexity = 30
         let orig_threshold = env::var("DEBTMAP_COMPLEXITY_THRESHOLD").ok();
 
         // Set env var
-        env::set_var("DEBTMAP_COMPLEXITY_THRESHOLD", "42");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var("DEBTMAP_COMPLEXITY_THRESHOLD", "42") };
 
         let mut config = DebtmapConfig::default();
         let mut field_sources = HashMap::new();
@@ -782,8 +783,10 @@ complexity = 30
 
         // Restore original env var
         match orig_threshold {
-            Some(v) => env::set_var("DEBTMAP_COMPLEXITY_THRESHOLD", v),
-            None => env::remove_var("DEBTMAP_COMPLEXITY_THRESHOLD"),
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            Some(v) => unsafe { env::set_var("DEBTMAP_COMPLEXITY_THRESHOLD", v) },
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            None => unsafe { env::remove_var("DEBTMAP_COMPLEXITY_THRESHOLD") },
         }
     }
 }

@@ -180,12 +180,12 @@ impl ContextRuleEngine {
 
     /// Load rules from configuration
     fn load_config_rules(&mut self) {
-        if let Ok(config) = crate::config::get_config_safe() {
-            if let Some(context_config) = config.context {
-                for rule_config in context_config.rules {
-                    if let Some(rule) = Self::parse_config_rule(rule_config) {
-                        self.add_rule(rule);
-                    }
+        if let Ok(config) = crate::config::get_config_safe()
+            && let Some(context_config) = config.context
+        {
+            for rule_config in context_config.rules {
+                if let Some(rule) = Self::parse_config_rule(rule_config) {
+                    self.add_rule(rule);
                 }
             }
         }

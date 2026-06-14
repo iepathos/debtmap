@@ -169,10 +169,10 @@ fn count_members(body: &Node, ast: &TypeScriptAst) -> (usize, usize, bool) {
             "method_definition" => {
                 methods += 1;
                 // Check if it's a constructor
-                if let Some(name) = child.child_by_field_name("name") {
-                    if node_text(&name, &ast.source) == "constructor" {
-                        has_constructor = true;
-                    }
+                if let Some(name) = child.child_by_field_name("name")
+                    && node_text(&name, &ast.source) == "constructor"
+                {
+                    has_constructor = true;
                 }
             }
             "public_field_definition" | "field_definition" | "property_definition" => {

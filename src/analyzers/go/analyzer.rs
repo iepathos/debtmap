@@ -1,8 +1,8 @@
 //! Go analyzer implementation.
 
+use crate::analyzers::Analyzer;
 use crate::analyzers::go::orchestration::analyze_go_file;
 use crate::analyzers::go::parser::parse_source;
-use crate::analyzers::Analyzer;
 use crate::core::ast::Ast;
 use crate::core::{ComplexityMetrics, FileMetrics, Language};
 use anyhow::Result;
@@ -254,10 +254,11 @@ func run(ch chan int) {
 
         assert_eq!(add.is_pure, Some(true));
         assert_eq!(run.is_pure, Some(false));
-        assert!(run
-            .detected_patterns
-            .as_ref()
-            .unwrap()
-            .contains(&"go-statement".to_string()));
+        assert!(
+            run.detected_patterns
+                .as_ref()
+                .unwrap()
+                .contains(&"go-statement".to_string())
+        );
     }
 }

@@ -5,8 +5,8 @@
 use crate::analyzers::Analyzer;
 use crate::complexity::threshold_manager::{ComplexityThresholds, ThresholdPreset};
 use crate::core::{
-    ast::{Ast, RustAst},
     ComplexityMetrics, FileMetrics, Language,
+    ast::{Ast, RustAst},
 };
 use anyhow::Result;
 use std::path::PathBuf;

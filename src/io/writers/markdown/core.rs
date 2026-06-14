@@ -6,8 +6,8 @@
 use crate::core::{AnalysisResults, DebtItem, FunctionMetrics, Priority};
 use crate::debt::total_debt_score;
 use crate::io::output::{
-    build_summary_rows, complexity_header_lines, get_recommendation, get_top_complex_functions,
-    OutputWriter,
+    OutputWriter, build_summary_rows, complexity_header_lines, get_recommendation,
+    get_top_complex_functions,
 };
 use crate::io::writers::pattern_display::{format_pattern_confidence, format_pattern_type};
 use crate::risk::{RiskDistribution, RiskInsight};

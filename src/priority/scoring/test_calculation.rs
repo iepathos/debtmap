@@ -182,14 +182,12 @@ fn extract_test_count(text: &str) -> Option<u32> {
     ];
 
     for pattern_str in patterns {
-        if let Ok(re) = Regex::new(pattern_str) {
-            if let Some(captures) = re.captures(text) {
-                if let Some(count_str) = captures.get(1) {
-                    if let Ok(count) = count_str.as_str().parse::<u32>() {
-                        return Some(count);
-                    }
-                }
-            }
+        if let Ok(re) = Regex::new(pattern_str)
+            && let Some(captures) = re.captures(text)
+            && let Some(count_str) = captures.get(1)
+            && let Ok(count) = count_str.as_str().parse::<u32>()
+        {
+            return Some(count);
         }
     }
 

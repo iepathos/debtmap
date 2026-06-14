@@ -154,10 +154,9 @@ fn test_individual_signal_strengths() {
     for test_case in &corpus.test_cases {
         if let Some(io_signal) =
             aggregator.collect_io_signal(&test_case.code, test_case.parse_language())
+            && io_signal.category == test_case.parse_expected_category()
         {
-            if io_signal.category == test_case.parse_expected_category() {
-                io_correct += 1;
-            }
+            io_correct += 1;
         }
     }
     println!(
@@ -170,10 +169,9 @@ fn test_individual_signal_strengths() {
     for test_case in &corpus.test_cases {
         if let Some(purity_signal) =
             aggregator.collect_purity_signal(&test_case.code, test_case.parse_language())
+            && purity_signal.category == test_case.parse_expected_category()
         {
-            if purity_signal.category == test_case.parse_expected_category() {
-                purity_correct += 1;
-            }
+            purity_correct += 1;
         }
     }
     println!(

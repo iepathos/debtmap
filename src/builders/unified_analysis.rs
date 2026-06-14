@@ -6,7 +6,7 @@
 //! Following Stillwater philosophy: Pure core (phases/), imperative shell (this file).
 
 use super::{call_graph, parallel_call_graph, parallel_unified_analysis};
-use crate::observability::{set_phase_persistent, set_progress, AnalysisPhase};
+use crate::observability::{AnalysisPhase, set_phase_persistent, set_progress};
 use crate::time_span;
 use tracing::{debug, info, info_span, warn};
 
@@ -25,9 +25,9 @@ use crate::core::{AnalysisResults, Language};
 use crate::debt::suppression::parse_suppression_comments;
 use crate::organization::GodObjectAnalysis;
 use crate::priority::{
+    DebtType, UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     call_graph::{CallGraph, FunctionId},
     debt_aggregator::DebtAggregator,
-    DebtType, UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
 };
 use crate::risk;
 use anyhow::Result;
@@ -390,11 +390,7 @@ fn load_context_stage(options: ContextStageOptions<'_>) -> Option<risk::RiskAnal
 }
 
 fn context_stage_metric(enable_context: bool) -> &'static str {
-    if enable_context {
-        "loaded"
-    } else {
-        "skipped"
-    }
+    if enable_context { "loaded" } else { "skipped" }
 }
 
 struct DebtScoringOptions<'a> {
@@ -917,7 +913,7 @@ fn build_god_object_item(
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     call_graph: &CallGraph,
 ) -> (UnifiedDebtItem, crate::organization::GodObjectAnalysis) {
-    use crate::priority::context::{generate_context_suggestion, ContextConfig};
+    use crate::priority::context::{ContextConfig, generate_context_suggestion};
     use crate::priority::god_object_aggregation::aggregate_god_object_metrics_with_coverage;
 
     // Scope aggregation to the detected god object's methods (GodClass) or
@@ -1086,15 +1082,10 @@ fn finalize_tui_progress(last_subtask: usize) {
     use crate::tui::app::StageStatus;
     const CALL_GRAPH_STAGE: usize = 1;
 
-    if let Some(manager) = crate::progress::ProgressManager::global() {
-        if last_subtask != usize::MAX {
-            manager.tui_update_subtask(
-                CALL_GRAPH_STAGE,
-                last_subtask,
-                StageStatus::Completed,
-                None,
-            );
-        }
+    if let Some(manager) = crate::progress::ProgressManager::global()
+        && last_subtask != usize::MAX
+    {
+        manager.tui_update_subtask(CALL_GRAPH_STAGE, last_subtask, StageStatus::Completed, None);
     }
 }
 

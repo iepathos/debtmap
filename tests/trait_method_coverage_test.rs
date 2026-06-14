@@ -86,10 +86,10 @@ fn test_coverage_matching_integration() {
             }
 
             // Must have coverage data (not null)
-            if let Some(metrics) = item.get("metrics") {
-                if let Some(coverage) = metrics.get("coverage") {
-                    return !coverage.is_null();
-                }
+            if let Some(metrics) = item.get("metrics")
+                && let Some(coverage) = metrics.get("coverage")
+            {
+                return !coverage.is_null();
             }
             false
         } else {

@@ -1,7 +1,7 @@
 //! Filter functionality for results.
 
-use crate::priority::classification::Severity;
 use crate::priority::UnifiedDebtItem;
+use crate::priority::classification::Severity;
 
 /// Filter for debt items
 #[derive(Debug, Clone)]

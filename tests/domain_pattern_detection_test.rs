@@ -1,7 +1,7 @@
 //! Integration tests for domain pattern detection (Spec 175)
 
 use debtmap::organization::domain_patterns::{FileContext, MethodInfo};
-use debtmap::organization::{cluster_methods_by_domain, DomainPattern, DomainPatternDetector};
+use debtmap::organization::{DomainPattern, DomainPatternDetector, cluster_methods_by_domain};
 use std::collections::HashSet;
 
 #[test]

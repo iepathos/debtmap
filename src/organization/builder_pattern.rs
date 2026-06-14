@@ -4,7 +4,7 @@
 /// present for configuration purposes. Prevents false positives where god object
 /// detection flags builders for having many methods.
 use std::collections::HashMap;
-use syn::{spanned::Spanned, visit::Visit, File, ImplItem, Item, ItemImpl, ReturnType, Type};
+use syn::{File, ImplItem, Item, ItemImpl, ReturnType, Type, spanned::Spanned, visit::Visit};
 
 /// Information about a method signature
 #[derive(Debug, Clone)]
@@ -284,12 +284,11 @@ impl<'a, 'ast> Visit<'ast> for MethodVisitor<'a> {
     fn visit_item(&mut self, item: &'ast Item) {
         if let Item::Impl(item_impl) = item {
             for impl_item in &item_impl.items {
-                if let ImplItem::Fn(method) = impl_item {
-                    if let Some(method_info) =
+                if let ImplItem::Fn(method) = impl_item
+                    && let Some(method_info) =
                         extract_method_info(method, item_impl, self.file_content)
-                    {
-                        self.methods.push(method_info);
-                    }
+                {
+                    self.methods.push(method_info);
                 }
             }
         }
@@ -345,12 +344,11 @@ fn classify_return_type(output: &ReturnType, impl_block: &ItemImpl) -> MethodRet
 fn classify_type(ty: &Type, _impl_block: &ItemImpl) -> MethodReturnType {
     match ty {
         Type::Reference(type_ref) => {
-            if type_ref.mutability.is_some() {
-                if let Type::Path(type_path) = &*type_ref.elem {
-                    if type_path.path.is_ident("Self") {
-                        return MethodReturnType::MutableSelfRef;
-                    }
-                }
+            if type_ref.mutability.is_some()
+                && let Type::Path(type_path) = &*type_ref.elem
+                && type_path.path.is_ident("Self")
+            {
+                return MethodReturnType::MutableSelfRef;
             }
             MethodReturnType::Other(quote::quote!(#ty).to_string())
         }

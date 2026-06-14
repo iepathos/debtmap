@@ -164,12 +164,12 @@ impl ReachingDefinitions {
                 }
 
                 // Compute gen and kill sets for this block
-                let (gen, kill) = Self::compute_gen_kill(block);
+                let (r#gen, kill) = Self::compute_gen_kill(block);
 
                 // Compute reach_out = (reach_in - kill) ∪ gen
                 let mut new_reach_out = new_reach_in.clone();
                 new_reach_out.retain(|v| !kill.contains(&v.name_id));
-                new_reach_out.extend(gen);
+                new_reach_out.extend(r#gen);
 
                 // Check for changes
                 if new_reach_in != *reach_in.get(&block.id).unwrap()
@@ -450,7 +450,7 @@ impl ReachingDefinitions {
     /// - gen: new definitions created in this block
     /// - kill: variable name_ids whose definitions are overwritten
     fn compute_gen_kill(block: &BasicBlock) -> (HashSet<VarId>, HashSet<u32>) {
-        let mut gen = HashSet::new();
+        let mut r#gen = HashSet::new();
         let mut kill = HashSet::new();
 
         for stmt in &block.statements {
@@ -458,11 +458,11 @@ impl ReachingDefinitions {
                 // This assignment kills all previous definitions of this variable
                 kill.insert(target.name_id);
                 // And generates a new definition
-                gen.insert(*target);
+                r#gen.insert(*target);
             }
         }
 
-        (gen, kill)
+        (r#gen, kill)
     }
 
     /// Get predecessors of a block in the CFG.

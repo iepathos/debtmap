@@ -148,11 +148,11 @@ fn get_try_pattern(node: &Node, source: &str) -> String {
     let has_catch = node.child_by_field_name("handler").is_some();
     let has_finally = node.child_by_field_name("finalizer").is_some();
 
-    if let Some(handler) = node.child_by_field_name("handler") {
-        if let Some(body) = handler.child_by_field_name("body") {
-            let structure = categorize_statement_structure(&body, source);
-            return format!("try:catch:{}", structure);
-        }
+    if let Some(handler) = node.child_by_field_name("handler")
+        && let Some(body) = handler.child_by_field_name("body")
+    {
+        let structure = categorize_statement_structure(&body, source);
+        return format!("try:catch:{}", structure);
     }
 
     match (has_catch, has_finally) {
@@ -176,25 +176,23 @@ fn get_method_chain_pattern(node: &Node, source: &str) -> Option<String> {
 }
 
 fn collect_method_chain(node: &Node, source: &str, chain: &mut Vec<String>) {
-    if node.kind() == "call_expression" {
-        if let Some(func) = node.child_by_field_name("function") {
-            if func.kind() == "member_expression" {
-                if let Some(prop) = func.child_by_field_name("property") {
-                    let method_name = node_text(&prop, source);
-                    match method_name {
-                        "map" | "filter" | "reduce" | "forEach" | "find" | "some" | "every"
-                        | "flatMap" | "then" | "catch" | "finally" => {
-                            chain.push(method_name.to_string());
-                        }
-                        _ => {}
-                    }
-
-                    // Check if the object is also a call expression (chained)
-                    if let Some(obj) = func.child_by_field_name("object") {
-                        collect_method_chain(&obj, source, chain);
-                    }
-                }
+    if node.kind() == "call_expression"
+        && let Some(func) = node.child_by_field_name("function")
+        && func.kind() == "member_expression"
+        && let Some(prop) = func.child_by_field_name("property")
+    {
+        let method_name = node_text(&prop, source);
+        match method_name {
+            "map" | "filter" | "reduce" | "forEach" | "find" | "some" | "every" | "flatMap"
+            | "then" | "catch" | "finally" => {
+                chain.push(method_name.to_string());
             }
+            _ => {}
+        }
+
+        // Check if the object is also a call expression (chained)
+        if let Some(obj) = func.child_by_field_name("object") {
+            collect_method_chain(&obj, source, chain);
         }
     }
 }

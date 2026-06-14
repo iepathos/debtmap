@@ -1,6 +1,6 @@
 use super::{
-    is_test_function, ComplexitySource, TestQualityImpact, TestSimplification, TestingAntiPattern,
-    TestingDetector,
+    ComplexitySource, TestQualityImpact, TestSimplification, TestingAntiPattern, TestingDetector,
+    is_test_function,
 };
 use std::path::Path;
 use syn::visit::Visit;

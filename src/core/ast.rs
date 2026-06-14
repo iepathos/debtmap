@@ -322,11 +322,7 @@ pub fn filter_ast<F>(ast: Ast, predicate: F) -> Option<Ast>
 where
     F: Fn(&Ast) -> bool,
 {
-    if predicate(&ast) {
-        Some(ast)
-    } else {
-        None
-    }
+    if predicate(&ast) { Some(ast) } else { None }
 }
 
 #[cfg(test)]

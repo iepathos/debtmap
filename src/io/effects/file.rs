@@ -27,8 +27,8 @@
 //! println!("Loaded {} files, {} errors", result.valid.len(), result.errors.len());
 //! ```
 
-use crate::effects::validation::{FileError, ValidatedFileSet};
 use crate::effects::AnalysisEffect;
+use crate::effects::validation::{FileError, ValidatedFileSet};
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use std::path::PathBuf;
@@ -506,12 +506,16 @@ mod tests {
 
         // Check that errors have the correct paths
         let error_paths: Vec<_> = result.errors.iter().map(|e| e.path.clone()).collect();
-        assert!(error_paths
-            .iter()
-            .any(|p| p.file_name().unwrap() == "missing.txt"));
-        assert!(error_paths
-            .iter()
-            .any(|p| p.file_name().unwrap() == "also_missing.txt"));
+        assert!(
+            error_paths
+                .iter()
+                .any(|p| p.file_name().unwrap() == "missing.txt")
+        );
+        assert!(
+            error_paths
+                .iter()
+                .any(|p| p.file_name().unwrap() == "also_missing.txt")
+        );
     }
 
     #[test]

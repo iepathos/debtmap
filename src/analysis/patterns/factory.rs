@@ -239,12 +239,16 @@ mod tests {
         let patterns = recognizer.detect(&file_metrics);
 
         assert_eq!(patterns.len(), 2);
-        assert!(patterns
-            .iter()
-            .any(|p| p.implementations[0].function_name == "create_handler"));
-        assert!(patterns
-            .iter()
-            .any(|p| p.implementations[0].function_name == "make_widget"));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.implementations[0].function_name == "create_handler")
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.implementations[0].function_name == "make_widget")
+        );
     }
 
     #[test]

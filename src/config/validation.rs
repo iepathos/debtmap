@@ -45,15 +45,15 @@ use std::path::{Path, PathBuf};
 
 use crate::effects::validation::{FieldPath, ValidationError};
 use crate::effects::{
-    combine_validations, run_validation, validation_failure, validation_failures,
-    validation_success, AnalysisValidation,
+    AnalysisValidation, combine_validations, run_validation, validation_failure,
+    validation_failures, validation_success,
 };
 use crate::errors::AnalysisError;
 use stillwater::{NonEmptyVec, Validation};
 
+use super::DebtmapConfig;
 use super::scoring::ScoringWeights;
 use super::thresholds::{ThresholdsConfig, ValidationThresholds};
-use super::DebtmapConfig;
 
 /// Validation result with field context for structured error reporting.
 pub type FieldValidation<T> = Validation<T, NonEmptyVec<ValidationError>>;
@@ -167,21 +167,21 @@ fn validate_thresholds_config(thresholds: Option<&ThresholdsConfig>) -> Analysis
     let mut errors = Vec::new();
 
     // Validate complexity threshold
-    if let Some(complexity) = thresholds.complexity {
-        if complexity == 0 {
-            errors.push(AnalysisError::config(
-                "Complexity threshold cannot be zero".to_string(),
-            ));
-        }
+    if let Some(complexity) = thresholds.complexity
+        && complexity == 0
+    {
+        errors.push(AnalysisError::config(
+            "Complexity threshold cannot be zero".to_string(),
+        ));
     }
 
     // Validate max_file_length
-    if let Some(max_len) = thresholds.max_file_length {
-        if max_len == 0 {
-            errors.push(AnalysisError::config(
-                "Max file length cannot be zero".to_string(),
-            ));
-        }
+    if let Some(max_len) = thresholds.max_file_length
+        && max_len == 0
+    {
+        errors.push(AnalysisError::config(
+            "Max file length cannot be zero".to_string(),
+        ));
     }
 
     // Validate validation thresholds if present
@@ -448,23 +448,23 @@ fn validate_thresholds_with_context(
     let mut errors = Vec::new();
 
     // Validate complexity threshold
-    if let Some(complexity) = thresholds.complexity {
-        if complexity == 0 {
-            errors.push(
-                ValidationError::at_field(&path.push("complexity"), "cannot be zero")
-                    .with_expected("positive integer"),
-            );
-        }
+    if let Some(complexity) = thresholds.complexity
+        && complexity == 0
+    {
+        errors.push(
+            ValidationError::at_field(&path.push("complexity"), "cannot be zero")
+                .with_expected("positive integer"),
+        );
     }
 
     // Validate max_file_length
-    if let Some(max_len) = thresholds.max_file_length {
-        if max_len == 0 {
-            errors.push(
-                ValidationError::at_field(&path.push("max_file_length"), "cannot be zero")
-                    .with_expected("positive integer"),
-            );
-        }
+    if let Some(max_len) = thresholds.max_file_length
+        && max_len == 0
+    {
+        errors.push(
+            ValidationError::at_field(&path.push("max_file_length"), "cannot be zero")
+                .with_expected("positive integer"),
+        );
     }
 
     // Validate validation thresholds if present
@@ -939,15 +939,21 @@ mod tests {
         assert_eq!(errors.len(), 3, "Expected 3 errors");
 
         // Verify nested field paths
-        assert!(errors
-            .iter()
-            .any(|e| e.field.as_string() == "validation.max_average_complexity"));
-        assert!(errors
-            .iter()
-            .any(|e| e.field.as_string() == "validation.max_debt_density"));
-        assert!(errors
-            .iter()
-            .any(|e| e.field.as_string() == "validation.min_coverage_percentage"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.as_string() == "validation.max_average_complexity")
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.as_string() == "validation.max_debt_density")
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.as_string() == "validation.min_coverage_percentage")
+        );
     }
 
     #[test]
@@ -964,12 +970,16 @@ mod tests {
         assert_eq!(errors.len(), 2, "Expected 2 errors");
 
         // Check array index notation
-        assert!(errors
-            .iter()
-            .any(|e| e.field.as_string() == "ignore.patterns.[0]"));
-        assert!(errors
-            .iter()
-            .any(|e| e.field.as_string() == "ignore.patterns.[2]"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.as_string() == "ignore.patterns.[0]")
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.as_string() == "ignore.patterns.[2]")
+        );
     }
 
     #[test]
@@ -986,12 +996,16 @@ mod tests {
         assert_eq!(errors.len(), 2, "Expected 2 errors");
 
         // Verify paths include array indices
-        assert!(errors
-            .iter()
-            .any(|e| e.field.as_string() == "config.patterns.[0]"));
-        assert!(errors
-            .iter()
-            .any(|e| e.field.as_string() == "config.patterns.[2]"));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.as_string() == "config.patterns.[0]")
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.as_string() == "config.patterns.[2]")
+        );
     }
 
     #[test]

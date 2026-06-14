@@ -87,7 +87,8 @@ fn set_threshold_preset(preset: Option<cli::ThresholdPreset>) {
             cli::ThresholdPreset::Balanced => "balanced",
             cli::ThresholdPreset::Lenient => "lenient",
         };
-        std::env::set_var("DEBTMAP_THRESHOLD_PRESET", value);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_THRESHOLD_PRESET", value) };
     }
 }
 
@@ -103,14 +104,16 @@ fn setup_env_vars(config: &AnalyzeConfig) {
 /// Set max files environment variable if specified.
 fn setup_max_files(max_files: Option<usize>) {
     if let Some(max_files) = max_files {
-        std::env::set_var("DEBTMAP_MAX_FILES", max_files.to_string());
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_MAX_FILES", max_files.to_string()) };
     }
 }
 
 /// Set minimum score threshold environment variable if specified.
 fn setup_min_score(min_score: Option<f64>) {
     if let Some(min_score) = min_score {
-        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", min_score.to_string());
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", min_score.to_string()) };
     }
 }
 
@@ -128,13 +131,15 @@ fn setup_min_priority(min_priority: Option<&str>) {
         _ => return,
     };
 
-    std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", threshold.to_string());
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", threshold.to_string()) };
 }
 
 /// Set jobs environment variable for parallel processing.
 fn setup_jobs(jobs: usize) {
     if jobs > 0 {
-        std::env::set_var("DEBTMAP_JOBS", jobs.to_string());
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_JOBS", jobs.to_string()) };
     }
 }
 
@@ -144,7 +149,8 @@ fn setup_functional_analysis(config: &AnalyzeConfig) {
         return;
     }
 
-    std::env::set_var("DEBTMAP_FUNCTIONAL_ANALYSIS", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_FUNCTIONAL_ANALYSIS", "true") };
 
     if let Some(profile) = config.functional_analysis_profile {
         let profile_str = match profile {
@@ -152,7 +158,8 @@ fn setup_functional_analysis(config: &AnalyzeConfig) {
             cli::FunctionalAnalysisProfile::Balanced => "balanced",
             cli::FunctionalAnalysisProfile::Lenient => "lenient",
         };
-        std::env::set_var("DEBTMAP_FUNCTIONAL_ANALYSIS_PROFILE", profile_str);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_FUNCTIONAL_ANALYSIS_PROFILE", profile_str) };
     }
 }
 

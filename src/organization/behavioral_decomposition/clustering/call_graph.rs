@@ -158,10 +158,10 @@ impl<'ast, 'a> Visit<'ast> for MethodCallVisitor<'a> {
     }
 
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
-        if let Some(called_name) = extract_called_function_name(node, self.all_function_names) {
-            if called_name != self.current_method {
-                self.calls.push(called_name);
-            }
+        if let Some(called_name) = extract_called_function_name(node, self.all_function_names)
+            && called_name != self.current_method
+        {
+            self.calls.push(called_name);
         }
         syn::visit::visit_expr_call(self, node);
     }

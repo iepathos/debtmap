@@ -5,16 +5,16 @@
 //! file:line ranges.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
-use crate::priority::context::{ContextRelationship, ContextSuggestion};
 use crate::priority::UnifiedDebtItem;
+use crate::priority::context::{ContextRelationship, ContextSuggestion};
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// Format relationship type as short label (per DESIGN.md 20-char column)

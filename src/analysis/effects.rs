@@ -44,13 +44,13 @@
 
 use crate::config::DebtmapConfig;
 use crate::effects::{
-    asks_config, effect_from_fn, effect_pure, validation_failure, validation_success,
-    AnalysisEffect, AnalysisValidation,
+    AnalysisEffect, AnalysisValidation, asks_config, effect_from_fn, effect_pure,
+    validation_failure, validation_success,
 };
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
-use stillwater::effect::prelude::*;
 use stillwater::Effect;
+use stillwater::effect::prelude::*;
 
 // Re-export common effect types for convenience
 pub use crate::effects::{
@@ -148,8 +148,8 @@ pub fn get_complexity_threshold() -> impl Effect<Output = u32, Error = AnalysisE
 }
 
 /// Get file length threshold from config with default fallback.
-pub fn get_file_length_threshold(
-) -> impl Effect<Output = usize, Error = AnalysisError, Env = RealEnv> {
+pub fn get_file_length_threshold()
+-> impl Effect<Output = usize, Error = AnalysisError, Env = RealEnv> {
     query_config(|config| {
         config
             .thresholds

@@ -1,7 +1,7 @@
 use crate::analysis::multi_signal_aggregation::ResponsibilityCategory;
 use crate::analysis::rust_patterns::context::RustFunctionContext;
 use serde::{Deserialize, Serialize};
-use syn::{visit::Visit, Expr, ExprAwait, ExprCall, ExprPath};
+use syn::{Expr, ExprAwait, ExprCall, ExprPath, visit::Visit};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AsyncPatternType {
@@ -233,9 +233,11 @@ mod tests {
         let context = create_test_context(code);
 
         let patterns = detector.detect_async_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == AsyncPatternType::TaskSpawning));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == AsyncPatternType::TaskSpawning)
+        );
     }
 
     #[test]
@@ -249,9 +251,11 @@ mod tests {
         let context = create_test_context(code);
 
         let patterns = detector.detect_async_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == AsyncPatternType::ChannelCommunication));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == AsyncPatternType::ChannelCommunication)
+        );
     }
 
     #[test]
@@ -266,9 +270,11 @@ mod tests {
         let context = create_test_context(code);
 
         let patterns = detector.detect_async_patterns(&context);
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == AsyncPatternType::MutexUsage));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == AsyncPatternType::MutexUsage)
+        );
     }
 
     #[test]

@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 
 use crate::core::Language;
 use crate::effects::{
-    combine_validations, run_validation, validation_failure, validation_success, AnalysisValidation,
+    AnalysisValidation, combine_validations, run_validation, validation_failure, validation_success,
 };
 use crate::errors::AnalysisError;
 

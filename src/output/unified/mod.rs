@@ -35,8 +35,8 @@ mod types;
 pub use anti_patterns::{AntiPatternItem, AntiPatternOutput, AntiPatternSummary};
 pub use cohesion::{CohesionClassification, CohesionOutput, CohesionSummary};
 pub use coupling::{
-    calculate_architectural_dependency_factor, calculate_instability, classify_coupling,
-    classify_coupling_pattern, CouplingClassification, FileDependencies,
+    CouplingClassification, FileDependencies, calculate_architectural_dependency_factor,
+    calculate_instability, classify_coupling, classify_coupling_pattern,
 };
 pub use dedup::deduplicate_items;
 pub use dependencies::{Dependencies, PurityAnalysis};

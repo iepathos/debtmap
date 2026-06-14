@@ -521,10 +521,10 @@ impl ResponsibilityAggregator {
     /// Aggregate all signals into final classification
     pub fn aggregate(&self, signals: &SignalSet) -> AggregatedClassification {
         // Check for high-confidence framework override
-        if let Some(ref framework) = signals.framework_signal {
-            if framework.confidence >= self.config.framework_override_threshold {
-                return self.framework_override(framework, signals);
-            }
+        if let Some(ref framework) = signals.framework_signal
+            && framework.confidence >= self.config.framework_override_threshold
+        {
+            return self.framework_override(framework, signals);
         }
 
         // Collect weighted votes
@@ -592,20 +592,20 @@ impl ResponsibilityAggregator {
         }
 
         // Framework Patterns (5%, low confidence)
-        if let Some(ref framework) = signals.framework_signal {
-            if framework.confidence < self.config.framework_override_threshold {
-                let contribution = framework.confidence * self.config.weights.framework_patterns;
-                *category_scores.entry(framework.category).or_insert(0.0) += contribution;
+        if let Some(ref framework) = signals.framework_signal
+            && framework.confidence < self.config.framework_override_threshold
+        {
+            let contribution = framework.confidence * self.config.weights.framework_patterns;
+            *category_scores.entry(framework.category).or_insert(0.0) += contribution;
 
-                evidence.push(SignalEvidence {
-                    signal_type: SignalType::Framework,
-                    category: framework.category,
-                    confidence: framework.confidence,
-                    weight: self.config.weights.framework_patterns,
-                    contribution,
-                    description: framework.evidence.clone(),
-                });
-            }
+            evidence.push(SignalEvidence {
+                signal_type: SignalType::Framework,
+                category: framework.category,
+                confidence: framework.confidence,
+                weight: self.config.weights.framework_patterns,
+                contribution,
+                description: framework.evidence.clone(),
+            });
         }
 
         // Name Heuristics (5%, fallback)

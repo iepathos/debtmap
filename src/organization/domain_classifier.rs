@@ -161,10 +161,10 @@ fn infer_domain_from_methods(methods: &[String]) -> String {
     }
 
     // Return most common domain, if any pattern is strong enough (>30% of methods)
-    if let Some((domain, count)) = domain_counts.iter().max_by_key(|(_, &count)| count) {
-        if *count as f64 / methods.len() as f64 > 0.3 {
-            return domain.to_string();
-        }
+    if let Some((domain, count)) = domain_counts.iter().max_by_key(|&(_, &count)| count)
+        && *count as f64 / methods.len() as f64 > 0.3
+    {
+        return domain.to_string();
     }
 
     String::new()

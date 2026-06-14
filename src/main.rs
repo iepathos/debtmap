@@ -10,9 +10,9 @@
 use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{
-    configure_thread_pool, get_worker_count, handle_analyze_command_with_profiling,
-    handle_compare_command, handle_explain_coverage_command, handle_validate_command,
-    handle_validate_improvement_command, show_config_sources, Cli, Commands, MAIN_STACK_SIZE,
+    Cli, Commands, MAIN_STACK_SIZE, configure_thread_pool, get_worker_count,
+    handle_analyze_command_with_profiling, handle_compare_command, handle_explain_coverage_command,
+    handle_validate_command, handle_validate_improvement_command, show_config_sources,
 };
 use debtmap::di::create_app_container;
 use debtmap::observability::{extract_thread_panic_message, init_tracing, install_panic_hook};
@@ -32,9 +32,11 @@ fn extract_jobs(command: &Commands) -> usize {
 fn parse_cli() -> Cli {
     if let Ok(args_str) = std::env::var("ARGUMENTS") {
         let args: Vec<String> = args_str.split_whitespace().map(String::from).collect();
-        let mut full_args = vec![std::env::args()
-            .next()
-            .unwrap_or_else(|| "debtmap".to_string())];
+        let mut full_args = vec![
+            std::env::args()
+                .next()
+                .unwrap_or_else(|| "debtmap".to_string()),
+        ];
         full_args.extend(args);
         Cli::parse_from(full_args)
     } else {
@@ -75,7 +77,8 @@ fn main_inner() -> Result<()> {
 
     // If custom config path provided, set environment variable for loaders
     if let Some(ref config_path) = cli.config {
-        std::env::set_var("DEBTMAP_CONFIG", config_path);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_CONFIG", config_path) };
     }
 
     // Create the dependency injection container once at startup

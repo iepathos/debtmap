@@ -1,4 +1,4 @@
-use super::{module_detection::ModuleType, TestTarget};
+use super::{TestTarget, module_detection::ModuleType};
 
 pub struct RationaleBuilder;
 
@@ -129,8 +129,8 @@ pub struct ImpactAnalysis {
 mod tests {
     use super::*;
     use crate::core::ComplexityMetrics;
-    use crate::risk::priority::module_detection::ModuleType;
     use crate::risk::priority::TestTarget;
+    use crate::risk::priority::module_detection::ModuleType;
 
     // Test-only helper functions
     fn describe_coverage_status(target: &TestTarget) -> &'static str {

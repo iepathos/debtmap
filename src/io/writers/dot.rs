@@ -109,10 +109,10 @@ impl DotWriter {
             .filter_map(|item| match item {
                 UnifiedDebtItemOutput::File(file_item) => {
                     // Apply minimum score filter
-                    if let Some(min) = self.config.min_score {
-                        if file_item.score < min {
-                            return None;
-                        }
+                    if let Some(min) = self.config.min_score
+                        && file_item.score < min
+                    {
+                        return None;
                     }
                     Some(*file_item)
                 }
@@ -214,7 +214,10 @@ impl DotWriter {
         writeln!(out, "    bgcolor=\"#F0F0F0\";")?;
         writeln!(out, "    fontname=\"Helvetica\";")?;
         writeln!(out)?;
-        writeln!(out, "    legend_critical [label=\"Critical (>=100)\", fillcolor=\"#FF6B6B\", fontcolor=\"white\"];")?;
+        writeln!(
+            out,
+            "    legend_critical [label=\"Critical (>=100)\", fillcolor=\"#FF6B6B\", fontcolor=\"white\"];"
+        )?;
         writeln!(
             out,
             "    legend_high [label=\"High (>=50)\", fillcolor=\"#FF8C00\"];"

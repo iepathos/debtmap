@@ -382,7 +382,7 @@ fn parse_ast_by_language(
 }
 
 fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn::File> {
-    use syn::{parse_str, Item};
+    use syn::{Item, parse_str};
 
     let file = parse_str::<syn::File>(source).ok()?;
 

@@ -239,9 +239,9 @@ mod tests {
         role: FunctionRole,
         cyclomatic: u32,
     ) -> UnifiedDebtItem {
-        use crate::priority::unified_scorer::{Location, UnifiedScore};
         use crate::priority::ActionableRecommendation;
         use crate::priority::ImpactMetrics;
+        use crate::priority::unified_scorer::{Location, UnifiedScore};
 
         UnifiedDebtItem {
             location: Location {

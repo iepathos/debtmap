@@ -30,7 +30,7 @@
 //! - Falls back to name-based detection (Spec 117)
 //! - Graceful degradation, no failures
 
-use syn::{visit::Visit, Expr, ItemFn, ReturnType as SynReturnType, Type};
+use syn::{Expr, ItemFn, ReturnType as SynReturnType, Type, visit::Visit};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstructorReturnType {

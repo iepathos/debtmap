@@ -29,8 +29,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::effects::{
-    combine_validations, validation_failure, validation_failures, validation_success,
-    AnalysisValidation,
+    AnalysisValidation, combine_validations, validation_failure, validation_failures,
+    validation_success,
 };
 use crate::errors::AnalysisError;
 
@@ -251,13 +251,13 @@ impl AnalysisConfig {
         }
 
         // Validate coverage_file exists if provided
-        if let Some(ref coverage) = self.coverage_file {
-            if !coverage.exists() {
-                errors.push(AnalysisError::config(format!(
-                    "coverage_file does not exist: {}",
-                    coverage.display()
-                )));
-            }
+        if let Some(ref coverage) = self.coverage_file
+            && !coverage.exists()
+        {
+            errors.push(AnalysisError::config(format!(
+                "coverage_file does not exist: {}",
+                coverage.display()
+            )));
         }
 
         if errors.is_empty() {
@@ -500,9 +500,11 @@ mod tests {
 
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| e.to_string().contains("mutually exclusive")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.to_string().contains("mutually exclusive"))
+        );
     }
 
     #[test]
@@ -545,9 +547,11 @@ mod tests {
 
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| e.to_string().contains("multi_pass requires enable_context")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.to_string().contains("multi_pass requires enable_context"))
+        );
     }
 
     #[test]
@@ -560,9 +564,11 @@ mod tests {
 
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| e.to_string().contains("does not exist")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.to_string().contains("does not exist"))
+        );
     }
 
     #[test]
@@ -575,9 +581,11 @@ mod tests {
 
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| e.to_string().contains("not a directory")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.to_string().contains("not a directory"))
+        );
     }
 
     #[test]
@@ -612,9 +620,11 @@ mod tests {
 
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| e.to_string().contains("invalid exclude pattern")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.to_string().contains("invalid exclude pattern"))
+        );
     }
 
     #[test]

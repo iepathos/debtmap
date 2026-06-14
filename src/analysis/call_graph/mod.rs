@@ -413,11 +413,7 @@ impl RustCallGraph {
         factors.fold(
             base_confidence,
             |conf, (applies, factor)| {
-                if applies {
-                    conf * factor
-                } else {
-                    conf
-                }
+                if applies { conf * factor } else { conf }
             },
         )
     }

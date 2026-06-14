@@ -2,17 +2,17 @@ use crate::{
     analysis::ContextDetector,
     analyzers::FileAnalyzer,
     builders::unified_analysis_phases::phases::scoring::{
-        build_suppression_context_cache, SuppressionContextCache,
+        SuppressionContextCache, build_suppression_context_cache,
     },
     core::FunctionMetrics,
     data_flow::DataFlowGraph,
     extraction::ExtractedFileData,
     priority::{
+        UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
         file_metrics::FileDebtItem,
         scoring::ContextRecommendationEngine,
-        UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     },
     progress::ProgressManager,
     risk::lcov::LcovData,
@@ -1010,15 +1010,15 @@ impl ParallelUnifiedAnalysisBuilder {
 
                 // Update TUI progress (throttled)
                 let current = processed_count.fetch_add(1, Ordering::Relaxed) + 1;
-                if current % update_interval == 0 || current == total_metrics {
-                    if let Some(manager) = crate::progress::ProgressManager::global() {
-                        manager.tui_update_subtask(
-                            5,
-                            1,
-                            crate::tui::app::StageStatus::Active,
-                            Some((current, total_metrics)),
-                        );
-                    }
+                if (current % update_interval == 0 || current == total_metrics)
+                    && let Some(manager) = crate::progress::ProgressManager::global()
+                {
+                    manager.tui_update_subtask(
+                        5,
+                        1,
+                        crate::tui::app::StageStatus::Active,
+                        Some((current, total_metrics)),
+                    );
                 }
 
                 result
@@ -1126,18 +1126,18 @@ impl ParallelUnifiedAnalysisBuilder {
                 let current =
                     processed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
 
-                if let Ok(mut last) = last_update.try_lock() {
-                    if current % 10 == 0 || last.elapsed() > std::time::Duration::from_millis(100) {
-                        if let Some(manager) = crate::progress::ProgressManager::global() {
-                            manager.tui_update_subtask(
-                                5,
-                                2,
-                                crate::tui::app::StageStatus::Active,
-                                Some((current, total_files)),
-                            );
-                        }
-                        *last = Instant::now();
+                if let Ok(mut last) = last_update.try_lock()
+                    && (current % 10 == 0 || last.elapsed() > std::time::Duration::from_millis(100))
+                {
+                    if let Some(manager) = crate::progress::ProgressManager::global() {
+                        manager.tui_update_subtask(
+                            5,
+                            2,
+                            crate::tui::app::StageStatus::Active,
+                            Some((current, total_files)),
+                        );
                     }
+                    *last = Instant::now();
                 }
 
                 // Return both the file item and the raw functions
@@ -1482,7 +1482,7 @@ impl ParallelUnifiedAnalysisBuilder {
         raw_functions: &[FunctionMetrics],
         coverage_data: Option<&LcovData>,
     ) -> UnifiedDebtItem {
-        use crate::priority::context::{generate_context_suggestion, ContextConfig};
+        use crate::priority::context::{ContextConfig, generate_context_suggestion};
 
         let aggregated_metrics = self.aggregate_god_object_metrics(
             unified,

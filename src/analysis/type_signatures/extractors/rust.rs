@@ -239,10 +239,12 @@ mod tests {
 
         assert_eq!(signature.generic_bounds.len(), 1);
         assert_eq!(signature.generic_bounds[0].type_param, "T");
-        assert!(signature.generic_bounds[0]
-            .trait_bounds
-            .iter()
-            .any(|b| b.contains("Read")));
+        assert!(
+            signature.generic_bounds[0]
+                .trait_bounds
+                .iter()
+                .any(|b| b.contains("Read"))
+        );
     }
 
     #[test]
@@ -262,9 +264,11 @@ mod tests {
 
         assert_eq!(signature.generic_bounds.len(), 1);
         assert_eq!(signature.generic_bounds[0].type_param, "T");
-        assert!(signature.generic_bounds[0]
-            .trait_bounds
-            .iter()
-            .any(|b| b.contains("Iterator")));
+        assert!(
+            signature.generic_bounds[0]
+                .trait_bounds
+                .iter()
+                .any(|b| b.contains("Iterator"))
+        );
     }
 }

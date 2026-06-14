@@ -1,8 +1,8 @@
 //! Search functionality for filtering results.
 
 use crate::priority::UnifiedAnalysis;
-use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 /// Search state
 #[derive(Debug)]

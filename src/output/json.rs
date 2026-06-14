@@ -171,8 +171,8 @@ mod tests {
         UnifiedOutput,
     };
     use crate::priority::{
-        call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
-        Location, UnifiedDebtItem, UnifiedScore,
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedDebtItem,
+        UnifiedScore, call_graph::CallGraph,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;
@@ -332,10 +332,12 @@ mod tests {
         let filtered = apply_filters_to_unified_output(output, Some(1), None);
 
         assert_eq!(filtered.items.len(), 2);
-        assert!(filtered
-            .items
-            .iter()
-            .all(|item| get_function_name(item) == Some("grouped".to_string())));
+        assert!(
+            filtered
+                .items
+                .iter()
+                .all(|item| get_function_name(item) == Some("grouped".to_string()))
+        );
     }
 
     #[test]

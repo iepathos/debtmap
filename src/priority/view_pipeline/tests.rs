@@ -3,11 +3,11 @@
 use super::*;
 use crate::priority::unified_scorer::Location;
 use crate::priority::{
+    ActionableRecommendation, DebtType, ImpactMetrics, UnifiedScore,
     file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact},
     semantic_classifier::FunctionRole,
     tiers::RecommendationTier,
     view::{SortCriteria, ViewConfig},
-    ActionableRecommendation, DebtType, ImpactMetrics, UnifiedScore,
 };
 use std::path::PathBuf;
 
@@ -189,9 +189,11 @@ fn test_combine_items_only_functions() {
     let combined = combine_items(&functions, &files);
 
     assert_eq!(combined.len(), 3);
-    assert!(combined
-        .iter()
-        .all(|item| matches!(item, ViewItem::Function(_))));
+    assert!(
+        combined
+            .iter()
+            .all(|item| matches!(item, ViewItem::Function(_)))
+    );
 }
 
 #[test]
@@ -204,9 +206,11 @@ fn test_combine_items_only_files() {
     let combined = combine_items(&functions, &files);
 
     assert_eq!(combined.len(), 2);
-    assert!(combined
-        .iter()
-        .all(|item| matches!(item, ViewItem::File(_))));
+    assert!(
+        combined
+            .iter()
+            .all(|item| matches!(item, ViewItem::File(_)))
+    );
 }
 
 // ========================================================================

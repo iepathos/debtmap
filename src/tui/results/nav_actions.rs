@@ -13,8 +13,9 @@
 //! 4. Returns a NavigationResult indicating success/failure
 
 use super::nav_state::{
-    can_enter_detail, can_enter_filter_menu, can_enter_help, can_enter_search, can_enter_sort_menu,
-    can_go_back, can_navigate_detail_pages, is_valid_transition, NavigationResult, NavigationState,
+    NavigationResult, NavigationState, can_enter_detail, can_enter_filter_menu, can_enter_help,
+    can_enter_search, can_enter_sort_menu, can_go_back, can_navigate_detail_pages,
+    is_valid_transition,
 };
 use super::{detail_page::DetailPage, view_mode::ViewMode};
 

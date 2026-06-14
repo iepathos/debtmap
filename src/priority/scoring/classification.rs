@@ -2,7 +2,7 @@
 
 use crate::core::{FunctionMetrics, Language};
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use crate::priority::semantic_classifier::{classify_function_role, FunctionRole};
+use crate::priority::semantic_classifier::{FunctionRole, classify_function_role};
 use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
 use std::collections::HashSet;
 
@@ -25,10 +25,10 @@ pub fn is_dead_code(
     }
 
     // Check if function is definitely used through function pointers
-    if let Some(fp_used) = function_pointer_used_functions {
-        if fp_used.contains(func_id) {
-            return false;
-        }
+    if let Some(fp_used) = function_pointer_used_functions
+        && fp_used.contains(func_id)
+    {
+        return false;
     }
 
     // LAST: Check hardcoded exclusions (includes test functions, main, etc.)
@@ -413,10 +413,11 @@ pub fn is_complexity_hotspot(func: &FunctionMetrics, role: &FunctionRole) -> Opt
 /// Classify risk-based debt
 pub fn classify_risk_based_debt(func: &FunctionMetrics, role: &FunctionRole) -> DebtType {
     // Check if it's simple enough to be considered not debt
-    if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        if let Some(debt) = classify_simple_function_risk(func, role) {
-            return debt;
-        }
+    if func.cyclomatic <= 3
+        && func.cognitive <= 5
+        && let Some(debt) = classify_simple_function_risk(func, role)
+    {
+        return debt;
     }
 
     // Calculate risk score for more complex functions

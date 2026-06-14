@@ -6,4 +6,4 @@
 
 pub mod error_prone;
 
-pub use error_prone::{check_error_prone_patterns, ErrorPronePattern, PatternType, Severity};
+pub use error_prone::{ErrorPronePattern, PatternType, Severity, check_error_prone_patterns};

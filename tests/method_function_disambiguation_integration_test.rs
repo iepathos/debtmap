@@ -80,7 +80,10 @@ pub fn test_import_analysis() {
          The test calls the METHOD `resolver.analyze_imports()`, not the standalone function.",
         standalone_id.line,
         standalone_callers.len(),
-        standalone_callers.iter().map(|c| format!("{}:{}", c.name, c.line)).collect::<Vec<_>>()
+        standalone_callers
+            .iter()
+            .map(|c| format!("{}:{}", c.name, c.line))
+            .collect::<Vec<_>>()
     );
 
     // THE FIX: Method correctly shows callers

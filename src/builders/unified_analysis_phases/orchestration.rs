@@ -13,13 +13,13 @@ use crate::analysis::purity_analysis::PurityAnalyzer;
 use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
 use crate::core::{AnalysisResults, FunctionMetrics, Language};
 use crate::data_flow::DataFlowGraph;
-use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::debt::suppression::{SuppressionContext, parse_suppression_comments};
 use crate::organization::GodObjectAnalysis;
-use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::DebtType;
+use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::{UnifiedAnalysis, UnifiedAnalysisUtils};
-use crate::risk::lcov::LcovData;
 use crate::risk::RiskAnalyzer;
+use crate::risk::lcov::LcovData;
 use std::collections::HashSet;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -252,7 +252,7 @@ fn process_god_object(
     god_analysis: &crate::organization::GodObjectAnalysis,
     ctx: &GodObjectProcessingContext<'_>,
 ) -> GodObjectProcessingResult {
-    use crate::priority::context::{generate_context_suggestion, ContextConfig};
+    use crate::priority::context::{ContextConfig, generate_context_suggestion};
     use crate::priority::god_object_aggregation::aggregate_god_object_metrics_with_coverage;
 
     // Aggregate metrics from raw functions (pure), scoped to the god object's

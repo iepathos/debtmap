@@ -1,5 +1,5 @@
-use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use debtmap::extraction::UnifiedFileExtractor;
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use std::fs;
 use std::path::Path;
 

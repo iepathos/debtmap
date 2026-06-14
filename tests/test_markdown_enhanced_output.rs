@@ -1,9 +1,9 @@
-use debtmap::io::writers::markdown::EnhancedMarkdownWriter;
 use debtmap::io::writers::MarkdownWriter;
+use debtmap::io::writers::markdown::EnhancedMarkdownWriter;
 use debtmap::priority::{
-    unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
     CallGraph, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, UnifiedAnalysis,
     UnifiedAnalysisUtils,
+    unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
 };
 use std::io::Cursor;
 use std::path::PathBuf;

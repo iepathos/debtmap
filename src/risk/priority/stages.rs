@@ -1,8 +1,8 @@
 use super::{
+    TestTarget,
     module_detection::ModuleType,
     pipeline::PrioritizationStage,
     scoring::{CriticalityScorer, EffortEstimator},
-    TestTarget,
 };
 
 pub struct ZeroCoverageStage {

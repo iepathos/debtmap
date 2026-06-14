@@ -230,10 +230,10 @@ impl RustSemanticNormalizer {
         match stmt {
             Stmt::Local(local) => {
                 // Check for multiline patterns in destructuring
-                if let Some(tuple_destructure) = self.normalize_tuple_destructure(&local.pat) {
-                    if tuple_destructure.is_multiline_artifact {
-                        metadata.multiline_expressions_normalized += 1;
-                    }
+                if let Some(tuple_destructure) = self.normalize_tuple_destructure(&local.pat)
+                    && tuple_destructure.is_multiline_artifact
+                {
+                    metadata.multiline_expressions_normalized += 1;
                 }
 
                 NormalizedStatement::Local(super::semantic_normalizer::NormalizedLocal {

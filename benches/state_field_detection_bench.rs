@@ -3,10 +3,10 @@
 //! Measures the overhead of enhanced state field detection with multi-strategy analysis.
 //! Target: < 5ms per-function overhead for state detection.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::analyzers::state_field_detector::{StateDetectionConfig, StateFieldDetector};
 use std::hint::black_box as hint_black_box;
-use syn::{parse_quote, ExprField};
+use syn::{ExprField, parse_quote};
 
 /// Generate field access expressions for benchmarking
 fn generate_field_accesses() -> Vec<ExprField> {

@@ -7,8 +7,8 @@ pub mod function_analysis;
 pub mod helpers;
 
 use crate::complexity::threshold_manager::ComplexityThresholds;
-use crate::core::ast::TypeScriptAst;
 use crate::core::FunctionMetrics;
+use crate::core::ast::TypeScriptAst;
 
 use super::types::JsFunctionMetrics;
 use function_analysis::extract_functions;

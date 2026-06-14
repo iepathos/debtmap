@@ -4,8 +4,8 @@
 /// comes from conditional field assignment rather than algorithmic logic. These functions
 /// are flagged incorrectly by traditional complexity metrics.
 use syn::{
-    spanned::Spanned, visit::Visit, Expr, ExprStruct, File, ImplItem, ImplItemFn, Item, ItemImpl,
-    ReturnType, Stmt, Type,
+    Expr, ExprStruct, File, ImplItem, ImplItemFn, Item, ItemImpl, ReturnType, Stmt, Type,
+    spanned::Spanned, visit::Visit,
 };
 
 /// Field dependency information
@@ -305,18 +305,16 @@ impl<'ast> Visit<'ast> for ReturnStructVisitor {
             }
             Expr::Call(call_expr) => {
                 // Check for Ok(StructName { ... })
-                if let Expr::Path(path) = &*call_expr.func {
-                    if path
+                if let Expr::Path(path) = &*call_expr.func
+                    && path
                         .path
                         .segments
                         .last()
                         .map(|s| s.ident == "Ok")
                         .unwrap_or(false)
-                    {
-                        if let Some(Expr::Struct(struct_expr)) = call_expr.args.first() {
-                            self.extract_struct_info(struct_expr);
-                        }
-                    }
+                    && let Some(Expr::Struct(struct_expr)) = call_expr.args.first()
+                {
+                    self.extract_struct_info(struct_expr);
                 }
             }
             _ => {}
@@ -447,14 +445,13 @@ struct ConstructorCallVisitor {
 
 impl<'ast> Visit<'ast> for ConstructorCallVisitor {
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        if let Expr::Call(call_expr) = expr {
-            if let Expr::Path(path) = &*call_expr.func {
-                if let Some(segment) = path.path.segments.last() {
-                    let name = segment.ident.to_string();
-                    if name == "new" || name.starts_with("from_") || name.starts_with("with_") {
-                        self.calls_constructor = true;
-                    }
-                }
+        if let Expr::Call(call_expr) = expr
+            && let Expr::Path(path) = &*call_expr.func
+            && let Some(segment) = path.path.segments.last()
+        {
+            let name = segment.ident.to_string();
+            if name == "new" || name.starts_with("from_") || name.starts_with("with_") {
+                self.calls_constructor = true;
             }
         }
         syn::visit::visit_expr(self, expr);
@@ -511,12 +508,12 @@ fn extract_local_bindings(block: &syn::Block) -> Vec<(String, Expr)> {
     let mut bindings = Vec::new();
 
     for stmt in &block.stmts {
-        if let Stmt::Local(local) = stmt {
-            if let syn::Pat::Ident(pat_ident) = &local.pat {
-                let var_name = pat_ident.ident.to_string();
-                if let Some(init) = &local.init {
-                    bindings.push((var_name, (*init.expr).clone()));
-                }
+        if let Stmt::Local(local) = stmt
+            && let syn::Pat::Ident(pat_ident) = &local.pat
+        {
+            let var_name = pat_ident.ident.to_string();
+            if let Some(init) = &local.init {
+                bindings.push((var_name, (*init.expr).clone()));
             }
         }
     }
@@ -557,14 +554,12 @@ impl<'ast> Visit<'ast> for VariableRefVisitor {
             }
             Expr::Field(expr_field) => {
                 // Handle field access like low.column
-                if let Expr::Path(base_path) = &*expr_field.base {
-                    if let Some(ident) = base_path.path.get_ident() {
-                        let var_name = ident.to_string();
-                        if self.local_vars.contains(&var_name)
-                            && !self.references.contains(&var_name)
-                        {
-                            self.references.push(var_name);
-                        }
+                if let Expr::Path(base_path) = &*expr_field.base
+                    && let Some(ident) = base_path.path.get_ident()
+                {
+                    let var_name = ident.to_string();
+                    if self.local_vars.contains(&var_name) && !self.references.contains(&var_name) {
+                        self.references.push(var_name);
                     }
                 }
             }

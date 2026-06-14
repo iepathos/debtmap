@@ -71,7 +71,9 @@ impl PatternMatcher for WhileLoopMatcher {
                 evidence: PatternEvidence {
                     code_snippets: vec![],
                     line_numbers: vec![function.line as u32],
-                    confidence_factors: vec!["Function name indicates while/until loop".to_string()],
+                    confidence_factors: vec![
+                        "Function name indicates while/until loop".to_string(),
+                    ],
                 },
                 assessment: PatternAssessment::ImprovementOpportunity {
                     current_issues: vec![

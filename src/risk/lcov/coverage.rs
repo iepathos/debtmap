@@ -176,11 +176,11 @@ pub fn process_function_coverage_parallel(
     sorted_names.sort();
 
     for name in sorted_names {
-        if let Some(func) = file_functions.get_mut(&name) {
-            if let Some(data) = coverage_results.get(&func.start_line) {
-                func.coverage_percentage = data.coverage_percentage;
-                func.uncovered_lines = data.uncovered_lines.clone();
-            }
+        if let Some(func) = file_functions.get_mut(&name)
+            && let Some(data) = coverage_results.get(&func.start_line)
+        {
+            func.coverage_percentage = data.coverage_percentage;
+            func.uncovered_lines = data.uncovered_lines.clone();
         }
     }
 }

@@ -1,5 +1,5 @@
-use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::Analyzer;
+use debtmap::analyzers::rust::RustAnalyzer;
 use std::path::PathBuf;
 
 #[test]

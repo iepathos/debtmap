@@ -9,5 +9,5 @@ pub mod tests_ctx;
 pub mod types;
 pub mod types_ctx;
 
-pub use generator::{generate_context_suggestion, ContextConfig};
+pub use generator::{ContextConfig, generate_context_suggestion};
 pub use types::{ContextRelationship, ContextSuggestion, FileRange, RelatedContext};

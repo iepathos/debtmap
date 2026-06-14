@@ -152,12 +152,11 @@ pub fn is_in_current_project(path: &Path) -> bool {
 
     // If it's already an absolute path, check if it's under current directory
     if path.is_absolute() {
-        if let Ok(current_dir) = std::env::current_dir() {
-            if let (Ok(canonical_path), Ok(canonical_cwd)) =
+        if let Ok(current_dir) = std::env::current_dir()
+            && let (Ok(canonical_path), Ok(canonical_cwd)) =
                 (path.canonicalize(), current_dir.canonicalize())
-            {
-                return canonical_path.starts_with(canonical_cwd);
-            }
+        {
+            return canonical_path.starts_with(canonical_cwd);
         }
         // If we can't determine, assume it's external for safety
         return false;

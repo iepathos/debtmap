@@ -233,9 +233,9 @@ mod tests {
     fn test_is_hybrid_god_module_boundaries() {
         // Exactly 15 structs, 3 domains
         assert!(!is_hybrid_god_module(15, 3)); // not > 15
-                                               // 16 structs, 3 domains: 16 > 3*3 (9), and 16 > 15, and 3 domains
+        // 16 structs, 3 domains: 16 > 3*3 (9), and 16 > 15, and 3 domains
         assert!(!is_hybrid_god_module(16, 3)); // domains not > 3
-                                               // 16 structs, 4 domains: 16 > 4*3 (12), and 16 > 15, and 4 > 3
+        // 16 structs, 4 domains: 16 > 4*3 (12), and 16 > 15, and 4 > 3
         assert!(is_hybrid_god_module(16, 4));
     }
 

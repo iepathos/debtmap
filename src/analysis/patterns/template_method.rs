@@ -6,9 +6,9 @@
 //! - Abstract methods meant to be implemented by subclasses
 
 use super::{
-    find_class_implementations, Implementation, PatternInstance, PatternRecognizer, PatternType,
+    Implementation, PatternInstance, PatternRecognizer, PatternType, find_class_implementations,
 };
-use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
+use crate::core::{FileMetrics, FunctionMetrics, ast::ClassDef};
 
 pub struct TemplateMethodPatternRecognizer;
 
@@ -149,7 +149,7 @@ impl PatternRecognizer for TemplateMethodPatternRecognizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ast::MethodDef, ComplexityMetrics, Language};
+    use crate::core::{ComplexityMetrics, Language, ast::MethodDef};
     use std::path::PathBuf;
 
     fn create_template_base_class() -> ClassDef {

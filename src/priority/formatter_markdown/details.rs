@@ -3,8 +3,8 @@
 //! Handles detailed item formatting including score breakdowns,
 //! dependency information, and comprehensive item details
 
-use crate::priority::formatter_verbosity::git_history::classify_stability;
 use crate::priority::UnifiedDebtItem;
+use crate::priority::formatter_verbosity::git_history::classify_stability;
 use crate::risk::context::ContextDetails;
 use std::fmt::Write;
 
@@ -29,10 +29,10 @@ pub(crate) fn format_priority_item_markdown(
 
     writeln!(output, "\n**Why:** {}", item.recommendation.rationale).unwrap();
 
-    if verbosity >= 2 {
-        if let Some(context) = &item.context_suggestion {
-            format_context_suggestion(output, context);
-        }
+    if verbosity >= 2
+        && let Some(context) = &item.context_suggestion
+    {
+        format_context_suggestion(output, context);
     }
 }
 

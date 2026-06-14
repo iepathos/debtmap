@@ -54,7 +54,8 @@ fn production_code() {
     let debt_count_without_context = metrics.debt_items.len();
 
     // Test with context awareness
-    std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true") };
     let analyzer = get_analyzer_with_context(Language::Rust, true);
     let result = analyze_file(
         code.to_string(),
@@ -85,5 +86,6 @@ fn production_code() {
     );
 
     // Clean up
-    std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_CONTEXT_AWARE") };
 }

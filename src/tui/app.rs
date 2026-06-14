@@ -329,13 +329,13 @@ impl App {
         progress: Option<(usize, usize)>,
         label: Option<&str>,
     ) {
-        if let Some(stage) = self.stages.get_mut(stage_index) {
-            if let Some(subtask) = stage.sub_tasks.get_mut(subtask_index) {
-                subtask.status = status;
-                subtask.progress = progress;
-                if let Some(name) = label {
-                    subtask.name = name.to_string();
-                }
+        if let Some(stage) = self.stages.get_mut(stage_index)
+            && let Some(subtask) = stage.sub_tasks.get_mut(subtask_index)
+        {
+            subtask.status = status;
+            subtask.progress = progress;
+            if let Some(name) = label {
+                subtask.name = name.to_string();
             }
         }
     }

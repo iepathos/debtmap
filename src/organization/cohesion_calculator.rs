@@ -125,21 +125,21 @@ pub fn calculate_cohesion_score(
         let callee_struct = extract_struct_name(&call.callee.name);
 
         // Check if caller is in this module
-        if let Some(caller_s) = caller_struct {
-            if structs_in_module.contains(caller_s.as_str()) {
-                // Caller is in this module
-                if let Some(callee_s) = callee_struct {
-                    if structs_in_module.contains(callee_s.as_str()) {
-                        // Callee also in this module -> internal call
-                        internal_calls += 1;
-                    } else {
-                        // Callee in different module -> external call
-                        external_calls += 1;
-                    }
+        if let Some(caller_s) = caller_struct
+            && structs_in_module.contains(caller_s.as_str())
+        {
+            // Caller is in this module
+            if let Some(callee_s) = callee_struct {
+                if structs_in_module.contains(callee_s.as_str()) {
+                    // Callee also in this module -> internal call
+                    internal_calls += 1;
                 } else {
-                    // Callee is standalone function or external
+                    // Callee in different module -> external call
                     external_calls += 1;
                 }
+            } else {
+                // Callee is standalone function or external
+                external_calls += 1;
             }
         }
     }

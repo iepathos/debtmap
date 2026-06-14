@@ -80,7 +80,7 @@ pub use classifier::{
 };
 
 // Spec 211: Method Complexity Weighting
-pub use metrics_types::{calculate_complexity_metrics, ComplexityMetrics, MethodComplexity};
+pub use metrics_types::{ComplexityMetrics, MethodComplexity, calculate_complexity_metrics};
 pub use scoring::{calculate_complexity_factor, calculate_god_object_score_with_complexity};
 pub use thresholds::ComplexityThresholds;
 
@@ -92,6 +92,6 @@ pub use scoring::{apply_functional_bonus, calculate_god_object_score_with_functi
 
 // Spec 217: Trait-Mandated Method Detection
 pub use traits::{
-    classify_all_methods, classify_method_origin, ClassifiedMethod, KnownTraitRegistry,
-    MethodOrigin, MethodPattern, TraitCategory, TraitImplInfo, TraitMethodSummary,
+    ClassifiedMethod, KnownTraitRegistry, MethodOrigin, MethodPattern, TraitCategory,
+    TraitImplInfo, TraitMethodSummary, classify_all_methods, classify_method_origin,
 };

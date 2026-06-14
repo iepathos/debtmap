@@ -82,8 +82,8 @@ pub fn get_dead_code_effect(graph: RustCallGraph) -> AnalysisEffect<HashSet<Func
 }
 
 /// Query the analysis config from environment.
-pub fn get_analysis_config_effect(
-) -> impl Effect<Output = AnalysisConfig, Error = AnalysisError, Env = RealEnv> {
+pub fn get_analysis_config_effect()
+-> impl Effect<Output = AnalysisConfig, Error = AnalysisError, Env = RealEnv> {
     query_config(get_analysis_config_from_debtmap_config)
 }
 

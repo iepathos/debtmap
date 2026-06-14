@@ -359,10 +359,10 @@ impl AntiPatternDetector {
             }
 
             // Collect return type
-            if let Some(return_type) = &signature.return_type {
-                if !is_primitive(return_type) {
-                    types.insert(return_type.clone());
-                }
+            if let Some(return_type) = &signature.return_type
+                && !is_primitive(return_type)
+            {
+                types.insert(return_type.clone());
             }
         }
 

@@ -5,7 +5,7 @@
 /// validation, parsing, etc.
 use std::collections::HashMap;
 
-use super::types::{capitalize_first, BehaviorCategory};
+use super::types::{BehaviorCategory, capitalize_first};
 
 /// Behavioral categorizer for method names
 pub struct BehavioralCategorizer;

@@ -1,5 +1,5 @@
 use quote::ToTokens;
-use syn::{visit::Visit, Block, Expr, ExprIf, Stmt};
+use syn::{Block, Expr, ExprIf, Stmt, visit::Visit};
 
 /// Information about detected pattern matching
 #[derive(Debug, Clone)]
@@ -60,10 +60,10 @@ impl PatternMatchRecognizer {
         match expr {
             // path.ends_with(), path.starts_with(), etc.
             Expr::MethodCall(method) => {
-                if let Expr::Path(path) = &*method.receiver {
-                    if let Some(ident) = path.path.get_ident() {
-                        return Some(ident.to_string());
-                    }
+                if let Expr::Path(path) = &*method.receiver
+                    && let Some(ident) = path.path.get_ident()
+                {
+                    return Some(ident.to_string());
                 }
                 // Also handle field access like self.field.method()
                 if let Expr::Field(field) = &*method.receiver {
@@ -73,16 +73,16 @@ impl PatternMatchRecognizer {
             }
             // var == value, var != value
             Expr::Binary(binary) => {
-                if let Expr::Path(path) = &*binary.left {
-                    if let Some(ident) = path.path.get_ident() {
-                        return Some(ident.to_string());
-                    }
+                if let Expr::Path(path) = &*binary.left
+                    && let Some(ident) = path.path.get_ident()
+                {
+                    return Some(ident.to_string());
                 }
                 // Also check right side for commutative operations
-                if let Expr::Path(path) = &*binary.right {
-                    if let Some(ident) = path.path.get_ident() {
-                        return Some(ident.to_string());
-                    }
+                if let Expr::Path(path) = &*binary.right
+                    && let Some(ident) = path.path.get_ident()
+                {
+                    return Some(ident.to_string());
                 }
                 None
             }

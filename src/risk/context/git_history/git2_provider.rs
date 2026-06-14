@@ -334,10 +334,10 @@ impl Git2Repository {
 
         for oid in revwalk.filter_map(|r| r.ok()) {
             let commit = repo.find_commit(oid)?;
-            if self.commit_modifies_pattern(&repo, &commit, &relative_path, regex)? {
-                if let Some(stats) = self.commit_to_basic_stats(&commit)? {
-                    results.push(stats);
-                }
+            if self.commit_modifies_pattern(&repo, &commit, &relative_path, regex)?
+                && let Some(stats) = self.commit_to_basic_stats(&commit)?
+            {
+                results.push(stats);
             }
         }
 
@@ -582,10 +582,10 @@ pub fn compute_repo_function_histories(
             .ok()
             .flatten();
             let done = processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            if let Some(cb) = progress_cb {
-                if done % 50 == 0 || done == total {
-                    cb(GitPreloadPhase::Commits, done, total);
-                }
+            if let Some(cb) = progress_cb
+                && (done % 50 == 0 || done == total)
+            {
+                cb(GitPreloadPhase::Commits, done, total);
             }
             data
         })
@@ -821,12 +821,11 @@ pub fn commit_diff_matches_regex(
         None,
         None,
         Some(&mut |_, _, line| {
-            if matches!(line.origin(), '+' | '-') {
-                if let Ok(content) = std::str::from_utf8(line.content()) {
-                    if regex.is_match(content) {
-                        found = true;
-                    }
-                }
+            if matches!(line.origin(), '+' | '-')
+                && let Ok(content) = std::str::from_utf8(line.content())
+                && regex.is_match(content)
+            {
+                found = true;
             }
             true
         }),

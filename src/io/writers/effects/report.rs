@@ -4,7 +4,7 @@
 //! writing analysis results and optional risk insights to multiple formats.
 
 use crate::core::AnalysisResults;
-use crate::effects::{effect_from_fn, AnalysisEffect};
+use crate::effects::{AnalysisEffect, effect_from_fn};
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use crate::io::output::OutputWriter;

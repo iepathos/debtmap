@@ -54,11 +54,11 @@ pub mod summary;
 mod tests;
 
 use crate::priority::{
+    UnifiedAnalysis,
     file_metrics::FileDebtItem,
-    tiers::{classify_tier, TierConfig},
+    tiers::{TierConfig, classify_tier},
     unified_scorer::UnifiedDebtItem,
     view::{PreparedDebtView, ViewConfig, ViewItem},
-    UnifiedAnalysis,
 };
 
 // Re-export key types for convenience

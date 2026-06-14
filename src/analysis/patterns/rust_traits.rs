@@ -36,33 +36,33 @@ impl RustTraitPatternRecognizer {
         }
 
         for trait_name in &trait_names {
-            if let Some(implementations) = self.trait_registry.find_implementations(trait_name) {
-                if !implementations.is_empty() {
-                    let impls: Vec<Implementation> = implementations
-                        .iter()
-                        .map(|impl_info| Implementation {
-                            file: impl_info.method_id.file.clone(),
-                            class_name: None,
-                            function_name: impl_info.method_name.clone(),
-                            line: impl_info.method_id.line,
-                        })
-                        .collect();
+            if let Some(implementations) = self.trait_registry.find_implementations(trait_name)
+                && !implementations.is_empty()
+            {
+                let impls: Vec<Implementation> = implementations
+                    .iter()
+                    .map(|impl_info| Implementation {
+                        file: impl_info.method_id.file.clone(),
+                        class_name: None,
+                        function_name: impl_info.method_name.clone(),
+                        line: impl_info.method_id.line,
+                    })
+                    .collect();
 
-                    let usage_sites = self.find_trait_method_calls(trait_name);
+                let usage_sites = self.find_trait_method_calls(trait_name);
 
-                    patterns.push(PatternInstance {
-                        pattern_type: PatternType::Observer,
-                        confidence: 0.95,
-                        base_class: Some(trait_name.clone()),
-                        implementations: impls,
-                        usage_sites,
-                        reasoning: format!(
-                            "Rust trait {} with {} implementations",
-                            trait_name,
-                            implementations.len()
-                        ),
-                    });
-                }
+                patterns.push(PatternInstance {
+                    pattern_type: PatternType::Observer,
+                    confidence: 0.95,
+                    base_class: Some(trait_name.clone()),
+                    implementations: impls,
+                    usage_sites,
+                    reasoning: format!(
+                        "Rust trait {} with {} implementations",
+                        trait_name,
+                        implementations.len()
+                    ),
+                });
             }
         }
 

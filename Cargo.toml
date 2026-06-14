@@ -1,7 +1,7 @@
 [package]
 name = "debtmap"
 version = "0.18.0"
-edition = "2021"
+edition = "2024"
 rust-version = "1.89"
 authors = ["Glen Baker <iepathos@gmail.com>"]
 description = "Code complexity and technical debt analyzer"

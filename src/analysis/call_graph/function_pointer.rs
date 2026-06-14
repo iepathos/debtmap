@@ -350,15 +350,15 @@ impl FunctionPointerVisitor {
     fn extract_possible_targets(&self, expr: &Expr) -> HashSet<FunctionId> {
         let mut possible_targets = HashSet::new();
 
-        if let Expr::Path(path) = expr {
-            if let Some(func_name) = self.extract_function_name_from_path(path) {
-                let target_func = FunctionId::new(
-                    self.file_path.clone(),
-                    func_name,
-                    0, // Unknown line for external function
-                );
-                possible_targets.insert(target_func);
-            }
+        if let Expr::Path(path) = expr
+            && let Some(func_name) = self.extract_function_name_from_path(path)
+        {
+            let target_func = FunctionId::new(
+                self.file_path.clone(),
+                func_name,
+                0, // Unknown line for external function
+            );
+            possible_targets.insert(target_func);
         }
 
         possible_targets
@@ -421,11 +421,11 @@ impl FunctionPointerVisitor {
         let mut function_arguments = Vector::new();
 
         for arg in &call.args {
-            if let Expr::Path(arg_path) = arg {
-                if let Some(arg_func_name) = self.extract_function_name_from_path(arg_path) {
-                    let func_arg = FunctionId::new(self.file_path.clone(), arg_func_name, 0);
-                    function_arguments.push_back(func_arg);
-                }
+            if let Expr::Path(arg_path) = arg
+                && let Some(arg_func_name) = self.extract_function_name_from_path(arg_path)
+            {
+                let func_arg = FunctionId::new(self.file_path.clone(), arg_func_name, 0);
+                function_arguments.push_back(func_arg);
             }
         }
 
@@ -458,24 +458,24 @@ impl<'ast> Visit<'ast> for FunctionPointerVisitor {
 
         // Analyze function parameters for function pointers
         for param in &item.sig.inputs {
-            if let syn::FnArg::Typed(typed_param) = param {
-                if let Type::BareFn(_) = &*typed_param.ty {
-                    // This is a function pointer parameter
-                    if let Pat::Ident(PatIdent { ident, .. }) = &*typed_param.pat {
-                        let param_name = ident.to_string();
-                        let line = self.get_line_number(ident.span());
+            if let syn::FnArg::Typed(typed_param) = param
+                && let Type::BareFn(_) = &*typed_param.ty
+            {
+                // This is a function pointer parameter
+                if let Pat::Ident(PatIdent { ident, .. }) = &*typed_param.pat {
+                    let param_name = ident.to_string();
+                    let line = self.get_line_number(ident.span());
 
-                        if let Some(current_func) = &self.current_function {
-                            let pointer_info = FunctionPointerInfo {
-                                variable_name: param_name,
-                                defining_function: current_func.clone(),
-                                possible_targets: HashSet::new(), // Unknown targets for parameters
-                                line,
-                                is_parameter: true,
-                            };
+                    if let Some(current_func) = &self.current_function {
+                        let pointer_info = FunctionPointerInfo {
+                            variable_name: param_name,
+                            defining_function: current_func.clone(),
+                            possible_targets: HashSet::new(), // Unknown targets for parameters
+                            line,
+                            is_parameter: true,
+                        };
 
-                            self.function_pointers.push(pointer_info);
-                        }
+                        self.function_pointers.push(pointer_info);
                     }
                 }
             }
@@ -538,15 +538,15 @@ impl ClosureCallVisitor {
 
 impl<'ast> Visit<'ast> for ClosureCallVisitor {
     fn visit_expr_call(&mut self, call: &'ast ExprCall) {
-        if let Expr::Path(path) = &*call.func {
-            if let Some(func_name) = self.extract_function_name_from_path(path) {
-                let func_id = FunctionId::new(
-                    std::path::PathBuf::new(), // Will be filled in by parent
-                    func_name,
-                    0,
-                );
-                self.function_calls.push(func_id);
-            }
+        if let Expr::Path(path) = &*call.func
+            && let Some(func_name) = self.extract_function_name_from_path(path)
+        {
+            let func_id = FunctionId::new(
+                std::path::PathBuf::new(), // Will be filled in by parent
+                func_name,
+                0,
+            );
+            self.function_calls.push(func_id);
         }
 
         // Continue visiting

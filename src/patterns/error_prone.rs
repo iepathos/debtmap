@@ -71,19 +71,18 @@ fn detect_generic_expects(content: &str, _file_path: &Path) -> Vec<ErrorPronePat
             if let Some(col) = line.find(".expect(") {
                 // Check if the expect message is too generic
                 let msg_start = col + 8;
-                if let Some(msg_content) = line.get(msg_start..) {
-                    if msg_content.starts_with("\"failed\"")
+                if let Some(msg_content) = line.get(msg_start..)
+                    && (msg_content.starts_with("\"failed\"")
                         || msg_content.starts_with("\"error\"")
-                        || msg_content.starts_with("\"should work\"")
-                    {
-                        return Some(ErrorPronePattern {
-                            pattern_type: PatternType::GenericExpect,
-                            line: line_num + 1,
-                            column: col + 1,
-                            message: "Expect message should be more descriptive".to_string(),
-                            severity: Severity::Medium,
-                        });
-                    }
+                        || msg_content.starts_with("\"should work\""))
+                {
+                    return Some(ErrorPronePattern {
+                        pattern_type: PatternType::GenericExpect,
+                        line: line_num + 1,
+                        column: col + 1,
+                        message: "Expect message should be more descriptive".to_string(),
+                        severity: Severity::Medium,
+                    });
                 }
             }
             None
@@ -239,15 +238,21 @@ fn safe_function() -> Result<(), Error> {
         assert!(patterns.len() >= 3);
 
         // Check we have each type of pattern
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == PatternType::UnsafeUnwrap));
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == PatternType::GenericExpect));
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == PatternType::PanicInCode));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == PatternType::UnsafeUnwrap)
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == PatternType::GenericExpect)
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == PatternType::PanicInCode)
+        );
     }
 
     #[test]

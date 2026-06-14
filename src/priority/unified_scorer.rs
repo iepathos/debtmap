@@ -2,6 +2,7 @@ use crate::core::{FunctionMetrics, PurityLevel};
 use crate::data_flow::DataFlowGraph;
 use crate::organization::GodObjectAnalysis;
 use crate::priority::{
+    ActionableRecommendation, DebtType, FunctionAnalysis, ImpactMetrics,
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::TransitiveCoverage,
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
@@ -11,8 +12,7 @@ use crate::priority::{
         calculate_dependency_factor,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
-    semantic_classifier::{classify_function_role, FunctionRole},
-    ActionableRecommendation, DebtType, FunctionAnalysis, ImpactMetrics,
+    semantic_classifier::{FunctionRole, classify_function_role},
 };
 use crate::risk::evidence_calculator::EvidenceBasedRiskCalculator;
 use crate::risk::lcov::LcovData;
@@ -844,7 +844,7 @@ fn normalize_complexity(
 /// Uses the call graph to check if each caller is a test function,
 /// then falls back to heuristics if call graph data is unavailable.
 fn count_production_callers(callers: &[FunctionId], call_graph: &CallGraph) -> usize {
-    use crate::priority::caller_classification::{classify_caller, CallerType};
+    use crate::priority::caller_classification::{CallerType, classify_caller};
 
     callers
         .iter()

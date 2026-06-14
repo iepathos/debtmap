@@ -3,7 +3,7 @@
 //! Detects patterns like rayon, tokio parallel execution.
 
 use crate::organization::parallel_execution_pattern::{
-    adjust_parallel_score, ParallelPatternDetector,
+    ParallelPatternDetector, adjust_parallel_score,
 };
 
 /// Detect parallel execution patterns and update complexity (spec 127)

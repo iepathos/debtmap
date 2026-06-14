@@ -13,10 +13,10 @@
 //! let metrics = run_effect(effect, config)?;
 //! ```
 
-use super::{analyze_file, get_analyzer, Analyzer};
+use super::{Analyzer, analyze_file, get_analyzer};
 use crate::analysis::effects::{analyze_with_env, lift_pure, traverse_effect};
 use crate::core::{FileMetrics, Language};
-use crate::effects::{effect_from_fn, AnalysisEffect};
+use crate::effects::{AnalysisEffect, effect_from_fn};
 use crate::env::RealEnv;
 use crate::errors::AnalysisError;
 use std::path::PathBuf;

@@ -23,11 +23,11 @@
 //! - [`PreparedDebtView`] - The canonical view model
 
 use crate::priority::{
+    DebtCategory,
     classification::Severity,
     file_metrics::FileDebtItem,
     tiers::RecommendationTier,
     unified_scorer::{Location, UnifiedDebtItem},
-    DebtCategory,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -452,9 +452,9 @@ impl PreparedDebtView {
 mod tests {
     use super::*;
     use crate::priority::{
+        ActionableRecommendation, DebtType, ImpactMetrics, UnifiedScore,
         file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact},
         semantic_classifier::FunctionRole,
-        ActionableRecommendation, DebtType, ImpactMetrics, UnifiedScore,
     };
 
     fn create_test_function_item(score: f64) -> UnifiedDebtItem {

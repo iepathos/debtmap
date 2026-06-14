@@ -2,8 +2,8 @@ use super::{
     ComparisonResult, CouplingEvidence, CouplingIssue, CouplingMetrics, DesignPattern,
     RemediationAction, RiskEvidence, RiskFactor, RiskSeverity, RiskType,
 };
-use crate::priority::call_graph::CallGraph;
 use crate::priority::FunctionAnalysis;
+use crate::priority::call_graph::CallGraph;
 use crate::risk::evidence::{ModuleType, RiskContext};
 use crate::risk::thresholds::{CouplingThresholds, StatisticalThresholdProvider};
 

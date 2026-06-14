@@ -403,16 +403,17 @@ def handle_request(a, b, c, d):
             .find(|function| function.name == "handle_request")
             .unwrap();
 
-        assert!(function
-            .detected_patterns
-            .as_ref()
-            .is_some_and(|patterns| patterns
+        assert!(function.detected_patterns.as_ref().is_some_and(|patterns| {
+            patterns
                 .iter()
-                .any(|pattern| pattern.starts_with("threshold-exceeded:"))));
-        assert!(result
-            .debt_items
-            .iter()
-            .any(|item| item.id.starts_with("python-high-complexity-")));
+                .any(|pattern| pattern.starts_with("threshold-exceeded:"))
+        }));
+        assert!(
+            result
+                .debt_items
+                .iter()
+                .any(|item| item.id.starts_with("python-high-complexity-"))
+        );
     }
 
     #[test]
@@ -526,14 +527,20 @@ def transform(items):
             .clone()
             .unwrap_or_default();
 
-        assert!(disabled_patterns
-            .iter()
-            .all(|pattern| !pattern.starts_with("functional-pattern:")));
-        assert!(enabled_patterns
-            .iter()
-            .any(|pattern| pattern == "functional-pattern:map"));
-        assert!(enabled_patterns
-            .iter()
-            .any(|pattern| pattern == "functional-pattern:filter"));
+        assert!(
+            disabled_patterns
+                .iter()
+                .all(|pattern| !pattern.starts_with("functional-pattern:"))
+        );
+        assert!(
+            enabled_patterns
+                .iter()
+                .any(|pattern| pattern == "functional-pattern:map")
+        );
+        assert!(
+            enabled_patterns
+                .iter()
+                .any(|pattern| pattern == "functional-pattern:filter")
+        );
     }
 }

@@ -5,9 +5,9 @@
 
 use crate::analysis::ContextDetector;
 use crate::config::{get_context_multipliers, get_data_flow_scoring_config};
-use crate::context::{detect_file_type, FileType};
+use crate::context::{FileType, detect_file_type};
 use crate::core::FunctionMetrics;
-use crate::priority::context::{generate_context_suggestion, ContextConfig};
+use crate::priority::context::{ContextConfig, generate_context_suggestion};
 
 use crate::complexity::EntropyAnalysis;
 use crate::priority::scoring::ContextRecommendationEngine;
@@ -16,6 +16,8 @@ use crate::priority::unified_scorer::{
     calculate_unified_priority_with_role,
 };
 use crate::priority::{
+    ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, TransitiveCoverage,
+    UnifiedDebtItem, UnifiedScore,
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::calculate_transitive_coverage,
     debt_aggregator::DebtAggregator,
@@ -25,8 +27,6 @@ use crate::priority::{
         generate_recommendation_with_coverage_and_data_flow,
     },
     semantic_classifier::classify_function_role,
-    ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, TransitiveCoverage,
-    UnifiedDebtItem, UnifiedScore,
 };
 use crate::risk::lcov::LcovData;
 use std::collections::{HashMap, HashSet};
@@ -459,7 +459,7 @@ fn extract_dependency_metrics(
     func_id: &FunctionId,
     call_graph: &CallGraph,
 ) -> DependencyMetrics {
-    use crate::priority::caller_classification::{classify_callers, ClassifiedCallers};
+    use crate::priority::caller_classification::{ClassifiedCallers, classify_callers};
 
     // Use pre-populated call graph data from FunctionMetrics if available
     let (upstream_names, downstream_names) =
@@ -498,7 +498,7 @@ fn extract_dependency_metrics(
 
 // Apply exponential scaling, debt type multiplier, and risk boosting to a debt item (spec 171, spec 260)
 fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
-    use crate::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
+    use crate::priority::scoring::scaling::{ScalingConfig, calculate_final_score};
 
     let config = ScalingConfig::default();
     let base_score = item.unified_score.final_score;

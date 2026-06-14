@@ -83,7 +83,7 @@
 //! ```
 
 use crate::core::FileMetrics;
-use crate::effects::{validation_success, AnalysisValidation};
+use crate::effects::{AnalysisValidation, validation_success};
 use crate::errors::AnalysisError;
 use serde::Serialize;
 use std::path::PathBuf;

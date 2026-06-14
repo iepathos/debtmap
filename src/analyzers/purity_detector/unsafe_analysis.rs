@@ -3,7 +3,7 @@
 //! Classifies unsafe operations as pure (no side effects) or impure.
 
 use super::types::UnsafeOp;
-use syn::{visit::Visit, Block, Expr};
+use syn::{Block, Expr, visit::Visit};
 
 /// Collector for unsafe operations within a block
 pub struct UnsafeOpCollector {

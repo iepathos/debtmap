@@ -101,10 +101,10 @@ fn process_neighbors(
     for neighbor in neighbors.iter().rev() {
         if !visited.contains(neighbor) {
             to_visit.push(neighbor.clone());
-        } else if rec_stack.contains(neighbor) {
-            if let Some(idx) = path.iter().position(|n| n == neighbor) {
-                cycle_starts.push(idx);
-            }
+        } else if rec_stack.contains(neighbor)
+            && let Some(idx) = path.iter().position(|n| n == neighbor)
+        {
+            cycle_starts.push(idx);
         }
     }
 

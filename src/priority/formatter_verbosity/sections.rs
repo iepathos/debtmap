@@ -76,7 +76,7 @@ pub fn format_coverage_detail(has_coverage: bool, gap: f64, pct: f64) -> String 
 
 /// Pure function to format complexity detail
 pub fn format_complexity_detail(entropy: &Option<EntropyAnalysis>) -> String {
-    if let Some(ref e) = entropy {
+    if let Some(e) = entropy {
         format!(" (entropy-adjusted from {})", e.original_complexity)
     } else {
         String::new()
@@ -412,19 +412,19 @@ pub fn format_pattern_analysis(output: &mut String, item: &UnifiedDebtItem, verb
         return;
     }
 
-    if let Some(ref pattern_analysis) = item.pattern_analysis {
-        if pattern_analysis.has_patterns() {
-            writeln!(output, "├─ {}", "PATTERN ANALYSIS:".bright_blue()).unwrap();
+    if let Some(ref pattern_analysis) = item.pattern_analysis
+        && pattern_analysis.has_patterns()
+    {
+        writeln!(output, "├─ {}", "PATTERN ANALYSIS:".bright_blue()).unwrap();
 
-            // Use PatternFormatter to format the analysis
-            let formatted =
-                crate::output::pattern_formatter::PatternFormatter::format(pattern_analysis);
+        // Use PatternFormatter to format the analysis
+        let formatted =
+            crate::output::pattern_formatter::PatternFormatter::format(pattern_analysis);
 
-            // Indent each line for proper tree formatting
-            for line in formatted.lines() {
-                if !line.is_empty() {
-                    writeln!(output, "│  {}", line).unwrap();
-                }
+        // Indent each line for proper tree formatting
+        for line in formatted.lines() {
+            if !line.is_empty() {
+                writeln!(output, "│  {}", line).unwrap();
             }
         }
     }

@@ -69,15 +69,15 @@ impl ExtremeLegacyProcessor {
                                                         score += value * 0.5;
                                                     } else if special == "maybe" {
                                                         // Deep nesting level 7
-                                                        if let Ok(state) = self.state.lock() {
-                                                            if state.running {
-                                                                if state.error_count < 10 {
-                                                                    score += value * 1.5;
-                                                                } else if state.error_count < 100 {
-                                                                    score += value * 0.75;
-                                                                } else {
-                                                                    error_count += 1;
-                                                                }
+                                                        if let Ok(state) = self.state.lock()
+                                                            && state.running
+                                                        {
+                                                            if state.error_count < 10 {
+                                                                score += value * 1.5;
+                                                            } else if state.error_count < 100 {
+                                                                score += value * 0.75;
+                                                            } else {
+                                                                error_count += 1;
                                                             }
                                                         }
                                                     } else {
@@ -92,16 +92,15 @@ impl ExtremeLegacyProcessor {
                                                 }
                                             } else {
                                                 // Another condition branch
-                                                if item.metadata.contains_key("priority") {
-                                                    if let Some(priority) =
+                                                if item.metadata.contains_key("priority")
+                                                    && let Some(priority) =
                                                         item.metadata.get("priority")
-                                                    {
-                                                        match priority.parse::<u32>() {
-                                                            Ok(p) if p > 5 => score += value * 2.5,
-                                                            Ok(p) if p > 3 => score += value * 1.8,
-                                                            Ok(_) => score += value,
-                                                            Err(_) => error_count += 1,
-                                                        }
+                                                {
+                                                    match priority.parse::<u32>() {
+                                                        Ok(p) if p > 5 => score += value * 2.5,
+                                                        Ok(p) if p > 3 => score += value * 1.8,
+                                                        Ok(_) => score += value,
+                                                        Err(_) => error_count += 1,
                                                     }
                                                 }
                                             }
@@ -144,10 +143,10 @@ impl ExtremeLegacyProcessor {
                         // More processing
                         let mut temp_score = 0.0;
                         for (k, v) in &item.metadata {
-                            if k.contains("score") {
-                                if let Ok(parsed) = v.parse::<f64>() {
-                                    temp_score += parsed;
-                                }
+                            if k.contains("score")
+                                && let Ok(parsed) = v.parse::<f64>()
+                            {
+                                temp_score += parsed;
                             }
                         }
                         results.push(ProcessingResult {

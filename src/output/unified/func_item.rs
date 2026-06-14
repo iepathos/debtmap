@@ -8,9 +8,9 @@ use super::format::{assert_ratio_invariants, assert_score_invariants};
 use super::format::{round_ratio, round_score};
 use super::location::UnifiedLocation;
 use super::patterns::{extract_complexity_pattern, extract_pattern_data};
+use super::priority::Priority;
 #[cfg(debug_assertions)]
 use super::priority::assert_priority_invariants;
-use super::priority::Priority;
 use crate::core::PurityLevel;
 use crate::priority::{DebtType, FunctionRole, UnifiedDebtItem};
 use serde::{Deserialize, Serialize};

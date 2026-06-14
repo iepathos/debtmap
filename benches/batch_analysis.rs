@@ -7,7 +7,7 @@
 //! This helps validate that the traverse pattern batch analysis provides
 //! meaningful performance improvements for multi-file workloads.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use debtmap::analyzers::batch::{analyze_files_effect, validate_files};
 use debtmap::config::{BatchAnalysisConfig, DebtmapConfig};
 use debtmap::effects::run_validation;

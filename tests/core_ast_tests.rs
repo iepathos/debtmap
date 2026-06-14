@@ -1,5 +1,5 @@
 // debtmap:ignore-start -- This file contains test code with function names that trigger crypto detection
-use debtmap::core::ast::{combine_asts, filter_ast, Ast, AstNode, NodeKind, RustAst};
+use debtmap::core::ast::{Ast, AstNode, NodeKind, RustAst, combine_asts, filter_ast};
 use std::path::PathBuf;
 
 fn create_test_rust_ast() -> Ast {

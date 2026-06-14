@@ -695,9 +695,11 @@ mod tests {
         let pattern = result.unwrap();
         assert_eq!(pattern.pattern_type, PatternType::TestFunction);
         assert_eq!(pattern.framework_name, Some("tokio".to_string()));
-        assert!(pattern
-            .triggering_attributes
-            .contains(&"tokio::test".to_string()));
+        assert!(
+            pattern
+                .triggering_attributes
+                .contains(&"tokio::test".to_string())
+        );
     }
 
     #[test]

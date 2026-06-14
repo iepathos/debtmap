@@ -44,8 +44,8 @@
 
 // Re-export core types and functions from the unified output module
 pub use crate::output::unified::{
-    calculate_architectural_dependency_factor, calculate_instability, classify_coupling_pattern,
-    CouplingClassification,
+    CouplingClassification, calculate_architectural_dependency_factor, calculate_instability,
+    classify_coupling_pattern,
 };
 
 /// Low confidence threshold for filtering uncertain items (spec 269).

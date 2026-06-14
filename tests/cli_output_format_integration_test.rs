@@ -74,58 +74,58 @@ fn test_cli_output_format_unified_produces_valid_structure() {
     assert!(items.is_array(), "items should be an array");
 
     // If there are debt items, validate their structure
-    if let Some(item_array) = items.as_array() {
-        if !item_array.is_empty() {
-            let first_item = &item_array[0];
+    if let Some(item_array) = items.as_array()
+        && !item_array.is_empty()
+    {
+        let first_item = &item_array[0];
 
-            // Check required fields per spec 108
-            assert!(
-                first_item.get("type").is_some(),
-                "Debt item missing 'type' field"
-            );
-            assert!(
-                first_item.get("location").is_some(),
-                "Debt item missing 'location' field"
-            );
-            assert!(
-                first_item.get("category").is_some(),
-                "Debt item missing 'category' field"
-            );
-            assert!(
-                first_item.get("priority").is_some(),
-                "Debt item missing 'priority' field"
-            );
-            assert!(
-                first_item.get("score").is_some(),
-                "Debt item missing 'score' field"
-            );
+        // Check required fields per spec 108
+        assert!(
+            first_item.get("type").is_some(),
+            "Debt item missing 'type' field"
+        );
+        assert!(
+            first_item.get("location").is_some(),
+            "Debt item missing 'location' field"
+        );
+        assert!(
+            first_item.get("category").is_some(),
+            "Debt item missing 'category' field"
+        );
+        assert!(
+            first_item.get("priority").is_some(),
+            "Debt item missing 'priority' field"
+        );
+        assert!(
+            first_item.get("score").is_some(),
+            "Debt item missing 'score' field"
+        );
 
-            // Validate type is either "File" or "Function"
-            let item_type = first_item.get("type").unwrap().as_str().unwrap();
-            assert!(
-                item_type == "File" || item_type == "Function",
-                "Type must be 'File' or 'Function', got: {}",
-                item_type
-            );
+        // Validate type is either "File" or "Function"
+        let item_type = first_item.get("type").unwrap().as_str().unwrap();
+        assert!(
+            item_type == "File" || item_type == "Function",
+            "Type must be 'File' or 'Function', got: {}",
+            item_type
+        );
 
-            // Validate location structure
-            let location = first_item.get("location").unwrap();
-            assert!(location.get("file").is_some(), "Location missing 'file'");
+        // Validate location structure
+        let location = first_item.get("location").unwrap();
+        assert!(location.get("file").is_some(), "Location missing 'file'");
 
-            // Validate priority is one of the expected values
-            let priority = first_item.get("priority").unwrap().as_str().unwrap();
-            assert!(
-                priority == "high" || priority == "medium" || priority == "low",
-                "Priority must be 'high', 'medium', or 'low', got: {}",
-                priority
-            );
+        // Validate priority is one of the expected values
+        let priority = first_item.get("priority").unwrap().as_str().unwrap();
+        assert!(
+            priority == "high" || priority == "medium" || priority == "low",
+            "Priority must be 'high', 'medium', or 'low', got: {}",
+            priority
+        );
 
-            // Validate score is a number
-            assert!(
-                first_item.get("score").unwrap().is_number(),
-                "Score should be a number"
-            );
-        }
+        // Validate score is a number
+        assert!(
+            first_item.get("score").unwrap().is_number(),
+            "Score should be a number"
+        );
     }
 
     // Validate summary structure

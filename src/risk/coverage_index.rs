@@ -1,7 +1,7 @@
 use super::function_name_matching::{
-    extract_closure_parent, function_names_match, generate_function_name_variants, MatchConfidence,
+    MatchConfidence, extract_closure_parent, function_names_match, generate_function_name_variants,
 };
-use super::lcov::{normalize_demangled_name, strip_trailing_generics, FunctionCoverage, LcovData};
+use super::lcov::{FunctionCoverage, LcovData, normalize_demangled_name, strip_trailing_generics};
 use super::path_normalization::normalize_path_components;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -356,14 +356,14 @@ impl CoverageIndex {
                 return Some(f.coverage_percentage / 100.0);
             }
             // Try original query (in case it was already normalized)
-            if query_name != function_name {
-                if let Some(f) = file_functions.get(function_name) {
-                    log::debug!(
-                        "✓ Found via exact match (original): {}% coverage",
-                        f.coverage_percentage
-                    );
-                    return Some(f.coverage_percentage / 100.0);
-                }
+            if query_name != function_name
+                && let Some(f) = file_functions.get(function_name)
+            {
+                log::debug!(
+                    "✓ Found via exact match (original): {}% coverage",
+                    f.coverage_percentage
+                );
+                return Some(f.coverage_percentage / 100.0);
             }
         }
 
@@ -644,10 +644,10 @@ impl CoverageIndex {
         line: usize,
     ) -> Option<Vec<usize>> {
         // O(1) file lookup + O(1) function lookup
-        if let Some(file_functions) = self.by_file.get(file) {
-            if let Some(func) = file_functions.get(function_name) {
-                return Some(func.uncovered_lines.clone());
-            }
+        if let Some(file_functions) = self.by_file.get(file)
+            && let Some(func) = file_functions.get(function_name)
+        {
+            return Some(func.uncovered_lines.clone());
         }
 
         // Try path matching strategies
@@ -742,10 +742,10 @@ impl CoverageIndex {
         function_name: &str,
     ) -> Option<AggregateCoverage> {
         // Try exact match first (O(1))
-        if let Some(file_functions) = self.by_file.get(file) {
-            if let Some(exact) = file_functions.get(function_name) {
-                return Some(AggregateCoverage::single(exact));
-            }
+        if let Some(file_functions) = self.by_file.get(file)
+            && let Some(exact) = file_functions.get(function_name)
+        {
+            return Some(AggregateCoverage::single(exact));
         }
 
         // Try method name index for trait methods (O(1))
@@ -1014,7 +1014,7 @@ mod tests {
         let agg = merge_coverage(vec![&cov1, &cov2]);
         assert_eq!(agg.version_count, 2);
         assert_eq!(agg.coverage_pct, 75.0); // Average: (70 + 80) / 2
-                                            // Intersection: only line 20 is uncovered in BOTH versions
+        // Intersection: only line 20 is uncovered in BOTH versions
         assert_eq!(agg.uncovered_lines.len(), 1);
         assert!(agg.uncovered_lines.contains(&20));
         assert!(!agg.uncovered_lines.contains(&10)); // Covered in cov2
@@ -1096,7 +1096,7 @@ mod tests {
         let agg = agg.unwrap();
         assert_eq!(agg.version_count, 2);
         assert_eq!(agg.coverage_pct, 75.0); // (70 + 80) / 2
-                                            // Only line 20 is uncovered in both versions
+        // Only line 20 is uncovered in both versions
         assert_eq!(agg.uncovered_lines, vec![20]);
     }
 

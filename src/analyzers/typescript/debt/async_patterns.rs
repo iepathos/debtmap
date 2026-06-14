@@ -153,12 +153,11 @@ fn has_error_handling_in_chain(node: &Node, ast: &TypeScriptAst) -> bool {
     // In promise chains, error handling wraps the entire chain
     let mut current = node.parent();
     while let Some(parent) = current {
-        if parent.kind() == "call_expression" {
-            if let Some(method) = get_call_method_name(&parent, &ast.source) {
-                if is_error_handler_method(method) {
-                    return true;
-                }
-            }
+        if parent.kind() == "call_expression"
+            && let Some(method) = get_call_method_name(&parent, &ast.source)
+            && is_error_handler_method(method)
+        {
+            return true;
         }
         current = parent.parent();
     }
@@ -288,9 +287,11 @@ fetch('/api/data')
         let items = detect_async_debt(&ast, &[]);
 
         // Should detect unhandled promise
-        assert!(items
-            .iter()
-            .any(|i| i.message.contains("without error handling")));
+        assert!(
+            items
+                .iter()
+                .any(|i| i.message.contains("without error handling"))
+        );
     }
 
     #[test]
@@ -307,9 +308,11 @@ fetch('/api/data')
         let items = detect_async_debt(&ast, &[]);
 
         // Should not detect unhandled promise when .catch is present
-        assert!(!items
-            .iter()
-            .any(|i| i.message.contains("without error handling")));
+        assert!(
+            !items
+                .iter()
+                .any(|i| i.message.contains("without error handling"))
+        );
     }
 
     #[test]
@@ -334,9 +337,11 @@ fetch('/api/data')
         let items = detect_async_debt(&ast, &[]);
 
         // .finally() counts as error handling
-        assert!(!items
-            .iter()
-            .any(|i| i.message.contains("without error handling")));
+        assert!(
+            !items
+                .iter()
+                .any(|i| i.message.contains("without error handling"))
+        );
     }
 
     #[test]

@@ -31,7 +31,7 @@
 //! ```
 
 use super::pure::Pattern;
-use crate::effects::{effect_fail, effect_pure, AnalysisEffect};
+use crate::effects::{AnalysisEffect, effect_fail, effect_pure};
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use crate::extraction::{DetectedPattern, UnifiedFileExtractor};

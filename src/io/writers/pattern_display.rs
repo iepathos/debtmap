@@ -123,17 +123,17 @@ impl PatternInfo {
 pub fn extract_pattern_info(metrics: &FunctionMetrics) -> Option<PatternInfo> {
     if let Some(LanguageSpecificData::Rust(rust_data)) = &metrics.language_specific {
         // Check state machine first (higher priority)
-        if let Some(sm_signals) = &rust_data.state_machine_signals {
-            if sm_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD {
-                return Some(PatternInfo::from_state_machine(sm_signals));
-            }
+        if let Some(sm_signals) = &rust_data.state_machine_signals
+            && sm_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD
+        {
+            return Some(PatternInfo::from_state_machine(sm_signals));
         }
 
         // Check coordinator second
-        if let Some(coord_signals) = &rust_data.coordinator_signals {
-            if coord_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD {
-                return Some(PatternInfo::from_coordinator(coord_signals));
-            }
+        if let Some(coord_signals) = &rust_data.coordinator_signals
+            && coord_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD
+        {
+            return Some(PatternInfo::from_coordinator(coord_signals));
         }
     }
 

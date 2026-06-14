@@ -84,11 +84,7 @@ impl<T> PipelineBuilder<T> {
     where
         F: FnOnce(Self) -> Self,
     {
-        if condition {
-            f(self)
-        } else {
-            self
-        }
+        if condition { f(self) } else { self }
     }
 
     /// Enable progress reporting for this pipeline.
@@ -125,22 +121,20 @@ impl<T: 'static> BuiltPipeline<T> {
         let mut data: Box<dyn Any> = Box::new(());
 
         // Report total number of stages if progress enabled
-        if self.progress_enabled {
-            if let Ok(quiet) = std::env::var("DEBTMAP_QUIET") {
-                if quiet != "true" {
-                    log::info!("Pipeline: {} stages", self.stages.len());
-                }
-            }
+        if self.progress_enabled
+            && let Ok(quiet) = std::env::var("DEBTMAP_QUIET")
+            && quiet != "true"
+        {
+            log::info!("Pipeline: {} stages", self.stages.len());
         }
 
         // Execute each stage in sequence
         for (i, stage) in self.stages.iter().enumerate() {
-            if self.progress_enabled {
-                if let Ok(quiet) = std::env::var("DEBTMAP_QUIET") {
-                    if quiet != "true" {
-                        log::info!("Stage {}/{}: {}", i + 1, self.stages.len(), stage.name());
-                    }
-                }
+            if self.progress_enabled
+                && let Ok(quiet) = std::env::var("DEBTMAP_QUIET")
+                && quiet != "true"
+            {
+                log::info!("Stage {}/{}: {}", i + 1, self.stages.len(), stage.name());
             }
 
             data = stage.execute_any(data).map_err(|e| {
@@ -164,12 +158,11 @@ impl<T: 'static> BuiltPipeline<T> {
         for (i, stage) in self.stages.iter().enumerate() {
             let start = Instant::now();
 
-            if self.progress_enabled {
-                if let Ok(quiet) = std::env::var("DEBTMAP_QUIET") {
-                    if quiet != "true" {
-                        log::info!("Stage {}/{}: {}", i + 1, self.stages.len(), stage.name());
-                    }
-                }
+            if self.progress_enabled
+                && let Ok(quiet) = std::env::var("DEBTMAP_QUIET")
+                && quiet != "true"
+            {
+                log::info!("Stage {}/{}: {}", i + 1, self.stages.len(), stage.name());
             }
 
             data = stage.execute_any(data).map_err(|e| {

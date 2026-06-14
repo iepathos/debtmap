@@ -1,8 +1,8 @@
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use dashmap::{DashMap, DashSet};
 use rayon::prelude::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Statistics for parallel call graph construction
 #[derive(Debug, Default)]
@@ -38,11 +38,7 @@ impl ParallelStats {
     pub fn progress_ratio(&self) -> f64 {
         let processed = self.files_processed.load(Ordering::Relaxed) as f64;
         let total = self.total_files.load(Ordering::Relaxed) as f64;
-        if total > 0.0 {
-            processed / total
-        } else {
-            0.0
-        }
+        if total > 0.0 { processed / total } else { 0.0 }
     }
 }
 

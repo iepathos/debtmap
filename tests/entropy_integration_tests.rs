@@ -1,5 +1,5 @@
-use debtmap::analyzers::{rust::RustAnalyzer, Analyzer};
-use debtmap::complexity::entropy::{apply_entropy_dampening, EntropyAnalyzer};
+use debtmap::analyzers::{Analyzer, rust::RustAnalyzer};
+use debtmap::complexity::entropy::{EntropyAnalyzer, apply_entropy_dampening};
 use std::path::PathBuf;
 
 /// Pattern corpus for testing entropy detection
@@ -207,61 +207,61 @@ fn test_pattern_corpus_detection() {
 
         if let Some(_func) = metrics.complexity.functions.first() {
             // Extract the function block for entropy analysis
-            if let Ok(file) = syn::parse_str::<syn::File>(example.code) {
-                if let Some(syn::Item::Fn(item_fn)) = file.items.first() {
-                    let score = entropy_analyzer.calculate_entropy(&item_fn.block);
+            if let Ok(file) = syn::parse_str::<syn::File>(example.code)
+                && let Some(syn::Item::Fn(item_fn)) = file.items.first()
+            {
+                let score = entropy_analyzer.calculate_entropy(&item_fn.block);
 
-                    // Test pattern repetition
-                    if example.expected_high_repetition {
-                        assert!(
-                            score.pattern_repetition > 0.4,
-                            "{}: Expected high repetition, got {}",
-                            example.name,
-                            score.pattern_repetition
-                        );
-                    } else {
-                        // Note: Even complex code has some pattern repetition
-                        assert!(
-                            score.pattern_repetition < 0.8,
-                            "{}: Expected lower repetition, got {}",
-                            example.name,
-                            score.pattern_repetition
-                        );
-                    }
+                // Test pattern repetition
+                if example.expected_high_repetition {
+                    assert!(
+                        score.pattern_repetition > 0.4,
+                        "{}: Expected high repetition, got {}",
+                        example.name,
+                        score.pattern_repetition
+                    );
+                } else {
+                    // Note: Even complex code has some pattern repetition
+                    assert!(
+                        score.pattern_repetition < 0.8,
+                        "{}: Expected lower repetition, got {}",
+                        example.name,
+                        score.pattern_repetition
+                    );
+                }
 
-                    // Test token entropy
-                    if example.expected_low_entropy {
-                        assert!(
-                            score.token_entropy < 0.65, // Adjusted threshold for real-world code
-                            "{}: Expected low entropy, got {}",
-                            example.name,
-                            score.token_entropy
-                        );
-                    } else {
-                        assert!(
-                            score.token_entropy > 0.3,
-                            "{}: Expected high entropy, got {}",
-                            example.name,
-                            score.token_entropy
-                        );
-                    }
+                // Test token entropy
+                if example.expected_low_entropy {
+                    assert!(
+                        score.token_entropy < 0.65, // Adjusted threshold for real-world code
+                        "{}: Expected low entropy, got {}",
+                        example.name,
+                        score.token_entropy
+                    );
+                } else {
+                    assert!(
+                        score.token_entropy > 0.3,
+                        "{}: Expected high entropy, got {}",
+                        example.name,
+                        score.token_entropy
+                    );
+                }
 
-                    // Test effective complexity (dampening)
-                    if example.expected_dampening {
-                        assert!(
-                            score.effective_complexity < 0.8, // Adjusted - any reduction is good
-                            "{}: Expected dampening, got effective complexity {}",
-                            example.name,
-                            score.effective_complexity
-                        );
-                    } else {
-                        assert!(
-                            score.effective_complexity > 0.7, // High complexity retained
-                            "{}: Expected no dampening, got effective complexity {}",
-                            example.name,
-                            score.effective_complexity
-                        );
-                    }
+                // Test effective complexity (dampening)
+                if example.expected_dampening {
+                    assert!(
+                        score.effective_complexity < 0.8, // Adjusted - any reduction is good
+                        "{}: Expected dampening, got effective complexity {}",
+                        example.name,
+                        score.effective_complexity
+                    );
+                } else {
+                    assert!(
+                        score.effective_complexity > 0.7, // High complexity retained
+                        "{}: Expected no dampening, got effective complexity {}",
+                        example.name,
+                        score.effective_complexity
+                    );
                 }
             }
         }
@@ -304,22 +304,22 @@ fn test_false_positive_reduction() {
         assert!(func.cyclomatic >= 5, "Expected high cyclomatic complexity");
 
         // With entropy, effective complexity should be much lower
-        if let Ok(file) = syn::parse_str::<syn::File>(validation_code) {
-            if let Some(syn::Item::Fn(item_fn)) = file.items.first() {
-                let mut entropy_analyzer = EntropyAnalyzer::new();
-                let score = entropy_analyzer.calculate_entropy(&item_fn.block);
+        if let Ok(file) = syn::parse_str::<syn::File>(validation_code)
+            && let Some(syn::Item::Fn(item_fn)) = file.items.first()
+        {
+            let mut entropy_analyzer = EntropyAnalyzer::new();
+            let score = entropy_analyzer.calculate_entropy(&item_fn.block);
 
-                // Should detect the pattern and reduce complexity
-                assert!(score.pattern_repetition > 0.4); // Validation patterns detected
-                assert!(score.effective_complexity < 0.85); // Some reduction expected
+            // Should detect the pattern and reduce complexity
+            assert!(score.pattern_repetition > 0.4); // Validation patterns detected
+            assert!(score.effective_complexity < 0.85); // Some reduction expected
 
-                // Calculate dampened complexity
-                let _dampened = apply_entropy_dampening(func.cyclomatic, &score);
+            // Calculate dampened complexity
+            let _dampened = apply_entropy_dampening(func.cyclomatic, &score);
 
-                // Note: This will only work if entropy is enabled in config
-                // For testing, we verify the calculation would reduce complexity
-                assert!(score.effective_complexity < 1.0);
-            }
+            // Note: This will only work if entropy is enabled in config
+            // For testing, we verify the calculation would reduce complexity
+            assert!(score.effective_complexity < 1.0);
         }
     }
 }
@@ -427,25 +427,24 @@ fn test_entropy_benchmark_suite() {
             .unwrap();
         let metrics = analyzer.analyze(&ast);
 
-        if let Some(func) = metrics.complexity.functions.first() {
-            if let Ok(file) = syn::parse_str::<syn::File>(example.code) {
-                if let Some(syn::Item::Fn(item_fn)) = file.items.first() {
-                    let hash = format!("{}_hash", example.name);
-                    let score = entropy_analyzer.calculate_entropy_cached(&item_fn.block, &hash);
+        if let Some(func) = metrics.complexity.functions.first()
+            && let Ok(file) = syn::parse_str::<syn::File>(example.code)
+            && let Some(syn::Item::Fn(item_fn)) = file.items.first()
+        {
+            let hash = format!("{}_hash", example.name);
+            let score = entropy_analyzer.calculate_entropy_cached(&item_fn.block, &hash);
 
-                    let reduction = 1.0 - score.effective_complexity;
-                    total_reduction += reduction;
-                    count += 1;
+            let reduction = 1.0 - score.effective_complexity;
+            total_reduction += reduction;
+            count += 1;
 
-                    println!(
-                        "{}: Complexity {} -> {:.1} ({}% reduction)",
-                        example.name,
-                        func.cyclomatic,
-                        func.cyclomatic as f64 * score.effective_complexity,
-                        (reduction * 100.0) as i32
-                    );
-                }
-            }
+            println!(
+                "{}: Complexity {} -> {:.1} ({}% reduction)",
+                example.name,
+                func.cyclomatic,
+                func.cyclomatic as f64 * score.effective_complexity,
+                (reduction * 100.0) as i32
+            );
         }
     }
 

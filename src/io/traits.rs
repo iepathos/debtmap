@@ -159,14 +159,17 @@ impl CoverageData {
             let lines_in_range: Vec<_> = fc
                 .line_hits
                 .iter()
-                .filter(|(&line, _)| line >= start_line && line <= end_line)
+                .filter(|&(&line, _)| line >= start_line && line <= end_line)
                 .collect();
 
             if lines_in_range.is_empty() {
                 return 0.0;
             }
 
-            let hit_count = lines_in_range.iter().filter(|(_, &hits)| hits > 0).count();
+            let hit_count = lines_in_range
+                .iter()
+                .filter(|&&(_, &hits)| hits > 0)
+                .count();
             (hit_count as f64 / lines_in_range.len() as f64) * 100.0
         })
     }
@@ -255,9 +258,10 @@ mod tests {
     #[test]
     fn test_coverage_data_empty() {
         let data = CoverageData::new();
-        assert!(data
-            .get_file_coverage(Path::new("nonexistent.rs"))
-            .is_none());
+        assert!(
+            data.get_file_coverage(Path::new("nonexistent.rs"))
+                .is_none()
+        );
     }
 
     #[test]

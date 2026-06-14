@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use super::super::types::{capitalize_first, BehaviorCategory, MethodCluster};
+use super::super::types::{BehaviorCategory, MethodCluster, capitalize_first};
 use super::cohesion::calculate_standalone_cohesion;
 
 const MIN_CLUSTER_SIZE: usize = 3;

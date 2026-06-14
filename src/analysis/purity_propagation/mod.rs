@@ -22,13 +22,13 @@ mod known_pure_functions;
 pub use cache::PurityCache;
 pub use call_graph_adapter::PurityCallGraphAdapter;
 pub use known_pure_functions::{
-    aggregate_callee_purity, resolve_callee_purity, CalleeEvidence, CalleePurity,
+    CalleeEvidence, CalleePurity, aggregate_callee_purity, resolve_callee_purity,
 };
 
 use crate::analysis::purity_analysis::{PurityAnalysis, PurityAnalyzer, PurityLevel};
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::FunctionId;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use dashmap::DashMap;
 
 /// Result of purity propagation for a function

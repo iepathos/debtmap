@@ -100,10 +100,10 @@ impl<'a> ErrorPropagationAnalyzer<'a> {
         };
 
         // Check if this item is suppressed
-        if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &debt_type) {
-                return;
-            }
+        if let Some(checker) = self.suppression
+            && checker.is_suppressed(line, &debt_type)
+        {
+            return;
         }
 
         let priority = self.determine_priority(&quality);

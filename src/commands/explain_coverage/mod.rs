@@ -32,7 +32,7 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
 use crate::risk::coverage_index::CoverageIndex;
-use crate::risk::lcov::{parse_lcov_file, LcovData};
+use crate::risk::lcov::{LcovData, parse_lcov_file};
 
 use formatter::format_text_report;
 use strategies::{search_all_files, try_exact_match, try_path_strategies};

@@ -45,7 +45,7 @@
 //! }
 //! ```
 
-use syn::{visit::Visit, BinOp, Expr, ExprBinary, ExprCall, ExprIf, ExprMethodCall, ItemFn, Stmt};
+use syn::{BinOp, Expr, ExprBinary, ExprCall, ExprIf, ExprMethodCall, ItemFn, Stmt, visit::Visit};
 
 #[derive(Debug, Clone)]
 pub struct DataFlowProfile {
@@ -262,12 +262,11 @@ impl<'ast> Visit<'ast> for DataFlowVisitor {
 
     fn visit_stmt(&mut self, node: &'ast Stmt) {
         // Track struct initialization (builder pattern)
-        if let Stmt::Local(local) = node {
-            if let Some(init) = &local.init {
-                if matches!(init.expr.as_ref(), Expr::Struct(_)) {
-                    self.transformation_ops += 1;
-                }
-            }
+        if let Stmt::Local(local) = node
+            && let Some(init) = &local.init
+            && matches!(init.expr.as_ref(), Expr::Struct(_))
+        {
+            self.transformation_ops += 1;
         }
 
         syn::visit::visit_stmt(self, node);

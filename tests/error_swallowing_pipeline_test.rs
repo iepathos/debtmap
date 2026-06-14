@@ -131,7 +131,12 @@ fn some_function() -> Result<i32, std::io::Error> {
     assert!(
         !functions_with_error_swallowing.is_empty(),
         "FunctionMetrics should have error_swallowing_count set for functions with error swallowing patterns. Functions: {:?}",
-        metrics.complexity.functions.iter().map(|f| (&f.name, f.error_swallowing_count)).collect::<Vec<_>>()
+        metrics
+            .complexity
+            .functions
+            .iter()
+            .map(|f| (&f.name, f.error_swallowing_count))
+            .collect::<Vec<_>>()
     );
 
     // Verify patterns are detected correctly

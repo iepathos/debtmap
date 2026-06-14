@@ -4,11 +4,11 @@ use super::detail_pages;
 use super::{app::ResultsApp, detail_page::DetailPage};
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 
 /// Render detail view for selected item

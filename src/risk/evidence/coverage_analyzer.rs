@@ -2,10 +2,10 @@ use super::{
     ComparisonResult, CoverageEvidence, RemediationAction, RiskEvidence, RiskFactor, RiskSeverity,
     RiskType, TestQuality, TestType,
 };
+use crate::priority::FunctionAnalysis;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::coverage_propagation::calculate_indirect_coverage;
 use crate::priority::semantic_classifier::FunctionRole;
-use crate::priority::FunctionAnalysis;
 use crate::risk::evidence::RiskContext;
 use crate::risk::lcov::LcovData;
 use crate::risk::thresholds::{CoverageThresholds, StatisticalThresholdProvider};

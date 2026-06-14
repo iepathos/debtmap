@@ -133,9 +133,10 @@ end_of_record
 
         assert_eq!(data.total_lines, 2);
         assert_eq!(data.lines_hit, 2);
-        assert!(data
-            .get_function_coverage(std::path::Path::new("/path/to/file.rs"), "test_function")
-            .is_some());
+        assert!(
+            data.get_function_coverage(std::path::Path::new("/path/to/file.rs"), "test_function")
+                .is_some()
+        );
     }
 
     /// Test backward compatibility of re-exports

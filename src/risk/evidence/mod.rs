@@ -3,8 +3,8 @@ pub mod complexity_analyzer;
 pub mod coupling_analyzer;
 pub mod coverage_analyzer;
 
-use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::FunctionVisibility;
+use crate::priority::semantic_classifier::FunctionRole;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

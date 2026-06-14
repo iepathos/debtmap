@@ -204,21 +204,21 @@ impl AnalyzeConfig<Unvalidated> {
         }
 
         // Validate output path if specified
-        if let Some(ref output) = self.output {
-            if let Some(parent) = output.parent() {
-                // Empty parent means current directory (e.g., "file.json" has parent "")
-                // which is always valid
-                if !parent.as_os_str().is_empty() && !parent.exists() {
-                    anyhow::bail!("Output directory does not exist: {}", parent.display());
-                }
+        if let Some(ref output) = self.output
+            && let Some(parent) = output.parent()
+        {
+            // Empty parent means current directory (e.g., "file.json" has parent "")
+            // which is always valid
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                anyhow::bail!("Output directory does not exist: {}", parent.display());
             }
         }
 
         // Validate coverage file if specified
-        if let Some(ref coverage_file) = self.coverage_file {
-            if !coverage_file.exists() {
-                anyhow::bail!("Coverage file does not exist: {}", coverage_file.display());
-            }
+        if let Some(ref coverage_file) = self.coverage_file
+            && !coverage_file.exists()
+        {
+            anyhow::bail!("Coverage file does not exist: {}", coverage_file.display());
         }
 
         // Validate job count
@@ -227,19 +227,19 @@ impl AnalyzeConfig<Unvalidated> {
         }
 
         // Validate min_score if specified
-        if let Some(min_score) = self.min_score {
-            if !(0.0..=100.0).contains(&min_score) {
-                anyhow::bail!("Minimum score must be between 0.0 and 100.0");
-            }
+        if let Some(min_score) = self.min_score
+            && !(0.0..=100.0).contains(&min_score)
+        {
+            anyhow::bail!("Minimum score must be between 0.0 and 100.0");
         }
 
-        if let Some(ref min_priority) = self.min_priority {
-            if !matches!(
+        if let Some(ref min_priority) = self.min_priority
+            && !matches!(
                 min_priority.to_ascii_lowercase().as_str(),
                 "low" | "medium" | "high" | "critical"
-            ) {
-                anyhow::bail!("Minimum priority must be one of: low, medium, high, critical");
-            }
+            )
+        {
+            anyhow::bail!("Minimum priority must be one of: low, medium, high, critical");
         }
 
         // Validation successful - transition to validated state

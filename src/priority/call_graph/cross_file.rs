@@ -247,8 +247,8 @@ impl CallGraph {
     /// - No shared mutable state between threads
     pub fn resolve_cross_file_calls(&mut self) {
         use rayon::prelude::*;
-        use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
         let mut all_functions: Vec<FunctionId> = self.get_all_functions().cloned().collect();
         all_functions.sort();

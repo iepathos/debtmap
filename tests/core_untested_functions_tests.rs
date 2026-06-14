@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 use debtmap::core::{
+    ComplexityMetrics, FileMetrics, FunctionMetrics, Language,
     lazy::TransformationPipeline,
     metrics::combine_metrics,
-    monadic::{lift_result, traverse_results, Applicative, OptionExt, ResultExt},
-    ComplexityMetrics, FileMetrics, FunctionMetrics, Language,
+    monadic::{Applicative, OptionExt, ResultExt, lift_result, traverse_results},
 };
 use std::path::PathBuf;
 

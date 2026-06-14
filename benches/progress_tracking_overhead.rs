@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::utils::analysis_helpers::{detect_duplications, detect_duplications_with_progress};
 use std::hint::black_box;
 use std::path::PathBuf;

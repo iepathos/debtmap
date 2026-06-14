@@ -329,10 +329,9 @@ impl EvidenceFormatter {
             .evidence
             .iter()
             .find(|s| matches!(s.signal_type, SignalType::IoDetection))
+            && io_signal.confidence < 0.60
         {
-            if io_signal.confidence < 0.60 {
-                reasons.push("I/O pattern unclear - mixed operations");
-            }
+            reasons.push("I/O pattern unclear - mixed operations");
         }
 
         // Check for call graph clarity
@@ -340,10 +339,9 @@ impl EvidenceFormatter {
             .evidence
             .iter()
             .find(|s| matches!(s.signal_type, SignalType::CallGraph))
+            && cg_signal.confidence < 0.60
         {
-            if cg_signal.confidence < 0.60 {
-                reasons.push("No clear structural pattern - neither orchestrator nor leaf");
-            }
+            reasons.push("No clear structural pattern - neither orchestrator nor leaf");
         }
 
         // Check for ambiguity

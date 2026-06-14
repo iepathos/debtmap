@@ -66,19 +66,19 @@ pub mod profiling;
 pub mod tracing;
 
 pub use context::{
-    get_current_context, get_progress, increment_processed, set_current_file, set_phase,
-    set_phase_persistent, set_progress, AnalysisContext, AnalysisPhase, ContextGuard,
+    AnalysisContext, AnalysisPhase, ContextGuard, get_current_context, get_progress,
+    increment_processed, set_current_file, set_phase, set_phase_persistent, set_progress,
 };
 pub use panic_hook::{
-    extract_thread_panic_message, get_last_panic_info, install_panic_hook, CapturedPanicInfo,
+    CapturedPanicInfo, extract_thread_panic_message, get_last_panic_info, install_panic_hook,
 };
 pub use parallel::{
-    process_file_with_context, with_parallel_context, ParallelContext, ParallelContextExt,
-    ParallelContextGuard,
+    ParallelContext, ParallelContextExt, ParallelContextGuard, process_file_with_context,
+    with_parallel_context,
 };
 pub use profiling::{
-    enable_profiling, get_timing_report, is_profiling_enabled, reset_timing_data, PhaseTiming,
-    TimingReport, TimingSpan,
+    PhaseTiming, TimingReport, TimingSpan, enable_profiling, get_timing_report,
+    is_profiling_enabled, reset_timing_data,
 };
 pub use tracing::{
     init_tracing, init_tracing_with_filter, is_debug_enabled, is_tui_active, set_tui_active,

@@ -152,10 +152,10 @@ impl<T> Lazy<T> {
 
     /// Force evaluation and get the value
     pub fn force(&mut self) -> &T {
-        if self.value.is_none() {
-            if let Some(generator) = self.generator.take() {
-                self.value = Some(generator());
-            }
+        if self.value.is_none()
+            && let Some(generator) = self.generator.take()
+        {
+            self.value = Some(generator());
         }
         // Safe: Either value was already Some, or we just set it via generator
         // The only edge case is if force() is called after generator was already taken

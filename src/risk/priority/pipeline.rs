@@ -1,4 +1,4 @@
-use super::{stages::*, TestTarget};
+use super::{TestTarget, stages::*};
 
 pub trait PrioritizationStage {
     fn process(&self, targets: Vec<TestTarget>) -> Vec<TestTarget>;

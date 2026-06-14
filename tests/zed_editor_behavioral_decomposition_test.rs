@@ -1,3 +1,4 @@
+use debtmap::extraction::UnifiedFileExtractor;
 /// Integration test for Spec 178: Behavioral Decomposition on Zed-like Editor
 ///
 /// This test demonstrates behavioral decomposition analysis on a realistic
@@ -9,10 +10,9 @@
 /// 3. Shows field dependencies for each behavioral group
 /// 4. Provides specific method extraction recommendations (not just struct grouping)
 use debtmap::extraction::adapters::god_object::analyze_god_objects;
-use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::organization::{
-    cluster_methods_by_behavior, suggest_trait_extraction, BehaviorCategory, BehavioralCategorizer,
-    FieldAccessTracker, MethodCluster,
+    BehaviorCategory, BehavioralCategorizer, FieldAccessTracker, MethodCluster,
+    cluster_methods_by_behavior, suggest_trait_extraction,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -431,7 +431,9 @@ fn test_provides_specific_method_extraction_recommendations() {
     }
 
     if !has_event_handling_split {
-        eprintln!("Warning: No event handling split found - behavioral categorization may need enhancement");
+        eprintln!(
+            "Warning: No event handling split found - behavioral categorization may need enhancement"
+        );
     }
 }
 

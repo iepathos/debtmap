@@ -2,8 +2,8 @@
 
 use std::collections::HashSet;
 use syn::{
-    visit::Visit, Block, Expr, ExprAsync, ExprAwait, ExprBlock, ExprCall, ExprClosure,
-    ExprMethodCall, Item, ItemFn, Path, Stmt, UseTree,
+    Block, Expr, ExprAsync, ExprAwait, ExprBlock, ExprCall, ExprClosure, ExprMethodCall, Item,
+    ItemFn, Path, Stmt, UseTree, visit::Visit,
 };
 
 /// Detects async boundaries where blocking I/O would be problematic
@@ -480,10 +480,12 @@ mod tests {
 
         assert!(detector.imports.has_std_command);
         assert!(detector.imports.imported_symbols.contains("Command"));
-        assert!(detector
-            .imports
-            .imported_symbols
-            .contains("std::process::Command"));
+        assert!(
+            detector
+                .imports
+                .imported_symbols
+                .contains("std::process::Command")
+        );
     }
 
     #[test]

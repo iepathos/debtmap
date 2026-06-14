@@ -16,7 +16,7 @@ mod similarity;
 mod unclustered_handler;
 
 pub use hierarchical::{Cluster, HierarchicalClustering};
-pub use quality_metrics::{calculate_silhouette_score, ClusterQuality};
+pub use quality_metrics::{ClusterQuality, calculate_silhouette_score};
 pub use similarity::{
     CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider, SimilarityWeights,
 };

@@ -5,7 +5,7 @@
 
 use super::pattern_matchers::{matches_debug_pattern, matches_output_io_pattern};
 use crate::analyzers::rust_constructor_detector::{
-    analyze_function_body, extract_return_type, ConstructorReturnType,
+    ConstructorReturnType, analyze_function_body, extract_return_type,
 };
 use crate::analyzers::rust_enum_converter_detector::is_enum_converter;
 use crate::core::FunctionMetrics;

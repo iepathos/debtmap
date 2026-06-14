@@ -7,8 +7,8 @@ use super::dependencies::extract_dependencies;
 use super::metrics::{build_file_metrics, calculate_total_complexity};
 use super::visitor::analyze_ast;
 use crate::complexity::threshold_manager::ComplexityThresholds;
-use crate::core::ast::TypeScriptAst;
 use crate::core::FileMetrics;
+use crate::core::ast::TypeScriptAst;
 
 /// Analyze a TypeScript/JavaScript file and return file metrics
 pub fn analyze_typescript_file(

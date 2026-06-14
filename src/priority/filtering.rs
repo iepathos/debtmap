@@ -4,8 +4,8 @@
 //! about what was filtered and why. All functions are deterministic with no
 //! side effects, following the functional programming principles from Spec 224.
 
-use super::tiers::RecommendationTier;
 use super::DebtItem;
+use super::tiers::RecommendationTier;
 
 /// Metrics tracking filtering decisions with tier awareness.
 ///

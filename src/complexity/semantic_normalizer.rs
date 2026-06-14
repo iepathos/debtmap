@@ -413,10 +413,10 @@ fn has_early_return(statements: &[NormalizedStatement]) -> bool {
     for (i, stmt) in statements.iter().enumerate() {
         if i < statements.len() - 1 {
             // Check if this is a return that's not the last statement
-            if let NormalizedStatement::Expression(expr) = stmt {
-                if let Expr::Return(_) = &expr.original_expr {
-                    return true;
-                }
+            if let NormalizedStatement::Expression(expr) = stmt
+                && let Expr::Return(_) = &expr.original_expr
+            {
+                return true;
             }
         }
     }

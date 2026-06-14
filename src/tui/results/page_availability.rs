@@ -10,7 +10,7 @@
 //! a boolean indicating whether specific data is present.
 
 use crate::data_flow::DataFlowGraph;
-use crate::priority::{call_graph::FunctionId, UnifiedDebtItem};
+use crate::priority::{UnifiedDebtItem, call_graph::FunctionId};
 
 use super::detail_page::DetailPage;
 
@@ -200,8 +200,8 @@ pub fn ensure_valid_page(
 mod tests {
     use super::*;
     use crate::priority::{
-        unified_scorer::Location, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
-        UnifiedScore,
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, UnifiedScore,
+        unified_scorer::Location,
     };
     use std::path::PathBuf;
 

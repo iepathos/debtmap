@@ -58,10 +58,10 @@ fn is_callback_function(node: &Node) -> bool {
     }
 
     // Check if parent is arguments of a call expression
-    if let Some(parent) = node.parent() {
-        if parent.kind() == "arguments" {
-            return true;
-        }
+    if let Some(parent) = node.parent()
+        && parent.kind() == "arguments"
+    {
+        return true;
     }
 
     false

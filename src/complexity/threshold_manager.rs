@@ -436,7 +436,7 @@ mod tests {
         high_cyclomatic.cyclomatic = 50; // Way over 5 threshold
         high_cyclomatic.cognitive = 5; // Under 10 threshold
         high_cyclomatic.length = 100; // Over 20 threshold
-                                      // Total = 55, way over 8 threshold
+        // Total = 55, way over 8 threshold
 
         // This should be flagged - cyclomatic=50 is extremely complex
         assert!(
@@ -484,7 +484,7 @@ mod tests {
         very_long.cyclomatic = 6; // Just over 5 threshold
         very_long.cognitive = 12; // Just over 10 threshold
         very_long.length = 500; // 25x the threshold!
-                                // Total = 18, over 8 threshold
+        // Total = 18, over 8 threshold
 
         // This should be flagged - 500 lines is way too long
         assert!(

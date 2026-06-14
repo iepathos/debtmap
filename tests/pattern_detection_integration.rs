@@ -7,11 +7,11 @@
 //! - CLI options integration
 
 use debtmap::analysis::patterns::{
-    config::PatternConfig, PatternDetector, PatternInstance, PatternType,
+    PatternDetector, PatternInstance, PatternType, config::PatternConfig,
 };
 use debtmap::core::{
-    ast::{ClassDef, MethodDef},
     ComplexityMetrics, FileMetrics, Language,
+    ast::{ClassDef, MethodDef},
 };
 use std::fs;
 use std::path::PathBuf;
@@ -168,10 +168,12 @@ confidence = 0.9
     assert!(config.enabled);
     assert_eq!(config.confidence_threshold, 0.85);
     assert_eq!(config.observer.interface_markers.len(), 3);
-    assert!(config
-        .observer
-        .interface_markers
-        .contains(&"EventHandler".to_string()));
+    assert!(
+        config
+            .observer
+            .interface_markers
+            .contains(&"EventHandler".to_string())
+    );
     assert_eq!(config.factory.name_patterns.len(), 4);
     assert_eq!(config.custom_rules.len(), 1);
     assert_eq!(config.custom_rules[0].name, "event_handler");

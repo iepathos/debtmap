@@ -3,8 +3,8 @@ use crate::analyzers::go::dependencies::extract_dependencies;
 use crate::analyzers::go::generated::is_generated_go;
 use crate::analyzers::go::metrics::{build_file_metrics, to_function_metrics};
 use crate::analyzers::go::visitor::analyze_ast;
-use crate::core::ast::GoAst;
 use crate::core::FileMetrics;
+use crate::core::ast::GoAst;
 
 pub fn analyze_go_file(ast: &GoAst, threshold: u32) -> FileMetrics {
     let analysis = analyze_ast(ast);

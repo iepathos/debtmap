@@ -40,10 +40,10 @@ impl ModuleTypeDetector {
 pub fn determine_module_type(path: &Path) -> ModuleType {
     let path_str = path.to_string_lossy().to_lowercase();
 
-    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-        if ModuleTypeDetector::is_entry_point(file_name) {
-            return ModuleType::EntryPoint;
-        }
+    if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
+        && ModuleTypeDetector::is_entry_point(file_name)
+    {
+        return ModuleType::EntryPoint;
     }
 
     ModuleTypeDetector::from_path_patterns(&path_str)

@@ -158,14 +158,12 @@ impl GitHistoryProvider {
         }
 
         // Slow path: canonicalize both paths to resolve symlinks (e.g., /var -> /private/var)
-        if path.is_absolute() {
-            if let (Ok(canonical_path), Ok(canonical_root)) =
+        if path.is_absolute()
+            && let (Ok(canonical_path), Ok(canonical_root)) =
                 (path.canonicalize(), self.repo_root.canonicalize())
-            {
-                if let Ok(rel) = canonical_path.strip_prefix(&canonical_root) {
-                    return std::borrow::Cow::Owned(rel.to_path_buf());
-                }
-            }
+            && let Ok(rel) = canonical_path.strip_prefix(&canonical_root)
+        {
+            return std::borrow::Cow::Owned(rel.to_path_buf());
         }
 
         // Return original path if no stripping was possible
@@ -183,8 +181,8 @@ impl GitHistoryProvider {
         }
 
         // Try batched history (fast O(1) HashMap lookup)
-        if let Some(ref batched) = self.batched_history {
-            if let Some((
+        if let Some(ref batched) = self.batched_history
+            && let Some((
                 change_frequency,
                 bug_fix_count,
                 last_modified,
@@ -193,21 +191,20 @@ impl GitHistoryProvider {
                 total_commits,
                 age_days,
             )) = batched.calculate_metrics(relative_path.as_ref(), now)
-            {
-                let history = FileHistory {
-                    change_frequency,
-                    bug_fix_count,
-                    last_modified,
-                    author_count,
-                    stability_score,
-                    total_commits,
-                    age_days,
-                };
-                // Cache for future lookups (lock-free write)
-                self.cache
-                    .insert(relative_path.into_owned(), history.clone());
-                return Ok(history);
-            }
+        {
+            let history = FileHistory {
+                change_frequency,
+                bug_fix_count,
+                last_modified,
+                author_count,
+                stability_score,
+                total_commits,
+                age_days,
+            };
+            // Cache for future lookups (lock-free write)
+            self.cache
+                .insert(relative_path.into_owned(), history.clone());
+            return Ok(history);
         }
 
         // Fallback to direct git queries (slow path)
@@ -423,10 +420,10 @@ impl GitHistoryProvider {
         relative_path: &Path,
         target: &AnalysisTarget,
     ) -> Result<Option<function_level::FunctionHistory>> {
-        if let Some(ref batched) = self.batched_functions {
-            if let Some(history) = batched.get(relative_path, &target.function_name) {
-                return Ok(Some(history));
-            }
+        if let Some(ref batched) = self.batched_functions
+            && let Some(history) = batched.get(relative_path, &target.function_name)
+        {
+            return Ok(Some(history));
         }
 
         let Some(ref repo) = self.git2_repo else {

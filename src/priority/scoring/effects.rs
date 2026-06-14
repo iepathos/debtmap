@@ -86,8 +86,8 @@ fn determine_severity(score: f64) -> Severity {
 /// Get the current scoring weights from the environment.
 ///
 /// This effect provides direct access to the scoring weights.
-pub fn get_weights_effect<Env>(
-) -> impl Effect<Output = ScoreWeights, Error = AnalysisError, Env = Env>
+pub fn get_weights_effect<Env>()
+-> impl Effect<Output = ScoreWeights, Error = AnalysisError, Env = Env>
 where
     Env: ScoringEnv,
 {

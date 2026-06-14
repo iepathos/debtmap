@@ -52,10 +52,10 @@ impl TestClassifier {
             }
 
             // Check for tokio::test, async_std::test, etc.
-            if let Some(last_segment) = attr.path().segments.last() {
-                if last_segment.ident == "test" {
-                    return true;
-                }
+            if let Some(last_segment) = attr.path().segments.last()
+                && last_segment.ident == "test"
+            {
+                return true;
             }
 
             // Check for #[cfg(test)]

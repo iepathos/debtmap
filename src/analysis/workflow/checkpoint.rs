@@ -260,10 +260,12 @@ mod tests {
         // Loading should fail with version error
         let result = load_checkpoint(future_file.path());
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("newer than supported"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("newer than supported")
+        );
     }
 
     #[test]

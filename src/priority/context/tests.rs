@@ -8,7 +8,7 @@ mod integration_tests {
     };
     use crate::priority::call_graph::{CallType, FunctionId};
     use crate::priority::context::{
-        generate_context_suggestion, ContextConfig, ContextRelationship, FileRange,
+        ContextConfig, ContextRelationship, FileRange, generate_context_suggestion,
     };
     use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
     use crate::priority::{

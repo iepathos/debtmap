@@ -334,26 +334,36 @@ mod tests {
         analyzer.detect_entry_points(&functions);
 
         assert_eq!(analyzer.entry_points.len(), 5);
-        assert!(analyzer
-            .entry_points
-            .iter()
-            .any(|e| e.entry_type == EntryType::Main));
-        assert!(analyzer
-            .entry_points
-            .iter()
-            .any(|e| e.entry_type == EntryType::ApiEndpoint));
-        assert!(analyzer
-            .entry_points
-            .iter()
-            .any(|e| e.entry_type == EntryType::TestEntry));
-        assert!(analyzer
-            .entry_points
-            .iter()
-            .any(|e| e.entry_type == EntryType::EventHandler));
-        assert!(analyzer
-            .entry_points
-            .iter()
-            .any(|e| e.entry_type == EntryType::CliCommand));
+        assert!(
+            analyzer
+                .entry_points
+                .iter()
+                .any(|e| e.entry_type == EntryType::Main)
+        );
+        assert!(
+            analyzer
+                .entry_points
+                .iter()
+                .any(|e| e.entry_type == EntryType::ApiEndpoint)
+        );
+        assert!(
+            analyzer
+                .entry_points
+                .iter()
+                .any(|e| e.entry_type == EntryType::TestEntry)
+        );
+        assert!(
+            analyzer
+                .entry_points
+                .iter()
+                .any(|e| e.entry_type == EntryType::EventHandler)
+        );
+        assert!(
+            analyzer
+                .entry_points
+                .iter()
+                .any(|e| e.entry_type == EntryType::CliCommand)
+        );
     }
 
     #[test]

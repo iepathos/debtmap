@@ -19,7 +19,7 @@ impl PatternMatcher for MapPatternMatcher {
                     code_snippets: vec![],
                     line_numbers: vec![function.line as u32],
                     confidence_factors: vec![
-                        "Function uses map pattern for transformation".to_string()
+                        "Function uses map pattern for transformation".to_string(),
                     ],
                 },
                 assessment: PatternAssessment::GoodExample {
@@ -53,7 +53,7 @@ impl PatternMatcher for FilterPatternMatcher {
                     code_snippets: vec![],
                     line_numbers: vec![function.line as u32],
                     confidence_factors: vec![
-                        "Function uses filter pattern for selection".to_string()
+                        "Function uses filter pattern for selection".to_string(),
                     ],
                 },
                 assessment: PatternAssessment::GoodExample {
@@ -90,7 +90,7 @@ impl PatternMatcher for FoldPatternMatcher {
                     code_snippets: vec![],
                     line_numbers: vec![function.line as u32],
                     confidence_factors: vec![
-                        "Function uses fold/reduce pattern for aggregation".to_string()
+                        "Function uses fold/reduce pattern for aggregation".to_string(),
                     ],
                 },
                 assessment: PatternAssessment::GoodExample {
@@ -127,7 +127,7 @@ impl PatternMatcher for PipelinePatternMatcher {
                     code_snippets: vec![],
                     line_numbers: vec![function.line as u32],
                     confidence_factors: vec![
-                        "Function uses pipeline/composition pattern".to_string()
+                        "Function uses pipeline/composition pattern".to_string(),
                     ],
                 },
                 assessment: PatternAssessment::GoodExample {

@@ -211,13 +211,13 @@ impl DomainDiversityMetrics {
             ));
         }
 
-        if let Some((domain, count)) = self.smallest_domain() {
-            if count == 1 {
-                output.push_str(&format!(
-                    "Singleton domain: {} (1 struct) - may merge or recategorize\n",
-                    domain
-                ));
-            }
+        if let Some((domain, count)) = self.smallest_domain()
+            && count == 1
+        {
+            output.push_str(&format!(
+                "Singleton domain: {} (1 struct) - may merge or recategorize\n",
+                domain
+            ));
         }
 
         output
@@ -362,11 +362,7 @@ fn calculate_domain_entropy(
         .values()
         .map(|structs| {
             let p = structs.len() as f64 / total as f64;
-            if p > 0.0 {
-                -p * p.log2()
-            } else {
-                0.0
-            }
+            if p > 0.0 { -p * p.log2() } else { 0.0 }
         })
         .sum();
 

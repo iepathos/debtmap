@@ -1,11 +1,11 @@
 /// Benchmark for contextual risk analysis performance (spec 202)
 /// Verifies that --context flag adds less than 10% overhead
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::CallGraph;
+use debtmap::risk::RiskAnalyzer;
 use debtmap::risk::context::git_history::GitHistoryProvider;
 use debtmap::risk::context::{AnalysisTarget, ContextAggregator};
-use debtmap::risk::RiskAnalyzer;
 use std::hint::black_box;
 use std::path::PathBuf;
 use std::process::Command;

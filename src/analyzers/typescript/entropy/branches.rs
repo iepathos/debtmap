@@ -5,7 +5,7 @@
 //! - Switch cases: Compare case body token sequences
 //! - Ternary expressions: Compare branches
 
-use super::token::{extract_tokens_recursive, JsEntropyToken};
+use super::token::{JsEntropyToken, extract_tokens_recursive};
 use crate::complexity::entropy_core::EntropyToken;
 use tree_sitter::Node;
 

@@ -8,7 +8,7 @@
 /// A function with 90 callers where 85 are tests is NOT high-risk - it's well-tested code.
 /// This integration tests the full classification pipeline.
 use debtmap::priority::caller_classification::{
-    classify_caller, classify_callers, CallerType, ClassifiedCallers,
+    CallerType, ClassifiedCallers, classify_caller, classify_callers,
 };
 
 /// Test that production blast radius is correctly calculated as lower than total.

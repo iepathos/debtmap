@@ -283,10 +283,10 @@ fn format_single_split(
     .unwrap();
 
     // Evidence (conditional on verbosity)
-    if verbosity > 0 {
-        if let Some(ref evidence) = split.classification_evidence {
-            format_split_evidence(output, evidence);
-        }
+    if verbosity > 0
+        && let Some(ref evidence) = split.classification_evidence
+    {
+        format_split_evidence(output, evidence);
     }
 
     // Methods list (prefer representative_methods, fallback to methods_to_move)
@@ -308,12 +308,12 @@ fn format_single_split(
     }
 
     // Trait extraction (conditional on verbosity)
-    if let Some(ref trait_suggestion) = split.trait_suggestion {
-        if verbosity > 0 {
-            writeln!(output, "  - Trait extraction:").unwrap();
-            for line in trait_suggestion.lines() {
-                writeln!(output, "    {}", line).unwrap();
-            }
+    if let Some(ref trait_suggestion) = split.trait_suggestion
+        && verbosity > 0
+    {
+        writeln!(output, "  - Trait extraction:").unwrap();
+        for line in trait_suggestion.lines() {
+            writeln!(output, "    {}", line).unwrap();
         }
     }
 
@@ -416,9 +416,9 @@ mod tests {
     use crate::analysis::multi_signal_aggregation::{
         AggregatedClassification, ResponsibilityCategory, SignalEvidence, SignalType,
     };
+    use crate::organization::Priority;
     use crate::organization::file_classifier::FileType;
     use crate::organization::god_object::ModuleSplit;
-    use crate::organization::Priority;
     use std::path::PathBuf;
 
     fn test_file_metrics(total_lines: usize) -> FileDebtMetrics {

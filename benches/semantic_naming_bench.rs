@@ -2,7 +2,7 @@
 //!
 //! Validates that semantic naming adds <10% overhead to god object analysis.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::organization::semantic_naming::SemanticNameGenerator;
 use std::hint::black_box;
 

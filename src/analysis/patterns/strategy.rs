@@ -6,9 +6,9 @@
 //! - Strategy injection through constructors or setters
 
 use super::{
-    find_class_implementations, Implementation, PatternInstance, PatternRecognizer, PatternType,
+    Implementation, PatternInstance, PatternRecognizer, PatternType, find_class_implementations,
 };
-use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
+use crate::core::{FileMetrics, FunctionMetrics, ast::ClassDef};
 
 /// Extract class and method names from a qualified function name (e.g., "ClassName.method_name")
 fn parse_qualified_name(name: &str) -> Option<(&str, &str)> {
@@ -209,7 +209,7 @@ impl PatternRecognizer for StrategyPatternRecognizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ast::MethodDef, ComplexityMetrics, Language};
+    use crate::core::{ComplexityMetrics, Language, ast::MethodDef};
     use std::path::PathBuf;
 
     fn create_strategy_interface() -> ClassDef {

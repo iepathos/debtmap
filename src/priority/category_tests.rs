@@ -348,16 +348,22 @@ mod tests {
         let categorized = analysis.get_categorized_debt(10);
 
         // Verify categories exist
-        assert!(categorized
-            .categories
-            .contains_key(&DebtCategory::Architecture));
+        assert!(
+            categorized
+                .categories
+                .contains_key(&DebtCategory::Architecture)
+        );
         assert!(categorized.categories.contains_key(&DebtCategory::Testing));
-        assert!(categorized
-            .categories
-            .contains_key(&DebtCategory::Performance));
-        assert!(categorized
-            .categories
-            .contains_key(&DebtCategory::CodeQuality));
+        assert!(
+            categorized
+                .categories
+                .contains_key(&DebtCategory::Performance)
+        );
+        assert!(
+            categorized
+                .categories
+                .contains_key(&DebtCategory::CodeQuality)
+        );
 
         // Verify item counts
         let arch_summary = &categorized.categories[&DebtCategory::Architecture];
@@ -572,13 +578,17 @@ mod tests {
 
         // Only Architecture category should exist
         assert_eq!(categorized.categories.len(), 1);
-        assert!(categorized
-            .categories
-            .contains_key(&DebtCategory::Architecture));
+        assert!(
+            categorized
+                .categories
+                .contains_key(&DebtCategory::Architecture)
+        );
         assert!(!categorized.categories.contains_key(&DebtCategory::Testing));
-        assert!(!categorized
-            .categories
-            .contains_key(&DebtCategory::Performance));
+        assert!(
+            !categorized
+                .categories
+                .contains_key(&DebtCategory::Performance)
+        );
     }
 
     #[test]
@@ -602,12 +612,16 @@ mod tests {
 
         let categorized = analysis.get_categorized_debt(10);
 
-        assert!(categorized
-            .categories
-            .contains_key(&DebtCategory::Architecture));
+        assert!(
+            categorized
+                .categories
+                .contains_key(&DebtCategory::Architecture)
+        );
         assert!(categorized.categories.contains_key(&DebtCategory::Testing));
-        assert!(categorized
-            .categories
-            .contains_key(&DebtCategory::CodeQuality));
+        assert!(
+            categorized
+                .categories
+                .contains_key(&DebtCategory::CodeQuality)
+        );
     }
 }

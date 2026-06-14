@@ -159,7 +159,7 @@ pub fn count_expr_branches(expr: &Expr) -> u32 {
     match expr {
         Expr::If(expr_if) => {
             let mut count = 1; // if itself
-                               // Count condition complexity
+            // Count condition complexity
             count += count_expr_branches(&expr_if.cond);
             // Count then branch
             count += expr_if

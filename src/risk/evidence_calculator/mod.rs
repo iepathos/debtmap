@@ -23,13 +23,13 @@ mod risk_aggregation;
 mod risk_classification;
 mod role_utils;
 
-use crate::priority::call_graph::CallGraph;
 use crate::priority::FunctionAnalysis;
+use crate::priority::call_graph::CallGraph;
+use crate::risk::evidence::RiskAssessment;
 use crate::risk::evidence::change_analyzer::ChangeRiskAnalyzer;
 use crate::risk::evidence::complexity_analyzer::ComplexityRiskAnalyzer;
 use crate::risk::evidence::coupling_analyzer::CouplingRiskAnalyzer;
 use crate::risk::evidence::coverage_analyzer::CoverageRiskAnalyzer;
-use crate::risk::evidence::RiskAssessment;
 use crate::risk::lcov::LcovData;
 
 // Re-export pure functions for external use

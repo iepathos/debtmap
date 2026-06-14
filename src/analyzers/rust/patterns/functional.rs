@@ -3,7 +3,7 @@
 //! Analyzes functional programming patterns in functions.
 
 use crate::analysis::functional_composition::{
-    analyze_composition, CompositionMetrics, FunctionalAnalysisConfig,
+    CompositionMetrics, FunctionalAnalysisConfig, analyze_composition,
 };
 
 /// Perform functional composition analysis (spec 111)

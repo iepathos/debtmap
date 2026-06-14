@@ -8,10 +8,10 @@
 //! - Module split recommendation generation
 //! - Full analysis pipeline orchestration
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::organization::{
-    calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
-    group_methods_by_responsibility, GodObjectDetector, GodObjectThresholds, OrganizationDetector,
+    GodObjectDetector, GodObjectThresholds, OrganizationDetector, calculate_god_object_score,
+    calculate_god_object_score_weighted, determine_confidence, group_methods_by_responsibility,
 };
 use std::fs;
 use std::hint::black_box;

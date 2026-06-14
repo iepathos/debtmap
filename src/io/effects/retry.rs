@@ -18,7 +18,7 @@
 //! reasons) fail immediately without retry.
 
 use crate::config::RetryConfig;
-use crate::effects::{with_retry, AnalysisEffect};
+use crate::effects::{AnalysisEffect, with_retry};
 use std::path::PathBuf;
 
 use super::directory::walk_dir_effect;

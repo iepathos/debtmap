@@ -15,4 +15,4 @@ pub mod branches;
 pub mod patterns;
 pub mod token;
 
-pub use analyzer::{calculate_entropy, JsEntropyAnalyzer};
+pub use analyzer::{JsEntropyAnalyzer, calculate_entropy};

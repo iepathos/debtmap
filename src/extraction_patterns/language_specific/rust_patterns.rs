@@ -3,7 +3,7 @@ use crate::extraction_patterns::{
     GuardCheck, MatchedPattern, Parameter, PatternMatcher, ReturnType, TransformStage,
 };
 use quote::ToTokens;
-use syn::{visit::Visit, Expr, File, Pat, Stmt};
+use syn::{Expr, File, Pat, Stmt, visit::Visit};
 
 pub struct RustPatternMatcher {
     patterns: Vec<ExtractablePattern>,
@@ -386,30 +386,30 @@ impl<'ast, 'a> Visit<'ast> for GuardChainVisitor<'a> {
     }
 
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
-        if self.in_function {
-            if let Stmt::Expr(Expr::If(if_expr), _) = stmt {
-                // Check if this is a guard clause (early return)
-                let has_early_return = if_expr
-                    .then_branch
-                    .stmts
-                    .iter()
-                    .any(|s| matches!(s, Stmt::Expr(Expr::Return(_), _)));
+        if self.in_function
+            && let Stmt::Expr(Expr::If(if_expr), _) = stmt
+        {
+            // Check if this is a guard clause (early return)
+            let has_early_return = if_expr
+                .then_branch
+                .stmts
+                .iter()
+                .any(|s| matches!(s, Stmt::Expr(Expr::Return(_), _)));
 
-                if has_early_return {
-                    // Extract a snippet of the condition for line searching
-                    let condition_snippet = if_expr.cond.to_token_stream().to_string();
-                    // Simplify the condition text for searching (remove spaces)
-                    let _condition_text = condition_snippet.replace(" ", "");
+            if has_early_return {
+                // Extract a snippet of the condition for line searching
+                let condition_snippet = if_expr.cond.to_token_stream().to_string();
+                // Simplify the condition text for searching (remove spaces)
+                let _condition_text = condition_snippet.replace(" ", "");
 
-                    // Find the actual line number, ensure at least line 1
-                    let line = self.find_line_for_pattern("if").max(1);
+                // Find the actual line number, ensure at least line 1
+                let line = self.find_line_for_pattern("if").max(1);
 
-                    self.current_guards.push(GuardCheck {
-                        condition: condition_snippet,
-                        return_value: Some("Error".to_string()),
-                        line,
-                    });
-                }
+                self.current_guards.push(GuardCheck {
+                    condition: condition_snippet,
+                    return_value: Some("Error".to_string()),
+                    line,
+                });
             }
         }
 

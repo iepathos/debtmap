@@ -95,10 +95,10 @@ impl DomainTermExtractor {
             let tokens = self.tokenize_method_name(method);
 
             // Find verbs (action words at start of method name)
-            if let Some(first_token) = tokens.first() {
-                if action_verbs.contains(&first_token.as_str()) {
-                    *verb_counts.entry(first_token.clone()).or_insert(0) += 1;
-                }
+            if let Some(first_token) = tokens.first()
+                && action_verbs.contains(&first_token.as_str())
+            {
+                *verb_counts.entry(first_token.clone()).or_insert(0) += 1;
             }
 
             // Find nouns (significant domain terms, not at start)
@@ -439,7 +439,9 @@ impl DomainTermExtractor {
                                 specificity_score: 0.8,
                                 reasoning: format!(
                                     "Identified verb-noun pattern: '{}' + '{}' (avg frequency: {:.0}%)",
-                                    verb_candidate, noun_candidate, combined_freq * 100.0
+                                    verb_candidate,
+                                    noun_candidate,
+                                    combined_freq * 100.0
                                 ),
                                 strategy: NamingStrategy::DomainTerms,
                             });

@@ -10,11 +10,11 @@ use crate::priority::UnifiedDebtItem;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// Build all lines for the responsibilities page (pure function).
@@ -32,10 +32,10 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
     }
 
     // Add explanatory note for god objects
-    if let Some(indicators) = &item.god_object_indicators {
-        if indicators.is_god_object {
-            build_god_object_note(&mut lines, theme);
-        }
+    if let Some(indicators) = &item.god_object_indicators
+        && indicators.is_god_object
+    {
+        build_god_object_note(&mut lines, theme);
     }
 
     lines

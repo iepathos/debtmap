@@ -2,8 +2,8 @@
 ///
 /// Verifies that the role-based coverage expectations and scoring have
 /// minimal performance impact (<3% of analysis time) as required by spec.
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use debtmap::priority::scoring::{calculate_coverage_score, CoverageExpectations};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use debtmap::priority::scoring::{CoverageExpectations, calculate_coverage_score};
 use std::hint::black_box;
 
 fn bench_coverage_score_calculation(c: &mut Criterion) {

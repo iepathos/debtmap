@@ -48,28 +48,28 @@ use crate::core::FunctionMetrics;
 
 // Re-export EntropyAnalysis as the unified entropy type (Spec 218)
 // This is the SINGLE SOURCE OF TRUTH for entropy analysis data.
-pub use entropy_core::{aggregate_entropy, EntropyAnalysis};
+pub use entropy_core::{EntropyAnalysis, aggregate_entropy};
 
 // Re-export weighted complexity types (spec 121)
 pub use nested_callables::{
-    nested_callable_patterns, parse_nested_callable_patterns, scoring_complexity,
-    NestedCallableSummary,
+    NestedCallableSummary, nested_callable_patterns, parse_nested_callable_patterns,
+    scoring_complexity,
 };
 pub use weighted::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
 
 // Re-export pure complexity functions (spec 196)
 // These pure functions operate directly on AST and are much faster to test
 pub use pure::{
-    calculate_cognitive_for_block, calculate_cognitive_pure, calculate_cyclomatic_pure,
+    Pattern, calculate_cognitive_for_block, calculate_cognitive_pure, calculate_cyclomatic_pure,
     calculate_max_nesting_depth, calculate_nesting_depth, count_branches, detect_complex_matches,
-    detect_patterns_pure, is_pure_mapping_match, Pattern,
+    detect_patterns_pure, is_pure_mapping_match,
 };
 
 // Re-export effect wrappers for I/O operations (spec 196)
 pub use effects_wrappers::{
-    analyze_complexity_effect, calculate_cognitive_effect, calculate_cognitive_from_string,
-    calculate_cyclomatic_effect, calculate_cyclomatic_from_string, detect_patterns_effect,
-    detect_patterns_from_string, ComplexityResult,
+    ComplexityResult, analyze_complexity_effect, calculate_cognitive_effect,
+    calculate_cognitive_from_string, calculate_cyclomatic_effect, calculate_cyclomatic_from_string,
+    detect_patterns_effect, detect_patterns_from_string,
 };
 
 #[derive(Clone, Debug)]

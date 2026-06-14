@@ -1,11 +1,11 @@
+use debtmap::analyzers::Analyzer;
 use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
-use debtmap::analyzers::Analyzer;
+use debtmap::priority::DebtType;
 use debtmap::priority::call_graph::FunctionId;
 use debtmap::priority::scoring::classification::{
     classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
 };
-use debtmap::priority::DebtType;
 use im::HashSet;
 use std::path::PathBuf;
 
@@ -138,7 +138,9 @@ mod tests {
     for debt_type in debt_types {
         match debt_type {
             DebtType::DeadCode { .. } => {
-                panic!("DependencyGraph::calculate_coupling_metrics should not be classified as DeadCode! This is the false positive we're testing for.");
+                panic!(
+                    "DependencyGraph::calculate_coupling_metrics should not be classified as DeadCode! This is the false positive we're testing for."
+                );
             }
             _ => {
                 // Good - it's not dead code

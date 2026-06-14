@@ -201,48 +201,48 @@ fn extract_variable_functions_with_calls(
     let mut cursor = node.walk();
 
     for child in node.children(&mut cursor) {
-        if child.kind() == "variable_declarator" {
-            if let Some(name_node) = child.child_by_field_name("name") {
-                let name = node_text(&name_node, &ast.source).to_string();
+        if child.kind() == "variable_declarator"
+            && let Some(name_node) = child.child_by_field_name("name")
+        {
+            let name = node_text(&name_node, &ast.source).to_string();
 
-                if let Some(value_node) = child.child_by_field_name("value") {
-                    match value_node.kind() {
-                        "arrow_function" => {
-                            let line = value_node.start_position().row + 1;
-                            let body_node = value_node.child_by_field_name("body");
+            if let Some(value_node) = child.child_by_field_name("value") {
+                match value_node.kind() {
+                    "arrow_function" => {
+                        let line = value_node.start_position().row + 1;
+                        let body_node = value_node.child_by_field_name("body");
 
-                            let calls = body_node
-                                .map(|b| extract_calls_from_body(&b, ast))
-                                .unwrap_or_default();
+                        let calls = body_node
+                            .map(|b| extract_calls_from_body(&b, ast))
+                            .unwrap_or_default();
 
-                            functions.push(FunctionWithCalls {
-                                name: name.clone(),
-                                file: ast.path.clone(),
-                                line,
-                                calls,
-                                is_exported,
-                                is_test: is_test_function(&name),
-                            });
-                        }
-                        "function_expression" | "function" => {
-                            let line = value_node.start_position().row + 1;
-                            let body = value_node.child_by_field_name("body");
-
-                            let calls = body
-                                .map(|b| extract_calls_from_body(&b, ast))
-                                .unwrap_or_default();
-
-                            functions.push(FunctionWithCalls {
-                                name: name.clone(),
-                                file: ast.path.clone(),
-                                line,
-                                calls,
-                                is_exported,
-                                is_test: is_test_function(&name),
-                            });
-                        }
-                        _ => {}
+                        functions.push(FunctionWithCalls {
+                            name: name.clone(),
+                            file: ast.path.clone(),
+                            line,
+                            calls,
+                            is_exported,
+                            is_test: is_test_function(&name),
+                        });
                     }
+                    "function_expression" | "function" => {
+                        let line = value_node.start_position().row + 1;
+                        let body = value_node.child_by_field_name("body");
+
+                        let calls = body
+                            .map(|b| extract_calls_from_body(&b, ast))
+                            .unwrap_or_default();
+
+                        functions.push(FunctionWithCalls {
+                            name: name.clone(),
+                            file: ast.path.clone(),
+                            line,
+                            calls,
+                            is_exported,
+                            is_test: is_test_function(&name),
+                        });
+                    }
+                    _ => {}
                 }
             }
         }
@@ -269,12 +269,11 @@ fn extract_class_methods_with_calls(
         let mut cursor = body.walk();
 
         for child in body.children(&mut cursor) {
-            if child.kind() == "method_definition" {
-                if let Some(func) =
+            if child.kind() == "method_definition"
+                && let Some(func) =
                     extract_method_with_calls(&child, ast, class_name.as_deref(), is_exported)
-                {
-                    functions.push(func);
-                }
+            {
+                functions.push(func);
             }
         }
     }
@@ -323,13 +322,13 @@ fn extract_calls_from_body(body: &Node, ast: &TypeScriptAst) -> Vec<ExtractedCal
 
 /// Recursively extract function calls from AST nodes
 fn extract_calls_recursive(node: &Node, ast: &TypeScriptAst, calls: &mut Vec<ExtractedCall>) {
-    if node.kind() == "call_expression" {
-        if let Some(callee_name) = extract_callee_name(node, ast) {
-            calls.push(ExtractedCall {
-                callee_name,
-                line: node.start_position().row + 1,
-            });
-        }
+    if node.kind() == "call_expression"
+        && let Some(callee_name) = extract_callee_name(node, ast)
+    {
+        calls.push(ExtractedCall {
+            callee_name,
+            line: node.start_position().row + 1,
+        });
     }
 
     // Recurse into children

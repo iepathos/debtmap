@@ -1,7 +1,7 @@
-use debtmap::analyzers::{rust::RustAnalyzer, Analyzer};
+use debtmap::analyzers::{Analyzer, rust::RustAnalyzer};
 use debtmap::complexity::entropy::EntropyAnalyzer;
 use std::path::PathBuf;
-use syn::{parse_str, Block};
+use syn::{Block, parse_str};
 
 #[test]
 fn test_entropy_reduces_pattern_complexity() {

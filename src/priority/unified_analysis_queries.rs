@@ -9,7 +9,7 @@ use super::{
     DisplayGroup, ImpactLevel, Tier, TieredDisplay, UnifiedAnalysis, UnifiedDebtItem,
 };
 use crate::priority::filtering::{ClassifiedItem, FilterConfig, FilterResult};
-use crate::priority::tiers::{classify_tier, TierConfig};
+use crate::priority::tiers::{TierConfig, classify_tier};
 use im::Vector;
 use std::collections::{BTreeMap, HashMap};
 
@@ -538,69 +538,65 @@ fn identify_cross_category_dependencies(
     // Architecture issues often block effective testing
     if categories.contains_key(&DebtCategory::Architecture)
         && categories.contains_key(&DebtCategory::Testing)
+        && let Some(arch) = categories.get(&DebtCategory::Architecture)
     {
-        if let Some(arch) = categories.get(&DebtCategory::Architecture) {
-            // Check for god objects which are hard to test
-            let has_god_objects = arch.top_items.iter().any(|item| match item {
-                DebtItem::Function(func) => {
-                    matches!(func.debt_type, DebtType::GodObject { .. })
-                }
-                DebtItem::File(file) => file
-                    .metrics
-                    .god_object_analysis
-                    .as_ref()
-                    .is_some_and(|a| a.is_god_object),
-            });
+        // Check for god objects which are hard to test
+        let has_god_objects = arch.top_items.iter().any(|item| match item {
+            DebtItem::Function(func) => {
+                matches!(func.debt_type, DebtType::GodObject { .. })
+            }
+            DebtItem::File(file) => file
+                .metrics
+                .god_object_analysis
+                .as_ref()
+                .is_some_and(|a| a.is_god_object),
+        });
 
-            if has_god_objects {
-                dependencies.push(CrossCategoryDependency {
+        if has_god_objects {
+            dependencies.push(CrossCategoryDependency {
                     source_category: DebtCategory::Architecture,
                     target_category: DebtCategory::Testing,
                     description: "God objects and complex architectures make testing difficult. Refactor architecture first to enable effective testing.".to_string(),
                     impact_level: ImpactLevel::High,
                 });
-            }
         }
     }
 
     // Performance issues may require architectural changes
     if categories.contains_key(&DebtCategory::Performance)
         && categories.contains_key(&DebtCategory::Architecture)
+        && let Some(perf) = categories.get(&DebtCategory::Performance)
     {
-        if let Some(perf) = categories.get(&DebtCategory::Performance) {
-            // Check for async misuse which often requires architectural changes
-            let has_async_issues = perf.top_items.iter().any(|item| match item {
-                DebtItem::Function(func) => {
-                    matches!(func.debt_type, DebtType::AsyncMisuse { .. })
-                }
-                _ => false,
-            });
+        // Check for async misuse which often requires architectural changes
+        let has_async_issues = perf.top_items.iter().any(|item| match item {
+            DebtItem::Function(func) => {
+                matches!(func.debt_type, DebtType::AsyncMisuse { .. })
+            }
+            _ => false,
+        });
 
-            if has_async_issues {
-                dependencies.push(CrossCategoryDependency {
+        if has_async_issues {
+            dependencies.push(CrossCategoryDependency {
                     source_category: DebtCategory::Performance,
                     target_category: DebtCategory::Architecture,
                     description: "Async performance issues may require architectural refactoring for proper async/await patterns.".to_string(),
                     impact_level: ImpactLevel::Medium,
                 });
-            }
         }
     }
 
     // Complex code affects testability
     if categories.contains_key(&DebtCategory::CodeQuality)
         && categories.contains_key(&DebtCategory::Testing)
+        && let Some(quality) = categories.get(&DebtCategory::CodeQuality)
+        && quality.average_severity >= 70.0
     {
-        if let Some(quality) = categories.get(&DebtCategory::CodeQuality) {
-            if quality.average_severity >= 70.0 {
-                dependencies.push(CrossCategoryDependency {
+        dependencies.push(CrossCategoryDependency {
                     source_category: DebtCategory::CodeQuality,
                     target_category: DebtCategory::Testing,
                     description: "High complexity code is harder to test effectively. Simplify code first for better test coverage.".to_string(),
                     impact_level: ImpactLevel::Medium,
                 });
-            }
-        }
     }
 
     dependencies
@@ -806,31 +802,35 @@ mod tests {
     #[test]
     fn test_get_minimum_score_threshold_with_env_override() {
         // Test default threshold
-        std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD") };
         let default_threshold = crate::config::get_minimum_score_threshold();
         assert_eq!(default_threshold, 3.0);
 
         // Test environment variable override
-        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "5.0");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "5.0") };
         let env_threshold = crate::config::get_minimum_score_threshold();
         assert_eq!(env_threshold, 5.0);
 
         // Test zero threshold (disable filtering)
-        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "0.0");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "0.0") };
         let zero_threshold = crate::config::get_minimum_score_threshold();
         assert_eq!(zero_threshold, 0.0);
 
         // Clean up
-        std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD") };
     }
 
     // ============================================================
     // Tests for get_tiered_display
     // ============================================================
 
+    use crate::priority::CallGraph;
     use crate::priority::debt_types::FunctionVisibility;
     use crate::priority::semantic_classifier::FunctionRole;
-    use crate::priority::CallGraph;
 
     /// Create a test UnifiedDebtItem with specified score and debt type
     fn create_test_unified_item(name: &str, score: f64, debt_type: DebtType) -> UnifiedDebtItem {
@@ -1065,11 +1065,13 @@ mod tests {
 
         // Should have batch action for multiple items
         assert!(display.moderate[0].batch_action.is_some());
-        assert!(display.moderate[0]
-            .batch_action
-            .as_ref()
-            .unwrap()
-            .contains("2"));
+        assert!(
+            display.moderate[0]
+                .batch_action
+                .as_ref()
+                .unwrap()
+                .contains("2")
+        );
     }
 
     #[test]
@@ -1281,11 +1283,13 @@ mod tests {
         assert_eq!(group.items.len(), 3);
         assert!(group.batch_action.is_some());
         assert!(group.batch_action.as_ref().unwrap().contains("3"));
-        assert!(group
-            .batch_action
-            .as_ref()
-            .unwrap()
-            .contains("test coverage"));
+        assert!(
+            group
+                .batch_action
+                .as_ref()
+                .unwrap()
+                .contains("test coverage")
+        );
     }
 
     #[test]

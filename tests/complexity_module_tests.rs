@@ -1,5 +1,5 @@
 use debtmap::complexity::{
-    average_complexity, combine_complexity, max_complexity, ComplexityCalculator,
+    ComplexityCalculator, average_complexity, combine_complexity, max_complexity,
 };
 use debtmap::core::FunctionMetrics;
 use std::path::PathBuf;

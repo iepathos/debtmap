@@ -88,14 +88,16 @@ def io_func():
     let data = UnifiedFileExtractor::extract(path, source).expect("Failed to extract");
 
     let func = &data.functions[0];
-    assert!(func
-        .io_operations
-        .iter()
-        .any(|op| op.io_type == debtmap::extraction::IoType::Console));
-    assert!(func
-        .io_operations
-        .iter()
-        .any(|op| op.io_type == debtmap::extraction::IoType::File));
+    assert!(
+        func.io_operations
+            .iter()
+            .any(|op| op.io_type == debtmap::extraction::IoType::Console)
+    );
+    assert!(
+        func.io_operations
+            .iter()
+            .any(|op| op.io_type == debtmap::extraction::IoType::File)
+    );
 }
 
 #[test]

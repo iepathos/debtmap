@@ -1,6 +1,6 @@
+use syn::ItemFn;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::ItemFn;
 
 /// Scores test complexity using multiple factors
 pub struct ComplexityScorer {

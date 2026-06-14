@@ -105,14 +105,13 @@ impl<'a> PythonPurityAnalyzer<'a> {
 
     fn collect_locals(&mut self, node: &Node) {
         let kind = node.kind();
-        if kind == "assignment" {
-            if let Some(left) = node.child_by_field_name("left") {
-                if left.kind() == "identifier" {
-                    let name = &self.source[left.start_byte()..left.end_byte()];
-                    if !self.params.contains(name) {
-                        self.local_vars.insert(name.to_string());
-                    }
-                }
+        if kind == "assignment"
+            && let Some(left) = node.child_by_field_name("left")
+            && left.kind() == "identifier"
+        {
+            let name = &self.source[left.start_byte()..left.end_byte()];
+            if !self.params.contains(name) {
+                self.local_vars.insert(name.to_string());
             }
         }
 
@@ -353,9 +352,11 @@ def update_global(value):
         let analysis = analyze_py(source, vec!["value"]);
         assert!(!analysis.is_pure);
         assert_eq!(analysis.purity_level, PurityLevel::Impure);
-        assert!(analysis
-            .upvalue_mutations
-            .contains(&"Use of global/nonlocal statement".to_string()));
+        assert!(
+            analysis
+                .upvalue_mutations
+                .contains(&"Use of global/nonlocal statement".to_string())
+        );
     }
 
     #[test]

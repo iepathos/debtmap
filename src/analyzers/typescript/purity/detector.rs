@@ -757,28 +757,28 @@ fn extract_function_params(node: &Node, source: &str) -> Vec<String> {
                 }
                 "required_parameter" | "optional_parameter" => {
                     // TypeScript parameter - get the pattern/name
-                    if let Some(pattern) = child.child_by_field_name("pattern") {
-                        if let Ok(text) = pattern.utf8_text(source.as_bytes()) {
-                            params.push(text.to_string());
-                        }
+                    if let Some(pattern) = child.child_by_field_name("pattern")
+                        && let Ok(text) = pattern.utf8_text(source.as_bytes())
+                    {
+                        params.push(text.to_string());
                     }
                 }
                 "assignment_pattern" => {
                     // Default parameter: x = defaultValue
-                    if let Some(left) = child.child_by_field_name("left") {
-                        if let Ok(text) = left.utf8_text(source.as_bytes()) {
-                            params.push(text.to_string());
-                        }
+                    if let Some(left) = child.child_by_field_name("left")
+                        && let Ok(text) = left.utf8_text(source.as_bytes())
+                    {
+                        params.push(text.to_string());
                     }
                 }
                 "rest_pattern" => {
                     // Rest parameter: ...args
                     let mut cursor2 = child.walk();
                     for rest_child in child.children(&mut cursor2) {
-                        if rest_child.kind() == "identifier" {
-                            if let Ok(text) = rest_child.utf8_text(source.as_bytes()) {
-                                params.push(text.to_string());
-                            }
+                        if rest_child.kind() == "identifier"
+                            && let Ok(text) = rest_child.utf8_text(source.as_bytes())
+                        {
+                            params.push(text.to_string());
                         }
                     }
                 }
@@ -792,10 +792,10 @@ fn extract_function_params(node: &Node, source: &str) -> Vec<String> {
     }
 
     // Also check for single parameter (arrow functions: x => x + 1)
-    if let Some(param) = node.child_by_field_name("parameter") {
-        if let Ok(text) = param.utf8_text(source.as_bytes()) {
-            params.push(text.to_string());
-        }
+    if let Some(param) = node.child_by_field_name("parameter")
+        && let Ok(text) = param.utf8_text(source.as_bytes())
+    {
+        params.push(text.to_string());
     }
 
     params
@@ -850,15 +850,11 @@ mod tests {
                     // Look for arrow function
                     let mut cursor2 = child.walk();
                     for decl_child in child.children(&mut cursor2) {
-                        if decl_child.kind() == "variable_declarator" {
-                            if let Some(value) = decl_child.child_by_field_name("value") {
-                                if value.kind() == "arrow_function" {
-                                    return TypeScriptPurityAnalyzer::analyze_function(
-                                        &value,
-                                        &ast.source,
-                                    );
-                                }
-                            }
+                        if decl_child.kind() == "variable_declarator"
+                            && let Some(value) = decl_child.child_by_field_name("value")
+                            && value.kind() == "arrow_function"
+                        {
+                            return TypeScriptPurityAnalyzer::analyze_function(&value, &ast.source);
                         }
                     }
                 }
@@ -886,10 +882,12 @@ mod tests {
     fn test_impure_console_log() {
         let analysis = analyze_code("function log(msg) { console.log(msg); }");
         assert_eq!(analysis.level, PurityLevel::Impure);
-        assert!(analysis
-            .reasons
-            .iter()
-            .any(|r| matches!(r, JsImpurityReason::BrowserIO(_))));
+        assert!(
+            analysis
+                .reasons
+                .iter()
+                .any(|r| matches!(r, JsImpurityReason::BrowserIO(_)))
+        );
     }
 
     #[test]
@@ -903,10 +901,12 @@ mod tests {
     fn test_impure_fetch() {
         let analysis = analyze_code("async function getData() { await fetch('/api'); }");
         assert_eq!(analysis.level, PurityLevel::Impure);
-        assert!(analysis
-            .reasons
-            .iter()
-            .any(|r| matches!(r, JsImpurityReason::AsyncOperation)));
+        assert!(
+            analysis
+                .reasons
+                .iter()
+                .any(|r| matches!(r, JsImpurityReason::AsyncOperation))
+        );
     }
 
     #[test]
@@ -928,10 +928,12 @@ mod tests {
     fn test_impure_this_mutation() {
         let analysis = analyze_code("function setName(name) { this.name = name; }");
         assert_eq!(analysis.level, PurityLevel::Impure);
-        assert!(analysis
-            .reasons
-            .iter()
-            .any(|r| matches!(r, JsImpurityReason::ExternalMutation(_))));
+        assert!(
+            analysis
+                .reasons
+                .iter()
+                .any(|r| matches!(r, JsImpurityReason::ExternalMutation(_)))
+        );
     }
 
     #[test]
@@ -953,10 +955,12 @@ mod tests {
     fn test_impure_eval() {
         let analysis = analyze_code("function dangerous(code) { eval(code); }");
         assert_eq!(analysis.level, PurityLevel::Impure);
-        assert!(analysis
-            .reasons
-            .iter()
-            .any(|r| matches!(r, JsImpurityReason::DynamicEval)));
+        assert!(
+            analysis
+                .reasons
+                .iter()
+                .any(|r| matches!(r, JsImpurityReason::DynamicEval))
+        );
     }
 
     #[test]
@@ -998,30 +1002,36 @@ mod tests {
     fn test_impure_math_random() {
         let analysis = analyze_code("function rand() { return Math.random(); }");
         assert_eq!(analysis.level, PurityLevel::Impure);
-        assert!(analysis
-            .reasons
-            .iter()
-            .any(|r| matches!(r, JsImpurityReason::NonDeterministic(_))));
+        assert!(
+            analysis
+                .reasons
+                .iter()
+                .any(|r| matches!(r, JsImpurityReason::NonDeterministic(_)))
+        );
     }
 
     #[test]
     fn test_impure_date_now() {
         let analysis = analyze_code("function timestamp() { return Date.now(); }");
         assert_eq!(analysis.level, PurityLevel::Impure);
-        assert!(analysis
-            .reasons
-            .iter()
-            .any(|r| matches!(r, JsImpurityReason::NonDeterministic(_))));
+        assert!(
+            analysis
+                .reasons
+                .iter()
+                .any(|r| matches!(r, JsImpurityReason::NonDeterministic(_)))
+        );
     }
 
     #[test]
     fn test_impure_new_date_no_args() {
         let analysis = analyze_code("function now() { return new Date(); }");
         assert_eq!(analysis.level, PurityLevel::Impure);
-        assert!(analysis
-            .reasons
-            .iter()
-            .any(|r| matches!(r, JsImpurityReason::NonDeterministic(_))));
+        assert!(
+            analysis
+                .reasons
+                .iter()
+                .any(|r| matches!(r, JsImpurityReason::NonDeterministic(_)))
+        );
     }
 
     #[test]

@@ -43,10 +43,10 @@ impl<'a> TraitHandler<'a> {
             let var_name = pat_ident.ident.to_string();
 
             // Try to infer type from the initializer
-            if let Some(init) = &local.init {
-                if let Some(type_info) = self.type_tracker.resolve_expr_type(&init.expr) {
-                    self.type_tracker.record_variable(var_name, type_info);
-                }
+            if let Some(init) = &local.init
+                && let Some(type_info) = self.type_tracker.resolve_expr_type(&init.expr)
+            {
+                self.type_tracker.record_variable(var_name, type_info);
             }
         }
     }

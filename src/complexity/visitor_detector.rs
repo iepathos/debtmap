@@ -78,10 +78,11 @@ impl VisitorPatternDetector {
     pub fn detect_visitor_pattern(&mut self, file: &File, func: &ItemFn) -> Option<VisitorInfo> {
         // Check trait implementations
         for item in &file.items {
-            if let Item::Impl(impl_block) = item {
-                if self.is_visitor_trait(impl_block) && self.contains_function(impl_block, func) {
-                    return Some(self.analyze_visitor(func));
-                }
+            if let Item::Impl(impl_block) = item
+                && self.is_visitor_trait(impl_block)
+                && self.contains_function(impl_block, func)
+            {
+                return Some(self.analyze_visitor(func));
             }
         }
         None
@@ -89,20 +90,20 @@ impl VisitorPatternDetector {
 
     /// Check if an impl block is for a visitor trait
     fn is_visitor_trait(&self, impl_block: &ItemImpl) -> bool {
-        if let Some((_, path, _)) = &impl_block.trait_ {
-            if let Some(trait_name) = self.extract_trait_name(path) {
-                // Check exact matches
-                if self.visitor_traits.contains(&trait_name) {
-                    return true;
-                }
+        if let Some((_, path, _)) = &impl_block.trait_
+            && let Some(trait_name) = self.extract_trait_name(path)
+        {
+            // Check exact matches
+            if self.visitor_traits.contains(&trait_name) {
+                return true;
+            }
 
-                // Check for generic Visit traits like Visit<'ast>
-                if trait_name.starts_with("Visit")
-                    || trait_name.starts_with("Visitor")
-                    || trait_name.starts_with("Fold")
-                {
-                    return true;
-                }
+            // Check for generic Visit traits like Visit<'ast>
+            if trait_name.starts_with("Visit")
+                || trait_name.starts_with("Visitor")
+                || trait_name.starts_with("Fold")
+            {
+                return true;
             }
         }
         false

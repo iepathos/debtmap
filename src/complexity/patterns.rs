@@ -1,4 +1,4 @@
-use syn::{visit::Visit, Expr, Item};
+use syn::{Expr, Item, visit::Visit};
 
 /// Modern pattern complexity detection
 #[derive(Debug, Clone, Default)]
@@ -133,14 +133,14 @@ impl PatternDetector {
     }
 
     fn detect_functional_composition(&mut self, expr: &Expr) {
-        if let Expr::MethodCall(method) = expr {
-            if self.is_higher_order_function(expr) {
-                self.patterns.higher_order_functions += 1;
+        if let Expr::MethodCall(method) = expr
+            && self.is_higher_order_function(expr)
+        {
+            self.patterns.higher_order_functions += 1;
 
-                // Check if it's part of a chain
-                if let Expr::MethodCall(_) = &*method.receiver {
-                    self.patterns.functional_composition += 1;
-                }
+            // Check if it's part of a chain
+            if let Expr::MethodCall(_) = &*method.receiver {
+                self.patterns.functional_composition += 1;
             }
         }
     }
@@ -170,12 +170,11 @@ impl PatternDetector {
     }
 
     fn check_recursive_method_call(&mut self, expr: &Expr) {
-        if let Some(ref func_name) = self.current_function_name {
-            if let Expr::MethodCall(method) = expr {
-                if method.method == func_name {
-                    self.patterns.recursive_calls += 1;
-                }
-            }
+        if let Some(ref func_name) = self.current_function_name
+            && let Expr::MethodCall(method) = expr
+            && method.method == func_name
+        {
+            self.patterns.recursive_calls += 1;
         }
     }
 
@@ -207,10 +206,10 @@ impl PatternDetector {
     }
 
     fn check_recursive_function_call(&mut self, call: &syn::ExprCall) {
-        if let Some(ref func_name) = self.current_function_name {
-            if Self::is_recursive_call(&call.func, func_name) {
-                self.patterns.recursive_calls += 1;
-            }
+        if let Some(ref func_name) = self.current_function_name
+            && Self::is_recursive_call(&call.func, func_name)
+        {
+            self.patterns.recursive_calls += 1;
         }
     }
 

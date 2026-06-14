@@ -1,6 +1,6 @@
 use super::{
-    is_test_function, FlakinessType, ReliabilityImpact, TestQualityImpact, TestingAntiPattern,
-    TestingDetector,
+    FlakinessType, ReliabilityImpact, TestQualityImpact, TestingAntiPattern, TestingDetector,
+    is_test_function,
 };
 use std::path::Path;
 use syn::visit::Visit;

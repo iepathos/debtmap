@@ -1,9 +1,9 @@
 use debtmap::core::FunctionMetrics;
-use debtmap::priority::external_api_detector::{
-    generate_enhanced_dead_code_hints_with_config, is_likely_external_api_with_config,
-    ExternalApiConfig,
-};
 use debtmap::priority::FunctionVisibility;
+use debtmap::priority::external_api_detector::{
+    ExternalApiConfig, generate_enhanced_dead_code_hints_with_config,
+    is_likely_external_api_with_config,
+};
 use std::path::PathBuf;
 
 fn create_function(name: &str, path: &str, visibility: Option<String>) -> FunctionMetrics {

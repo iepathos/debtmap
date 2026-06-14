@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::builders::{call_graph, parallel_call_graph};
 use debtmap::priority::call_graph::CallGraph;
 use std::hint::black_box;

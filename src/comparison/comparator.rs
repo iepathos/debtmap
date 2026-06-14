@@ -444,8 +444,8 @@ mod tests {
     use super::*;
 
     use crate::priority::{
-        unified_scorer::{Location, UnifiedScore},
         DebtType, FunctionRole, ImpactMetrics,
+        unified_scorer::{Location, UnifiedScore},
     };
     use im::Vector;
     use std::path::PathBuf;

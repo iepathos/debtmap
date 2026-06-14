@@ -5,9 +5,9 @@
 
 use dashmap::DashMap;
 use std::sync::Arc;
-use syn::{visit::Visit, Block, Expr, ExprClosure, ExprMethodCall, ItemFn, Local, Pat, Stmt};
+use syn::{Block, Expr, ExprClosure, ExprMethodCall, ItemFn, Local, Pat, Stmt, visit::Visit};
 
-use super::confidence::{calculate_confidence_score, ConfidenceParams};
+use super::confidence::{ConfidenceParams, calculate_confidence_score};
 use super::constants::ITERATOR_METHODS;
 use super::io_detection::{is_io_call, is_mutation_method};
 use super::macro_handling::{apply_purity, classify_builtin, extract_macro_name};
@@ -421,21 +421,21 @@ impl PurityDetector {
             let scope = determine_mutation_scope(receiver, &self.scope);
             match scope {
                 MutationScope::Local => {
-                    if let Expr::Path(path) = &**receiver {
-                        if let Some(ident) = path.path.get_ident() {
-                            self.local_mutations.push(LocalMutation {
-                                target: ident.to_string(),
-                            });
-                        }
+                    if let Expr::Path(path) = &**receiver
+                        && let Some(ident) = path.path.get_ident()
+                    {
+                        self.local_mutations.push(LocalMutation {
+                            target: ident.to_string(),
+                        });
                     }
                 }
                 MutationScope::Upvalue => {
-                    if let Expr::Path(path) = &**receiver {
-                        if let Some(ident) = path.path.get_ident() {
-                            self.upvalue_mutations.push(UpvalueMutation {
-                                captured_var: ident.to_string(),
-                            });
-                        }
+                    if let Expr::Path(path) = &**receiver
+                        && let Some(ident) = path.path.get_ident()
+                    {
+                        self.upvalue_mutations.push(UpvalueMutation {
+                            captured_var: ident.to_string(),
+                        });
                     }
                 }
                 MutationScope::External => {
@@ -524,27 +524,23 @@ impl<'ast> Visit<'ast> for PurityDetector {
                             }
                         }
                         Expr::Field(field) => {
-                            if let Expr::Path(path) = &*field.base {
-                                if let Some(ident) = path.path.get_ident() {
-                                    self.local_mutations.push(LocalMutation {
-                                        target: format!(
-                                            "{}.{}",
-                                            ident,
-                                            quote::quote!(#field.member)
-                                        ),
-                                    });
-                                }
+                            if let Expr::Path(path) = &*field.base
+                                && let Some(ident) = path.path.get_ident()
+                            {
+                                self.local_mutations.push(LocalMutation {
+                                    target: format!("{}.{}", ident, quote::quote!(#field.member)),
+                                });
                             }
                         }
                         _ => {}
                     },
                     MutationScope::Upvalue => {
-                        if let Expr::Path(path) = &*assign.left {
-                            if let Some(ident) = path.path.get_ident() {
-                                self.upvalue_mutations.push(UpvalueMutation {
-                                    captured_var: ident.to_string(),
-                                });
-                            }
+                        if let Expr::Path(path) = &*assign.left
+                            && let Some(ident) = path.path.get_ident()
+                        {
+                            self.upvalue_mutations.push(UpvalueMutation {
+                                captured_var: ident.to_string(),
+                            });
                         }
                     }
                     MutationScope::External => {

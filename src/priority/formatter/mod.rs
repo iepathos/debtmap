@@ -4,7 +4,7 @@
 //! including detailed recommendations and summary tables.
 
 use crate::formatting::FormattingConfig;
-use crate::output::unified::{classify_coupling, CouplingClassification};
+use crate::output::unified::{CouplingClassification, classify_coupling};
 use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 
 use crate::priority::formatter_verbosity as verbosity;
@@ -231,29 +231,29 @@ pub fn format_file_priority_item_with_verbosity(
     }
 
     // God object details (if applicable)
-    if let Some(ref god_analysis) = item.metrics.god_object_analysis {
-        if god_analysis.is_god_object {
+    if let Some(ref god_analysis) = item.metrics.god_object_analysis
+        && god_analysis.is_god_object
+    {
+        writeln!(
+            output,
+            "{} {} methods, {} fields, {} responsibilities (score: {:.1})",
+            "├─ GOD OBJECT:".bright_blue(),
+            god_analysis.method_count,
+            god_analysis.field_count,
+            god_analysis.responsibility_count,
+            god_analysis.god_object_score
+        )
+        .unwrap();
+
+        // Show recommended splits if available
+        if !god_analysis.recommended_splits.is_empty() {
             writeln!(
                 output,
-                "{} {} methods, {} fields, {} responsibilities (score: {:.1})",
-                "├─ GOD OBJECT:".bright_blue(),
-                god_analysis.method_count,
-                god_analysis.field_count,
-                god_analysis.responsibility_count,
-                god_analysis.god_object_score
+                "   {} {} recommended module splits",
+                "Suggested:".dimmed(),
+                god_analysis.recommended_splits.len()
             )
             .unwrap();
-
-            // Show recommended splits if available
-            if !god_analysis.recommended_splits.is_empty() {
-                writeln!(
-                    output,
-                    "   {} {} recommended module splits",
-                    "Suggested:".dimmed(),
-                    god_analysis.recommended_splits.len()
-                )
-                .unwrap();
-            }
         }
     }
 
@@ -279,42 +279,39 @@ pub fn format_file_priority_item_with_verbosity(
 
 /// Generate rationale explaining why this file-level debt matters
 fn format_file_rationale(item: &crate::priority::FileDebtItem) -> String {
-    if let Some(ref god_analysis) = item.metrics.god_object_analysis {
-        if god_analysis.is_god_object {
-            let responsibilities = god_analysis.responsibility_count;
-            let methods = god_analysis.method_count;
+    if let Some(ref god_analysis) = item.metrics.god_object_analysis
+        && god_analysis.is_god_object
+    {
+        let responsibilities = god_analysis.responsibility_count;
+        let methods = god_analysis.method_count;
 
-            if responsibilities > 5 {
-                return format!(
-                    "File has {} distinct responsibilities across {} methods. High coupling makes changes risky and testing difficult. Splitting by responsibility will improve maintainability and reduce change impact.",
-                    responsibilities, methods
-                );
-            } else if methods > 50 {
-                return format!(
-                    "File contains {} methods with {} responsibilities. Large interface makes it difficult to understand and maintain. Extracting cohesive modules will improve clarity.",
-                    methods, responsibilities
-                );
-            } else {
-                return format!(
-                    "File exhibits god object characteristics (score: {:.1}). Refactoring will improve separation of concerns and testability.",
-                    god_analysis.god_object_score
-                );
-            }
+        if responsibilities > 5 {
+            return format!(
+                "File has {} distinct responsibilities across {} methods. High coupling makes changes risky and testing difficult. Splitting by responsibility will improve maintainability and reduce change impact.",
+                responsibilities, methods
+            );
+        } else if methods > 50 {
+            return format!(
+                "File contains {} methods with {} responsibilities. Large interface makes it difficult to understand and maintain. Extracting cohesive modules will improve clarity.",
+                methods, responsibilities
+            );
+        } else {
+            return format!(
+                "File exhibits god object characteristics (score: {:.1}). Refactoring will improve separation of concerns and testability.",
+                god_analysis.god_object_score
+            );
         }
     }
 
     if item.metrics.total_complexity > 500 {
         format!(
             "High total complexity ({}) across {} functions (avg: {:.1}). Breaking into smaller modules will reduce cognitive load and improve maintainability.",
-            item.metrics.total_complexity,
-            item.metrics.function_count,
-            item.metrics.avg_complexity
+            item.metrics.total_complexity, item.metrics.function_count, item.metrics.avg_complexity
         )
     } else if item.metrics.total_lines > 1000 {
         format!(
             "Large file ({} lines) with {} functions. Size alone increases maintenance burden and makes navigation difficult.",
-            item.metrics.total_lines,
-            item.metrics.function_count
+            item.metrics.total_lines, item.metrics.function_count
         )
     } else {
         "File-level refactoring will improve overall code organization and maintainability."

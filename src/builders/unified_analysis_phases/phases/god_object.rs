@@ -6,7 +6,7 @@
 use crate::organization::GodObjectAnalysis;
 use crate::priority::architecture_recognition::calculate_instability;
 use crate::priority::call_graph::CallGraph;
-use crate::priority::caller_classification::{classify_callers, ClassifiedCallers};
+use crate::priority::caller_classification::{ClassifiedCallers, classify_callers};
 use crate::priority::file_metrics::FileDebtMetrics;
 use crate::priority::god_object_aggregation::GodObjectAggregatedMetrics;
 use crate::priority::{
@@ -31,17 +31,16 @@ pub fn create_god_object_debt_item(
     call_graph: Option<&CallGraph>,
 ) -> UnifiedDebtItem {
     // Fallback: If no function-level coverage, use file-level coverage from LCOV
-    if aggregated_metrics.weighted_coverage.is_none() {
-        if let Some(coverage) = coverage_data {
-            if let Some(file_coverage) = coverage.get_file_coverage(file_path) {
-                aggregated_metrics.weighted_coverage = Some(TransitiveCoverage {
-                    direct: file_coverage,
-                    transitive: 0.0,
-                    propagated_from: vec![],
-                    uncovered_lines: vec![],
-                });
-            }
-        }
+    if aggregated_metrics.weighted_coverage.is_none()
+        && let Some(coverage) = coverage_data
+        && let Some(file_coverage) = coverage.get_file_coverage(file_path)
+    {
+        aggregated_metrics.weighted_coverage = Some(TransitiveCoverage {
+            direct: file_coverage,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
     }
 
     // Spec 267: Classify callers into production and test for god objects

@@ -4,18 +4,18 @@
 //! following Stillwater philosophy: "Pure Core, Imperative Shell".
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
-use crate::organization::{calculate_file_cohesion, FileCohesionResult};
+use crate::organization::{FileCohesionResult, calculate_file_cohesion};
 use crate::output::unified::CohesionClassification;
 use crate::priority::classification::Severity;
 use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 // ============================================================================
@@ -647,7 +647,7 @@ mod tests {
         assert!(content.contains("2 items at this location"));
         assert!(content.contains("combined"));
         assert!(content.contains("135.0")); // 75 + 60
-                                            // Spec 267: Should show individual item scores
+        // Spec 267: Should show individual item scores
         assert!(content.contains("item scores"));
         assert!(content.contains("High Complexity"));
         assert!(content.contains("Testing Gap"));

@@ -3,7 +3,7 @@
 //! Measures the performance impact of struct ownership-based god object analysis
 //! to verify < 10% overhead requirement (Spec 143 AC8 and NFR1)
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::organization::{GodObjectDetector, OrganizationDetector};
 use std::fs;
 use std::hint::black_box;

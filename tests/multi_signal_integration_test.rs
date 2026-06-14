@@ -100,7 +100,8 @@ async fn handle_create_user(
             || result.primary == ResponsibilityCategory::DatabaseIO
             || result.primary == ResponsibilityCategory::Orchestration
             || result.primary == ResponsibilityCategory::Unknown,
-        "Expected HTTP Handler, Database I/O, Orchestration, or Unknown (for minimal context), got {:?}", result.primary
+        "Expected HTTP Handler, Database I/O, Orchestration, or Unknown (for minimal context), got {:?}",
+        result.primary
     );
 }
 

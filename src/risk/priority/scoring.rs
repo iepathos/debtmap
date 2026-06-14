@@ -1,4 +1,4 @@
-use super::{module_detection::ModuleType, TestTarget};
+use super::{TestTarget, module_detection::ModuleType};
 use crate::core::ComplexityMetrics;
 use im::HashMap;
 use std::path::Path;

@@ -725,18 +725,24 @@ mod tests {
         let mut registry = FrameworkPatternRegistry::new();
 
         registry.auto_detect_frameworks(Path::new("tests/test_module.py"), &[]);
-        assert!(registry
-            .get_active_frameworks()
-            .contains(&FrameworkType::Pytest));
-        assert!(registry
-            .get_active_frameworks()
-            .contains(&FrameworkType::Unittest));
+        assert!(
+            registry
+                .get_active_frameworks()
+                .contains(&FrameworkType::Pytest)
+        );
+        assert!(
+            registry
+                .get_active_frameworks()
+                .contains(&FrameworkType::Unittest)
+        );
 
         let mut registry2 = FrameworkPatternRegistry::new();
         registry2.auto_detect_frameworks(Path::new("myapp/manage.py"), &[]);
-        assert!(registry2
-            .get_active_frameworks()
-            .contains(&FrameworkType::Django));
+        assert!(
+            registry2
+                .get_active_frameworks()
+                .contains(&FrameworkType::Django)
+        );
     }
 
     #[test]

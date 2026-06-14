@@ -4,8 +4,8 @@
 //! and analysis without any I/O or progress reporting side effects.
 
 use crate::analysis::FileContext;
-use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
 use crate::analyzers::FileAnalyzer;
+use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
 use crate::core::{FunctionMetrics, Language};
 use crate::priority::file_metrics::{FileDebtItem, FileDebtMetrics};
 use crate::risk::lcov::LcovData;

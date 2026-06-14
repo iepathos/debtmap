@@ -1,9 +1,9 @@
+use super::RecommendationTier;
 /// Pure tier classification logic using composed predicates.
 ///
 /// This module implements the "Pure Core, Imperative Shell" principle by composing
 /// small, testable predicate functions into tier classification logic.
 use super::predicates::*;
-use super::RecommendationTier;
 use crate::priority::{TierConfig, UnifiedDebtItem};
 
 /// Pure tier classification using composed predicates.

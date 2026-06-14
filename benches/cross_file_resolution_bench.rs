@@ -2,7 +2,7 @@
 //!
 //! Validates spec 133 requirement: 10-15% performance improvement on multi-core systems
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use std::hint::black_box;
 use std::path::PathBuf;

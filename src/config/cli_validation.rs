@@ -131,14 +131,14 @@ pub fn validate_analyze_args(
     }
 
     // Validate coverage file exists if provided
-    if let Some(coverage_path) = coverage_file {
-        if !coverage_path.exists() {
-            errors.push(CliValidationError {
-                argument: "--coverage-file".to_string(),
-                message: format!("file does not exist: {}", coverage_path.display()),
-                suggestion: Some("Check that the coverage file path is correct".to_string()),
-            });
-        }
+    if let Some(coverage_path) = coverage_file
+        && !coverage_path.exists()
+    {
+        errors.push(CliValidationError {
+            argument: "--coverage-file".to_string(),
+            message: format!("file does not exist: {}", coverage_path.display()),
+            suggestion: Some("Check that the coverage file path is correct".to_string()),
+        });
     }
 
     // Validate context dependencies
@@ -312,9 +312,11 @@ mod tests {
         );
 
         assert!(!errors.is_empty());
-        assert!(errors
-            .iter()
-            .any(|e| e.argument == "--coverage-file" && e.message.contains("does not exist")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.argument == "--coverage-file" && e.message.contains("does not exist"))
+        );
     }
 
     #[test]

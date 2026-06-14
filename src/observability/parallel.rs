@@ -57,10 +57,10 @@
 //! - Maximum performance is critical
 //! - No need for crash context
 
-use super::context::{get_current_context, increment_processed, set_current_file, AnalysisContext};
+use super::context::{AnalysisContext, get_current_context, increment_processed, set_current_file};
 use rayon::prelude::*;
 use std::path::Path;
-use tracing::{debug_span, Span};
+use tracing::{Span, debug_span};
 
 // Re-export thread-local for tests
 thread_local! {
@@ -286,7 +286,7 @@ impl<T, I: ParallelIterator<Item = T> + Sized> ParallelContextExt<T> for I {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::observability::context::{reset_context, reset_progress, set_phase, AnalysisPhase};
+    use crate::observability::context::{AnalysisPhase, reset_context, reset_progress, set_phase};
     use std::path::PathBuf;
 
     #[test]

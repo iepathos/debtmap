@@ -79,13 +79,13 @@ impl<'a> CallResolver<'a> {
             function_index.entry(key).or_default().push(func_id.clone());
 
             // Also index by just the function name without qualification
-            if let Some(simple_name) = func_id.name.split("::").last() {
-                if simple_name != func_id.name {
-                    function_index
-                        .entry(simple_name.to_string())
-                        .or_default()
-                        .push(func_id.clone());
-                }
+            if let Some(simple_name) = func_id.name.split("::").last()
+                && simple_name != func_id.name
+            {
+                function_index
+                    .entry(simple_name.to_string())
+                    .or_default()
+                    .push(func_id.clone());
             }
         }
 
@@ -133,11 +133,10 @@ impl<'a> CallResolver<'a> {
         if let CallSiteType::Instance {
             receiver_type: None,
         } = &call.call_site_type
+            && Self::is_common_library_method(&call.callee_name)
         {
-            if Self::is_common_library_method(&call.callee_name) {
-                // Conservative: assume it's a std library method
-                return ResolutionOutcome::IgnoredLibraryCall;
-            }
+            // Conservative: assume it's a std library method
+            return ResolutionOutcome::IgnoredLibraryCall;
         }
 
         let normalized_name = Self::normalize_path_prefix(&call.callee_name);
@@ -578,10 +577,10 @@ impl<'a> CallResolver<'a> {
     ) -> String {
         if let Some(recv_type) = receiver_type {
             // Handle self references
-            if recv_type == "Self" {
-                if let Some(impl_type) = current_impl_type {
-                    return format!("{}::{}", impl_type, method_name);
-                }
+            if recv_type == "Self"
+                && let Some(impl_type) = current_impl_type
+            {
+                return format!("{}::{}", impl_type, method_name);
             }
             format!("{}::{}", recv_type, method_name)
         } else {

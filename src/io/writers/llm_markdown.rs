@@ -300,12 +300,12 @@ pub mod format {
             writeln!(out, "- Purity Level: {}", level).unwrap();
         }
         writeln!(out, "- Confidence: {:.2}", p.confidence).unwrap();
-        if let Some(ref effects) = &p.side_effects {
-            if !effects.is_empty() {
-                writeln!(out, "- Side Effects:").unwrap();
-                for effect in effects {
-                    writeln!(out, "  - {}", effect).unwrap();
-                }
+        if let Some(effects) = &p.side_effects
+            && !effects.is_empty()
+        {
+            writeln!(out, "- Side Effects:").unwrap();
+            for effect in effects {
+                writeln!(out, "  - {}", effect).unwrap();
             }
         }
         Some(out)
@@ -380,25 +380,25 @@ pub mod format {
         format_optional_multiplier(&mut out, "Pattern Factor", s.pattern_factor);
 
         // Pre-normalization score if clamping occurred
-        if let Some(pre) = s.pre_normalization_score {
-            if (pre - s.final_score).abs() > 0.1 {
-                writeln!(
-                    out,
-                    "- Pre-normalization Score: {:.2} (clamped to {:.2})",
-                    pre, s.final_score
-                )
-                .unwrap();
-            }
+        if let Some(pre) = s.pre_normalization_score
+            && (pre - s.final_score).abs() > 0.1
+        {
+            writeln!(
+                out,
+                "- Pre-normalization Score: {:.2} (clamped to {:.2})",
+                pre, s.final_score
+            )
+            .unwrap();
         }
         writeln!(out, "- Final Score: {:.2}", s.final_score).unwrap();
         Some(out)
     }
 
     fn format_optional_multiplier(out: &mut String, label: &str, value: Option<f64>) {
-        if let Some(v) = value {
-            if (v - 1.0).abs() > 0.01 {
-                writeln!(out, "- {}: {:.2}", label, v).unwrap();
-            }
+        if let Some(v) = value
+            && (v - 1.0).abs() > 0.01
+        {
+            writeln!(out, "- {}: {:.2}", label, v).unwrap();
         }
     }
 

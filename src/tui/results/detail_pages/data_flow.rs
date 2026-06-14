@@ -2,16 +2,16 @@
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
 use crate::data_flow::{DataFlowGraph, PurityInfo};
-use crate::priority::call_graph::FunctionId;
 use crate::priority::UnifiedDebtItem;
+use crate::priority::call_graph::FunctionId;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// Format a reason with inline suggestion context
@@ -99,10 +99,10 @@ fn build_purity_section(
         add_label_value(lines, "reasons", formatted_reasons, theme, width);
 
         // Show actionable fix suggestion for almost-pure functions (1-2 issues)
-        if purity_info.impurity_reasons.len() <= 2 {
-            if let Some(suggestion) = get_fix_suggestion(&purity_info.impurity_reasons) {
-                add_label_value(lines, "fix", suggestion.to_string(), theme, width);
-            }
+        if purity_info.impurity_reasons.len() <= 2
+            && let Some(suggestion) = get_fix_suggestion(&purity_info.impurity_reasons)
+        {
+            add_label_value(lines, "fix", suggestion.to_string(), theme, width);
         }
     }
 
@@ -164,27 +164,27 @@ pub fn build_page_lines(
     }
 
     // I/O Operations Section
-    if let Some(io_ops) = data_flow.get_io_operations(&func_id) {
-        if !io_ops.is_empty() {
-            add_section_header(&mut lines, "i/o operations", theme);
+    if let Some(io_ops) = data_flow.get_io_operations(&func_id)
+        && !io_ops.is_empty()
+    {
+        add_section_header(&mut lines, "i/o operations", theme);
 
-            for op in io_ops {
-                lines.push(Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled(
-                        format!(
-                            "{} at line {} (variables: {})",
-                            op.operation_type,
-                            op.line,
-                            op.variables.join(", ")
-                        ),
-                        Style::default().fg(Color::Yellow),
+        for op in io_ops {
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    format!(
+                        "{} at line {} (variables: {})",
+                        op.operation_type,
+                        op.line,
+                        op.variables.join(", ")
                     ),
-                ]));
-            }
-
-            add_blank_line(&mut lines);
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]));
         }
+
+        add_blank_line(&mut lines);
     }
 
     // Escape/taint analysis removed - not providing actionable debt signals

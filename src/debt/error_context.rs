@@ -41,10 +41,10 @@ impl<'a> ContextLossAnalyzer<'a> {
         };
 
         // Check if this item is suppressed
-        if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &debt_type) {
-                return;
-            }
+        if let Some(checker) = self.suppression
+            && checker.is_suppressed(line, &debt_type)
+        {
+            return;
         }
 
         let priority = self.determine_priority(&pattern);
@@ -539,17 +539,23 @@ mod tests {
     fn test_context_loss_pattern_remediations() {
         use ContextLossPattern::*;
 
-        assert!(MapErrDiscardingOriginal
-            .remediation()
-            .contains("Include original error"));
+        assert!(
+            MapErrDiscardingOriginal
+                .remediation()
+                .contains("Include original error")
+        );
         assert!(AnyhowWithoutContext.remediation().contains("context"));
         assert!(QuestionMarkChain.remediation().contains("Add context"));
-        assert!(StringErrorConversion
-            .remediation()
-            .contains("Preserve error type"));
-        assert!(IntoErrorConversion
-            .remediation()
-            .contains("explicit error conversion"));
+        assert!(
+            StringErrorConversion
+                .remediation()
+                .contains("Preserve error type")
+        );
+        assert!(
+            IntoErrorConversion
+                .remediation()
+                .contains("explicit error conversion")
+        );
     }
 
     #[test]

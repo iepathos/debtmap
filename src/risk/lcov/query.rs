@@ -49,9 +49,9 @@
 use super::diagnostics::{track_match_attempt, track_match_success, track_match_zero};
 use super::types::{FunctionCoverage, LcovData};
 use crate::risk::function_name_matching::{
-    find_matching_function, MatchConfidence, MatchableFunction,
+    MatchConfidence, MatchableFunction, find_matching_function,
 };
-use crate::risk::path_normalization::{find_matching_path, MatchStrategy};
+use crate::risk::path_normalization::{MatchStrategy, find_matching_path};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -191,15 +191,15 @@ impl LcovData {
             let mut total_code_lines = 0;
 
             for file in &files {
-                if counter.should_include(file) {
-                    if let Ok(count) = counter.count_file(file) {
-                        total_code_lines += count.code_lines;
-                        log::debug!(
-                            "LOC counter: {} has {} code lines",
-                            file.display(),
-                            count.code_lines
-                        );
-                    }
+                if counter.should_include(file)
+                    && let Ok(count) = counter.count_file(file)
+                {
+                    total_code_lines += count.code_lines;
+                    log::debug!(
+                        "LOC counter: {} has {} code lines",
+                        file.display(),
+                        count.code_lines
+                    );
                 }
             }
 

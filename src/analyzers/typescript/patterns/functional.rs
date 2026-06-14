@@ -17,12 +17,12 @@ pub fn detect_functional_chains(node: &Node, ast: &TypeScriptAst) -> Vec<Functio
 }
 
 fn detect_chains_recursive(node: &Node, ast: &TypeScriptAst, chains: &mut Vec<FunctionalChain>) {
-    if node.kind() == "call_expression" {
-        if let Some(chain) = try_extract_chain(node, ast) {
-            chains.push(chain);
-            // Don't recurse into this node to avoid double-counting
-            return;
-        }
+    if node.kind() == "call_expression"
+        && let Some(chain) = try_extract_chain(node, ast)
+    {
+        chains.push(chain);
+        // Don't recurse into this node to avoid double-counting
+        return;
     }
 
     // Recurse

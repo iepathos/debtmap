@@ -2,7 +2,7 @@
 /// These tests run quickly and can be used in CI
 #[cfg(test)]
 mod tests {
-    use debtmap::context::{detect_file_type, detector::ContextDetector, FileType, FunctionRole};
+    use debtmap::context::{FileType, FunctionRole, detect_file_type, detector::ContextDetector};
     use std::path::Path;
     use syn::visit::Visit;
 
@@ -97,13 +97,15 @@ mod tests {
     #[test]
     fn test_context_aware_environment_variable() {
         // Test that the environment variable can be set and read
-        std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true") };
         let is_aware = std::env::var("DEBTMAP_CONTEXT_AWARE")
             .map(|v| v == "true")
             .unwrap_or(false);
         assert!(is_aware, "Environment variable should be set");
 
-        std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("DEBTMAP_CONTEXT_AWARE") };
         let is_aware_after = std::env::var("DEBTMAP_CONTEXT_AWARE")
             .map(|v| v == "true")
             .unwrap_or(false);

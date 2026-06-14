@@ -4,7 +4,7 @@ use super::{
 };
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use syn::{visit::Visit, ImplItem, ItemImpl, ItemStruct, Type};
+use syn::{ImplItem, ItemImpl, ItemStruct, Type, visit::Visit};
 
 /// Classification of resource cleanup patterns
 #[derive(Debug, PartialEq, Eq)]
@@ -291,17 +291,17 @@ impl<'ast> Visit<'ast> for DropVisitor {
 
     fn visit_item_impl(&mut self, node: &'ast ItemImpl) {
         // Check if this is a Drop implementation
-        if is_drop_impl(&node.trait_) {
-            if let Some(type_name) = extract_impl_type_name(&node.self_ty) {
-                self.drop_implementations.insert(type_name);
-            }
+        if is_drop_impl(&node.trait_)
+            && let Some(type_name) = extract_impl_type_name(&node.self_ty)
+        {
+            self.drop_implementations.insert(type_name);
         }
 
         // Check for manual cleanup methods
-        if let Some(type_name) = extract_impl_type_name(&node.self_ty) {
-            if has_cleanup_methods(&node.items) {
-                mark_type_as_having_cleanup(&mut self.type_definitions, &type_name);
-            }
+        if let Some(type_name) = extract_impl_type_name(&node.self_ty)
+            && has_cleanup_methods(&node.items)
+        {
+            mark_type_as_having_cleanup(&mut self.type_definitions, &type_name);
         }
     }
 }

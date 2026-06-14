@@ -94,23 +94,22 @@ fn format_context_contributions(ctx_risk: &super::context::ContextualRisk) -> St
             ));
 
             // Show details for git_history provider
-            if context.provider == "git_history" {
-                if let ContextDetails::Historical {
+            if context.provider == "git_history"
+                && let ContextDetails::Historical {
                     change_frequency,
                     bug_density,
                     age_days,
                     author_count,
                     ..
                 } = &context.details
-                {
-                    output.push_str(&format!(
-                        "         (changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {})\n",
-                        change_frequency,
-                        bug_density * 100.0,
-                        age_days,
-                        author_count
-                    ));
-                }
+            {
+                output.push_str(&format!(
+                    "         (changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {})\n",
+                    change_frequency,
+                    bug_density * 100.0,
+                    age_days,
+                    author_count
+                ));
             }
         }
     }

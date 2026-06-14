@@ -4,9 +4,9 @@
 //! across Rust, Python, and JavaScript/TypeScript codebases.
 
 use debtmap::analysis::framework_patterns_multi::{
+    FrameworkDetector,
     detector::{Attribute, Decorator, FileContext, FunctionAst, FunctionCall, Parameter},
     patterns::Language,
-    FrameworkDetector,
 };
 use std::path::Path;
 

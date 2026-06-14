@@ -1,7 +1,7 @@
 use debtmap::complexity::cognitive::{
     calculate_cognitive, calculate_cognitive_penalty, combine_cognitive,
 };
-use syn::{parse_quote, Block};
+use syn::{Block, parse_quote};
 
 #[test]
 fn test_calculate_cognitive_simple_block() {

@@ -3,11 +3,11 @@
 //! Validates that score-based sorting has acceptable performance
 //! (target: within 5% of previous tier-based implementation).
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::data_flow::DataFlowGraph;
 use debtmap::priority::call_graph::CallGraph;
 use debtmap::priority::filter_predicates::FilterStatistics;
-use debtmap::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
+use debtmap::priority::scoring::scaling::{ScalingConfig, calculate_final_score};
 use debtmap::priority::semantic_classifier::FunctionRole;
 use debtmap::priority::unified_analysis_queries::UnifiedAnalysisQueries;
 use debtmap::priority::unified_scorer::{Location, UnifiedScore};

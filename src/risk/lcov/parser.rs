@@ -36,8 +36,9 @@
 //! ```
 
 use super::handlers::{
-    handle_end_of_record, handle_function_data, handle_function_name, handle_incomplete_file,
-    handle_line_data, handle_lines_found, handle_lines_hit, handle_source_file, LcovParserState,
+    LcovParserState, handle_end_of_record, handle_function_data, handle_function_name,
+    handle_incomplete_file, handle_line_data, handle_lines_found, handle_lines_hit,
+    handle_source_file,
 };
 use super::types::{CoverageProgress, LcovData};
 use anyhow::{Context, Result};

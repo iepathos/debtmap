@@ -229,10 +229,10 @@ impl CrossModuleTracker {
         function_name: &str,
     ) -> Option<FunctionId> {
         // Look for the function in the target module
-        if let Some(boundary) = self.module_boundaries.get(module_path) {
-            if let Some(func_id) = Self::find_function_export(boundary, function_name) {
-                return Some(func_id);
-            }
+        if let Some(boundary) = self.module_boundaries.get(module_path)
+            && let Some(func_id) = Self::find_function_export(boundary, function_name)
+        {
+            return Some(func_id);
         }
 
         // Check re-exports
@@ -333,18 +333,18 @@ impl CrossModuleTracker {
     fn build_public_api_mappings(&mut self) {
         for (module_path, boundary) in &self.module_boundaries {
             for export in &boundary.public_exports {
-                if export.export_type == ExportType::Function {
-                    if let Some(func_id) = &export.function_id {
-                        let api_info = PublicApiInfo {
-                            function_id: func_id.clone(),
-                            defining_module: module_path.clone(),
-                            visibility: export.visibility.clone(),
-                            is_reexported: false, // Would need more analysis
-                            importing_modules: HashSet::new(), // Would be filled by usage analysis
-                        };
+                if export.export_type == ExportType::Function
+                    && let Some(func_id) = &export.function_id
+                {
+                    let api_info = PublicApiInfo {
+                        function_id: func_id.clone(),
+                        defining_module: module_path.clone(),
+                        visibility: export.visibility.clone(),
+                        is_reexported: false, // Would need more analysis
+                        importing_modules: HashSet::new(), // Would be filled by usage analysis
+                    };
 
-                        self.public_apis.insert(func_id.clone(), api_info);
-                    }
+                    self.public_apis.insert(func_id.clone(), api_info);
                 }
             }
         }
@@ -572,28 +572,28 @@ impl<'ast> Visit<'ast> for CrossModuleCallVisitor {
     }
 
     fn visit_expr_call(&mut self, expr: &'ast syn::ExprCall) {
-        if let Some(caller) = &self.current_function {
-            if let syn::Expr::Path(path_expr) = &*expr.func {
-                let path_string = self.extract_path_string(&path_expr.path);
-                let line = self.get_line_number(path_expr.path.span());
+        if let Some(caller) = &self.current_function
+            && let syn::Expr::Path(path_expr) = &*expr.func
+        {
+            let path_string = self.extract_path_string(&path_expr.path);
+            let line = self.get_line_number(path_expr.path.span());
 
-                // Check if this is a cross-module call (contains ::)
-                if path_string.contains("::") {
-                    let parts: Vec<&str> = path_string.rsplitn(2, "::").collect();
-                    if parts.len() == 2 {
-                        let function_name = parts[0].to_string();
-                        let module_path = parts[1].to_string();
+            // Check if this is a cross-module call (contains ::)
+            if path_string.contains("::") {
+                let parts: Vec<&str> = path_string.rsplitn(2, "::").collect();
+                if parts.len() == 2 {
+                    let function_name = parts[0].to_string();
+                    let module_path = parts[1].to_string();
 
-                        let cross_call = CrossModuleCall {
-                            caller: caller.clone(),
-                            module_path,
-                            function_name,
-                            line,
-                            through_import: false, // Would need import analysis
-                        };
+                    let cross_call = CrossModuleCall {
+                        caller: caller.clone(),
+                        module_path,
+                        function_name,
+                        line,
+                        through_import: false, // Would need import analysis
+                    };
 
-                        self.cross_module_calls.push(cross_call);
-                    }
+                    self.cross_module_calls.push(cross_call);
                 }
             }
         }

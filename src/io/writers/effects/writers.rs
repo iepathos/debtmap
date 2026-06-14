@@ -9,7 +9,7 @@
 //! with effect-based I/O at the boundaries.
 
 use crate::core::AnalysisResults;
-use crate::effects::{effect_from_fn, AnalysisEffect};
+use crate::effects::{AnalysisEffect, effect_from_fn};
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use crate::io::output::OutputWriter;

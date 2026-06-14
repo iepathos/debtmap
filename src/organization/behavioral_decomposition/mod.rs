@@ -40,19 +40,19 @@ mod types;
 pub use types::{BehaviorCategory, FieldAccessStats, MethodCluster};
 
 // Re-export categorization functions
-pub use categorization::{cluster_methods_by_behavior, is_test_method, BehavioralCategorizer};
+pub use categorization::{BehavioralCategorizer, cluster_methods_by_behavior, is_test_method};
 
 // Re-export clustering functions
 pub use clustering::{
-    apply_community_detection, apply_hybrid_clustering, apply_production_ready_clustering,
-    build_method_call_adjacency_matrix, build_method_call_adjacency_matrix_with_functions,
-    ClusteringResult, ClusteringWarning,
+    ClusteringResult, ClusteringWarning, apply_community_detection, apply_hybrid_clustering,
+    apply_production_ready_clustering, build_method_call_adjacency_matrix,
+    build_method_call_adjacency_matrix_with_functions,
 };
 
 // Re-export analysis functions
 pub use analysis::{
-    detect_service_candidates, recommend_service_extraction, suggest_trait_extraction,
-    FieldAccessTracker,
+    FieldAccessTracker, detect_service_candidates, recommend_service_extraction,
+    suggest_trait_extraction,
 };
 
 #[cfg(test)]

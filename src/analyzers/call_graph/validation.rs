@@ -260,23 +260,22 @@ impl CallGraphValidator {
         }
 
         // Check file path for examples and benchmarks
-        if let Some(path_str) = function.file.to_str() {
-            if path_str.contains("/examples/")
+        if let Some(path_str) = function.file.to_str()
+            && (path_str.contains("/examples/")
                 || path_str.contains("/benches/")
                 || path_str.starts_with("examples/")
-                || path_str.starts_with("benches/")
-            {
-                return true;
-            }
+                || path_str.starts_with("benches/"))
+        {
+            return true;
         }
 
         // Check for lib.rs or main.rs (library APIs)
-        if let Some(file_name) = function.file.file_name().and_then(|s| s.to_str()) {
-            if file_name == "lib.rs" || file_name == "main.rs" {
-                // Functions in lib.rs with short names (< 30 chars) likely public exports
-                if function.name.len() < 30 && !function.name.contains("::") {
-                    return true;
-                }
+        if let Some(file_name) = function.file.file_name().and_then(|s| s.to_str())
+            && (file_name == "lib.rs" || file_name == "main.rs")
+        {
+            // Functions in lib.rs with short names (< 30 chars) likely public exports
+            if function.name.len() < 30 && !function.name.contains("::") {
+                return true;
             }
         }
 

@@ -196,7 +196,9 @@ impl AnalyzerFactory {
         match language {
             crate::core::types::Language::Rust => Box::new(RustAnalyzerAdapter::new()),
             crate::core::types::Language::Python => {
-                panic!("Python analysis is not currently supported. Debtmap is focusing exclusively on Rust analysis.")
+                panic!(
+                    "Python analysis is not currently supported. Debtmap is focusing exclusively on Rust analysis."
+                )
             }
         }
     }

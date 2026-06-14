@@ -68,4 +68,4 @@ pub use writers::{
 pub use compose::{render_to_string_effect, write_multi_format_effect};
 
 // Report generation
-pub use report::{write_analysis_report_effect, ReportConfig, ReportConfigBuilder, ReportResult};
+pub use report::{ReportConfig, ReportConfigBuilder, ReportResult, write_analysis_report_effect};

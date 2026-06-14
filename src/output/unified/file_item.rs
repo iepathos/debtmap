@@ -2,16 +2,16 @@
 //!
 //! Provides `FileDebtItemOutput` struct and conversion from `FileDebtItem`.
 
-use super::anti_patterns::{build_anti_patterns, AntiPatternOutput};
+use super::anti_patterns::{AntiPatternOutput, build_anti_patterns};
 use super::cohesion::CohesionOutput;
-use super::coupling::{build_file_dependencies, FileDependencies};
+use super::coupling::{FileDependencies, build_file_dependencies};
 #[cfg(debug_assertions)]
 use super::format::{assert_ratio_invariants, assert_score_invariants};
 use super::format::{round_ratio, round_score};
 use super::location::UnifiedLocation;
+use super::priority::Priority;
 #[cfg(debug_assertions)]
 use super::priority::assert_priority_invariants;
-use super::priority::Priority;
 use crate::priority::{DebtType, FileDebtItem};
 use serde::{Deserialize, Serialize};
 
@@ -198,20 +198,20 @@ fn categorize_file_debt(_item: &FileDebtItem) -> String {
 /// or if raw metrics exceed god object thresholds.
 fn derive_file_debt_type(item: &FileDebtItem) -> Option<DebtType> {
     // Check if this file has god object analysis and is classified as a god object
-    if let Some(ref analysis) = item.metrics.god_object_analysis {
-        if analysis.is_god_object {
-            return Some(DebtType::GodObject {
-                methods: analysis.method_count as u32,
-                fields: if analysis.field_count > 0 {
-                    Some(analysis.field_count as u32)
-                } else {
-                    None
-                },
-                responsibilities: analysis.responsibility_count as u32,
-                god_object_score: analysis.god_object_score,
-                lines: analysis.lines_of_code as u32,
-            });
-        }
+    if let Some(ref analysis) = item.metrics.god_object_analysis
+        && analysis.is_god_object
+    {
+        return Some(DebtType::GodObject {
+            methods: analysis.method_count as u32,
+            fields: if analysis.field_count > 0 {
+                Some(analysis.field_count as u32)
+            } else {
+                None
+            },
+            responsibilities: analysis.responsibility_count as u32,
+            god_object_score: analysis.god_object_score,
+            lines: analysis.lines_of_code as u32,
+        });
     }
 
     // Fallback: infer god object from raw metrics if thresholds exceeded

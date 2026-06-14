@@ -1,8 +1,8 @@
 use crate::analyzers::go::parser::{node_line, node_text};
 use crate::analyzers::go::purity::analyze_purity;
 use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
-use crate::core::ast::GoAst;
 use crate::core::PurityLevel;
+use crate::core::ast::GoAst;
 use std::collections::HashMap;
 use std::path::Path;
 use tree_sitter::Node;

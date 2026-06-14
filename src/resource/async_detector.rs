@@ -3,7 +3,7 @@ use super::{
     ResourceManagementIssue, ResourceType, SourceLocation,
 };
 use std::path::Path;
-use syn::{visit::Visit, Expr, ExprAwait, ExprCall, ExprMethodCall, ItemFn, Stmt};
+use syn::{Expr, ExprAwait, ExprCall, ExprMethodCall, ItemFn, Stmt, visit::Visit};
 
 pub struct AsyncResourceDetector {
     cancellation_analyzer: CancellationAnalyzer,
@@ -385,10 +385,10 @@ impl DropCallVisitor {
 
 impl<'ast> Visit<'ast> for DropCallVisitor {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if let Expr::Path(path) = &*node.func {
-            if path.path.segments.last().is_some_and(|s| s.ident == "drop") {
-                self.drop_calls.push(self.current_line);
-            }
+        if let Expr::Path(path) = &*node.func
+            && path.path.segments.last().is_some_and(|s| s.ident == "drop")
+        {
+            self.drop_calls.push(self.current_line);
         }
         self.current_line += 1;
     }

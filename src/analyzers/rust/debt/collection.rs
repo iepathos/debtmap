@@ -16,7 +16,7 @@ use crate::debt::patterns::{
     find_code_smells_with_suppression, find_todos_and_fixmes_with_suppression,
 };
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
-use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::debt::suppression::{SuppressionContext, parse_suppression_comments};
 use crate::testing;
 use std::path::Path;
 

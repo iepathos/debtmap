@@ -12,11 +12,11 @@ use crate::priority::UnifiedDebtItem;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// Build all lines for the dependencies page (pure function).

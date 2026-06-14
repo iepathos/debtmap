@@ -4,7 +4,7 @@
 
 use super::branches::analyze_branch_similarity;
 use super::patterns::detect_js_patterns;
-use super::token::{extract_tokens_recursive, JsEntropyToken};
+use super::token::{JsEntropyToken, extract_tokens_recursive};
 use crate::complexity::entropy_analysis::{calculate_repetition_score, calculate_weighted_entropy};
 use crate::complexity::entropy_core::{
     EntropyConfig, EntropyScore, LanguageEntropyAnalyzer, PatternMetrics,

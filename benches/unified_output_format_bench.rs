@@ -10,7 +10,7 @@
 //!
 //! Note: Legacy format was removed in spec 202 - unified format is now the only JSON format.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::builders::unified_analysis;
 use debtmap::core::Language;
 use debtmap::output::json::output_json_with_format;

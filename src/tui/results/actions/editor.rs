@@ -49,8 +49,8 @@ pub fn open_in_editor(path: &Path, line: Option<usize>) -> Result<()> {
         event::{DisableMouseCapture, EnableMouseCapture},
         execute,
         terminal::{
-            disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
-            LeaveAlternateScreen,
+            Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
+            enable_raw_mode,
         },
     };
     use std::io;
@@ -135,7 +135,8 @@ mod tests {
         // during normal test runs.
         // Manual testing: run with --ignored --nocapture
         let path = PathBuf::from("/tmp/test.rs");
-        std::env::set_var("EDITOR", "true"); // Use `true` command
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("EDITOR", "true") }; // Use `true` command
 
         let result = open_in_editor(&path, Some(42));
         assert!(result.is_ok());

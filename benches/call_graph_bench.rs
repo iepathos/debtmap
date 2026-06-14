@@ -2,7 +2,7 @@
 //!
 //! This ensures that the refactoring hasn't introduced performance regressions
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::analyzers::call_graph::debug::{CallGraphDebugger, DebugConfig, DebugFormat};
 use debtmap::analyzers::call_graph::validation::CallGraphValidator;
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};

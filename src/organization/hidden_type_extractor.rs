@@ -191,28 +191,28 @@ impl HiddenTypeExtractor {
         }
 
         // Remove Option wrapper
-        if normalized.name.starts_with("Option<") {
-            if let Some(inner) = self.extract_generic_inner(&normalized.name) {
-                normalized.name = inner;
-            }
+        if normalized.name.starts_with("Option<")
+            && let Some(inner) = self.extract_generic_inner(&normalized.name)
+        {
+            normalized.name = inner;
         }
 
         // Extract from Vec, Box, etc. for comparison
-        if matches!(normalized.name.as_str(), s if s.starts_with("Vec<") || s.starts_with("Box<")) {
-            if let Some(inner) = self.extract_generic_inner(&normalized.name) {
-                // Keep the wrapper but store the inner type for comparison
-                normalized.generics = vec![inner];
-            }
+        if matches!(normalized.name.as_str(), s if s.starts_with("Vec<") || s.starts_with("Box<"))
+            && let Some(inner) = self.extract_generic_inner(&normalized.name)
+        {
+            // Keep the wrapper but store the inner type for comparison
+            normalized.generics = vec![inner];
         }
 
         normalized
     }
 
     fn extract_generic_inner(&self, type_name: &str) -> Option<String> {
-        if let Some(start) = type_name.find('<') {
-            if let Some(end) = type_name.rfind('>') {
-                return Some(type_name[start + 1..end].trim().to_string());
-            }
+        if let Some(start) = type_name.find('<')
+            && let Some(end) = type_name.rfind('>')
+        {
+            return Some(type_name[start + 1..end].trim().to_string());
         }
         None
     }

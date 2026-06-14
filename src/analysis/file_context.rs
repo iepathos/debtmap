@@ -255,12 +255,11 @@ impl FileContextDetector {
         }
 
         // Check if parent directory is named "tests"
-        if let Some(parent) = path.parent() {
-            if let Some(dir_name) = parent.file_name().and_then(|n| n.to_str()) {
-                if dir_name == "tests" {
-                    return 1.0;
-                }
-            }
+        if let Some(parent) = path.parent()
+            && let Some(dir_name) = parent.file_name().and_then(|n| n.to_str())
+            && dir_name == "tests"
+        {
+            return 1.0;
         }
 
         0.0

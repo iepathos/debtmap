@@ -149,15 +149,15 @@ impl TraitResolver {
     ) -> Option<ResolvedMethod> {
         for blanket_impl in self.tracker.get_blanket_impls() {
             // Check if this blanket implementation applies to the receiver type
-            if self.blanket_applies_to_type(blanket_impl, receiver_type) {
-                if let Some(method) = blanket_impl.methods.get(method_name) {
-                    return Some(ResolvedMethod {
-                        function_id: method.function_id.clone(),
-                        trait_name: Some(blanket_impl.trait_name.clone()),
-                        priority: ResolutionPriority::BlanketImplementation,
-                        confidence: 0.7,
-                    });
-                }
+            if self.blanket_applies_to_type(blanket_impl, receiver_type)
+                && let Some(method) = blanket_impl.methods.get(method_name)
+            {
+                return Some(ResolvedMethod {
+                    function_id: method.function_id.clone(),
+                    trait_name: Some(blanket_impl.trait_name.clone()),
+                    priority: ResolutionPriority::BlanketImplementation,
+                    confidence: 0.7,
+                });
             }
         }
 

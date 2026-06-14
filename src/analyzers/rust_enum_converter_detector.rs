@@ -65,10 +65,10 @@ pub fn is_enum_converter(func: &FunctionMetrics, syn_func: &ItemFn) -> bool {
     }
 
     // Analyze function body for exhaustive literal match
-    if let Some(match_expr) = find_single_match_expr(&syn_func.block) {
-        if is_exhaustive_literal_match(match_expr) {
-            return true;
-        }
+    if let Some(match_expr) = find_single_match_expr(&syn_func.block)
+        && is_exhaustive_literal_match(match_expr)
+    {
+        return true;
     }
 
     false
@@ -115,12 +115,11 @@ fn find_single_match_expr(block: &syn::Block) -> Option<&ExprMatch> {
             return Some(match_expr);
         }
         // Check for explicit return with match
-        if let Expr::Return(ret_expr) = expr {
-            if let Some(ret_value) = &ret_expr.expr {
-                if let Expr::Match(match_expr) = ret_value.as_ref() {
-                    return Some(match_expr);
-                }
-            }
+        if let Expr::Return(ret_expr) = expr
+            && let Some(ret_value) = &ret_expr.expr
+            && let Expr::Match(match_expr) = ret_value.as_ref()
+        {
+            return Some(match_expr);
         }
     }
 

@@ -1,7 +1,7 @@
 use super::{complexity, context, coverage, git_history, sections};
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::priority::classification::Severity;
-use crate::priority::{score_formatter, UnifiedDebtItem};
+use crate::priority::{UnifiedDebtItem, score_formatter};
 use colored::*;
 use std::fmt::Write;
 
@@ -370,9 +370,11 @@ mod tests {
             complexity_estimate: "O(n^3)".to_string(),
         };
         let factors = collect_scoring_factors(&item, &weights, true);
-        assert!(factors
-            .iter()
-            .any(|f| f.contains("Performance impact (High)")));
+        assert!(
+            factors
+                .iter()
+                .any(|f| f.contains("Performance impact (High)"))
+        );
         assert!(factors.iter().any(|f| f.contains("3 level nested loops")));
     }
 

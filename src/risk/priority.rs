@@ -4,11 +4,11 @@ pub mod recommendations;
 pub mod scoring;
 pub mod stages;
 
-pub use module_detection::{determine_module_type, infer_module_relationships, ModuleType};
+pub use module_detection::{ModuleType, determine_module_type, infer_module_relationships};
 pub use pipeline::{PrioritizationPipeline, PrioritizationStage};
 pub use recommendations::{
-    generate_enhanced_rationale_v2, ComplexityLevel, ImpactAnalysis, TestApproach,
-    TestEffortDetails, TestRecommendation,
+    ComplexityLevel, ImpactAnalysis, TestApproach, TestEffortDetails, TestRecommendation,
+    generate_enhanced_rationale_v2,
 };
 pub use scoring::{CriticalityScorer, EffortEstimator};
 pub use stages::{
@@ -39,8 +39,8 @@ pub struct TestTarget {
 }
 
 pub use super::roi::{
-    ROIBreakdown, ROICalculator as AdvancedROICalculator, ROIComponent, ROIConfig,
-    ROI as AdvancedROI,
+    ROI as AdvancedROI, ROIBreakdown, ROICalculator as AdvancedROICalculator, ROIComponent,
+    ROIConfig,
 };
 
 pub struct ROICalculator {

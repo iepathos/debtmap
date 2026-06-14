@@ -6,9 +6,9 @@
 //! All functions are pure with no side effects, following functional programming
 //! principles from the Debtmap development guidelines.
 
-use super::filtering::{filter_with_metrics, ClassifiedItem, FilterConfig, FilterResult};
-use super::tiers::{classify_tier, TierConfig};
 use super::UnifiedDebtItem;
+use super::filtering::{ClassifiedItem, FilterConfig, FilterResult, filter_with_metrics};
+use super::tiers::{TierConfig, classify_tier};
 use std::cmp::Ordering;
 
 /// Sorts items by score in descending order (pure).

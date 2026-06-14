@@ -32,9 +32,9 @@ mod pattern_recognizer;
 mod specificity_scorer;
 mod uniqueness_validator;
 
-pub use domain_extractor::{extract_dominant_verb, DomainTermExtractor};
+pub use domain_extractor::{DomainTermExtractor, extract_dominant_verb};
 pub use pattern_recognizer::PatternRecognizer;
-pub use specificity_scorer::{is_generic_type_name, SpecificityScorer};
+pub use specificity_scorer::{SpecificityScorer, is_generic_type_name};
 pub use uniqueness_validator::NameUniquenessValidator;
 
 use serde::{Deserialize, Serialize};
@@ -119,33 +119,32 @@ impl SemanticNameGenerator {
 
         // Strategy 0: Method-based naming (HIGHEST PRIORITY)
         // Extracts verb+noun from actual method names for maximum specificity
-        if let Some(method_name) = self.domain_extractor.extract_from_methods(methods) {
-            if self.is_valid_candidate(&method_name) {
-                candidates.push(method_name);
-            }
+        if let Some(method_name) = self.domain_extractor.extract_from_methods(methods)
+            && self.is_valid_candidate(&method_name)
+        {
+            candidates.push(method_name);
         }
 
         // Strategy 1: Domain terms from method names
-        if let Some(domain_name) = self.domain_extractor.generate_domain_name(methods) {
-            if self.is_valid_candidate(&domain_name) {
-                candidates.push(domain_name);
-            }
+        if let Some(domain_name) = self.domain_extractor.generate_domain_name(methods)
+            && self.is_valid_candidate(&domain_name)
+        {
+            candidates.push(domain_name);
         }
 
         // Strategy 2: Behavioral patterns
-        if let Some(behavior_name) = self.pattern_recognizer.recognize_pattern(methods) {
-            if self.is_valid_candidate(&behavior_name) {
-                candidates.push(behavior_name);
-            }
+        if let Some(behavior_name) = self.pattern_recognizer.recognize_pattern(methods)
+            && self.is_valid_candidate(&behavior_name)
+        {
+            candidates.push(behavior_name);
         }
 
         // Strategy 3: Extract from responsibility if provided and high quality
-        if let Some(resp) = responsibility {
-            if let Some(resp_name) = self.domain_extractor.extract_from_description(resp) {
-                if self.is_valid_candidate(&resp_name) {
-                    candidates.push(resp_name);
-                }
-            }
+        if let Some(resp) = responsibility
+            && let Some(resp_name) = self.domain_extractor.extract_from_description(resp)
+            && self.is_valid_candidate(&resp_name)
+        {
+            candidates.push(resp_name);
         }
 
         // If we have no good candidates, generate descriptive fallback

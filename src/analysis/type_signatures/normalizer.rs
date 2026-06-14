@@ -226,11 +226,11 @@ impl TypeNormalizer {
 
         if !ty.generics.is_empty() {
             result.push('<');
-            for (i, gen) in ty.generics.iter().enumerate() {
+            for (i, r#gen) in ty.generics.iter().enumerate() {
                 if i > 0 {
                     result.push_str(", ");
                 }
-                result.push_str(&self.canonical_to_string(gen));
+                result.push_str(&self.canonical_to_string(r#gen));
             }
             result.push('>');
         }

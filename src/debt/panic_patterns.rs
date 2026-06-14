@@ -39,10 +39,10 @@ impl<'a> PanicPatternDetector<'a> {
         };
 
         // Check if this item is suppressed
-        if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &debt_type) {
-                return;
-            }
+        if let Some(checker) = self.suppression
+            && checker.is_suppressed(line, &debt_type)
+        {
+            return;
         }
 
         let priority = self.determine_priority(&pattern);
@@ -540,16 +540,22 @@ mod tests {
 
         // Test remediations
         assert!(UnwrapOnResult.remediation().contains("? operator"));
-        assert!(ExpectWithGenericMessage
-            .remediation()
-            .contains("descriptive context"));
+        assert!(
+            ExpectWithGenericMessage
+                .remediation()
+                .contains("descriptive context")
+        );
         assert!(PanicInNonTest.remediation().contains("Return Result"));
-        assert!(UnreachableInReachable
-            .remediation()
-            .contains("Verify code path"));
-        assert!(TodoInProduction
-            .remediation()
-            .contains("Implement the functionality"));
+        assert!(
+            UnreachableInReachable
+                .remediation()
+                .contains("Verify code path")
+        );
+        assert!(
+            TodoInProduction
+                .remediation()
+                .contains("Implement the functionality")
+        );
     }
 
     #[test]

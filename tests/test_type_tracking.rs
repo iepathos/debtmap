@@ -1,4 +1,4 @@
-use debtmap::analyzers::type_registry::{extract_type_definitions, GlobalTypeRegistry};
+use debtmap::analyzers::type_registry::{GlobalTypeRegistry, extract_type_definitions};
 use debtmap::analyzers::type_tracker::TypeTracker;
 use std::sync::Arc;
 

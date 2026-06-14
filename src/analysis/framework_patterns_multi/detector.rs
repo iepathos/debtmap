@@ -301,10 +301,9 @@ impl FrameworkDetector {
             }
         }
 
-        if let Some(regex) = self.regex_cache.get(pattern) {
-            regex.is_match(text)
-        } else {
-            false
+        match self.regex_cache.get(pattern) {
+            Some(regex) => regex.is_match(text),
+            _ => false,
         }
     }
 }
@@ -613,10 +612,12 @@ patterns = []
         let config = toml::Value::String("not a table".into());
         let result = parse_config_into_patterns(&config);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("must be a TOML table"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must be a TOML table")
+        );
     }
 
     #[test]

@@ -29,10 +29,10 @@ pub mod codebase_type_analyzer;
 pub mod confidence;
 pub mod data_flow_analyzer;
 pub use behavioral_decomposition::{
+    BehaviorCategory, BehavioralCategorizer, FieldAccessStats, FieldAccessTracker, MethodCluster,
     apply_hybrid_clustering, apply_production_ready_clustering,
     build_method_call_adjacency_matrix_with_functions, cluster_methods_by_behavior,
-    suggest_trait_extraction, BehaviorCategory, BehavioralCategorizer, FieldAccessStats,
-    FieldAccessTracker, MethodCluster,
+    suggest_trait_extraction,
 };
 pub mod boilerplate_detector;
 pub mod builder_pattern;
@@ -69,17 +69,6 @@ pub mod type_based_clustering;
 // Re-export god object functionality from new modular structure
 // Spec 262: Recommendation functions removed
 pub use god_object::{
-    // Scoring
-    calculate_god_object_score,
-    calculate_god_object_score_weighted,
-    calculate_struct_ratio,
-    classify_struct_domain,
-    count_distinct_domains,
-    // Classification
-    determine_confidence,
-    extract_domain_from_name,
-    group_methods_by_responsibility,
-    infer_responsibility_with_confidence,
     // Types
     ClassificationResult,
     DetectionType,
@@ -104,15 +93,26 @@ pub use god_object::{
     StageType,
     StructMetrics,
     StructWithMethods,
+    // Scoring
+    calculate_god_object_score,
+    calculate_god_object_score_weighted,
+    calculate_struct_ratio,
+    classify_struct_domain,
+    count_distinct_domains,
+    // Classification
+    determine_confidence,
+    extract_domain_from_name,
+    group_methods_by_responsibility,
+    infer_responsibility_with_confidence,
 };
 
-pub use cohesion_calculator::{calculate_file_cohesion, FileCohesionResult};
+pub use cohesion_calculator::{FileCohesionResult, calculate_file_cohesion};
 pub use domain_classifier::classify_struct_domain_enhanced;
 pub use domain_diversity::{
     CrossDomainSeverity, DiversityScore, DomainDiversityMetrics, StructDomainClassification,
 };
 pub use split_validator::{
-    validate_and_refine_splits, validate_and_refine_splits_with_config, SplitSizeConfig,
+    SplitSizeConfig, validate_and_refine_splits, validate_and_refine_splits_with_config,
 };
 pub use struct_ownership::StructOwnershipAnalyzer;
 
@@ -122,24 +122,24 @@ pub use god_object_metrics::{
 };
 
 pub use complexity_weighting::{
+    ComplexityWeight, ComplexityWeightedAnalysis, FunctionComplexityInfo,
     aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_penalty,
-    calculate_complexity_weight, ComplexityWeight, ComplexityWeightedAnalysis,
-    FunctionComplexityInfo,
+    calculate_complexity_weight,
 };
 
 pub use confidence::{
-    emit_classification_metrics, ClassificationMetrics, MINIMUM_CONFIDENCE, MIN_METHODS_FOR_SPLIT,
-    MODULE_SPLIT_CONFIDENCE, UTILITIES_THRESHOLD,
+    ClassificationMetrics, MIN_METHODS_FOR_SPLIT, MINIMUM_CONFIDENCE, MODULE_SPLIT_CONFIDENCE,
+    UTILITIES_THRESHOLD, emit_classification_metrics,
 };
 
 pub use purity_analyzer::{PurityAnalyzer, PurityIndicators, PurityLevel};
 
 pub use builder_pattern::{
-    adjust_builder_score, BuilderPattern, BuilderPatternDetector, MethodInfo, MethodReturnType,
+    BuilderPattern, BuilderPatternDetector, MethodInfo, MethodReturnType, adjust_builder_score,
 };
 
 pub use registry_pattern::{
-    adjust_registry_score, RegistryPattern, RegistryPatternDetector, TraitImplInfo,
+    RegistryPattern, RegistryPatternDetector, TraitImplInfo, adjust_registry_score,
 };
 
 pub use struct_initialization::{
@@ -147,7 +147,7 @@ pub use struct_initialization::{
 };
 
 pub use parallel_execution_pattern::{
-    adjust_parallel_score, ClosureInfo, ParallelLibrary, ParallelPattern, ParallelPatternDetector,
+    ClosureInfo, ParallelLibrary, ParallelPattern, ParallelPatternDetector, adjust_parallel_score,
 };
 
 pub use boilerplate_detector::{
@@ -162,8 +162,8 @@ pub use type_based_clustering::{
 };
 
 pub use domain_patterns::{
-    cluster_methods_by_domain, DomainPattern, DomainPatternDetector, DomainPatternMatch,
-    PatternEvidence, DOMAIN_PATTERN_THRESHOLD, MIN_DOMAIN_CLUSTER_SIZE,
+    DOMAIN_PATTERN_THRESHOLD, DomainPattern, DomainPatternDetector, DomainPatternMatch,
+    MIN_DOMAIN_CLUSTER_SIZE, PatternEvidence, cluster_methods_by_domain,
 };
 
 pub use hidden_type_extractor::{
@@ -179,8 +179,8 @@ pub use macro_recommendations::MacroRecommendationEngine;
 
 pub mod module_recommendations;
 pub use module_recommendations::{
-    generate_decomposition_plan, is_generic_name, DecompositionLevel, DecompositionPlan,
-    ModuleRecommendation,
+    DecompositionLevel, DecompositionPlan, ModuleRecommendation, generate_decomposition_plan,
+    is_generic_name,
 };
 
 pub mod semantic_naming;
@@ -190,8 +190,8 @@ pub use semantic_naming::{
 };
 
 pub use anti_pattern_detector::{
-    is_primitive, AntiPattern, AntiPatternConfig, AntiPatternDetector, AntiPatternSeverity,
-    AntiPatternType, SplitQualityReport,
+    AntiPattern, AntiPatternConfig, AntiPatternDetector, AntiPatternSeverity, AntiPatternType,
+    SplitQualityReport, is_primitive,
 };
 
 pub use integrated_analyzer::{
@@ -212,8 +212,9 @@ pub use codebase_type_analyzer::{
 };
 
 pub use file_classifier::{
-    calculate_reduction_target, classify_file, get_threshold, recommendation_level, ConfigType,
-    FileSizeAnalysis, FileSizeThresholds, FileType, RecommendationLevel, ReductionTarget, TestType,
+    ConfigType, FileSizeAnalysis, FileSizeThresholds, FileType, RecommendationLevel,
+    ReductionTarget, TestType, calculate_reduction_target, classify_file, get_threshold,
+    recommendation_level,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -406,6 +407,6 @@ pub use struct_init_detector::StructInitOrganizationDetector;
 pub use class_ownership::{ClassOwnership, ClassOwnershipAnalyzer};
 pub use language::Language;
 pub use layering::{
-    calculate_layering_penalty, compute_layering_impact, compute_layering_score, path_to_module,
-    LayeringAnalysis, LayeringImpact, ModuleDependency,
+    LayeringAnalysis, LayeringImpact, ModuleDependency, calculate_layering_penalty,
+    compute_layering_impact, compute_layering_score, path_to_module,
 };

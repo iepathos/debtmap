@@ -20,16 +20,16 @@ use std::hash::{Hash, Hasher};
 /// ```
 macro_rules! hash_fields {
     // Base case: done
-    ($state:expr $(,)?) => {};
+    ($state:expr_2021 $(,)?) => {};
 
     // f64 field (marked with @f64)
-    ($state:expr, @f64 $field:expr $(, $($rest:tt)*)?) => {{
+    ($state:expr_2021, @f64 $field:expr_2021 $(, $($rest:tt)*)?) => {{
         $field.to_bits().hash($state);
         hash_fields!($state $(, $($rest)*)?);
     }};
 
     // Regular field (implements Hash)
-    ($state:expr, $field:expr $(, $($rest:tt)*)?) => {{
+    ($state:expr_2021, $field:expr_2021 $(, $($rest:tt)*)?) => {{
         $field.hash($state);
         hash_fields!($state $(, $($rest)*)?);
     }};

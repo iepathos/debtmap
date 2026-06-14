@@ -38,10 +38,10 @@ impl<'a> ErrorSwallowingDetector<'a> {
             context: Some(context.to_string()),
         };
 
-        if let Some(checker) = self.suppression {
-            if checker.is_suppressed(line, &debt_type) {
-                return;
-            }
+        if let Some(checker) = self.suppression
+            && checker.is_suppressed(line, &debt_type)
+        {
+            return;
         }
 
         let priority = self.determine_priority(&pattern);
@@ -127,20 +127,18 @@ impl<'a> ErrorSwallowingDetector<'a> {
     }
 
     fn check_let_underscore(&mut self, stmt: &Stmt) {
-        if let Stmt::Local(local) = stmt {
-            if let Pat::Wild(wild) = &local.pat {
-                if let Some(init) = &local.init {
-                    if is_result_type(&init.expr) {
-                        // Get the actual line number from the underscore token's span
-                        let line = self.get_line_number(wild.underscore_token.span);
-                        self.add_debt_item(
-                            line,
-                            ErrorSwallowingPattern::LetUnderscoreResult,
-                            "Result discarded with let _ pattern",
-                        );
-                    }
-                }
-            }
+        if let Stmt::Local(local) = stmt
+            && let Pat::Wild(wild) = &local.pat
+            && let Some(init) = &local.init
+            && is_result_type(&init.expr)
+        {
+            // Get the actual line number from the underscore token's span
+            let line = self.get_line_number(wild.underscore_token.span);
+            self.add_debt_item(
+                line,
+                ErrorSwallowingPattern::LetUnderscoreResult,
+                "Result discarded with let _ pattern",
+            );
         }
     }
 
@@ -177,19 +175,18 @@ impl<'a> ErrorSwallowingDetector<'a> {
 
     fn check_match_expr(&mut self, expr_match: &ExprMatch) {
         for arm in &expr_match.arms {
-            if let Pat::TupleStruct(pat_tuple) = &arm.pat {
-                if let Some(path) = pat_tuple.path.get_ident() {
-                    if path == "Err" {
-                        // Check if the Err arm body is effectively empty
-                        if is_empty_expr(&arm.body) {
-                            let line = self.get_line_number(pat_tuple.path.span());
-                            self.add_debt_item(
-                                line,
-                                ErrorSwallowingPattern::MatchIgnoredErr,
-                                "Error variant ignored in match expression",
-                            );
-                        }
-                    }
+            if let Pat::TupleStruct(pat_tuple) = &arm.pat
+                && let Some(path) = pat_tuple.path.get_ident()
+                && path == "Err"
+            {
+                // Check if the Err arm body is effectively empty
+                if is_empty_expr(&arm.body) {
+                    let line = self.get_line_number(pat_tuple.path.span());
+                    self.add_debt_item(
+                        line,
+                        ErrorSwallowingPattern::MatchIgnoredErr,
+                        "Error variant ignored in match expression",
+                    );
                 }
             }
         }
@@ -361,14 +358,12 @@ impl FunctionErrorSwallowingDetector {
     }
 
     fn check_let_underscore(&mut self, stmt: &Stmt) {
-        if let Stmt::Local(local) = stmt {
-            if let Pat::Wild(_) = &local.pat {
-                if let Some(init) = &local.init {
-                    if is_result_type(&init.expr) {
-                        self.add_pattern(ErrorSwallowingPattern::LetUnderscoreResult);
-                    }
-                }
-            }
+        if let Stmt::Local(local) = stmt
+            && let Pat::Wild(_) = &local.pat
+            && let Some(init) = &local.init
+            && is_result_type(&init.expr)
+        {
+            self.add_pattern(ErrorSwallowingPattern::LetUnderscoreResult);
         }
     }
 
@@ -391,12 +386,12 @@ impl FunctionErrorSwallowingDetector {
 
     fn check_match_expr(&mut self, expr_match: &ExprMatch) {
         for arm in &expr_match.arms {
-            if let Pat::TupleStruct(pat_tuple) = &arm.pat {
-                if let Some(path) = pat_tuple.path.get_ident() {
-                    if path == "Err" && is_empty_expr(&arm.body) {
-                        self.add_pattern(ErrorSwallowingPattern::MatchIgnoredErr);
-                    }
-                }
+            if let Pat::TupleStruct(pat_tuple) = &arm.pat
+                && let Some(path) = pat_tuple.path.get_ident()
+                && path == "Err"
+                && is_empty_expr(&arm.body)
+            {
+                self.add_pattern(ErrorSwallowingPattern::MatchIgnoredErr);
             }
         }
     }
@@ -428,7 +423,7 @@ impl Visit<'_> for FunctionErrorSwallowingDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::{parse_quote, parse_str, Pat};
+    use syn::{Pat, parse_quote, parse_str};
 
     #[test]
     fn test_detect_error_swallowing_in_function() {
@@ -646,7 +641,7 @@ mod tests {
 
     #[test]
     fn test_classify_error_handling() {
-        use syn::{parse_quote, Expr};
+        use syn::{Expr, parse_quote};
 
         // Test case: No else branch
         let else_branch = None;
@@ -783,9 +778,11 @@ mod tests {
         // Should detect 2 issues (unwrap_or and unwrap_or_default, but not unwrap_or_else with logging)
         assert_eq!(items.len(), 2);
         assert!(items.iter().any(|item| item.message.contains("unwrap_or")));
-        assert!(items
-            .iter()
-            .any(|item| item.message.contains("unwrap_or_default")));
+        assert!(
+            items
+                .iter()
+                .any(|item| item.message.contains("unwrap_or_default"))
+        );
     }
 
     #[test]

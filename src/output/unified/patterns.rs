@@ -51,34 +51,34 @@ pub fn extract_pattern_data(
 ) -> (Option<String>, Option<f64>, Option<serde_json::Value>) {
     if let Some(LanguageSpecificData::Rust(rust_data)) = language_specific {
         // Check state machine first (higher priority)
-        if let Some(sm_signals) = &rust_data.state_machine_signals {
-            if sm_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD {
-                let details = serde_json::json!({
-                    "transition_count": sm_signals.transition_count,
-                    "match_expression_count": sm_signals.match_expression_count,
-                    "action_dispatch_count": sm_signals.action_dispatch_count,
-                });
-                return (
-                    Some("state_machine".to_string()),
-                    Some(sm_signals.confidence),
-                    Some(details),
-                );
-            }
+        if let Some(sm_signals) = &rust_data.state_machine_signals
+            && sm_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD
+        {
+            let details = serde_json::json!({
+                "transition_count": sm_signals.transition_count,
+                "match_expression_count": sm_signals.match_expression_count,
+                "action_dispatch_count": sm_signals.action_dispatch_count,
+            });
+            return (
+                Some("state_machine".to_string()),
+                Some(sm_signals.confidence),
+                Some(details),
+            );
         }
 
         // Check coordinator second
-        if let Some(coord_signals) = &rust_data.coordinator_signals {
-            if coord_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD {
-                let details = serde_json::json!({
-                    "actions": coord_signals.actions,
-                    "comparisons": coord_signals.comparisons,
-                });
-                return (
-                    Some("coordinator".to_string()),
-                    Some(coord_signals.confidence),
-                    Some(details),
-                );
-            }
+        if let Some(coord_signals) = &rust_data.coordinator_signals
+            && coord_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD
+        {
+            let details = serde_json::json!({
+                "actions": coord_signals.actions,
+                "comparisons": coord_signals.comparisons,
+            });
+            return (
+                Some("coordinator".to_string()),
+                Some(coord_signals.confidence),
+                Some(details),
+            );
         }
     }
     (None, None, None)

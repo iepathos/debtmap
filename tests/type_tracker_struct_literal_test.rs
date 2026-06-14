@@ -1,5 +1,5 @@
 use debtmap::analyzers::type_tracker::{ScopeKind, TypeSource, TypeTracker};
-use syn::{parse_quote, Expr};
+use syn::{Expr, parse_quote};
 
 #[test]
 fn test_resolve_struct_literal_type() {

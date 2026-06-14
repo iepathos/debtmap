@@ -3,9 +3,9 @@
 //! Detects type scattering, orphaned functions, and utilities sprawl across
 //! the entire codebase to recommend idiomatic Rust organization patterns.
 
+use crate::organization::RecommendationSeverity;
 use crate::organization::architecture_utils::*;
 use crate::organization::type_based_clustering::MethodSignature;
-use crate::organization::RecommendationSeverity;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -978,9 +978,11 @@ mod tests {
         let analysis = analyzer.analyze_codebase(&snapshot);
 
         assert!(!analysis.recommendations.is_empty());
-        assert!(analysis
-            .recommendations
-            .iter()
-            .any(|r| r.title.contains("FileMetrics")));
+        assert!(
+            analysis
+                .recommendations
+                .iter()
+                .any(|r| r.title.contains("FileMetrics"))
+        );
     }
 }

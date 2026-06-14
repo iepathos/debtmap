@@ -5,19 +5,22 @@ use debtmap::priority::filter_config::ItemFilterConfig;
 #[test]
 fn configuration_precedence_env_var_overrides_default() {
     // Set env var to override default
-    std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "15.0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "15.0") };
 
     let config = ItemFilterConfig::from_environment();
     assert_eq!(config.min_score, 15.0);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD") };
 }
 
 #[test]
 fn configuration_precedence_cli_overrides_env_var() {
     // Set env var
-    std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "15.0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "15.0") };
 
     let config = ItemFilterConfig::from_environment();
     assert_eq!(config.min_score, 15.0);
@@ -27,7 +30,8 @@ fn configuration_precedence_cli_overrides_env_var() {
     assert_eq!(config.min_score, 20.0);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD") };
 }
 
 #[test]

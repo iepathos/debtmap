@@ -107,7 +107,10 @@ mod tests {
          so it should ONLY call the METHOD, not the standalone function.",
         standalone_id.line,
         standalone_callers.len(),
-        standalone_callers.iter().map(|c| format!("`{}` at line {}", c.name, c.line)).collect::<Vec<_>>()
+        standalone_callers
+            .iter()
+            .map(|c| format!("`{}` at line {}", c.name, c.line))
+            .collect::<Vec<_>>()
     );
 
     // THE FIX: Method correctly shows callers

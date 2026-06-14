@@ -6,10 +6,10 @@
 //! - Observer notification loops
 
 use super::{
-    find_class_implementations, is_abstract_base, Implementation, PatternInstance,
-    PatternRecognizer, PatternType,
+    Implementation, PatternInstance, PatternRecognizer, PatternType, find_class_implementations,
+    is_abstract_base,
 };
-use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
+use crate::core::{FileMetrics, FunctionMetrics, ast::ClassDef};
 
 pub struct ObserverPatternRecognizer;
 
@@ -163,31 +163,31 @@ impl PatternRecognizer for ObserverPatternRecognizer {
 
         // Check if class implements an observer interface
         for base_class_name in &class.base_classes {
-            if let Some(base_class) = classes.iter().find(|c| &c.name == base_class_name) {
-                if is_abstract_base(base_class) {
-                    // Check if this method overrides an abstract method
-                    if base_class
-                        .methods
-                        .iter()
-                        .any(|m| m.name == method_name && m.is_abstract)
-                    {
-                        return Some(PatternInstance {
-                            pattern_type: PatternType::Observer,
-                            confidence: 0.85,
-                            base_class: Some(base_class.name.clone()),
-                            implementations: vec![Implementation {
-                                file: file_metrics.path.clone(),
-                                class_name: Some(class_name.to_string()),
-                                function_name: method_name.to_string(),
-                                line: function.line,
-                            }],
-                            usage_sites: vec![],
-                            reasoning: format!(
-                                "Implements abstract method {} from observer interface {}",
-                                method_name, base_class.name
-                            ),
-                        });
-                    }
+            if let Some(base_class) = classes.iter().find(|c| &c.name == base_class_name)
+                && is_abstract_base(base_class)
+            {
+                // Check if this method overrides an abstract method
+                if base_class
+                    .methods
+                    .iter()
+                    .any(|m| m.name == method_name && m.is_abstract)
+                {
+                    return Some(PatternInstance {
+                        pattern_type: PatternType::Observer,
+                        confidence: 0.85,
+                        base_class: Some(base_class.name.clone()),
+                        implementations: vec![Implementation {
+                            file: file_metrics.path.clone(),
+                            class_name: Some(class_name.to_string()),
+                            function_name: method_name.to_string(),
+                            line: function.line,
+                        }],
+                        usage_sites: vec![],
+                        reasoning: format!(
+                            "Implements abstract method {} from observer interface {}",
+                            method_name, base_class.name
+                        ),
+                    });
                 }
             }
         }
@@ -199,7 +199,7 @@ impl PatternRecognizer for ObserverPatternRecognizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ast::MethodDef, ComplexityMetrics, Language};
+    use crate::core::{ComplexityMetrics, Language, ast::MethodDef};
     use std::path::PathBuf;
 
     fn create_test_file_metrics_with_classes(classes: Vec<ClassDef>) -> FileMetrics {

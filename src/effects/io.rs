@@ -44,8 +44,8 @@
 use crate::env::AnalysisEnv;
 use crate::errors::AnalysisError;
 use std::path::PathBuf;
-use stillwater::effect::prelude::*;
 use stillwater::Effect;
+use stillwater::effect::prelude::*;
 
 /// Read a file's contents as a UTF-8 string.
 ///

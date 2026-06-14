@@ -51,7 +51,7 @@
 /// ```
 #[macro_export]
 macro_rules! assert_result_ok {
-    ($result:expr) => {
+    ($result:expr_2021) => {
         match $result {
             Ok(value) => value,
             Err(e) => panic!(
@@ -63,7 +63,7 @@ macro_rules! assert_result_ok {
             ),
         }
     };
-    ($result:expr, $($msg:tt)+) => {
+    ($result:expr_2021, $($msg:tt)+) => {
         match $result {
             Ok(value) => value,
             Err(e) => panic!(
@@ -93,7 +93,7 @@ macro_rules! assert_result_ok {
 /// ```
 #[macro_export]
 macro_rules! assert_result_err {
-    ($result:expr) => {
+    ($result:expr_2021) => {
         match $result {
             Ok(value) => panic!(
                 "Expected Err, got Ok: {:?}\n  at {}:{}:{}",
@@ -105,7 +105,7 @@ macro_rules! assert_result_err {
             Err(e) => e,
         }
     };
-    ($result:expr, $($msg:tt)+) => {
+    ($result:expr_2021, $($msg:tt)+) => {
         match $result {
             Ok(value) => panic!(
                 "{}: Expected Err, got Ok: {:?}\n  at {}:{}:{}",
@@ -135,7 +135,7 @@ macro_rules! assert_result_err {
 /// ```
 #[macro_export]
 macro_rules! assert_contains_error {
-    ($result:expr, $pattern:expr) => {{
+    ($result:expr_2021, $pattern:expr_2021) => {{
         let err = $crate::assert_result_err!($result);
         let err_str = err.to_string();
         assert!(
@@ -169,7 +169,7 @@ macro_rules! assert_contains_error {
 /// ```
 #[macro_export]
 macro_rules! assert_validation_error_count {
-    ($validation:expr, $count:expr) => {
+    ($validation:expr_2021, $count:expr_2021) => {
         match $validation {
             stillwater::Validation::Success(value) => panic!(
                 "Expected {} validation errors, got success with: {:?}\n  at {}:{}:{}",
@@ -214,7 +214,7 @@ macro_rules! assert_validation_error_count {
 /// ```
 #[macro_export]
 macro_rules! assert_validation_ok {
-    ($validation:expr) => {
+    ($validation:expr_2021) => {
         match $validation {
             stillwater::Validation::Success(value) => value,
             stillwater::Validation::Failure(errors) => panic!(
@@ -243,7 +243,7 @@ macro_rules! assert_validation_ok {
 /// ```
 #[macro_export]
 macro_rules! assert_validation_err {
-    ($validation:expr) => {
+    ($validation:expr_2021) => {
         match $validation {
             stillwater::Validation::Success(value) => panic!(
                 "Expected validation failure, got success: {:?}\n  at {}:{}:{}",

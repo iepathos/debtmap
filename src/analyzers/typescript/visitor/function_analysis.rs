@@ -306,28 +306,28 @@ fn extract_variable_functions(
     let mut cursor = node.walk();
 
     for child in node.children(&mut cursor) {
-        if child.kind() == "variable_declarator" {
-            if let Some(name_node) = child.child_by_field_name("name") {
-                let name = node_text(&name_node, &ast.source).to_string();
+        if child.kind() == "variable_declarator"
+            && let Some(name_node) = child.child_by_field_name("name")
+        {
+            let name = node_text(&name_node, &ast.source).to_string();
 
-                if let Some(value_node) = child.child_by_field_name("value") {
-                    match value_node.kind() {
-                        "arrow_function" => {
-                            if let Some(metrics) =
-                                analyze_arrow_function(&value_node, ast, Some(name), false)
-                            {
-                                functions.push(metrics);
-                            }
+            if let Some(value_node) = child.child_by_field_name("value") {
+                match value_node.kind() {
+                    "arrow_function" => {
+                        if let Some(metrics) =
+                            analyze_arrow_function(&value_node, ast, Some(name), false)
+                        {
+                            functions.push(metrics);
                         }
-                        "function_expression" | "function" => {
-                            if let Some(metrics) =
-                                analyze_function_expression(&value_node, ast, Some(name))
-                            {
-                                functions.push(metrics);
-                            }
-                        }
-                        _ => {}
                     }
+                    "function_expression" | "function" => {
+                        if let Some(metrics) =
+                            analyze_function_expression(&value_node, ast, Some(name))
+                        {
+                            functions.push(metrics);
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -504,18 +504,18 @@ fn extract_field_functions(
     functions: &mut Vec<JsFunctionMetrics>,
     class_name: Option<&str>,
 ) {
-    if let Some(value) = node.child_by_field_name("value") {
-        if value.kind() == "arrow_function" {
-            let name = node
-                .child_by_field_name("name")
-                .map(|n| node_text(&n, &ast.source).to_string());
+    if let Some(value) = node.child_by_field_name("value")
+        && value.kind() == "arrow_function"
+    {
+        let name = node
+            .child_by_field_name("name")
+            .map(|n| node_text(&n, &ast.source).to_string());
 
-            let full_name = field_full_name(class_name, name.as_deref());
+        let full_name = field_full_name(class_name, name.as_deref());
 
-            if let Some(mut metrics) = analyze_arrow_function(&value, ast, Some(full_name), false) {
-                metrics.kind = FunctionKind::Method;
-                functions.push(metrics);
-            }
+        if let Some(mut metrics) = analyze_arrow_function(&value, ast, Some(full_name), false) {
+            metrics.kind = FunctionKind::Method;
+            functions.push(metrics);
         }
     }
 }
@@ -555,8 +555,8 @@ fn get_method_body<'a>(node: &'a Node<'a>) -> Option<Node<'a>> {
 
 fn has_async_modifier(node: &Node) -> bool {
     let mut cursor = node.walk();
-    let result = node.children(&mut cursor).any(|c| c.kind() == "async");
-    result
+
+    node.children(&mut cursor).any(|c| c.kind() == "async")
 }
 
 fn determine_method_kind(node: &Node, ast: &TypeScriptAst, in_class: bool) -> FunctionKind {

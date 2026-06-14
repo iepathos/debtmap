@@ -113,15 +113,13 @@ impl ExplainCoverageResult {
     pub fn add_attempt(&mut self, attempt: StrategyAttempt) {
         let is_success = attempt.success;
         self.attempts.push(attempt);
-        if is_success {
-            if let Some(last) = self.attempts.last() {
-                let strategy = last.strategy.clone();
-                let coverage = last.coverage_percentage;
-                if !self.coverage_found {
-                    self.matched_by_strategy = Some(strategy);
-                    self.coverage_found = true;
-                    self.coverage_percentage = coverage;
-                }
+        if is_success && let Some(last) = self.attempts.last() {
+            let strategy = last.strategy.clone();
+            let coverage = last.coverage_percentage;
+            if !self.coverage_found {
+                self.matched_by_strategy = Some(strategy);
+                self.coverage_found = true;
+                self.coverage_percentage = coverage;
             }
         }
     }

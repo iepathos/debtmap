@@ -130,34 +130,33 @@ pub fn finalize_file_functions(
 /// * `path` - The path of the new source file
 pub(crate) fn handle_source_file(state: &mut LcovParserState, path: PathBuf) {
     // Save previous file's data if any
-    if let Some(file) = state.current_file.take() {
-        if !state.file_functions.is_empty() {
-            let funcs = finalize_file_functions(&mut state.file_functions);
+    if let Some(file) = state.current_file.take()
+        && !state.file_functions.is_empty()
+    {
+        let funcs = finalize_file_functions(&mut state.file_functions);
 
-            // Merge into existing file data if it exists (Spec 214 fix)
-            if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
-                for new_func in funcs {
-                    if let Some(existing) =
-                        existing_funcs.iter_mut().find(|f| f.name == new_func.name)
-                    {
-                        existing.execution_count =
-                            existing.execution_count.max(new_func.execution_count);
-                        // Line coverage is already pre-calculated in finalize_file_functions,
-                        // but if we merge later we might need to recalculate.
-                        // For now, assume same function has same start_line.
-                    } else {
-                        existing_funcs.push(new_func);
-                    }
+        // Merge into existing file data if it exists (Spec 214 fix)
+        if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
+            for new_func in funcs {
+                if let Some(existing) = existing_funcs.iter_mut().find(|f| f.name == new_func.name)
+                {
+                    existing.execution_count =
+                        existing.execution_count.max(new_func.execution_count);
+                    // Line coverage is already pre-calculated in finalize_file_functions,
+                    // but if we merge later we might need to recalculate.
+                    // For now, assume same function has same start_line.
+                } else {
+                    existing_funcs.push(new_func);
                 }
-                // Maintain sorted order
-                existing_funcs.sort_by(|a, b| {
-                    a.start_line
-                        .cmp(&b.start_line)
-                        .then_with(|| a.name.cmp(&b.name))
-                });
-            } else {
-                state.data.functions.insert(file, funcs);
             }
+            // Maintain sorted order
+            existing_funcs.sort_by(|a, b| {
+                a.start_line
+                    .cmp(&b.start_line)
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+        } else {
+            state.data.functions.insert(file, funcs);
         }
     }
     state.current_file = Some(path);
@@ -276,31 +275,30 @@ pub(crate) fn handle_end_of_record(state: &mut LcovParserState) {
     process_function_coverage_parallel(&mut state.file_functions, &state.file_lines);
 
     // Save the file's data
-    if let Some(file) = state.current_file.take() {
-        if !state.file_functions.is_empty() {
-            let funcs = finalize_file_functions(&mut state.file_functions);
+    if let Some(file) = state.current_file.take()
+        && !state.file_functions.is_empty()
+    {
+        let funcs = finalize_file_functions(&mut state.file_functions);
 
-            // Merge into existing file data if it exists (Spec 214 fix)
-            if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
-                for new_func in funcs {
-                    if let Some(existing) =
-                        existing_funcs.iter_mut().find(|f| f.name == new_func.name)
-                    {
-                        existing.execution_count =
-                            existing.execution_count.max(new_func.execution_count);
-                    } else {
-                        existing_funcs.push(new_func);
-                    }
+        // Merge into existing file data if it exists (Spec 214 fix)
+        if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
+            for new_func in funcs {
+                if let Some(existing) = existing_funcs.iter_mut().find(|f| f.name == new_func.name)
+                {
+                    existing.execution_count =
+                        existing.execution_count.max(new_func.execution_count);
+                } else {
+                    existing_funcs.push(new_func);
                 }
-                // Maintain sorted order
-                existing_funcs.sort_by(|a, b| {
-                    a.start_line
-                        .cmp(&b.start_line)
-                        .then_with(|| a.name.cmp(&b.name))
-                });
-            } else {
-                state.data.functions.insert(file, funcs);
             }
+            // Maintain sorted order
+            existing_funcs.sort_by(|a, b| {
+                a.start_line
+                    .cmp(&b.start_line)
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+        } else {
+            state.data.functions.insert(file, funcs);
         }
     }
 
@@ -318,31 +316,30 @@ pub(crate) fn handle_end_of_record(state: &mut LcovParserState) {
 ///
 /// * `state` - The parser state to modify
 pub(crate) fn handle_incomplete_file(state: &mut LcovParserState) {
-    if let Some(file) = state.current_file.take() {
-        if !state.file_functions.is_empty() {
-            let funcs = finalize_file_functions(&mut state.file_functions);
+    if let Some(file) = state.current_file.take()
+        && !state.file_functions.is_empty()
+    {
+        let funcs = finalize_file_functions(&mut state.file_functions);
 
-            // Merge into existing file data if it exists (Spec 214 fix)
-            if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
-                for new_func in funcs {
-                    if let Some(existing) =
-                        existing_funcs.iter_mut().find(|f| f.name == new_func.name)
-                    {
-                        existing.execution_count =
-                            existing.execution_count.max(new_func.execution_count);
-                    } else {
-                        existing_funcs.push(new_func);
-                    }
+        // Merge into existing file data if it exists (Spec 214 fix)
+        if let Some(existing_funcs) = state.data.functions.get_mut(&file) {
+            for new_func in funcs {
+                if let Some(existing) = existing_funcs.iter_mut().find(|f| f.name == new_func.name)
+                {
+                    existing.execution_count =
+                        existing.execution_count.max(new_func.execution_count);
+                } else {
+                    existing_funcs.push(new_func);
                 }
-                // Maintain sorted order
-                existing_funcs.sort_by(|a, b| {
-                    a.start_line
-                        .cmp(&b.start_line)
-                        .then_with(|| a.name.cmp(&b.name))
-                });
-            } else {
-                state.data.functions.insert(file, funcs);
             }
+            // Maintain sorted order
+            existing_funcs.sort_by(|a, b| {
+                a.start_line
+                    .cmp(&b.start_line)
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+        } else {
+            state.data.functions.insert(file, funcs);
         }
     }
 }
@@ -491,10 +488,12 @@ mod tests {
         handle_source_file(&mut state, PathBuf::from("file2.rs"));
 
         // First file's data should be saved
-        assert!(state
-            .data
-            .functions
-            .contains_key(&PathBuf::from("file1.rs")));
+        assert!(
+            state
+                .data
+                .functions
+                .contains_key(&PathBuf::from("file1.rs"))
+        );
 
         // Current file should be the new one
         assert_eq!(state.current_file, Some(PathBuf::from("file2.rs")));
@@ -516,10 +515,12 @@ mod tests {
         handle_incomplete_file(&mut state);
 
         // Data should be saved despite missing EndOfRecord
-        assert!(state
-            .data
-            .functions
-            .contains_key(&PathBuf::from("incomplete.rs")));
+        assert!(
+            state
+                .data
+                .functions
+                .contains_key(&PathBuf::from("incomplete.rs"))
+        );
         let funcs = state
             .data
             .functions

@@ -3,20 +3,20 @@
 use super::components::{add_blank_line, add_label_value, add_section_header};
 use crate::complexity::EntropyAnalysis;
 use crate::core::LanguageSpecificData;
+use crate::organization::AntiPatternReport;
 use crate::organization::anti_pattern_detector::{AntiPattern, AntiPatternSeverity};
 use crate::organization::god_object::GodObjectAnalysis;
-use crate::organization::AntiPatternReport;
 use crate::output::PatternAnalysis;
-use crate::priority::detected_pattern::DetectedPattern;
 use crate::priority::UnifiedDebtItem;
+use crate::priority::detected_pattern::DetectedPattern;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// Describe entropy level based on score

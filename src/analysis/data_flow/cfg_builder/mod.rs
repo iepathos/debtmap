@@ -376,10 +376,10 @@ mod tests {
             .find(|b| matches!(b.terminator, Terminator::Return { .. }));
 
         assert!(exit_block.is_some());
-        if let Some(block) = exit_block {
-            if let Terminator::Return { value } = &block.terminator {
-                assert!(value.is_some(), "Return should track actual variable");
-            }
+        if let Some(block) = exit_block
+            && let Terminator::Return { value } = &block.terminator
+        {
+            assert!(value.is_some(), "Return should track actual variable");
         }
     }
 
@@ -631,11 +631,10 @@ mod tests {
             .blocks
             .iter()
             .find(|b| matches!(b.terminator, Terminator::Match { .. }))
+            && let Terminator::Match { scrutinee, .. } = &block.terminator
         {
-            if let Terminator::Match { scrutinee, .. } = &block.terminator {
-                let name = graph.var_names.get(scrutinee.name_id as usize);
-                assert!(name.is_some(), "Scrutinee should have a valid name");
-            }
+            let name = graph.var_names.get(scrutinee.name_id as usize);
+            assert!(name.is_some(), "Scrutinee should have a valid name");
         }
     }
 
@@ -698,14 +697,14 @@ mod tests {
             .iter()
             .find(|b| matches!(b.terminator, Terminator::Match { .. }));
 
-        if let Some(block) = match_block {
-            if let Terminator::Match { arms, .. } = &block.terminator {
-                assert!(
-                    arms.len() >= 3,
-                    "Match should have at least 3 arms, got {}",
-                    arms.len()
-                );
-            }
+        if let Some(block) = match_block
+            && let Terminator::Match { arms, .. } = &block.terminator
+        {
+            assert!(
+                arms.len() >= 3,
+                "Match should have at least 3 arms, got {}",
+                arms.len()
+            );
         }
     }
 

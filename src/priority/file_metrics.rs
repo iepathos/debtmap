@@ -467,7 +467,8 @@ impl FileDebtMetrics {
                 // Generic but more specific recommendation
                 format!(
                     "URGENT: {} lines, {} functions! Split by data flow: 1) Input/parsing functions 2) Core logic/transformation 3) Output/formatting. Create {} focused modules with <30 functions each.",
-                    self.total_lines, self.function_count,
+                    self.total_lines,
+                    self.function_count,
                     (self.function_count / 25).clamp(3, 8)
                 )
             }

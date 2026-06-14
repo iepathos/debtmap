@@ -11,16 +11,20 @@ fn test_context_aware_filters_parameter_analyzer() {
     let file_path = PathBuf::from("src/organization/parameter_analyzer.rs");
 
     // First analyze without context-aware (simulate by setting env var)
-    std::env::set_var("DEBTMAP_CONTEXT_AWARE", "false");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "false") };
     let results_without =
         analyze_file_directly(&file_path).expect("Failed to analyze parameter_analyzer.rs");
-    std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_CONTEXT_AWARE") };
 
     // Then analyze with context-aware enabled
-    std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true") };
     let results_with =
         analyze_file_directly(&file_path).expect("Failed to analyze parameter_analyzer.rs");
-    std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_CONTEXT_AWARE") };
 
     // Count complexity issues (changed from security)
     let complexity_without = results_without
@@ -85,9 +89,11 @@ fn test_context_aware_filters_rust_call_graph() {
     // Test using library API directly
     let file_path = PathBuf::from("src/analyzers/rust_call_graph.rs");
 
-    std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true") };
     let results = analyze_file_directly(&file_path).expect("Failed to analyze rust_call_graph.rs");
-    std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_CONTEXT_AWARE") };
 
     // Check for the specific functions mentioned in user's output
     let problematic_functions = [
@@ -143,7 +149,8 @@ fn test_context_aware_on_entire_codebase() {
     // Count total files to analyze
     println!("Analyzing {} files", project_files.len());
 
-    std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true") };
 
     let mut total_debt_items = 0;
     let mut found_test_issues = false;
@@ -174,12 +181,15 @@ fn test_context_aware_on_entire_codebase() {
         }
     }
 
-    std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_CONTEXT_AWARE") };
 
     println!("Total debt items found: {}", total_debt_items);
 
     if found_test_issues {
-        println!("ISSUE CONFIRMED: Test functions are triggering false positives even with context-aware");
+        println!(
+            "ISSUE CONFIRMED: Test functions are triggering false positives even with context-aware"
+        );
     }
 }
 
@@ -193,7 +203,8 @@ fn test_context_aware_on_specific_dirs() {
     let dirs_to_test = ["src/organization", "src/analyzers"];
     let config = DebtmapConfig::default();
 
-    std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true") };
 
     for dir in &dirs_to_test {
         let dir_path = Path::new(dir);
@@ -226,5 +237,6 @@ fn test_context_aware_on_specific_dirs() {
         }
     }
 
-    std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_CONTEXT_AWARE") };
 }

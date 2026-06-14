@@ -4,7 +4,7 @@
 /// coordination complexity vs. algorithmic complexity. Helps distinguish between
 /// extractable business logic and necessary coordination overhead in parallel code.
 use std::collections::HashSet;
-use syn::{visit::Visit, Expr, ExprClosure, ExprMethodCall, File, Item, Stmt};
+use syn::{Expr, ExprClosure, ExprMethodCall, File, Item, Stmt, visit::Visit};
 
 /// Parallel library being used
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

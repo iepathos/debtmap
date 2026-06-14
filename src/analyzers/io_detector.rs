@@ -45,8 +45,8 @@
 
 use crate::data_flow::IoOperation;
 use syn::{
-    punctuated::Punctuated, spanned::Spanned, token::Comma, visit::Visit, Expr, ExprCall,
-    ExprMethodCall, ItemFn, Macro, Member,
+    Expr, ExprCall, ExprMethodCall, ItemFn, Macro, Member, punctuated::Punctuated,
+    spanned::Spanned, token::Comma, visit::Visit,
 };
 
 /// Pattern for matching I/O operations
@@ -325,10 +325,10 @@ impl IoDetectorVisitor {
 
             // If pattern specifies a receiver type, check it
             if let Some(required_receiver) = pattern.receiver_type {
-                if let Some(actual_receiver) = receiver {
-                    if actual_receiver.contains(required_receiver) {
-                        return Some(pattern.operation_type);
-                    }
+                if let Some(actual_receiver) = receiver
+                    && actual_receiver.contains(required_receiver)
+                {
+                    return Some(pattern.operation_type);
                 }
                 // If receiver type is required but we don't have one, skip
                 continue;
@@ -526,10 +526,10 @@ fn collect_variables_from_expr(expr: &Expr, vars: &mut Vec<String>, depth: usize
                 // Multi-segment path: self.field or module::item
                 let path_str = quote::quote!(#path).to_string();
                 // Only include if it looks like a variable (lowercase start)
-                if let Some(first_char) = path_str.chars().next() {
-                    if first_char.is_lowercase() || path_str.starts_with("self") {
-                        vars.push(path_str);
-                    }
+                if let Some(first_char) = path_str.chars().next()
+                    && (first_char.is_lowercase() || path_str.starts_with("self"))
+                {
+                    vars.push(path_str);
                 }
             }
         }

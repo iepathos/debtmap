@@ -2,7 +2,7 @@
 //!
 //! Verifies that evidence formatting overhead is <2% as required by spec
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::analysis::multi_signal_aggregation::{
     AggregatedClassification, ResponsibilityCategory, SignalEvidence, SignalType,
 };

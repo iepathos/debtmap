@@ -31,7 +31,7 @@ pub mod env;
 pub mod guards;
 pub mod state;
 
-pub use actions::{run_analysis, WorkflowRunner};
+pub use actions::{WorkflowRunner, run_analysis};
 pub use checkpoint::{load_checkpoint, save_checkpoint};
 pub use env::{AnalysisEnv, FileSystem, ProgressReporter, RealAnalysisEnv};
 pub use guards::*;

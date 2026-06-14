@@ -352,15 +352,21 @@ mod tests {
         // name_long and is_switch should appear in both (100%)
         // unique_method appears in 1/2 = 50%, so it should also be included
         assert_eq!(shared.len(), 3);
-        assert!(shared
-            .iter()
-            .any(|(name, freq)| name == "name_long" && *freq == 1.0));
-        assert!(shared
-            .iter()
-            .any(|(name, freq)| name == "is_switch" && *freq == 1.0));
-        assert!(shared
-            .iter()
-            .any(|(name, freq)| name == "unique_method" && *freq == 0.5));
+        assert!(
+            shared
+                .iter()
+                .any(|(name, freq)| name == "name_long" && *freq == 1.0)
+        );
+        assert!(
+            shared
+                .iter()
+                .any(|(name, freq)| name == "is_switch" && *freq == 1.0)
+        );
+        assert!(
+            shared
+                .iter()
+                .any(|(name, freq)| name == "unique_method" && *freq == 0.5)
+        );
     }
 
     #[test]

@@ -158,9 +158,11 @@ fn test_filter_by_priority_minimum_threshold() {
     // Filter for Medium or higher priority
     let filtered = filter_by_priority(items.clone(), Priority::Medium);
     assert_eq!(filtered.len(), 2); // Medium and High
-    assert!(filtered
-        .iter()
-        .all(|item| item.priority >= Priority::Medium));
+    assert!(
+        filtered
+            .iter()
+            .all(|item| item.priority >= Priority::Medium)
+    );
 
     // Filter for Low or higher (all items)
     let filtered = filter_by_priority(items.clone(), Priority::Low);
@@ -239,9 +241,11 @@ fn test_filter_by_type_single() {
     let filtered = filter_by_type(items, DebtType::Todo { reason: None });
 
     assert_eq!(filtered.len(), 2);
-    assert!(filtered
-        .iter()
-        .all(|item| item.debt_type == DebtType::Todo { reason: None }));
+    assert!(
+        filtered
+            .iter()
+            .all(|item| item.debt_type == DebtType::Todo { reason: None })
+    );
 }
 
 #[test]

@@ -22,15 +22,15 @@
 //! assert_eq!(formatted.rank, 1);
 //! ```
 
-use super::context::{create_format_context, FormatContext};
+use super::context::{FormatContext, create_format_context};
 use super::sections::generate_formatted_sections;
 use crate::formatting::FormattingConfig;
+use crate::priority::UnifiedDebtItem;
 use crate::priority::classification::{CoverageLevel, Severity};
 use crate::priority::detected_pattern::DetectedPattern;
 use crate::priority::formatted_output::{
     ContextProviderInfo, CoverageTag, FormattedPriorityItem, FormattedSection, SeverityInfo,
 };
-use crate::priority::UnifiedDebtItem;
 use crate::risk::context::{ContextDetails, ContextualRisk};
 
 /// Pure function: transforms debt item → formatted output.

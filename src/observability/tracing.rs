@@ -43,7 +43,7 @@
 
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Tracks whether TUI mode is active to suppress tracing output.
 static TUI_ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -60,22 +60,22 @@ pub fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
 
     // Check if we should log to a file instead of stderr
-    if let Ok(log_file_path) = std::env::var("DEBTMAP_LOG_FILE") {
-        if let Ok(file) = std::fs::File::create(&log_file_path) {
-            let file = std::sync::Mutex::new(file);
-            tracing_subscriber::registry()
-                .with(
-                    fmt::layer()
-                        .with_target(false)
-                        .with_ansi(false)
-                        .with_writer(move || FileWriter {
-                            file: &file as *const _,
-                        }),
-                )
-                .with(filter)
-                .init();
-            return;
-        }
+    if let Ok(log_file_path) = std::env::var("DEBTMAP_LOG_FILE")
+        && let Ok(file) = std::fs::File::create(&log_file_path)
+    {
+        let file = std::sync::Mutex::new(file);
+        tracing_subscriber::registry()
+            .with(
+                fmt::layer()
+                    .with_target(false)
+                    .with_ansi(false)
+                    .with_writer(move || FileWriter {
+                        file: &file as *const _,
+                    }),
+            )
+            .with(filter)
+            .init();
+        return;
     }
 
     // Default: stderr with TUI-aware suppression

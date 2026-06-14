@@ -4,8 +4,8 @@
 //! easily testable functions that perform categorization, extraction,
 //! and data transformation.
 
-use crate::priority::classification::Severity;
 use crate::priority::DebtType;
+use crate::priority::classification::Severity;
 
 /// Helper to get file extension from path
 pub(crate) fn get_file_extension(path: &std::path::Path) -> &str {

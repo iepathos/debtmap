@@ -118,10 +118,10 @@ impl ItemFilterConfig {
 /// Get minimum score threshold with precedence.
 fn get_min_score_threshold() -> f64 {
     // Environment variable takes precedence
-    if let Ok(env_value) = std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD") {
-        if let Ok(threshold) = env_value.parse::<f64>() {
-            return threshold;
-        }
+    if let Ok(env_value) = std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD")
+        && let Ok(threshold) = env_value.parse::<f64>()
+    {
+        return threshold;
     }
 
     // Fallback to config file

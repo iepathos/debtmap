@@ -5,9 +5,9 @@
 
 use super::filter::FilterStats;
 use crate::priority::{
+    DebtCategory,
     classification::Severity,
     view::{CategoryCounts, ScoreDistribution, ViewItem, ViewSummary},
-    DebtCategory,
 };
 
 /// Calculates summary statistics from items.

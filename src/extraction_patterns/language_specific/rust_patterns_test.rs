@@ -5,7 +5,7 @@ mod tests {
         AccumulationOp, AnalysisContext, Expression, ExtractablePattern, GuardCheck,
         MatchedPattern, PatternMatcher, ReturnType,
     };
-    use syn::{parse_str, File};
+    use syn::{File, parse_str};
 
     fn create_test_context() -> AnalysisContext {
         AnalysisContext {

@@ -178,10 +178,10 @@ fn add_provider_to_aggregator(
 
     // Update subsection to Active state
     // Context stage is at index 4 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
-    if let Some(index) = subsection_index {
-        if let Some(manager) = crate::progress::ProgressManager::global() {
-            manager.tui_update_subtask(4, index, crate::tui::app::StageStatus::Active, None);
-        }
+    if let Some(index) = subsection_index
+        && let Some(manager) = crate::progress::ProgressManager::global()
+    {
+        manager.tui_update_subtask(4, index, crate::tui::app::StageStatus::Active, None);
     }
 
     let result = match create_provider(provider_name, project_path, function_metrics) {
@@ -194,21 +194,21 @@ fn add_provider_to_aggregator(
 
     // Update subsection to Completed state and add visibility pause (spec 219)
     // Context stage is at index 4 (0=files, 1=call graph, 2=coverage, 3=purity, 4=context, 5=debt scoring)
-    if let Some(index) = subsection_index {
-        if let Some(manager) = crate::progress::ProgressManager::global() {
-            manager.tui_update_subtask(4, index, crate::tui::app::StageStatus::Completed, None);
-            if index == 2 {
-                manager.tui_update_subtask_labeled(
-                    4,
-                    2,
-                    crate::tui::app::StageStatus::Completed,
-                    None,
-                    Some("git history"),
-                );
-            }
-            // 150ms visibility pause for user feedback
-            std::thread::sleep(std::time::Duration::from_millis(150));
+    if let Some(index) = subsection_index
+        && let Some(manager) = crate::progress::ProgressManager::global()
+    {
+        manager.tui_update_subtask(4, index, crate::tui::app::StageStatus::Completed, None);
+        if index == 2 {
+            manager.tui_update_subtask_labeled(
+                4,
+                2,
+                crate::tui::app::StageStatus::Completed,
+                None,
+                Some("git history"),
+            );
         }
+        // 150ms visibility pause for user feedback
+        std::thread::sleep(std::time::Duration::from_millis(150));
     }
 
     result

@@ -55,7 +55,8 @@ pub fn is_automation_mode() -> bool {
 /// Apply environment setup for analysis (side effect function, I/O at edges)
 pub fn apply_environment_setup(no_context_aware: bool) -> Result<()> {
     if !no_context_aware {
-        std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true") };
     }
 
     Ok(())

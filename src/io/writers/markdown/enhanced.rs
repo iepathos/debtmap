@@ -214,16 +214,16 @@ fn format_item_breakdown(number: usize, item: &UnifiedDebtItem) -> String {
     );
 
     // Add god object indicators if present
-    if let Some(ref god_obj) = item.god_object_indicators {
-        if god_obj.is_god_object {
-            result.push_str(&format!(
+    if let Some(ref god_obj) = item.god_object_indicators
+        && god_obj.is_god_object
+    {
+        result.push_str(&format!(
                 "- **God Object Warning**: {} methods, {} fields, {} responsibilities (score: {:.1}%)\n",
                 god_obj.method_count,
                 god_obj.field_count,
                 god_obj.responsibility_count,
                 god_obj.god_object_score
             ));
-        }
     }
 
     result
@@ -270,18 +270,17 @@ fn format_data_flow_section(
     }
 
     // I/O operations
-    if let Some(io_ops) = data_flow.get_io_operations(&func_id) {
-        if !io_ops.is_empty() {
-            result.push_str(&format!("- I/O Operations: {} detected\n", io_ops.len()));
-            for op in io_ops.iter().take(3) {
-                result.push_str(&format!("  - {} at line {}\n", op.operation_type, op.line));
-            }
-            if io_ops.len() > 3 {
-                result.push_str(&format!("  - ... and {} more\n", io_ops.len() - 3));
-            }
-            result
-                .push_str("  - **Recommendation**: Consider isolating I/O in separate functions\n");
+    if let Some(io_ops) = data_flow.get_io_operations(&func_id)
+        && !io_ops.is_empty()
+    {
+        result.push_str(&format!("- I/O Operations: {} detected\n", io_ops.len()));
+        for op in io_ops.iter().take(3) {
+            result.push_str(&format!("  - {} at line {}\n", op.operation_type, op.line));
         }
+        if io_ops.len() > 3 {
+            result.push_str(&format!("  - ... and {} more\n", io_ops.len() - 3));
+        }
+        result.push_str("  - **Recommendation**: Consider isolating I/O in separate functions\n");
     }
 
     // Escape/taint analysis removed - not providing actionable debt signals

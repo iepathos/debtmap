@@ -154,13 +154,14 @@ pub use framework_patterns_multi::{
     PatternMatcher as MultiLangPatternMatcher,
 };
 pub use functional_composition::{
-    analyze_composition, analyze_purity, detect_pipelines, score_composition, CompositionMetrics,
-    FunctionalAnalysisConfig, Pipeline, PipelineStage, PurityMetrics, SideEffectKind, TerminalOp,
+    CompositionMetrics, FunctionalAnalysisConfig, Pipeline, PipelineStage, PurityMetrics,
+    SideEffectKind, TerminalOp, analyze_composition, analyze_purity, detect_pipelines,
+    score_composition,
 };
 pub use graph_metrics::{
-    compute_betweenness_centrality, compute_clustering_coefficient,
-    compute_depth_from_entry_points, CallGraphPattern, GraphMetrics,
-    PatternDetector as CallGraphPatternDetector, ResponsibilityClassification,
+    CallGraphPattern, GraphMetrics, PatternDetector as CallGraphPatternDetector,
+    ResponsibilityClassification, compute_betweenness_centrality, compute_clustering_coefficient,
+    compute_depth_from_entry_points,
 };
 pub use io_detection::{
     CollectionOp as IoCollectionOp, IoDetector, IoOperation, IoPatternSet, IoProfile, Language,
@@ -177,9 +178,9 @@ pub use multi_signal_aggregation::{
     SignalWeights,
 };
 pub use patterns::{
+    Implementation, PatternDetector, PatternInstance, PatternRecognizer, PatternType, UsageSite,
     callback::CallbackPatternRecognizer, factory::FactoryPatternRecognizer,
-    observer::ObserverPatternRecognizer, Implementation, PatternDetector, PatternInstance,
-    PatternRecognizer, PatternType, UsageSite,
+    observer::ObserverPatternRecognizer,
 };
 pub use purity_analysis::{
     EffortLevel, PurityAnalysis, PurityAnalyzer, PurityLevel, PurityRefactoringOpportunity,
@@ -194,14 +195,13 @@ pub use rust_patterns::{
 };
 pub use type_flow_tracker::{CollectionOp, Location, TypeFlowTracker, TypeId, TypeInfo};
 pub use type_signatures::{
-    extract_rust_signature, CanonicalType, GenericBound, Parameter, TypeBasedClassification,
-    TypeMatcher, TypeNormalizer, TypePattern, TypePatternLibrary, TypeSignature,
-    TypeSignatureAnalyzer,
+    CanonicalType, GenericBound, Parameter, TypeBasedClassification, TypeMatcher, TypeNormalizer,
+    TypePattern, TypePatternLibrary, TypeSignature, TypeSignatureAnalyzer, extract_rust_signature,
 };
 pub use workflow::{
-    load_checkpoint, run_analysis, save_checkpoint, AnalysisConfig as WorkflowConfig, AnalysisEnv,
-    AnalysisPhase, AnalysisResults as WorkflowResults, AnalysisState, FileSystem, ProgressReporter,
-    RealAnalysisEnv, WorkflowRunner,
+    AnalysisConfig as WorkflowConfig, AnalysisEnv, AnalysisPhase,
+    AnalysisResults as WorkflowResults, AnalysisState, FileSystem, ProgressReporter,
+    RealAnalysisEnv, WorkflowRunner, load_checkpoint, run_analysis, save_checkpoint,
 };
 
 #[cfg(test)]

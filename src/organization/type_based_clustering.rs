@@ -195,10 +195,10 @@ impl ImplicitTypeDetector {
     }
 
     fn suggest_type_name(methods: &[String]) -> String {
-        if let Some(common_prefix) = Self::find_common_prefix(methods) {
-            if common_prefix.len() > 2 {
-                return Self::to_pascal_case(&common_prefix);
-            }
+        if let Some(common_prefix) = Self::find_common_prefix(methods)
+            && common_prefix.len() > 2
+        {
+            return Self::to_pascal_case(&common_prefix);
         }
         "ImplicitType".to_string()
     }
@@ -355,15 +355,15 @@ impl TypeAffinityAnalyzer {
         }
 
         // Check if return type of one matches param type of another (pipeline)
-        if let Some(ret1) = &sig1.return_type {
-            if sig2.param_types.iter().any(|p| p.name == ret1.name) {
-                score += 0.5;
-            }
+        if let Some(ret1) = &sig1.return_type
+            && sig2.param_types.iter().any(|p| p.name == ret1.name)
+        {
+            score += 0.5;
         }
-        if let Some(ret2) = &sig2.return_type {
-            if sig1.param_types.iter().any(|p| p.name == ret2.name) {
-                score += 0.5;
-            }
+        if let Some(ret2) = &sig2.return_type
+            && sig1.param_types.iter().any(|p| p.name == ret2.name)
+        {
+            score += 0.5;
         }
 
         score
@@ -435,10 +435,10 @@ impl TypeAffinityAnalyzer {
             }
         }
 
-        if let Some(ret) = &sig.return_type {
-            if self.is_domain_type(&ret.name) {
-                return self.extract_base_type(&ret.name);
-            }
+        if let Some(ret) = &sig.return_type
+            && self.is_domain_type(&ret.name)
+        {
+            return self.extract_base_type(&ret.name);
         }
 
         "Unknown".to_string()
@@ -458,11 +458,11 @@ impl TypeAffinityAnalyzer {
 
         for m1 in methods {
             for m2 in methods {
-                if m1 != m2 {
-                    if let Some(score) = affinity_matrix.get(&(m1.clone(), m2.clone())) {
-                        total_affinity += score;
-                        pair_count += 1;
-                    }
+                if m1 != m2
+                    && let Some(score) = affinity_matrix.get(&(m1.clone(), m2.clone()))
+                {
+                    total_affinity += score;
+                    pair_count += 1;
                 }
             }
         }
@@ -592,15 +592,15 @@ impl TypeAffinityAnalyzer {
     /// - `Metrics` → `Metrics` (unchanged)
     fn extract_base_type(&self, type_name: &str) -> String {
         // Handle generic types
-        if let Some(start) = type_name.find('<') {
-            if let Some(end) = type_name.rfind('>') {
-                let inner = &type_name[start + 1..end];
-                // For multi-generic types (e.g., Result<T, E>), take first
-                if let Some(comma) = inner.find(',') {
-                    return inner[..comma].trim().to_string();
-                }
-                return inner.trim().to_string();
+        if let Some(start) = type_name.find('<')
+            && let Some(end) = type_name.rfind('>')
+        {
+            let inner = &type_name[start + 1..end];
+            // For multi-generic types (e.g., Result<T, E>), take first
+            if let Some(comma) = inner.find(',') {
+                return inner[..comma].trim().to_string();
             }
+            return inner.trim().to_string();
         }
 
         // Handle references

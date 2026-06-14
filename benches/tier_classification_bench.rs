@@ -3,7 +3,7 @@
 //! Validates that tier classification has acceptable performance
 //! and ensures no regression after refactoring to smaller functions.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::priority::tiers::pure::classify_tier;
 use debtmap::priority::{
     ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, TierConfig,

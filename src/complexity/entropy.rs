@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
-use syn::{visit::Visit, Block, Expr};
+use syn::{Block, Expr, visit::Visit};
 
 use super::token_classifier::{
     ClassificationConfig, ClassifiedToken, NodeType, TokenClass, TokenClassifier, TokenContext,
@@ -338,11 +338,7 @@ impl EntropyAnalyzer {
             .values()
             .map(|&weight| {
                 let p = weight / total_weight;
-                if p > 0.0 {
-                    -p * p.log2()
-                } else {
-                    0.0
-                }
+                if p > 0.0 { -p * p.log2() } else { 0.0 }
             })
             .sum();
 
@@ -486,10 +482,10 @@ impl EntropyAnalyzer {
 
         impl<'ast> Visit<'ast> for VariableCollector {
             fn visit_expr(&mut self, expr: &'ast Expr) {
-                if let Expr::Path(path) = expr {
-                    if let Some(segment) = path.path.segments.first() {
-                        self.unique_variables.insert(segment.ident.to_string());
-                    }
+                if let Expr::Path(path) = expr
+                    && let Some(segment) = path.path.segments.first()
+                {
+                    self.unique_variables.insert(segment.ident.to_string());
                 }
                 syn::visit::visit_expr(self, expr);
             }
@@ -1099,7 +1095,13 @@ mod tests {
 
     fn assert_float_eq(left: f64, right: f64, epsilon: f64) {
         if (left - right).abs() > epsilon {
-            panic!("assertion failed: `(left == right)`\n  left: `{}`,\n right: `{}`\n  diff: `{}`\nepsilon: `{}`", left, right, (left - right).abs(), epsilon);
+            panic!(
+                "assertion failed: `(left == right)`\n  left: `{}`,\n right: `{}`\n  diff: `{}`\nepsilon: `{}`",
+                left,
+                right,
+                (left - right).abs(),
+                epsilon
+            );
         }
     }
 
@@ -1356,7 +1358,8 @@ mod tests {
         };
 
         // Enable entropy dampening for this test
-        std::env::set_var("DEBTMAP_ENTROPY_ENABLED", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_ENTROPY_ENABLED", "true") };
 
         let original = 20;
         let dampened = apply_entropy_dampening(original, &extreme_score);
@@ -1381,7 +1384,8 @@ mod tests {
         }
 
         // Clean up
-        std::env::remove_var("DEBTMAP_ENTROPY_ENABLED");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("DEBTMAP_ENTROPY_ENABLED") };
     }
 
     #[test]

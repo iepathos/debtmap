@@ -2,15 +2,15 @@
 
 use super::app::ResultsApp;
 use super::grouping;
-use crate::priority::classification::Severity;
 use crate::priority::UnifiedDebtItem;
+use crate::priority::classification::Severity;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
-    Frame,
 };
 
 /// Horizontal margin constant per DESIGN.md spacing rules.

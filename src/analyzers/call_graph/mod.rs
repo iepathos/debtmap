@@ -271,11 +271,10 @@ impl CallGraphExtractor {
 
     /// Check for function references in expressions
     fn check_for_function_reference(&mut self, expr: &Expr) {
-        if let Expr::Path(path_expr) = expr {
-            if let Some(func_name) = GraphBuilder::extract_function_name_from_path(&path_expr.path)
-            {
-                self.process_call(func_name, call_resolution::CallSiteType::Static, true);
-            }
+        if let Expr::Path(path_expr) = expr
+            && let Some(func_name) = GraphBuilder::extract_function_name_from_path(&path_expr.path)
+        {
+            self.process_call(func_name, call_resolution::CallSiteType::Static, true);
         }
     }
 
@@ -309,15 +308,14 @@ impl CallGraphExtractor {
         func: &Expr,
         args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
     ) {
-        if let Expr::Path(path_expr) = func {
-            if let Some(func_name) = GraphBuilder::extract_function_name_from_path(&path_expr.path)
-            {
-                let same_file_hint =
-                    CallResolver::is_same_file_call(&func_name, &self.current_impl_type);
-                // Static calls use Expr::Call syntax
-                let call_site_type = call_resolution::CallSiteType::Static;
-                self.process_call(func_name, call_site_type, same_file_hint);
-            }
+        if let Expr::Path(path_expr) = func
+            && let Some(func_name) = GraphBuilder::extract_function_name_from_path(&path_expr.path)
+        {
+            let same_file_hint =
+                CallResolver::is_same_file_call(&func_name, &self.current_impl_type);
+            // Static calls use Expr::Call syntax
+            let call_site_type = call_resolution::CallSiteType::Static;
+            self.process_call(func_name, call_site_type, same_file_hint);
         }
 
         self.process_arguments(args);
@@ -479,10 +477,10 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         if let Pat::Ident(pat_ident) = &local.pat {
             let var_name = pat_ident.ident.to_string();
 
-            if let Some(init) = &local.init {
-                if let Some(type_info) = self.type_tracker.resolve_expr_type(&init.expr) {
-                    self.type_tracker.record_variable(var_name, type_info);
-                }
+            if let Some(init) = &local.init
+                && let Some(type_info) = self.type_tracker.resolve_expr_type(&init.expr)
+            {
+                self.type_tracker.record_variable(var_name, type_info);
             }
         }
 
@@ -533,12 +531,12 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
 
         // Track function parameters
         for input in &item_fn.sig.inputs {
-            if let syn::FnArg::Typed(pat_type) = input {
-                if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                    let _param_name = pat_ident.ident.to_string();
-                    // Track parameter - type inference would happen here
-                    // For now, we skip tracking to avoid type issues
-                }
+            if let syn::FnArg::Typed(pat_type) = input
+                && let Pat::Ident(pat_ident) = &*pat_type.pat
+            {
+                let _param_name = pat_ident.ident.to_string();
+                // Track parameter - type inference would happen here
+                // For now, we skip tracking to avoid type issues
             }
         }
 
@@ -706,12 +704,16 @@ mod tests {
 
         assert_eq!(graph.node_count(), 3);
         assert!(graph.get_all_functions().any(|f| f.name == "MyStruct::new"));
-        assert!(graph
-            .get_all_functions()
-            .any(|f| f.name == "MyStruct::method"));
-        assert!(graph
-            .get_all_functions()
-            .any(|f| f.name == "MyStruct::other_method"));
+        assert!(
+            graph
+                .get_all_functions()
+                .any(|f| f.name == "MyStruct::method")
+        );
+        assert!(
+            graph
+                .get_all_functions()
+                .any(|f| f.name == "MyStruct::other_method")
+        );
     }
 
     #[test]
@@ -737,12 +739,16 @@ mod tests {
         let graph = extractor.extract(&file);
 
         assert!(graph.get_all_functions().any(|f| f.name == "main"));
-        assert!(graph
-            .get_all_functions()
-            .any(|f| f.name == "submodule::func"));
-        assert!(graph
-            .get_all_functions()
-            .any(|f| f.name == "submodule::inner_func"));
+        assert!(
+            graph
+                .get_all_functions()
+                .any(|f| f.name == "submodule::func")
+        );
+        assert!(
+            graph
+                .get_all_functions()
+                .any(|f| f.name == "submodule::inner_func")
+        );
     }
 
     #[test]

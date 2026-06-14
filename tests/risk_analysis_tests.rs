@@ -172,10 +172,12 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
     );
 
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Failed to parse LCOV file"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse LCOV file")
+    );
 }
 
 #[test]

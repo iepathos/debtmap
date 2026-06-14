@@ -137,10 +137,12 @@ Some content without location marker.
 
         let result = PlanParser::extract_target_location(temp_file.path());
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Could not find **Location**:"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Could not find **Location**:")
+        );
     }
 
     #[test]

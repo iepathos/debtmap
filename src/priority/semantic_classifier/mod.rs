@@ -74,10 +74,10 @@ fn classify_by_rules(
     }
 
     // Check for enum converters (Spec 124)
-    if let Some(syn_func) = syn_func {
-        if is_enum_converter_enhanced(func, syn_func) {
-            return Some(FunctionRole::IOWrapper);
-        }
+    if let Some(syn_func) = syn_func
+        && is_enum_converter_enhanced(func, syn_func)
+    {
+        return Some(FunctionRole::IOWrapper);
     }
 
     // Check for accessor methods (Spec 125)
@@ -193,10 +193,10 @@ fn is_accessor_method(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) ->
     }
 
     // If AST available, verify body is simple
-    if let Some(syn_func) = syn_func {
-        if !is_simple_accessor_body(syn_func) {
-            return false;
-        }
+    if let Some(syn_func) = syn_func
+        && !is_simple_accessor_body(syn_func)
+    {
+        return false;
     }
 
     true

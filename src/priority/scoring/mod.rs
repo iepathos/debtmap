@@ -36,11 +36,11 @@ pub mod validation;
 
 // Re-export commonly used items
 pub use calculation::{
-    calculate_base_score, calculate_base_score_with_coverage_multiplier,
-    calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
+    NormalizedScore, ScalingMethod, calculate_base_score,
+    calculate_base_score_with_coverage_multiplier, calculate_complexity_factor,
+    calculate_coverage_factor, calculate_coverage_multiplier,
     calculate_coverage_multiplier_with_test_flag, calculate_dependency_factor, denormalize_score,
     generate_normalization_curve, normalize_complexity, normalize_final_score_with_metadata,
-    NormalizedScore, ScalingMethod,
 };
 
 pub use classification::{
@@ -50,11 +50,11 @@ pub use classification::{
 
 // Spec 262: Recommendation re-exports removed
 
-pub use test_calculation::{calculate_tests_needed, ComplexityTier, TestRecommendation};
+pub use test_calculation::{ComplexityTier, TestRecommendation, calculate_tests_needed};
 
 pub use orchestration_adjustment::{
-    adjust_score, extract_composition_metrics, CompositionMetrics, OrchestrationAdjustmentConfig,
-    ReductionPercent, ScoreAdjustment,
+    CompositionMetrics, OrchestrationAdjustmentConfig, ReductionPercent, ScoreAdjustment,
+    adjust_score, extract_composition_metrics,
 };
 
 pub use coverage_expectations::{CoverageExpectations, CoverageGap, CoverageRange, GapSeverity};
@@ -73,10 +73,10 @@ pub use file_context_scoring::{
 
 pub use facade_scoring::adjust_score_for_facade;
 
-pub use scaling::{calculate_final_score, ScalingConfig};
+pub use scaling::{ScalingConfig, calculate_final_score};
 
 pub use effects::{
-    calculate_score_effect, calculate_scores_effect, get_weights_effect, ScoringEnv, TestScoringEnv,
+    ScoringEnv, TestScoringEnv, calculate_score_effect, calculate_scores_effect, get_weights_effect,
 };
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

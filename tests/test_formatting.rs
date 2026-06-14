@@ -12,22 +12,28 @@ fn test_color_mode_from_str() {
 #[test]
 fn test_formatting_config_from_env() {
     // Test with NO_COLOR set
-    std::env::set_var("NO_COLOR", "1");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("NO_COLOR", "1") };
     let config = FormattingConfig::from_env();
     assert_eq!(config.color, ColorMode::Never);
-    std::env::remove_var("NO_COLOR");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("NO_COLOR") };
 
     // Test with CLICOLOR=0
-    std::env::set_var("CLICOLOR", "0");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("CLICOLOR", "0") };
     let config = FormattingConfig::from_env();
     assert_eq!(config.color, ColorMode::Never);
-    std::env::remove_var("CLICOLOR");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("CLICOLOR") };
 
     // Test with CLICOLOR_FORCE=1
-    std::env::set_var("CLICOLOR_FORCE", "1");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("CLICOLOR_FORCE", "1") };
     let config = FormattingConfig::from_env();
     assert_eq!(config.color, ColorMode::Always);
-    std::env::remove_var("CLICOLOR_FORCE");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("CLICOLOR_FORCE") };
 }
 
 #[test]

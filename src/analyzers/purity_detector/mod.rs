@@ -91,9 +91,11 @@ mod tests {
             "#,
         );
         assert!(!analysis.is_pure);
-        assert!(analysis
-            .reasons
-            .contains(&ImpurityReason::MutableParameters));
+        assert!(
+            analysis
+                .reasons
+                .contains(&ImpurityReason::MutableParameters)
+        );
     }
 
     #[test]

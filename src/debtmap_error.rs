@@ -775,14 +775,13 @@ impl From<crate::core::errors::Error> for DebtmapError {
                 if let Some(io_err) = source {
                     let mut result = Self::from_io_error(io_err, path);
                     // Override message if we have a better one
-                    if !message.is_empty() {
-                        if let Self::Io {
+                    if !message.is_empty()
+                        && let Self::Io {
                             message: ref mut msg,
                             ..
                         } = result
-                        {
-                            *msg = message;
-                        }
+                    {
+                        *msg = message;
                     }
                     result
                 } else {

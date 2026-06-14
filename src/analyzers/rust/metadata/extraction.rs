@@ -108,10 +108,10 @@ mod tests {
         let (is_pure, confidence, _purity_level) = detect_purity(&item_fn);
         assert!(is_pure.is_some());
         assert!(confidence.is_some());
-        if let (Some(pure), Some(conf)) = (is_pure, confidence) {
-            if pure {
-                assert!(conf > 0.5);
-            }
+        if let (Some(pure), Some(conf)) = (is_pure, confidence)
+            && pure
+        {
+            assert!(conf > 0.5);
         }
     }
 

@@ -7,9 +7,9 @@
 /// - **Service extraction**: Identifies methods that can be extracted to service objects
 /// - **Trait extraction**: Suggests trait-based decomposition for behavioral clusters
 use std::collections::{HashMap, HashSet};
-use syn::{visit::Visit, Expr, ExprField, ImplItemFn, ItemImpl};
+use syn::{Expr, ExprField, ImplItemFn, ItemImpl, visit::Visit};
 
-use super::types::{capitalize_first, BehaviorCategory, FieldAccessStats, MethodCluster};
+use super::types::{BehaviorCategory, FieldAccessStats, MethodCluster, capitalize_first};
 
 /// Detect methods that could be extracted to service objects
 ///
@@ -358,12 +358,11 @@ impl<'ast> Visit<'ast> for FieldAccessTracker {
         // Track field accesses of the form self.field_name
         if let Some(ref method_name) = self.current_method {
             // Check if this is a self.field access
-            if is_self_field_access(&node.base) {
-                if let syn::Member::Named(field_ident) = &node.member {
-                    if let Some(fields) = self.method_fields.get_mut(method_name) {
-                        fields.insert(field_ident.to_string());
-                    }
-                }
+            if is_self_field_access(&node.base)
+                && let syn::Member::Named(field_ident) = &node.member
+                && let Some(fields) = self.method_fields.get_mut(method_name)
+            {
+                fields.insert(field_ident.to_string());
             }
         }
 

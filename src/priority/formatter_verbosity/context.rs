@@ -60,20 +60,20 @@ pub fn is_non_production_context(context: &FileContext) -> bool {
 
 /// Format context dampening section (spec 191)
 pub fn format_context_dampening_section(output: &mut String, item: &UnifiedDebtItem) {
-    if let (Some(multiplier), Some(file_type)) = (item.context_multiplier, item.context_type) {
-        if should_show_context_dampening(Some(multiplier)) {
-            let description = get_context_description(file_type);
-            let dampening_pct = calculate_dampening_percentage(multiplier);
+    if let (Some(multiplier), Some(file_type)) = (item.context_multiplier, item.context_type)
+        && should_show_context_dampening(Some(multiplier))
+    {
+        let description = get_context_description(file_type);
+        let dampening_pct = calculate_dampening_percentage(multiplier);
 
-            writeln!(
-                output,
-                "├─ {} {} ({}% dampening applied)",
-                "CONTEXT:".bright_blue(),
-                description.bright_cyan(),
-                dampening_pct
-            )
-            .unwrap();
-        }
+        writeln!(
+            output,
+            "├─ {} {} ({}% dampening applied)",
+            "CONTEXT:".bright_blue(),
+            description.bright_cyan(),
+            dampening_pct
+        )
+        .unwrap();
     }
 }
 

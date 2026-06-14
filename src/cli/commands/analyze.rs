@@ -8,12 +8,12 @@ use crate::observability::{enable_profiling, get_timing_report};
 use std::path::PathBuf;
 
 use crate::cli::config_builder::{
-    build_debug_config, build_display_config, build_feature_config, build_language_config,
-    build_path_config, build_performance_config, build_threshold_config, compute_multi_pass,
-    compute_verbosity, convert_context_providers, convert_disable_context,
-    convert_filter_categories, convert_languages, convert_min_priority, convert_output_format,
-    convert_threshold_preset, create_formatting_config, should_use_parallel, AnalysisFeatureConfig,
-    DebugConfig, DisplayConfig, LanguageConfig, PathConfig, PerformanceConfig, ThresholdConfig,
+    AnalysisFeatureConfig, DebugConfig, DisplayConfig, LanguageConfig, PathConfig,
+    PerformanceConfig, ThresholdConfig, build_debug_config, build_display_config,
+    build_feature_config, build_language_config, build_path_config, build_performance_config,
+    build_threshold_config, compute_multi_pass, compute_verbosity, convert_context_providers,
+    convert_disable_context, convert_filter_categories, convert_languages, convert_min_priority,
+    convert_output_format, convert_threshold_preset, create_formatting_config, should_use_parallel,
 };
 use crate::cli::setup::{apply_environment_setup, get_worker_count, print_metrics_explanation};
 use crate::error::{CliError, ConfigError};
@@ -163,7 +163,8 @@ pub fn extract_analyze_params(
         let lang_cfg = build_language_config(languages, aggregation_method);
 
         if quiet {
-            std::env::set_var("DEBTMAP_QUIET", "true");
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { std::env::set_var("DEBTMAP_QUIET", "true") };
         }
 
         Ok((

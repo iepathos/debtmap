@@ -4,7 +4,7 @@
 // preventing the bug where ACTION says "Add 3 tests" but steps say "Write 11 tests".
 
 use debtmap::priority::scoring::test_calculation::{
-    calculate_tests_needed, validate_recommendation_consistency, ComplexityTier,
+    ComplexityTier, calculate_tests_needed, validate_recommendation_consistency,
 };
 
 #[test]

@@ -12,10 +12,10 @@
 #[cfg(test)]
 mod tests {
     use crate::analysis::attribution::{AttributedComplexity, ComplexityAttribution};
+    use crate::analysis::diagnostics::DetailLevel;
     use crate::analysis::diagnostics::effects::{
         generate_report_effect, generate_summary_effect, get_detail_level_effect,
     };
-    use crate::analysis::diagnostics::DetailLevel;
     use crate::analysis::effects::{
         analyze_with_config, get_complexity_threshold, lift_pure, run_analysis_effect,
         sequence_effects, traverse_effect,

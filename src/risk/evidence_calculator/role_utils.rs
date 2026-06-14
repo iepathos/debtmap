@@ -4,7 +4,7 @@
 //! and building RiskContext for risk assessment.
 
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use crate::priority::semantic_classifier::{classify_function_role, FunctionRole};
+use crate::priority::semantic_classifier::{FunctionRole, classify_function_role};
 use crate::priority::{FunctionAnalysis, FunctionVisibility};
 use crate::risk::evidence::RiskContext;
 use std::path::Path;

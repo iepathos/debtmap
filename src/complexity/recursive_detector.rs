@@ -1,8 +1,8 @@
 use super::match_patterns::MatchExpressionRecognizer;
 use std::collections::HashMap;
 use syn::{
-    visit::Visit, Block, Expr, ExprAsync, ExprBlock, ExprClosure, ExprForLoop, ExprIf, ExprLoop,
-    ExprMatch, ExprWhile, ImplItem, Item, Stmt,
+    Block, Expr, ExprAsync, ExprBlock, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMatch,
+    ExprWhile, ImplItem, Item, Stmt, visit::Visit,
 };
 
 /// Location information for a match expression found in the AST

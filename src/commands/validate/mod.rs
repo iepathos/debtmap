@@ -37,7 +37,7 @@ use crate::progress::{ProgressConfig, ProgressManager};
 use crate::utils::risk_analyzer;
 use crate::{config, risk};
 use analysis::{
-    calculate_unified_analysis, read_parallel_options_from_env, ValidationAnalysisOptions,
+    ValidationAnalysisOptions, calculate_unified_analysis, read_parallel_options_from_env,
 };
 use anyhow::Result;
 use output::{
@@ -99,12 +99,14 @@ pub fn validate_project(config: ValidateConfig) -> Result<()> {
 /// I/O: Set up parallel processing environment.
 fn setup_parallel_processing(enabled: bool, jobs: usize, verbosity: u8) {
     if enabled {
-        std::env::set_var("DEBTMAP_PARALLEL", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
         print_parallel_status(enabled, jobs, verbosity);
     }
 
     if jobs > 0 {
-        std::env::set_var("DEBTMAP_JOBS", jobs.to_string());
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_JOBS", jobs.to_string()) };
     }
 }
 

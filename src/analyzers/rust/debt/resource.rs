@@ -4,8 +4,8 @@
 
 use crate::core::DebtItem;
 use crate::resource::{
-    convert_resource_issue_to_debt_item, AsyncResourceDetector, DropDetector, ResourceDetector,
-    UnboundedCollectionDetector,
+    AsyncResourceDetector, DropDetector, ResourceDetector, UnboundedCollectionDetector,
+    convert_resource_issue_to_debt_item,
 };
 use std::path::Path;
 

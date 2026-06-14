@@ -621,10 +621,12 @@ mod tests {
 
         assert_eq!(analysis.purity, PurityLevel::ReadOnly);
         assert!(!analysis.violations.is_empty());
-        assert!(analysis
-            .violations
-            .iter()
-            .any(|v| { matches!(v, PurityViolation::IoOperation { .. }) }));
+        assert!(
+            analysis
+                .violations
+                .iter()
+                .any(|v| { matches!(v, PurityViolation::IoOperation { .. }) })
+        );
     }
 
     #[test]
@@ -654,10 +656,12 @@ mod tests {
         let analysis = analyzer.analyze_code(code, Language::Rust);
 
         assert!(!analysis.is_deterministic);
-        assert!(analysis
-            .violations
-            .iter()
-            .any(|v| { matches!(v, PurityViolation::NonDeterministic { .. }) }));
+        assert!(
+            analysis
+                .violations
+                .iter()
+                .any(|v| { matches!(v, PurityViolation::NonDeterministic { .. }) })
+        );
     }
 
     #[test]
@@ -695,10 +699,12 @@ def generate_timestamp():
         let analysis = analyzer.analyze_code(code, Language::Python);
 
         assert!(!analysis.is_deterministic);
-        assert!(analysis
-            .violations
-            .iter()
-            .any(|v| { matches!(v, PurityViolation::NonDeterministic { .. }) }));
+        assert!(
+            analysis
+                .violations
+                .iter()
+                .any(|v| { matches!(v, PurityViolation::NonDeterministic { .. }) })
+        );
     }
 
     #[test]
@@ -713,10 +719,12 @@ function randomNumber() {
         let analysis = analyzer.analyze_code(code, Language::JavaScript);
 
         assert!(!analysis.is_deterministic);
-        assert!(analysis
-            .violations
-            .iter()
-            .any(|v| { matches!(v, PurityViolation::NonDeterministic { .. }) }));
+        assert!(
+            analysis
+                .violations
+                .iter()
+                .any(|v| { matches!(v, PurityViolation::NonDeterministic { .. }) })
+        );
     }
 
     #[test]

@@ -6,8 +6,8 @@
 //! Run with: `cargo run --example pipeline_demo`
 
 use debtmap::pipeline::{
-    stage::{FallibleStage, PureStage},
     PipelineBuilder,
+    stage::{FallibleStage, PureStage},
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

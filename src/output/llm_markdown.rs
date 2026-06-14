@@ -11,7 +11,7 @@
 
 use crate::io::writers::llm_markdown::format;
 use crate::output::unified::{
-    convert_to_unified_format, FunctionDebtItemOutput, Priority, UnifiedOutput,
+    FunctionDebtItemOutput, Priority, UnifiedOutput, convert_to_unified_format,
 };
 use crate::priority::UnifiedAnalysis;
 use crate::tui::results::detail_pages::overview::format_debt_type_name;
@@ -348,11 +348,11 @@ fn write_location_group<W: Write>(
     }
 
     // Scoring breakdown (optional, show for first item with scoring details)
-    if let Some(ref scoring) = rep.scoring_details {
-        if let Some(scr) = format::scoring(Some(scoring), &rep.function_role) {
-            write!(writer, "{}", scr)?;
-            writeln!(writer)?;
-        }
+    if let Some(ref scoring) = rep.scoring_details
+        && let Some(scr) = format::scoring(Some(scoring), &rep.function_role)
+    {
+        write!(writer, "{}", scr)?;
+        writeln!(writer)?;
     }
 
     // Context section (critical for LLM agents)

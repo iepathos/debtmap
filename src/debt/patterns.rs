@@ -28,10 +28,10 @@ pub fn find_todos_and_fixmes_with_suppression(
                 let line_number = line_num + 1;
 
                 // Check if this line is suppressed
-                if let Some(ctx) = suppression {
-                    if ctx.is_suppressed(line_number, &debt_type) {
-                        return None;
-                    }
+                if let Some(ctx) = suppression
+                    && ctx.is_suppressed(line_number, &debt_type)
+                {
+                    return None;
                 }
 
                 Some(DebtItem {
@@ -100,10 +100,10 @@ pub fn find_code_smells_with_suppression(
             let file_path = file.to_path_buf();
 
             // Check if this line is suppressed for code smells
-            if let Some(ctx) = suppression {
-                if ctx.is_suppressed(line_number, &DebtType::CodeSmell { smell_type: None }) {
-                    return vec![];
-                }
+            if let Some(ctx) = suppression
+                && ctx.is_suppressed(line_number, &DebtType::CodeSmell { smell_type: None })
+            {
+                return vec![];
             }
 
             [

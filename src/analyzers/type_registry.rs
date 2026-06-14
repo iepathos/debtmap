@@ -385,7 +385,7 @@ pub fn extract_type_definitions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::{parse_quote, Field};
+    use syn::{Field, parse_quote};
 
     #[test]
     fn test_extract_type_name_from_simple_path() {

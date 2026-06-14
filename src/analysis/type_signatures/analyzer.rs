@@ -113,15 +113,15 @@ impl TypeSignatureAnalyzer {
         }
 
         // Check error type for classification (if no pattern matched)
-        if let Some(ref error_type) = signature.error_type {
-            if let Some(category) = self.classify_by_error_type(error_type) {
-                return Some(TypeBasedClassification {
-                    category,
-                    confidence: 0.80,
-                    evidence: format!("Error type suggests category: {}", error_type.base),
-                    pattern_name: "Error Type Classification".into(),
-                });
-            }
+        if let Some(ref error_type) = signature.error_type
+            && let Some(category) = self.classify_by_error_type(error_type)
+        {
+            return Some(TypeBasedClassification {
+                category,
+                confidence: 0.80,
+                evidence: format!("Error type suggests category: {}", error_type.base),
+                pattern_name: "Error Type Classification".into(),
+            });
         }
 
         // Check generic bounds (lowest priority)

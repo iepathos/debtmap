@@ -2,8 +2,8 @@ use super::{
     ComparisonResult, ComplexityEvidence, ComplexityThreshold, RefactoringTechnique,
     RemediationAction, RiskEvidence, RiskFactor, RiskSeverity, RiskType,
 };
-use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::FunctionAnalysis;
+use crate::priority::semantic_classifier::FunctionRole;
 use crate::risk::evidence::RiskContext;
 use crate::risk::thresholds::{ComplexityThresholds, StatisticalThresholdProvider};
 

@@ -7,8 +7,8 @@ use super::dependencies::extract_dependencies;
 use super::metrics::{build_file_metrics, calculate_total_complexity};
 use super::visitor::analyze_ast_with_content;
 use crate::complexity::threshold_manager::ComplexityThresholds;
-use crate::core::ast::RustAst;
 use crate::core::FileMetrics;
+use crate::core::ast::RustAst;
 
 /// Analyze a Rust file and return file metrics
 pub fn analyze_rust_file(

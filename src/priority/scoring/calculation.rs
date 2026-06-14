@@ -108,7 +108,7 @@ pub fn calculate_instability_aware_dependency_factor(
     efferent_count: usize,
 ) -> InstabilityAwareDependencyResult {
     use crate::output::unified::{
-        calculate_instability, classify_coupling_pattern, CouplingClassification,
+        CouplingClassification, calculate_instability, classify_coupling_pattern,
     };
 
     let afferent_count = production_caller_count + test_caller_count;

@@ -78,8 +78,8 @@ pub mod types;
 
 // Re-export public API from call_classification
 pub use call_classification::{
-    classify_call, is_known_impure, is_known_pure, CallPurity, UnknownCallBehavior,
-    KNOWN_IMPURE_FUNCTIONS, KNOWN_PURE_FUNCTIONS,
+    CallPurity, KNOWN_IMPURE_FUNCTIONS, KNOWN_PURE_FUNCTIONS, UnknownCallBehavior, classify_call,
+    is_known_impure, is_known_pure,
 };
 
 // Re-export public API from types

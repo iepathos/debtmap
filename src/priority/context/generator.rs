@@ -7,8 +7,8 @@ use super::tests_ctx::extract_test_contexts;
 use super::types::{ContextRelationship, ContextSuggestion, FileRange, RelatedContext};
 use super::types_ctx::extract_type_contexts;
 use crate::organization::DetectionType;
-use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::UnifiedDebtItem;
+use crate::priority::call_graph::{CallGraph, FunctionId};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 

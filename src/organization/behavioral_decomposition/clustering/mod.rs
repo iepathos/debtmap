@@ -72,4 +72,4 @@ pub use community::apply_community_detection;
 pub use hybrid::apply_hybrid_clustering;
 
 // Re-export production pipeline
-pub use pipeline::{apply_production_ready_clustering, ClusteringResult, ClusteringWarning};
+pub use pipeline::{ClusteringResult, ClusteringWarning, apply_production_ready_clustering};

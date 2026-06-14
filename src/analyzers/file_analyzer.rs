@@ -1,13 +1,13 @@
+use crate::analyzers::FileAnalyzer;
 use crate::analyzers::typescript::parser::{detect_variant, parse_source};
 use crate::analyzers::typescript::visitor::class_analysis::extract_classes;
 use crate::analyzers::typescript::visitor::function_analysis::extract_functions;
-use crate::analyzers::FileAnalyzer;
 use crate::core::FunctionMetrics;
 use crate::extraction::{ExtractedFileData, UnifiedFileExtractor};
 use crate::organization::god_object::classifier::group_methods_by_responsibility;
 use crate::organization::god_object::heuristics::{
-    detect_from_content, fallback_god_object_heuristics, HEURISTIC_MAX_FUNCTIONS,
-    HEURISTIC_MAX_LINES,
+    HEURISTIC_MAX_FUNCTIONS, HEURISTIC_MAX_LINES, detect_from_content,
+    fallback_god_object_heuristics,
 };
 use crate::organization::god_object::scoring::calculate_god_object_score_weighted;
 use crate::organization::god_object::{
@@ -866,14 +866,18 @@ mod tests {
         assert!(analysis.is_god_object);
         assert_eq!(analysis.method_count, 52);
         assert!(analysis.responsibilities.contains(&"Parsing".to_string()));
-        assert!(analysis
-            .responsibilities
-            .contains(&"Validation".to_string()));
+        assert!(
+            analysis
+                .responsibilities
+                .contains(&"Validation".to_string())
+        );
         assert!(analysis.responsibilities.contains(&"Rendering".to_string()));
-        assert!(!analysis
-            .responsibilities
-            .iter()
-            .any(|name| name.starts_with("responsibility_")));
+        assert!(
+            !analysis
+                .responsibilities
+                .iter()
+                .any(|name| name.starts_with("responsibility_"))
+        );
     }
 
     #[test]
@@ -901,14 +905,18 @@ mod tests {
         assert!(analysis.is_god_object);
         assert_eq!(analysis.method_count, 52);
         assert!(analysis.responsibilities.contains(&"Parsing".to_string()));
-        assert!(analysis
-            .responsibilities
-            .contains(&"Validation".to_string()));
+        assert!(
+            analysis
+                .responsibilities
+                .contains(&"Validation".to_string())
+        );
         assert!(analysis.responsibilities.contains(&"Rendering".to_string()));
-        assert!(!analysis
-            .responsibilities
-            .iter()
-            .any(|name| name.starts_with("responsibility_")));
+        assert!(
+            !analysis
+                .responsibilities
+                .iter()
+                .any(|name| name.starts_with("responsibility_"))
+        );
     }
 
     #[test]

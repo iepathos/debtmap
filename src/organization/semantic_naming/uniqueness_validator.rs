@@ -64,22 +64,22 @@ impl NameUniquenessValidator {
         let base_candidate = candidates.remove(0);
 
         // Try method-based disambiguation if methods provided
-        if let Some(methods) = methods {
-            if let Some(distinctive_term) = Self::extract_distinctive_term(methods) {
-                let candidate = format!("{}_{}", base_candidate.module_name, distinctive_term);
-                if !used.contains(&candidate) {
-                    used.insert(candidate.clone());
-                    return NameCandidate {
-                        module_name: candidate,
-                        confidence: base_candidate.confidence * 0.85, // Slight confidence reduction
-                        specificity_score: base_candidate.specificity_score,
-                        reasoning: format!(
-                            "{} (disambiguated with method-specific term '{}')",
-                            base_candidate.reasoning, distinctive_term
-                        ),
-                        strategy: base_candidate.strategy,
-                    };
-                }
+        if let Some(methods) = methods
+            && let Some(distinctive_term) = Self::extract_distinctive_term(methods)
+        {
+            let candidate = format!("{}_{}", base_candidate.module_name, distinctive_term);
+            if !used.contains(&candidate) {
+                used.insert(candidate.clone());
+                return NameCandidate {
+                    module_name: candidate,
+                    confidence: base_candidate.confidence * 0.85, // Slight confidence reduction
+                    specificity_score: base_candidate.specificity_score,
+                    reasoning: format!(
+                        "{} (disambiguated with method-specific term '{}')",
+                        base_candidate.reasoning, distinctive_term
+                    ),
+                    strategy: base_candidate.strategy,
+                };
             }
         }
 

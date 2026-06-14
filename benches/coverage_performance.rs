@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use debtmap::risk::lcov::{parse_lcov_file, FunctionCoverage};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use debtmap::risk::lcov::{FunctionCoverage, parse_lcov_file};
 use std::collections::HashMap;
 use std::hint::black_box;
 use std::io::Write;

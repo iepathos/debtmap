@@ -173,10 +173,10 @@ impl MacroExpander {
         }
 
         // Try map-specific parsing
-        if Self::is_map_macro(macro_name) {
-            if let Some(exprs) = Self::parse_map_tokens(tokens) {
-                return CollectionParseResult::MapSuccess(exprs);
-            }
+        if Self::is_map_macro(macro_name)
+            && let Some(exprs) = Self::parse_map_tokens(tokens)
+        {
+            return CollectionParseResult::MapSuccess(exprs);
         }
 
         // Try braced expressions
@@ -205,11 +205,7 @@ impl MacroExpander {
             }
         }
 
-        if exprs.is_empty() {
-            None
-        } else {
-            Some(exprs)
-        }
+        if exprs.is_empty() { None } else { Some(exprs) }
     }
 
     /// Parse format-type macros
@@ -219,16 +215,18 @@ impl MacroExpander {
         macro_name: &str,
     ) -> Vec<Expr> {
         // Try to extract expressions from format strings
-        if let Ok(expr) = Self::try_parse_single_expr(tokens) {
-            vec![expr]
-        } else {
-            self.parse_comma_separated_exprs(tokens)
+        match Self::try_parse_single_expr(tokens) {
+            Ok(expr) => {
+                vec![expr]
+            }
+            _ => self
+                .parse_comma_separated_exprs(tokens)
                 .unwrap_or_else(|_| {
                     if self.config.verbose_warnings {
                         eprintln!("Failed to parse format macro: {}", macro_name);
                     }
                     Vec::new()
-                })
+                }),
         }
     }
 
@@ -289,13 +287,12 @@ impl MacroExpander {
                 Ok(punctuated) => Ok(punctuated.into_iter().collect()),
                 Err(_) => {
                     // Try parsing as single expression
-                    if let Ok(expr) = syn::parse_str::<Expr>(inner) {
-                        Ok(vec![expr])
-                    } else {
-                        Err(syn::Error::new(
+                    match syn::parse_str::<Expr>(inner) {
+                        Ok(expr) => Ok(vec![expr]),
+                        _ => Err(syn::Error::new(
                             proc_macro2::Span::call_site(),
                             "Failed to parse bracketed expressions",
-                        ))
+                        )),
                     }
                 }
             }

@@ -241,10 +241,10 @@ impl DataFlowAnalyzer {
 
         while let Some((scc_idx, depth)) = queue.pop_front() {
             // Skip if already processed with shorter depth
-            if let Some(&existing_depth) = scc_depths.get(&scc_idx) {
-                if existing_depth <= depth {
-                    continue;
-                }
+            if let Some(&existing_depth) = scc_depths.get(&scc_idx)
+                && existing_depth <= depth
+            {
+                continue;
             }
 
             scc_depths.insert(scc_idx, depth);

@@ -87,15 +87,15 @@ fn try_suffix_match(
     lcov_data: &LcovData,
 ) -> Option<StrategyAttempt> {
     for (lcov_file, functions) in &lcov_data.functions {
-        if file_path.ends_with(lcov_file) || lcov_file.ends_with(file_path) {
-            if let Some(coverage_data) = functions.iter().find(|f| f.name == function_name) {
-                return Some(StrategyAttempt::success(
-                    "suffix_match",
-                    function_name.to_string(),
-                    lcov_file.display().to_string(),
-                    coverage_data.coverage_percentage / 100.0,
-                ));
-            }
+        if (file_path.ends_with(lcov_file) || lcov_file.ends_with(file_path))
+            && let Some(coverage_data) = functions.iter().find(|f| f.name == function_name)
+        {
+            return Some(StrategyAttempt::success(
+                "suffix_match",
+                function_name.to_string(),
+                lcov_file.display().to_string(),
+                coverage_data.coverage_percentage / 100.0,
+            ));
         }
     }
     None
@@ -132,15 +132,15 @@ fn try_normalized_path_match(
 
     for (lcov_file, functions) in &lcov_data.functions {
         let lcov_components = normalize_path_components(lcov_file);
-        if lcov_components == query_components {
-            if let Some(coverage_data) = functions.iter().find(|f| f.name == function_name) {
-                return Some(StrategyAttempt::success(
-                    "normalized_path_match",
-                    function_name.to_string(),
-                    lcov_file.display().to_string(),
-                    coverage_data.coverage_percentage / 100.0,
-                ));
-            }
+        if lcov_components == query_components
+            && let Some(coverage_data) = functions.iter().find(|f| f.name == function_name)
+        {
+            return Some(StrategyAttempt::success(
+                "normalized_path_match",
+                function_name.to_string(),
+                lcov_file.display().to_string(),
+                coverage_data.coverage_percentage / 100.0,
+            ));
         }
     }
     None

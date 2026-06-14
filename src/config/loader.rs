@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use super::core::DebtmapConfig;
 use super::scoring::ScoringWeights;
 use super::validation::validate_config;
-use crate::effects::{run_validation, validation_failure, validation_success, AnalysisValidation};
+use crate::effects::{AnalysisValidation, run_validation, validation_failure, validation_success};
 use crate::errors::AnalysisError;
 
 /// Load configuration from .debtmap.toml if it exists
@@ -85,11 +85,7 @@ pub(crate) fn directory_ancestors_impl(
 ) -> impl Iterator<Item = PathBuf> {
     std::iter::successors(Some(start), |dir| {
         let mut parent = dir.clone();
-        if parent.pop() {
-            Some(parent)
-        } else {
-            None
-        }
+        if parent.pop() { Some(parent) } else { None }
     })
     .take(max_depth)
 }

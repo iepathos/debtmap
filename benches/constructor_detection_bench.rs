@@ -3,12 +3,12 @@
 //! Measures the overhead of AST-based detection vs name-only detection.
 //! Target: < 5% overhead for AST analysis.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::analyzers::rust_constructor_detector::{
-    analyze_function_body, extract_return_type, ConstructorReturnType,
+    ConstructorReturnType, analyze_function_body, extract_return_type,
 };
 use std::hint::black_box;
-use syn::{parse_quote, ItemFn};
+use syn::{ItemFn, parse_quote};
 
 /// Generate Rust code with various constructor patterns
 fn generate_constructor_code(num_funcs: usize) -> Vec<ItemFn> {
@@ -146,17 +146,17 @@ fn bench_overhead_comparison(c: &mut Criterion) {
         b.iter(|| {
             let mut count = 0;
             for func in &functions {
-                if let Some(return_type) = extract_return_type(func) {
-                    if matches!(
+                if let Some(return_type) = extract_return_type(func)
+                    && matches!(
                         return_type,
                         ConstructorReturnType::OwnedSelf
                             | ConstructorReturnType::ResultSelf
                             | ConstructorReturnType::OptionSelf
-                    ) {
-                        let pattern = analyze_function_body(func);
-                        if pattern.is_constructor_like() {
-                            count += 1;
-                        }
+                    )
+                {
+                    let pattern = analyze_function_body(func);
+                    if pattern.is_constructor_like() {
+                        count += 1;
                     }
                 }
             }
@@ -175,16 +175,16 @@ fn bench_scalability(c: &mut Criterion) {
         c.bench_function(&format!("ast_detection_{name}"), |b| {
             b.iter(|| {
                 for func in &functions {
-                    if let Some(return_type) = extract_return_type(func) {
-                        if matches!(
+                    if let Some(return_type) = extract_return_type(func)
+                        && matches!(
                             return_type,
                             ConstructorReturnType::OwnedSelf
                                 | ConstructorReturnType::ResultSelf
                                 | ConstructorReturnType::OptionSelf
-                        ) {
-                            let pattern = analyze_function_body(func);
-                            black_box(pattern.is_constructor_like());
-                        }
+                        )
+                    {
+                        let pattern = analyze_function_body(func);
+                        black_box(pattern.is_constructor_like());
                     }
                 }
             })
@@ -241,16 +241,16 @@ fn bench_realistic_mixed_code(c: &mut Criterion) {
     c.bench_function("realistic_mixed_ast", |b| {
         b.iter(|| {
             for func in &functions {
-                if let Some(return_type) = extract_return_type(func) {
-                    if matches!(
+                if let Some(return_type) = extract_return_type(func)
+                    && matches!(
                         return_type,
                         ConstructorReturnType::OwnedSelf
                             | ConstructorReturnType::ResultSelf
                             | ConstructorReturnType::OptionSelf
-                    ) {
-                        let pattern = analyze_function_body(func);
-                        black_box(pattern.is_constructor_like());
-                    }
+                    )
+                {
+                    let pattern = analyze_function_body(func);
+                    black_box(pattern.is_constructor_like());
                 }
             }
         })

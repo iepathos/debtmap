@@ -3,9 +3,9 @@
 
 use crate::core::FunctionMetrics;
 use crate::priority::{
+    ActionableRecommendation, DebtType, FunctionRole, TransitiveCoverage, UnifiedScore,
     call_graph::{CallGraph, FunctionId},
     semantic_classifier::classify_function_role,
-    ActionableRecommendation, DebtType, FunctionRole, TransitiveCoverage, UnifiedScore,
 };
 
 // Re-export construction functions for backward compatibility
@@ -116,7 +116,13 @@ mod tests {
 
     fn assert_float_eq(left: f64, right: f64, epsilon: f64) {
         if (left - right).abs() > epsilon {
-            panic!("assertion failed: `(left == right)`\n  left: `{}`,\n right: `{}`\n  diff: `{}`\nepsilon: `{}`", left, right, (left - right).abs(), epsilon);
+            panic!(
+                "assertion failed: `(left == right)`\n  left: `{}`,\n right: `{}`\n  diff: `{}`\nepsilon: `{}`",
+                left,
+                right,
+                (left - right).abs(),
+                epsilon
+            );
         }
     }
 

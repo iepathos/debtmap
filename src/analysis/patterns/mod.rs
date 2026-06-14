@@ -14,7 +14,7 @@ pub mod strategy;
 pub mod template_method;
 
 use crate::analysis::call_graph::TraitRegistry;
-use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
+use crate::core::{FileMetrics, FunctionMetrics, ast::ClassDef};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -327,7 +327,7 @@ pub(crate) fn find_class_implementations<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ast::MethodDef, ComplexityMetrics, Language};
+    use crate::core::{ComplexityMetrics, Language, ast::MethodDef};
 
     fn create_test_file_metrics() -> FileMetrics {
         FileMetrics {

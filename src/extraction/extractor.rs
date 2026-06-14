@@ -1136,12 +1136,16 @@ fn transform(items: Vec<i32>) -> Vec<i32> {
         let patterns = &data.functions[0].transformation_patterns;
 
         assert!(patterns.iter().any(|p| p.pattern_type == PatternType::Map));
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == PatternType::Filter));
-        assert!(patterns
-            .iter()
-            .any(|p| p.pattern_type == PatternType::Collect));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == PatternType::Filter)
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.pattern_type == PatternType::Collect)
+        );
     }
 
     #[test]
@@ -1255,12 +1259,14 @@ fn private_fn() {}
 
         let crate_vis = data.functions.iter().find(|f| f.name == "crate_fn");
         assert!(crate_vis.unwrap().visibility.is_some());
-        assert!(crate_vis
-            .unwrap()
-            .visibility
-            .as_ref()
-            .unwrap()
-            .contains("crate"));
+        assert!(
+            crate_vis
+                .unwrap()
+                .visibility
+                .as_ref()
+                .unwrap()
+                .contains("crate")
+        );
 
         let private = data.functions.iter().find(|f| f.name == "private_fn");
         assert!(private.unwrap().visibility.is_none());

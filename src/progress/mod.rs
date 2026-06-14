@@ -377,10 +377,12 @@ mod tests {
 
     #[test]
     fn test_quiet_mode_disables_progress() {
-        std::env::set_var("DEBTMAP_QUIET", "1");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_QUIET", "1") };
         let config = ProgressConfig::from_env(false, 0);
         assert!(!config.should_show_progress());
-        std::env::remove_var("DEBTMAP_QUIET");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("DEBTMAP_QUIET") };
     }
 
     #[test]

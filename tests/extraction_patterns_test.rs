@@ -9,9 +9,11 @@ use std::path::PathBuf;
 #[test]
 fn test_unified_extraction_analyzer_creation() {
     let analyzer = UnifiedExtractionAnalyzer::new();
-    assert!(analyzer
-        .generate_recommendation(&create_test_suggestion(), VerbosityLevel::Summary)
-        .contains("confidence"));
+    assert!(
+        analyzer
+            .generate_recommendation(&create_test_suggestion(), VerbosityLevel::Summary)
+            .contains("confidence")
+    );
 }
 
 #[test]

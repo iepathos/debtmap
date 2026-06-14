@@ -348,9 +348,11 @@ end_of_record
 
         assert!(result.is_ok());
         let coverage = result.unwrap();
-        assert!(coverage
-            .get_file_coverage(std::path::Path::new("src/main.rs"))
-            .is_some());
+        assert!(
+            coverage
+                .get_file_coverage(std::path::Path::new("src/main.rs"))
+                .is_some()
+        );
     }
 
     #[test]
@@ -424,8 +426,10 @@ end_of_record
 
         assert!(result.is_ok());
         let coverage = result.unwrap();
-        assert!(coverage
-            .get_file_coverage(std::path::Path::new("src/main.rs"))
-            .is_some());
+        assert!(
+            coverage
+                .get_file_coverage(std::path::Path::new("src/main.rs"))
+                .is_some()
+        );
     }
 }

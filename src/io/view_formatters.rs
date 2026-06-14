@@ -698,11 +698,11 @@ fn format_markdown_filter_stats(output: &mut String, summary: &ViewSummary) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::UnifiedAnalysis;
     use crate::priority::call_graph::CallGraph;
     use crate::priority::tiers::TierConfig;
     use crate::priority::view::ViewConfig;
     use crate::priority::view_pipeline::prepare_view;
-    use crate::priority::UnifiedAnalysis;
 
     fn create_empty_view() -> PreparedDebtView {
         let call_graph = CallGraph::new();

@@ -3,7 +3,7 @@ use super::{
     SourceLocation,
 };
 use std::path::Path;
-use syn::{visit::Visit, Expr, ExprMethodCall, Fields, ItemImpl, ItemStruct, Type};
+use syn::{Expr, ExprMethodCall, Fields, ItemImpl, ItemStruct, Type, visit::Visit};
 
 pub struct UnboundedCollectionDetector {
     growth_analyzer: CollectionGrowthAnalyzer,
@@ -170,10 +170,10 @@ impl<'ast> Visit<'ast> for CollectionVisitor {
     }
 
     fn visit_item_impl(&mut self, node: &'ast ItemImpl) {
-        if let Type::Path(type_path) = &*node.self_ty {
-            if let Some(segment) = type_path.path.segments.last() {
-                self.current_struct = Some(segment.ident.to_string());
-            }
+        if let Type::Path(type_path) = &*node.self_ty
+            && let Some(segment) = type_path.path.segments.last()
+        {
+            self.current_struct = Some(segment.ident.to_string());
         }
 
         syn::visit::visit_item_impl(self, node);

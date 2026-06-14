@@ -3,7 +3,7 @@
 /// Detects intentional registry/catalog patterns where many small trait implementations
 /// are centralized in one file for discoverability and consistency.
 use std::collections::HashMap;
-use syn::{visit::Visit, File, Item, ItemImpl};
+use syn::{File, Item, ItemImpl, visit::Visit};
 
 /// Information about a trait implementation
 #[derive(Debug, Clone)]

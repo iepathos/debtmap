@@ -6,6 +6,6 @@
 mod default_implementations;
 
 pub use default_implementations::{
-    create_app_container, DefaultConfigProvider, DefaultDebtScorer, DefaultPriorityCalculator,
-    JsonFormatter, MarkdownFormatter, TerminalFormatter,
+    DefaultConfigProvider, DefaultDebtScorer, DefaultPriorityCalculator, JsonFormatter,
+    MarkdownFormatter, TerminalFormatter, create_app_container,
 };

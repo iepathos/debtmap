@@ -1,9 +1,9 @@
 //! AST-based context detection for functions and code blocks
 
-use crate::context::{detect_function_role, FileType, FrameworkPattern, FunctionContext};
+use crate::context::{FileType, FrameworkPattern, FunctionContext, detect_function_role};
 use syn::{
-    visit::Visit, Attribute, Block, Expr, ExprCall, ExprMethodCall, ImplItem, ItemFn, ItemImpl,
-    Path,
+    Attribute, Block, Expr, ExprCall, ExprMethodCall, ImplItem, ItemFn, ItemImpl, Path,
+    visit::Visit,
 };
 
 /// Detects context information from Rust AST

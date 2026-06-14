@@ -1,8 +1,8 @@
 //! Responsive layout management for different terminal sizes.
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
     Frame,
+    layout::{Constraint, Direction, Layout, Rect},
 };
 
 use super::app::App;

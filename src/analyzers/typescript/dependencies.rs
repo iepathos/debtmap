@@ -72,17 +72,17 @@ fn extract_require(node: &Node, ast: &TypeScriptAst) -> Option<Dependency> {
     // const x = require('module')
     if let Some(func) = node.child_by_field_name("function") {
         let func_text = node_text(&func, &ast.source);
-        if func_text == "require" {
-            if let Some(args) = node.child_by_field_name("arguments") {
-                let mut cursor = args.walk();
-                for arg in args.children(&mut cursor) {
-                    if arg.kind() == "string" || arg.kind() == "template_string" {
-                        let specifier = extract_string_value(&arg, ast);
-                        return Some(Dependency {
-                            name: specifier,
-                            kind: DependencyKind::Import,
-                        });
-                    }
+        if func_text == "require"
+            && let Some(args) = node.child_by_field_name("arguments")
+        {
+            let mut cursor = args.walk();
+            for arg in args.children(&mut cursor) {
+                if arg.kind() == "string" || arg.kind() == "template_string" {
+                    let specifier = extract_string_value(&arg, ast);
+                    return Some(Dependency {
+                        name: specifier,
+                        kind: DependencyKind::Import,
+                    });
                 }
             }
         }
@@ -93,19 +93,18 @@ fn extract_require(node: &Node, ast: &TypeScriptAst) -> Option<Dependency> {
 fn extract_dynamic_import(node: &Node, ast: &TypeScriptAst) -> Option<Dependency> {
     // import('module')
     // The function is literally "import"
-    if let Some(func) = node.child_by_field_name("function") {
-        if func.kind() == "import" {
-            if let Some(args) = node.child_by_field_name("arguments") {
-                let mut cursor = args.walk();
-                for arg in args.children(&mut cursor) {
-                    if arg.kind() == "string" || arg.kind() == "template_string" {
-                        let specifier = extract_string_value(&arg, ast);
-                        return Some(Dependency {
-                            name: specifier,
-                            kind: DependencyKind::Import,
-                        });
-                    }
-                }
+    if let Some(func) = node.child_by_field_name("function")
+        && func.kind() == "import"
+        && let Some(args) = node.child_by_field_name("arguments")
+    {
+        let mut cursor = args.walk();
+        for arg in args.children(&mut cursor) {
+            if arg.kind() == "string" || arg.kind() == "template_string" {
+                let specifier = extract_string_value(&arg, ast);
+                return Some(Dependency {
+                    name: specifier,
+                    kind: DependencyKind::Import,
+                });
             }
         }
     }

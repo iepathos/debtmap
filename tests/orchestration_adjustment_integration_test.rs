@@ -5,9 +5,9 @@
 
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use debtmap::priority::scoring::orchestration_adjustment::{
-    adjust_score, extract_composition_metrics, OrchestrationAdjustmentConfig,
+    OrchestrationAdjustmentConfig, adjust_score, extract_composition_metrics,
 };
-use debtmap::priority::semantic_classifier::{classify_function_role, FunctionRole};
+use debtmap::priority::semantic_classifier::{FunctionRole, classify_function_role};
 use debtmap::priority::unified_scorer::calculate_unified_priority;
 use std::path::PathBuf;
 

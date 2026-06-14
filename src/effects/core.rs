@@ -134,7 +134,7 @@
 
 use crate::config::DebtmapConfig;
 use crate::env::{AnalysisEnv, RealEnv};
-use crate::errors::{errors_to_anyhow, AnalysisError};
+use crate::errors::{AnalysisError, errors_to_anyhow};
 use stillwater::effect::prelude::*;
 use stillwater::{BoxedEffect, NonEmptyVec, Validation};
 

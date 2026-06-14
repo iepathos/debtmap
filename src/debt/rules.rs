@@ -437,10 +437,12 @@ mod tests {
 
         let critical = violations.iter().find(|v| v.priority == Priority::Critical);
         assert!(critical.is_some());
-        assert!(critical
-            .unwrap()
-            .message
-            .contains("critical cyclomatic complexity"));
+        assert!(
+            critical
+                .unwrap()
+                .message
+                .contains("critical cyclomatic complexity")
+        );
     }
 
     #[test]

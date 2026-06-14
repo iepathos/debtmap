@@ -1,17 +1,17 @@
 //! Git Context page (Page 3) - Git history and risk analysis.
 
 use super::components::{add_blank_line, add_label_value, add_section_header};
-use crate::priority::formatter_verbosity::git_history::classify_stability;
 use crate::priority::UnifiedDebtItem;
+use crate::priority::formatter_verbosity::git_history::classify_stability;
 use crate::risk::context::ContextDetails;
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// Build all lines for the git context page (pure function).
@@ -29,8 +29,8 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
             .iter()
             .find(|ctx| ctx.provider == "git_history");
 
-        if let Some(ctx) = git_context {
-            if let ContextDetails::Historical {
+        if let Some(ctx) = git_context
+            && let ContextDetails::Historical {
                 change_frequency,
                 bug_density: _,
                 age_days,
@@ -38,58 +38,57 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
                 total_commits,
                 bug_fix_count,
             } = &ctx.details
-            {
-                // Change Patterns section
-                add_section_header(&mut lines, "change patterns", theme);
+        {
+            // Change Patterns section
+            add_section_header(&mut lines, "change patterns", theme);
 
-                // Show commits and frequency together for clarity
-                // "N commits (X.XX/month)" makes it clear what the frequency represents
-                let frequency_display = if *total_commits == 0 {
-                    "0 commits".to_string()
-                } else {
-                    format!(
-                        "{} commit{} ({:.2}/month)",
-                        total_commits,
-                        if *total_commits == 1 { "" } else { "s" },
-                        change_frequency
-                    )
-                };
-                add_label_value(&mut lines, "activity", frequency_display, theme, width);
+            // Show commits and frequency together for clarity
+            // "N commits (X.XX/month)" makes it clear what the frequency represents
+            let frequency_display = if *total_commits == 0 {
+                "0 commits".to_string()
+            } else {
+                format!(
+                    "{} commit{} ({:.2}/month)",
+                    total_commits,
+                    if *total_commits == 1 { "" } else { "s" },
+                    change_frequency
+                )
+            };
+            add_label_value(&mut lines, "activity", frequency_display, theme, width);
 
-                let stability = classify_stability(*change_frequency);
-                add_label_value(&mut lines, "stability", stability.to_string(), theme, width);
+            let stability = classify_stability(*change_frequency);
+            add_label_value(&mut lines, "stability", stability.to_string(), theme, width);
 
-                // Show bug fixes as "N fixes / M changes" for clarity
-                // Changes = total_commits - 1 (excluding introduction)
-                let changes = total_commits.saturating_sub(1);
-                let fix_display = if changes == 0 {
-                    "no changes since intro".to_string()
-                } else {
-                    format!(
-                        "{} fix{} / {} change{}",
-                        bug_fix_count,
-                        if *bug_fix_count == 1 { "" } else { "es" },
-                        changes,
-                        if changes == 1 { "" } else { "s" }
-                    )
-                };
-                add_label_value(&mut lines, "fix rate", fix_display, theme, width);
-                add_label_value(
-                    &mut lines,
-                    "age",
-                    format!("{} days", age_days),
-                    theme,
-                    width,
-                );
-                add_label_value(
-                    &mut lines,
-                    "contributors",
-                    author_count.to_string(),
-                    theme,
-                    width,
-                );
-                add_blank_line(&mut lines);
-            }
+            // Show bug fixes as "N fixes / M changes" for clarity
+            // Changes = total_commits - 1 (excluding introduction)
+            let changes = total_commits.saturating_sub(1);
+            let fix_display = if changes == 0 {
+                "no changes since intro".to_string()
+            } else {
+                format!(
+                    "{} fix{} / {} change{}",
+                    bug_fix_count,
+                    if *bug_fix_count == 1 { "" } else { "es" },
+                    changes,
+                    if changes == 1 { "" } else { "s" }
+                )
+            };
+            add_label_value(&mut lines, "fix rate", fix_display, theme, width);
+            add_label_value(
+                &mut lines,
+                "age",
+                format!("{} days", age_days),
+                theme,
+                width,
+            );
+            add_label_value(
+                &mut lines,
+                "contributors",
+                author_count.to_string(),
+                theme,
+                width,
+            );
+            add_blank_line(&mut lines);
         }
 
         // Risk Impact section

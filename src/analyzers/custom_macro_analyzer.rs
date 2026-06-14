@@ -156,11 +156,11 @@ impl CustomMacroAnalyzer {
 
     fn analyze_complex(&self, body: &str) -> MacroPurity {
         // Try to parse as expression to detect structure
-        if let Ok(tokens) = body.parse::<proc_macro2::TokenStream>() {
-            if syn::parse2::<syn::Expr>(tokens).is_ok() {
-                // Successfully parsed as expression - likely pure computation
-                return MacroPurity::Unknown { confidence: 0.8 };
-            }
+        if let Ok(tokens) = body.parse::<proc_macro2::TokenStream>()
+            && syn::parse2::<syn::Expr>(tokens).is_ok()
+        {
+            // Successfully parsed as expression - likely pure computation
+            return MacroPurity::Unknown { confidence: 0.8 };
         }
 
         // Check for suspicious keywords

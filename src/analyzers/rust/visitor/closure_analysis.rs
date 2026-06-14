@@ -7,7 +7,7 @@ use crate::analyzers::rust_complexity_calculation;
 use crate::complexity::cyclomatic::calculate_cyclomatic;
 use crate::complexity::entropy_core::EntropyScore;
 use crate::complexity::pure_mapping_patterns::{
-    calculate_adjusted_complexity, MappingPatternConfig, MappingPatternDetector,
+    MappingPatternConfig, MappingPatternDetector, calculate_adjusted_complexity,
 };
 use crate::config::get_entropy_config;
 use crate::core::FunctionMetrics;

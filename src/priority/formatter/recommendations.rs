@@ -120,15 +120,15 @@ pub fn format_default_with_config(
     .unwrap();
 
     // Only show overall coverage if coverage data was provided (spec 108)
-    if analysis.has_coverage_data {
-        if let Some(coverage) = analysis.overall_coverage {
-            writeln!(
-                output,
-                "{}",
-                format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
-            )
-            .unwrap();
-        }
+    if analysis.has_coverage_data
+        && let Some(coverage) = analysis.overall_coverage
+    {
+        writeln!(
+            output,
+            "{}",
+            format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
+        )
+        .unwrap();
     }
 
     output

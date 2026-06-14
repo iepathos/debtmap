@@ -260,19 +260,19 @@ impl PatternRecognizer {
                     // Check if preceded by lowercase and followed by uppercase or end (camelCase boundary)
                     if i > 0 {
                         let prev_char = method.chars().nth(i - 1);
-                        if let Some(prev) = prev_char {
-                            if prev.is_lowercase() {
-                                // After lowercase, check what follows the verb
-                                let after_verb = i + verb.len();
-                                if after_verb >= method.len() {
-                                    return true; // getformat - verb at end
-                                }
-                                let next_char = method.chars().nth(after_verb);
-                                if let Some(_next) = next_char {
-                                    // Accept any character after verb in camelCase context
-                                    // This handles both "getFormat" and "getformat"
-                                    return true;
-                                }
+                        if let Some(prev) = prev_char
+                            && prev.is_lowercase()
+                        {
+                            // After lowercase, check what follows the verb
+                            let after_verb = i + verb.len();
+                            if after_verb >= method.len() {
+                                return true; // getformat - verb at end
+                            }
+                            let next_char = method.chars().nth(after_verb);
+                            if let Some(_next) = next_char {
+                                // Accept any character after verb in camelCase context
+                                // This handles both "getFormat" and "getformat"
+                                return true;
                             }
                         }
                     }

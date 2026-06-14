@@ -388,31 +388,31 @@ pub use crate::core::{
 };
 
 pub use crate::debt::{
-    circular::{analyze_module_dependencies, DependencyGraph},
-    coupling::{calculate_coupling_metrics, identify_coupling_issues, CouplingMetrics},
+    circular::{DependencyGraph, analyze_module_dependencies},
+    coupling::{CouplingMetrics, calculate_coupling_metrics, identify_coupling_issues},
     duplication::detect_duplication,
     patterns::{
         detect_duplicate_strings, find_code_smells, find_code_smells_with_suppression,
         find_todos_and_fixmes, find_todos_and_fixmes_with_suppression,
     },
     smells::{
-        analyze_function_smells, analyze_module_smells, detect_deep_nesting, detect_long_method,
-        detect_long_parameter_list, CodeSmell, SmellType,
+        CodeSmell, SmellType, analyze_function_smells, analyze_module_smells, detect_deep_nesting,
+        detect_long_method, detect_long_parameter_list,
     },
-    suppression::{parse_suppression_comments, SuppressionContext, SuppressionStats},
+    suppression::{SuppressionContext, SuppressionStats, parse_suppression_comments},
 };
 
 pub use crate::core::metrics::{
     calculate_average_complexity, count_high_complexity, find_max_complexity,
 };
 
-pub use crate::io::output::{create_writer, OutputFormat, OutputWriter};
+pub use crate::io::output::{OutputFormat, OutputWriter, create_writer};
 
-pub use crate::analyzers::{analyze_file, get_analyzer, Analyzer};
+pub use crate::analyzers::{Analyzer, analyze_file, get_analyzer};
 
 pub use crate::risk::{
-    insights::generate_risk_insights, lcov::parse_lcov_file, FunctionRisk, RiskAnalyzer,
-    RiskCategory, RiskInsight, TestingRecommendation,
+    FunctionRisk, RiskAnalyzer, RiskCategory, RiskInsight, TestingRecommendation,
+    insights::generate_risk_insights, lcov::parse_lcov_file,
 };
 
 pub use crate::analysis::{
@@ -422,12 +422,12 @@ pub use crate::analysis::{
 
 // Stillwater integration: Effect system and environment (spec 195)
 pub use crate::effects::{
-    combine_validations, effect_fail, effect_from_fn, effect_pure, run_effect, run_effect_async,
-    run_validation, validation_failure, validation_failures, validation_map, validation_success,
-    AnalysisEffect, AnalysisErrors, AnalysisValidation,
+    AnalysisEffect, AnalysisErrors, AnalysisValidation, combine_validations, effect_fail,
+    effect_from_fn, effect_pure, run_effect, run_effect_async, run_validation, validation_failure,
+    validation_failures, validation_map, validation_success,
 };
 pub use crate::env::{AnalysisEnv, RealEnv};
-pub use crate::errors::{errors_to_anyhow, format_error_list, AnalysisError};
+pub use crate::errors::{AnalysisError, errors_to_anyhow, format_error_list};
 
 // Reader pattern helpers (spec 199) - zero-cost config access without parameter threading
 pub use crate::effects::{
@@ -447,8 +447,8 @@ pub use crate::progress::{
 
 // Bracket pattern resource management (spec 206)
 pub use crate::resources::{
-    bracket_io, with_file_read, with_lock_file, with_progress, with_spinner, with_temp_dir,
-    FileHandle, LockFile, ProgressHandle, TempDir,
+    FileHandle, LockFile, ProgressHandle, TempDir, bracket_io, with_file_read, with_lock_file,
+    with_progress, with_spinner, with_temp_dir,
 };
 
 // Testing infrastructure (spec 200) - MockEnv and test helpers
@@ -457,8 +457,8 @@ pub use crate::testkit::{ConfigBuilder, DebtmapTestEnv};
 
 // Observability infrastructure (spec 207) - panic hook and context tracking
 pub use crate::observability::{
-    get_current_context, get_progress, increment_processed, install_panic_hook, set_current_file,
-    set_phase, set_phase_persistent, set_progress, AnalysisContext, AnalysisPhase,
+    AnalysisContext, AnalysisPhase, get_current_context, get_progress, increment_processed,
+    install_panic_hook, set_current_file, set_phase, set_phase_persistent, set_progress,
 };
 
 // Unified error types (spec 005) - consolidated error handling with context chaining

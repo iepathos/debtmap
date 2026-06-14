@@ -12,11 +12,11 @@ use crate::priority::{DebtType, UnifiedDebtItem};
 use crate::tui::results::app::ResultsApp;
 use crate::tui::theme::Theme;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 // Column layout constants (from DESIGN.md)
@@ -383,19 +383,19 @@ pub fn build_multipliers_section(
     }
 
     // Structural multiplier (spec 260) - if significantly different from 1.0
-    if let Some(struct_mult) = item.unified_score.structural_multiplier {
-        if (struct_mult - 1.0).abs() > 0.01 {
-            let desc = if struct_mult > 1.2 {
-                "deeply nested"
-            } else if struct_mult > 1.0 {
-                "moderate nesting"
-            } else if struct_mult < 0.85 {
-                "flat structure"
-            } else {
-                "good structure"
-            };
-            add_multiplier_line(&mut lines, "structural", struct_mult, desc, theme, width);
-        }
+    if let Some(struct_mult) = item.unified_score.structural_multiplier
+        && (struct_mult - 1.0).abs() > 0.01
+    {
+        let desc = if struct_mult > 1.2 {
+            "deeply nested"
+        } else if struct_mult > 1.0 {
+            "moderate nesting"
+        } else if struct_mult < 0.85 {
+            "flat structure"
+        } else {
+            "good structure"
+        };
+        add_multiplier_line(&mut lines, "structural", struct_mult, desc, theme, width);
     }
 
     // Entropy dampening - only show as multiplier for god objects where it's applied to final score
@@ -1264,22 +1264,22 @@ fn build_god_object_adjustment_lines(
     let mut lines = Vec::new();
 
     // Entropy dampening
-    if let Some(entropy_damp) = metrics.entropy_damp {
-        if (entropy_damp - 1.0).abs() > 0.01 {
-            let after_entropy = current * entropy_damp;
-            add_label_value(
-                &mut lines,
-                &format!("{}. × entropy", step_num),
-                format!(
-                    "{:.2} × {:.2} = {:.2} (dampening)",
-                    current, entropy_damp, after_entropy
-                ),
-                theme,
-                width,
-            );
-            current = after_entropy;
-            step_num += 1;
-        }
+    if let Some(entropy_damp) = metrics.entropy_damp
+        && (entropy_damp - 1.0).abs() > 0.01
+    {
+        let after_entropy = current * entropy_damp;
+        add_label_value(
+            &mut lines,
+            &format!("{}. × entropy", step_num),
+            format!(
+                "{:.2} × {:.2} = {:.2} (dampening)",
+                current, entropy_damp, after_entropy
+            ),
+            theme,
+            width,
+        );
+        current = after_entropy;
+        step_num += 1;
     }
 
     // Combined adjustments for remaining gap
@@ -1447,105 +1447,105 @@ fn build_adjustment_steps(
     let mut lines = Vec::new();
 
     // Check for orchestration adjustment (spec 110)
-    if let Some(adj) = &item.unified_score.adjustment_applied {
-        if adj.reduction_percent.abs() > 0.1 {
-            let after_orch = current_value * (1.0 - adj.reduction_percent / 100.0);
-            add_label_value(
-                &mut lines,
-                &format!("{}. orchestration", step_num),
-                format!(
-                    "{:.2} × {:.2} = {:.2} ({})",
-                    current_value,
-                    1.0 - adj.reduction_percent / 100.0,
-                    after_orch,
-                    adj.adjustment_reason
-                ),
-                theme,
-                width,
-            );
-            current_value = after_orch;
-            step_num += 1;
-        }
+    if let Some(adj) = &item.unified_score.adjustment_applied
+        && adj.reduction_percent.abs() > 0.1
+    {
+        let after_orch = current_value * (1.0 - adj.reduction_percent / 100.0);
+        add_label_value(
+            &mut lines,
+            &format!("{}. orchestration", step_num),
+            format!(
+                "{:.2} × {:.2} = {:.2} ({})",
+                current_value,
+                1.0 - adj.reduction_percent / 100.0,
+                after_orch,
+                adj.adjustment_reason
+            ),
+            theme,
+            width,
+        );
+        current_value = after_orch;
+        step_num += 1;
     }
 
     // Check for context multiplier (spec 191)
-    if let Some(ctx_mult) = item.context_multiplier {
-        if (ctx_mult - 1.0).abs() > 0.01 {
-            let ctx_type_name = item
-                .context_type
-                .as_ref()
-                .map(|t| format!("{:?}", t).to_lowercase())
-                .unwrap_or_else(|| "context".to_string());
-            let after_ctx = current_value * ctx_mult;
-            add_label_value(
-                &mut lines,
-                &format!("{}. × context", step_num),
-                format!(
-                    "{:.2} × {:.2} = {:.2} ({} dampening)",
-                    current_value, ctx_mult, after_ctx, ctx_type_name
-                ),
-                theme,
-                width,
-            );
-            current_value = after_ctx;
-            step_num += 1;
-        }
+    if let Some(ctx_mult) = item.context_multiplier
+        && (ctx_mult - 1.0).abs() > 0.01
+    {
+        let ctx_type_name = item
+            .context_type
+            .as_ref()
+            .map(|t| format!("{:?}", t).to_lowercase())
+            .unwrap_or_else(|| "context".to_string());
+        let after_ctx = current_value * ctx_mult;
+        add_label_value(
+            &mut lines,
+            &format!("{}. × context", step_num),
+            format!(
+                "{:.2} × {:.2} = {:.2} ({} dampening)",
+                current_value, ctx_mult, after_ctx, ctx_type_name
+            ),
+            theme,
+            width,
+        );
+        current_value = after_ctx;
+        step_num += 1;
     }
 
     // Show debt adjustment if applied (spec 260)
-    if let Some(debt) = &item.unified_score.debt_adjustment {
-        if debt.total.abs() > 0.01 {
-            let after_debt = current_value + debt.total;
-            let components: Vec<String> = [
-                (debt.testing, "test"),
-                (debt.resource, "res"),
-                (debt.duplication, "dup"),
-            ]
-            .iter()
-            .filter(|(v, _)| v.abs() > 0.01)
-            .map(|(v, name)| format!("{}:{:+.2}", name, v))
-            .collect();
-            let breakdown = if components.is_empty() {
-                String::new()
-            } else {
-                format!(" ({})", components.join(", "))
-            };
-            add_label_value(
-                &mut lines,
-                &format!("{}. + debt", step_num),
-                format!(
-                    "{:.2} + {:.2} = {:.2}{}",
-                    current_value, debt.total, after_debt, breakdown
-                ),
-                theme,
-                width,
-            );
-            current_value = after_debt;
-            step_num += 1;
-        }
+    if let Some(debt) = &item.unified_score.debt_adjustment
+        && debt.total.abs() > 0.01
+    {
+        let after_debt = current_value + debt.total;
+        let components: Vec<String> = [
+            (debt.testing, "test"),
+            (debt.resource, "res"),
+            (debt.duplication, "dup"),
+        ]
+        .iter()
+        .filter(|(v, _)| v.abs() > 0.01)
+        .map(|(v, name)| format!("{}:{:+.2}", name, v))
+        .collect();
+        let breakdown = if components.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", components.join(", "))
+        };
+        add_label_value(
+            &mut lines,
+            &format!("{}. + debt", step_num),
+            format!(
+                "{:.2} + {:.2} = {:.2}{}",
+                current_value, debt.total, after_debt, breakdown
+            ),
+            theme,
+            width,
+        );
+        current_value = after_debt;
+        step_num += 1;
     }
 
     // Show contextual risk multiplier if applied (spec 255, spec 260)
-    if let Some(risk_mult) = item.unified_score.contextual_risk_multiplier {
-        if (risk_mult - 1.0).abs() > 0.001 {
-            let pre_ctx = item
-                .unified_score
-                .pre_contextual_score
-                .unwrap_or(current_value);
-            let after_risk = pre_ctx * risk_mult;
-            add_label_value(
-                &mut lines,
-                &format!("{}. × risk", step_num),
-                format!(
-                    "{:.2} × {:.2} = {:.2} (git history risk)",
-                    pre_ctx, risk_mult, after_risk
-                ),
-                theme,
-                width,
-            );
-            current_value = after_risk;
-            step_num += 1;
-        }
+    if let Some(risk_mult) = item.unified_score.contextual_risk_multiplier
+        && (risk_mult - 1.0).abs() > 0.001
+    {
+        let pre_ctx = item
+            .unified_score
+            .pre_contextual_score
+            .unwrap_or(current_value);
+        let after_risk = pre_ctx * risk_mult;
+        add_label_value(
+            &mut lines,
+            &format!("{}. × risk", step_num),
+            format!(
+                "{:.2} × {:.2} = {:.2} (git history risk)",
+                pre_ctx, risk_mult, after_risk
+            ),
+            theme,
+            width,
+        );
+        current_value = after_risk;
+        step_num += 1;
     }
 
     // Handle any remaining gap between calculated value and stored base_score

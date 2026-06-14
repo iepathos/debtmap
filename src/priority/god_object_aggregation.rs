@@ -36,8 +36,8 @@
 //! assert!(metrics.weighted_coverage.is_some());
 //! ```
 
-use crate::complexity::entropy_core::{EntropyConfig, EntropyScore, UniversalEntropyCalculator};
 use crate::complexity::EntropyAnalysis;
+use crate::complexity::entropy_core::{EntropyConfig, EntropyScore, UniversalEntropyCalculator};
 use crate::core::FunctionMetrics;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
@@ -571,10 +571,10 @@ fn is_internal_dependency(
         return false;
     };
 
-    if let Some(method) = name.rsplit("::").next() {
-        if internal.contains(&format!("{file}:{method}")) {
-            return true;
-        }
+    if let Some(method) = name.rsplit("::").next()
+        && internal.contains(&format!("{file}:{method}"))
+    {
+        return true;
     }
 
     if functions.iter().any(|func| {
@@ -1190,9 +1190,11 @@ mod tests {
         let members = extract_member_functions(items.iter(), Path::new("file1.rs"));
 
         assert_eq!(members.len(), 2);
-        assert!(members
-            .iter()
-            .all(|m| m.location.file == Path::new("file1.rs")));
+        assert!(
+            members
+                .iter()
+                .all(|m| m.location.file == Path::new("file1.rs"))
+        );
     }
 
     #[test]
@@ -1241,7 +1243,7 @@ mod tests {
                 purity_level: None,
                 error_swallowing_count: Some(2),
                 error_swallowing_patterns: Some(vec![
-                    "if let Ok(...) without else branch".to_string()
+                    "if let Ok(...) without else branch".to_string(),
                 ]),
                 entropy_analysis: None,
             },
@@ -1457,9 +1459,11 @@ mod tests {
         assert_eq!(metrics.total_cognitive, 15);
         assert_eq!(metrics.total_error_swallowing_count, 4);
         assert_eq!(metrics.error_swallowing_patterns.len(), 1);
-        assert!(metrics
-            .error_swallowing_patterns
-            .contains(&"match with ignored Err variant".to_string()));
+        assert!(
+            metrics
+                .error_swallowing_patterns
+                .contains(&"match with ignored Err variant".to_string())
+        );
     }
 
     #[test]
@@ -2397,7 +2401,7 @@ mod tests {
         // Total complexity from production: 10+8 = 18, max = 10
         assert_eq!(dist.max_complexity, 10);
         assert!((dist.avg_complexity - 9.0).abs() < 0.01); // 18/2 = 9.0
-                                                           // Production LOC: 100 + 50 = 150
+        // Production LOC: 100 + 50 = 150
         assert_eq!(dist.production_loc, 150);
         // Test LOC: 200
         assert_eq!(dist.test_loc, 200);
@@ -2465,15 +2469,21 @@ mod tests {
 
     #[test]
     fn test_complexity_distribution_explanations() {
-        assert!(ComplexityDistribution::Concentrated
-            .classification_explanation()
-            .contains("god function"));
-        assert!(ComplexityDistribution::Mixed
-            .classification_explanation()
-            .contains("review"));
-        assert!(ComplexityDistribution::Distributed
-            .classification_explanation()
-            .contains("Well-Structured"));
+        assert!(
+            ComplexityDistribution::Concentrated
+                .classification_explanation()
+                .contains("god function")
+        );
+        assert!(
+            ComplexityDistribution::Mixed
+                .classification_explanation()
+                .contains("review")
+        );
+        assert!(
+            ComplexityDistribution::Distributed
+                .classification_explanation()
+                .contains("Well-Structured")
+        );
     }
 
     #[test]
@@ -2777,14 +2787,18 @@ mod tests {
             aggregated.downstream_dependencies, 2,
             "Downstream dependencies must scope to struct methods only"
         );
-        assert!(aggregated
-            .unique_upstream_callers
-            .iter()
-            .all(|c| c == "caller_a"));
-        assert!(!aggregated
-            .unique_downstream_callees
-            .iter()
-            .any(|c| c.starts_with("external_")));
+        assert!(
+            aggregated
+                .unique_upstream_callers
+                .iter()
+                .all(|c| c == "caller_a")
+        );
+        assert!(
+            !aggregated
+                .unique_downstream_callees
+                .iter()
+                .any(|c| c.starts_with("external_"))
+        );
     }
 
     #[test]

@@ -8,9 +8,9 @@
 //! - Pure action determination in `list_actions` module
 //! - Imperative shell (this module) executes the actions
 
-use super::detail_actions::{classify_detail_key, DetailAction, DetailActionContext};
+use super::detail_actions::{DetailAction, DetailActionContext, classify_detail_key};
 use super::filter::{CoverageFilter, Filter, SeverityFilter};
-use super::list_actions::{determine_list_action, ListAction, ListActionContext};
+use super::list_actions::{ListAction, ListActionContext, determine_list_action};
 use super::nav_state::can_enter_help;
 use super::sort::SortCriteria;
 use super::{app::ResultsApp, page_availability, view_mode::ViewMode};

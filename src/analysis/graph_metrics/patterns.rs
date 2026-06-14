@@ -119,10 +119,10 @@ impl PatternDetector {
         }
 
         // I/O Gateway: Calls I/O functions or has I/O operations
-        if let Some(profile) = io_profile {
-            if !profile.is_pure || self.calls_io_functions(call_graph, function_id, profile) {
-                patterns.push(CallGraphPattern::IoGateway);
-            }
+        if let Some(profile) = io_profile
+            && (!profile.is_pure || self.calls_io_functions(call_graph, function_id, profile))
+        {
+            patterns.push(CallGraphPattern::IoGateway);
         }
 
         patterns

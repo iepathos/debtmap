@@ -140,7 +140,11 @@ pub fn pattern_to_message_context(pattern: &OrganizationAntiPattern) -> (String,
         } => (
             format!(
                 "Struct initialization pattern in '{}' - {} fields, cyclomatic: {}, field complexity: {:.1}, confidence: {:.0}%",
-                function_name, field_count, cyclomatic_complexity, field_based_complexity, confidence * 100.0
+                function_name,
+                field_count,
+                cyclomatic_complexity,
+                field_based_complexity,
+                confidence * 100.0
             ),
             Some(format!(
                 "{} (Use field-based complexity {:.1} instead of cyclomatic {})",

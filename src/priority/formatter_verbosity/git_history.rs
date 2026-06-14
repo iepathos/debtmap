@@ -124,11 +124,11 @@ pub fn format_risk_impact_line(output: &mut String, data: &GitHistoryData) {
 
 /// Format complete git history section
 pub fn format_git_history_section(output: &mut String, item: &UnifiedDebtItem) {
-    if let Some(ref contextual_risk) = item.contextual_risk {
-        if let Some(data) = GitHistoryData::from_contextual_risk(contextual_risk) {
-            format_git_history_line(output, &data);
-            format_risk_impact_line(output, &data);
-        }
+    if let Some(ref contextual_risk) = item.contextual_risk
+        && let Some(data) = GitHistoryData::from_contextual_risk(contextual_risk)
+    {
+        format_git_history_line(output, &data);
+        format_risk_impact_line(output, &data);
     }
 }
 

@@ -9,7 +9,8 @@ use std::path::PathBuf;
 #[test]
 fn test_validate_sets_parallel_env_var() {
     // Clear any existing env var
-    std::env::remove_var("DEBTMAP_PARALLEL");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_PARALLEL") };
 
     // Simulate validate command with parallel enabled (default)
     let config = ValidateConfig {
@@ -33,13 +34,15 @@ fn test_validate_sets_parallel_env_var() {
 
     // When parallel is enabled, the environment variable should be set
     if !config.no_parallel {
-        std::env::set_var("DEBTMAP_PARALLEL", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
     }
 
     assert_eq!(std::env::var("DEBTMAP_PARALLEL").unwrap(), "true");
 
     // Clean up
-    std::env::remove_var("DEBTMAP_PARALLEL");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_PARALLEL") };
 }
 
 #[test]
@@ -75,7 +78,8 @@ fn test_validate_respects_no_parallel_flag() {
 #[test]
 fn test_validate_sets_jobs_env_var() {
     // Clear any existing env var
-    std::env::remove_var("DEBTMAP_JOBS");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_JOBS") };
 
     // Simulate validate command with custom job count
     let config = ValidateConfig {
@@ -99,13 +103,15 @@ fn test_validate_sets_jobs_env_var() {
 
     // When jobs is set, the environment variable should be set
     if config.jobs > 0 {
-        std::env::set_var("DEBTMAP_JOBS", config.jobs.to_string());
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DEBTMAP_JOBS", config.jobs.to_string()) };
     }
 
     assert_eq!(std::env::var("DEBTMAP_JOBS").unwrap(), "4");
 
     // Clean up
-    std::env::remove_var("DEBTMAP_JOBS");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_JOBS") };
 }
 
 #[test]
@@ -116,40 +122,46 @@ fn test_env_var_parsing() {
     // Test DEBTMAP_PARALLEL detection
 
     // Case 1: DEBTMAP_PARALLEL not set (default: sequential)
-    std::env::remove_var("DEBTMAP_PARALLEL");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_PARALLEL") };
     let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
     assert!(!parallel_enabled);
 
     // Case 2: DEBTMAP_PARALLEL=true
-    std::env::set_var("DEBTMAP_PARALLEL", "true");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
     let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
     assert!(parallel_enabled);
 
     // Case 3: DEBTMAP_PARALLEL=1
-    std::env::set_var("DEBTMAP_PARALLEL", "1");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_PARALLEL", "1") };
     let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
     assert!(parallel_enabled);
 
     // Case 4: DEBTMAP_PARALLEL=false
-    std::env::set_var("DEBTMAP_PARALLEL", "false");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_PARALLEL", "false") };
     let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
     assert!(!parallel_enabled);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_PARALLEL");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_PARALLEL") };
 
     // Test DEBTMAP_JOBS parsing
 
     // Case 1: Valid number
-    std::env::set_var("DEBTMAP_JOBS", "8");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_JOBS", "8") };
     let jobs = std::env::var("DEBTMAP_JOBS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
@@ -157,7 +169,8 @@ fn test_env_var_parsing() {
     assert_eq!(jobs, 8);
 
     // Case 2: Invalid number (defaults to 0)
-    std::env::set_var("DEBTMAP_JOBS", "invalid");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("DEBTMAP_JOBS", "invalid") };
     let jobs = std::env::var("DEBTMAP_JOBS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
@@ -165,7 +178,8 @@ fn test_env_var_parsing() {
     assert_eq!(jobs, 0);
 
     // Case 3: Not set (defaults to 0)
-    std::env::remove_var("DEBTMAP_JOBS");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_JOBS") };
     let jobs = std::env::var("DEBTMAP_JOBS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
@@ -173,7 +187,8 @@ fn test_env_var_parsing() {
     assert_eq!(jobs, 0);
 
     // Clean up
-    std::env::remove_var("DEBTMAP_JOBS");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("DEBTMAP_JOBS") };
 }
 
 #[test]

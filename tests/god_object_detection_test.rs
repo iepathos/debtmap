@@ -1,8 +1,8 @@
-use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use debtmap::extraction::UnifiedFileExtractor;
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use debtmap::organization::{
-    calculate_god_object_score, determine_confidence, DetectionType, GodObjectConfidence,
-    GodObjectThresholds,
+    DetectionType, GodObjectConfidence, GodObjectThresholds, calculate_god_object_score,
+    determine_confidence,
 };
 use std::path::Path;
 
@@ -378,7 +378,7 @@ fn test_spec_130_god_class_vs_god_file_detection() {
 /// Test behavioral decomposition with field access tracking and trait extraction (Spec 178)
 #[test]
 fn test_behavioral_decomposition_with_field_tracking() {
-    use debtmap::organization::{cluster_methods_by_behavior, FieldAccessTracker};
+    use debtmap::organization::{FieldAccessTracker, cluster_methods_by_behavior};
 
     let code = r#"
         struct Editor {

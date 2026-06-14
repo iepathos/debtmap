@@ -4,9 +4,9 @@
 //! from inputs without side effects. Functions are kept under 20 lines.
 
 use super::types::{
-    extract_function_keys, extract_functions, extract_location_keys, is_critical,
-    is_score_unchanged, is_significantly_improved, AnalysisSummary, DebtmapJsonInput,
-    IdentifiedChanges, ImprovedItems, ItemInfo, NewItems, ResolvedItems, UnchangedCritical,
+    AnalysisSummary, DebtmapJsonInput, IdentifiedChanges, ImprovedItems, ItemInfo, NewItems,
+    ResolvedItems, UnchangedCritical, extract_function_keys, extract_functions,
+    extract_location_keys, is_critical, is_score_unchanged, is_significantly_improved,
 };
 use crate::output::unified::{FunctionDebtItemOutput, UnifiedDebtItemOutput};
 use std::collections::{HashMap, HashSet};

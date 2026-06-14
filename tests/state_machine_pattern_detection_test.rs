@@ -3,8 +3,8 @@
 //! Verifies that the state machine and coordinator patterns are correctly
 //! detected from real Rust code examples.
 
-use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::analyzers::Analyzer;
+use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::core::LanguageSpecificData;
 use std::path::PathBuf;
 

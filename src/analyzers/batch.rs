@@ -31,7 +31,7 @@ use crate::config::{BatchAnalysisConfig, ParallelConfig};
 use crate::core::ast::Ast;
 use crate::core::{DebtItem, FileMetrics, Language};
 use crate::effects::{
-    validation_failure, validation_failures, validation_success, AnalysisEffect, AnalysisValidation,
+    AnalysisEffect, AnalysisValidation, validation_failure, validation_failures, validation_success,
 };
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
@@ -267,7 +267,7 @@ pub fn validate_single_file(path: &Path) -> AnalysisValidation<ValidatedFile> {
             return validation_failure(AnalysisError::io_with_path(
                 format!("Failed to read file: {}", e),
                 path,
-            ))
+            ));
         }
     };
 

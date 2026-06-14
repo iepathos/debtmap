@@ -1,5 +1,5 @@
-use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use debtmap::extraction::UnifiedFileExtractor;
+use debtmap::extraction::adapters::god_object::analyze_god_objects;
 use debtmap::organization::GodObjectMetrics;
 use std::path::{Path, PathBuf};
 
@@ -81,13 +81,13 @@ fn test_metrics_tracking_integration() {
     }
 
     // If we have multiple snapshots, verify trend tracking
-    if metrics.snapshots.len() >= 2 {
-        if let Some(trend) = metrics.get_file_trend(&PathBuf::from("test.rs")) {
-            // Trends are informational - just verify we can get them
-            let _ = trend.method_count_change;
-            let _ = trend.score_change;
-            let _ = trend.trend_direction;
-        }
+    if metrics.snapshots.len() >= 2
+        && let Some(trend) = metrics.get_file_trend(&PathBuf::from("test.rs"))
+    {
+        // Trends are informational - just verify we can get them
+        let _ = trend.method_count_change;
+        let _ = trend.score_change;
+        let _ = trend.trend_direction;
     }
 }
 

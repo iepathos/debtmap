@@ -82,10 +82,10 @@ impl FileWalker {
                         return false;
                     }
                     // Check against filename for patterns like "*.test.rs"
-                    if let Some(file_name) = path.file_name() {
-                        if glob_pattern.matches(file_name.to_string_lossy().as_ref()) {
-                            return false;
-                        }
+                    if let Some(file_name) = path.file_name()
+                        && glob_pattern.matches(file_name.to_string_lossy().as_ref())
+                    {
+                        return false;
                     }
                 }
             }

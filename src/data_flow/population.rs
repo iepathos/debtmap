@@ -109,7 +109,7 @@ mod ast_helpers {
     }
 }
 
-pub use ast_helpers::{find_function_in_ast, FoundFunction};
+pub use ast_helpers::{FoundFunction, find_function_in_ast};
 
 /// Populate DataFlowGraph from purity analysis results
 ///

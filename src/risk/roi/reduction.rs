@@ -1,5 +1,5 @@
-use super::super::priority::TestTarget;
 use super::super::RiskAnalyzer;
+use super::super::priority::TestTarget;
 
 pub trait RiskReductionModel: Send + Sync {
     fn calculate(&self, target: &TestTarget) -> RiskReduction;

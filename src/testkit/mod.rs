@@ -86,7 +86,7 @@ pub mod proptest_generators;
 // Re-export main types
 // Note: Assertion macros are exported at crate root via #[macro_export]
 pub use helpers::{
-    create_complex_project, create_coverage_data, create_multi_function_ast, create_nested_ast,
-    create_test_ast, create_test_coverage, create_test_project, parse_test_code, ConfigBuilder,
+    ConfigBuilder, create_complex_project, create_coverage_data, create_multi_function_ast,
+    create_nested_ast, create_test_ast, create_test_coverage, create_test_project, parse_test_code,
 };
 pub use mock_env::DebtmapTestEnv;

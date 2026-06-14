@@ -170,8 +170,8 @@ pub fn get_orchestrator_detection_config() -> OrchestratorDetectionConfig {
 }
 
 /// Get orchestration adjustment configuration (spec 110)
-pub fn get_orchestration_adjustment_config(
-) -> crate::priority::scoring::orchestration_adjustment::OrchestrationAdjustmentConfig {
+pub fn get_orchestration_adjustment_config()
+-> crate::priority::scoring::orchestration_adjustment::OrchestrationAdjustmentConfig {
     get_config()
         .orchestration_adjustment
         .clone()
@@ -220,10 +220,10 @@ pub fn get_context_multipliers() -> ContextMultipliers {
 /// CLI flag --min-score overrides config file setting via DEBTMAP_MIN_SCORE_THRESHOLD env var
 pub fn get_minimum_score_threshold() -> f64 {
     // Check environment variable first (CLI override)
-    if let Ok(env_value) = std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD") {
-        if let Ok(threshold) = env_value.parse::<f64>() {
-            return threshold;
-        }
+    if let Ok(env_value) = std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD")
+        && let Ok(threshold) = env_value.parse::<f64>()
+    {
+        return threshold;
     }
 
     // Fall back to config file or default

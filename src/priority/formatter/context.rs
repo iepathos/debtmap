@@ -208,14 +208,14 @@ pub(crate) struct ContextDampeningInfo {
 impl ContextDampeningInfo {
     fn from_item(item: &UnifiedDebtItem) -> Option<Self> {
         // Only show context info if dampening was applied (multiplier < 1.0)
-        if let (Some(multiplier), Some(file_type)) = (item.context_multiplier, item.context_type) {
-            if multiplier < 1.0 {
-                let description = Self::get_file_type_description(file_type);
-                return Some(Self {
-                    multiplier,
-                    description,
-                });
-            }
+        if let (Some(multiplier), Some(file_type)) = (item.context_multiplier, item.context_type)
+            && multiplier < 1.0
+        {
+            let description = Self::get_file_type_description(file_type);
+            return Some(Self {
+                multiplier,
+                description,
+            });
         }
         None
     }

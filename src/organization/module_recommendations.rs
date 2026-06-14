@@ -654,10 +654,12 @@ mod tests {
 
         recommendation.validate();
         assert!(!recommendation.is_acceptable());
-        assert!(recommendation
-            .warnings
-            .iter()
-            .any(|w| w.contains("Too small")));
+        assert!(
+            recommendation
+                .warnings
+                .iter()
+                .any(|w| w.contains("Too small"))
+        );
     }
 
     #[test]
@@ -677,10 +679,12 @@ mod tests {
 
         recommendation.validate();
         assert!(!recommendation.is_acceptable());
-        assert!(recommendation
-            .warnings
-            .iter()
-            .any(|w| w.contains("Generic module name")));
+        assert!(
+            recommendation
+                .warnings
+                .iter()
+                .any(|w| w.contains("Generic module name"))
+        );
     }
 
     #[test]

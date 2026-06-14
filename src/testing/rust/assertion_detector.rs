@@ -113,13 +113,13 @@ impl Default for AssertionDetector {
 impl<'ast> Visit<'ast> for AssertionDetector {
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         // Check for macro invocations in statements
-        if let Stmt::Macro(stmt_macro) = stmt {
-            if let Some(assertion_type) = self.detect_assertion_macro(&stmt_macro.mac) {
-                self.assertions.push(Assertion {
-                    assertion_type,
-                    line: stmt_macro.mac.path.span().start().line,
-                });
-            }
+        if let Stmt::Macro(stmt_macro) = stmt
+            && let Some(assertion_type) = self.detect_assertion_macro(&stmt_macro.mac)
+        {
+            self.assertions.push(Assertion {
+                assertion_type,
+                line: stmt_macro.mac.path.span().start().line,
+            });
         }
 
         syn::visit::visit_stmt(self, stmt);
@@ -127,13 +127,13 @@ impl<'ast> Visit<'ast> for AssertionDetector {
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
         // Check for macro invocations in expressions
-        if let Expr::Macro(expr_macro) = expr {
-            if let Some(assertion_type) = self.detect_assertion_macro(&expr_macro.mac) {
-                self.assertions.push(Assertion {
-                    assertion_type,
-                    line: expr_macro.mac.path.span().start().line,
-                });
-            }
+        if let Expr::Macro(expr_macro) = expr
+            && let Some(assertion_type) = self.detect_assertion_macro(&expr_macro.mac)
+        {
+            self.assertions.push(Assertion {
+                assertion_type,
+                line: expr_macro.mac.path.span().start().line,
+            });
         }
 
         syn::visit::visit_expr(self, expr);

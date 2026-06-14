@@ -2,11 +2,11 @@
 //!
 //! Measures the overhead of framework pattern detection to verify < 5% impact requirement
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::analysis::framework_patterns_multi::{
+    FrameworkDetector,
     detector::{FileContext, FunctionAst, Parameter},
     patterns::Language,
-    FrameworkDetector,
 };
 use std::hint::black_box;
 use std::path::Path;

@@ -391,15 +391,15 @@ impl StateFieldDetector {
         }
 
         // Strategy 2: Type-based detection
-        if self.config.use_type_analysis {
-            if let Some(type_info) = self.analyze_field_type(field_expr) {
-                if type_info.is_enum && type_info.variant_count >= self.config.min_enum_variants {
-                    breakdown.type_score = 0.4;
-                    breakdown
-                        .explanation
-                        .push_str(&format!("enum with {} variants; ", type_info.variant_count));
-                }
-            }
+        if self.config.use_type_analysis
+            && let Some(type_info) = self.analyze_field_type(field_expr)
+            && type_info.is_enum
+            && type_info.variant_count >= self.config.min_enum_variants
+        {
+            breakdown.type_score = 0.4;
+            breakdown
+                .explanation
+                .push_str(&format!("enum with {} variants; ", type_info.variant_count));
         }
 
         // Strategy 3: Semantic pattern recognition

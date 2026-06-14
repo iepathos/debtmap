@@ -59,10 +59,10 @@
 
 use crate::errors::AnalysisError;
 use crate::progress::traits::HasProgress;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use stillwater::effect::prelude::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use stillwater::Effect;
+use stillwater::effect::prelude::*;
 
 /// Wrap an effect with stage tracking.
 ///
@@ -97,7 +97,7 @@ use stillwater::Effect;
 pub fn with_stage<T, Err, Env, Eff>(
     stage_name: &str,
     effect: Eff,
-) -> impl Effect<Output = T, Error = Err, Env = Env>
+) -> impl Effect<Output = T, Error = Err, Env = Env> + use<T, Err, Env, Eff>
 where
     Env: HasProgress + Clone + Send + Sync + 'static,
     T: Send + 'static,
@@ -159,7 +159,7 @@ pub fn traverse_with_progress<T, U, Env, F, Eff>(
     items: Vec<T>,
     stage_name: &str,
     f: F,
-) -> impl Effect<Output = Vec<U>, Error = AnalysisError, Env = Env>
+) -> impl Effect<Output = Vec<U>, Error = AnalysisError, Env = Env> + use<T, U, Env, F, Eff>
 where
     T: Send + 'static,
     U: Send + 'static,
@@ -238,7 +238,7 @@ pub fn par_traverse_with_progress<T, U, Env, F, Eff>(
     items: Vec<T>,
     stage_name: &str,
     f: F,
-) -> impl Effect<Output = Vec<U>, Error = AnalysisError, Env = Env>
+) -> impl Effect<Output = Vec<U>, Error = AnalysisError, Env = Env> + use<T, U, Env, F, Eff>
 where
     T: Send + 'static,
     U: Send + 'static,
@@ -305,7 +305,7 @@ pub fn report_progress<Env>(
     stage: &str,
     current: usize,
     total: usize,
-) -> impl Effect<Output = (), Error = AnalysisError, Env = Env>
+) -> impl Effect<Output = (), Error = AnalysisError, Env = Env> + use<Env>
 where
     Env: HasProgress + Clone + Send + Sync + 'static,
 {
@@ -336,7 +336,7 @@ where
 /// ```
 pub fn warn_progress<Env>(
     message: &str,
-) -> impl Effect<Output = (), Error = AnalysisError, Env = Env>
+) -> impl Effect<Output = (), Error = AnalysisError, Env = Env> + use<Env>
 where
     Env: HasProgress + Clone + Send + Sync + 'static,
 {

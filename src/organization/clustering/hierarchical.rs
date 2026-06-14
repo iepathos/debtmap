@@ -1,8 +1,8 @@
 //! Hierarchical agglomerative clustering algorithm
 
+use super::Method;
 use super::quality_metrics::ClusterQuality;
 use super::similarity::{CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider};
-use super::Method;
 use std::collections::HashMap;
 
 /// A cluster of related methods
@@ -318,10 +318,10 @@ impl SimilarityMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::organization::clustering::Visibility;
     use crate::organization::clustering::similarity::{
         CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider,
     };
-    use crate::organization::clustering::Visibility;
     use std::collections::HashSet;
 
     struct MockCallGraph;

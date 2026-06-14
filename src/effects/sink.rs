@@ -40,7 +40,7 @@
 use std::path::Path;
 
 use serde::Serialize;
-use stillwater::effect::sink::{emit, SinkEffect};
+use stillwater::effect::sink::{SinkEffect, emit};
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
@@ -183,7 +183,7 @@ where
 /// Convenience function that serializes the value to JSON Lines format.
 pub fn emit_json_line<T, E, Env>(
     value: &T,
-) -> impl SinkEffect<Output = (), Error = E, Env = Env, Item = ReportLine>
+) -> impl SinkEffect<Output = (), Error = E, Env = Env, Item = ReportLine> + use<T, E, Env>
 where
     T: Serialize,
     E: Send + 'static,
@@ -215,8 +215,8 @@ where
 }
 
 /// Emit a separator.
-pub fn emit_separator<E, Env>(
-) -> impl SinkEffect<Output = (), Error = E, Env = Env, Item = ReportLine>
+pub fn emit_separator<E, Env>()
+-> impl SinkEffect<Output = (), Error = E, Env = Env, Item = ReportLine>
 where
     E: Send + 'static,
     Env: Clone + Send + Sync + 'static,

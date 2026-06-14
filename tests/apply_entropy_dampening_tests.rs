@@ -1,4 +1,4 @@
-use debtmap::complexity::entropy::{apply_entropy_dampening, EntropyScore};
+use debtmap::complexity::entropy::{EntropyScore, apply_entropy_dampening};
 
 /// Helper function to create an EntropyScore with specified values
 fn create_entropy_score(

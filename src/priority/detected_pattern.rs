@@ -68,35 +68,35 @@ impl DetectedPattern {
         };
 
         // Check state machine first (higher priority)
-        if let Some(sm_signals) = &rust_data.state_machine_signals {
-            if sm_signals.confidence >= 0.7 {
-                return Some(Self {
-                    pattern_type: PatternType::StateMachine,
-                    confidence: sm_signals.confidence,
-                    metrics: PatternMetrics {
-                        state_transitions: Some(sm_signals.transition_count as usize),
-                        match_expressions: Some(sm_signals.match_expression_count as usize),
-                        action_dispatches: Some(sm_signals.action_dispatch_count as usize),
-                        comparisons: None,
-                    },
-                });
-            }
+        if let Some(sm_signals) = &rust_data.state_machine_signals
+            && sm_signals.confidence >= 0.7
+        {
+            return Some(Self {
+                pattern_type: PatternType::StateMachine,
+                confidence: sm_signals.confidence,
+                metrics: PatternMetrics {
+                    state_transitions: Some(sm_signals.transition_count as usize),
+                    match_expressions: Some(sm_signals.match_expression_count as usize),
+                    action_dispatches: Some(sm_signals.action_dispatch_count as usize),
+                    comparisons: None,
+                },
+            });
         }
 
         // Check coordinator second
-        if let Some(coord_signals) = &rust_data.coordinator_signals {
-            if coord_signals.confidence >= 0.7 {
-                return Some(Self {
-                    pattern_type: PatternType::Coordinator,
-                    confidence: coord_signals.confidence,
-                    metrics: PatternMetrics {
-                        state_transitions: None,
-                        match_expressions: None,
-                        action_dispatches: Some(coord_signals.actions as usize),
-                        comparisons: Some(coord_signals.comparisons as usize),
-                    },
-                });
-            }
+        if let Some(coord_signals) = &rust_data.coordinator_signals
+            && coord_signals.confidence >= 0.7
+        {
+            return Some(Self {
+                pattern_type: PatternType::Coordinator,
+                confidence: coord_signals.confidence,
+                metrics: PatternMetrics {
+                    state_transitions: None,
+                    match_expressions: None,
+                    action_dispatches: Some(coord_signals.actions as usize),
+                    comparisons: Some(coord_signals.comparisons as usize),
+                },
+            });
         }
 
         None

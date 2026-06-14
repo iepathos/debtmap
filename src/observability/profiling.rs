@@ -43,8 +43,8 @@
 
 use dashmap::DashMap;
 use serde::Serialize;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 /// Global flag indicating whether profiling is enabled.
@@ -442,14 +442,14 @@ fn format_duration(d: Duration) -> String {
 /// ```
 #[macro_export]
 macro_rules! time_span {
-    ($name:expr) => {
+    ($name:expr_2021) => {
         let _timing_span = if $crate::observability::profiling::is_profiling_enabled() {
             Some($crate::observability::profiling::TimingSpan::new($name))
         } else {
             None
         };
     };
-    ($name:expr, parent: $parent:expr) => {
+    ($name:expr_2021, parent: $parent:expr_2021) => {
         let _timing_span = if $crate::observability::profiling::is_profiling_enabled() {
             Some($crate::observability::profiling::TimingSpan::with_parent(
                 $name, $parent,

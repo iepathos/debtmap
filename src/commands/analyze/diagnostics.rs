@@ -127,7 +127,7 @@ fn build_debug_config(config: &AnalyzeConfig, format: DebugFormat) -> DebugConfi
 
 /// Add trace functions to debugger.
 fn add_trace_functions(debugger: &mut CallGraphDebugger, trace_functions: &Option<Vec<String>>) {
-    if let Some(ref funcs) = trace_functions {
+    if let Some(funcs) = trace_functions {
         for func in funcs {
             debugger.add_trace_function(func.clone());
         }

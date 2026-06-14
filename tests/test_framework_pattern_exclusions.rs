@@ -1,8 +1,8 @@
 use debtmap::analysis::call_graph::FrameworkPatternDetector;
 use debtmap::core::FunctionMetrics;
+use debtmap::priority::DebtType;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
 use debtmap::priority::scoring::classification::classify_debt_type_with_exclusions;
-use debtmap::priority::DebtType;
 use std::collections::HashSet;
 use std::path::PathBuf;
 

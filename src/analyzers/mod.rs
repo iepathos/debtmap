@@ -17,7 +17,7 @@
 //! [`FileAnalyzer`] for debt-focused metrics. The enhanced analyzer provides
 //! comprehensive analysis including call graphs and effect tracking.
 
-use crate::core::{ast::Ast, FileMetrics, FunctionMetrics};
+use crate::core::{FileMetrics, FunctionMetrics, ast::Ast};
 use crate::priority::file_metrics::FileDebtMetrics;
 use anyhow::Result;
 use std::path::Path;

@@ -63,20 +63,12 @@ fn effort_from_risk(risk_score: &f64) -> u32 {
 
 /// Calculate effort based on duplication instances
 fn effort_from_duplication(instances: &u32) -> u32 {
-    if instances > &5 {
-        8
-    } else {
-        4
-    }
+    if instances > &5 { 8 } else { 4 }
 }
 
 /// Calculate effort based on nested loop depth
 fn effort_from_loop_depth(depth: &u32) -> u32 {
-    if depth > &3 {
-        8
-    } else {
-        4
-    }
+    if depth > &3 { 8 } else { 4 }
 }
 
 /// Calculate base effort for a debt type

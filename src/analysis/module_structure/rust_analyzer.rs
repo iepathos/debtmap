@@ -26,7 +26,7 @@ use super::types::{
 /// Spec 202: Resets SourceMap after analysis (not after parsing) to ensure
 /// span lookups in the AST remain valid during analysis.
 pub fn analyze_rust_file(content: &str, _file_path: &Path) -> ModuleStructure {
-    let result = match syn::parse_file(content) {
+    match syn::parse_file(content) {
         Ok(ast) => {
             // Analyze while AST spans are still valid
             let structure = analyze_rust_ast_with_path(&ast, Some(_file_path));
@@ -43,8 +43,7 @@ pub fn analyze_rust_file(content: &str, _file_path: &Path) -> ModuleStructure {
             dependencies: ComponentDependencyGraph::new(),
             facade_info: None,
         },
-    };
-    result
+    }
 }
 
 /// Analyze a parsed Rust AST
@@ -695,24 +694,32 @@ pub fn render(config: Config) -> Helper {
         let ast = syn::parse_file(code).unwrap();
         let structure = analyze_rust_ast(&ast);
 
-        assert!(structure
-            .dependencies
-            .edges
-            .iter()
-            .any(|(from, to)| from == "Config" && to == "Helper"));
-        assert!(structure
-            .dependencies
-            .edges
-            .iter()
-            .any(|(from, to)| from == "Config impl" && to == "log"));
-        assert!(structure
-            .dependencies
-            .edges
-            .iter()
-            .any(|(from, to)| from == "module" && to == "serde"));
-        assert!(structure
-            .dependencies
-            .coupling_scores
-            .contains_key("Config impl"));
+        assert!(
+            structure
+                .dependencies
+                .edges
+                .iter()
+                .any(|(from, to)| from == "Config" && to == "Helper")
+        );
+        assert!(
+            structure
+                .dependencies
+                .edges
+                .iter()
+                .any(|(from, to)| from == "Config impl" && to == "log")
+        );
+        assert!(
+            structure
+                .dependencies
+                .edges
+                .iter()
+                .any(|(from, to)| from == "module" && to == "serde")
+        );
+        assert!(
+            structure
+                .dependencies
+                .coupling_scores
+                .contains_key("Config impl")
+        );
     }
 }

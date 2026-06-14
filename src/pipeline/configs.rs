@@ -18,7 +18,7 @@
 //! let result = pipeline.execute()?;
 //! ```
 
-use super::{stage::PureStage, stages::*, PipelineBuilder};
+use super::{PipelineBuilder, stage::PureStage, stages::*};
 use crate::core::Language;
 use crate::pipeline::data::PipelineData;
 use std::path::{Path, PathBuf};
