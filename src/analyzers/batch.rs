@@ -548,12 +548,9 @@ fn go_symbol_index(results: &[FileAnalysisResult]) -> HashMap<GoPackageKey, GoPa
         |mut index, result| {
             let package = go_package_key(result);
             let package_symbols = index.entry(package).or_default();
-            result
-                .metrics
-                .complexity
-                .functions
-                .iter()
-                .for_each(|function| package_symbols.insert(&function.name));
+            for function in &result.metrics.complexity.functions {
+                package_symbols.insert(&function.name);
+            }
             index
         },
     )
