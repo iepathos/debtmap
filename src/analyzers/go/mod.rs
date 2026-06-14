@@ -1,5 +1,6 @@
 //! Go analyzer support.
 
+pub mod advanced;
 pub mod analyzer;
 pub mod debt;
 pub mod dependencies;

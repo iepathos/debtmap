@@ -28,6 +28,8 @@ fn debt_for_function(path: &Path, threshold: u32, function: &FunctionMetrics) ->
         items.push(length_debt(path, function));
     }
 
+    items.extend(advisory_debt_items(path, function));
+
     items
 }
 
@@ -95,6 +97,97 @@ fn length_debt(path: &Path, function: &FunctionMetrics) -> DebtItem {
         ),
         context: Some("Consider splitting this function into smaller units.".to_string()),
     }
+}
+
+fn advisory_debt_items(path: &Path, function: &FunctionMetrics) -> Vec<DebtItem> {
+    function
+        .detected_patterns
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|pattern| advisory_debt(path, function, &pattern))
+        .collect()
+}
+
+fn advisory_debt(path: &Path, function: &FunctionMetrics, pattern: &str) -> Option<DebtItem> {
+    let definition = advisory_definition(pattern)?;
+
+    Some(DebtItem {
+        id: format!("go-{}-{}-{}", pattern, path.display(), function.line),
+        debt_type: DebtType::CodeSmell {
+            smell_type: Some(pattern.to_string()),
+        },
+        priority: definition.priority,
+        file: path.to_path_buf(),
+        line: function.line,
+        column: None,
+        message: format!("Function '{}' {}", function.name, definition.message),
+        context: Some(definition.context.to_string()),
+    })
+}
+
+struct AdvisoryDefinition {
+    priority: Priority,
+    message: &'static str,
+    context: &'static str,
+}
+
+fn advisory_definition(pattern: &str) -> Option<AdvisoryDefinition> {
+    let definition = match pattern {
+        "repetitive-error-handling" => AdvisoryDefinition {
+            priority: Priority::Low,
+            message: "has repetitive error handling",
+            context: "Consider extracting a helper if the repeated handling obscures core logic.",
+        },
+        "swallowed-error" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "appears to discard an error value",
+            context: "Handle, return, or explicitly document why the error can be ignored.",
+        },
+        "panic-in-production" => AdvisoryDefinition {
+            priority: Priority::High,
+            message: "calls panic outside test or main code",
+            context: "Prefer returning an error unless process termination is intentional.",
+        },
+        "recover-without-handling" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "uses recover without visible handling",
+            context: "Recover paths should log, convert, or otherwise handle the panic value.",
+        },
+        "goroutine-without-synchronization" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "starts a goroutine with no local lifecycle signal",
+            context: "Check for cancellation, synchronization, or ownership of the goroutine lifetime.",
+        },
+        "defer-in-loop" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "defers work inside a loop",
+            context: "Deferred calls in loops can delay cleanup and retain resources longer than expected.",
+        },
+        "channel-operation" => AdvisoryDefinition {
+            priority: Priority::Low,
+            message: "uses channel operations",
+            context: "Review blocking behavior, buffering, and cancellation for this concurrency path.",
+        },
+        "pointer-receiver-mutation" => AdvisoryDefinition {
+            priority: Priority::Low,
+            message: "mutates receiver state",
+            context: "State mutation is expected in some methods; keep ownership and invariants explicit.",
+        },
+        "collection-mutation" => AdvisoryDefinition {
+            priority: Priority::Low,
+            message: "mutates a map or slice element",
+            context: "Review shared ownership and aliasing before passing mutable collections across boundaries.",
+        },
+        "package-global-mutation" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "mutates package-level state",
+            context: "Package-level mutation can hide dependencies and complicate concurrent use.",
+        },
+        _ => return None,
+    };
+
+    Some(definition)
 }
 
 fn complexity_priority(complexity: u32, threshold: u32) -> Priority {

@@ -23,6 +23,9 @@ pub struct GoFunction {
     pub purity_level: PurityLevel,
     pub purity_confidence: f32,
     pub purity_patterns: Vec<String>,
+    pub advisory_patterns: Vec<String>,
+    pub error_swallowing_count: u32,
+    pub error_swallowing_patterns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]

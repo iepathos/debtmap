@@ -1,3 +1,4 @@
+use crate::analyzers::go::advanced::detect_advanced_signals;
 use crate::analyzers::go::parser::{node_line, node_text};
 use crate::analyzers::go::purity::analyze_purity;
 use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
@@ -10,12 +11,19 @@ use tree_sitter::Node;
 pub fn analyze_ast(ast: &GoAst) -> GoAnalysis {
     let root = ast.tree.root_node();
     let return_types = function_return_types(root, ast);
+    let package_variables = package_variables(root, ast);
     let mut analysis = GoAnalysis {
         package_name: package_name_from_ast(ast),
         functions: Vec::new(),
     };
 
-    collect_functions(root, ast, &return_types, &mut analysis.functions);
+    collect_functions(
+        root,
+        ast,
+        &return_types,
+        &package_variables,
+        &mut analysis.functions,
+    );
     analysis
         .functions
         .sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
@@ -30,15 +38,16 @@ fn collect_functions(
     node: Node,
     ast: &GoAst,
     return_types: &HashMap<String, String>,
+    package_variables: &[String],
     functions: &mut Vec<GoFunction>,
 ) {
-    if let Some(function) = function_from_node(node, ast, return_types) {
+    if let Some(function) = function_from_node(node, ast, return_types, package_variables) {
         functions.push(function);
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_functions(child, ast, return_types, functions);
+        collect_functions(child, ast, return_types, package_variables, functions);
     }
 }
 
@@ -46,10 +55,11 @@ fn function_from_node(
     node: Node,
     ast: &GoAst,
     return_types: &HashMap<String, String>,
+    package_variables: &[String],
 ) -> Option<GoFunction> {
     match node.kind() {
-        "function_declaration" => named_function(node, ast, return_types),
-        "method_declaration" => method_function(node, ast, return_types),
+        "function_declaration" => named_function(node, ast, return_types, package_variables),
+        "method_declaration" => method_function(node, ast, return_types, package_variables),
         _ => None,
     }
 }
@@ -58,6 +68,7 @@ fn named_function(
     node: Node,
     ast: &GoAst,
     return_types: &HashMap<String, String>,
+    package_variables: &[String],
 ) -> Option<GoFunction> {
     let name = child_text(node, "name", ast)?;
     Some(build_function(
@@ -66,6 +77,7 @@ fn named_function(
         name,
         GoFunctionKind::Function,
         FunctionContext::new(return_types, None),
+        package_variables,
     ))
 }
 
@@ -73,6 +85,7 @@ fn method_function(
     node: Node,
     ast: &GoAst,
     return_types: &HashMap<String, String>,
+    package_variables: &[String],
 ) -> Option<GoFunction> {
     let name = child_text(node, "name", ast)?;
     let receiver = receiver_info(node, ast);
@@ -86,6 +99,7 @@ fn method_function(
         format!("{receiver_type}.{name}"),
         GoFunctionKind::Method,
         FunctionContext::new(return_types, receiver),
+        package_variables,
     ))
 }
 
@@ -95,19 +109,24 @@ fn build_function(
     name: String,
     kind: GoFunctionKind,
     context: FunctionContext<'_>,
+    package_variables: &[String],
 ) -> GoFunction {
     let body = node.child_by_field_name("body");
     let cyclomatic = body.map(cyclomatic_complexity).unwrap_or(1);
     let cognitive = body.map(|node| cognitive_complexity(node, 0)).unwrap_or(0);
     let nesting = body.map(|node| max_nesting(node, 0)).unwrap_or(0);
     let purity = body.map(|node| analyze_purity(node, &ast.source));
+    let is_test = is_test_file(&ast.path) || is_test_function(&name);
+    let advisory = body
+        .map(|node| detect_advanced_signals(node, &ast.source, &name, is_test, package_variables))
+        .unwrap_or_default();
     let local_types = body
         .map(|node| local_type_environment(node, ast, &context))
         .unwrap_or_default();
 
     GoFunction {
         visibility: visibility_for(&name),
-        is_test: is_test_file(&ast.path) || is_test_function(&name),
+        is_test,
         name,
         file: ast.path.clone(),
         line: node_line(&node),
@@ -128,6 +147,9 @@ fn build_function(
             .map(|purity| purity.confidence)
             .unwrap_or(0.0),
         purity_patterns: purity.map(|purity| purity.patterns).unwrap_or_default(),
+        advisory_patterns: advisory.patterns,
+        error_swallowing_count: advisory.error_swallowing_count,
+        error_swallowing_patterns: advisory.error_swallowing_patterns,
     }
 }
 
@@ -199,6 +221,27 @@ fn function_return_types(root: Node, ast: &GoAst) -> HashMap<String, String> {
     children(root)
         .into_iter()
         .filter_map(|child| function_return_type(child, ast))
+        .collect()
+}
+
+fn package_variables(root: Node, ast: &GoAst) -> Vec<String> {
+    children(root)
+        .into_iter()
+        .filter(|child| child.kind() == "var_declaration")
+        .flat_map(|child| variable_names(child, ast))
+        .collect()
+}
+
+fn variable_names(node: Node, ast: &GoAst) -> Vec<String> {
+    if node.kind() == "var_spec" {
+        return first_child_text(node, "identifier", ast)
+            .into_iter()
+            .collect();
+    }
+
+    children(node)
+        .into_iter()
+        .flat_map(|child| variable_names(child, ast))
         .collect()
 }
 

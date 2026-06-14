@@ -37,6 +37,8 @@ fn complexity_totals(functions: Vec<FunctionMetrics>) -> ComplexityMetrics {
 }
 
 pub fn to_function_metrics(function: &GoFunction) -> FunctionMetrics {
+    let detected_patterns = detected_patterns(function);
+
     FunctionMetrics {
         name: function.name.clone(),
         file: function.file.clone(),
@@ -54,8 +56,7 @@ pub fn to_function_metrics(function: &GoFunction) -> FunctionMetrics {
         purity_confidence: Some(function.purity_confidence),
         purity_reason: purity_reason(function),
         call_dependencies: (!function.calls.is_empty()).then_some(function.calls.clone()),
-        detected_patterns: (!function.purity_patterns.is_empty())
-            .then_some(function.purity_patterns.clone()),
+        detected_patterns: (!detected_patterns.is_empty()).then_some(detected_patterns),
         upstream_callers: None,
         downstream_callees: None,
         mapping_pattern_result: None,
@@ -63,10 +64,20 @@ pub fn to_function_metrics(function: &GoFunction) -> FunctionMetrics {
         composition_metrics: None,
         language_specific: None,
         purity_level: Some(function.purity_level),
-        error_swallowing_count: None,
-        error_swallowing_patterns: None,
+        error_swallowing_count: (function.error_swallowing_count > 0)
+            .then_some(function.error_swallowing_count),
+        error_swallowing_patterns: (!function.error_swallowing_patterns.is_empty())
+            .then_some(function.error_swallowing_patterns.clone()),
         entropy_analysis: None,
     }
+}
+
+fn detected_patterns(function: &GoFunction) -> Vec<String> {
+    let mut patterns = function.purity_patterns.clone();
+    patterns.extend(function.advisory_patterns.clone());
+    patterns.sort();
+    patterns.dedup();
+    patterns
 }
 
 fn purity_reason(function: &GoFunction) -> Option<String> {
