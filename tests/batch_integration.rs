@@ -666,6 +666,194 @@ func (s *Service) Handle() {}
     assert_eq!(service_handle.upstream_callers, None);
 }
 
+#[test]
+fn test_go_module_import_calls_resolve_to_local_package() {
+    let files = vec![
+        (
+            "cmd/app/main.go",
+            r#"package main
+
+import "example.com/app/internal/mathx"
+
+func main() {
+    mathx.Add()
+}
+"#,
+        ),
+        (
+            "internal/mathx/math.go",
+            r#"package mathx
+
+func Add() {}
+"#,
+        ),
+    ];
+    let (temp_dir, paths) = create_test_project(&files);
+    fs::write(temp_dir.path().join("go.mod"), "module example.com/app\n").unwrap();
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let main_fn = find_go_function(&results, "main.go", "main");
+    let add_fn = find_go_function(&results, "math.go", "Add");
+
+    assert_eq!(main_fn.downstream_callees, Some(vec!["Add".to_string()]));
+    assert_eq!(add_fn.upstream_callers, Some(vec!["main".to_string()]));
+}
+
+#[test]
+fn test_go_module_alias_import_calls_resolve() {
+    let files = vec![
+        (
+            "cmd/app/main.go",
+            r#"package main
+
+import util "example.com/app/pkg/mathx"
+
+func main() {
+    util.Add()
+}
+"#,
+        ),
+        (
+            "pkg/mathx/math.go",
+            r#"package mathx
+
+func Add() {}
+"#,
+        ),
+    ];
+    let (temp_dir, paths) = create_test_project(&files);
+    fs::write(temp_dir.path().join("go.mod"), "module example.com/app\n").unwrap();
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let main_fn = find_go_function(&results, "main.go", "main");
+    let add_fn = find_go_function(&results, "math.go", "Add");
+
+    assert_eq!(main_fn.downstream_callees, Some(vec!["Add".to_string()]));
+    assert_eq!(add_fn.upstream_callers, Some(vec!["main".to_string()]));
+}
+
+#[test]
+fn test_go_external_module_imports_stay_unresolved() {
+    let files = vec![(
+        "cmd/app/main.go",
+        r#"package main
+
+import (
+    "fmt"
+    ext "github.com/acme/lib"
+)
+
+func main() {
+    fmt.Println("hello")
+    ext.Run()
+}
+"#,
+    )];
+    let (temp_dir, paths) = create_test_project(&files);
+    fs::write(temp_dir.path().join("go.mod"), "module example.com/app\n").unwrap();
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let main_fn = find_go_function(&results, "main.go", "main");
+
+    assert_eq!(main_fn.call_dependencies, None);
+    assert_eq!(main_fn.downstream_callees, None);
+}
+
+#[test]
+fn test_go_duplicate_package_names_resolve_by_import_path() {
+    let files = vec![
+        (
+            "cmd/app/main.go",
+            r#"package main
+
+import auth "example.com/app/internal/auth"
+
+func main() {
+    auth.Run()
+}
+"#,
+        ),
+        (
+            "internal/auth/auth.go",
+            r#"package auth
+
+func Run() {}
+"#,
+        ),
+        (
+            "pkg/auth/auth.go",
+            r#"package auth
+
+func Run() {}
+"#,
+        ),
+    ];
+    let (temp_dir, paths) = create_test_project(&files);
+    fs::write(temp_dir.path().join("go.mod"), "module example.com/app\n").unwrap();
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let main_fn = find_go_function(&results, "main.go", "main");
+    let internal_run = find_go_function(&results, "internal/auth/auth.go", "Run");
+    let pkg_run = find_go_function(&results, "pkg/auth/auth.go", "Run");
+
+    assert_eq!(main_fn.downstream_callees, Some(vec!["Run".to_string()]));
+    assert_eq!(
+        internal_run.upstream_callers,
+        Some(vec!["main".to_string()])
+    );
+    assert_eq!(pkg_run.upstream_callers, None);
+}
+
+#[test]
+fn test_go_dot_import_is_explicitly_ignored() {
+    let files = vec![
+        (
+            "cmd/app/main.go",
+            r#"package main
+
+import . "example.com/app/internal/mathx"
+
+func main() {
+    Add()
+}
+"#,
+        ),
+        (
+            "internal/mathx/math.go",
+            r#"package mathx
+
+func Add() {}
+"#,
+        ),
+    ];
+    let (temp_dir, paths) = create_test_project(&files);
+    fs::write(temp_dir.path().join("go.mod"), "module example.com/app\n").unwrap();
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let main_fn = find_go_function(&results, "main.go", "main");
+    let add_fn = find_go_function(&results, "math.go", "Add");
+
+    assert_eq!(main_fn.downstream_callees, None);
+    assert_eq!(add_fn.upstream_callers, None);
+}
+
+fn find_go_function<'a>(
+    results: &'a [debtmap::analyzers::batch::FileAnalysisResult],
+    file_suffix: &str,
+    name: &str,
+) -> &'a debtmap::core::FunctionMetrics {
+    results
+        .iter()
+        .flat_map(|result| result.metrics.complexity.functions.iter())
+        .find(|function| function.file.ends_with(file_suffix) && function.name == name)
+        .unwrap()
+}
+
 // ============================================================================
 // Edge Cases
 // ============================================================================

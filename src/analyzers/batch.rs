@@ -489,33 +489,96 @@ fn analyze_validated_file(file: &ValidatedFile) -> Result<FileAnalysisResult, An
 
 fn resolve_go_cross_file_calls(mut results: Vec<FileAnalysisResult>) -> Vec<FileAnalysisResult> {
     let symbol_index = go_symbol_index(&results);
+    let import_maps = go_import_maps(&results);
+    let mut edges: Vec<(GoFunctionKey, String, GoFunctionKey)> = Vec::new();
 
     for result in results.iter_mut().filter(|result| is_go_result(result)) {
         let package = go_package_key(result);
-        let symbols = symbol_index.get(&package).cloned().unwrap_or_default();
+        let imports = import_maps.get(&result.path).cloned().unwrap_or_default();
 
         for function in &mut result.metrics.complexity.functions {
-            let resolved = function
+            let resolved_calls = function
                 .call_dependencies
                 .clone()
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|call| symbols.contains(call))
+                .filter_map(|call| resolve_go_call(&call, &package, &imports, &symbol_index))
                 .collect::<Vec<_>>();
 
-            function.call_dependencies = (!resolved.is_empty()).then_some(resolved.clone());
-            function.downstream_callees = (!resolved.is_empty()).then_some(resolved);
+            let downstream = resolved_calls
+                .iter()
+                .map(|call| call.display_name.clone())
+                .collect::<Vec<_>>();
+            let caller = GoFunctionKey::new(package.clone(), function.name.clone());
+            edges.extend(
+                resolved_calls
+                    .into_iter()
+                    .map(|call| (caller.clone(), function.name.clone(), call.key)),
+            );
+
+            function.call_dependencies = (!downstream.is_empty()).then_some(downstream.clone());
+            function.downstream_callees = (!downstream.is_empty()).then_some(downstream);
         }
     }
 
-    let upstream = go_upstream_callers(&results);
+    let upstream = go_upstream_callers(edges);
     for result in results.iter_mut().filter(|result| is_go_result(result)) {
+        let package = go_package_key(result);
         for function in &mut result.metrics.complexity.functions {
-            function.upstream_callers = upstream.get(&function.name).cloned();
+            let key = GoFunctionKey::new(package.clone(), function.name.clone());
+            function.upstream_callers = upstream.get(&key).cloned();
         }
     }
 
     results
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedGoCall {
+    display_name: String,
+    key: GoFunctionKey,
+}
+
+fn resolve_go_call(
+    call: &str,
+    current_package: &GoPackageKey,
+    imports: &HashMap<String, String>,
+    index: &GoSymbolIndex,
+) -> Option<ResolvedGoCall> {
+    imported_go_call(call, imports, index)
+        .or_else(|| same_package_go_call(call, current_package, index))
+}
+
+fn same_package_go_call(
+    call: &str,
+    package: &GoPackageKey,
+    index: &GoSymbolIndex,
+) -> Option<ResolvedGoCall> {
+    index.by_package.get(package).and_then(|symbols| {
+        symbols.contains(call).then(|| ResolvedGoCall {
+            display_name: call.to_string(),
+            key: GoFunctionKey::new(package.clone(), call.to_string()),
+        })
+    })
+}
+
+fn imported_go_call(
+    call: &str,
+    imports: &HashMap<String, String>,
+    index: &GoSymbolIndex,
+) -> Option<ResolvedGoCall> {
+    let (alias, function_name) = call.split_once('.')?;
+    let import_path = imports.get(alias)?;
+    let package = index.by_import_path.get(import_path)?;
+    let symbols = index.by_package.get(package)?;
+
+    symbols
+        .free_functions
+        .contains(function_name)
+        .then(|| ResolvedGoCall {
+            display_name: function_name.to_string(),
+            key: GoFunctionKey::new(package.clone(), function_name.to_string()),
+        })
 }
 
 #[derive(Debug, Clone, Default)]
@@ -542,12 +605,22 @@ impl GoPackageSymbols {
     }
 }
 
-fn go_symbol_index(results: &[FileAnalysisResult]) -> HashMap<GoPackageKey, GoPackageSymbols> {
+#[derive(Debug, Clone, Default)]
+struct GoSymbolIndex {
+    by_package: HashMap<GoPackageKey, GoPackageSymbols>,
+    by_import_path: HashMap<String, GoPackageKey>,
+}
+
+fn go_symbol_index(results: &[FileAnalysisResult]) -> GoSymbolIndex {
     results.iter().filter(|result| is_go_result(result)).fold(
-        HashMap::new(),
+        GoSymbolIndex::default(),
         |mut index, result| {
             let package = go_package_key(result);
-            let package_symbols = index.entry(package).or_default();
+            if is_importable_go_package(&package) {
+                let import_path = package.import_path.clone().unwrap_or_default();
+                index.by_import_path.insert(import_path, package.clone());
+            }
+            let package_symbols = index.by_package.entry(package).or_default();
             for function in &result.metrics.complexity.functions {
                 package_symbols.insert(&function.name);
             }
@@ -556,19 +629,37 @@ fn go_symbol_index(results: &[FileAnalysisResult]) -> HashMap<GoPackageKey, GoPa
     )
 }
 
-fn go_upstream_callers(results: &[FileAnalysisResult]) -> HashMap<String, Vec<String>> {
+fn is_importable_go_package(package: &GoPackageKey) -> bool {
+    package.import_path.is_some()
+        && package
+            .package_name
+            .as_deref()
+            .map(|name| !name.ends_with("_test"))
+            .unwrap_or(true)
+}
+
+fn go_upstream_callers(
+    edges: Vec<(GoFunctionKey, String, GoFunctionKey)>,
+) -> HashMap<GoFunctionKey, Vec<String>> {
+    edges
+        .into_iter()
+        .fold(HashMap::new(), |mut upstream, edge| {
+            let (_caller_key, caller_name, callee_key) = edge;
+            upstream.entry(callee_key).or_default().push(caller_name);
+            upstream
+        })
+}
+
+fn go_import_maps(results: &[FileAnalysisResult]) -> HashMap<PathBuf, HashMap<String, String>> {
     results
         .iter()
         .filter(|result| is_go_result(result))
-        .flat_map(|result| result.metrics.complexity.functions.iter())
-        .fold(HashMap::new(), |mut upstream, caller| {
-            for callee in caller.downstream_callees.clone().unwrap_or_default() {
-                upstream
-                    .entry(callee)
-                    .or_default()
-                    .push(caller.name.clone());
-            }
-            upstream
+        .fold(HashMap::new(), |mut maps, result| {
+            let imports = std::fs::read_to_string(&result.path)
+                .map(|source| go_import_aliases(&source))
+                .unwrap_or_default();
+            maps.insert(result.path.clone(), imports);
+            maps
         })
 }
 
@@ -580,17 +671,154 @@ fn is_go_result(result: &FileAnalysisResult) -> bool {
 struct GoPackageKey {
     directory: PathBuf,
     package_name: Option<String>,
+    import_path: Option<String>,
 }
 
 fn go_package_key(result: &FileAnalysisResult) -> GoPackageKey {
+    let directory = result
+        .path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_path_buf();
+
     GoPackageKey {
-        directory: result
-            .path
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .to_path_buf(),
+        import_path: go_package_import_path(&directory),
+        directory,
         package_name: result.package_name.clone(),
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct GoFunctionKey {
+    package: GoPackageKey,
+    name: String,
+}
+
+impl GoFunctionKey {
+    fn new(package: GoPackageKey, name: String) -> Self {
+        Self { package, name }
+    }
+}
+
+fn go_package_import_path(directory: &Path) -> Option<String> {
+    let module = nearest_go_module(directory)?;
+    let relative = directory.strip_prefix(&module.root).ok()?;
+    Some(join_go_import_path(&module.path, relative))
+}
+
+#[derive(Debug, Clone)]
+struct GoModule {
+    root: PathBuf,
+    path: String,
+}
+
+fn nearest_go_module(directory: &Path) -> Option<GoModule> {
+    directory
+        .ancestors()
+        .filter_map(|ancestor| go_module_at(ancestor))
+        .next()
+}
+
+fn go_module_at(directory: &Path) -> Option<GoModule> {
+    let go_mod = directory.join("go.mod");
+    let source = std::fs::read_to_string(go_mod).ok()?;
+    parse_go_module_path(&source).map(|path| GoModule {
+        root: directory.to_path_buf(),
+        path,
+    })
+}
+
+fn parse_go_module_path(source: &str) -> Option<String> {
+    source.lines().find_map(|line| {
+        let line = line.split("//").next().unwrap_or("").trim();
+        line.strip_prefix("module ")
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .map(str::to_string)
+    })
+}
+
+fn join_go_import_path(module_path: &str, relative: &Path) -> String {
+    let relative_path = relative
+        .components()
+        .filter_map(|component| component.as_os_str().to_str())
+        .collect::<Vec<_>>()
+        .join("/");
+
+    if relative_path.is_empty() {
+        module_path.to_string()
+    } else {
+        format!("{module_path}/{relative_path}")
+    }
+}
+
+fn go_import_aliases(source: &str) -> HashMap<String, String> {
+    go_import_specs(source)
+        .into_iter()
+        .filter_map(|spec| {
+            let alias = go_import_alias(&spec)?;
+            let path = go_import_path(&spec)?;
+            Some((alias, path))
+        })
+        .filter(|(alias, _)| alias != "." && alias != "_")
+        .collect()
+}
+
+fn go_import_specs(source: &str) -> Vec<String> {
+    source
+        .lines()
+        .fold(ImportScan::default(), |scan, line| scan.next(line))
+        .specs
+}
+
+#[derive(Debug, Clone, Default)]
+struct ImportScan {
+    in_block: bool,
+    specs: Vec<String>,
+}
+
+impl ImportScan {
+    fn next(mut self, line: &str) -> Self {
+        let trimmed = line.trim();
+        if self.in_block {
+            if trimmed.starts_with(')') {
+                self.in_block = false;
+            } else {
+                self.specs.push(trimmed.to_string());
+            }
+            return self;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix("import ") {
+            if rest.trim_start().starts_with('(') {
+                self.in_block = true;
+            } else {
+                self.specs.push(rest.trim().to_string());
+            }
+        }
+
+        self
+    }
+}
+
+fn go_import_alias(spec: &str) -> Option<String> {
+    let quote_index = spec.find('"').or_else(|| spec.find('`'))?;
+    let prefix = spec[..quote_index].trim();
+    prefix
+        .split_whitespace()
+        .last()
+        .map(str::to_string)
+        .or_else(|| {
+            go_import_path(spec).and_then(|path| path.rsplit('/').next().map(str::to_string))
+        })
+}
+
+fn go_import_path(spec: &str) -> Option<String> {
+    let start = spec.find('"').or_else(|| spec.find('`'))?;
+    let quote = spec.as_bytes()[start] as char;
+    let rest = &spec[start + 1..];
+    let end = rest.find(quote)?;
+    Some(rest[..end].to_string())
 }
 
 /// Combine validations while preserving successful values.
@@ -877,6 +1105,50 @@ mod tests {
         let content = "package main\n\nfunc main() {}";
         let result = validate_syntax(content, Language::Go, Path::new("main.go"));
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_go_module_path() {
+        let source = "// comment\nmodule example.com/app\n\ngo 1.22\n";
+
+        assert_eq!(
+            super::parse_go_module_path(source),
+            Some("example.com/app".to_string())
+        );
+    }
+
+    #[test]
+    fn test_join_go_import_path() {
+        assert_eq!(
+            super::join_go_import_path("example.com/app", Path::new("internal/mathx")),
+            "example.com/app/internal/mathx"
+        );
+        assert_eq!(
+            super::join_go_import_path("example.com/app", Path::new("")),
+            "example.com/app"
+        );
+    }
+
+    #[test]
+    fn test_go_import_aliases() {
+        let source = r#"package main
+
+import (
+    "fmt"
+    util "example.com/app/internal/mathx"
+    _ "example.com/app/internal/sideeffect"
+    . "example.com/app/internal/dot"
+)
+"#;
+        let aliases = super::go_import_aliases(source);
+
+        assert_eq!(aliases.get("fmt"), Some(&"fmt".to_string()));
+        assert_eq!(
+            aliases.get("util"),
+            Some(&"example.com/app/internal/mathx".to_string())
+        );
+        assert!(!aliases.contains_key("_"));
+        assert!(!aliases.contains_key("."));
     }
 
     #[test]
