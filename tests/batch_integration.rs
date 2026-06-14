@@ -842,6 +842,36 @@ func Add() {}
     assert_eq!(add_fn.upstream_callers, None);
 }
 
+#[test]
+fn test_go_generic_instantiated_calls_resolve() {
+    let files = vec![(
+        "collections.go",
+        r#"package collections
+
+func Run(xs []int) []string {
+    return Map[int, string](xs, format)
+}
+
+func Map[T any, U any](items []T, f func(T) U) []U {
+    return nil
+}
+
+func format(item int) string {
+    return ""
+}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let run = find_go_function(&results, "collections.go", "Run");
+    let map = find_go_function(&results, "collections.go", "Map");
+
+    assert_eq!(run.downstream_callees, Some(vec!["Map".to_string()]));
+    assert_eq!(map.upstream_callers, Some(vec!["Run".to_string()]));
+}
+
 fn find_go_function<'a>(
     results: &'a [debtmap::analyzers::batch::FileAnalysisResult],
     file_suffix: &str,

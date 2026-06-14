@@ -523,8 +523,8 @@ fn composite_literal_type(text: &str) -> Option<String> {
 }
 
 fn constructor_return_type(text: &str, return_types: &HashMap<String, String>) -> Option<String> {
-    let name = text.split('(').next()?.trim();
-    return_types.get(name).cloned()
+    let name = normalize_go_type(text.split('(').next()?.trim());
+    return_types.get(&name).cloned()
 }
 
 #[cfg(test)]
@@ -612,5 +612,102 @@ func helper() {}
             serve.calls,
             vec!["helper".to_string(), "fmt.Println".to_string()]
         );
+    }
+
+    #[test]
+    fn test_extracts_generic_functions_with_stable_names() {
+        let source = r#"package collections
+
+func Map[T any, U any](items []T, f func(T) U) []U {
+    if len(items) == 0 {
+        return nil
+    }
+    return []U{}
+}
+"#;
+        let ast = parse_source(source, &PathBuf::from("collections.go")).unwrap();
+        let analysis = analyze_ast(&ast);
+        let map = analysis
+            .functions
+            .iter()
+            .find(|function| function.name == "Map")
+            .unwrap();
+
+        assert_eq!(map.visibility, Some("public".to_string()));
+        assert!(map.cyclomatic > 1);
+    }
+
+    #[test]
+    fn test_extracts_generic_receiver_methods_with_stable_names() {
+        let source = r#"package collections
+
+type Set[T comparable] map[T]struct{}
+
+func (s Set[T]) Has(item T) bool {
+    _, ok := s[item]
+    return ok
+}
+"#;
+        let ast = parse_source(source, &PathBuf::from("set.go")).unwrap();
+        let analysis = analyze_ast(&ast);
+
+        assert_eq!(analysis.functions[0].name, "Set.Has");
+    }
+
+    #[test]
+    fn test_extracts_generic_instantiated_calls_without_type_arguments() {
+        let source = r#"package collections
+
+func Run(xs []int) []string {
+    return Map[int, string](xs, format)
+}
+
+func Map[T any, U any](items []T, f func(T) U) []U {
+    return nil
+}
+
+func format(item int) string {
+    return ""
+}
+"#;
+        let ast = parse_source(source, &PathBuf::from("collections.go")).unwrap();
+        let analysis = analyze_ast(&ast);
+        let run = analysis
+            .functions
+            .iter()
+            .find(|function| function.name == "Run")
+            .unwrap();
+
+        assert_eq!(run.calls, vec!["Map".to_string()]);
+    }
+
+    #[test]
+    fn test_extracts_generic_constructor_receiver_call() {
+        let source = r#"package collections
+
+type Set[T comparable] map[T]struct{}
+
+func Run() bool {
+    set := NewSet[int]()
+    return set.Has(1)
+}
+
+func NewSet[T comparable]() Set[T] {
+    return Set[T]{}
+}
+
+func (s Set[T]) Has(item T) bool {
+    return true
+}
+"#;
+        let ast = parse_source(source, &PathBuf::from("set.go")).unwrap();
+        let analysis = analyze_ast(&ast);
+        let run = analysis
+            .functions
+            .iter()
+            .find(|function| function.name == "Run")
+            .unwrap();
+
+        assert_eq!(run.calls, vec!["NewSet".to_string(), "Set.Has".to_string()]);
     }
 }
