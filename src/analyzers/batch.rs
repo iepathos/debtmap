@@ -713,10 +713,7 @@ struct GoModule {
 }
 
 fn nearest_go_module(directory: &Path) -> Option<GoModule> {
-    directory
-        .ancestors()
-        .filter_map(|ancestor| go_module_at(ancestor))
-        .next()
+    directory.ancestors().filter_map(go_module_at).next()
 }
 
 fn go_module_at(directory: &Path) -> Option<GoModule> {
