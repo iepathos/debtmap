@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-06-14
+
+### Added
+
+- **Go Module Call Resolution** - Go analysis now resolves calls across local packages in `go.mod` modules
+  - Resolves module-local imports, alias imports, and internal package calls to analyzed functions
+  - Keeps standard-library and third-party package calls external
+  - Avoids conflating duplicate package names under different directories
+
+- **Go Generics Coverage** - Go parsing and extraction now explicitly support generic code paths
+  - Parses generic functions, generic receiver methods, generic types, and constraint interfaces
+  - Normalizes instantiated calls such as `Map[int](items)` to stable function names
+  - Resolves generic constructor-style calls through receiver method inference
+
+- **Go Advanced Debt Signals** - Go analysis now reports advisory signals for common risk patterns
+  - Detects repetitive error handling, swallowed errors, panic/recover risks, goroutine lifecycle risks, defer-in-loop, channel operations, receiver mutation, collection mutation, and package-global mutation
+  - Emits advisory `CodeSmell` debt items while preserving existing complexity scoring
+  - Keeps generated Go files parsed for metrics while suppressing generated-file debt
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for the 0.19.0 release
+
 ## [0.18.0] - 2026-06-13
 
 ### Added
