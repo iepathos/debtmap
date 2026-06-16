@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-06-16
+
+### Changed
+
+- Updated README crate badges to use Badgen
+
+### Dependencies
+
+- Bumped `time` from 0.3.47 to 0.3.49 in the lockfile
+- Bumped `tui-scrollview` from 0.6.5 to 0.6.7 in the lockfile
+- Refreshed the Cargo lockfile for the 0.19.1 release, including transitive `syn` and `which` updates
+
 ## [0.19.0] - 2026-06-14
 
 ### Added
