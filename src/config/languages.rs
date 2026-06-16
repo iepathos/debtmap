@@ -22,7 +22,7 @@ pub struct LanguagesConfig {
 
     /// Go-specific configuration
     #[serde(default)]
-    pub go: Option<LanguageFeatures>,
+    pub go: Option<GoLanguageConfig>,
 }
 
 /// Language-specific feature configuration
@@ -39,6 +39,39 @@ pub struct LanguageFeatures {
     /// Whether to detect duplication for this language
     #[serde(default = "default_detect_duplication")]
     pub detect_duplication: bool,
+}
+
+/// Go-specific language configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoLanguageConfig {
+    #[serde(flatten)]
+    pub features: LanguageFeatures,
+
+    /// How generated Go files should be handled.
+    #[serde(default)]
+    pub generated_code: GeneratedCodeMode,
+}
+
+impl Default for GoLanguageConfig {
+    fn default() -> Self {
+        Self {
+            features: LanguageFeatures::default(),
+            generated_code: GeneratedCodeMode::default(),
+        }
+    }
+}
+
+/// Generated Go handling policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GeneratedCodeMode {
+    /// Analyze generated files normally and emit debt items.
+    Analyze,
+    /// Analyze generated files, but suppress generated-file debt items.
+    #[default]
+    SuppressDebt,
+    /// Exclude generated files from config-driven batch analysis.
+    Exclude,
 }
 
 impl Default for LanguageFeatures {

@@ -119,6 +119,7 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
         }
         Language::Go => languages_config
             .and_then(|lc| lc.go.clone())
+            .map(|go| go.features)
             .unwrap_or_default(),
         Language::Unknown => LanguageFeatures::default(),
     }

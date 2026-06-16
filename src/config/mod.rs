@@ -85,7 +85,9 @@ pub use classification::{
 };
 
 // Re-export language types for backward compatibility
-pub use languages::{EntropyConfig, LanguageFeatures, LanguagesConfig};
+pub use languages::{
+    EntropyConfig, GeneratedCodeMode, GoLanguageConfig, LanguageFeatures, LanguagesConfig,
+};
 
 // Re-export display types for backward compatibility
 pub use display::{
@@ -703,9 +705,27 @@ detect_duplication = false
         .unwrap();
 
         let go = config.languages.and_then(|languages| languages.go).unwrap();
-        assert!(go.detect_dead_code);
-        assert!(go.detect_complexity);
-        assert!(!go.detect_duplication);
+        assert!(go.features.detect_dead_code);
+        assert!(go.features.detect_complexity);
+        assert!(!go.features.detect_duplication);
+        assert_eq!(go.generated_code, GeneratedCodeMode::SuppressDebt);
+    }
+
+    #[test]
+    fn test_go_generated_code_config_deserializes() {
+        let config: DebtmapConfig = toml::from_str(
+            r#"
+[languages]
+enabled = ["go"]
+
+[languages.go]
+generated_code = "exclude"
+"#,
+        )
+        .unwrap();
+
+        let go = config.languages.and_then(|languages| languages.go).unwrap();
+        assert_eq!(go.generated_code, GeneratedCodeMode::Exclude);
     }
 
     #[test]

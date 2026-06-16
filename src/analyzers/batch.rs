@@ -27,7 +27,7 @@
 //! ```
 
 use crate::analyzers::get_analyzer;
-use crate::config::{BatchAnalysisConfig, ParallelConfig};
+use crate::config::{BatchAnalysisConfig, GeneratedCodeMode, ParallelConfig};
 use crate::core::ast::Ast;
 use crate::core::{DebtItem, FileMetrics, Language};
 use crate::effects::{
@@ -169,7 +169,9 @@ pub fn analyze_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<FileAnaly
             .map(|b| b.collect_timing)
             .unwrap_or(false);
 
-        analyze_files_parallel(&paths, &parallel_config, collect_timing)
+        let generated_mode = go_generated_code_mode(config);
+
+        analyze_files_parallel_with_mode(&paths, &parallel_config, collect_timing, generated_mode)
     })
     .boxed()
 }
@@ -387,54 +389,89 @@ pub fn validate_and_analyze_files(
 // ============================================================================
 
 /// Analyze files in parallel using rayon.
+#[cfg(test)]
 fn analyze_files_parallel(
     paths: &[PathBuf],
     config: &ParallelConfig,
     collect_timing: bool,
 ) -> Result<Vec<FileAnalysisResult>, AnalysisError> {
-    let results: Result<Vec<FileAnalysisResult>, AnalysisError> =
-        if !config.enabled || paths.len() <= 1 {
-            // Sequential processing
+    analyze_files_parallel_with_mode(
+        paths,
+        config,
+        collect_timing,
+        GeneratedCodeMode::SuppressDebt,
+    )
+}
+
+fn analyze_files_parallel_with_mode(
+    paths: &[PathBuf],
+    config: &ParallelConfig,
+    collect_timing: bool,
+    generated_mode: GeneratedCodeMode,
+) -> Result<Vec<FileAnalysisResult>, AnalysisError> {
+    let results: Result<Vec<Option<FileAnalysisResult>>, AnalysisError> = if !config.enabled
+        || paths.len() <= 1
+    {
+        // Sequential processing
+        paths
+            .iter()
+            .map(|path| analyze_file_from_path_with_mode(path, collect_timing, generated_mode))
+            .collect()
+    } else {
+        // Parallel processing with rayon
+        let batch_size = config.effective_batch_size();
+
+        if paths.len() <= batch_size {
+            // Single batch
             paths
-                .iter()
-                .map(|path| analyze_file_from_path(path, collect_timing))
+                .par_iter()
+                .map(|path| analyze_file_from_path_with_mode(path, collect_timing, generated_mode))
                 .collect()
         } else {
-            // Parallel processing with rayon
-            let batch_size = config.effective_batch_size();
+            // Chunked processing for large codebases
+            paths
+                .chunks(batch_size)
+                .flat_map(|chunk| {
+                    chunk
+                        .par_iter()
+                        .map(|path| {
+                            analyze_file_from_path_with_mode(path, collect_timing, generated_mode)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+        }
+    };
 
-            if paths.len() <= batch_size {
-                // Single batch
-                paths
-                    .par_iter()
-                    .map(|path| analyze_file_from_path(path, collect_timing))
-                    .collect()
-            } else {
-                // Chunked processing for large codebases
-                paths
-                    .chunks(batch_size)
-                    .flat_map(|chunk| {
-                        chunk
-                            .par_iter()
-                            .map(|path| analyze_file_from_path(path, collect_timing))
-                            .collect::<Vec<_>>()
-                    })
-                    .collect()
-            }
-        };
-
-    results.map(resolve_go_cross_file_calls)
+    results.map(|items| {
+        let analyzed = items.into_iter().flatten().collect::<Vec<_>>();
+        resolve_go_cross_file_calls(analyzed)
+    })
 }
 
 /// Analyze a file from its path.
+#[cfg(test)]
 fn analyze_file_from_path(
     path: &Path,
     collect_timing: bool,
 ) -> Result<FileAnalysisResult, AnalysisError> {
+    analyze_file_from_path_with_mode(path, collect_timing, GeneratedCodeMode::SuppressDebt)
+        .map(|result| result.expect("default generated mode does not exclude files"))
+}
+
+fn analyze_file_from_path_with_mode(
+    path: &Path,
+    collect_timing: bool,
+    generated_mode: GeneratedCodeMode,
+) -> Result<Option<FileAnalysisResult>, AnalysisError> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| AnalysisError::io_with_path(format!("Failed to read file: {}", e), path))?;
 
-    analyze_file_content(path, &content, collect_timing)
+    if should_exclude_go_file(path, &content, generated_mode) {
+        return Ok(None);
+    }
+
+    analyze_file_content_with_mode(path, &content, collect_timing, generated_mode).map(Some)
 }
 
 /// Analyze file content with the appropriate analyzer.
@@ -443,6 +480,20 @@ fn analyze_file_content(
     content: &str,
     collect_timing: bool,
 ) -> Result<FileAnalysisResult, AnalysisError> {
+    analyze_file_content_with_mode(
+        path,
+        content,
+        collect_timing,
+        GeneratedCodeMode::SuppressDebt,
+    )
+}
+
+fn analyze_file_content_with_mode(
+    path: &Path,
+    content: &str,
+    collect_timing: bool,
+    generated_mode: GeneratedCodeMode,
+) -> Result<FileAnalysisResult, AnalysisError> {
     let start = if collect_timing {
         Some(Instant::now())
     } else {
@@ -450,7 +501,7 @@ fn analyze_file_content(
     };
 
     let language = Language::from_path(path);
-    let analyzer = get_analyzer(language);
+    let analyzer = get_analyzer_for_mode(language, generated_mode);
 
     let ast = analyzer
         .parse(content, path.to_path_buf())
@@ -473,6 +524,33 @@ fn analyze_file_content(
         analysis_time,
         package_name,
     })
+}
+
+fn get_analyzer_for_mode(
+    language: Language,
+    generated_mode: GeneratedCodeMode,
+) -> Box<dyn crate::analyzers::Analyzer> {
+    match language {
+        Language::Go => Box::new(
+            crate::analyzers::go::GoAnalyzer::new().with_generated_code_mode(generated_mode),
+        ),
+        _ => get_analyzer(language),
+    }
+}
+
+fn should_exclude_go_file(path: &Path, content: &str, generated_mode: GeneratedCodeMode) -> bool {
+    generated_mode == GeneratedCodeMode::Exclude
+        && Language::from_path(path) == Language::Go
+        && crate::analyzers::go::generated::is_generated_go(path, content)
+}
+
+fn go_generated_code_mode(config: &crate::config::DebtmapConfig) -> GeneratedCodeMode {
+    config
+        .languages
+        .as_ref()
+        .and_then(|languages| languages.go.as_ref())
+        .map(|go| go.generated_code)
+        .unwrap_or_default()
 }
 
 fn package_name_for_ast(ast: &Ast) -> Option<String> {
