@@ -1,7 +1,7 @@
 # debtmap
 
-[![Crates.io](https://img.shields.io/crates/v/debtmap)](https://crates.io/crates/debtmap)
-[![Downloads](https://img.shields.io/crates/d/debtmap)](https://crates.io/crates/debtmap)
+[![Crates.io](https://badgen.net/crates/v/debtmap)](https://crates.io/crates/debtmap)
+[![Downloads](https://badgen.net/crates/d/debtmap)](https://crates.io/crates/debtmap)
 [![CI](https://github.com/iepathos/debtmap/actions/workflows/ci.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
