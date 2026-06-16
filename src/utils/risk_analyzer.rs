@@ -22,9 +22,7 @@ pub fn analyze_risk_with_coverage(
         enable_context,
         context_providers,
         disable_context,
-        // Preload runs once inside perform_unified_analysis_with_options
-        // (TUI stage 4); skip here so we don't block before call-graph stage.
-        None,
+        Some(results.complexity.metrics.as_slice()),
     ) {
         analyzer = analyzer.with_context_aggregator(aggregator);
     }
@@ -83,9 +81,7 @@ pub fn analyze_risk_without_coverage(
         enable_context,
         context_providers,
         disable_context,
-        // Preload runs once inside perform_unified_analysis_with_options
-        // (TUI stage 4); skip here so we don't block before call-graph stage.
-        None,
+        Some(results.complexity.metrics.as_slice()),
     ) {
         analyzer = analyzer.with_context_aggregator(aggregator);
     }
