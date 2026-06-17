@@ -42,7 +42,7 @@ pub struct LanguageFeatures {
 }
 
 /// Go-specific language configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GoLanguageConfig {
     #[serde(flatten)]
     pub features: LanguageFeatures,
@@ -50,15 +50,6 @@ pub struct GoLanguageConfig {
     /// How generated Go files should be handled.
     #[serde(default)]
     pub generated_code: GeneratedCodeMode,
-}
-
-impl Default for GoLanguageConfig {
-    fn default() -> Self {
-        Self {
-            features: LanguageFeatures::default(),
-            generated_code: GeneratedCodeMode::default(),
-        }
-    }
 }
 
 /// Generated Go handling policy.
