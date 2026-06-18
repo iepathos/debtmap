@@ -82,7 +82,7 @@ For a complete list of metrics and their formulas, see the [Metrics Reference](.
 - **Deterministic output** - Same input = same output
 
 ### Analysis Capabilities
-- **Rust, Python, and JS/TS analysis** - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, and TypeScript
+- **Rust, Python, JS/TS, and Go analysis** - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, TypeScript, and Go
 - **Multi-strategy prioritization** - Cross-ranks debt using complexity, coverage, git history, coupling, purity, and entropy
 - **Coverage integration** - Native LCOV support for risk assessment, especially for complex code
 - **Debt pattern detection** - God objects, boilerplate code, error handling anti-patterns
@@ -98,14 +98,15 @@ For a complete list of metrics and their formulas, see the [Metrics Reference](.
 
 ## Current Status
 
-Debtmap currently supports Rust, Python, JavaScript, and TypeScript analysis. This lets debtmap:
+Debtmap currently supports Rust, Python, JavaScript, TypeScript, and Go analysis. This lets debtmap:
 
 - Build deep Rust-specific analysis (macros, traits, lifetimes)
 - Analyze Python projects with language-aware parsing and complexity detection
 - Analyze JavaScript and TypeScript projects with tree-sitter-based parsing and frontend/backend-aware patterns
+- Analyze Go projects with package/import extraction, receiver-method metrics, lightweight local call resolution, generated-code handling, and advisory Go debt signals
 - Keep the core AI workflow focused on high-signal, coverage-aware prioritization
 
-Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, and TypeScript.
+Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, TypeScript, and Go.
 
 ## Target Audience
 

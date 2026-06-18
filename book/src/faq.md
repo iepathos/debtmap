@@ -110,9 +110,7 @@ A function with 20 identical if/return validation checks has the same cyclomatic
 - **Python** - Language-aware parsing with tree-sitter plus function, class, decorator, and comprehension analysis
 - **JavaScript** - Tree-sitter parsing with modern ES syntax, JSX support, and async pattern analysis
 - **TypeScript** - Tree-sitter parsing with TS/TSX syntax, type-oriented patterns, and modern module support
-
-**Planned:**
-- Go
+- **Go** - Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, same-package call relationships, generated-code handling, and advisory Go debt signals
 
 ### How does coverage integration work?
 

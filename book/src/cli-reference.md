@@ -342,8 +342,9 @@ Configure analysis behavior, thresholds, and language selection.
 
 **Language Selection:**
 - `--languages <LANGS>` - Comma-separated list of languages to analyze
-  - Example: `--languages rust,python,javascript`
-  - Supported: rust, python, javascript, typescript
+  - Example: `--languages rust,python,javascript,typescript,go`
+  - Supported: rust, python, javascript, typescript, go
+  - Aliases include common extensions plus `golang` for Go
 
 **Analysis Modes:**
 - `--semantic-off` - Disable semantic analysis (fallback mode)

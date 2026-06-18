@@ -11,7 +11,7 @@ Debtmap is designed to provide AI coding assistants with the signals they need t
 3. Example workflows for different AI tools
 4. Interpreting signals for effective prompts
 
-Debtmap currently analyzes Rust, Python, JavaScript, and TypeScript. All languages are enabled by default; use `--languages rust,python,javascript,typescript` when you want to constrain a run.
+Debtmap currently analyzes Rust, Python, JavaScript, TypeScript, and Go. All languages are enabled by default; use `--languages rust,python,javascript,typescript,go` when you want to constrain a run.
 
 ## Output Formats
 

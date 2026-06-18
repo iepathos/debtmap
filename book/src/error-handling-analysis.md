@@ -1000,6 +1000,7 @@ debtmap analyze . --filter ErrorHandling | tee weekly-error-health.txt
 - `#[test]` attributes
 - `test_` function name prefix in Python
 - `*.test.ts`, `*.spec.js` file patterns
+- `_test.go` files and `Test*`/`Benchmark*`/`Fuzz*`/`Example*` Go functions
 
 If false positives persist:
 ```rust
@@ -1015,7 +1016,7 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 
 1. **Language support not enabled**
    ```bash
-   debtmap analyze . --languages rust,python,javascript,typescript
+   debtmap analyze . --languages rust,python,javascript,typescript,go
    ```
 
 2. **Pattern disabled in config**

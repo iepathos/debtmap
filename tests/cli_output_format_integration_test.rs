@@ -8,7 +8,7 @@
 use assert_cmd::cargo::CommandCargoExt;
 use serde_json::Value;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -246,3 +246,140 @@ fn test_cli_unified_format_metrics_presence() {
 
 // Note: test_cli_default_output_format_is_legacy removed in spec 202
 // Legacy JSON format has been removed - unified format is now the only format
+
+#[test]
+#[ignore = "requires pre-built binary, run with --ignored"]
+fn test_cli_go_json_output_contains_go_function_location() {
+    let temp_dir = TempDir::new().unwrap();
+    write_go_fixture(temp_dir.path());
+    let output_path = temp_dir.path().join("go_output.json");
+
+    let output = Command::cargo_bin("debtmap")
+        .unwrap()
+        .args([
+            "analyze",
+            "--format",
+            "json",
+            "--languages",
+            "go",
+            "--threshold-complexity",
+            "1",
+            "--output",
+            output_path.to_str().unwrap(),
+            temp_dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute debtmap command");
+
+    assert_command_success(output);
+
+    let output_content = fs::read_to_string(&output_path).expect("Failed to read output file");
+    let json: Value = serde_json::from_str(&output_content).expect("Output is not valid JSON");
+    let items = json["items"].as_array().expect("items should be an array");
+
+    assert!(
+        items.iter().any(is_go_function_item),
+        "expected Go function debt item in JSON output: {}",
+        output_content
+    );
+}
+
+#[test]
+#[ignore = "requires pre-built binary, run with --ignored"]
+fn test_cli_go_markdown_output_contains_function_name() {
+    let temp_dir = TempDir::new().unwrap();
+    write_go_fixture(temp_dir.path());
+    let output_path = temp_dir.path().join("go_output.md");
+
+    let output = Command::cargo_bin("debtmap")
+        .unwrap()
+        .args([
+            "analyze",
+            "--format",
+            "markdown",
+            "--languages",
+            "golang",
+            "--threshold-complexity",
+            "1",
+            "--output",
+            output_path.to_str().unwrap(),
+            temp_dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute debtmap command");
+
+    assert_command_success(output);
+
+    let markdown = fs::read_to_string(&output_path).expect("Failed to read markdown output file");
+    assert!(markdown.contains("Decide"), "markdown output: {markdown}");
+    assert!(
+        markdown.contains("service.go"),
+        "markdown output: {markdown}"
+    );
+}
+
+fn write_go_fixture(root: &Path) {
+    fs::write(
+        root.join("service.go"),
+        r#"package service
+
+func Decide(value int) int {
+    if value == 1 {
+        return 1
+    }
+    if value == 2 {
+        return 2
+    }
+    if value == 3 {
+        return 3
+    }
+    if value == 4 {
+        return 4
+    }
+    if value == 5 {
+        return 5
+    }
+    if value == 6 {
+        return 6
+    }
+    if value == 7 {
+        return 7
+    }
+    if value == 8 {
+        return 8
+    }
+    if value == 9 {
+        return 9
+    }
+    if value == 10 {
+        return 10
+    }
+    if value == 11 {
+        return 11
+    }
+    if value == 12 {
+        return 12
+    }
+    return 0
+}
+"#,
+    )
+    .expect("Failed to write Go fixture");
+}
+
+fn assert_command_success(output: std::process::Output) {
+    if !output.status.success() {
+        eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+        eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+        panic!("debtmap analyze command failed");
+    }
+}
+
+fn is_go_function_item(item: &Value) -> bool {
+    item["type"] == "Function"
+        && item["location"]["file"]
+            .as_str()
+            .map(|file| file.ends_with("service.go"))
+            .unwrap_or(false)
+        && item["location"]["function"] == "Decide"
+}

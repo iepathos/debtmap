@@ -17,6 +17,7 @@ Debtmap analyzes source code for technical debt and complexity issues. Language 
 - **Python** - Full AST parsing with tree-sitter
 - **JavaScript** - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows
 - **TypeScript** - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows
+- **Go** - Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, generated-code handling, and advisory Go debt signals
 
 **Source**: `src/core/mod.rs` (Language enum) and `src/config/languages.rs` (language-specific configuration fields)
 
@@ -29,6 +30,7 @@ pub enum Language {
     Python,
     JavaScript,
     TypeScript,
+    Go,
     Unknown,
 }
 ```
@@ -38,6 +40,7 @@ pub enum Language {
 - `.py` and `.pyw` files are analyzed as Python
 - `.js`, `.mjs`, `.cjs`, and `.jsx` files are analyzed as JavaScript
 - `.ts`, `.mts`, `.cts`, and `.tsx` files are analyzed as TypeScript
+- `.go` files are analyzed as Go
 
 **Source**: `src/core/mod.rs`
 
@@ -48,6 +51,7 @@ pub fn from_extension(ext: &str) -> Self {
         "py" | "pyw" => Language::Python,
         "js" | "mjs" | "cjs" | "jsx" => Language::JavaScript,
         "ts" | "mts" | "cts" | "tsx" => Language::TypeScript,
+        "go" => Language::Go,
         _ => Language::Unknown,
     }
 }
@@ -61,7 +65,7 @@ The `[languages]` section in your `debtmap.toml` configures language analysis.
 
 ```toml
 [languages]
-enabled = ["rust", "python", "javascript", "typescript"]
+enabled = ["rust", "python", "javascript", "typescript", "go"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -82,6 +86,12 @@ detect_duplication = true
 detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
+
+[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+generated_code = "suppress_debt"
 ```
 
 ## Language-Specific Features
@@ -156,16 +166,28 @@ detect_duplication = true
 
 TypeScript analysis covers TS/TSX syntax, modules, type-oriented patterns, and async workflow patterns.
 
+### Go Configuration
+
+```toml
+[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+generated_code = "suppress_debt"
+```
+
+Go analysis covers packages, imports, top-level functions, receiver methods, complexity, same-package call relationships, and advisory Go debt signals. Generated Go files are parsed by default, but generated-file debt is suppressed unless `generated_code = "analyze"` is configured. Use `generated_code = "exclude"` to skip generated Go files during config-driven batch analysis.
+
 ## Enabling Languages
 
 Specify which languages to analyze with the `enabled` array:
 
 ```toml
 [languages]
-enabled = ["rust", "python", "javascript", "typescript"]
+enabled = ["rust", "python", "javascript", "typescript", "go"]
 ```
 
-The documented and implemented user-facing language set is Rust, Python, JavaScript, and TypeScript.
+The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, and Go.
 
 ## Feature Defaults
 

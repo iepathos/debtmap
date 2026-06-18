@@ -2,7 +2,7 @@
 
 ## Overview
 
-Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the `Analyzer` trait for extensibility across Rust, Python, JavaScript, and TypeScript.
+Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the `Analyzer` trait for extensibility across Rust, Python, JavaScript, TypeScript, and Go.
 
 ## Rust Analyzer
 
@@ -50,6 +50,7 @@ Debtmap provides full analysis for the following languages:
 | **Python** | tree-sitter | `.py` |
 | **JavaScript** | tree-sitter | `.js`, `.mjs`, `.cjs`, `.jsx` |
 | **TypeScript** | tree-sitter | `.ts`, `.mts`, `.cts`, `.tsx` |
+| **Go** | tree-sitter | `.go` |
 
 ### Python Analyzer
 
@@ -71,6 +72,19 @@ The JavaScript and TypeScript analyzers use tree-sitter for AST parsing and prov
 - **Type-Oriented Patterns**: TypeScript-specific constructs such as assertions and broad type usage
 - **Entropy Analysis**: Pattern-based false positive reduction
 
+### Go Analyzer
+
+The Go analyzer uses tree-sitter for AST parsing and provides:
+
+- **Package and Import Extraction**: Package declarations and import dependencies
+- **Function and Method Extraction**: Top-level functions and receiver methods with stable names
+- **Complexity Metrics**: Cyclomatic complexity, cognitive complexity, nesting depth, and length
+- **Call Relationships**: Same-file, same-package, and module-local package call resolution where statically inferable
+- **Generated-Code Policy**: Configurable generated Go handling with debt suppression by default
+- **Advisory Signals**: Repetitive error handling, swallowed errors, panic/recover risks, goroutine lifecycle hints, defer-in-loop patterns, channel operation risks, and mutation categories
+
+Current limitations: Go analysis is syntax and lightweight symbol based. It does not perform full type checking, full interface dispatch, or complete external module resolution, and ambiguous receiver calls are left unresolved instead of creating likely-wrong internal edges.
+
 ### File Detection
 
 During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:
@@ -80,7 +94,7 @@ During file discovery, debtmap detects files by extension and routes them to the
 debtmap analyze .
 
 # Analyze specific languages only
-debtmap analyze . --languages rust,python,javascript,typescript
+debtmap analyze . --languages rust,python,javascript,typescript,go
 
 # All supported languages are enabled by default
 ```
