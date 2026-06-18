@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b91ac412.js";
+            window.path_to_searchindex_js = "searchindex-8a665273.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -254,7 +254,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </ul>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Rust, Python, and JS/TS analysis</strong> - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, and TypeScript</li>
+<li><strong>Rust, Python, JS/TS, and Go analysis</strong> - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, TypeScript, and Go</li>
 <li><strong>Multi-strategy prioritization</strong> - Cross-ranks debt using complexity, coverage, git history, coupling, purity, and entropy</li>
 <li><strong>Coverage integration</strong> - Native LCOV support for risk assessment, especially for complex code</li>
 <li><strong>Debt pattern detection</strong> - God objects, boilerplate code, error handling anti-patterns</li>
@@ -270,14 +270,15 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <li><strong>Progress tracking</strong> - Compare debt across commits with <code>compare</code> and <code>validate-improvement</code> commands</li>
 </ul>
 <h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
-<p>Debtmap currently supports Rust, Python, JavaScript, and TypeScript analysis. This lets debtmap:</p>
+<p>Debtmap currently supports Rust, Python, JavaScript, TypeScript, and Go analysis. This lets debtmap:</p>
 <ul>
 <li>Build deep Rust-specific analysis (macros, traits, lifetimes)</li>
 <li>Analyze Python projects with language-aware parsing and complexity detection</li>
 <li>Analyze JavaScript and TypeScript projects with tree-sitter-based parsing and frontend/backend-aware patterns</li>
+<li>Analyze Go projects with package/import extraction, receiver-method metrics, lightweight local call resolution, generated-code handling, and advisory Go debt signals</li>
 <li>Keep the core AI workflow focused on high-signal, coverage-aware prioritization</li>
 </ul>
-<p>Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, and TypeScript.</p>
+<p>Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, TypeScript, and Go.</p>
 <h2 id="target-audience"><a class="header" href="#target-audience">Target Audience</a></h2>
 <p>Debtmap is designed for:</p>
 <ul>
@@ -606,8 +607,8 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, and TypeScript</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, Go <code>.go</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, TypeScript, and Go</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
@@ -843,7 +844,7 @@ patterns = ["**/target/**", "**/tests/**"]
 <li>Example workflows for different AI tools</li>
 <li>Interpreting signals for effective prompts</li>
 </ol>
-<p>Debtmap currently analyzes Rust, Python, JavaScript, and TypeScript. All languages are enabled by default; use <code>--languages rust,python,javascript,typescript</code> when you want to constrain a run.</p>
+<p>Debtmap currently analyzes Rust, Python, JavaScript, TypeScript, and Go. All languages are enabled by default; use <code>--languages rust,python,javascript,typescript,go</code> when you want to constrain a run.</p>
 <h2 id="output-formats-1"><a class="header" href="#output-formats-1">Output Formats</a></h2>
 <h3 id="markdown-recommended"><a class="header" href="#markdown-recommended">Markdown (Recommended)</a></h3>
 <p>The <code>markdown</code> format is specifically designed for LLM consumption:</p>
@@ -1635,8 +1636,9 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <ul>
 <li><code>--languages &lt;LANGS&gt;</code> - Comma-separated list of languages to analyze
 <ul>
-<li>Example: <code>--languages rust,python,javascript</code></li>
-<li>Supported: rust, python, javascript, typescript</li>
+<li>Example: <code>--languages rust,python,javascript,typescript,go</code></li>
+<li>Supported: rust, python, javascript, typescript, go</li>
+<li>Aliases include common extensions plus <code>golang</code> for Go</li>
 </ul>
 </li>
 </ul>
@@ -4765,7 +4767,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="analyzer-types"><a class="header" href="#analyzer-types">Analyzer Types</a></h1>
 <h2 id="overview-2"><a class="header" href="#overview-2">Overview</a></h2>
-<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility across Rust, Python, JavaScript, and TypeScript.</p>
+<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility across Rust, Python, JavaScript, TypeScript, and Go.</p>
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
@@ -4806,6 +4808,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <tr><td><strong>Python</strong></td><td>tree-sitter</td><td><code>.py</code></td></tr>
 <tr><td><strong>JavaScript</strong></td><td>tree-sitter</td><td><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.jsx</code></td></tr>
 <tr><td><strong>TypeScript</strong></td><td>tree-sitter</td><td><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, <code>.tsx</code></td></tr>
+<tr><td><strong>Go</strong></td><td>tree-sitter</td><td><code>.go</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -4827,13 +4830,24 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <li><strong>Type-Oriented Patterns</strong>: TypeScript-specific constructs such as assertions and broad type usage</li>
 <li><strong>Entropy Analysis</strong>: Pattern-based false positive reduction</li>
 </ul>
+<h3 id="go-analyzer"><a class="header" href="#go-analyzer">Go Analyzer</a></h3>
+<p>The Go analyzer uses tree-sitter for AST parsing and provides:</p>
+<ul>
+<li><strong>Package and Import Extraction</strong>: Package declarations and import dependencies</li>
+<li><strong>Function and Method Extraction</strong>: Top-level functions and receiver methods with stable names</li>
+<li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, nesting depth, and length</li>
+<li><strong>Call Relationships</strong>: Same-file, same-package, and module-local package call resolution where statically inferable</li>
+<li><strong>Generated-Code Policy</strong>: Configurable generated Go handling with debt suppression by default</li>
+<li><strong>Advisory Signals</strong>: Repetitive error handling, swallowed errors, panic/recover risks, goroutine lifecycle hints, defer-in-loop patterns, channel operation risks, and mutation categories</li>
+</ul>
+<p>Current limitations: Go analysis is syntax and lightweight symbol based. It does not perform full type checking, full interface dispatch, or complete external module resolution, and ambiguous receiver calls are left unresolved instead of creating likely-wrong internal edges.</p>
 <h3 id="file-detection"><a class="header" href="#file-detection">File Detection</a></h3>
 <p>During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:</p>
 <pre><code class="language-bash"># Analyze all supported files in current directory
 debtmap analyze .
 
 # Analyze specific languages only
-debtmap analyze . --languages rust,python,javascript,typescript
+debtmap analyze . --languages rust,python,javascript,typescript,go
 
 # All supported languages are enabled by default
 </code></pre>
@@ -7481,6 +7495,7 @@ min_lines_per_function = 3.0  # Safety threshold (default: 3.0)
 <li><strong>Python</strong> - Full AST parsing with tree-sitter</li>
 <li><strong>JavaScript</strong> - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows</li>
 <li><strong>TypeScript</strong> - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows</li>
+<li><strong>Go</strong> - Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, generated-code handling, and advisory Go debt signals</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/mod.rs</code> (Language enum) and <code>src/config/languages.rs</code> (language-specific configuration fields)</p>
 <p>The <code>Language</code> enum in the codebase currently supports:</p>
@@ -7492,6 +7507,7 @@ pub enum Language {
     Python,
     JavaScript,
     TypeScript,
+    Go,
     Unknown,
 }
 <span class="boring">}</span></code></pre>
@@ -7501,6 +7517,7 @@ pub enum Language {
 <li><code>.py</code> and <code>.pyw</code> files are analyzed as Python</li>
 <li><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, and <code>.jsx</code> files are analyzed as JavaScript</li>
 <li><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, and <code>.tsx</code> files are analyzed as TypeScript</li>
+<li><code>.go</code> files are analyzed as Go</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/mod.rs</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -7511,6 +7528,7 @@ pub enum Language {
         "py" | "pyw" =&gt; Language::Python,
         "js" | "mjs" | "cjs" | "jsx" =&gt; Language::JavaScript,
         "ts" | "mts" | "cts" | "tsx" =&gt; Language::TypeScript,
+        "go" =&gt; Language::Go,
         _ =&gt; Language::Unknown,
     }
 }
@@ -7519,7 +7537,7 @@ pub enum Language {
 <p>The <code>[languages]</code> section in your <code>debtmap.toml</code> configures language analysis.</p>
 <p><strong>Source</strong>: <code>src/config/languages.rs:4-22</code> (LanguagesConfig struct)</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python", "javascript", "typescript"]
+enabled = ["rust", "python", "javascript", "typescript", "go"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -7540,6 +7558,12 @@ detect_duplication = true
 detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
+
+[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+generated_code = "suppress_debt"
 </code></pre>
 <h2 id="language-specific-features"><a class="header" href="#language-specific-features">Language-Specific Features</a></h2>
 <p>Each language supports three configurable feature toggles:</p>
@@ -7598,12 +7622,20 @@ detect_complexity = true
 detect_duplication = true
 </code></pre>
 <p>TypeScript analysis covers TS/TSX syntax, modules, type-oriented patterns, and async workflow patterns.</p>
+<h3 id="go-configuration"><a class="header" href="#go-configuration">Go Configuration</a></h3>
+<pre><code class="language-toml">[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+generated_code = "suppress_debt"
+</code></pre>
+<p>Go analysis covers packages, imports, top-level functions, receiver methods, complexity, same-package call relationships, and advisory Go debt signals. Generated Go files are parsed by default, but generated-file debt is suppressed unless <code>generated_code = "analyze"</code> is configured. Use <code>generated_code = "exclude"</code> to skip generated Go files during config-driven batch analysis.</p>
 <h2 id="enabling-languages"><a class="header" href="#enabling-languages">Enabling Languages</a></h2>
 <p>Specify which languages to analyze with the <code>enabled</code> array:</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python", "javascript", "typescript"]
+enabled = ["rust", "python", "javascript", "typescript", "go"]
 </code></pre>
-<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, and TypeScript.</p>
+<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, and Go.</p>
 <h2 id="feature-defaults"><a class="header" href="#feature-defaults">Feature Defaults</a></h2>
 <p><strong>Source</strong>: <code>src/config/languages.rs:40-61</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -17826,6 +17858,7 @@ debtmap analyze . --filter ErrorHandling | tee weekly-error-health.txt
 <li><code>#[test]</code> attributes</li>
 <li><code>test_</code> function name prefix in Python</li>
 <li><code>*.test.ts</code>, <code>*.spec.js</code> file patterns</li>
+<li><code>_test.go</code> files and <code>Test*</code>/<code>Benchmark*</code>/<code>Fuzz*</code>/<code>Example*</code> Go functions</li>
 </ul>
 <p>If false positives persist:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -17839,7 +17872,7 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 <ol>
 <li>
 <p><strong>Language support not enabled</strong></p>
-<pre><code class="language-bash">debtmap analyze . --languages rust,python,javascript,typescript
+<pre><code class="language-bash">debtmap analyze . --languages rust,python,javascript,typescript,go
 </code></pre>
 </li>
 <li>
@@ -28384,10 +28417,7 @@ debtmap analyze . --format markdown --top 10 &gt; debt-report.md
 <li><strong>Python</strong> - Language-aware parsing with tree-sitter plus function, class, decorator, and comprehension analysis</li>
 <li><strong>JavaScript</strong> - Tree-sitter parsing with modern ES syntax, JSX support, and async pattern analysis</li>
 <li><strong>TypeScript</strong> - Tree-sitter parsing with TS/TSX syntax, type-oriented patterns, and modern module support</li>
-</ul>
-<p><strong>Planned:</strong></p>
-<ul>
-<li>Go</li>
+<li><strong>Go</strong> - Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, same-package call relationships, generated-code handling, and advisory Go debt signals</li>
 </ul>
 <h3 id="how-does-coverage-integration-work"><a class="header" href="#how-does-coverage-integration-work">How does coverage integration work?</a></h3>
 <p>Debtmap reads LCOV format coverage data and maps it to functions:</p>

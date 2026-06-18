@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b91ac412.js";
+            window.path_to_searchindex_js = "searchindex-8a665273.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -253,7 +253,7 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 </ul>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Rust, Python, and JS/TS analysis</strong> - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, and TypeScript</li>
+<li><strong>Rust, Python, JS/TS, and Go analysis</strong> - Native Rust AST parsing plus tree-sitter analysis for Python, JavaScript, TypeScript, and Go</li>
 <li><strong>Multi-strategy prioritization</strong> - Cross-ranks debt using complexity, coverage, git history, coupling, purity, and entropy</li>
 <li><strong>Coverage integration</strong> - Native LCOV support for risk assessment, especially for complex code</li>
 <li><strong>Debt pattern detection</strong> - God objects, boilerplate code, error handling anti-patterns</li>
@@ -269,14 +269,15 @@ debtmap analyze . --lcov coverage.lcov --format markdown
 <li><strong>Progress tracking</strong> - Compare debt across commits with <code>compare</code> and <code>validate-improvement</code> commands</li>
 </ul>
 <h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
-<p>Debtmap currently supports Rust, Python, JavaScript, and TypeScript analysis. This lets debtmap:</p>
+<p>Debtmap currently supports Rust, Python, JavaScript, TypeScript, and Go analysis. This lets debtmap:</p>
 <ul>
 <li>Build deep Rust-specific analysis (macros, traits, lifetimes)</li>
 <li>Analyze Python projects with language-aware parsing and complexity detection</li>
 <li>Analyze JavaScript and TypeScript projects with tree-sitter-based parsing and frontend/backend-aware patterns</li>
+<li>Analyze Go projects with package/import extraction, receiver-method metrics, lightweight local call resolution, generated-code handling, and advisory Go debt signals</li>
 <li>Keep the core AI workflow focused on high-signal, coverage-aware prioritization</li>
 </ul>
-<p>Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, and TypeScript.</p>
+<p>Additional language expansion remains possible in future releases, but the current documented supported set is Rust, Python, JavaScript, TypeScript, and Go.</p>
 <h2 id="target-audience"><a class="header" href="#target-audience">Target Audience</a></h2>
 <p>Debtmap is designed for:</p>
 <ul>

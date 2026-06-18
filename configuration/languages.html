@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-b91ac412.js";
+            window.path_to_searchindex_js = "../searchindex-8a665273.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -193,6 +193,7 @@
 <li><strong>Python</strong> - Full AST parsing with tree-sitter</li>
 <li><strong>JavaScript</strong> - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows</li>
 <li><strong>TypeScript</strong> - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows</li>
+<li><strong>Go</strong> - Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, generated-code handling, and advisory Go debt signals</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/mod.rs</code> (Language enum) and <code>src/config/languages.rs</code> (language-specific configuration fields)</p>
 <p>The <code>Language</code> enum in the codebase currently supports:</p>
@@ -204,6 +205,7 @@ pub enum Language {
     Python,
     JavaScript,
     TypeScript,
+    Go,
     Unknown,
 }
 <span class="boring">}</span></code></pre>
@@ -213,6 +215,7 @@ pub enum Language {
 <li><code>.py</code> and <code>.pyw</code> files are analyzed as Python</li>
 <li><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, and <code>.jsx</code> files are analyzed as JavaScript</li>
 <li><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, and <code>.tsx</code> files are analyzed as TypeScript</li>
+<li><code>.go</code> files are analyzed as Go</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/mod.rs</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -223,6 +226,7 @@ pub enum Language {
         "py" | "pyw" =&gt; Language::Python,
         "js" | "mjs" | "cjs" | "jsx" =&gt; Language::JavaScript,
         "ts" | "mts" | "cts" | "tsx" =&gt; Language::TypeScript,
+        "go" =&gt; Language::Go,
         _ =&gt; Language::Unknown,
     }
 }
@@ -231,7 +235,7 @@ pub enum Language {
 <p>The <code>[languages]</code> section in your <code>debtmap.toml</code> configures language analysis.</p>
 <p><strong>Source</strong>: <code>src/config/languages.rs:4-22</code> (LanguagesConfig struct)</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python", "javascript", "typescript"]
+enabled = ["rust", "python", "javascript", "typescript", "go"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -252,6 +256,12 @@ detect_duplication = true
 detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
+
+[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+generated_code = "suppress_debt"
 </code></pre>
 <h2 id="language-specific-features"><a class="header" href="#language-specific-features">Language-Specific Features</a></h2>
 <p>Each language supports three configurable feature toggles:</p>
@@ -310,12 +320,20 @@ detect_complexity = true
 detect_duplication = true
 </code></pre>
 <p>TypeScript analysis covers TS/TSX syntax, modules, type-oriented patterns, and async workflow patterns.</p>
+<h3 id="go-configuration"><a class="header" href="#go-configuration">Go Configuration</a></h3>
+<pre><code class="language-toml">[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+generated_code = "suppress_debt"
+</code></pre>
+<p>Go analysis covers packages, imports, top-level functions, receiver methods, complexity, same-package call relationships, and advisory Go debt signals. Generated Go files are parsed by default, but generated-file debt is suppressed unless <code>generated_code = "analyze"</code> is configured. Use <code>generated_code = "exclude"</code> to skip generated Go files during config-driven batch analysis.</p>
 <h2 id="enabling-languages"><a class="header" href="#enabling-languages">Enabling Languages</a></h2>
 <p>Specify which languages to analyze with the <code>enabled</code> array:</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python", "javascript", "typescript"]
+enabled = ["rust", "python", "javascript", "typescript", "go"]
 </code></pre>
-<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, and TypeScript.</p>
+<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, and Go.</p>
 <h2 id="feature-defaults"><a class="header" href="#feature-defaults">Feature Defaults</a></h2>
 <p><strong>Source</strong>: <code>src/config/languages.rs:40-61</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]

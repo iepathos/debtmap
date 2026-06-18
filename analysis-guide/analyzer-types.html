@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-b91ac412.js";
+            window.path_to_searchindex_js = "../searchindex-8a665273.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -179,7 +179,7 @@
                     <main>
                         <h1 id="analyzer-types"><a class="header" href="#analyzer-types">Analyzer Types</a></h1>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
-<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility across Rust, Python, JavaScript, and TypeScript.</p>
+<p>Debtmap provides deep, language-specific code analysis through specialized analyzers for each supported language. The architecture uses the <code>Analyzer</code> trait for extensibility across Rust, Python, JavaScript, TypeScript, and Go.</p>
 <h2 id="rust-analyzer"><a class="header" href="#rust-analyzer">Rust Analyzer</a></h2>
 <p>Debtmap provides comprehensive analysis for Rust codebases using the <code>syn</code> crate for native AST parsing.</p>
 <h3 id="core-capabilities"><a class="header" href="#core-capabilities">Core Capabilities</a></h3>
@@ -220,6 +220,7 @@
 <tr><td><strong>Python</strong></td><td>tree-sitter</td><td><code>.py</code></td></tr>
 <tr><td><strong>JavaScript</strong></td><td>tree-sitter</td><td><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.jsx</code></td></tr>
 <tr><td><strong>TypeScript</strong></td><td>tree-sitter</td><td><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, <code>.tsx</code></td></tr>
+<tr><td><strong>Go</strong></td><td>tree-sitter</td><td><code>.go</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -241,13 +242,24 @@
 <li><strong>Type-Oriented Patterns</strong>: TypeScript-specific constructs such as assertions and broad type usage</li>
 <li><strong>Entropy Analysis</strong>: Pattern-based false positive reduction</li>
 </ul>
+<h3 id="go-analyzer"><a class="header" href="#go-analyzer">Go Analyzer</a></h3>
+<p>The Go analyzer uses tree-sitter for AST parsing and provides:</p>
+<ul>
+<li><strong>Package and Import Extraction</strong>: Package declarations and import dependencies</li>
+<li><strong>Function and Method Extraction</strong>: Top-level functions and receiver methods with stable names</li>
+<li><strong>Complexity Metrics</strong>: Cyclomatic complexity, cognitive complexity, nesting depth, and length</li>
+<li><strong>Call Relationships</strong>: Same-file, same-package, and module-local package call resolution where statically inferable</li>
+<li><strong>Generated-Code Policy</strong>: Configurable generated Go handling with debt suppression by default</li>
+<li><strong>Advisory Signals</strong>: Repetitive error handling, swallowed errors, panic/recover risks, goroutine lifecycle hints, defer-in-loop patterns, channel operation risks, and mutation categories</li>
+</ul>
+<p>Current limitations: Go analysis is syntax and lightweight symbol based. It does not perform full type checking, full interface dispatch, or complete external module resolution, and ambiguous receiver calls are left unresolved instead of creating likely-wrong internal edges.</p>
 <h3 id="file-detection"><a class="header" href="#file-detection">File Detection</a></h3>
 <p>During file discovery, debtmap detects files by extension and routes them to the appropriate analyzer:</p>
 <pre><code class="language-bash"># Analyze all supported files in current directory
 debtmap analyze .
 
 # Analyze specific languages only
-debtmap analyze . --languages rust,python,javascript,typescript
+debtmap analyze . --languages rust,python,javascript,typescript,go
 
 # All supported languages are enabled by default
 </code></pre>

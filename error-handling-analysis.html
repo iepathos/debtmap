@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b91ac412.js";
+            window.path_to_searchindex_js = "searchindex-8a665273.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -1123,6 +1123,7 @@ debtmap analyze . --filter ErrorHandling | tee weekly-error-health.txt
 <li><code>#[test]</code> attributes</li>
 <li><code>test_</code> function name prefix in Python</li>
 <li><code>*.test.ts</code>, <code>*.spec.js</code> file patterns</li>
+<li><code>_test.go</code> files and <code>Test*</code>/<code>Benchmark*</code>/<code>Fuzz*</code>/<code>Example*</code> Go functions</li>
 </ul>
 <p>If false positives persist:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -1136,7 +1137,7 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 <ol>
 <li>
 <p><strong>Language support not enabled</strong></p>
-<pre><code class="language-bash">debtmap analyze . --languages rust,python,javascript,typescript
+<pre><code class="language-bash">debtmap analyze . --languages rust,python,javascript,typescript,go
 </code></pre>
 </li>
 <li>

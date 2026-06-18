@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b91ac412.js";
+            window.path_to_searchindex_js = "searchindex-8a665273.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -266,8 +266,8 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, and TypeScript</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, Go <code>.go</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, TypeScript, and Go</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
 <li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
