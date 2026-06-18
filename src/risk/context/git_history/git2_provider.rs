@@ -177,7 +177,7 @@ impl Git2Repository {
             .filter_map(|oid| oid.ok())
             .filter_map(|oid| repo.find_commit(oid).ok())
             .filter(|commit| self.commit_touches_file(&repo, commit, &relative_path))
-            .filter_map(|commit| commit.author().email().map(String::from))
+            .filter_map(|commit| commit.author().email().ok().map(String::from))
             .collect();
 
         Ok(authors)
@@ -233,8 +233,10 @@ impl Git2Repository {
 
         let mut lines = HashMap::new();
         for hunk in blame.iter() {
-            let sig = hunk.final_signature();
-            let author = sig.name().unwrap_or("Unknown").to_string();
+            let author = hunk
+                .final_signature()
+                .and_then(|sig| sig.name().ok().map(String::from))
+                .unwrap_or_else(|| "Unknown".to_string());
             let commit_hash = hunk.final_commit_id().to_string();
             let start_line = hunk.final_start_line();
             let num_lines = hunk.lines_in_hunk();
@@ -325,7 +327,7 @@ impl Git2Repository {
         let mut revwalk = repo.revwalk()?;
         revwalk.push_head()?;
         // Equivalent to `git log <after_commit>..HEAD` (exclude intro and its ancestors).
-        if after_commit != Oid::zero() {
+        if after_commit != Oid::ZERO_SHA1 {
             revwalk.hide(after_commit)?;
         }
         revwalk.set_sorting(Sort::TIME)?;
@@ -1143,7 +1145,7 @@ mod tests {
 
         // Use a pattern that matches the changed line in all commits
         // Pass a zero OID that won't match any commit, so we get all modifications
-        let zero_oid = git2::Oid::zero();
+        let zero_oid = git2::Oid::ZERO_SHA1;
         let modifications = repo.find_modifications(Path::new("test.rs"), "marker", zero_oid)?;
 
         // All three commits change a line containing "marker"
@@ -1187,7 +1189,7 @@ mod tests {
         )?;
 
         let repo = Git2Repository::open(&repo_path)?;
-        let zero_oid = git2::Oid::zero();
+        let zero_oid = git2::Oid::ZERO_SHA1;
 
         // Search for a pattern that was never in any diff
         let untouched_modifications =
@@ -1223,7 +1225,7 @@ mod tests {
 
         // Verify with zero OID we get all commits
         let all_mods =
-            repo.find_modifications(Path::new("test.rs"), r"let x", git2::Oid::zero())?;
+            repo.find_modifications(Path::new("test.rs"), r"let x", git2::Oid::ZERO_SHA1)?;
         assert_eq!(all_mods.len(), 4, "Should find all 4 commits with zero OID");
 
         Ok(())

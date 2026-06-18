@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-06-18
+
+### Added
+
+- **Configurable Go Generated-Code Handling** - Go analysis now supports configurable generated-code behavior
+  - Supports analyzing generated Go normally, suppressing generated-code debt while preserving metrics, or excluding generated Go files from batch analysis
+  - Preserves the existing default behavior of parsing generated files and suppressing debt
+  - Adds batch integration coverage for generated comments, generated filenames, and each generated-code mode
+
+### Fixed
+
+- **Git2 RustSec Advisories** - Updated `git2` to 0.21.0 to resolve `RUSTSEC-2026-0183` and `RUSTSEC-2026-0184`
+  - Clears the security workflow dependency check for unsound `git2` 0.20.x advisories
+  - Keeps vendored OpenSSL enabled for self-contained CI builds
+
+- **Go Language Defaults** - Go configuration now derives shared language defaults consistently
+  - Avoids duplicating default language-feature setup for Go
+  - Keeps Go config behavior aligned with the other supported languages
+
+### Performance
+
+- **Validation Git History Context** - Validation now batches git history context analysis
+  - Reduces repeated risk-history work while preserving validation output behavior
+
+### Changed
+
+- **Go CLI Documentation** - README and book documentation now describe Go CLI support
+  - Documents `go` and `golang` language filters, generated-code configuration, supported Go analyzer behavior, and known limitations
+  - Adds CLI output coverage for Go JSON and markdown output
+
+- **CI Test Workflow** - Unix test jobs now run the same `cargo nextest` command directly
+  - Removes the extra `setup-just` install step that failed on macOS after a GitHub API timeout
+  - Keeps the local `just test` recipe unchanged for developer use
+
+### Dependencies
+
+- Updated `git2` from 0.20.4 to 0.21.0 in the lockfile
+- Refreshed the Cargo lockfile for the 0.20.0 release
+
 ## [0.19.1] - 2026-06-16
 
 ### Changed

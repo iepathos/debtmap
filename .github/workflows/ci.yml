@@ -41,9 +41,6 @@ jobs:
       with:
         cache-bin: "false"
 
-    - name: Install just
-      uses: extractions/setup-just@v4
-
     - name: Install cargo-nextest
       uses: taiki-e/install-action@v2
       with:
@@ -51,7 +48,14 @@ jobs:
 
     - name: Run tests (Unix)
       if: runner.os != 'Windows'
-      run: just test
+      env:
+        SKIP_INTEGRATION_TESTS: 1
+      run: |
+        echo "Running tests with cargo nextest..."
+        cargo nextest run --lib \
+          --test analyzer_tests --test complexity_tests --test core_metrics_tests \
+          --test debt_tests --test entropy_tests \
+          --status-level fail --final-status-level slow
 
     - name: Configure vendored OpenSSL prerequisites (Windows)
       if: runner.os == 'Windows'

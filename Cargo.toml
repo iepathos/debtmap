@@ -1,6 +1,6 @@
 [package]
 name = "debtmap"
-version = "0.19.1"
+version = "0.20.0"
 edition = "2024"
 rust-version = "1.89"
 authors = ["Glen Baker <iepathos@gmail.com>"]
@@ -138,7 +138,7 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 # Git operations
-git2 = { version = "0.20", features = ["vendored-openssl"] }
+git2 = { version = "0.21", features = ["vendored-openssl"] }
 # Use vendored OpenSSL consistently so builds do not depend on runner packages.
 openssl-sys = { version = "0.9.113", features = ["vendored"] }
 
