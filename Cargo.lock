@@ -2196,9 +2196,9 @@ dependencies = [
 
 [[package]]
 name = "premortem"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9d71a0807601b3d8210c0290d56638096ba910942af0d530444dd1f592a1933"
+checksum = "989eb2b438fc7b0cf71d7556e83329da7c00002c905577f4d8959d6b64b06427"
 dependencies = [
  "premortem-derive",
  "regex",
