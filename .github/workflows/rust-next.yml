@@ -38,7 +38,7 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
@@ -80,7 +80,7 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
