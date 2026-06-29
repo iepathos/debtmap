@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-06-29
+
+### Dependencies
+
+- Refreshed the Cargo lockfile for dependency maintenance updates
+- Bumped transitive dependencies including `anyhow`, `bytes`, `env_logger`, `jiff`, `ratatui`, `time`, `trybuild`, `uuid`, and `wasm-bindgen`
+
 ## [0.20.0] - 2026-06-18
 
 ### Added
