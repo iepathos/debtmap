@@ -1,4 +1,5 @@
 use crate::analyzers::solidity::advanced::detect_advanced_patterns;
+use crate::analyzers::solidity::calls::{call_display, extract_calls};
 use crate::analyzers::solidity::complexity::{
     cognitive_complexity, cyclomatic_complexity, function_length, max_nesting,
 };
@@ -130,7 +131,7 @@ fn callable_from_node(
         kind,
         is_test,
         visibility,
-        calls: collect_calls(body, ast),
+        calls: extract_calls(body, ast).iter().map(call_display).collect(),
         advisory_patterns,
         contract_name,
         entropy_analysis,
@@ -273,29 +274,6 @@ fn is_callable_node(node: Node) -> bool {
             | "fallback"
             | "receive"
     )
-}
-
-fn collect_calls(node: Node, ast: &SolidityAst) -> Vec<String> {
-    if is_callable_node(node) {
-        return Vec::new();
-    }
-
-    let mut calls = Vec::new();
-    if node.kind() == "call_expression" {
-        if let Some(name) = call_name(node, ast) {
-            calls.push(name);
-        }
-    }
-
-    walk_children(node, |child| calls.extend(collect_calls(child, ast)));
-    calls.sort();
-    calls.dedup();
-    calls
-}
-
-fn call_name(node: Node, ast: &SolidityAst) -> Option<String> {
-    let function = node.child_by_field_name("function")?;
-    Some(node_text(&function, &ast.source).to_string())
 }
 
 fn walk_children(node: Node, mut f: impl FnMut(Node)) {

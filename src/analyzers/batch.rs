@@ -755,34 +755,45 @@ fn resolve_solidity_import_dependencies(
 fn resolve_solidity_cross_file_calls(
     mut results: Vec<FileAnalysisResult>,
 ) -> Vec<FileAnalysisResult> {
-    let index = solidity_function_index(&results);
-    let mut edges: Vec<(String, String)> = Vec::new();
+    let snapshots: Vec<_> = results
+        .iter()
+        .filter(|result| is_solidity_result(result))
+        .map(
+            |result| crate::analyzers::solidity::call_graph::SolidityBatchSnapshot {
+                path: result.path.clone(),
+                language: result.metrics.language,
+                functions: result
+                    .metrics
+                    .complexity
+                    .functions
+                    .iter()
+                    .map(|function| function.name.clone())
+                    .collect(),
+            },
+        )
+        .collect();
+
+    let downstream = crate::analyzers::solidity::call_graph::compute_call_edges(&snapshots);
+    let mut edges = Vec::new();
 
     for result in results
         .iter_mut()
         .filter(|result| is_solidity_result(result))
     {
         for function in &mut result.metrics.complexity.functions {
-            let downstream = function
-                .call_dependencies
-                .clone()
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|call| resolve_solidity_call(&call, &index))
-                .collect::<Vec<_>>();
-
-            if downstream.is_empty() {
+            let key = (result.path.clone(), function.name.clone());
+            let Some(callees) = downstream.get(&key) else {
                 continue;
-            }
+            };
 
             edges.extend(
-                downstream
+                callees
                     .iter()
                     .cloned()
                     .map(|callee| (function.name.clone(), callee)),
             );
-            function.downstream_callees = Some(downstream.clone());
-            function.call_dependencies = Some(downstream);
+            function.downstream_callees = Some(callees.clone());
+            function.call_dependencies = Some(callees.clone());
         }
     }
 
@@ -797,34 +808,6 @@ fn resolve_solidity_cross_file_calls(
     }
 
     results
-}
-
-fn solidity_function_index(results: &[FileAnalysisResult]) -> HashMap<String, Vec<String>> {
-    results
-        .iter()
-        .filter(|result| is_solidity_result(result))
-        .flat_map(|result| result.metrics.complexity.functions.iter())
-        .fold(HashMap::new(), |mut index, function| {
-            index
-                .entry(solidity_short_name(&function.name))
-                .or_insert_with(Vec::new)
-                .push(function.name.clone());
-            index
-        })
-}
-
-fn resolve_solidity_call(call: &str, index: &HashMap<String, Vec<String>>) -> Option<String> {
-    let short = solidity_short_name(call);
-    index.get(&short).and_then(|matches| {
-        (matches.len() == 1)
-            .then(|| matches.first())
-            .flatten()
-            .cloned()
-    })
-}
-
-fn solidity_short_name(name: &str) -> String {
-    name.rsplit('.').next().unwrap_or(name).to_string()
 }
 
 fn solidity_upstream_callers(edges: Vec<(String, String)>) -> HashMap<String, Vec<String>> {

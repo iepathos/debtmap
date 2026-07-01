@@ -739,6 +739,145 @@ interface IERC20 {}
 }
 
 #[test]
+fn test_solidity_inherited_call_resolves_in_batch() {
+    let files = vec![
+        (
+            "Settlement.sol",
+            r#"pragma solidity 0.8.20;
+contract Settlement { function settle() public {} }"#,
+        ),
+        (
+            "Vault.sol",
+            r#"pragma solidity 0.8.20;
+import "./Settlement.sol";
+contract Vault is Settlement {
+    function withdraw() public { settle(); }
+}"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let withdraw = results
+        .iter()
+        .flat_map(|result| &result.metrics.complexity.functions)
+        .find(|function| function.name == "Vault.withdraw")
+        .expect("withdraw");
+
+    assert_eq!(
+        withdraw.downstream_callees.as_deref(),
+        Some(&["Settlement.settle".to_string()][..])
+    );
+}
+
+#[test]
+fn test_solidity_selector_call_resolves_via_state_variable_type() {
+    let files = vec![
+        (
+            "Settlement.sol",
+            r#"pragma solidity 0.8.20;
+contract Settlement { function settle() public {} }"#,
+        ),
+        (
+            "Vault.sol",
+            r#"pragma solidity 0.8.20;
+import "./Settlement.sol";
+contract Vault {
+    Settlement settlement;
+    function withdraw() public { settlement.settle(); }
+}"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let withdraw = results
+        .iter()
+        .flat_map(|result| &result.metrics.complexity.functions)
+        .find(|function| function.name == "Vault.withdraw")
+        .expect("withdraw");
+
+    assert_eq!(
+        withdraw.downstream_callees.as_deref(),
+        Some(&["Settlement.settle".to_string()][..])
+    );
+}
+
+#[test]
+fn test_solidity_interface_cast_call_resolves() {
+    let files = vec![
+        (
+            "IERC20.sol",
+            r#"pragma solidity 0.8.20;
+interface IERC20 { function transfer(address to, uint256 amount) external returns (bool); }"#,
+        ),
+        (
+            "Vault.sol",
+            r#"pragma solidity 0.8.20;
+import "./IERC20.sol";
+contract Vault {
+    function payout(address token, address to, uint256 amount) public {
+        IERC20(token).transfer(to, amount);
+    }
+}"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let payout = results
+        .iter()
+        .flat_map(|result| &result.metrics.complexity.functions)
+        .find(|function| function.name == "Vault.payout")
+        .expect("payout");
+
+    assert_eq!(
+        payout.downstream_callees.as_deref(),
+        Some(&["IERC20.transfer".to_string()][..])
+    );
+}
+
+#[test]
+fn test_solidity_ambiguous_bare_call_stays_unresolved_in_batch() {
+    let files = vec![
+        (
+            "Alpha.sol",
+            r#"pragma solidity 0.8.20;
+contract Alpha { function run() public {} }"#,
+        ),
+        (
+            "Beta.sol",
+            r#"pragma solidity 0.8.20;
+contract Beta { function run() public {} }"#,
+        ),
+        (
+            "Caller.sol",
+            r#"pragma solidity 0.8.20;
+contract Caller { function dispatch() public { run(); } }"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let dispatch = results
+        .iter()
+        .flat_map(|result| &result.metrics.complexity.functions)
+        .find(|function| function.name == "Caller.dispatch")
+        .expect("dispatch");
+
+    assert!(
+        dispatch
+            .downstream_callees
+            .as_ref()
+            .is_none_or(Vec::is_empty)
+    );
+}
+
+#[test]
 fn test_go_same_package_cross_file_calls_resolve() {
     let files = vec![
         (
