@@ -1,6 +1,7 @@
 use crate::analyzers::solidity::parser::node_text;
 use crate::core::ast::SolidityAst;
 use crate::core::{Dependency, DependencyKind};
+use std::path::{Component, Path, PathBuf};
 use tree_sitter::Node;
 
 pub fn extract_dependencies(ast: &SolidityAst) -> Vec<Dependency> {
@@ -40,11 +41,39 @@ fn import_dependencies(node: Node, ast: &SolidityAst) -> Vec<Dependency> {
     collect_import_paths(node, ast, &mut imports);
     imports
         .into_iter()
+        .map(|name| resolve_import_name(&name, &ast.path))
         .map(|name| Dependency {
             name,
             kind: DependencyKind::Import,
         })
         .collect()
+}
+
+fn resolve_import_name(import: &str, file_path: &Path) -> String {
+    if !import.starts_with('.') {
+        return import.to_string();
+    }
+
+    file_path
+        .parent()
+        .map(|parent| normalize_path(parent.join(import)))
+        .unwrap_or_else(|| PathBuf::from(import))
+        .to_string_lossy()
+        .to_string()
+}
+
+fn normalize_path(path: PathBuf) -> PathBuf {
+    path.components()
+        .fold(PathBuf::new(), |mut normalized, part| {
+            match part {
+                Component::ParentDir => {
+                    normalized.pop();
+                }
+                Component::CurDir => {}
+                _ => normalized.push(part.as_os_str()),
+            }
+            normalized
+        })
 }
 
 fn collect_import_paths(node: Node, ast: &SolidityAst, paths: &mut Vec<String>) {
@@ -97,5 +126,20 @@ contract Vault is Token, Ownable {
             deps.iter()
                 .any(|dep| dep.kind == DependencyKind::Inheritance && dep.name == "Token")
         );
+    }
+
+    #[test]
+    fn test_resolves_relative_imports_against_file_path() {
+        let source = r#"pragma solidity ^0.8.0;
+import "../interfaces/IERC20.sol";
+contract Vault {}
+"#;
+        let ast = parse_source(source, &PathBuf::from("contracts/vault/Vault.sol")).unwrap();
+        let deps = extract_dependencies(&ast);
+
+        assert!(deps.iter().any(|dep| {
+            dep.kind == DependencyKind::Import
+                && dep.name.ends_with("contracts/interfaces/IERC20.sol")
+        }));
     }
 }

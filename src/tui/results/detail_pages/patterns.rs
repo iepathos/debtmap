@@ -148,10 +148,9 @@ fn render_language_specific_section(
     theme: &Theme,
     width: u16,
 ) -> bool {
-    add_section_header(lines, "language-specific (rust)", theme);
-
     match lang_specific {
         LanguageSpecificData::Rust(rust_data) => {
+            add_section_header(lines, "language-specific (rust)", theme);
             if let Some(ref trait_impl) = rust_data.trait_impl {
                 add_label_value(lines, "trait", format!("{:?}", trait_impl), theme, width);
             }
@@ -182,6 +181,33 @@ fn render_language_specific_section(
                     width,
                 );
             }
+        }
+        LanguageSpecificData::Solidity(solidity_data) => {
+            add_section_header(lines, "language-specific (solidity)", theme);
+            if let Some(mutability) = &solidity_data.state_mutability {
+                add_label_value(lines, "mutability", mutability.clone(), theme, width);
+            }
+            add_label_value(
+                lines,
+                "payable",
+                solidity_data.is_payable.to_string(),
+                theme,
+                width,
+            );
+            add_label_value(
+                lines,
+                "advisories",
+                solidity_data.advisory_pattern_count.to_string(),
+                theme,
+                width,
+            );
+            add_label_value(
+                lines,
+                "delegatecall",
+                solidity_data.uses_delegatecall.to_string(),
+                theme,
+                width,
+            );
         }
     }
 

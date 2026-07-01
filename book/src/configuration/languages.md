@@ -69,7 +69,7 @@ The `[languages]` section in your `debtmap.toml` configures language analysis.
 
 ```toml
 [languages]
-enabled = ["rust", "python", "javascript", "typescript", "go"]
+enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -96,6 +96,33 @@ detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
 generated_code = "suppress_debt"
+
+[languages.solidity]
+detect_dead_code = false
+detect_complexity = true
+detect_duplication = true
+vendor_code = "suppress_debt"
+large_contract_threshold = 20
+
+[languages.solidity.security]
+tx_origin = true
+reentrancy_heuristic = true
+unchecked_calls = true
+delegatecall = true
+selfdestruct = true
+assembly_blocks = true
+unbounded_loops = true
+missing_access_control = true
+hardcoded_addresses = true
+floating_pragma = true
+large_contracts = true
+unchecked_arithmetic = true
+unsafe_erc20_transfer = true
+push_without_length_cap = true
+block_timestamp_dependency = true
+tx_gas_price_dependency = true
+encode_packed_collision = true
+delegatecall_in_constructor = true
 ```
 
 ## Language-Specific Features
@@ -189,16 +216,49 @@ Go analysis covers packages, imports, top-level functions, receiver methods, com
 detect_dead_code = false
 detect_complexity = true
 detect_duplication = true
+vendor_code = "suppress_debt"
 large_contract_threshold = 20
 
 [languages.solidity.security]
 tx_origin = true
 reentrancy_heuristic = true
 unchecked_calls = true
+delegatecall = true
+selfdestruct = true
 assembly_blocks = true
+unbounded_loops = true
+missing_access_control = true
+hardcoded_addresses = true
+floating_pragma = true
+large_contracts = true
+unchecked_arithmetic = true
+unsafe_erc20_transfer = true
+push_without_length_cap = true
+block_timestamp_dependency = true
+tx_gas_price_dependency = true
+encode_packed_collision = true
+delegatecall_in_constructor = true
 ```
 
-Solidity analysis covers contracts, interfaces, libraries, functions, modifiers, constructors, complexity metrics, imports, inheritance, and heuristic security advisories (for example `tx.origin` usage, unchecked low-level calls, assembly blocks, and reentrancy heuristics). Foundry test files (`*.t.sol`) and contracts importing `forge-std/Test.sol` are detected as tests; complexity debt is suppressed for test functions.
+Solidity analysis covers contracts, interfaces, libraries, functions, modifiers, constructors, complexity metrics, imports, inheritance, and heuristic security advisories (for example `tx.origin` usage, unchecked low-level calls, assembly blocks, and reentrancy heuristics). Foundry test files (`*.t.sol`), Hardhat-style `*.test.sol` files, and contracts importing `forge-std/Test.sol` or `hardhat/console.sol` are detected as tests; complexity debt is suppressed for test functions.
+
+Generated/vendor Solidity handling uses the same modes as Go:
+
+| `vendor_code` | Behavior |
+|---------------|----------|
+| `"analyze"` | Analyze generated/vendor files and emit debt normally |
+| `"suppress_debt"` | Preserve metrics but suppress debt for generated/vendor files |
+| `"exclude"` | Skip generated/vendor Solidity files during config-driven batch analysis |
+
+Solidity supports standard suppression comments:
+
+```solidity
+// debtmap:ignore-next-line[smell] -- reviewed low-level call
+target.call(data);
+
+// debtmap:ignore[complexity] -- compact state machine
+function settle(uint256 state) public { ... }
+```
 
 ## Enabling Languages
 
@@ -330,6 +390,9 @@ File exclusions in `[ignore]` apply before language detection:
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
+    "out/**",          # Foundry build output
+    "cache/**",        # Foundry/Hardhat cache
+    "artifacts/**",    # Hardhat build output
     "*.min.js",        # Minified frontend artifacts
 ]
 ```

@@ -124,7 +124,16 @@ pub struct FunctionMetrics {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LanguageSpecificData {
     Rust(crate::analysis::rust_patterns::RustPatternResult),
+    Solidity(SolidityPatternResult),
     // Future: Python(PythonPatternResult), JavaScript(JSPatternResult)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SolidityPatternResult {
+    pub state_mutability: Option<String>,
+    pub is_payable: bool,
+    pub advisory_pattern_count: usize,
+    pub uses_delegatecall: bool,
 }
 
 /// Entropy details for explainable output

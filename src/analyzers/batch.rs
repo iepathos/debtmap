@@ -27,7 +27,9 @@
 //! ```
 
 use crate::analyzers::get_analyzer;
-use crate::config::{BatchAnalysisConfig, GeneratedCodeMode, ParallelConfig};
+use crate::config::{
+    BatchAnalysisConfig, GeneratedCodeMode, ParallelConfig, SolidityLanguageConfig,
+};
 use crate::core::ast::Ast;
 use crate::core::{DebtItem, FileMetrics, Language};
 use crate::effects::{
@@ -170,8 +172,15 @@ pub fn analyze_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<FileAnaly
             .unwrap_or(false);
 
         let generated_mode = go_generated_code_mode(config);
+        let solidity_config = solidity_config_from_debtmap(config);
 
-        analyze_files_parallel_with_mode(&paths, &parallel_config, collect_timing, generated_mode)
+        analyze_files_parallel_with_mode(
+            &paths,
+            &parallel_config,
+            collect_timing,
+            generated_mode,
+            solidity_config,
+        )
     })
     .boxed()
 }
@@ -406,6 +415,7 @@ fn analyze_files_parallel(
         config,
         collect_timing,
         GeneratedCodeMode::SuppressDebt,
+        SolidityLanguageConfig::default(),
     )
 }
 
@@ -414,44 +424,63 @@ fn analyze_files_parallel_with_mode(
     config: &ParallelConfig,
     collect_timing: bool,
     generated_mode: GeneratedCodeMode,
+    solidity_config: SolidityLanguageConfig,
 ) -> Result<Vec<FileAnalysisResult>, AnalysisError> {
-    let results: Result<Vec<Option<FileAnalysisResult>>, AnalysisError> = if !config.enabled
-        || paths.len() <= 1
-    {
-        // Sequential processing
-        paths
-            .iter()
-            .map(|path| analyze_file_from_path_with_mode(path, collect_timing, generated_mode))
-            .collect()
-    } else {
-        // Parallel processing with rayon
-        let batch_size = config.effective_batch_size();
-
-        if paths.len() <= batch_size {
-            // Single batch
+    let results: Result<Vec<Option<FileAnalysisResult>>, AnalysisError> =
+        if !config.enabled || paths.len() <= 1 {
+            // Sequential processing
             paths
-                .par_iter()
-                .map(|path| analyze_file_from_path_with_mode(path, collect_timing, generated_mode))
-                .collect()
-        } else {
-            // Chunked processing for large codebases
-            paths
-                .chunks(batch_size)
-                .flat_map(|chunk| {
-                    chunk
-                        .par_iter()
-                        .map(|path| {
-                            analyze_file_from_path_with_mode(path, collect_timing, generated_mode)
-                        })
-                        .collect::<Vec<_>>()
+                .iter()
+                .map(|path| {
+                    analyze_file_from_path_with_config(
+                        path,
+                        collect_timing,
+                        generated_mode,
+                        &solidity_config,
+                    )
                 })
                 .collect()
-        }
-    };
+        } else {
+            // Parallel processing with rayon
+            let batch_size = config.effective_batch_size();
+
+            if paths.len() <= batch_size {
+                // Single batch
+                paths
+                    .par_iter()
+                    .map(|path| {
+                        analyze_file_from_path_with_config(
+                            path,
+                            collect_timing,
+                            generated_mode,
+                            &solidity_config,
+                        )
+                    })
+                    .collect()
+            } else {
+                // Chunked processing for large codebases
+                paths
+                    .chunks(batch_size)
+                    .flat_map(|chunk| {
+                        chunk
+                            .par_iter()
+                            .map(|path| {
+                                analyze_file_from_path_with_config(
+                                    path,
+                                    collect_timing,
+                                    generated_mode,
+                                    &solidity_config,
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect()
+            }
+        };
 
     results.map(|items| {
         let analyzed = items.into_iter().flatten().collect::<Vec<_>>();
-        resolve_go_cross_file_calls(analyzed)
+        resolve_solidity_cross_file_calls(resolve_go_cross_file_calls(analyzed))
     })
 }
 
@@ -465,19 +494,43 @@ fn analyze_file_from_path(
         .map(|result| result.expect("default generated mode does not exclude files"))
 }
 
+#[cfg(test)]
 fn analyze_file_from_path_with_mode(
     path: &Path,
     collect_timing: bool,
     generated_mode: GeneratedCodeMode,
 ) -> Result<Option<FileAnalysisResult>, AnalysisError> {
+    analyze_file_from_path_with_config(
+        path,
+        collect_timing,
+        generated_mode,
+        &SolidityLanguageConfig::default(),
+    )
+}
+
+fn analyze_file_from_path_with_config(
+    path: &Path,
+    collect_timing: bool,
+    generated_mode: GeneratedCodeMode,
+    solidity_config: &SolidityLanguageConfig,
+) -> Result<Option<FileAnalysisResult>, AnalysisError> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| AnalysisError::io_with_path(format!("Failed to read file: {}", e), path))?;
 
-    if should_exclude_go_file(path, &content, generated_mode) {
+    if should_exclude_go_file(path, &content, generated_mode)
+        || should_exclude_solidity_file(path, &content, solidity_config)
+    {
         return Ok(None);
     }
 
-    analyze_file_content_with_mode(path, &content, collect_timing, generated_mode).map(Some)
+    analyze_file_content_with_config(
+        path,
+        &content,
+        collect_timing,
+        generated_mode,
+        solidity_config,
+    )
+    .map(Some)
 }
 
 /// Analyze file content with the appropriate analyzer.
@@ -500,6 +553,22 @@ fn analyze_file_content_with_mode(
     collect_timing: bool,
     generated_mode: GeneratedCodeMode,
 ) -> Result<FileAnalysisResult, AnalysisError> {
+    analyze_file_content_with_config(
+        path,
+        content,
+        collect_timing,
+        generated_mode,
+        &SolidityLanguageConfig::default(),
+    )
+}
+
+fn analyze_file_content_with_config(
+    path: &Path,
+    content: &str,
+    collect_timing: bool,
+    generated_mode: GeneratedCodeMode,
+    solidity_config: &SolidityLanguageConfig,
+) -> Result<FileAnalysisResult, AnalysisError> {
     let start = if collect_timing {
         Some(Instant::now())
     } else {
@@ -507,7 +576,7 @@ fn analyze_file_content_with_mode(
     };
 
     let language = Language::from_path(path);
-    let analyzer = get_analyzer_for_mode(language, generated_mode);
+    let analyzer = get_analyzer_for_mode(language, generated_mode, solidity_config);
 
     let ast = analyzer
         .parse(content, path.to_path_buf())
@@ -535,10 +604,15 @@ fn analyze_file_content_with_mode(
 fn get_analyzer_for_mode(
     language: Language,
     generated_mode: GeneratedCodeMode,
+    solidity_config: &SolidityLanguageConfig,
 ) -> Box<dyn crate::analyzers::Analyzer> {
     match language {
         Language::Go => Box::new(
             crate::analyzers::go::GoAnalyzer::new().with_generated_code_mode(generated_mode),
+        ),
+        Language::Solidity => Box::new(
+            crate::analyzers::solidity::SolidityAnalyzer::new()
+                .with_config(solidity_config.clone()),
         ),
         _ => get_analyzer(language),
     }
@@ -550,12 +624,30 @@ fn should_exclude_go_file(path: &Path, content: &str, generated_mode: GeneratedC
         && crate::analyzers::go::generated::is_generated_go(path, content)
 }
 
+fn should_exclude_solidity_file(
+    path: &Path,
+    content: &str,
+    config: &SolidityLanguageConfig,
+) -> bool {
+    config.vendor_code == GeneratedCodeMode::Exclude
+        && Language::from_path(path) == Language::Solidity
+        && crate::analyzers::solidity::generated::is_vendor_or_generated_solidity(path, content)
+}
+
 fn go_generated_code_mode(config: &crate::config::DebtmapConfig) -> GeneratedCodeMode {
     config
         .languages
         .as_ref()
         .and_then(|languages| languages.go.as_ref())
         .map(|go| go.generated_code)
+        .unwrap_or_default()
+}
+
+fn solidity_config_from_debtmap(config: &crate::config::DebtmapConfig) -> SolidityLanguageConfig {
+    config
+        .languages
+        .as_ref()
+        .and_then(|languages| languages.solidity.clone())
         .unwrap_or_default()
 }
 
@@ -615,6 +707,97 @@ fn resolve_go_cross_file_calls(mut results: Vec<FileAnalysisResult>) -> Vec<File
     }
 
     results
+}
+
+fn resolve_solidity_cross_file_calls(
+    mut results: Vec<FileAnalysisResult>,
+) -> Vec<FileAnalysisResult> {
+    let index = solidity_function_index(&results);
+    let mut edges: Vec<(String, String)> = Vec::new();
+
+    for result in results
+        .iter_mut()
+        .filter(|result| is_solidity_result(result))
+    {
+        for function in &mut result.metrics.complexity.functions {
+            let downstream = function
+                .call_dependencies
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|call| resolve_solidity_call(&call, &index))
+                .collect::<Vec<_>>();
+
+            if downstream.is_empty() {
+                continue;
+            }
+
+            edges.extend(
+                downstream
+                    .iter()
+                    .cloned()
+                    .map(|callee| (function.name.clone(), callee)),
+            );
+            function.downstream_callees = Some(downstream.clone());
+            function.call_dependencies = Some(downstream);
+        }
+    }
+
+    let upstream = solidity_upstream_callers(edges);
+    for result in results
+        .iter_mut()
+        .filter(|result| is_solidity_result(result))
+    {
+        for function in &mut result.metrics.complexity.functions {
+            function.upstream_callers = upstream.get(&function.name).cloned();
+        }
+    }
+
+    results
+}
+
+fn solidity_function_index(results: &[FileAnalysisResult]) -> HashMap<String, Vec<String>> {
+    results
+        .iter()
+        .filter(|result| is_solidity_result(result))
+        .flat_map(|result| result.metrics.complexity.functions.iter())
+        .fold(HashMap::new(), |mut index, function| {
+            index
+                .entry(solidity_short_name(&function.name))
+                .or_insert_with(Vec::new)
+                .push(function.name.clone());
+            index
+        })
+}
+
+fn resolve_solidity_call(call: &str, index: &HashMap<String, Vec<String>>) -> Option<String> {
+    let short = solidity_short_name(call);
+    index.get(&short).and_then(|matches| {
+        (matches.len() == 1)
+            .then(|| matches.first())
+            .flatten()
+            .cloned()
+    })
+}
+
+fn solidity_short_name(name: &str) -> String {
+    name.rsplit('.').next().unwrap_or(name).to_string()
+}
+
+fn solidity_upstream_callers(edges: Vec<(String, String)>) -> HashMap<String, Vec<String>> {
+    edges
+        .into_iter()
+        .fold(HashMap::new(), |mut upstream, (caller, callee)| {
+            let callers = upstream.entry(callee).or_insert_with(Vec::new);
+            if !callers.contains(&caller) {
+                callers.push(caller);
+            }
+            upstream
+        })
+}
+
+fn is_solidity_result(result: &FileAnalysisResult) -> bool {
+    result.metrics.language == Language::Solidity
 }
 
 #[derive(Debug, Clone)]

@@ -301,7 +301,7 @@ impl Ast {
             Ast::Python(_) => self.extract_python_nodes(),
             Ast::TypeScript(_) => self.extract_typescript_nodes(),
             Ast::Go(_) => self.extract_go_nodes(),
-            Ast::Solidity(_) => vec![],
+            Ast::Solidity(_) => self.extract_solidity_nodes(),
             Ast::Unknown => vec![],
         }
     }
@@ -323,6 +323,14 @@ impl Ast {
         vec![]
     }
 
+    fn extract_solidity_nodes(&self) -> Vec<AstNode> {
+        let Ast::Solidity(ast) = self else {
+            return vec![];
+        };
+
+        solidity_nodes_from_root(ast.tree.root_node(), &ast.source)
+    }
+
     pub fn count_branches(&self) -> usize {
         self.extract_nodes()
             .iter()
@@ -334,6 +342,127 @@ impl Ast {
             })
             .count()
     }
+}
+
+fn solidity_nodes_from_root(root: tree_sitter::Node, source: &str) -> Vec<AstNode> {
+    let mut nodes = Vec::new();
+    collect_solidity_nodes(root, source, &mut nodes);
+    nodes
+}
+
+fn collect_solidity_nodes(node: tree_sitter::Node, source: &str, nodes: &mut Vec<AstNode>) {
+    if let Some(contract) = solidity_contract_node(node, source) {
+        nodes.push(contract);
+        return;
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_solidity_nodes(child, source, nodes);
+    }
+}
+
+fn solidity_contract_node(node: tree_sitter::Node, source: &str) -> Option<AstNode> {
+    if !matches!(
+        node.kind(),
+        "contract_declaration" | "interface_declaration" | "library_declaration"
+    ) {
+        return None;
+    }
+
+    let mut children = Vec::new();
+    collect_solidity_function_nodes(node, source, &mut children);
+    Some(AstNode {
+        kind: NodeKind::Class,
+        name: node
+            .child_by_field_name("name")
+            .map(|name| solidity_node_text(name, source).to_string()),
+        line: solidity_node_line(node),
+        children,
+    })
+}
+
+fn collect_solidity_function_nodes(
+    node: tree_sitter::Node,
+    source: &str,
+    nodes: &mut Vec<AstNode>,
+) {
+    if let Some(function) = solidity_function_node(node, source) {
+        nodes.push(function);
+        return;
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_solidity_function_nodes(child, source, nodes);
+    }
+}
+
+fn solidity_function_node(node: tree_sitter::Node, source: &str) -> Option<AstNode> {
+    if !matches!(
+        node.kind(),
+        "function_definition"
+            | "modifier_definition"
+            | "constructor"
+            | "constructor_definition"
+            | "fallback"
+            | "receive"
+    ) {
+        return None;
+    }
+
+    let mut children = Vec::new();
+    collect_solidity_branch_nodes(node, &mut children);
+    Some(AstNode {
+        kind: NodeKind::Function,
+        name: solidity_callable_name(node, source),
+        line: solidity_node_line(node),
+        children,
+    })
+}
+
+fn collect_solidity_branch_nodes(node: tree_sitter::Node, nodes: &mut Vec<AstNode>) {
+    if let Some(kind) = solidity_branch_kind(node) {
+        nodes.push(AstNode {
+            kind,
+            name: None,
+            line: solidity_node_line(node),
+            children: vec![],
+        });
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_solidity_branch_nodes(child, nodes);
+    }
+}
+
+fn solidity_branch_kind(node: tree_sitter::Node) -> Option<NodeKind> {
+    match node.kind() {
+        "if_statement" => Some(NodeKind::If),
+        "for_statement" => Some(NodeKind::For),
+        "while_statement" | "do_while_statement" => Some(NodeKind::While),
+        _ => None,
+    }
+}
+
+fn solidity_callable_name(node: tree_sitter::Node, source: &str) -> Option<String> {
+    node.child_by_field_name("name")
+        .map(|name| solidity_node_text(name, source).to_string())
+        .or_else(|| match node.kind() {
+            "constructor" | "constructor_definition" => Some("constructor".to_string()),
+            "fallback" => Some("fallback".to_string()),
+            "receive" => Some("receive".to_string()),
+            _ => None,
+        })
+}
+
+fn solidity_node_text<'a>(node: tree_sitter::Node, source: &'a str) -> &'a str {
+    &source[node.start_byte()..node.end_byte()]
+}
+
+fn solidity_node_line(node: tree_sitter::Node) -> usize {
+    node.start_position().row + 1
 }
 
 pub fn combine_asts(asts: Vec<Ast>) -> Vec<Ast> {

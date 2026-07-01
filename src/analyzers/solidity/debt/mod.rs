@@ -3,10 +3,12 @@ pub mod security_patterns;
 use std::path::Path;
 
 use crate::analyzers::solidity::debt::security_patterns::detect_contract_patterns;
+use crate::config::SolidityLanguageConfig;
 use crate::core::ast::SolidityAst;
 use crate::core::{DebtItem, DebtType, FunctionMetrics, Priority};
-use crate::debt::patterns::find_todos_and_fixmes;
+use crate::debt::patterns::find_todos_and_fixmes_with_suppression;
 use crate::debt::smells::analyze_function_smells;
+use crate::debt::suppression::{SuppressionContext, parse_suppression_comments};
 
 pub fn detect_debt(
     path: &Path,
@@ -14,16 +16,28 @@ pub fn detect_debt(
     functions: &[FunctionMetrics],
     ast: &SolidityAst,
     skip_debt: bool,
+    config: &SolidityLanguageConfig,
 ) -> Vec<DebtItem> {
     if skip_debt {
         return Vec::new();
     }
 
-    let mut items = detect_complexity_debt(path, threshold, functions);
-    items.extend(find_todos_and_fixmes(&ast.source, path));
+    let suppression =
+        parse_suppression_comments(&ast.source, crate::core::Language::Solidity, path);
+    let mut items = if config.features.detect_complexity {
+        detect_complexity_debt(path, threshold, functions)
+    } else {
+        advisory_debt_items_for_functions(path, functions)
+    };
+    items.extend(find_todos_and_fixmes_with_suppression(
+        &ast.source,
+        path,
+        Some(&suppression),
+    ));
     items.extend(function_smell_debt(functions));
-    items.extend(contract_level_debt(path, ast));
-    items
+    items.extend(natspec_debt(path, ast, functions));
+    items.extend(contract_level_debt(path, ast, config));
+    filter_suppressed_items(items, &suppression)
 }
 
 pub fn detect_complexity_debt(
@@ -66,10 +80,58 @@ fn function_smell_debt(functions: &[FunctionMetrics]) -> Vec<DebtItem> {
         .collect()
 }
 
-fn contract_level_debt(path: &Path, ast: &SolidityAst) -> Vec<DebtItem> {
+fn natspec_debt(path: &Path, ast: &SolidityAst, functions: &[FunctionMetrics]) -> Vec<DebtItem> {
+    let lines = ast.source.lines().collect::<Vec<_>>();
+    functions
+        .iter()
+        .filter(|function| !function.is_test)
+        .filter(|function| matches!(function.visibility.as_deref(), Some("public" | "external")))
+        .filter(|function| !has_natspec_before(&lines, function.line))
+        .map(|function| missing_natspec_debt(path, function))
+        .collect()
+}
+
+fn has_natspec_before(lines: &[&str], function_line: usize) -> bool {
+    let start = function_line.saturating_sub(6);
+    let end = function_line.saturating_sub(1);
+    lines.get(start..end).unwrap_or(&[]).iter().any(|line| {
+        let trimmed = line.trim();
+        trimmed.starts_with("///") && (trimmed.contains("@notice") || trimmed.contains("@dev"))
+    })
+}
+
+fn missing_natspec_debt(path: &Path, function: &FunctionMetrics) -> DebtItem {
+    DebtItem {
+        id: format!(
+            "solidity-missing-natspec-{}-{}",
+            path.display(),
+            function.line
+        ),
+        debt_type: DebtType::CodeSmell {
+            smell_type: Some("missing-natspec".to_string()),
+        },
+        priority: Priority::Low,
+        file: path.to_path_buf(),
+        line: function.line,
+        column: None,
+        message: format!(
+            "Function '{}' is public/external without NatSpec",
+            function.name
+        ),
+        context: Some(
+            "Add /// @notice or /// @dev documentation for external callers.".to_string(),
+        ),
+    }
+}
+
+fn contract_level_debt(
+    path: &Path,
+    ast: &SolidityAst,
+    config: &SolidityLanguageConfig,
+) -> Vec<DebtItem> {
     let root = ast.tree.root_node();
     let mut items = Vec::new();
-    collect_contract_debt(root, path, ast, &mut items);
+    collect_contract_debt(root, path, ast, config, &mut items);
     items
 }
 
@@ -77,6 +139,7 @@ fn collect_contract_debt(
     node: tree_sitter::Node,
     path: &Path,
     ast: &SolidityAst,
+    config: &SolidityLanguageConfig,
     items: &mut Vec<DebtItem>,
 ) {
     if matches!(
@@ -88,7 +151,7 @@ fn collect_contract_debt(
             .map(|n| crate::analyzers::solidity::parser::node_text(&n, &ast.source))
             .unwrap_or("Contract");
         let function_count = count_callables(node);
-        for pattern in detect_contract_patterns(node, &ast.source, function_count) {
+        for pattern in detect_contract_patterns(node, &ast.source, function_count, config) {
             if let Some(item) = contract_advisory(path, name, &pattern, node) {
                 items.push(item);
             }
@@ -97,7 +160,7 @@ fn collect_contract_debt(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_contract_debt(child, path, ast, items);
+        collect_contract_debt(child, path, ast, config, items);
     }
 }
 
@@ -208,6 +271,14 @@ fn advisory_debt_items(path: &Path, function: &FunctionMetrics) -> Vec<DebtItem>
         .collect()
 }
 
+fn advisory_debt_items_for_functions(path: &Path, functions: &[FunctionMetrics]) -> Vec<DebtItem> {
+    functions
+        .iter()
+        .filter(|function| !function.is_test)
+        .flat_map(|function| advisory_debt_items(path, function))
+        .collect()
+}
+
 fn advisory_debt(path: &Path, function: &FunctionMetrics, pattern: &str) -> Option<DebtItem> {
     let definition = advisory_definition(pattern)?;
 
@@ -226,6 +297,21 @@ fn advisory_debt(path: &Path, function: &FunctionMetrics, pattern: &str) -> Opti
         ),
         context: Some(definition.context.to_string()),
     })
+}
+
+fn filter_suppressed_items(
+    items: Vec<DebtItem>,
+    suppression: &SuppressionContext,
+) -> Vec<DebtItem> {
+    items
+        .into_iter()
+        .filter(|item| !is_suppressed_item(item, suppression))
+        .collect()
+}
+
+fn is_suppressed_item(item: &DebtItem, suppression: &SuppressionContext) -> bool {
+    suppression.is_suppressed(item.line, &item.debt_type)
+        || suppression.is_function_allowed(item.line, &item.debt_type)
 }
 
 struct AdvisoryDefinition {
@@ -280,6 +366,41 @@ fn advisory_definition(pattern: &str) -> Option<AdvisoryDefinition> {
             priority: Priority::Medium,
             message: "is public/external without visible access control",
             context: "Confirm authorization is enforced via modifiers or explicit checks.",
+        },
+        "unchecked-arithmetic" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "uses an unchecked arithmetic block",
+            context: "Unchecked arithmetic skips overflow checks; confirm bounds are proven elsewhere.",
+        },
+        "unsafe-erc20-transfer" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "may call ERC20 transfer functions without checking the result",
+            context: "Use SafeERC20 wrappers or explicitly validate token transfer return values.",
+        },
+        "push-without-length-cap" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "pushes to a collection without an obvious length cap",
+            context: "Unbounded storage growth can increase gas costs or create denial-of-service risk.",
+        },
+        "block-timestamp-dependency" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "depends on block.timestamp",
+            context: "Timestamp-dependent logic can be miner/validator-influenced within protocol limits.",
+        },
+        "tx-gas-price-dependency" => AdvisoryDefinition {
+            priority: Priority::Low,
+            message: "depends on tx.gasprice",
+            context: "Gas price assumptions are brittle across fee markets and transaction relayers.",
+        },
+        "encode-packed-collision" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "uses abi.encodePacked",
+            context: "Packed encoding with dynamic values can create hash collision ambiguity; review typed inputs.",
+        },
+        "delegatecall-in-constructor" => AdvisoryDefinition {
+            priority: Priority::High,
+            message: "uses delegatecall during construction",
+            context: "Constructor delegatecalls can create proxy initialization and storage-layout risks.",
         },
         _ => return None,
     };

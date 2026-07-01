@@ -62,6 +62,37 @@ fn test_extract_nodes_unknown_ast() {
 }
 
 #[test]
+fn test_extract_nodes_solidity_contracts_and_functions() {
+    let source = r#"pragma solidity 0.8.20;
+contract Vault {
+    function withdraw(uint256 amount) public {
+        if (amount > 0) {
+            amount;
+        }
+    }
+}
+"#;
+    let solidity =
+        debtmap::analyzers::solidity::parser::parse_source(source, &PathBuf::from("Vault.sol"))
+            .unwrap();
+    let ast = Ast::Solidity(solidity);
+    let nodes = ast.extract_nodes();
+
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].kind, NodeKind::Class);
+    assert_eq!(nodes[0].name.as_deref(), Some("Vault"));
+    assert_eq!(nodes[0].children.len(), 1);
+    assert_eq!(nodes[0].children[0].kind, NodeKind::Function);
+    assert_eq!(nodes[0].children[0].name.as_deref(), Some("withdraw"));
+    assert!(
+        nodes[0].children[0]
+            .children
+            .iter()
+            .any(|child| child.kind == NodeKind::If)
+    );
+}
+
+#[test]
 fn test_ast_transform() {
     let ast = create_test_rust_ast();
 

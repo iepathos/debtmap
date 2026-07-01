@@ -1,16 +1,20 @@
+use crate::analyzers::solidity::advanced::detect_advanced_patterns;
 use crate::analyzers::solidity::complexity::{
     cognitive_complexity, cyclomatic_complexity, function_length, max_nesting,
 };
 use crate::analyzers::solidity::debt::security_patterns::detect_function_patterns;
+use crate::analyzers::solidity::entropy::calculate_entropy;
 use crate::analyzers::solidity::parser::{node_line, node_text};
 use crate::analyzers::solidity::test_detection::function_is_test;
 use crate::analyzers::solidity::types::{
     ContractInfo, ContractKind, SolidityAnalysis, SolidityFunction, SolidityFunctionKind,
 };
+use crate::complexity::entropy_core::{EntropyAnalysis, EntropyConfig};
+use crate::config::SolidityLanguageConfig;
 use crate::core::ast::SolidityAst;
 use tree_sitter::Node;
 
-pub fn analyze_ast(ast: &SolidityAst) -> SolidityAnalysis {
+pub fn analyze_ast(ast: &SolidityAst, config: &SolidityLanguageConfig) -> SolidityAnalysis {
     let root = ast.tree.root_node();
     let is_test_file =
         crate::analyzers::solidity::test_detection::is_test_context(&ast.path, &ast.source, None);
@@ -24,7 +28,7 @@ pub fn analyze_ast(ast: &SolidityAst) -> SolidityAnalysis {
     };
 
     collect_contracts(root, ast, &mut analysis);
-    collect_callables(root, ast, None, &mut analysis.functions);
+    collect_callables(root, ast, config, None, &mut analysis.functions);
 
     analysis
         .functions
@@ -66,12 +70,13 @@ fn contract_from_node(node: Node, ast: &SolidityAst) -> Option<ContractInfo> {
 fn collect_callables(
     node: Node,
     ast: &SolidityAst,
+    config: &SolidityLanguageConfig,
     contract_name: Option<String>,
     functions: &mut Vec<SolidityFunction>,
 ) {
     let current_contract = contract_name.or_else(|| contract_name_from_ancestor(node, ast));
 
-    if let Some(function) = callable_from_node(node, ast, current_contract.clone()) {
+    if let Some(function) = callable_from_node(node, ast, config, current_contract.clone()) {
         functions.push(function);
     }
 
@@ -84,18 +89,20 @@ fn collect_callables(
     };
 
     walk_children(node, |child| {
-        collect_callables(child, ast, next_contract.clone(), functions)
+        collect_callables(child, ast, config, next_contract.clone(), functions)
     });
 }
 
 fn callable_from_node(
     node: Node,
     ast: &SolidityAst,
+    config: &SolidityLanguageConfig,
     contract_name: Option<String>,
 ) -> Option<SolidityFunction> {
     let (kind, name) = callable_kind_and_name(node, ast, contract_name.as_deref())?;
     let body = node.child_by_field_name("body")?;
     let visibility = visibility_from_node(node, ast);
+    let state_mutability = state_mutability_from_node(node, ast);
     let qualified_name = qualify_name(contract_name.as_deref(), &name);
     let is_test = function_is_test(
         &ast.path,
@@ -104,8 +111,13 @@ fn callable_from_node(
         &qualified_name,
     );
 
-    let advisory_patterns =
-        detect_function_patterns(node, &ast.source, visibility.as_deref(), is_test);
+    let mut advisory_patterns =
+        detect_function_patterns(node, &ast.source, visibility.as_deref(), is_test, config);
+    advisory_patterns.extend(detect_advanced_patterns(node, &ast.source, config));
+    advisory_patterns.sort();
+    advisory_patterns.dedup();
+    let cognitive = cognitive_complexity(body, &ast.source, 0);
+    let entropy_analysis = entropy_analysis_for_body(body, &ast.source, cognitive);
 
     Some(SolidityFunction {
         name: qualified_name,
@@ -113,7 +125,7 @@ fn callable_from_node(
         line: node_line(&node),
         length: function_length(node),
         cyclomatic: cyclomatic_complexity(body, &ast.source),
-        cognitive: cognitive_complexity(body, &ast.source, 0),
+        cognitive,
         nesting: max_nesting(body, 0),
         kind,
         is_test,
@@ -121,6 +133,20 @@ fn callable_from_node(
         calls: collect_calls(body, ast),
         advisory_patterns,
         contract_name,
+        entropy_analysis,
+        state_mutability,
+    })
+}
+
+fn entropy_analysis_for_body(
+    body: Node,
+    source: &str,
+    cognitive_complexity: u32,
+) -> Option<EntropyAnalysis> {
+    let config = EntropyConfig::default();
+    config.enabled.then(|| {
+        let raw = calculate_entropy(body, source, &config);
+        EntropyAnalysis::from_raw(&raw, cognitive_complexity, &config)
     })
 }
 
@@ -141,7 +167,7 @@ fn callable_kind_and_name(
             let name = node_text(&node.child_by_field_name("name")?, &ast.source).to_string();
             Some((SolidityFunctionKind::Modifier, name))
         }
-        "constructor" => Some((
+        "constructor" | "constructor_definition" => Some((
             SolidityFunctionKind::Constructor,
             format!("{}.constructor", contract_name.unwrap_or("Contract")),
         )),
@@ -173,6 +199,14 @@ fn visibility_from_node(node: Node, ast: &SolidityAst) -> Option<String> {
         }
         None
     })
+}
+
+fn state_mutability_from_node(node: Node, ast: &SolidityAst) -> Option<String> {
+    let text = node_text(&node, &ast.source);
+    ["pure", "view", "payable"]
+        .into_iter()
+        .find(|mutability| text.split_whitespace().any(|word| word == *mutability))
+        .map(str::to_string)
 }
 
 fn visibility_in_subtree(node: Node, ast: &SolidityAst) -> Option<String> {
@@ -232,7 +266,12 @@ fn count_callables(node: Node) -> usize {
 fn is_callable_node(node: Node) -> bool {
     matches!(
         node.kind(),
-        "function_definition" | "modifier_definition" | "constructor" | "fallback" | "receive"
+        "function_definition"
+            | "modifier_definition"
+            | "constructor"
+            | "constructor_definition"
+            | "fallback"
+            | "receive"
     )
 }
 

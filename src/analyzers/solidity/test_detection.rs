@@ -3,7 +3,7 @@ use std::path::Path;
 pub fn is_test_file(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
-        .is_some_and(|name| name.ends_with(".t.sol"))
+        .is_some_and(|name| name.ends_with(".t.sol") || name.ends_with(".test.sol"))
 }
 
 pub fn is_test_contract_name(name: &str) -> bool {
@@ -19,9 +19,16 @@ pub fn uses_foundry_test_import(source: &str) -> bool {
     source.contains("forge-std/Test.sol") || source.contains("forge-std/src/Test.sol")
 }
 
+pub fn uses_hardhat_test_import(source: &str) -> bool {
+    source.contains("hardhat/console.sol")
+        || source.contains("@nomicfoundation/hardhat")
+        || source.contains("@nomiclabs/hardhat")
+}
+
 pub fn is_test_context(path: &Path, source: &str, contract_name: Option<&str>) -> bool {
     is_test_file(path)
         || uses_foundry_test_import(source)
+        || uses_hardhat_test_import(source)
         || contract_name.is_some_and(is_test_contract_name)
 }
 
@@ -51,7 +58,18 @@ mod tests {
     #[test]
     fn test_foundry_test_file_detection() {
         assert!(is_test_file(&PathBuf::from("Token.t.sol")));
+        assert!(is_test_file(&PathBuf::from("Token.test.sol")));
         assert!(!is_test_file(&PathBuf::from("Token.sol")));
+    }
+
+    #[test]
+    fn test_hardhat_test_context_detection() {
+        assert!(uses_hardhat_test_import(r#"import "hardhat/console.sol";"#));
+        assert!(is_test_context(
+            &PathBuf::from("Token.test.sol"),
+            "",
+            Some("Token")
+        ));
     }
 
     #[test]

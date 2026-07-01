@@ -87,6 +87,7 @@ pub use classification::{
 // Re-export language types for backward compatibility
 pub use languages::{
     EntropyConfig, GeneratedCodeMode, GoLanguageConfig, LanguageFeatures, LanguagesConfig,
+    SolidityLanguageConfig, SoliditySecurityConfig,
 };
 
 // Re-export display types for backward compatibility
@@ -726,6 +727,51 @@ generated_code = "exclude"
 
         let go = config.languages.and_then(|languages| languages.go).unwrap();
         assert_eq!(go.generated_code, GeneratedCodeMode::Exclude);
+    }
+
+    #[test]
+    fn test_solidity_language_config_deserializes() {
+        let config: DebtmapConfig = toml::from_str(
+            r#"
+[languages]
+enabled = ["solidity"]
+
+[languages.solidity]
+detect_dead_code = true
+detect_complexity = false
+detect_duplication = false
+vendor_code = "exclude"
+large_contract_threshold = 5
+
+[languages.solidity.security]
+tx_origin = false
+reentrancy_heuristic = true
+unchecked_calls = false
+delegatecall = false
+selfdestruct = false
+assembly_blocks = false
+unbounded_loops = false
+missing_access_control = false
+hardcoded_addresses = false
+floating_pragma = false
+large_contracts = true
+"#,
+        )
+        .unwrap();
+
+        let solidity = config
+            .languages
+            .and_then(|languages| languages.solidity)
+            .unwrap();
+        assert!(solidity.features.detect_dead_code);
+        assert!(!solidity.features.detect_complexity);
+        assert!(!solidity.features.detect_duplication);
+        assert_eq!(solidity.vendor_code, GeneratedCodeMode::Exclude);
+        assert_eq!(solidity.large_contract_threshold, 5);
+        assert!(!solidity.security.tx_origin);
+        assert!(!solidity.security.unchecked_calls);
+        assert!(!solidity.security.delegatecall);
+        assert!(solidity.security.large_contracts);
     }
 
     #[test]

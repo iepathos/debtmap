@@ -47,10 +47,14 @@ debtmap analyze . --format markdown --top 1 | claude "Fix this"
 - **JavaScript** — Tree-sitter parsing with ES modules, React/JSX patterns, and async workflow analysis
 - **TypeScript** — Tree-sitter parsing with TS/TSX support, type-aware patterns, and modern frontend/server syntax
 - **Go** — Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, same-package calls, and advisory Go debt signals
+- **Solidity** — Tree-sitter parsing for contracts, interfaces, libraries, modifiers, imports/inheritance, and heuristic smart-contract security advisories
 
 ```bash
 # Analyze specific languages
-debtmap analyze . --languages rust,python,javascript,typescript,go
+debtmap analyze . --languages rust,python,javascript,typescript,go,solidity
+
+# Analyze Solidity contracts only
+debtmap analyze ./contracts --languages sol
 
 # All supported languages are enabled by default
 debtmap analyze .
@@ -251,7 +255,7 @@ perf report
 
 ## Roadmap
 
-**Current focus:** Rust, Python, JavaScript, TypeScript, and Go analysis quality + AI workflow integration
+**Current focus:** Rust, Python, JavaScript, TypeScript, Go, and Solidity analysis quality + AI workflow integration
 
 - [x] Cognitive + cyclomatic complexity
 - [x] Test coverage correlation
@@ -263,6 +267,7 @@ perf report
 - [x] JavaScript language support
 - [x] TypeScript language support
 - [x] Go language support
+- [x] Solidity language support
 - [x] Unified JSON output for dashboards and automation
 - [x] Graphviz DOT dependency output
 - [x] Coverage diagnostics and function-level coverage explanation

@@ -66,7 +66,35 @@ pub struct SoliditySecurityConfig {
     #[serde(default = "default_true")]
     pub unchecked_calls: bool,
     #[serde(default = "default_true")]
+    pub delegatecall: bool,
+    #[serde(default = "default_true")]
+    pub selfdestruct: bool,
+    #[serde(default = "default_true")]
     pub assembly_blocks: bool,
+    #[serde(default = "default_true")]
+    pub unbounded_loops: bool,
+    #[serde(default = "default_true")]
+    pub missing_access_control: bool,
+    #[serde(default = "default_true")]
+    pub hardcoded_addresses: bool,
+    #[serde(default = "default_true")]
+    pub floating_pragma: bool,
+    #[serde(default = "default_true")]
+    pub large_contracts: bool,
+    #[serde(default = "default_true")]
+    pub unchecked_arithmetic: bool,
+    #[serde(default = "default_true")]
+    pub unsafe_erc20_transfer: bool,
+    #[serde(default = "default_true")]
+    pub push_without_length_cap: bool,
+    #[serde(default = "default_true")]
+    pub block_timestamp_dependency: bool,
+    #[serde(default = "default_true")]
+    pub tx_gas_price_dependency: bool,
+    #[serde(default = "default_true")]
+    pub encode_packed_collision: bool,
+    #[serde(default = "default_true")]
+    pub delegatecall_in_constructor: bool,
 }
 
 impl Default for SoliditySecurityConfig {
@@ -75,7 +103,21 @@ impl Default for SoliditySecurityConfig {
             tx_origin: true,
             reentrancy_heuristic: true,
             unchecked_calls: true,
+            delegatecall: true,
+            selfdestruct: true,
             assembly_blocks: true,
+            unbounded_loops: true,
+            missing_access_control: true,
+            hardcoded_addresses: true,
+            floating_pragma: true,
+            large_contracts: true,
+            unchecked_arithmetic: true,
+            unsafe_erc20_transfer: true,
+            push_without_length_cap: true,
+            block_timestamp_dependency: true,
+            tx_gas_price_dependency: true,
+            encode_packed_collision: true,
+            delegatecall_in_constructor: true,
         }
     }
 }
@@ -92,6 +134,10 @@ pub struct SolidityLanguageConfig {
 
     #[serde(default)]
     pub security: SoliditySecurityConfig,
+
+    /// How generated/vendor Solidity files should be handled.
+    #[serde(default)]
+    pub vendor_code: GeneratedCodeMode,
 
     /// Maximum functions/state variables before large-contract advisory.
     #[serde(default = "default_large_contract_threshold")]

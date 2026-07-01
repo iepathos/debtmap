@@ -7,7 +7,7 @@ use super::detection::{
     OrchestratorDetectionConfig,
 };
 use super::display::DisplayConfig;
-use super::languages::{EntropyConfig, LanguageFeatures};
+use super::languages::{EntropyConfig, LanguageFeatures, SolidityLanguageConfig};
 use super::loader::load_config;
 use super::scoring::{
     ContextMultipliers, RoleCoverageWeights, RoleMultiplierConfig, RoleMultipliers, ScoringWeights,
@@ -127,6 +127,15 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
             .unwrap_or_default(),
         Language::Unknown => LanguageFeatures::default(),
     }
+}
+
+/// Get Solidity-specific language configuration.
+pub fn get_solidity_config() -> SolidityLanguageConfig {
+    get_config()
+        .languages
+        .as_ref()
+        .and_then(|languages| languages.solidity.clone())
+        .unwrap_or_default()
 }
 
 /// Get complexity thresholds configuration

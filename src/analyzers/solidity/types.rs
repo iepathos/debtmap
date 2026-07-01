@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::complexity::entropy_core::EntropyAnalysis;
 use crate::core::ast::ClassDef;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +27,8 @@ pub struct SolidityFunction {
     pub calls: Vec<String>,
     pub advisory_patterns: Vec<String>,
     pub contract_name: Option<String>,
+    pub entropy_analysis: Option<EntropyAnalysis>,
+    pub state_mutability: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]

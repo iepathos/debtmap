@@ -3,12 +3,14 @@
 use tree_sitter::Node;
 
 use crate::analyzers::solidity::parser::node_text;
+use crate::config::SolidityLanguageConfig;
 
 pub fn detect_function_patterns(
     node: Node,
     source: &str,
     visibility: Option<&str>,
     is_test: bool,
+    config: &SolidityLanguageConfig,
 ) -> Vec<String> {
     if is_test {
         return Vec::new();
@@ -18,31 +20,34 @@ pub fn detect_function_patterns(
     let body_text = node_text(&body, source);
     let mut patterns = Vec::new();
 
-    if body_text.contains("tx.origin") {
+    if config.security.tx_origin && body_text.contains("tx.origin") {
         patterns.push("tx-origin-usage".to_string());
     }
-    if body_text.contains("delegatecall") {
+    if config.security.delegatecall && body_text.contains("delegatecall") {
         patterns.push("delegatecall-usage".to_string());
     }
-    if body_text.contains("selfdestruct") {
+    if config.security.selfdestruct && body_text.contains("selfdestruct") {
         patterns.push("selfdestruct-usage".to_string());
     }
-    if contains_assembly(body) {
+    if config.security.assembly_blocks
+        && (contains_assembly(body) || body_text.contains("assembly"))
+    {
         patterns.push("assembly-block".to_string());
     }
-    if has_hardcoded_address(body_text) {
+    if config.security.hardcoded_addresses && has_hardcoded_address(body_text) {
         patterns.push("hardcoded-address".to_string());
     }
-    if has_unchecked_low_level_call(body, source) {
+    if config.security.unchecked_calls && has_unchecked_low_level_call(body, source) {
         patterns.push("unchecked-low-level-call".to_string());
     }
-    if has_unbounded_loop(body) {
+    if config.security.unbounded_loops && has_unbounded_loop(body, body_text) {
         patterns.push("unbounded-loop".to_string());
     }
-    if has_external_call_before_state_update(body, source) {
+    if config.security.reentrancy_heuristic && has_external_call_before_state_update(body, source) {
         patterns.push("external-call-before-state-update".to_string());
     }
-    if is_missing_access_control(node, source, visibility) {
+    if config.security.missing_access_control && is_missing_access_control(node, source, visibility)
+    {
         patterns.push("missing-access-control".to_string());
     }
 
@@ -55,15 +60,19 @@ pub fn detect_contract_patterns(
     contract: Node,
     source: &str,
     function_count: usize,
+    config: &SolidityLanguageConfig,
 ) -> Vec<String> {
     let mut patterns = Vec::new();
     let state_count = count_kind(contract, "state_variable_declaration");
 
-    if function_count > 20 || state_count > 20 {
+    if config.security.large_contracts
+        && (function_count > config.large_contract_threshold
+            || state_count > config.large_contract_threshold)
+    {
         patterns.push("large-contract".to_string());
     }
 
-    if has_floating_pragma(source) {
+    if config.security.floating_pragma && has_floating_pragma(source) {
         patterns.push("floating-pragma".to_string());
     }
 
@@ -86,6 +95,8 @@ fn contains_assembly(node: Node) -> bool {
 
 fn has_hardcoded_address(text: &str) -> bool {
     text.split_whitespace().any(|token| {
+        let token = token
+            .trim_matches(|ch: char| matches!(ch, ';' | ',' | ')' | '(' | '[' | ']' | '{' | '}'));
         token.starts_with("0x")
             && token.len() >= 42
             && token[2..].chars().all(|ch| ch.is_ascii_hexdigit())
@@ -116,7 +127,11 @@ fn has_unchecked_low_level_call(node: Node, source: &str) -> bool {
     found
 }
 
-fn has_unbounded_loop(node: Node) -> bool {
+fn has_unbounded_loop(node: Node, text: &str) -> bool {
+    if text.contains(".length") && (text.contains("for ") || text.contains("while ")) {
+        return true;
+    }
+
     let mut found = false;
     walk_nodes(node, &mut |current| {
         if !matches!(current.kind(), "for_statement" | "while_statement") {
@@ -152,19 +167,20 @@ fn has_external_call_before_state_update(node: Node, source: &str) -> bool {
 }
 
 fn top_level_statements(node: Node) -> Vec<Node> {
-    if node.kind() == "block" {
-        let mut cursor = node.walk();
-        return node.children(&mut cursor).collect();
+    let mut cursor = node.walk();
+    let children = node
+        .children(&mut cursor)
+        .filter(|child| child.is_named())
+        .collect::<Vec<_>>();
+
+    if !children.is_empty() {
+        return children;
     }
 
     vec![node]
 }
 
 fn is_external_call(node: Node, source: &str) -> bool {
-    if node.kind() != "call_expression" && node.kind() != "expression_statement" {
-        return false;
-    }
-
     let text = node_text(&node, source);
     text.contains(".call")
         || text.contains(".transfer(")
@@ -173,10 +189,8 @@ fn is_external_call(node: Node, source: &str) -> bool {
 }
 
 fn is_state_update(node: Node) -> bool {
-    matches!(
-        node.kind(),
-        "assignment_expression" | "augmented_assignment_expression" | "expression_statement"
-    ) && child_kind_exists(node, "identifier")
+    child_kind_exists(node, "assignment_expression")
+        || child_kind_exists(node, "augmented_assignment_expression")
 }
 
 fn is_missing_access_control(node: Node, source: &str, visibility: Option<&str>) -> bool {

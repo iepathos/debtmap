@@ -556,6 +556,14 @@ Solidity analysis emits **heuristic advisories** (not formal verification) for c
 | `missing-access-control` | Public/external function without visible access control |
 | `floating-pragma` | Uses floating compiler pragma (`^` or `>=`) |
 | `large-contract` | Contract exceeds configured function/state-variable threshold |
+| `unchecked-arithmetic` | Uses an `unchecked` arithmetic block |
+| `unsafe-erc20-transfer` | ERC20 transfer call may not check return value |
+| `push-without-length-cap` | Storage/dynamic collection push lacks an obvious cap |
+| `block-timestamp-dependency` | Logic depends on `block.timestamp` |
+| `tx-gas-price-dependency` | Logic depends on `tx.gasprice` |
+| `encode-packed-collision` | Uses `abi.encodePacked` and needs collision review |
+| `delegatecall-in-constructor` | Constructor uses `delegatecall` |
+| `missing-natspec` | Public/external function lacks nearby `/// @notice` or `/// @dev` NatSpec |
 
 Foundry/Hardhat test contracts (`*.t.sol`, `forge-std/Test.sol` imports) skip complexity debt. Security checks can be toggled under `[languages.solidity.security]` in `debtmap.toml`.
 
@@ -582,4 +590,3 @@ debt_score = priority_weight × type_weight
 **Total debt score** = Sum of all debt item scores
 
 Lower is better. Track over time to measure improvement.
-

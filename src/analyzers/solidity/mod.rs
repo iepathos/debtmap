@@ -1,9 +1,12 @@
 //! Solidity analyzer support.
 
+pub mod advanced;
 pub mod analyzer;
 pub mod complexity;
 pub mod debt;
 pub mod dependencies;
+pub mod entropy;
+pub mod generated;
 pub mod metrics;
 pub mod orchestration;
 pub mod parser;
