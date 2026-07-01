@@ -10,6 +10,7 @@ pub mod generated;
 pub mod metrics;
 pub mod orchestration;
 pub mod parser;
+pub mod remappings;
 pub mod test_detection;
 pub mod types;
 pub mod visitor;

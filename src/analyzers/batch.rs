@@ -31,7 +31,7 @@ use crate::config::{
     BatchAnalysisConfig, GeneratedCodeMode, ParallelConfig, SolidityLanguageConfig,
 };
 use crate::core::ast::Ast;
-use crate::core::{DebtItem, FileMetrics, Language};
+use crate::core::{DebtItem, DependencyKind, FileMetrics, Language};
 use crate::effects::{
     AnalysisEffect, AnalysisValidation, validation_failure, validation_failures, validation_success,
 };
@@ -480,7 +480,9 @@ fn analyze_files_parallel_with_mode(
 
     results.map(|items| {
         let analyzed = items.into_iter().flatten().collect::<Vec<_>>();
-        resolve_solidity_cross_file_calls(resolve_go_cross_file_calls(analyzed))
+        resolve_solidity_cross_file_calls(resolve_solidity_import_dependencies(
+            resolve_go_cross_file_calls(analyzed),
+        ))
     })
 }
 
@@ -704,6 +706,47 @@ fn resolve_go_cross_file_calls(mut results: Vec<FileAnalysisResult>) -> Vec<File
             let key = GoFunctionKey::new(package.clone(), function.name.clone());
             function.upstream_callers = upstream.get(&key).cloned();
         }
+    }
+
+    results
+}
+
+fn resolve_solidity_import_dependencies(
+    mut results: Vec<FileAnalysisResult>,
+) -> Vec<FileAnalysisResult> {
+    let solidity_paths: Vec<PathBuf> = results
+        .iter()
+        .filter(|result| is_solidity_result(result))
+        .map(|result| result.path.clone())
+        .collect();
+
+    if solidity_paths.is_empty() {
+        return results;
+    }
+
+    let resolver =
+        crate::analyzers::solidity::remappings::SolidityImportResolver::from_analyzed_files(
+            &solidity_paths,
+        );
+
+    for result in results
+        .iter_mut()
+        .filter(|result| is_solidity_result(result))
+    {
+        for dependency in &mut result.metrics.dependencies {
+            if dependency.kind == DependencyKind::Import {
+                dependency.name = resolver.resolve(&dependency.name, &result.path);
+            }
+        }
+        result.metrics.dependencies.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then_with(|| format!("{:?}", a.kind).cmp(&format!("{:?}", b.kind)))
+        });
+        result
+            .metrics
+            .dependencies
+            .dedup_by(|a, b| a.name == b.name && a.kind == b.kind);
     }
 
     results

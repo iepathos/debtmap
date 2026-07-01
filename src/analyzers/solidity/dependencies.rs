@@ -142,4 +142,18 @@ contract Vault {}
                 && dep.name.ends_with("contracts/interfaces/IERC20.sol")
         }));
     }
+
+    #[test]
+    fn test_extracts_package_imports() {
+        let source = r#"pragma solidity 0.8.20;
+import "@thirdparty/contracts/Token.sol";
+contract Vault {}
+"#;
+        let ast = parse_source(source, &PathBuf::from("src/Vault.sol")).unwrap();
+        let deps = extract_dependencies(&ast);
+
+        assert!(deps.iter().any(|dep| {
+            dep.kind == DependencyKind::Import && dep.name == "@thirdparty/contracts/Token.sol"
+        }));
+    }
 }

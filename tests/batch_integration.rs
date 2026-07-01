@@ -633,6 +633,112 @@ contract Settlement {
 }
 
 #[test]
+fn test_solidity_remapping_resolves_openzeppelin_import() {
+    let files = vec![
+        (
+            "remappings.txt",
+            "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/\n",
+        ),
+        (
+            "src/Vault.sol",
+            r#"pragma solidity 0.8.20;
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract Vault is ERC20 {
+    constructor() ERC20("Vault", "VLT") {}
+}
+"#,
+        ),
+        (
+            "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol",
+            r#"pragma solidity 0.8.20;
+contract ERC20 {
+    constructor(string memory, string memory) {}
+}
+"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+    let source_paths: Vec<PathBuf> = paths
+        .into_iter()
+        .filter(|path| path.extension().is_some_and(|ext| ext == "sol"))
+        .collect();
+
+    let results =
+        run_effect(analyze_files_effect(source_paths), DebtmapConfig::default()).expect("analyze");
+    let vault = results
+        .iter()
+        .find(|result| result.path.ends_with("src/Vault.sol"))
+        .expect("vault result");
+
+    assert!(vault.metrics.dependencies.iter().any(|dep| {
+        dep.name
+            .contains("lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol")
+    }));
+}
+
+#[test]
+fn test_solidity_unresolved_external_import_stays_raw() {
+    let files = vec![(
+        "src/Vault.sol",
+        r#"pragma solidity 0.8.20;
+import "@thirdparty/contracts/Token.sol";
+
+contract Vault {}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let vault = &results[0];
+
+    assert!(
+        vault
+            .metrics
+            .dependencies
+            .iter()
+            .any(|dep| { dep.name == "@thirdparty/contracts/Token.sol" })
+    );
+}
+
+#[test]
+fn test_solidity_relative_import_resolves_in_batch() {
+    let files = vec![
+        (
+            "contracts/vault/Vault.sol",
+            r#"pragma solidity 0.8.20;
+import "../interfaces/IERC20.sol";
+
+contract Vault {}
+"#,
+        ),
+        (
+            "contracts/interfaces/IERC20.sol",
+            r#"pragma solidity 0.8.20;
+interface IERC20 {}
+"#,
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let vault = results
+        .iter()
+        .find(|result| result.path.ends_with("contracts/vault/Vault.sol"))
+        .expect("vault result");
+
+    assert!(
+        vault
+            .metrics
+            .dependencies
+            .iter()
+            .any(|dep| { dep.name.ends_with("interfaces/IERC20.sol") })
+    );
+}
+
+#[test]
 fn test_go_same_package_cross_file_calls_resolve() {
     let files = vec![
         (
