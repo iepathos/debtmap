@@ -425,6 +425,7 @@ pub enum DependencyKind {
     Import,
     Module,
     Package,
+    Inheritance,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
@@ -434,6 +435,7 @@ pub enum Language {
     JavaScript,
     TypeScript,
     Go,
+    Solidity,
     Unknown,
 }
 
@@ -445,6 +447,7 @@ impl Language {
             (&["js", "mjs", "cjs", "jsx"], Language::JavaScript),
             (&["ts", "mts", "cts", "tsx"], Language::TypeScript),
             (&["go"], Language::Go),
+            (&["sol"], Language::Solidity),
         ];
 
         EXTENSION_MAP
@@ -475,6 +478,7 @@ impl std::fmt::Display for Language {
             (Language::JavaScript, "JavaScript"),
             (Language::TypeScript, "TypeScript"),
             (Language::Go, "Go"),
+            (Language::Solidity, "Solidity"),
             (Language::Unknown, "Unknown"),
         ];
 

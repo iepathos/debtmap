@@ -45,6 +45,7 @@ pub mod rust_data_flow_analyzer;
 pub mod rust_enum_converter_detector;
 pub mod scope_tracker;
 pub mod signature_extractor;
+pub mod solidity;
 pub mod state_field_detector;
 pub mod state_machine_pattern_detector;
 pub mod test_detector;
@@ -141,6 +142,9 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
             Box::new(analyzer)
         }),
         (Language::Go, || Box::new(go::GoAnalyzer::new())),
+        (Language::Solidity, || {
+            Box::new(solidity::SolidityAnalyzer::new())
+        }),
     ];
 
     ANALYZER_MAP

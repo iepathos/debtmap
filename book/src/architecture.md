@@ -130,6 +130,12 @@ include_patterns = ["src/**/*.rs", "lib/**/*.py"]
 - Handles: JSX/TSX, decorators, generics
 - Performance: ~8-18ms per file
 
+**Solidity (tree-sitter):**
+- Uses tree-sitter-solidity for `.sol` parsing
+- Extracts: contracts, interfaces, libraries, functions, modifiers
+- Computes: cyclomatic/cognitive complexity, import/inheritance dependencies
+- Detects: heuristic smart-contract security advisories and Foundry test files
+
 **Error Handling:**
 - Syntax errors logged but don't stop analysis
 - Partial ASTs used when possible

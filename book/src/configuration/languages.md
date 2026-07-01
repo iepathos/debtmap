@@ -18,6 +18,7 @@ Debtmap analyzes source code for technical debt and complexity issues. Language 
 - **JavaScript** - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows
 - **TypeScript** - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows
 - **Go** - Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, generated-code handling, and advisory Go debt signals
+- **Solidity** - Tree-sitter parsing for contracts, interfaces, libraries, modifiers, complexity metrics, import/inheritance extraction, Foundry test detection, and heuristic smart-contract security advisories
 
 **Source**: `src/core/mod.rs` (Language enum) and `src/config/languages.rs` (language-specific configuration fields)
 
@@ -31,6 +32,7 @@ pub enum Language {
     JavaScript,
     TypeScript,
     Go,
+    Solidity,
     Unknown,
 }
 ```
@@ -41,6 +43,7 @@ pub enum Language {
 - `.js`, `.mjs`, `.cjs`, and `.jsx` files are analyzed as JavaScript
 - `.ts`, `.mts`, `.cts`, and `.tsx` files are analyzed as TypeScript
 - `.go` files are analyzed as Go
+- `.sol` files are analyzed as Solidity (including Foundry `*.t.sol` test files)
 
 **Source**: `src/core/mod.rs`
 
@@ -52,6 +55,7 @@ pub fn from_extension(ext: &str) -> Self {
         "js" | "mjs" | "cjs" | "jsx" => Language::JavaScript,
         "ts" | "mts" | "cts" | "tsx" => Language::TypeScript,
         "go" => Language::Go,
+        "sol" => Language::Solidity,
         _ => Language::Unknown,
     }
 }
@@ -178,16 +182,34 @@ generated_code = "suppress_debt"
 
 Go analysis covers packages, imports, top-level functions, receiver methods, complexity, same-package call relationships, and advisory Go debt signals. Generated Go files are parsed by default, but generated-file debt is suppressed unless `generated_code = "analyze"` is configured. Use `generated_code = "exclude"` to skip generated Go files during config-driven batch analysis.
 
+### Solidity Configuration
+
+```toml
+[languages.solidity]
+detect_dead_code = false
+detect_complexity = true
+detect_duplication = true
+large_contract_threshold = 20
+
+[languages.solidity.security]
+tx_origin = true
+reentrancy_heuristic = true
+unchecked_calls = true
+assembly_blocks = true
+```
+
+Solidity analysis covers contracts, interfaces, libraries, functions, modifiers, constructors, complexity metrics, imports, inheritance, and heuristic security advisories (for example `tx.origin` usage, unchecked low-level calls, assembly blocks, and reentrancy heuristics). Foundry test files (`*.t.sol`) and contracts importing `forge-std/Test.sol` are detected as tests; complexity debt is suppressed for test functions.
+
 ## Enabling Languages
 
 Specify which languages to analyze with the `enabled` array:
 
 ```toml
 [languages]
-enabled = ["rust", "python", "javascript", "typescript", "go"]
+enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
 ```
 
-The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, and Go.
+The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, Go, and Solidity.
 
 ## Feature Defaults
 

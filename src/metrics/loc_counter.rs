@@ -47,6 +47,8 @@ pub enum LocLanguage {
     TypeScript,
     /// Go: `//` and `/* */` comments
     Go,
+    /// Solidity: `//` and `/* */` comments
+    Solidity,
     /// Unknown language - uses conservative comment detection
     #[default]
     Unknown,
@@ -61,6 +63,7 @@ impl LocLanguage {
             Some("js") | Some("jsx") | Some("mjs") | Some("cjs") => Self::JavaScript,
             Some("ts") | Some("tsx") | Some("mts") | Some("cts") => Self::TypeScript,
             Some("go") => Self::Go,
+            Some("sol") => Self::Solidity,
             _ => Self::Unknown,
         }
     }

@@ -121,6 +121,10 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
             .and_then(|lc| lc.go.clone())
             .map(|go| go.features)
             .unwrap_or_default(),
+        Language::Solidity => languages_config
+            .and_then(|lc| lc.solidity.clone())
+            .map(|solidity| solidity.features)
+            .unwrap_or_default(),
         Language::Unknown => LanguageFeatures::default(),
     }
 }

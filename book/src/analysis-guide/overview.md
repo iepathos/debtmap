@@ -8,6 +8,8 @@ Debtmap analyzes code through multiple lenses to provide a comprehensive view of
 - **Python** - Full analysis support with tree-sitter parsing, class/function extraction, and Python-specific complexity handling
 - **JavaScript** - Full analysis support with tree-sitter parsing, modern ES syntax, JSX support, and async pattern handling
 - **TypeScript** - Full analysis support with tree-sitter parsing, TS/TSX syntax, and type-oriented pattern analysis
+- **Go** - Tree-sitter parsing for packages, functions, receiver methods, and advisory Go debt signals
+- **Solidity** - Tree-sitter parsing for smart contracts with complexity metrics and heuristic security advisories
 
 ## Analysis Capabilities
 

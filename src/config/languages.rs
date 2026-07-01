@@ -23,6 +23,10 @@ pub struct LanguagesConfig {
     /// Go-specific configuration
     #[serde(default)]
     pub go: Option<GoLanguageConfig>,
+
+    /// Solidity-specific configuration
+    #[serde(default)]
+    pub solidity: Option<SolidityLanguageConfig>,
 }
 
 /// Language-specific feature configuration
@@ -50,6 +54,52 @@ pub struct GoLanguageConfig {
     /// How generated Go files should be handled.
     #[serde(default)]
     pub generated_code: GeneratedCodeMode,
+}
+
+/// Solidity security pattern toggles.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SoliditySecurityConfig {
+    #[serde(default = "default_true")]
+    pub tx_origin: bool,
+    #[serde(default = "default_true")]
+    pub reentrancy_heuristic: bool,
+    #[serde(default = "default_true")]
+    pub unchecked_calls: bool,
+    #[serde(default = "default_true")]
+    pub assembly_blocks: bool,
+}
+
+impl Default for SoliditySecurityConfig {
+    fn default() -> Self {
+        Self {
+            tx_origin: true,
+            reentrancy_heuristic: true,
+            unchecked_calls: true,
+            assembly_blocks: true,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Solidity-specific language configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SolidityLanguageConfig {
+    #[serde(flatten)]
+    pub features: LanguageFeatures,
+
+    #[serde(default)]
+    pub security: SoliditySecurityConfig,
+
+    /// Maximum functions/state variables before large-contract advisory.
+    #[serde(default = "default_large_contract_threshold")]
+    pub large_contract_threshold: usize,
+}
+
+fn default_large_contract_threshold() -> usize {
+    20
 }
 
 /// Generated Go handling policy.

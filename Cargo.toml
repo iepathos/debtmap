@@ -48,11 +48,12 @@ syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
 
 # Tree-sitter for JS/TS/Python parsing
-tree-sitter = "0.23"
+tree-sitter = "0.25"
 tree-sitter-javascript = "0.23"
 tree-sitter-typescript = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
+tree-sitter-solidity = "=1.2.13"
 
 # CLI
 clap = { version = "4.6", features = ["derive", "env"] }

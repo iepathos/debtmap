@@ -198,6 +198,13 @@ impl FileContextDetector {
                     0.0
                 }
             }
+            Language::Solidity => {
+                if filename.ends_with(".t.sol") {
+                    0.9
+                } else {
+                    0.0
+                }
+            }
             Language::Unknown => 0.0,
         }
     }

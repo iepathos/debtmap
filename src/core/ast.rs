@@ -37,6 +37,7 @@ pub enum Ast {
     Python(PythonAst),
     TypeScript(TypeScriptAst),
     Go(GoAst),
+    Solidity(SolidityAst),
     Unknown,
 }
 
@@ -232,6 +233,26 @@ impl std::fmt::Debug for GoAst {
     }
 }
 
+/// Solidity AST wrapper
+#[derive(Clone)]
+pub struct SolidityAst {
+    /// The tree-sitter parse tree
+    pub tree: tree_sitter::Tree,
+    /// Path to the source file
+    pub path: PathBuf,
+    /// Original source code
+    pub source: String,
+}
+
+impl std::fmt::Debug for SolidityAst {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SolidityAst")
+            .field("path", &self.path)
+            .field("source_len", &self.source.len())
+            .finish()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct AstNode {
     pub kind: NodeKind,
@@ -280,6 +301,7 @@ impl Ast {
             Ast::Python(_) => self.extract_python_nodes(),
             Ast::TypeScript(_) => self.extract_typescript_nodes(),
             Ast::Go(_) => self.extract_go_nodes(),
+            Ast::Solidity(_) => vec![],
             Ast::Unknown => vec![],
         }
     }

@@ -539,6 +539,26 @@ fn process_payment(tx: Transaction) -> Result<Receipt> {
 **When detected**: Combines complexity metrics with coverage data
 **Action**: Either add comprehensive tests OR refactor to reduce complexity
 
+## Solidity Security Advisories
+
+Solidity analysis emits **heuristic advisories** (not formal verification) for common smart-contract review signals. These appear as `CodeSmell` debt items with pattern IDs such as:
+
+| Pattern ID | Meaning |
+|------------|---------|
+| `tx-origin-usage` | Authorization uses `tx.origin` instead of `msg.sender` |
+| `unchecked-low-level-call` | Low-level call without visible return-value handling |
+| `delegatecall-usage` | Uses `delegatecall` (proxy/upgrade risk) |
+| `selfdestruct-usage` | Uses `selfdestruct` |
+| `assembly-block` | Contains inline assembly |
+| `unbounded-loop` | Loop may iterate over unbounded dynamic data |
+| `external-call-before-state-update` | External call may precede state update (reentrancy heuristic) |
+| `hardcoded-address` | Contains hardcoded address literal |
+| `missing-access-control` | Public/external function without visible access control |
+| `floating-pragma` | Uses floating compiler pragma (`^` or `>=`) |
+| `large-contract` | Contract exceeds configured function/state-variable threshold |
+
+Foundry/Hardhat test contracts (`*.t.sol`, `forge-std/Test.sol` imports) skip complexity debt. Security checks can be toggled under `[languages.solidity.security]` in `debtmap.toml`.
+
 ### Debt Scoring Formula
 
 Each debt item gets a score based on priority and type:

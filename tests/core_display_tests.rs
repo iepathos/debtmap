@@ -147,6 +147,11 @@ fn test_language_display_go() {
 }
 
 #[test]
+fn test_language_display_solidity() {
+    assert_eq!(format!("{}", Language::Solidity), "Solidity");
+}
+
+#[test]
 fn test_language_display_all_variants() {
     let languages = vec![
         (Language::Rust, "Rust"),
@@ -154,6 +159,7 @@ fn test_language_display_all_variants() {
         (Language::JavaScript, "JavaScript"),
         (Language::TypeScript, "TypeScript"),
         (Language::Go, "Go"),
+        (Language::Solidity, "Solidity"),
         (Language::Unknown, "Unknown"),
     ];
 
@@ -193,6 +199,11 @@ fn test_language_from_extension_typescript() {
 #[test]
 fn test_language_from_extension_go() {
     assert_eq!(Language::from_extension("go"), Language::Go);
+}
+
+#[test]
+fn test_language_from_extension_solidity() {
+    assert_eq!(Language::from_extension("sol"), Language::Solidity);
 }
 
 #[test]

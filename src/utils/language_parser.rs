@@ -18,6 +18,7 @@ pub fn parse_single_language(lang_str: &str) -> Option<Language> {
         "javascript" | "js" => Some(Language::JavaScript),
         "typescript" | "ts" => Some(Language::TypeScript),
         "go" | "golang" => Some(Language::Go),
+        "solidity" | "sol" => Some(Language::Solidity),
         _ => None,
     }
 }
@@ -29,5 +30,6 @@ pub fn default_languages() -> Vec<Language> {
         Language::JavaScript,
         Language::TypeScript,
         Language::Go,
+        Language::Solidity,
     ]
 }

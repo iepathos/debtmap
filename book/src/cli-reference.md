@@ -342,9 +342,9 @@ Configure analysis behavior, thresholds, and language selection.
 
 **Language Selection:**
 - `--languages <LANGS>` - Comma-separated list of languages to analyze
-  - Example: `--languages rust,python,javascript,typescript,go`
-  - Supported: rust, python, javascript, typescript, go
-  - Aliases include common extensions plus `golang` for Go
+  - Example: `--languages rust,python,javascript,typescript,go,solidity`
+  - Supported: rust, python, javascript, typescript, go, solidity
+  - Aliases include common extensions plus `golang` for Go and `sol` for Solidity
 
 **Analysis Modes:**
 - `--semantic-off` - Disable semantic analysis (fallback mode)

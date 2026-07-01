@@ -19,6 +19,7 @@ impl FileWalker {
                 Language::JavaScript,
                 Language::TypeScript,
                 Language::Go,
+                Language::Solidity,
             ],
             ignore_patterns: vec![],
         }
