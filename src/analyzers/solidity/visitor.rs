@@ -275,10 +275,10 @@ fn visibility_in_subtree(node: Node, ast: &SolidityAst) -> Option<String> {
 fn inheritance_names(node: Node, ast: &SolidityAst) -> Vec<String> {
     let mut names = Vec::new();
     walk_children(node, |child| {
-        if child.kind() == "inheritance_specifier" {
-            if let Some(name) = child.child_by_field_name("name") {
-                names.push(node_text(&name, &ast.source).to_string());
-            }
+        if child.kind() == "inheritance_specifier"
+            && let Some(name) = child.child_by_field_name("name")
+        {
+            names.push(node_text(&name, &ast.source).to_string());
         }
     });
     names
@@ -287,13 +287,13 @@ fn inheritance_names(node: Node, ast: &SolidityAst) -> Vec<String> {
 fn contract_name_from_ancestor(node: Node, ast: &SolidityAst) -> Option<String> {
     let mut current = node.parent();
     while let Some(parent) = current {
-        if let Some(name) = parent.child_by_field_name("name") {
-            if matches!(
+        if let Some(name) = parent.child_by_field_name("name")
+            && matches!(
                 parent.kind(),
                 "contract_declaration" | "interface_declaration" | "library_declaration"
-            ) {
-                return Some(node_text(&name, &ast.source).to_string());
-            }
+            )
+        {
+            return Some(node_text(&name, &ast.source).to_string());
         }
         current = parent.parent();
     }

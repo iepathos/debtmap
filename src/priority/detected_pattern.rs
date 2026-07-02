@@ -188,7 +188,8 @@ mod tests {
     #[test]
     fn detect_state_machine_pattern() {
         let rust_data = create_test_rust_data_with_state_machine();
-        let pattern = DetectedPattern::detect(&Some(LanguageSpecificData::Rust(rust_data)));
+        let pattern =
+            DetectedPattern::detect(&Some(LanguageSpecificData::Rust(Box::new(rust_data))));
 
         assert!(pattern.is_some());
         let pattern = pattern.unwrap();
@@ -202,7 +203,8 @@ mod tests {
     #[test]
     fn detect_coordinator_pattern() {
         let rust_data = create_test_rust_data_with_coordinator();
-        let pattern = DetectedPattern::detect(&Some(LanguageSpecificData::Rust(rust_data)));
+        let pattern =
+            DetectedPattern::detect(&Some(LanguageSpecificData::Rust(Box::new(rust_data))));
 
         assert!(pattern.is_some());
         let pattern = pattern.unwrap();
@@ -216,7 +218,8 @@ mod tests {
         let mut rust_data = create_test_rust_data_with_state_machine();
         rust_data.state_machine_signals.as_mut().unwrap().confidence = 0.6;
 
-        let pattern = DetectedPattern::detect(&Some(LanguageSpecificData::Rust(rust_data)));
+        let pattern =
+            DetectedPattern::detect(&Some(LanguageSpecificData::Rust(Box::new(rust_data))));
         assert!(pattern.is_none());
     }
 
@@ -263,7 +266,8 @@ mod tests {
             validation_signals: None,
         };
 
-        let pattern = DetectedPattern::detect(&Some(LanguageSpecificData::Rust(rust_data)));
+        let pattern =
+            DetectedPattern::detect(&Some(LanguageSpecificData::Rust(Box::new(rust_data))));
 
         assert!(pattern.is_some());
         let pattern = pattern.unwrap();

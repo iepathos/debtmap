@@ -814,7 +814,7 @@ fn solidity_upstream_callers(edges: Vec<(String, String)>) -> HashMap<String, Ve
     edges
         .into_iter()
         .fold(HashMap::new(), |mut upstream, (caller, callee)| {
-            let callers = upstream.entry(callee).or_insert_with(Vec::new);
+            let callers = upstream.entry(callee).or_default();
             if !callers.contains(&caller) {
                 callers.push(caller);
             }

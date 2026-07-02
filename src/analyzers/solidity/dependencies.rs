@@ -58,8 +58,7 @@ fn resolve_import_name(import: &str, file_path: &Path) -> String {
         .parent()
         .map(|parent| normalize_path(parent.join(import)))
         .unwrap_or_else(|| PathBuf::from(import))
-        .to_string_lossy()
-        .to_string()
+        .to_slash_path()
 }
 
 fn normalize_path(path: PathBuf) -> PathBuf {
@@ -74,6 +73,17 @@ fn normalize_path(path: PathBuf) -> PathBuf {
             }
             normalized
         })
+}
+
+trait SolidityPathDisplay {
+    fn to_slash_path(&self) -> String;
+}
+
+impl SolidityPathDisplay for Path {
+    fn to_slash_path(&self) -> String {
+        self.to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/")
+    }
 }
 
 fn collect_import_paths(node: Node, ast: &SolidityAst, paths: &mut Vec<String>) {

@@ -123,7 +123,7 @@ pub struct FunctionMetrics {
 /// Language-specific data to avoid memory overhead for non-applicable files
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LanguageSpecificData {
-    Rust(crate::analysis::rust_patterns::RustPatternResult),
+    Rust(Box<crate::analysis::rust_patterns::RustPatternResult>),
     Solidity(SolidityPatternResult),
     // Future: Python(PythonPatternResult), JavaScript(JSPatternResult)
 }

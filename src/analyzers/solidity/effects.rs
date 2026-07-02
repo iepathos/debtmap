@@ -104,13 +104,13 @@ fn collect_modifier_bodies<'a>(
     source: &str,
     modifiers: &mut HashMap<String, Node<'a>>,
 ) {
-    if node.kind() == "modifier_definition" {
-        if let (Some(name), Some(body)) = (
+    if node.kind() == "modifier_definition"
+        && let (Some(name), Some(body)) = (
             node.child_by_field_name("name"),
             node.child_by_field_name("body"),
-        ) {
-            modifiers.insert(node_text(&name, source).to_string(), body);
-        }
+        )
+    {
+        modifiers.insert(node_text(&name, source).to_string(), body);
     }
 
     let mut cursor = node.walk();

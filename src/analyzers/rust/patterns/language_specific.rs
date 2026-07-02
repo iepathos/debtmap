@@ -35,16 +35,16 @@ pub fn build_language_specific(
     };
 
     if enable_rust_patterns {
-        Some(LanguageSpecificData::Rust(
+        Some(LanguageSpecificData::Rust(Box::new(
             RustPatternDetector::new().detect_all_patterns(
                 &rust_context,
                 signals.validation.clone(),
                 signals.state_machine.clone(),
                 signals.coordinator.clone(),
             ),
-        ))
+        )))
     } else if signals.has_any() {
-        Some(LanguageSpecificData::Rust(
+        Some(LanguageSpecificData::Rust(Box::new(
             crate::analysis::rust_patterns::RustPatternResult {
                 trait_impl: None,
                 async_patterns: vec![],
@@ -54,7 +54,7 @@ pub fn build_language_specific(
                 state_machine_signals: signals.state_machine.clone(),
                 coordinator_signals: signals.coordinator.clone(),
             },
-        ))
+        )))
     } else {
         None
     }

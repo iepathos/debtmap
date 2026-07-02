@@ -357,11 +357,14 @@ fn return_slot_count(return_type: Option<Node>, _source: &str) -> usize {
         return count;
     }
 
-    return_type
+    if return_type
         .children(&mut return_type.walk())
         .any(|child| child.kind() == "type_name")
-        .then_some(1)
-        .unwrap_or(0)
+    {
+        1
+    } else {
+        0
+    }
 }
 
 fn is_under_node(node: Node, ancestor: Option<Node>) -> bool {

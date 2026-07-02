@@ -306,25 +306,25 @@ fn ingest_function_calls(
 ) {
     let current_contract = contract_name.or_else(|| contract_name_from_node(node, ast));
 
-    if node.kind() == "function_definition" {
-        if let Some(contract) = current_contract.clone() {
-            let method = node
-                .child_by_field_name("name")
-                .map(|name| node_text(&name, &ast.source).to_string())
-                .unwrap_or_else(|| "function".to_string());
-            let qualified = format!("{contract}.{method}");
-            push_function(
-                &mut index.functions_by_contract_method,
-                contract.clone(),
-                method.clone(),
-                qualified.clone(),
-            );
+    if node.kind() == "function_definition"
+        && let Some(contract) = current_contract.clone()
+    {
+        let method = node
+            .child_by_field_name("name")
+            .map(|name| node_text(&name, &ast.source).to_string())
+            .unwrap_or_else(|| "function".to_string());
+        let qualified = format!("{contract}.{method}");
+        push_function(
+            &mut index.functions_by_contract_method,
+            contract.clone(),
+            method.clone(),
+            qualified.clone(),
+        );
 
-            if let Some(body) = node.child_by_field_name("body") {
-                index
-                    .function_calls
-                    .insert((ast.path.clone(), qualified), extract_calls(body, ast));
-            }
+        if let Some(body) = node.child_by_field_name("body") {
+            index
+                .function_calls
+                .insert((ast.path.clone(), qualified), extract_calls(body, ast));
         }
     }
 
@@ -371,10 +371,10 @@ fn import_directive_symbols(
         symbols.insert(alias, name.clone());
     }
 
-    if symbols.is_empty() {
-        if let Some(source) = import_source_contract(node, ast) {
-            symbols.insert(source.clone(), source);
-        }
+    if symbols.is_empty()
+        && let Some(source) = import_source_contract(node, ast)
+    {
+        symbols.insert(source.clone(), source);
     }
 
     symbols
@@ -425,16 +425,16 @@ fn collect_state_variables(
     ast: &crate::core::ast::SolidityAst,
     variables: &mut HashMap<String, String>,
 ) {
-    if node.kind() == "state_variable_declaration" {
-        if let (Some(name), Some(type_node)) = (
+    if node.kind() == "state_variable_declaration"
+        && let (Some(name), Some(type_node)) = (
             node.child_by_field_name("name"),
             node.child_by_field_name("type"),
-        ) {
-            variables.insert(
-                node_text(&name, &ast.source).to_string(),
-                node_text(&type_node, &ast.source).trim().to_string(),
-            );
-        }
+        )
+    {
+        variables.insert(
+            node_text(&name, &ast.source).to_string(),
+            node_text(&type_node, &ast.source).trim().to_string(),
+        );
     }
 
     walk_children(node, |child| collect_state_variables(child, ast, variables));
@@ -443,13 +443,12 @@ fn collect_state_variables(
 fn inheritance_names(node: Node, ast: &crate::core::ast::SolidityAst) -> Vec<String> {
     let mut names = Vec::new();
     walk_children(node, |child| {
-        if child.kind() == "inheritance_specifier" {
-            if let Some(name) = child
+        if child.kind() == "inheritance_specifier"
+            && let Some(name) = child
                 .child_by_field_name("ancestor")
                 .or_else(|| child.child_by_field_name("name"))
-            {
-                names.push(node_text(&name, &ast.source).trim().to_string());
-            }
+        {
+            names.push(node_text(&name, &ast.source).trim().to_string());
         }
     });
     names
@@ -643,10 +642,6 @@ contract Caller {
 
         let caller = &snapshots[2];
         let edges = compute_call_edges(&snapshots);
-        assert!(
-            edges
-                .get(&(caller.path.clone(), "Caller.dispatch".to_string()))
-                .is_none()
-        );
+        assert!(!edges.contains_key(&(caller.path.clone(), "Caller.dispatch".to_string())));
     }
 }

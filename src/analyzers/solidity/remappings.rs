@@ -166,9 +166,14 @@ impl SolidityImportResolver {
             ctx.analyzed_files
                 .iter()
                 .find(|analyzed| paths_equivalent(&normalized, analyzed, candidate))
-                .map(|path| path.to_string_lossy().to_string())
+                .map(|path| to_slash_path(path))
         })
     }
+}
+
+fn to_slash_path(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/")
 }
 
 fn paths_equivalent(normalized: &Path, analyzed: &Path, candidate: &Path) -> bool {
@@ -391,7 +396,7 @@ mod tests {
         fs::create_dir_all(source.parent().unwrap()).unwrap();
         fs::write(&source, "pragma solidity 0.8.20;").unwrap();
 
-        let resolver = SolidityImportResolver::from_analyzed_files(&[source.clone()]);
+        let resolver = SolidityImportResolver::from_analyzed_files(std::slice::from_ref(&source));
         assert_eq!(
             resolver.resolve("@thirdparty/contracts/Token.sol", &source),
             "@thirdparty/contracts/Token.sol"

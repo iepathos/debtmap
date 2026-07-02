@@ -190,7 +190,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: Some(LanguageSpecificData::Rust(rust_data)),
+            language_specific: Some(LanguageSpecificData::Rust(Box::new(rust_data))),
             purity_level: None,
             error_swallowing_count: None,
             error_swallowing_patterns: None,

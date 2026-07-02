@@ -38,10 +38,10 @@ fn collect_calls(node: Node, ast: &SolidityAst, calls: &mut Vec<SolidityCallShap
         return;
     }
 
-    if node.kind() == "call_expression" {
-        if let Some(call) = call_shape(node, ast) {
-            calls.push(call);
-        }
+    if node.kind() == "call_expression"
+        && let Some(call) = call_shape(node, ast)
+    {
+        calls.push(call);
     }
 
     walk_children(node, |child| collect_calls(child, ast, calls));
