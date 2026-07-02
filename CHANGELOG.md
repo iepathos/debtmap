@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-07-01
+
+### Added
+
+- **Solidity Analysis Support** - Debtmap now recognizes and analyzes Solidity smart contracts
+  - Adds Solidity parsing, metrics collection, complexity analysis, dependency extraction, generated-code handling, and debt detection
+  - Integrates Solidity into batch analysis, validated analysis output, language configuration, file discovery, LOC counting, CLI docs, and display coverage
+  - Adds smart contract fixtures and analyzer coverage for simple contracts, complex contracts, Foundry tests, interfaces, and security examples
+
+- **Solidity Smart Contract Signals** - Solidity analysis now reports contract-specific risk and maintainability signals
+  - Detects security patterns, advanced debt signals, entropy indicators, NatSpec completeness issues, and function purity effects
+  - Refines security pattern detection to reduce false positives while preserving high-risk findings
+  - Includes Solidity metrics and debt output in TUI detail patterns and batch analysis results
+
+- **Solidity Dependency Resolution** - Solidity analysis now resolves imports and cross-file calls
+  - Resolves remapped imports for common smart contract project layouts
+  - Tracks typed cross-file calls through Solidity call graph and call resolution support
+  - Adds integration coverage for remappings and cross-file call edges
+
+### Fixed
+
+- **Cleanup Test Isolation** - Cleanup tests now use temporary paths
+  - Avoids relying on shared filesystem state during cleanup test runs
+
 ## [0.20.1] - 2026-06-29
 
 ### Dependencies
