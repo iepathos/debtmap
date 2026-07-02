@@ -1,7 +1,9 @@
+pub mod natspec;
 pub mod security_patterns;
 
 use std::path::Path;
 
+use crate::analyzers::solidity::debt::natspec::detect_natspec_debt;
 use crate::analyzers::solidity::debt::security_patterns::detect_contract_patterns;
 use crate::config::SolidityLanguageConfig;
 use crate::core::ast::SolidityAst;
@@ -35,7 +37,7 @@ pub fn detect_debt(
         Some(&suppression),
     ));
     items.extend(function_smell_debt(functions));
-    items.extend(natspec_debt(path, ast, functions));
+    items.extend(detect_natspec_debt(path, ast, functions));
     items.extend(contract_level_debt(path, ast, config));
     filter_suppressed_items(items, &suppression)
 }
@@ -78,50 +80,6 @@ fn function_smell_debt(functions: &[FunctionMetrics]) -> Vec<DebtItem> {
         .flat_map(|function| analyze_function_smells(function, 0))
         .map(|smell| smell.to_debt_item())
         .collect()
-}
-
-fn natspec_debt(path: &Path, ast: &SolidityAst, functions: &[FunctionMetrics]) -> Vec<DebtItem> {
-    let lines = ast.source.lines().collect::<Vec<_>>();
-    functions
-        .iter()
-        .filter(|function| !function.is_test)
-        .filter(|function| matches!(function.visibility.as_deref(), Some("public" | "external")))
-        .filter(|function| !has_natspec_before(&lines, function.line))
-        .map(|function| missing_natspec_debt(path, function))
-        .collect()
-}
-
-fn has_natspec_before(lines: &[&str], function_line: usize) -> bool {
-    let start = function_line.saturating_sub(6);
-    let end = function_line.saturating_sub(1);
-    lines.get(start..end).unwrap_or(&[]).iter().any(|line| {
-        let trimmed = line.trim();
-        trimmed.starts_with("///") && (trimmed.contains("@notice") || trimmed.contains("@dev"))
-    })
-}
-
-fn missing_natspec_debt(path: &Path, function: &FunctionMetrics) -> DebtItem {
-    DebtItem {
-        id: format!(
-            "solidity-missing-natspec-{}-{}",
-            path.display(),
-            function.line
-        ),
-        debt_type: DebtType::CodeSmell {
-            smell_type: Some("missing-natspec".to_string()),
-        },
-        priority: Priority::Low,
-        file: path.to_path_buf(),
-        line: function.line,
-        column: None,
-        message: format!(
-            "Function '{}' is public/external without NatSpec",
-            function.name
-        ),
-        context: Some(
-            "Add /// @notice or /// @dev documentation for external callers.".to_string(),
-        ),
-    }
 }
 
 fn contract_level_debt(

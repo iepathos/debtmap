@@ -388,6 +388,128 @@ contract C {
 }
 
 #[test]
+fn test_natspec_completeness_positive_and_negative_fixtures() {
+    let cases = [
+        (
+            "missing-natspec-param",
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Moves tokens.
+    function f(address to, uint256 amount) public {}
+}
+"#,
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Moves tokens.
+    /// @param to Recipient
+    /// @param amount Amount
+    function f(address to, uint256 amount) public {}
+}
+"#,
+        ),
+        (
+            "stale-natspec-param",
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Moves tokens.
+    /// @param stale Old param
+    function f(address to) public {}
+}
+"#,
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Moves tokens.
+    /// @param to Recipient
+    function f(address to) public {}
+}
+"#,
+        ),
+        (
+            "missing-natspec-return",
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Reads value.
+    function f() public view returns (uint256) {}
+}
+"#,
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Reads value.
+    /// @return The stored value
+    function f() public view returns (uint256) {}
+}
+"#,
+        ),
+        (
+            "placeholder-natspec",
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice TODO
+    function f() public {}
+}
+"#,
+            r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Returns the stored value.
+    function f() public {}
+}
+"#,
+        ),
+    ];
+
+    for (pattern, positive, negative) in cases {
+        assert!(
+            has_pattern(&analyze_source("Positive.sol", positive), pattern),
+            "expected positive fixture to detect {pattern}"
+        );
+        assert!(
+            !has_pattern(&analyze_source("Negative.sol", negative), pattern),
+            "expected negative fixture not to detect {pattern}"
+        );
+    }
+}
+
+#[test]
+fn test_natspec_ignores_internal_functions() {
+    let metrics = analyze_source(
+        "Internal.sol",
+        r#"pragma solidity 0.8.20;
+contract C {
+    function hidden(uint256 value) internal {}
+}
+"#,
+    );
+
+    assert!(!metrics.debt_items.iter().any(|item| {
+        matches!(
+            &item.debt_type,
+            DebtType::CodeSmell { smell_type }
+                if smell_type
+                    .as_deref()
+                    .is_some_and(|pattern| pattern.contains("natspec"))
+        )
+    }));
+}
+
+#[test]
+fn test_natspec_ignores_docs_separated_too_far_from_function() {
+    let metrics = analyze_source(
+        "FarDoc.sol",
+        r#"pragma solidity 0.8.20;
+contract C {
+    /// @notice Old docs far away.
+
+    uint256 public value;
+
+    function f() public {}
+}
+"#,
+    );
+
+    assert!(has_pattern(&metrics, "missing-natspec"));
+}
+
+#[test]
 fn test_solidity_language_specific_data_and_purity() {
     let metrics = analyze_source(
         "Metadata.sol",
