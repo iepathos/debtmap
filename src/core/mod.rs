@@ -134,6 +134,10 @@ pub struct SolidityPatternResult {
     pub is_payable: bool,
     pub advisory_pattern_count: usize,
     pub uses_delegatecall: bool,
+    #[serde(default)]
+    pub reads_state: bool,
+    #[serde(default)]
+    pub writes_state: bool,
 }
 
 /// Entropy details for explainable output

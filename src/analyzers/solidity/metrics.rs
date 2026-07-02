@@ -2,7 +2,7 @@ use crate::analyzers::solidity::types::SolidityFunction;
 use crate::core::Dependency;
 use crate::core::{
     ComplexityMetrics, DebtItem, FileMetrics, FunctionMetrics, Language, LanguageSpecificData,
-    PurityLevel, SolidityPatternResult,
+    SolidityPatternResult,
 };
 use std::path::PathBuf;
 
@@ -63,9 +63,9 @@ pub fn to_function_metrics(function: &SolidityFunction) -> FunctionMetrics {
                 dampening_applied: analysis.dampening_factor,
             }
         }),
-        is_pure: None,
+        is_pure: Some(function.effects.is_strictly_pure()),
         purity_confidence: None,
-        purity_reason: None,
+        purity_reason: purity_reason(function),
         call_dependencies: (!function.calls.is_empty()).then_some(function.calls.clone()),
         detected_patterns,
         upstream_callers: None,
@@ -78,7 +78,7 @@ pub fn to_function_metrics(function: &SolidityFunction) -> FunctionMetrics {
         language_specific: Some(LanguageSpecificData::Solidity(solidity_pattern_result(
             function,
         ))),
-        purity_level: solidity_purity_level(function),
+        purity_level: Some(function.effects.purity_level()),
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis,
@@ -94,21 +94,34 @@ fn solidity_pattern_result(function: &SolidityFunction) -> SolidityPatternResult
             .advisory_patterns
             .iter()
             .any(|pattern| pattern.contains("delegatecall")),
+        reads_state: function.effects.reads_state,
+        writes_state: function.effects.writes_state,
     }
 }
 
-fn solidity_purity_level(function: &SolidityFunction) -> Option<PurityLevel> {
-    match function.state_mutability.as_deref() {
-        Some("pure") => Some(PurityLevel::StrictlyPure),
-        Some("view") => Some(PurityLevel::ReadOnly),
-        Some("payable") => Some(PurityLevel::Impure),
-        _ if function
-            .advisory_patterns
-            .iter()
-            .any(|pattern| pattern == "external-call-before-state-update") =>
-        {
-            Some(PurityLevel::Impure)
+fn purity_reason(function: &SolidityFunction) -> Option<String> {
+    if function
+        .advisory_patterns
+        .iter()
+        .any(|pattern| pattern == "mutability-mismatch")
+    {
+        return Some(
+            "Declared mutability conflicts with detected state or call effects".to_string(),
+        );
+    }
+
+    match function.effects.purity_level() {
+        crate::core::PurityLevel::StrictlyPure => {
+            Some("No state access or external effects detected".to_string())
         }
-        _ => None,
+        crate::core::PurityLevel::ReadOnly => {
+            Some("Reads contract state without writes".to_string())
+        }
+        crate::core::PurityLevel::Impure => {
+            Some("Writes state or performs external/value effects".to_string())
+        }
+        crate::core::PurityLevel::LocallyPure => {
+            Some("Mostly pure with limited local effects".to_string())
+        }
     }
 }

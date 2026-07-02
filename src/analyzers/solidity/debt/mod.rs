@@ -360,6 +360,11 @@ fn advisory_definition(pattern: &str) -> Option<AdvisoryDefinition> {
             message: "uses delegatecall during construction",
             context: "Constructor delegatecalls can create proxy initialization and storage-layout risks.",
         },
+        "mutability-mismatch" => AdvisoryDefinition {
+            priority: Priority::Medium,
+            message: "declared mutability may not match detected effects",
+            context: "Review pure/view/payable keywords against state reads, writes, and external calls.",
+        },
         _ => return None,
     };
 

@@ -515,9 +515,10 @@ fn test_solidity_language_specific_data_and_purity() {
         "Metadata.sol",
         r#"pragma solidity 0.8.20;
 contract C {
+    uint256 public value;
     /// @notice Reads value.
     function f() public view returns (uint256) {
-        return 1;
+        return value;
     }
 }
 "#,
@@ -530,11 +531,84 @@ contract C {
         .expect("function");
 
     assert_eq!(function.purity_level, Some(PurityLevel::ReadOnly));
+    assert_eq!(function.is_pure, Some(false));
     match function.language_specific.as_ref() {
         Some(LanguageSpecificData::Solidity(data)) => {
             assert_eq!(data.state_mutability.as_deref(), Some("view"));
+            assert!(data.reads_state);
+            assert!(!data.writes_state);
             assert!(!data.is_payable);
         }
         other => panic!("expected Solidity language-specific data, got {other:?}"),
     }
+}
+
+#[test]
+fn test_solidity_purity_effect_analysis_fixtures() {
+    let state_write = analyze_source(
+        "StateWrite.sol",
+        r#"pragma solidity 0.8.20;
+contract C {
+    uint256 public value;
+    function setValue(uint256 next) public { value = next; }
+}
+"#,
+    );
+    let writer = state_write
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "C.setValue")
+        .expect("setValue");
+    assert_eq!(writer.purity_level, Some(PurityLevel::Impure));
+    assert!(!has_pattern(&state_write, "mutability-mismatch"));
+
+    let pure_mismatch = analyze_source(
+        "PureMismatch.sol",
+        r#"pragma solidity 0.8.20;
+contract C {
+    uint256 public value;
+    function readAsPure() public pure returns (uint256) { return value; }
+}
+"#,
+    );
+    assert!(has_pattern(&pure_mismatch, "mutability-mismatch"));
+
+    let external_call = analyze_source(
+        "External.sol",
+        r#"pragma solidity 0.8.20;
+contract C {
+    function payout(address payable recipient) public {
+        recipient.transfer(1);
+    }
+}
+"#,
+    );
+    let payout = external_call
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "C.payout")
+        .expect("payout");
+    assert_eq!(payout.purity_level, Some(PurityLevel::Impure));
+
+    let local_only = analyze_source(
+        "Local.sol",
+        r#"pragma solidity 0.8.20;
+contract C {
+    function locals() public pure returns (uint256) {
+        uint256 local = 1;
+        return local + 1;
+    }
+}
+"#,
+    );
+    let locals = local_only
+        .complexity
+        .functions
+        .iter()
+        .find(|function| function.name == "C.locals")
+        .expect("locals");
+    assert_eq!(locals.purity_level, Some(PurityLevel::StrictlyPure));
+    assert_eq!(locals.is_pure, Some(true));
 }

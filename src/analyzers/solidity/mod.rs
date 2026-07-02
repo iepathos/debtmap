@@ -7,6 +7,7 @@ pub mod calls;
 pub mod complexity;
 pub mod debt;
 pub mod dependencies;
+pub mod effects;
 pub mod entropy;
 pub mod generated;
 pub mod metrics;

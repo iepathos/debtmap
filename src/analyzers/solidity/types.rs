@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::analyzers::solidity::effects::SolidityEffectSummary;
 use crate::complexity::entropy_core::EntropyAnalysis;
 use crate::core::ast::ClassDef;
 
@@ -29,6 +30,7 @@ pub struct SolidityFunction {
     pub contract_name: Option<String>,
     pub entropy_analysis: Option<EntropyAnalysis>,
     pub state_mutability: Option<String>,
+    pub effects: SolidityEffectSummary,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -38,6 +40,7 @@ pub struct ContractInfo {
     pub base_classes: Vec<String>,
     pub state_variable_count: usize,
     pub function_count: usize,
+    pub state_variables: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

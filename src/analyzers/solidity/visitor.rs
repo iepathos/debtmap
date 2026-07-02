@@ -4,6 +4,10 @@ use crate::analyzers::solidity::complexity::{
     cognitive_complexity, cyclomatic_complexity, function_length, max_nesting,
 };
 use crate::analyzers::solidity::debt::security_patterns::detect_function_patterns;
+use crate::analyzers::solidity::effects::{
+    analyze_callable_effects, modifier_bodies_by_name, mutability_mismatch_patterns,
+    state_variable_names,
+};
 use crate::analyzers::solidity::entropy::calculate_entropy;
 use crate::analyzers::solidity::parser::{node_line, node_text};
 use crate::analyzers::solidity::test_detection::function_is_test;
@@ -29,7 +33,16 @@ pub fn analyze_ast(ast: &SolidityAst, config: &SolidityLanguageConfig) -> Solidi
     };
 
     collect_contracts(root, ast, &mut analysis);
-    collect_callables(root, ast, config, None, &mut analysis.functions);
+    let modifiers = modifier_bodies_by_name(root, &ast.source);
+    collect_callables(
+        root,
+        ast,
+        config,
+        None,
+        &analysis.contracts,
+        &modifiers,
+        &mut analysis.functions,
+    );
 
     analysis
         .functions
@@ -65,6 +78,7 @@ fn contract_from_node(node: Node, ast: &SolidityAst) -> Option<ContractInfo> {
         base_classes,
         state_variable_count,
         function_count,
+        state_variables: state_variable_names(node, &ast.source),
     })
 }
 
@@ -73,11 +87,20 @@ fn collect_callables(
     ast: &SolidityAst,
     config: &SolidityLanguageConfig,
     contract_name: Option<String>,
+    contracts: &[ContractInfo],
+    modifiers: &std::collections::HashMap<String, Node<'_>>,
     functions: &mut Vec<SolidityFunction>,
 ) {
     let current_contract = contract_name.or_else(|| contract_name_from_ancestor(node, ast));
 
-    if let Some(function) = callable_from_node(node, ast, config, current_contract.clone()) {
+    if let Some(function) = callable_from_node(
+        node,
+        ast,
+        config,
+        current_contract.clone(),
+        contracts,
+        modifiers,
+    ) {
         functions.push(function);
     }
 
@@ -90,7 +113,15 @@ fn collect_callables(
     };
 
     walk_children(node, |child| {
-        collect_callables(child, ast, config, next_contract.clone(), functions)
+        collect_callables(
+            child,
+            ast,
+            config,
+            next_contract.clone(),
+            contracts,
+            modifiers,
+            functions,
+        )
     });
 }
 
@@ -99,6 +130,8 @@ fn callable_from_node(
     ast: &SolidityAst,
     config: &SolidityLanguageConfig,
     contract_name: Option<String>,
+    contracts: &[ContractInfo],
+    modifiers: &std::collections::HashMap<String, Node<'_>>,
 ) -> Option<SolidityFunction> {
     let (kind, name) = callable_kind_and_name(node, ast, contract_name.as_deref())?;
     let body = node.child_by_field_name("body")?;
@@ -111,10 +144,24 @@ fn callable_from_node(
         contract_name.as_deref(),
         &qualified_name,
     );
+    let state_variables = contract_name
+        .as_ref()
+        .and_then(|contract| {
+            contracts
+                .iter()
+                .find(|info| info.name == *contract)
+                .map(|info| info.state_variables.clone())
+        })
+        .unwrap_or_default();
+    let effects = analyze_callable_effects(node, &ast.source, &state_variables, modifiers);
 
     let mut advisory_patterns =
         detect_function_patterns(node, &ast.source, visibility.as_deref(), is_test, config);
     advisory_patterns.extend(detect_advanced_patterns(node, &ast.source, config));
+    advisory_patterns.extend(mutability_mismatch_patterns(
+        state_mutability.as_deref(),
+        &effects,
+    ));
     advisory_patterns.sort();
     advisory_patterns.dedup();
     let cognitive = cognitive_complexity(body, &ast.source, 0);
@@ -136,6 +183,7 @@ fn callable_from_node(
         contract_name,
         entropy_analysis,
         state_mutability,
+        effects,
     })
 }
 
