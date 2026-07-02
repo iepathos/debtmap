@@ -219,6 +219,48 @@ fn test_security_patterns_positive_and_negative_fixtures() {
 }
 
 #[test]
+fn test_security_pattern_precision_refinements() {
+    let cases = [
+        (
+            "external-call-before-state-update",
+            r#"pragma solidity 0.8.20; contract C { mapping(address => uint256) balances; function f() internal { if (true) { payable(msg.sender).transfer(1); } balances[msg.sender] = 0; } }"#,
+            r#"pragma solidity 0.8.20; contract C { mapping(address => uint256) balances; function f() internal { balances[msg.sender] = 0; if (true) { payable(msg.sender).transfer(1); } } }"#,
+        ),
+        (
+            "unchecked-low-level-call",
+            r#"pragma solidity 0.8.20; contract C { function f(address target) internal { target.call{value: 0}(""); } }"#,
+            r#"pragma solidity 0.8.20; contract C { function f(address target) internal { (bool success, ) = target.call{value: 0}(""); require(success); } }"#,
+        ),
+        (
+            "missing-access-control",
+            r#"pragma solidity 0.8.20; contract C { function setValue(uint256 value) public { value; } }"#,
+            r#"pragma solidity 0.8.20; contract C { function _checkOwner() internal view {} function setValue(uint256 value) public { _checkOwner(); value; } }"#,
+        ),
+        (
+            "unbounded-loop",
+            r#"pragma solidity 0.8.20; contract C { address[] users; function f() internal { for (uint256 i = 0; i < users.length; i++) {} } }"#,
+            r#"pragma solidity 0.8.20; contract C { uint256[10] items; function f() internal { for (uint256 i = 0; i < items.length; i++) {} } }"#,
+        ),
+        (
+            "hardcoded-address",
+            r#"pragma solidity 0.8.20; contract C { function f() internal pure returns (address) { return 0x1234567890123456789012345678901234567890; } }"#,
+            r#"pragma solidity 0.8.20; contract C { function f() internal pure returns (address) { return 0x0000000000000000000000000000000000000000; } }"#,
+        ),
+    ];
+
+    for (pattern, positive, negative) in cases {
+        assert!(
+            has_pattern(&analyze_source("Positive.sol", positive), pattern),
+            "expected positive fixture to detect {pattern}"
+        );
+        assert!(
+            !has_pattern(&analyze_source("Negative.sol", negative), pattern),
+            "expected negative fixture not to detect {pattern}"
+        );
+    }
+}
+
+#[test]
 fn test_large_contract_pattern_positive_and_negative() {
     let source = r#"pragma solidity 0.8.20;
 contract C {
@@ -300,7 +342,7 @@ fn test_advanced_advisory_patterns_positive_and_negative() {
         (
             "encode-packed-collision",
             r#"pragma solidity 0.8.20; contract C { function f(string memory a, string memory b) internal pure returns (bytes memory) { return abi.encodePacked(a, b); } }"#,
-            r#"pragma solidity 0.8.20; contract C { function f(string memory a, string memory b) internal pure returns (bytes memory) { return abi.encode(a, b); } }"#,
+            r#"pragma solidity 0.8.20; contract C { function f(uint256 a, address b) internal pure returns (bytes memory) { return abi.encodePacked(a, b); } }"#,
         ),
         (
             "delegatecall-in-constructor",
