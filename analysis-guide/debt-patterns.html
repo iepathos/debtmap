@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-8a665273.js";
+            window.path_to_searchindex_js = "../searchindex-91b3cc53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -679,6 +679,37 @@ fn process_payment(tx: Transaction) -&gt; Result&lt;Receipt&gt; {
 <span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Combines complexity metrics with coverage data
 <strong>Action</strong>: Either add comprehensive tests OR refactor to reduce complexity</p>
+<h2 id="solidity-security-advisories"><a class="header" href="#solidity-security-advisories">Solidity Security Advisories</a></h2>
+<p>Solidity analysis emits <strong>heuristic advisories</strong> (not formal verification) for common smart-contract review signals. These appear as <code>CodeSmell</code> debt items with pattern IDs such as:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Pattern ID</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>tx-origin-usage</code></td><td>Authorization uses <code>tx.origin</code> instead of <code>msg.sender</code></td></tr>
+<tr><td><code>unchecked-low-level-call</code></td><td>Low-level call without visible return-value handling</td></tr>
+<tr><td><code>delegatecall-usage</code></td><td>Uses <code>delegatecall</code> (proxy/upgrade risk)</td></tr>
+<tr><td><code>selfdestruct-usage</code></td><td>Uses <code>selfdestruct</code></td></tr>
+<tr><td><code>assembly-block</code></td><td>Contains inline assembly</td></tr>
+<tr><td><code>unbounded-loop</code></td><td>Loop may iterate over unbounded dynamic data</td></tr>
+<tr><td><code>external-call-before-state-update</code></td><td>External call may precede state update (reentrancy heuristic)</td></tr>
+<tr><td><code>hardcoded-address</code></td><td>Contains hardcoded address literal</td></tr>
+<tr><td><code>missing-access-control</code></td><td>Public/external function without visible access control</td></tr>
+<tr><td><code>floating-pragma</code></td><td>Uses floating compiler pragma (<code>^</code> or <code>&gt;=</code>)</td></tr>
+<tr><td><code>large-contract</code></td><td>Contract exceeds configured function/state-variable threshold</td></tr>
+<tr><td><code>unchecked-arithmetic</code></td><td>Uses an <code>unchecked</code> arithmetic block</td></tr>
+<tr><td><code>unsafe-erc20-transfer</code></td><td>ERC20 transfer call may not check return value</td></tr>
+<tr><td><code>push-without-length-cap</code></td><td>Storage/dynamic collection push lacks an obvious cap</td></tr>
+<tr><td><code>block-timestamp-dependency</code></td><td>Logic depends on <code>block.timestamp</code></td></tr>
+<tr><td><code>tx-gas-price-dependency</code></td><td>Logic depends on <code>tx.gasprice</code></td></tr>
+<tr><td><code>encode-packed-collision</code></td><td>Uses <code>abi.encodePacked</code> and needs collision review</td></tr>
+<tr><td><code>delegatecall-in-constructor</code></td><td>Constructor uses <code>delegatecall</code></td></tr>
+<tr><td><code>missing-natspec</code></td><td>Public/external function lacks nearby <code>/// @notice</code> or <code>/// @dev</code> NatSpec</td></tr>
+</tbody>
+</table>
+</div>
+<p>Foundry/Hardhat test contracts (<code>*.t.sol</code>, <code>forge-std/Test.sol</code> imports) skip complexity debt. Security checks can be toggled under <code>[languages.solidity.security]</code> in <code>debtmap.toml</code>.</p>
 <h3 id="debt-scoring-formula"><a class="header" href="#debt-scoring-formula">Debt Scoring Formula</a></h3>
 <p>Each debt item gets a score based on priority and type:</p>
 <pre><code>debt_score = priority_weight × type_weight

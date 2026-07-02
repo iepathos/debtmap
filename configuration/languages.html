@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-8a665273.js";
+            window.path_to_searchindex_js = "../searchindex-91b3cc53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -194,6 +194,7 @@
 <li><strong>JavaScript</strong> - Tree-sitter parsing for modern JS, JSX, modules, callbacks, promises, and async workflows</li>
 <li><strong>TypeScript</strong> - Tree-sitter parsing for TS/TSX syntax, type-oriented patterns, modules, and async workflows</li>
 <li><strong>Go</strong> - Tree-sitter parsing for packages, imports, functions, receiver methods, complexity, generated-code handling, and advisory Go debt signals</li>
+<li><strong>Solidity</strong> - Tree-sitter parsing for contracts, interfaces, libraries, modifiers, complexity metrics, import/inheritance extraction, Foundry test detection, and heuristic smart-contract security advisories</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/mod.rs</code> (Language enum) and <code>src/config/languages.rs</code> (language-specific configuration fields)</p>
 <p>The <code>Language</code> enum in the codebase currently supports:</p>
@@ -206,6 +207,7 @@ pub enum Language {
     JavaScript,
     TypeScript,
     Go,
+    Solidity,
     Unknown,
 }
 <span class="boring">}</span></code></pre>
@@ -216,6 +218,7 @@ pub enum Language {
 <li><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, and <code>.jsx</code> files are analyzed as JavaScript</li>
 <li><code>.ts</code>, <code>.mts</code>, <code>.cts</code>, and <code>.tsx</code> files are analyzed as TypeScript</li>
 <li><code>.go</code> files are analyzed as Go</li>
+<li><code>.sol</code> files are analyzed as Solidity (including Foundry <code>*.t.sol</code> test files)</li>
 </ul>
 <p><strong>Source</strong>: <code>src/core/mod.rs</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -227,6 +230,7 @@ pub enum Language {
         "js" | "mjs" | "cjs" | "jsx" =&gt; Language::JavaScript,
         "ts" | "mts" | "cts" | "tsx" =&gt; Language::TypeScript,
         "go" =&gt; Language::Go,
+        "sol" =&gt; Language::Solidity,
         _ =&gt; Language::Unknown,
     }
 }
@@ -235,7 +239,7 @@ pub enum Language {
 <p>The <code>[languages]</code> section in your <code>debtmap.toml</code> configures language analysis.</p>
 <p><strong>Source</strong>: <code>src/config/languages.rs:4-22</code> (LanguagesConfig struct)</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python", "javascript", "typescript", "go"]
+enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
 
 [languages.rust]
 detect_dead_code = false       # Disabled by default for Rust
@@ -262,6 +266,33 @@ detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
 generated_code = "suppress_debt"
+
+[languages.solidity]
+detect_dead_code = false
+detect_complexity = true
+detect_duplication = true
+vendor_code = "suppress_debt"
+large_contract_threshold = 20
+
+[languages.solidity.security]
+tx_origin = true
+reentrancy_heuristic = true
+unchecked_calls = true
+delegatecall = true
+selfdestruct = true
+assembly_blocks = true
+unbounded_loops = true
+missing_access_control = true
+hardcoded_addresses = true
+floating_pragma = true
+large_contracts = true
+unchecked_arithmetic = true
+unsafe_erc20_transfer = true
+push_without_length_cap = true
+block_timestamp_dependency = true
+tx_gas_price_dependency = true
+encode_packed_collision = true
+delegatecall_in_constructor = true
 </code></pre>
 <h2 id="language-specific-features"><a class="header" href="#language-specific-features">Language-Specific Features</a></h2>
 <p>Each language supports three configurable feature toggles:</p>
@@ -328,12 +359,61 @@ detect_duplication = true
 generated_code = "suppress_debt"
 </code></pre>
 <p>Go analysis covers packages, imports, top-level functions, receiver methods, complexity, same-package call relationships, and advisory Go debt signals. Generated Go files are parsed by default, but generated-file debt is suppressed unless <code>generated_code = "analyze"</code> is configured. Use <code>generated_code = "exclude"</code> to skip generated Go files during config-driven batch analysis.</p>
+<h3 id="solidity-configuration"><a class="header" href="#solidity-configuration">Solidity Configuration</a></h3>
+<pre><code class="language-toml">[languages.solidity]
+detect_dead_code = false
+detect_complexity = true
+detect_duplication = true
+vendor_code = "suppress_debt"
+large_contract_threshold = 20
+
+[languages.solidity.security]
+tx_origin = true
+reentrancy_heuristic = true
+unchecked_calls = true
+delegatecall = true
+selfdestruct = true
+assembly_blocks = true
+unbounded_loops = true
+missing_access_control = true
+hardcoded_addresses = true
+floating_pragma = true
+large_contracts = true
+unchecked_arithmetic = true
+unsafe_erc20_transfer = true
+push_without_length_cap = true
+block_timestamp_dependency = true
+tx_gas_price_dependency = true
+encode_packed_collision = true
+delegatecall_in_constructor = true
+</code></pre>
+<p>Solidity analysis covers contracts, interfaces, libraries, functions, modifiers, constructors, complexity metrics, imports, inheritance, and heuristic security advisories (for example <code>tx.origin</code> usage, unchecked low-level calls, assembly blocks, and reentrancy heuristics). Foundry test files (<code>*.t.sol</code>), Hardhat-style <code>*.test.sol</code> files, and contracts importing <code>forge-std/Test.sol</code> or <code>hardhat/console.sol</code> are detected as tests; complexity debt is suppressed for test functions.</p>
+<p>Generated/vendor Solidity handling uses the same modes as Go:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th><code>vendor_code</code></th><th>Behavior</th></tr>
+</thead>
+<tbody>
+<tr><td><code>"analyze"</code></td><td>Analyze generated/vendor files and emit debt normally</td></tr>
+<tr><td><code>"suppress_debt"</code></td><td>Preserve metrics but suppress debt for generated/vendor files</td></tr>
+<tr><td><code>"exclude"</code></td><td>Skip generated/vendor Solidity files during config-driven batch analysis</td></tr>
+</tbody>
+</table>
+</div>
+<p>Solidity supports standard suppression comments:</p>
+<pre><code class="language-solidity">// debtmap:ignore-next-line[smell] -- reviewed low-level call
+target.call(data);
+
+// debtmap:ignore[complexity] -- compact state machine
+function settle(uint256 state) public { ... }
+</code></pre>
 <h2 id="enabling-languages"><a class="header" href="#enabling-languages">Enabling Languages</a></h2>
 <p>Specify which languages to analyze with the <code>enabled</code> array:</p>
 <pre><code class="language-toml">[languages]
-enabled = ["rust", "python", "javascript", "typescript", "go"]
+enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
 </code></pre>
-<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, and Go.</p>
+<p>The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, Go, and Solidity.</p>
 <h2 id="feature-defaults"><a class="header" href="#feature-defaults">Feature Defaults</a></h2>
 <p><strong>Source</strong>: <code>src/config/languages.rs:40-61</code></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -432,6 +512,9 @@ detect_duplication = true
 patterns = [
     "target/**",       # Rust build output
     "venv/**",         # Python virtual environment
+    "out/**",          # Foundry build output
+    "cache/**",        # Foundry/Hardhat cache
+    "artifacts/**",    # Hardhat build output
     "*.min.js",        # Minified frontend artifacts
 ]
 </code></pre>

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-8a665273.js";
+            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -298,6 +298,13 @@ include_patterns = ["src/**/*.rs", "lib/**/*.py"]
 <li>Extracts: functions, classes, arrow functions, hooks</li>
 <li>Handles: JSX/TSX, decorators, generics</li>
 <li>Performance: ~8-18ms per file</li>
+</ul>
+<p><strong>Solidity (tree-sitter):</strong></p>
+<ul>
+<li>Uses tree-sitter-solidity for <code>.sol</code> parsing</li>
+<li>Extracts: contracts, interfaces, libraries, functions, modifiers</li>
+<li>Computes: cyclomatic/cognitive complexity, import/inheritance dependencies</li>
+<li>Detects: heuristic smart-contract security advisories and Foundry test files</li>
 </ul>
 <p><strong>Error Handling:</strong></p>
 <ul>
