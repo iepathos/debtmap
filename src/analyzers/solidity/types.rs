@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::analyzers::solidity::effects::SolidityEffectSummary;
@@ -13,7 +14,7 @@ pub enum SolidityFunctionKind {
     Receive,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SolidityFunction {
     pub name: String,
     pub file: PathBuf,
@@ -33,7 +34,7 @@ pub struct SolidityFunction {
     pub effects: SolidityEffectSummary,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContractInfo {
     pub name: String,
     pub kind: ContractKind,
@@ -51,13 +52,21 @@ pub enum ContractKind {
     Library,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SolidityAnalysis {
     pub contracts: Vec<ContractInfo>,
     pub functions: Vec<SolidityFunction>,
     pub is_test_file: bool,
     pub has_floating_pragma: bool,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SolidityFunctionSignature {
+    pub params: Vec<String>,
+    pub return_slots: usize,
+}
+
+pub type SolidityFunctionSignatures = HashMap<usize, SolidityFunctionSignature>;
 
 impl ContractInfo {
     pub fn to_class_def(&self) -> ClassDef {

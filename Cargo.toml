@@ -224,3 +224,7 @@ harness = false
 [[bench]]
 name = "tier_classification_bench"
 harness = false
+
+[[bench]]
+name = "solidity_parsing_bench"
+harness = false

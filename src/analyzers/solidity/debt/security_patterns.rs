@@ -69,9 +69,17 @@ pub fn detect_contract_patterns(
     function_count: usize,
     config: &SolidityLanguageConfig,
 ) -> Vec<String> {
-    let mut patterns = Vec::new();
     let state_count = count_kind(contract, "state_variable_declaration");
+    detect_contract_patterns_with_counts(source, function_count, state_count, config)
+}
 
+pub fn detect_contract_patterns_with_counts(
+    source: &str,
+    function_count: usize,
+    state_count: usize,
+    config: &SolidityLanguageConfig,
+) -> Vec<String> {
+    let mut patterns = Vec::new();
     if config.security.large_contracts
         && (function_count > config.large_contract_threshold
             || state_count > config.large_contract_threshold)

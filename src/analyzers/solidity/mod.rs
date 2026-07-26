@@ -9,6 +9,7 @@ pub mod debt;
 pub mod dependencies;
 pub mod effects;
 pub mod entropy;
+pub mod extraction;
 pub mod generated;
 pub mod metrics;
 pub mod orchestration;

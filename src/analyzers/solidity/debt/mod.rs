@@ -3,8 +3,11 @@ pub mod security_patterns;
 
 use std::path::Path;
 
-use crate::analyzers::solidity::debt::natspec::detect_natspec_debt;
-use crate::analyzers::solidity::debt::security_patterns::detect_contract_patterns;
+use crate::analyzers::solidity::debt::natspec::detect_natspec_debt_with_signatures;
+use crate::analyzers::solidity::debt::security_patterns::detect_contract_patterns_with_counts;
+use crate::analyzers::solidity::extraction::{
+    ExtractedContract, SolidityExtraction, extract_solidity,
+};
 use crate::config::SolidityLanguageConfig;
 use crate::core::ast::SolidityAst;
 use crate::core::{DebtItem, DebtType, FunctionMetrics, Priority};
@@ -17,6 +20,27 @@ pub fn detect_debt(
     threshold: u32,
     functions: &[FunctionMetrics],
     ast: &SolidityAst,
+    skip_debt: bool,
+    config: &SolidityLanguageConfig,
+) -> Vec<DebtItem> {
+    let extraction = extract_solidity(ast);
+    detect_debt_with_extraction(
+        path,
+        threshold,
+        functions,
+        ast,
+        &extraction,
+        skip_debt,
+        config,
+    )
+}
+
+pub fn detect_debt_with_extraction(
+    path: &Path,
+    threshold: u32,
+    functions: &[FunctionMetrics],
+    ast: &SolidityAst,
+    extraction: &SolidityExtraction<'_>,
     skip_debt: bool,
     config: &SolidityLanguageConfig,
 ) -> Vec<DebtItem> {
@@ -37,8 +61,18 @@ pub fn detect_debt(
         Some(&suppression),
     ));
     items.extend(function_smell_debt(functions));
-    items.extend(detect_natspec_debt(path, ast, functions));
-    items.extend(contract_level_debt(path, ast, config));
+    items.extend(detect_natspec_debt_with_signatures(
+        path,
+        &ast.source,
+        functions,
+        &extraction.function_signatures,
+    ));
+    items.extend(contract_level_debt(
+        path,
+        &ast.source,
+        &extraction.contracts,
+        config,
+    ));
     filter_suppressed_items(items, &suppression)
 }
 
@@ -84,42 +118,25 @@ fn function_smell_debt(functions: &[FunctionMetrics]) -> Vec<DebtItem> {
 
 fn contract_level_debt(
     path: &Path,
-    ast: &SolidityAst,
+    source: &str,
+    contracts: &[ExtractedContract<'_>],
     config: &SolidityLanguageConfig,
 ) -> Vec<DebtItem> {
-    let root = ast.tree.root_node();
-    let mut items = Vec::new();
-    collect_contract_debt(root, path, ast, config, &mut items);
-    items
-}
-
-fn collect_contract_debt(
-    node: tree_sitter::Node,
-    path: &Path,
-    ast: &SolidityAst,
-    config: &SolidityLanguageConfig,
-    items: &mut Vec<DebtItem>,
-) {
-    if matches!(
-        node.kind(),
-        "contract_declaration" | "interface_declaration" | "library_declaration"
-    ) {
-        let name = node
-            .child_by_field_name("name")
-            .map(|n| crate::analyzers::solidity::parser::node_text(&n, &ast.source))
-            .unwrap_or("Contract");
-        let function_count = count_callables(node);
-        for pattern in detect_contract_patterns(node, &ast.source, function_count, config) {
-            if let Some(item) = contract_advisory(path, name, &pattern, node) {
-                items.push(item);
-            }
-        }
-    }
-
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        collect_contract_debt(child, path, ast, config, items);
-    }
+    contracts
+        .iter()
+        .flat_map(|contract| {
+            detect_contract_patterns_with_counts(
+                source,
+                contract.advisory_function_count,
+                contract.info.state_variable_count,
+                config,
+            )
+            .into_iter()
+            .filter_map(|pattern| {
+                contract_advisory(path, &contract.info.name, &pattern, contract.node)
+            })
+        })
+        .collect()
 }
 
 fn contract_advisory(
@@ -397,16 +414,4 @@ fn complexity_priority(complexity: u32, threshold: u32) -> Priority {
     } else {
         Priority::Medium
     }
-}
-
-fn count_callables(node: tree_sitter::Node) -> usize {
-    let mut count = usize::from(matches!(
-        node.kind(),
-        "function_definition" | "modifier_definition" | "constructor" | "fallback" | "receive"
-    ));
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        count += count_callables(child);
-    }
-    count
 }

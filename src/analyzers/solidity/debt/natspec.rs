@@ -6,6 +6,8 @@ use std::path::Path;
 use tree_sitter::Node;
 
 use crate::analyzers::solidity::parser::{node_line, node_text};
+pub use crate::analyzers::solidity::types::SolidityFunctionSignature as FunctionSignature;
+use crate::analyzers::solidity::types::SolidityFunctionSignatures;
 use crate::core::ast::SolidityAst;
 use crate::core::{DebtItem, DebtType, FunctionMetrics, Priority};
 
@@ -18,12 +20,6 @@ pub struct NatSpecDoc {
     pub dev: Option<String>,
     pub params: HashMap<String, String>,
     pub returns: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct FunctionSignature {
-    pub params: Vec<String>,
-    pub return_slots: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,8 +37,17 @@ pub fn detect_natspec_debt(
     ast: &SolidityAst,
     functions: &[FunctionMetrics],
 ) -> Vec<DebtItem> {
-    let lines = ast.source.lines().collect::<Vec<_>>();
     let signatures = function_signatures_by_line(ast);
+    detect_natspec_debt_with_signatures(path, &ast.source, functions, &signatures)
+}
+
+pub fn detect_natspec_debt_with_signatures(
+    path: &Path,
+    source: &str,
+    functions: &[FunctionMetrics],
+    signatures: &SolidityFunctionSignatures,
+) -> Vec<DebtItem> {
+    let lines = source.lines().collect::<Vec<_>>();
 
     functions
         .iter()
