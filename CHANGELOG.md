@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-07-28
+
+### Fixed
+
+- **Go Generic Call Resolution** - Go analysis now preserves call graph edges for instantiated generic functions
+  - Resolves generic calls across files and imported local packages
+  - Avoids false call edges when an indexed local value shadows a function name
+
+### Changed
+
+- **Parser Compatibility** - Pinned one ABI-compatible tree-sitter runtime and grammar set across supported languages
+  - Upgrades the JavaScript, Python, and Go grammars to 0.25.0 while retaining compatible TypeScript and Solidity grammar versions
+  - Adds syntax and batch validation coverage for the aligned parsers
+
+- **Bounded Debug Test Gates** - Local and CI validation now use explicit nextest profiles and curated regression groups
+  - Reuses prebuilt debug binaries for CLI integration tests
+  - Expands focused integration and coverage checks without unbounded or duplicate test runs
+
+### Dependencies
+
+- Bumped `actions/setup-python` from 6 to 7
+- Refreshed the Cargo lockfile for the 0.21.2 release
+
 ## [0.21.1] - 2026-07-25
 
 ### Performance
