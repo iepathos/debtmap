@@ -58,7 +58,7 @@ jobs:
       run: |
         mkdir -p target/coverage
         cargo llvm-cov clean
-        SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --html --output-dir target/coverage \
+        cargo llvm-cov nextest --html --output-dir target/coverage \
           --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
           --test debt_tests --test entropy_tests \
           --status-level fail --final-status-level slow

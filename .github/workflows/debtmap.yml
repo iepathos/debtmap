@@ -66,26 +66,26 @@ jobs:
       run: |
         mkdir -p target/coverage
         cargo llvm-cov clean
-        SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --lcov --output-path target/coverage/lcov.info \
+        cargo llvm-cov nextest --lcov --output-path target/coverage/lcov.info \
           --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
           --test debt_tests --test entropy_tests \
           --status-level fail --final-status-level slow
         echo "Disk space after coverage generation:"
         df -h
 
-    - name: Build debtmap release binary
+    - name: Build debtmap debug binary
       run: |
-        cargo build --release
-        echo "Disk space after release build:"
+        cargo build
+        echo "Disk space after debug build:"
         df -h
 
     - name: Run debtmap validation with coverage
       run: |
         if [ -f "target/coverage/lcov.info" ]; then
-          ./target/release/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json --context
+          ./target/debug/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json --context
         else
           echo "Warning: LCOV file not found, running validation without coverage data"
-          ./target/release/debtmap validate . --format json --output debtmap-report.json --context
+          ./target/debug/debtmap validate . --format json --output debtmap-report.json --context
         fi
 
     - name: Upload debtmap report and coverage

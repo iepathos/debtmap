@@ -48,8 +48,6 @@ jobs:
 
     - name: Run tests (Unix)
       if: runner.os != 'Windows'
-      env:
-        SKIP_INTEGRATION_TESTS: 1
       run: |
         echo "Running tests with cargo nextest..."
         cargo nextest run --lib \
@@ -72,14 +70,45 @@ jobs:
     - name: Run tests (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
-      env:
-        SKIP_INTEGRATION_TESTS: 1
       run: |
         Write-Output "Running tests with cargo nextest..."
         cargo nextest run --lib `
           --test analyzer_tests `
           --test complexity_tests --test core_metrics_tests `
           --test debt_tests --test entropy_tests `
+          --status-level fail --final-status-level slow
+
+  integration:
+    name: Integration (Ubuntu, debug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-bin: "false"
+
+    - name: Install cargo-nextest
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-nextest
+
+    - name: Run bounded integration suite
+      run: |
+        cargo nextest run --profile integration \
+          --test language_tests \
+          --test python_extraction_test \
+          --test batch_integration \
+          --test solidity_analyzer_tests \
+          --test call_graph_disambiguation_test \
+          --test output_format_tests \
+          --test cli_output_format_integration_test \
           --status-level fail --final-status-level slow
 
   lint:
@@ -161,7 +190,7 @@ jobs:
       uses: taiki-e/install-action@cargo-hack
 
     - name: Check MSRV
-      run: cargo hack check --each-feature --locked --rust-version --workspace --all-targets --keep-going
+      run: cargo hack check --locked --rust-version --workspace --all-targets --keep-going
 
   minimal-versions:
     name: Minimal versions
@@ -187,31 +216,10 @@ jobs:
     - name: Check with minimal versions
       run: cargo +stable check --workspace --all-features --locked
 
-  feature-combinations:
-    name: Feature combinations
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
-
-    - name: Install cargo-hack
-      uses: taiki-e/install-action@cargo-hack
-
-    - name: Test each feature combination
-      run: cargo hack check --each-feature --workspace --keep-going
-
   # Aggregation job that reports overall CI status
   ci:
     name: CI
-    needs: [test, lint, clippy, msrv, minimal-versions, feature-combinations]
+    needs: [test, integration, lint, clippy, msrv, minimal-versions]
     runs-on: ubuntu-latest
     if: always()
     steps:

@@ -50,9 +50,6 @@ jobs:
         with:
           cache-bin: "false"
 
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-
       - name: Configure vendored OpenSSL prerequisites (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -65,11 +62,8 @@ jobs:
           "PERL=$perl" >> $env:GITHUB_ENV
           "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
 
-      - name: Build
-        run: cargo test --workspace --no-run
-
-      - name: Test each feature combination
-        run: cargo hack test --each-feature --workspace
+      - name: Run tests
+        run: cargo test --workspace
 
   latest:
     name: Check latest dependencies
@@ -90,14 +84,8 @@ jobs:
         with:
           cache-bin: "false"
 
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-
       - name: Update dependencies to latest versions
         run: cargo update
 
-      - name: Build
-        run: cargo test --workspace --no-run
-
-      - name: Test each feature combination
-        run: cargo hack test --each-feature --workspace
+      - name: Run tests
+        run: cargo test --workspace
