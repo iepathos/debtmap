@@ -16,11 +16,13 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v7
@@ -40,11 +42,6 @@ jobs:
       with:
         tool: cargo-llvm-cov
 
-    - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-nextest
-
     - name: Free up disk space
       run: |
         sudo rm -rf /usr/share/dotnet
@@ -57,12 +54,16 @@ jobs:
     - name: Generate code coverage
       run: |
         mkdir -p target/coverage
-        cargo llvm-cov clean
-        cargo llvm-cov nextest --html --output-dir target/coverage \
+        cargo llvm-cov --json --summary-only \
+          --output-path target/coverage/coverage-summary.json \
           --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-          --test debt_tests --test entropy_tests \
-          --status-level fail --final-status-level slow
-        cargo llvm-cov report --json --summary-only --output-path target/coverage/coverage-summary.json
+          --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
+          --test cli_output_format_integration_test --test batch_integration \
+          --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
+          --test risk_analysis_tests --test integrated_analysis \
+          --test validate_improvement_integration_test --test output_validation_test \
+          --test solidity_analyzer_tests --test python_extraction_test \
+          --test risk_context_tests -- --quiet
         python3 - <<'PY'
         import json
         import sys
@@ -83,6 +84,10 @@ jobs:
             )
             sys.exit(1)
         PY
+
+    - name: Generate HTML coverage report
+      if: github.event_name == 'push'
+      run: cargo llvm-cov report --html --output-dir target/coverage/html
 
     - name: Archive code coverage results
       if: always()

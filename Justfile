@@ -102,18 +102,24 @@ test-watch:
 # Run fast coverage using the default local test scope
 coverage: coverage-fast
 
-# Run fast coverage using cargo-llvm-cov and nextest
+# Run fast coverage using cargo-llvm-cov's low-profile-count libtest harness
 coverage-fast:
     #!/usr/bin/env bash
     set -euo pipefail
     # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
     export PATH="$HOME/.cargo/bin:$PATH"
     mkdir -p target/coverage
-    find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
-    echo "Generating fast HTML coverage report with cargo-llvm-cov nextest..."
-    cargo llvm-cov nextest --no-clean --html --output-dir target/coverage \
+    cargo llvm-cov clean --profraw-only
+    echo "Generating fast HTML coverage report with cargo-llvm-cov..."
+    cargo llvm-cov --no-clean --html --output-dir target/coverage \
         --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
+        --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
+        --test cli_output_format_integration_test --test batch_integration \
+        --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
+        --test risk_analysis_tests --test integrated_analysis \
+        --test validate_improvement_integration_test --test output_validation_test \
+        --test solidity_analyzer_tests --test python_extraction_test \
+        --test risk_context_tests -- --quiet
     echo "Coverage report generated at target/coverage/html/index.html"
 
 # Run tests with coverage (lcov format)
@@ -134,7 +140,13 @@ coverage-fast-lcov:
     echo "Generating LCOV report with cargo-llvm-cov..."
     cargo llvm-cov --no-clean --lcov --output-path target/coverage/lcov.info \
         --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests -- --quiet
+        --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
+        --test cli_output_format_integration_test --test batch_integration \
+        --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
+        --test risk_analysis_tests --test integrated_analysis \
+        --test validate_improvement_integration_test --test output_validation_test \
+        --test solidity_analyzer_tests --test python_extraction_test \
+        --test risk_context_tests -- --quiet
     echo "Coverage report generated at target/coverage/lcov.info"
     # Verify the file was actually created
     if [ ! -f target/coverage/lcov.info ]; then
@@ -149,11 +161,17 @@ coverage-check:
     # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
     export PATH="$HOME/.cargo/bin:$PATH"
     mkdir -p target/coverage
-    find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
+    cargo llvm-cov clean --profraw-only
     echo "Checking fast line coverage threshold..."
-    cargo llvm-cov nextest --no-clean --json --output-path target/coverage/coverage.json \
+    cargo llvm-cov --no-clean --json --summary-only --output-path target/coverage/coverage.json \
         --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
+        --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
+        --test cli_output_format_integration_test --test batch_integration \
+        --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
+        --test risk_analysis_tests --test integrated_analysis \
+        --test validate_improvement_integration_test --test output_validation_test \
+        --test solidity_analyzer_tests --test python_extraction_test \
+        --test risk_context_tests -- --quiet
     COVERAGE=$(jq -r '.data[0].totals.lines.percent' target/coverage/coverage.json)
     echo "Current coverage: ${COVERAGE}%"
     if (( $(echo "$COVERAGE < 80" | bc -l) )); then

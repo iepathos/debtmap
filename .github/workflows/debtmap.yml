@@ -17,6 +17,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   RUST_BACKTRACE: 1
 
@@ -24,6 +25,7 @@ jobs:
   validate:
     name: Technical Debt Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
     - name: Checkout repository
@@ -34,44 +36,12 @@ jobs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
       with:
-        components: rustfmt, clippy, llvm-tools-preview
+        components: rustfmt, clippy
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
       with:
         cache-bin: "false"
-
-    - name: Free disk space
-      run: |
-        echo "Disk space before cleanup:"
-        df -h
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo rm -rf /opt/hostedtoolcache/CodeQL
-        echo "Disk space after cleanup:"
-        df -h
-
-    - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-llvm-cov
-
-    - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-nextest
-
-    - name: Generate coverage data
-      run: |
-        mkdir -p target/coverage
-        cargo llvm-cov clean
-        cargo llvm-cov nextest --lcov --output-path target/coverage/lcov.info \
-          --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-          --test debt_tests --test entropy_tests \
-          --status-level fail --final-status-level slow
-        echo "Disk space after coverage generation:"
-        df -h
 
     - name: Build debtmap debug binary
       run: |
@@ -79,21 +49,13 @@ jobs:
         echo "Disk space after debug build:"
         df -h
 
-    - name: Run debtmap validation with coverage
-      run: |
-        if [ -f "target/coverage/lcov.info" ]; then
-          ./target/debug/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json --context
-        else
-          echo "Warning: LCOV file not found, running validation without coverage data"
-          ./target/debug/debtmap validate . --format json --output debtmap-report.json --context
-        fi
+    - name: Run debtmap validation
+      run: ./target/debug/debtmap validate . --format json --output debtmap-report.json --context
 
-    - name: Upload debtmap report and coverage
+    - name: Upload debtmap report
       if: always()
       uses: actions/upload-artifact@v7
       with:
         name: debtmap-analysis-artifacts
-        path: |
-          debtmap-report.json
-          target/coverage/lcov.info
+        path: debtmap-report.json
         retention-days: 7
