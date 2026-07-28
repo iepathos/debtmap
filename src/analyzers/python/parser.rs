@@ -75,6 +75,14 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_exception_group_handler() {
+        let source = "try:\n    run()\nexcept* ValueError as errors:\n    handle(errors)\n";
+        let ast = parse_source(source, Path::new("groups.py")).unwrap();
+
+        assert!(!has_parse_errors(&ast.tree));
+    }
+
+    #[test]
     fn test_node_text() {
         let source = "x = 42";
         let path = PathBuf::from("test.py");

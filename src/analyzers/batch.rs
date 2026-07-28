@@ -1424,6 +1424,45 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_syntax_javascript_valid() {
+        let result = validate_syntax(
+            "export const answer = () => 42;",
+            Language::JavaScript,
+            Path::new("answer.js"),
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_syntax_javascript_invalid() {
+        let result = validate_syntax(
+            "export function broken( {",
+            Language::JavaScript,
+            Path::new("broken.js"),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_syntax_typescript_and_tsx() {
+        let typed = "export const answer: number = 42;";
+        let component = "export const App = () => <main>Ready</main>;";
+
+        assert!(validate_syntax(typed, Language::TypeScript, Path::new("answer.ts")).is_ok());
+        assert!(validate_syntax(component, Language::TypeScript, Path::new("app.tsx")).is_ok());
+    }
+
+    #[test]
+    fn test_validate_syntax_typescript_invalid() {
+        let result = validate_syntax(
+            "const answer: = 42;",
+            Language::TypeScript,
+            Path::new("broken.ts"),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_validate_syntax_go_valid() {
         let content = "package main\n\nfunc main() {}";
         let result = validate_syntax(content, Language::Go, Path::new("main.go"));
@@ -1489,6 +1528,20 @@ import (
     fn test_validate_syntax_go_invalid() {
         let content = "package main\n\nfunc main( {}";
         let result = validate_syntax(content, Language::Go, Path::new("main.go"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_syntax_solidity_valid() {
+        let content = "pragma solidity ^0.8.0; contract Vault {}";
+        let result = validate_syntax(content, Language::Solidity, Path::new("Vault.sol"));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_syntax_solidity_invalid() {
+        let content = "pragma solidity ^0.8.0; contract {";
+        let result = validate_syntax(content, Language::Solidity, Path::new("Broken.sol"));
         assert!(result.is_err());
     }
 

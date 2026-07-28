@@ -242,6 +242,18 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_explicit_resource_management() {
+        let source = "using resource = acquire();";
+        let path = PathBuf::from("resource.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        assert_eq!(
+            ast.tree.root_node().named_child(0).unwrap().kind(),
+            "using_declaration"
+        );
+    }
+
+    #[test]
     fn test_node_text() {
         let source = "const x = 42;";
         let path = PathBuf::from("test.js");
