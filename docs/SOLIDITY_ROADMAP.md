@@ -455,6 +455,18 @@ flowchart TB
 
 **Estimated effort:** 1–2 days
 
+**Completed alignment:**
+
+- Pinned the runtime to `tree-sitter` 0.25.10 and the grammars to JavaScript
+  0.25.0, TypeScript 0.23.2, Python 0.25.0, Go 0.25.0, and Solidity 1.2.13.
+- TypeScript 0.23.2 remains the latest published crate. Its ABI 14 grammar is
+  compatible with the runtime's ABI 13–15 window; the other grammars use ABI 15.
+- Kept the runtime on 0.25.10 because 0.26 changes Rust APIs without expanding
+  the grammar ABI window needed by debtmap.
+- Rollback is limited to restoring JavaScript 0.23.1, Python 0.23.6, and Go
+  0.23.4 in the manifest and lockfile. The 0.25.10 runtime and Solidity pin must
+  remain together because Solidity requires ABI 15.
+
 ---
 
 ### 4.7 External tool integration (optional, long-term)
@@ -556,7 +568,7 @@ Solidity support is **feature-complete** (beyond MVP) when:
 - [ ] Cross-contract call graph populated on project analysis
 - [ ] README and init template list Solidity
 - [ ] NatSpec missing-docs detection on public/external functions
-- [ ] No known parser ABI mismatches across tree-sitter grammars
+- [x] No known parser ABI mismatches across tree-sitter grammars
 
 ---
 

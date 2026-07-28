@@ -47,12 +47,12 @@ path = "src/main.rs"
 syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
 
-# Tree-sitter for JS/TS/Python parsing
-tree-sitter = "0.25"
-tree-sitter-javascript = "0.23"
-tree-sitter-typescript = "0.23"
-tree-sitter-python = "0.23"
-tree-sitter-go = "0.23"
+# Tree-sitter parsers pinned as one ABI-compatible set
+tree-sitter = "=0.25.10"
+tree-sitter-javascript = "=0.25.0"
+tree-sitter-typescript = "=0.23.2"
+tree-sitter-python = "=0.25.0"
+tree-sitter-go = "=0.25.0"
 tree-sitter-solidity = "=1.2.13"
 
 # CLI

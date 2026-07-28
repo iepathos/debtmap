@@ -198,6 +198,38 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    fn assert_supported_grammar(name: &str, language: tree_sitter::Language, expected_abi: usize) {
+        let abi = language.abi_version();
+        let supported =
+            tree_sitter::MIN_COMPATIBLE_LANGUAGE_VERSION..=tree_sitter::LANGUAGE_VERSION;
+
+        assert_eq!(abi, expected_abi, "{name} grammar ABI changed");
+        assert!(
+            supported.contains(&abi),
+            "{name} grammar ABI is unsupported"
+        );
+    }
+
+    #[test]
+    fn test_tree_sitter_grammar_abis_are_compatible() {
+        let grammars = [
+            ("javascript", tree_sitter_javascript::LANGUAGE.into(), 15),
+            (
+                "typescript",
+                tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+                14,
+            ),
+            ("tsx", tree_sitter_typescript::LANGUAGE_TSX.into(), 14),
+            ("python", tree_sitter_python::LANGUAGE.into(), 15),
+            ("go", tree_sitter_go::LANGUAGE.into(), 15),
+            ("solidity", tree_sitter_solidity::LANGUAGE.into(), 15),
+        ];
+
+        for (name, language, abi) in grammars {
+            assert_supported_grammar(name, language, abi);
+        }
+    }
+
     #[test]
     fn test_transform_ast() {
         let ast = Ast::Unknown;
