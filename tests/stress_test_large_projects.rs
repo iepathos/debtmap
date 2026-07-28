@@ -126,7 +126,7 @@ mod stress_tests {
     }
 
     #[test]
-    #[ignore] // Run with: cargo test stress_test_1000_files -- --ignored
+    #[ignore = "stress: analyzes a generated project with 1,000 files"]
     fn stress_test_1000_files() {
         let metrics = create_large_codebase_metrics(1000, 10); // 1000 files, 10 functions each = 10,000 functions
         let call_graph = create_complex_call_graph(&metrics);
@@ -194,7 +194,7 @@ mod stress_tests {
     }
 
     #[test]
-    #[ignore] // Run with: cargo test stress_test_5000_files -- --ignored
+    #[ignore = "stress: analyzes a generated project with 5,000 files"]
     fn stress_test_5000_files() {
         let metrics = create_large_codebase_metrics(5000, 10); // 5000 files, 10 functions each = 50,000 functions
         let call_graph = create_complex_call_graph(&metrics);
@@ -251,7 +251,7 @@ mod stress_tests {
     }
 
     #[test]
-    #[ignore] // Run with: cargo test stress_test_memory_pressure -- --ignored
+    #[ignore = "stress: measures memory pressure on a large generated project"]
     fn stress_test_memory_pressure() {
         // Test with limited parallelism to ensure memory efficiency
         let metrics = create_large_codebase_metrics(2000, 20); // 40,000 functions
@@ -287,7 +287,7 @@ mod stress_tests {
     }
 
     #[test]
-    #[ignore] // Run with: cargo test stress_test_highly_connected_graph -- --ignored
+    #[ignore = "stress: analyzes a highly connected generated call graph"]
     fn stress_test_highly_connected_graph() {
         // Test with a highly interconnected call graph
         let metrics = create_large_codebase_metrics(100, 100); // 10,000 functions in 100 files
@@ -368,7 +368,7 @@ mod stress_tests {
     }
 
     #[test]
-    #[ignore] // Run with: cargo test stress_test_performance_scaling -- --ignored
+    #[ignore = "stress: measures scaling across multiple generated project sizes"]
     fn stress_test_performance_scaling() {
         // Test that performance scales appropriately with different job counts
         let metrics = create_large_codebase_metrics(500, 20); // 10,000 functions

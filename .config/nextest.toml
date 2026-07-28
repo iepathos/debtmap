@@ -1,0 +1,41 @@
+[profile.default]
+fail-fast = false
+failure-output = "immediate-final"
+success-output = "never"
+status-level = "fail"
+final-status-level = "slow"
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+# The default edit/test loop should identify accidental integration work quickly.
+[profile.fast]
+slow-timeout = { period = "10s", terminate-after = 2 }
+
+# Focused cross-module tests may do filesystem and parser work, but should remain bounded.
+[profile.integration]
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+# CLI tests share Cargo and terminal-adjacent resources, so run them serially.
+[profile.cli]
+test-threads = 1
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+# Slow regression tests are intentional, but a five-minute test is still actionable.
+[profile.slow]
+test-threads = 2
+slow-timeout = { period = "60s", terminate-after = 5 }
+
+# Stress tests trade feedback speed for scale and run serially to reduce timing noise.
+[profile.stress]
+test-threads = 1
+slow-timeout = { period = "120s", terminate-after = 3 }
+
+# Environment-dependent tests use external binaries, terminal state, or local artifacts.
+[profile.environment]
+test-threads = 1
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+# Known-broken tests are diagnostic and should fail promptly without retries.
+[profile.known-broken]
+test-threads = 1
+retries = 0
+slow-timeout = { period = "30s", terminate-after = 2 }

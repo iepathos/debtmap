@@ -51,36 +51,41 @@ clean:
 
 # === TESTING ===
 
-# Run all tests with nextest for faster execution
-test:
-    @echo "Running tests with cargo nextest..."
-    SKIP_INTEGRATION_TESTS=1 cargo nextest run --lib \
-        --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests \
-        --status-level fail --final-status-level slow
+# Run the bounded fast feedback suite
+test: test-fast
 
-# Run only the integration tests that don't hang
-test-safe:
-    cargo build
-    cargo nextest run --lib
-    @echo "Running safe integration tests..."
-    @for test in analyzer_tests apply_entropy_dampening_tests bug_documentation_tests \
-        call_graph_closure_test call_graph_extraction_test call_graph_improved_test \
-        call_graph_resolution_test cognitive_complexity_tests complexity_comparison_test \
-        complexity_module_tests complexity_tests context_aware_integration_test \
-        context_aware_test core_ast_tests core_cache_tests core_display_tests \
-        core_metrics_tests core_monadic_tests core_untested_functions_tests \
-        cross_module_call_false_positive_test cross_module_field_access_test \
-        cyclomatic_complexity_tests debt_grouping_tests debt_tests \
-        debug_real_callgraph_test dependency_and_coupling_tests \
-        entropy_integration_tests entropy_tests error_swallowing_test \
-        external_api_detection_tests external_api_detector_integration_test \
-        false_positive_reproduction_tests fast_unit_tests field_access_chain_test \
-        io_walker_tests; do \
-        echo "Testing $$test..."; \
-        cargo nextest run --test $$test || exit 1; \
-    done
-    @echo "✅ All safe tests passed!"
+# Run library tests and the smallest stable integration targets
+test-fast:
+    @echo "Running tests with cargo nextest..."
+    cargo nextest run --profile fast --lib \
+        --test analyzer_tests --test complexity_tests --test core_metrics_tests \
+        --test debt_tests --test entropy_tests
+
+# Backwards-compatible fast plus bounded integration suite
+test-safe: test-fast test-integration
+
+# Run the bounded cross-module regression suite
+test-integration:
+    cargo nextest run --profile integration \
+        --test analyzer_tests --test apply_entropy_dampening_tests --test batch_integration \
+        --test bug_documentation_tests --test call_graph_closure_test \
+        --test call_graph_extraction_test --test call_graph_improved_test \
+        --test call_graph_resolution_test --test call_graph_cross_file_resolution_test \
+        --test cognitive_complexity_tests --test complexity_comparison_test \
+        --test complexity_module_tests --test complexity_tests \
+        --test context_aware_integration_test --test context_aware_test --test core_ast_tests \
+        --test core_display_tests --test core_metrics_tests --test core_monadic_tests \
+        --test core_untested_functions_tests --test cyclomatic_complexity_tests \
+        --test debt_grouping_tests --test debt_tests --test dependency_and_coupling_tests \
+        --test demo_library_api_test --test determinism_regression_test \
+        --test entropy_integration_tests --test entropy_tests \
+        --test error_swallowing_pipeline_test --test error_swallowing_test \
+        --test external_api_detection_tests --test external_api_detector_integration_test \
+        --test false_positive_reproduction_tests --test fast_unit_tests \
+        --test field_access_chain_test --test io_walker_tests --test json_serialization_test \
+        --test language_tests --test python_complexity_tests --test python_extraction_test \
+        --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
+        --test validate_improvement_integration_test
 
 # Run tests with output
 test-verbose:
@@ -106,7 +111,7 @@ coverage-fast:
     mkdir -p target/coverage
     find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
     echo "Generating fast HTML coverage report with cargo-llvm-cov nextest..."
-    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --no-clean --html --output-dir target/coverage \
+    cargo llvm-cov nextest --no-clean --html --output-dir target/coverage \
         --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
         --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
     echo "Coverage report generated at target/coverage/html/index.html"
@@ -127,7 +132,7 @@ coverage-fast-lcov:
     # but source coverage creates one raw profile per test process, which makes
     # LLVM's final merge/export step dominate this suite.
     echo "Generating LCOV report with cargo-llvm-cov..."
-    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov --no-clean --lcov --output-path target/coverage/lcov.info \
+    cargo llvm-cov --no-clean --lcov --output-path target/coverage/lcov.info \
         --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
         --test debt_tests --test entropy_tests -- --quiet
     echo "Coverage report generated at target/coverage/lcov.info"
@@ -146,7 +151,7 @@ coverage-check:
     mkdir -p target/coverage
     find target/llvm-cov-target -maxdepth 1 -name '*.profraw' -delete 2>/dev/null || true
     echo "Checking fast line coverage threshold..."
-    SKIP_INTEGRATION_TESTS=1 cargo llvm-cov nextest --no-clean --json --output-path target/coverage/coverage.json \
+    cargo llvm-cov nextest --no-clean --json --output-path target/coverage/coverage.json \
         --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
         --test debt_tests --test entropy_tests --status-level fail --final-status-level slow
     COVERAGE=$(jq -r '.data[0].totals.lines.percent' target/coverage/coverage.json)
@@ -239,29 +244,63 @@ analyze-self:
 test-prop:
     cargo nextest run prop
 
-# Run integration tests only
-test-integration:
-    cargo nextest run --test '*'
+# Run bounded CLI/output tests serially against Cargo's prebuilt debug binary
+test-cli:
+    cargo nextest run --profile cli \
+        --test clean_dispatcher_output_test --test cli_output_format_integration_test \
+        --test progress_display_integration_test --test validate_parallel_test
 
 # Run benchmarks
 bench:
     cargo bench
 
-# Run ignored tests (including performance tests)
-test-ignored:
-    cargo nextest run --run-ignored ignored-only
-
-# Run slow git/context regression tests explicitly
+# Run bounded slow repository/context regressions
 test-slow:
-    cargo nextest run --run-ignored ignored-only 'risk::context'
+    cargo nextest run --profile slow --run-ignored only --lib \
+        --test god_object_detection_test --test integration_false_positive_test \
+        test_git_history_on_real_repo test_git_history_with_analysis_style_paths \
+        test_git_history_via_context_aggregator test_large_call_graph_no_stack_overflow \
+        test_context_aggregator_large_codebase test_real_project_health_score \
+        test_detects_rust_call_graph_scenario test_spec_130_god_class_vs_god_file_detection \
+        test_context_aware_on_entire_codebase
+    cargo nextest run --profile slow --run-ignored only --test ui_tests
 
-# Run performance tests only
-test-perf:
-    cargo nextest run --run-ignored ignored-only perf
+# Run bounded scale and timing tests
+test-stress:
+    cargo nextest run --profile stress --run-ignored only --lib \
+        test_analyze_many_functions_with_context_no_stack_overflow
+    cargo nextest run --profile stress --run-ignored only \
+        --test call_graph_debug_output_test --test call_graph_stress_test \
+        --test demo_library_api_test --test functional_composition_validation_test \
+        --test parallel_unified_analysis_test --test stress_test_large_projects
+    cargo nextest run --profile stress \
+        --test boilerplate_performance_test --test coverage_performance_regression_test
 
-# Run all tests including ignored ones
-test-all:
-    cargo nextest run --run-ignored all
+# Run opt-in tests that depend on terminal state, binaries, or local artifacts
+test-environment:
+    cargo nextest run --profile environment --run-ignored only --lib \
+        --test trait_method_coverage_test \
+        test_editor_command_construction test_execute_detail_action_open_in_editor \
+        test_coverage_matching_integration test_explain_coverage_finds_trait_method
+
+# Run only ignored tests that document unfinished behavior
+test-known-broken:
+    cargo nextest run --profile known-broken --run-ignored only --lib \
+        --test clustering_integration --test god_object_config_rs_test \
+        --test inter_procedural_purity_test --test tier_aware_filtering_integration_test \
+        test_simple_import_resolution test_select_macro test_clustering_determinism \
+        test_god_object_detection_on_config_rs test_impure_caller_propagates_impurity \
+        test_all_error_swallowing_patterns_visible_with_defaults test_t1_bypasses_high_threshold
+
+# Run every supported bounded group expected to pass in a configured environment
+test-supported: test-fast test-integration test-cli test-slow test-stress
+
+# Compatibility name for all ignored dispositions; diagnostics may fail by design
+test-ignored: test-slow test-stress test-environment test-known-broken
+test-perf: test-stress
+
+# Exhaustive bounded run; environment and known-broken diagnostics may fail by design
+test-all: test-supported test-environment test-known-broken
 
 # === CODE QUALITY ===
 
@@ -360,15 +399,13 @@ new-example NAME:
 # === CI/CD SIMULATION ===
 
 # Run all CI checks locally (matches GitHub Actions)
-ci:
+ci: test-fast test-integration test-cli
     @echo "Running CI checks (matching GitHub Actions)..."
     @echo "Setting environment variables..."
     @export CARGO_TERM_COLOR=always && \
      export CARGO_INCREMENTAL=0 && \
      export RUSTFLAGS="-Dwarnings" && \
      export RUST_BACKTRACE=1 && \
-     echo "Running tests..." && \
-     cargo nextest run --all-features && \
      echo "Running doc tests..." && \
      cargo test --doc && \
      echo "Running clippy..." && \
@@ -379,27 +416,17 @@ ci:
      cargo doc --no-deps --document-private-items && \
      echo "All CI checks passed!"
 
-# Run compatibility tests only
-test-compatibility:
-    cargo nextest run --test compatibility -j 1
-
-# Run performance tests only  
-test-performance:
-    cargo nextest run --test performance
-
 # Full CI build pipeline (equivalent to scripts/ci-build.sh)
-ci-build:
+ci-build: test-fast test-integration test-cli
     @echo "Building debtmap..."
     @echo "Checking code formatting..."
     cargo fmt --all -- --check
     @echo "Running clippy..."
     cargo clippy --all-targets --all-features -- -D warnings
     @echo "Building project..."
-    cargo build --release
-    @echo "Running tests..."
-    cargo nextest run --all
-    @echo "Building benchmarks..."
-    cargo bench --no-run
+    cargo build
+    @echo "Checking benchmarks..."
+    cargo check --benches
     @echo "Build successful!"
 
 # Pre-commit hook simulation

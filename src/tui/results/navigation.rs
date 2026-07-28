@@ -1058,7 +1058,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires terminal in raw mode for editor suspension
+    #[ignore = "environment: requires a terminal in raw mode"]
     fn test_execute_detail_action_open_in_editor() {
         let mut app = create_test_app(5);
         app.nav_mut().push_and_set_view(ViewMode::Detail);

@@ -496,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: Complete integration with CallGraphExtractor
+    #[ignore = "known-broken: CallGraphExtractor import integration is incomplete"]
     fn test_simple_import_resolution() {
         let file1 = PathBuf::from("src/main.rs");
         let file2 = PathBuf::from("src/helper.rs");

@@ -272,7 +272,7 @@ fn test_cross_file_purity_propagation() {
 }
 
 #[test]
-#[ignore] // TODO(spec-156): Impurity propagation needs enhancement - currently focuses on pure propagation
+#[ignore = "known-broken: inter-procedural impurity propagation is incomplete"]
 fn test_impure_caller_propagates_impurity() {
     // Test that calling an impure function makes the caller impure
 

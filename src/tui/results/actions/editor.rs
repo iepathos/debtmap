@@ -129,7 +129,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    #[ignore] // Requires terminal context (TUI must be active)
+    #[ignore = "environment: requires an active TUI terminal context"]
     fn test_editor_command_construction() {
         // This test requires a terminal in raw mode, which isn't available
         // during normal test runs.

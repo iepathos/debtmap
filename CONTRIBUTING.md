@@ -48,10 +48,12 @@ just watch          # Run with hot reloading
 just build          # Build the project
 
 # Testing
-just test           # Run all tests with nextest
-just test-verbose   # Run tests with output
-just coverage       # Generate coverage report
-just analyze-self   # Analyze debtmap with coverage
+just test              # Run the fast cross-platform smoke suite
+just test-integration  # Run bounded cross-module regressions
+just test-cli          # Run CLI and output-format regressions
+just test-verbose      # Run tests with output
+just coverage          # Generate coverage report
+just analyze-self      # Analyze debtmap with coverage
 
 # Code Quality
 just fmt            # Format code with rustfmt
@@ -180,8 +182,12 @@ mod tests {
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run the fast edit/test feedback suite
 just test
+
+# Run the bounded integration and CLI suites
+just test-integration
+just test-cli
 
 # Run with verbose output
 just test-verbose
@@ -193,6 +199,23 @@ just test-pattern "complexity"
 just coverage
 just coverage-open  # Opens HTML report
 ```
+
+Debtmap intentionally separates tests by feedback cost:
+
+| Recipe | Purpose | Pull-request CI |
+| --- | --- | --- |
+| `just test` | Library tests and a small stable integration smoke set | Linux, macOS, and Windows |
+| `just test-integration` | Parsers, language analyzers, call graphs, scoring, and serialization | Curated subset on Ubuntu |
+| `just test-cli` | End-to-end debug-binary and output-format behavior | Curated subset on Ubuntu |
+| `just test-slow` | Repository-scale and context regressions | Opt-in |
+| `just test-stress` | Performance, scale, and stack-safety checks | Scheduled or opt-in |
+| `just test-environment` | Terminal-, artifact-, and environment-dependent diagnostics | Opt-in |
+| `just test-known-broken` | Diagnostics for unfinished behavior | Opt-in; failures are expected until fixed |
+
+The profiles in `.config/nextest.toml` give each category explicit concurrency
+and timeout limits. Add ordinary regressions to the smallest applicable
+non-ignored group. Use `#[ignore]` only for slow/stress, environment-dependent,
+or known-broken behavior, and make that disposition explicit in the annotation.
 
 ### Test Coverage Expectations
 

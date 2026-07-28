@@ -16,7 +16,7 @@ use tempfile::TempDir;
 /// NOTE: This test currently validates the test setup works. Full validation
 /// of the 7 patterns will work once error swallowing line number extraction is fixed.
 #[test]
-#[ignore] // Ignored until error swallowing detection line number extraction is fixed
+#[ignore = "known-broken: error-swallowing line extraction is incomplete"]
 fn test_all_error_swallowing_patterns_visible_with_defaults() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let src_dir = temp_dir.path().join("src");
@@ -353,7 +353,7 @@ edition = "2021"
 ///
 /// NOTE: Ignored until error swallowing detection line number extraction is fixed
 #[test]
-#[ignore] // Ignored until error swallowing detection line number extraction is fixed
+#[ignore = "known-broken: error-swallowing line extraction is incomplete"]
 fn test_t1_bypasses_high_threshold() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let src_dir = temp_dir.path().join("src");

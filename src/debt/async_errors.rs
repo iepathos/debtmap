@@ -294,7 +294,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: Complex macro parsing requires more work
+    #[ignore = "known-broken: select macro parsing is incomplete"]
     fn test_select_macro() {
         let code = r#"
             async fn example() {

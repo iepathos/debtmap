@@ -917,7 +917,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Integration test - run explicitly
+    #[ignore = "slow: analyzes the full debtmap project call graph"]
     fn test_real_project_health_score() {
         use crate::builders::call_graph;
         use crate::core::Language;

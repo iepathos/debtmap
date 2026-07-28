@@ -5,7 +5,6 @@ use common::analyze_code_snippet;
 use debtmap::core::Language;
 
 #[test]
-#[ignore = "Demo test - may hang in CI"]
 fn test_library_api_demo() {
     // This test demonstrates using the library API directly
     // instead of spawning `cargo run` subprocesses
@@ -57,7 +56,7 @@ fn main() {
 }
 
 #[test]
-#[ignore = "Demo test - may hang in CI"]
+#[ignore = "stress: timing-sensitive sub-100ms performance assertion"]
 fn test_no_subprocess_hanging() {
     // This test shows that we can run multiple analyses quickly
     // without subprocess overhead or hanging issues

@@ -339,7 +339,7 @@ fn test_parallel_vs_sequential_consistency() {
 }
 
 #[test]
-#[ignore] // Performance test - can be slow on CI or with coverage instrumentation
+#[ignore = "stress: timing-sensitive parallel performance comparison"]
 fn test_large_codebase_parallel_analysis() {
     use std::time::{Duration, Instant};
 
@@ -941,7 +941,7 @@ fn test_god_objects_visible_in_tui() {
 }
 
 #[test]
-#[ignore] // Performance test - run explicitly with --ignored
+#[ignore = "stress: measures large-project parallel scoring performance"]
 fn test_data_flow_population_performance_overhead() {
     // This test validates spec 216 requirement: "Performance: Data flow population must add < 10% to total analysis time"
     // We measure the overhead by comparing analysis with and without data flow population
@@ -1299,7 +1299,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
 }
 
 #[test]
-#[ignore] // Performance test - run explicitly with --ignored
+#[ignore = "stress: measures parallel scaling across project sizes"]
 fn test_extraction_pipeline_speedup() {
     // This test validates spec 213 requirement: "10x+ speedup measured on large codebase"
     // Measures the speedup from using unified extraction vs repeated parsing
