@@ -5,6 +5,10 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+fn debtmap_command() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_debtmap"))
+}
+
 /// Test that progress display shows all 2 phases during analysis
 #[test]
 fn test_progress_display_shows_all_phases() {
@@ -13,16 +17,8 @@ fn test_progress_display_shows_all_phases() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run debtmap analyze on the sample codebase
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
-            "analyze",
-            test_codebase.to_str().unwrap(),
-        ])
+    let output = debtmap_command()
+        .args(["analyze", test_codebase.to_str().unwrap()])
         .output()
         .expect("Failed to execute debtmap command");
 
@@ -59,16 +55,8 @@ fn test_progress_display_shows_completion_indicators() {
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
-            "analyze",
-            test_codebase.to_str().unwrap(),
-        ])
+    let output = debtmap_command()
+        .args(["analyze", test_codebase.to_str().unwrap()])
         .output()
         .expect("Failed to execute debtmap command");
 
@@ -89,16 +77,8 @@ fn test_progress_display_completes_all_phases() {
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
-            "analyze",
-            test_codebase.to_str().unwrap(),
-        ])
+    let output = debtmap_command()
+        .args(["analyze", test_codebase.to_str().unwrap()])
         .output()
         .expect("Failed to execute debtmap command");
 
@@ -123,16 +103,8 @@ fn test_progress_display_shows_timing() {
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
-            "analyze",
-            test_codebase.to_str().unwrap(),
-        ])
+    let output = debtmap_command()
+        .args(["analyze", test_codebase.to_str().unwrap()])
         .output()
         .expect("Failed to execute debtmap command");
 
@@ -161,16 +133,8 @@ fn test_progress_display_with_empty_codebase() {
     // Create empty temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
-            "analyze",
-            temp_dir.path().to_str().unwrap(),
-        ])
+    let output = debtmap_command()
+        .args(["analyze", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to execute debtmap command");
 

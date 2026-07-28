@@ -10,6 +10,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
+fn debtmap_command() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_debtmap"))
+}
+
 /// Comprehensive test for coverage matching including trait methods
 ///
 /// This test runs debtmap analysis on the codebase itself with coverage data
@@ -20,7 +24,7 @@ use tempfile::TempDir;
 /// Trait methods test the name variant matching where debtmap stores
 /// "Type::method" but LCOV stores "method".
 #[test]
-#[ignore] // Slow integration test - runs full codebase analysis
+#[ignore = "environment: requires target/coverage/lcov.info and full-repository analysis"]
 fn test_coverage_matching_integration() {
     // Skip if coverage file doesn't exist (not in CI with coverage)
     let coverage_file = PathBuf::from("target/coverage/lcov.info");
@@ -36,13 +40,8 @@ fn test_coverage_matching_integration() {
     let output_path = temp_dir.path().join("analysis_output.json");
 
     // Run debtmap analyze on itself with coverage
-    let output = Command::new("cargo")
+    let output = debtmap_command()
         .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
             "analyze",
             ".",
             "--format",
@@ -181,7 +180,7 @@ fn test_coverage_matching_integration() {
 ///
 /// This is a more direct test that the coverage lookup mechanism works correctly.
 #[test]
-#[ignore] // Slow integration test - runs cargo command
+#[ignore = "environment: requires target/coverage/lcov.info and full-repository analysis"]
 fn test_explain_coverage_finds_trait_method() {
     // Skip if coverage file doesn't exist
     let coverage_file = PathBuf::from("target/coverage/lcov.info");
@@ -194,13 +193,8 @@ fn test_explain_coverage_finds_trait_method() {
     }
 
     // Run explain-coverage looking for visit_expr by method name only
-    let output = Command::new("cargo")
+    let output = debtmap_command()
         .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
             "explain-coverage",
             ".",
             "--coverage-file",

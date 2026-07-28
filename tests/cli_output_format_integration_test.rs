@@ -3,18 +3,18 @@
 //! Note: The legacy JSON format was removed in spec 202.
 //! JSON output now always uses the unified format with consistent structure.
 
-#![allow(deprecated)] // cargo_bin deprecation - tests are ignored anyway
-
-use assert_cmd::cargo::CommandCargoExt;
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
+fn debtmap_command() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_debtmap"))
+}
+
 /// Test that --format json generates valid unified format output
 #[test]
-#[ignore = "requires pre-built binary, run with --ignored"]
 fn test_cli_output_format_unified_produces_valid_structure() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("unified_output.json");
@@ -24,8 +24,7 @@ fn test_cli_output_format_unified_produces_valid_structure() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run debtmap analyze with --format json (always uses unified format now)
-    let output = Command::cargo_bin("debtmap")
-        .unwrap()
+    let output = debtmap_command()
         .args([
             "analyze",
             "--format",
@@ -152,7 +151,6 @@ fn test_cli_output_format_unified_produces_valid_structure() {
 
 /// Test that unified format can be parsed and filtered by scope
 #[test]
-#[ignore = "requires pre-built binary, run with --ignored"]
 fn test_cli_unified_format_scope_filtering() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("unified_output.json");
@@ -161,8 +159,7 @@ fn test_cli_unified_format_scope_filtering() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run analysis (JSON output always uses unified format)
-    let output = Command::cargo_bin("debtmap")
-        .unwrap()
+    let output = debtmap_command()
         .args([
             "analyze",
             "--format",
@@ -203,7 +200,6 @@ fn test_cli_unified_format_scope_filtering() {
 
 /// Test that unified format includes proper metric data
 #[test]
-#[ignore = "requires pre-built binary, run with --ignored"]
 fn test_cli_unified_format_metrics_presence() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("unified_output.json");
@@ -212,8 +208,7 @@ fn test_cli_unified_format_metrics_presence() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run analysis (JSON output always uses unified format)
-    let output = Command::cargo_bin("debtmap")
-        .unwrap()
+    let output = debtmap_command()
         .args([
             "analyze",
             "--format",
@@ -248,14 +243,12 @@ fn test_cli_unified_format_metrics_presence() {
 // Legacy JSON format has been removed - unified format is now the only format
 
 #[test]
-#[ignore = "requires pre-built binary, run with --ignored"]
 fn test_cli_go_json_output_contains_go_function_location() {
     let temp_dir = TempDir::new().unwrap();
     write_go_fixture(temp_dir.path());
     let output_path = temp_dir.path().join("go_output.json");
 
-    let output = Command::cargo_bin("debtmap")
-        .unwrap()
+    let output = debtmap_command()
         .args([
             "analyze",
             "--format",
@@ -285,14 +278,12 @@ fn test_cli_go_json_output_contains_go_function_location() {
 }
 
 #[test]
-#[ignore = "requires pre-built binary, run with --ignored"]
 fn test_cli_go_markdown_output_contains_function_name() {
     let temp_dir = TempDir::new().unwrap();
     write_go_fixture(temp_dir.path());
     let output_path = temp_dir.path().join("go_output.md");
 
-    let output = Command::cargo_bin("debtmap")
-        .unwrap()
+    let output = debtmap_command()
         .args([
             "analyze",
             "--format",
