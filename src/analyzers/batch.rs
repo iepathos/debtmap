@@ -838,8 +838,41 @@ fn resolve_go_call(
     imports: &HashMap<String, String>,
     index: &GoSymbolIndex,
 ) -> Option<ResolvedGoCall> {
+    resolve_go_call_name(call, current_package, imports, index).or_else(|| {
+        go_generic_call_base(call)
+            .and_then(|base| resolve_go_call_name(base, current_package, imports, index))
+    })
+}
+
+fn resolve_go_call_name(
+    call: &str,
+    current_package: &GoPackageKey,
+    imports: &HashMap<String, String>,
+    index: &GoSymbolIndex,
+) -> Option<ResolvedGoCall> {
     imported_go_call(call, imports, index)
         .or_else(|| same_package_go_call(call, current_package, index))
+}
+
+fn go_generic_call_base(call: &str) -> Option<&str> {
+    if !call.ends_with(']') {
+        return None;
+    }
+
+    let mut depth = 0u32;
+    for (index, character) in call.char_indices().rev() {
+        match character {
+            ']' => depth += 1,
+            '[' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return (index > 0).then_some(&call[..index]);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn same_package_go_call(
@@ -1417,6 +1450,17 @@ mod tests {
             super::join_go_import_path("example.com/app", Path::new("")),
             "example.com/app"
         );
+    }
+
+    #[test]
+    fn test_go_generic_call_base() {
+        assert_eq!(super::go_generic_call_base("Map[int]"), Some("Map"));
+        assert_eq!(
+            super::go_generic_call_base("mathx.Map[map[string][]int]"),
+            Some("mathx.Map")
+        );
+        assert_eq!(super::go_generic_call_base("callbacks[0].Run"), None);
+        assert_eq!(super::go_generic_call_base("Map"), None);
     }
 
     #[test]

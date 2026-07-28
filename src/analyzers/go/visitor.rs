@@ -4,26 +4,19 @@ use crate::analyzers::go::purity::analyze_purity;
 use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
 use crate::core::PurityLevel;
 use crate::core::ast::GoAst;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use tree_sitter::Node;
 
 pub fn analyze_ast(ast: &GoAst) -> GoAnalysis {
     let root = ast.tree.root_node();
-    let return_types = function_return_types(root, ast);
-    let package_variables = package_variables(root, ast);
+    let context = GoFileContext::new(root, ast);
     let mut analysis = GoAnalysis {
         package_name: package_name_from_ast(ast),
         functions: Vec::new(),
     };
 
-    collect_functions(
-        root,
-        ast,
-        &return_types,
-        &package_variables,
-        &mut analysis.functions,
-    );
+    collect_functions(root, ast, &context, &mut analysis.functions);
     analysis
         .functions
         .sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
@@ -37,56 +30,39 @@ pub fn package_name_from_ast(ast: &GoAst) -> Option<String> {
 fn collect_functions(
     node: Node,
     ast: &GoAst,
-    return_types: &HashMap<String, String>,
-    package_variables: &[String],
+    context: &GoFileContext,
     functions: &mut Vec<GoFunction>,
 ) {
-    if let Some(function) = function_from_node(node, ast, return_types, package_variables) {
+    if let Some(function) = function_from_node(node, ast, context) {
         functions.push(function);
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_functions(child, ast, return_types, package_variables, functions);
+        collect_functions(child, ast, context, functions);
     }
 }
 
-fn function_from_node(
-    node: Node,
-    ast: &GoAst,
-    return_types: &HashMap<String, String>,
-    package_variables: &[String],
-) -> Option<GoFunction> {
+fn function_from_node(node: Node, ast: &GoAst, context: &GoFileContext) -> Option<GoFunction> {
     match node.kind() {
-        "function_declaration" => named_function(node, ast, return_types, package_variables),
-        "method_declaration" => method_function(node, ast, return_types, package_variables),
+        "function_declaration" => named_function(node, ast, context),
+        "method_declaration" => method_function(node, ast, context),
         _ => None,
     }
 }
 
-fn named_function(
-    node: Node,
-    ast: &GoAst,
-    return_types: &HashMap<String, String>,
-    package_variables: &[String],
-) -> Option<GoFunction> {
+fn named_function(node: Node, ast: &GoAst, context: &GoFileContext) -> Option<GoFunction> {
     let name = child_text(node, "name", ast)?;
     Some(build_function(
         node,
         ast,
         name,
         GoFunctionKind::Function,
-        FunctionContext::new(return_types, None),
-        package_variables,
+        FunctionContext::new(context, None),
     ))
 }
 
-fn method_function(
-    node: Node,
-    ast: &GoAst,
-    return_types: &HashMap<String, String>,
-    package_variables: &[String],
-) -> Option<GoFunction> {
+fn method_function(node: Node, ast: &GoAst, context: &GoFileContext) -> Option<GoFunction> {
     let name = child_text(node, "name", ast)?;
     let receiver = receiver_info(node, ast);
     let receiver_type = receiver
@@ -98,8 +74,7 @@ fn method_function(
         ast,
         format!("{receiver_type}.{name}"),
         GoFunctionKind::Method,
-        FunctionContext::new(return_types, receiver),
-        package_variables,
+        FunctionContext::new(context, receiver),
     ))
 }
 
@@ -109,7 +84,6 @@ fn build_function(
     name: String,
     kind: GoFunctionKind,
     context: FunctionContext<'_>,
-    package_variables: &[String],
 ) -> GoFunction {
     let body = node.child_by_field_name("body");
     let cyclomatic = body.map(cyclomatic_complexity).unwrap_or(1);
@@ -118,11 +92,25 @@ fn build_function(
     let purity = body.map(|node| analyze_purity(node, &ast.source));
     let is_test = is_test_file(&ast.path) || is_test_function(&name);
     let advisory = body
-        .map(|node| detect_advanced_signals(node, &ast.source, &name, is_test, package_variables))
+        .map(|node| {
+            detect_advanced_signals(
+                node,
+                &ast.source,
+                &name,
+                is_test,
+                &context.file.package_variables,
+            )
+        })
         .unwrap_or_default();
     let local_types = body
         .map(|node| local_type_environment(node, ast, &context))
         .unwrap_or_default();
+    let local_names = function_local_names(node, ast);
+    let call_context = CallContext {
+        local_types: &local_types,
+        function_names: &context.file.function_names,
+        local_names: &local_names,
+    };
 
     GoFunction {
         visibility: visibility_for(&name),
@@ -136,7 +124,7 @@ fn build_function(
         nesting,
         kind,
         calls: body
-            .map(|node| collect_calls(node, ast, &local_types))
+            .map(|node| collect_calls(node, ast, &call_context))
             .unwrap_or_default(),
         purity_level: purity
             .as_ref()
@@ -165,17 +153,36 @@ struct ReceiverInfo {
     type_name: String,
 }
 
+struct GoFileContext {
+    return_types: HashMap<String, String>,
+    function_names: HashSet<String>,
+    package_variables: Vec<String>,
+}
+
+impl GoFileContext {
+    fn new(root: Node, ast: &GoAst) -> Self {
+        Self {
+            return_types: function_return_types(root, ast),
+            function_names: function_names(root, ast),
+            package_variables: package_variables(root, ast),
+        }
+    }
+}
+
 struct FunctionContext<'a> {
-    return_types: &'a HashMap<String, String>,
+    file: &'a GoFileContext,
     receiver: Option<ReceiverInfo>,
 }
 
+struct CallContext<'a> {
+    local_types: &'a HashMap<String, String>,
+    function_names: &'a HashSet<String>,
+    local_names: &'a HashSet<String>,
+}
+
 impl<'a> FunctionContext<'a> {
-    fn new(return_types: &'a HashMap<String, String>, receiver: Option<ReceiverInfo>) -> Self {
-        Self {
-            return_types,
-            receiver,
-        }
+    fn new(file: &'a GoFileContext, receiver: Option<ReceiverInfo>) -> Self {
+        Self { file, receiver }
     }
 }
 
@@ -221,6 +228,57 @@ fn function_return_types(root: Node, ast: &GoAst) -> HashMap<String, String> {
     children(root)
         .into_iter()
         .filter_map(|child| function_return_type(child, ast))
+        .collect()
+}
+
+fn function_names(root: Node, ast: &GoAst) -> HashSet<String> {
+    children(root)
+        .into_iter()
+        .filter(|child| child.kind() == "function_declaration")
+        .filter_map(|child| child_text(child, "name", ast))
+        .collect()
+}
+
+fn function_local_names(function: Node, ast: &GoAst) -> HashSet<String> {
+    children(function)
+        .into_iter()
+        .flat_map(|child| collect_local_names(child, ast))
+        .collect()
+}
+
+fn collect_local_names(node: Node, ast: &GoAst) -> Vec<String> {
+    if is_nested_callable(node) {
+        return Vec::new();
+    }
+
+    binding_names(node, ast)
+        .into_iter()
+        .chain(
+            children(node)
+                .into_iter()
+                .flat_map(|child| collect_local_names(child, ast)),
+        )
+        .collect()
+}
+
+fn binding_names(node: Node, ast: &GoAst) -> Vec<String> {
+    match node.kind() {
+        "parameter_declaration" | "variadic_parameter_declaration" | "var_spec" => {
+            direct_identifiers(node, ast)
+        }
+        "short_var_declaration" | "range_clause" | "receive_statement" => node
+            .child_by_field_name("left")
+            .map(|left| direct_identifiers(left, ast))
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+fn direct_identifiers(node: Node, ast: &GoAst) -> Vec<String> {
+    children(node)
+        .into_iter()
+        .filter(|child| child.kind() == "identifier")
+        .map(|child| node_text(&child, &ast.source).to_string())
         .collect()
 }
 
@@ -427,39 +485,55 @@ fn children(node: Node) -> Vec<Node> {
     node.children(&mut cursor).collect()
 }
 
-fn collect_calls(node: Node, ast: &GoAst, local_types: &HashMap<String, String>) -> Vec<String> {
+fn collect_calls(node: Node, ast: &GoAst, context: &CallContext<'_>) -> Vec<String> {
     if is_nested_callable(node) {
         return Vec::new();
     }
 
-    let current = if node.kind() == "call_expression" {
-        call_name(node, ast, local_types).into_iter().collect()
-    } else {
-        Vec::new()
-    };
+    let current = extracted_call_name(node, ast, context)
+        .into_iter()
+        .collect::<Vec<_>>();
 
     current
         .into_iter()
         .chain(
             children(node)
                 .into_iter()
-                .flat_map(|child| collect_calls(child, ast, local_types)),
+                .flat_map(|child| collect_calls(child, ast, context)),
         )
         .collect()
 }
 
-fn call_name(node: Node, ast: &GoAst, local_types: &HashMap<String, String>) -> Option<String> {
-    node.child_by_field_name("function")
-        .map(|function| normalize_call_name(function, ast, local_types))
+fn extracted_call_name(node: Node, ast: &GoAst, context: &CallContext<'_>) -> Option<String> {
+    match node.kind() {
+        "call_expression" => call_name(node, ast, context),
+        "type_conversion_expression" => conversion_call_name(node, ast, context),
+        _ => None,
+    }
 }
 
-fn normalize_call_name(
-    function: Node,
-    ast: &GoAst,
-    local_types: &HashMap<String, String>,
-) -> String {
+fn call_name(node: Node, ast: &GoAst, context: &CallContext<'_>) -> Option<String> {
+    node.child_by_field_name("function")
+        .and_then(|function| normalize_call_name(function, ast, context))
+}
+
+fn conversion_call_name(node: Node, ast: &GoAst, context: &CallContext<'_>) -> Option<String> {
+    let generic_type = node.child_by_field_name("type")?;
+    if generic_type.kind() != "generic_type" {
+        return None;
+    }
+    let function = generic_type.child_by_field_name("type")?;
+    let name = node_text(&function, &ast.source);
+    generic_candidate(name, node_text(&generic_type, &ast.source), context)
+}
+
+fn normalize_call_name(function: Node, ast: &GoAst, context: &CallContext<'_>) -> Option<String> {
     let text = node_text(&function, &ast.source);
-    selector_call_name(text, local_types).unwrap_or_else(|| text.to_string())
+    (function.kind() == "selector_expression")
+        .then(|| selector_call_name(text, context.local_types))
+        .flatten()
+        .or_else(|| generic_call_name(function, ast, context))
+        .or_else(|| (function.kind() != "index_expression").then(|| text.to_string()))
 }
 
 fn selector_call_name(text: &str, local_types: &HashMap<String, String>) -> Option<String> {
@@ -468,6 +542,27 @@ fn selector_call_name(text: &str, local_types: &HashMap<String, String>) -> Opti
         .get(receiver)
         .map(|type_name| format!("{type_name}.{method}"))
         .or_else(|| Some(format!("{receiver}.{method}")))
+}
+
+fn generic_call_name(function: Node, ast: &GoAst, context: &CallContext<'_>) -> Option<String> {
+    let operand = (function.kind() == "index_expression")
+        .then(|| function.child_by_field_name("operand"))
+        .flatten()?;
+    let name = node_text(&operand, &ast.source);
+    generic_candidate(name, node_text(&function, &ast.source), context)
+}
+
+fn generic_candidate(name: &str, raw: &str, context: &CallContext<'_>) -> Option<String> {
+    let root = name.split('.').next().unwrap_or(name);
+    if context.local_names.contains(root) {
+        return None;
+    }
+
+    Some(if context.function_names.contains(name) {
+        name.to_string()
+    } else {
+        raw.to_string()
+    })
 }
 
 fn local_type_environment(
@@ -482,7 +577,7 @@ fn local_type_environment(
         .into_iter()
         .collect();
 
-    collect_local_types(body, ast, context.return_types, initial)
+    collect_local_types(body, ast, &context.file.return_types, initial)
 }
 
 fn receiver_binding(receiver: &ReceiverInfo) -> Option<(String, String)> {
@@ -752,5 +847,48 @@ func (s Set[T]) Has(item T) bool {
             .unwrap();
 
         assert_eq!(run.calls, vec!["NewSet".to_string(), "Set.Has".to_string()]);
+    }
+
+    #[test]
+    fn test_normalizes_generic_calls_without_emitting_indexed_calls() {
+        let source = r#"package collections
+
+func Run(callbacks []func()) {
+    Print[int](1)
+    callbacks[0]()
+}
+
+func Print[T any](item T) {}
+"#;
+        let ast = parse_source(source, &PathBuf::from("calls.go")).unwrap();
+        let analysis = analyze_ast(&ast);
+        let run = analysis
+            .functions
+            .iter()
+            .find(|function| function.name == "Run")
+            .unwrap();
+
+        assert_eq!(run.calls, vec!["Print".to_string()]);
+    }
+
+    #[test]
+    fn test_local_indexed_value_shadows_function_name() {
+        let source = r#"package collections
+
+func Print() {}
+
+func Run(Print []func()) {
+    Print[0]()
+}
+"#;
+        let ast = parse_source(source, &PathBuf::from("shadow.go")).unwrap();
+        let analysis = analyze_ast(&ast);
+        let run = analysis
+            .functions
+            .iter()
+            .find(|function| function.name == "Run")
+            .unwrap();
+
+        assert!(run.calls.is_empty());
     }
 }

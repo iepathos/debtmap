@@ -1193,6 +1193,40 @@ func Add() {}
 }
 
 #[test]
+fn test_go_generic_module_import_calls_resolve() {
+    let files = vec![
+        (
+            "cmd/app/main.go",
+            r#"package main
+
+import "example.com/app/internal/mathx"
+
+func main() {
+    mathx.Identity[int](1)
+}
+"#,
+        ),
+        (
+            "internal/mathx/math.go",
+            "package mathx\n\nfunc Identity[T any](item T) T { return item }\n",
+        ),
+    ];
+    let (temp_dir, paths) = create_test_project(&files);
+    fs::write(temp_dir.path().join("go.mod"), "module example.com/app\n").unwrap();
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let main_fn = find_go_function(&results, "main.go", "main");
+    let identity = find_go_function(&results, "math.go", "Identity");
+
+    assert_eq!(
+        main_fn.downstream_callees,
+        Some(vec!["Identity".to_string()])
+    );
+    assert_eq!(identity.upstream_callers, Some(vec!["main".to_string()]));
+}
+
+#[test]
 fn test_go_module_alias_import_calls_resolve() {
     let files = vec![
         (
@@ -1362,6 +1396,53 @@ func format(item int) string {
 
     assert_eq!(run.downstream_callees, Some(vec!["Map".to_string()]));
     assert_eq!(map.upstream_callers, Some(vec!["Run".to_string()]));
+}
+
+#[test]
+fn test_go_cross_file_generic_instantiated_calls_resolve() {
+    let files = vec![
+        (
+            "run.go",
+            "package collections\n\nfunc Run() int { return Identity[int](1) }\n",
+        ),
+        (
+            "identity.go",
+            "package collections\n\nfunc Identity[T any](item T) T { return item }\n",
+        ),
+    ];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let run = find_go_function(&results, "run.go", "Run");
+    let identity = find_go_function(&results, "identity.go", "Identity");
+
+    assert_eq!(run.downstream_callees, Some(vec!["Identity".to_string()]));
+    assert_eq!(identity.upstream_callers, Some(vec!["Run".to_string()]));
+}
+
+#[test]
+fn test_go_local_indexed_value_does_not_resolve_to_shadowed_function() {
+    let files = vec![(
+        "shadow.go",
+        r#"package collections
+
+func Print() {}
+
+func Run(Print []func()) {
+    Print[0]()
+}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let results =
+        run_effect(analyze_files_effect(paths), DebtmapConfig::default()).expect("analyze");
+    let run = find_go_function(&results, "shadow.go", "Run");
+    let print = find_go_function(&results, "shadow.go", "Print");
+
+    assert_eq!(run.downstream_callees, None);
+    assert_eq!(print.upstream_callers, None);
 }
 
 fn find_go_function<'a>(
