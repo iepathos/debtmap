@@ -27,6 +27,7 @@ mod scoring;
 pub mod types;
 
 // Re-export public types
+pub(crate) use types::parse_debtmap_json;
 pub use types::{AnalysisSummary, CompareConfig, DebtmapJsonInput, GapDetail, ValidationResult};
 
 use analysis::{create_summary, identify_all_changes};

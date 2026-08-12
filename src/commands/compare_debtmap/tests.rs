@@ -1140,9 +1140,9 @@ fn test_output_json_deserializes_for_compare() {
         },
         summary: DebtSummary {
             total_items: 0,
-            total_debt_score: 0.0,
-            debt_density: 0.0,
-            total_loc: 0,
+            total_debt_score: 75.0,
+            debt_density: 25.0,
+            total_loc: 3000,
             by_type: TypeBreakdown {
                 file: 0,
                 function: 0,
@@ -1163,12 +1163,16 @@ fn test_output_json_deserializes_for_compare() {
     let json = serde_json::to_string_pretty(&unified_output).expect("Failed to serialize");
 
     // Deserialize as DebtmapJsonInput (what compare reads)
-    let result: Result<DebtmapJsonInput, _> = serde_json::from_str(&json);
+    let result = super::types::parse_debtmap_json(&json);
     assert!(
         result.is_ok(),
         "UnifiedOutput JSON should deserialize as DebtmapJsonInput: {:?}",
         result.err()
     );
+    let input = result.unwrap();
+    assert_eq!(input.total_debt_score, 75.0);
+    assert_eq!(input.debt_density, 25.0);
+    assert_eq!(input.total_lines_of_code, 3000);
 }
 
 // =============================================================================

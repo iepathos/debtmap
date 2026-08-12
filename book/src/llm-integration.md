@@ -74,67 +74,9 @@ For programmatic access and CI/CD integration:
 debtmap analyze . --format json --output debt.json
 ```
 
-**Structure:**
-```json
-{
-  "format_version": "3.0",
-  "metadata": {
-    "debtmap_version": "0.16.5",
-    "generated_at": "2026-05-18T10:30:00Z",
-    "project_root": ".",
-    "analysis_type": "unified"
-  },
-  "summary": {
-    "total_items": 47,
-    "total_debt_score": 2140.5,
-    "debt_density": 138.8,
-    "total_loc": 15420,
-    "score_distribution": {
-      "critical": 3,
-      "high": 12,
-      "medium": 20,
-      "low": 12
-    }
-  },
-  "items": [
-    {
-      "type": "Function",
-      "score": 128.4,
-      "category": "Testing",
-      "priority": "critical",
-      "location": {
-        "file": "src/parser.rs",
-        "line": 38,
-        "function": "parse_complex_input"
-      },
-      "metrics": {
-        "cyclomatic_complexity": 12,
-        "cognitive_complexity": 18,
-        "length": 47,
-        "nesting_depth": 4,
-        "coverage": 0.0
-      },
-      "dependencies": {
-        "upstream_count": 2,
-        "downstream_count": 4,
-        "blast_radius": 6,
-        "critical_path": true
-      },
-      "context": {
-        "primary": {
-          "file": "src/parser.rs",
-          "start_line": 38,
-          "end_line": 85,
-          "symbol": "parse_complex_input"
-        },
-        "related": [],
-        "total_lines": 48,
-        "completeness_confidence": 0.86
-      }
-    }
-  ]
-}
-```
+The canonical structure is defined by the [unified JSON v3 schema](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json).
+Use the checked [v3 items fixture](https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json)
+as a parser and prompt example.
 
 ### Terminal
 

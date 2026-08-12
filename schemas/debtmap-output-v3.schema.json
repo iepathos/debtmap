@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.debtmap.dev/schemas/debtmap-output-v3.schema.json",
+  "title": "Debtmap unified analyze JSON v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format_version", "metadata", "summary", "items"],
+  "properties": {
+    "format_version": { "const": "3.0" },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "items": {
+      "type": "array",
+      "items": { "oneOf": [{ "$ref": "#/$defs/functionItem" }, { "$ref": "#/$defs/fileItem" }] }
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "nonNegativeNumber": { "type": "number", "minimum": 0 },
+    "ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["debtmap_version", "generated_at", "project_root", "analysis_type"],
+      "properties": {
+        "debtmap_version": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "project_root": { "type": ["string", "null"] },
+        "analysis_type": { "const": "unified" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_items", "total_debt_score", "debt_density", "total_loc", "by_type", "by_category", "score_distribution"],
+      "properties": {
+        "total_items": { "$ref": "#/$defs/nonNegativeInteger" },
+        "total_debt_score": { "$ref": "#/$defs/nonNegativeNumber" },
+        "debt_density": { "$ref": "#/$defs/nonNegativeNumber" },
+        "total_loc": { "$ref": "#/$defs/nonNegativeInteger" },
+        "by_type": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["File", "Function"],
+          "properties": {
+            "File": { "$ref": "#/$defs/nonNegativeInteger" },
+            "Function": { "$ref": "#/$defs/nonNegativeInteger" }
+          }
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/nonNegativeInteger" }
+        },
+        "score_distribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["critical", "high", "medium", "low"],
+          "properties": {
+            "critical": { "$ref": "#/$defs/nonNegativeInteger" },
+            "high": { "$ref": "#/$defs/nonNegativeInteger" },
+            "medium": { "$ref": "#/$defs/nonNegativeInteger" },
+            "low": { "$ref": "#/$defs/nonNegativeInteger" }
+          }
+        },
+        "cohesion": { "type": "object" }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "$ref": "#/$defs/nonNegativeInteger" },
+        "function": { "type": "string" },
+        "file_context_label": { "type": "string" }
+      }
+    },
+    "priority": { "enum": ["critical", "high", "medium", "low"] },
+    "functionMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cyclomatic_complexity", "cognitive_complexity", "length", "nesting_depth"],
+      "properties": {
+        "cyclomatic_complexity": { "$ref": "#/$defs/nonNegativeInteger" },
+        "cognitive_complexity": { "$ref": "#/$defs/nonNegativeInteger" },
+        "length": { "$ref": "#/$defs/nonNegativeInteger" },
+        "nesting_depth": { "$ref": "#/$defs/nonNegativeInteger" },
+        "coverage": { "$ref": "#/$defs/ratio" },
+        "uncovered_lines": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonNegativeInteger" }
+        },
+        "entropy_score": { "$ref": "#/$defs/ratio" },
+        "pattern_repetition": { "$ref": "#/$defs/ratio" },
+        "branch_similarity": { "$ref": "#/$defs/ratio" },
+        "entropy_adjusted_cognitive": { "$ref": "#/$defs/nonNegativeInteger" },
+        "transitive_coverage": { "$ref": "#/$defs/ratio" }
+      }
+    },
+    "fileMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lines", "functions", "classes", "avg_complexity", "max_complexity", "total_complexity", "coverage", "uncovered_lines"],
+      "properties": {
+        "lines": { "$ref": "#/$defs/nonNegativeInteger" },
+        "functions": { "$ref": "#/$defs/nonNegativeInteger" },
+        "classes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "avg_complexity": { "$ref": "#/$defs/nonNegativeNumber" },
+        "max_complexity": { "$ref": "#/$defs/nonNegativeInteger" },
+        "total_complexity": { "$ref": "#/$defs/nonNegativeInteger" },
+        "coverage": { "$ref": "#/$defs/ratio" },
+        "uncovered_lines": { "$ref": "#/$defs/nonNegativeInteger" },
+        "distribution": { "type": "object" }
+      }
+    },
+    "functionItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "score", "category", "priority", "location", "metrics", "debt_type", "function_role", "dependencies", "impact"],
+      "properties": {
+        "type": { "const": "Function" },
+        "score": { "$ref": "#/$defs/nonNegativeNumber" },
+        "category": { "type": "string" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "location": { "$ref": "#/$defs/location" },
+        "metrics": { "$ref": "#/$defs/functionMetrics" },
+        "debt_type": { "type": "object", "minProperties": 1, "maxProperties": 1 },
+        "function_role": { "enum": ["PureLogic", "Orchestrator", "IOWrapper", "EntryPoint", "PatternMatch", "Debug", "Unknown"] },
+        "purity_analysis": { "type": "object" },
+        "dependencies": { "type": "object" },
+        "impact": { "type": "object" },
+        "scoring_details": { "type": "object" },
+        "adjusted_complexity": { "type": "object" },
+        "complexity_pattern": { "type": "string" },
+        "pattern_type": { "type": "string" },
+        "pattern_confidence": { "$ref": "#/$defs/ratio" },
+        "pattern_details": {},
+        "context": { "type": "object" },
+        "git_history": { "type": "object" },
+        "contextual_risk": { "type": "object" }
+      }
+    },
+    "fileItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "score", "category", "priority", "location", "metrics", "impact"],
+      "properties": {
+        "type": { "const": "File" },
+        "score": { "$ref": "#/$defs/nonNegativeNumber" },
+        "category": { "type": "string" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "location": { "$ref": "#/$defs/location" },
+        "metrics": { "$ref": "#/$defs/fileMetrics" },
+        "debt_type": { "type": "object", "minProperties": 1, "maxProperties": 1 },
+        "god_object_indicators": { "type": "object" },
+        "dependencies": { "type": "object" },
+        "anti_patterns": { "type": "object" },
+        "cohesion": { "type": "object" },
+        "impact": { "type": "object" },
+        "scoring_details": { "type": "object" }
+      }
+    }
+  }
+}

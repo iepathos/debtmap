@@ -116,11 +116,10 @@ When cohesion analysis is enabled, the summary includes codebase-wide cohesion s
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 15,
-      "cognitive": 22,
-      "adjusted_cyclomatic": null
+      "cognitive": 22
     }
   },
-  "function_role": "BusinessLogic",
+  "function_role": "PureLogic",
   "purity_analysis": {
     "is_pure": false,
     "confidence": 0.8,
@@ -131,14 +130,6 @@ When cohesion analysis is enabled, the summary includes codebase-wide cohesion s
     "downstream_count": 3,
     "upstream_callers": ["main", "process_request"],
     "downstream_callees": ["validate", "save", "notify"]
-  },
-  "recommendation": {
-    "action": "Add test coverage for complex function",
-    "priority": "High",
-    "implementation_steps": [
-      "Write unit tests covering all 15 branches",
-      "Consider extracting validation logic to reduce complexity"
-    ]
   },
   "impact": {
     "coverage_improvement": 0.85,
@@ -152,7 +143,7 @@ When cohesion analysis is enabled, the summary includes codebase-wide cohesion s
   "complexity_pattern": "validation",
   "pattern_type": "state_machine",
   "pattern_confidence": 0.72,
-  "context": {                            // optional, spec 263
+  "context": {
     "primary": {
       "file": "src/main.rs",
       "start_line": 35,
@@ -173,12 +164,14 @@ When cohesion analysis is enabled, the summary includes codebase-wide cohesion s
     "total_lines": 120,
     "completeness_confidence": 0.85
   },
-  "git_history": {                        // optional, spec 264
-    "change_frequency": 2.5,              // changes per month
-    "bug_density": 0.15,                  // ratio of bug fixes to total commits
-    "age_days": 180,                      // code age
-    "author_count": 3,                    // unique contributors
-    "stability": "Frequently Changed"     // stability classification
+  "git_history": {
+    "change_frequency": 2.5,
+    "bug_density": 0.15,
+    "age_days": 180,
+    "author_count": 3,
+    "total_commits": 24,
+    "bug_fix_count": 4,
+    "stability": "Frequently Changed"
   }
 }
 ```
@@ -205,7 +198,7 @@ When cohesion analysis is enabled, the summary includes codebase-wide cohesion s
 
 **Fields at item level:**
 
-- `function_role`: Function importance (`"EntryPoint"`, `"BusinessLogic"`, `"Utility"`, `"TestHelper"`) - affects score multiplier (src/priority/mod.rs:231)
+- `function_role`: Function classification (`"PureLogic"`, `"Orchestrator"`, `"IOWrapper"`, `"EntryPoint"`, `"PatternMatch"`, `"Debug"`, or `"Unknown"`) - affects score multipliers
 - `purity_analysis`: Whether function has side effects (optional) - affects testability assessment
   - `is_pure`: Boolean indicating no side effects
   - `confidence`: How certain (0.0-1.0)
@@ -807,7 +800,7 @@ Strategy:
 debtmap analyze . --format json --output debt-report.json
 
 # Extract density for trending
-DENSITY=$(jq '.debt_density' debt-report.json)
+DENSITY=$(jq '.summary.debt_density' debt-report.json)
 
 # Store in metrics database
 echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
@@ -818,7 +811,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 # .github/workflows/debt-check.yml
 - name: Check debt density
   run: |
-    DENSITY=$(debtmap analyze . --format json | jq '.debt_density')
+    DENSITY=$(debtmap analyze . --format json | jq '.summary.debt_density')
     if (( $(echo "$DENSITY > 150" | bc -l) )); then
       echo "❌ Debt density too high: $DENSITY (limit: 150)"
       exit 1

@@ -262,7 +262,7 @@ pub struct ModificationImpact {
 **Using modification impact:**
 ```bash
 # Analyze impact before refactoring
-debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_payment_method") | .modification_impact'
+debtmap analyze . --format json | jq '.items[] | select(.type == "Function" and .location.function == "validate_payment_method") | .dependencies'
 ```
 
 **Impact analysis uses:**

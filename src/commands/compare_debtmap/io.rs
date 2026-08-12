@@ -3,7 +3,7 @@
 //! This module contains all side-effecting operations: file reading,
 //! writing, environment variable access, and console output.
 
-use super::types::{CompareConfig, DebtmapJsonInput, ValidationResult};
+use super::types::{CompareConfig, DebtmapJsonInput, ValidationResult, parse_debtmap_json};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
@@ -38,7 +38,7 @@ pub fn load_debtmap(path: &Path) -> Result<DebtmapJsonInput> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read debtmap file: {}", path.display()))?;
 
-    serde_json::from_str(&content)
+    parse_debtmap_json(&content)
         .with_context(|| format!("Failed to parse debtmap JSON from: {}", path.display()))
 }
 

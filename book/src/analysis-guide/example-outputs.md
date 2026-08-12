@@ -21,7 +21,7 @@ This page demonstrates realistic examples of debtmap's terminal and JSON output 
   "type": "Function",
   "score": 92.5,
   "category": "CodeQuality",
-  "priority": "critical",
+  "priority": "high",
   "location": {
     "file": "src/payments/processor.rs",
     "line": 145,
@@ -38,8 +38,7 @@ This page demonstrates realistic examples of debtmap's terminal and JSON output 
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 25,
-      "cognitive": 38,
-      "adjusted_cyclomatic": null
+      "cognitive": 38
     }
   },
   "function_role": "Orchestrator",
@@ -65,15 +64,6 @@ This page demonstrates realistic examples of debtmap's terminal and JSON output 
       "log_transaction",
       "check_fraud",
       "notify_user"
-    ]
-  },
-  "recommendation": {
-    "action": "Refactor into 4 smaller, focused functions",
-    "implementation_steps": [
-      "Extract validation logic into validate_payment_request",
-      "Create calculate_payment_totals for fee calculation",
-      "Move side effects to separate transaction recorder",
-      "Keep process_transaction as thin orchestrator"
     ]
   },
   "impact": {
@@ -172,15 +162,6 @@ The `function_role` field helps prioritize testing and refactoring efforts based
     "coupling_score": 0.78,
     "cohesion_score": 0.34
   },
-  "recommendation": {
-    "action": "Split into focused modules by responsibility",
-    "implementation_steps": [
-      "Extract authentication into auth_service.rs",
-      "Move authorization to permission_service.rs",
-      "Create profile_service.rs for user data management",
-      "Separate audit concerns into audit_logger.rs"
-    ]
-  },
   "impact": {
     "complexity_reduction": 45.0,
     "maintainability_improvement": 0.68,
@@ -212,7 +193,7 @@ The `function_role` field helps prioritize testing and refactoring efforts based
   "type": "Function",
   "score": 89.0,
   "category": "Testing",
-  "priority": "critical",
+  "priority": "high",
   "location": {
     "file": "src/analyzers/rust_call_graph.rs",
     "line": 38,
@@ -253,17 +234,6 @@ The `function_role` field helps prioritize testing and refactoring efforts based
       "increment_counter",
       "validate_signature",
       "log_registration"
-    ]
-  },
-  "recommendation": {
-    "action": "Add unit tests for core business logic",
-    "implementation_steps": [
-      "Test happy path with valid function definition",
-      "Test error cases: null input, invalid syntax",
-      "Test edge cases: complex generics, lifetimes",
-      "Test integration with registry updates",
-      "Verify correct handling of visibility modifiers",
-      "Test type resolution edge cases"
     ]
   },
   "impact": {
@@ -320,8 +290,7 @@ Function: validate_config
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 20,
-      "cognitive": 18,
-      "adjusted_cyclomatic": 7
+      "cognitive": 18
     }
   },
   "adjusted_complexity": {
@@ -329,9 +298,6 @@ Function: validate_config
     "dampening_factor": 0.65
   },
   "function_role": "PatternMatch",
-  "recommendation": {
-    "action": "Low priority - repetitive validation pattern"
-  },
   "impact": {
     "coverage_improvement": 0.05,
     "complexity_reduction": 0.0,
@@ -352,7 +318,7 @@ Function: validate_config
 **Source**: `adjusted_complexity` from `src/output/unified/func_item.rs:AdjustedComplexity`, entropy dampening spec 182
 
 **Key Points:**
-- `adjusted_cyclomatic`: Entropy-dampened complexity value (7 vs original 20)
+- `dampened_cyclomatic`: Entropy-dampened complexity value (7 vs original 20)
 - `dampening_factor`: Amount of reduction applied (0.65 = 65% reduction)
 - `entropy_score`: Low value (0.28) indicates repetitive patterns
 - Score reduced from 43.5 to 15.2 due to entropy analysis

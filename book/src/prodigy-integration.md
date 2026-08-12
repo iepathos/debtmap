@@ -661,10 +661,8 @@ map:
   max_parallel: 5  # Run up to 5 agents in parallel
 
   # Filter and sort items
-  # Note: NULLS LAST ensures File items (with null Function.unified_score.final_score)
-  # and Function items (with null File.score) sort correctly
-  filter: "File.score >= 10 OR Function.unified_score.final_score >= 10"
-  sort_by: "File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST"
+  filter: "score >= 10"
+  sort_by: "score DESC"
   max_items: 10  # Limit to 10 items per run
 
 # Reduce phase: Aggregate results and verify overall improvements
@@ -758,12 +756,8 @@ prodigy run workflows/debtmap-reduce.yml -y
 
 **Understanding ${item} Structure:**
 
-The `${item}` variable contains different fields depending on whether it's a File or Function debt item:
-
-- **File items**: Have a `File.score` field (non-null) and `Function.unified_score.final_score` is null
-- **Function items**: Have a `Function.unified_score.final_score` field (non-null) and `File.score` is null
-
-This distinction matters when filtering and sorting items in MapReduce workflows. See the filter/sort_by examples below for proper handling of both types.
+Every `${item}` has a top-level `score`; use its `type` discriminator (`File` or `Function`)
+when variant-specific fields are needed. Filters and sorting can use `score` uniformly.
 
 ### MapReduce Architecture
 
@@ -1220,7 +1214,7 @@ git diff HEAD~1
 **Solution**:
 ```bash
 # Check debtmap analysis results
-cat .prodigy/debtmap-before.json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5]'
+cat .prodigy/debtmap-before.json | jq '.items | sort_by(-.score) | .[0:5]'
 
 # Verify coverage was generated
 ls -lh target/coverage/lcov.info

@@ -1,0 +1,27 @@
+{
+  "format_version": "3.0",
+  "metadata": {
+    "debtmap_version": "0.21.2",
+    "generated_at": "2026-01-01T00:00:00Z",
+    "project_root": null,
+    "analysis_type": "unified"
+  },
+  "summary": {
+    "total_items": 0,
+    "total_debt_score": 0.0,
+    "debt_density": 0.0,
+    "total_loc": 0,
+    "by_type": {
+      "File": 0,
+      "Function": 0
+    },
+    "by_category": {},
+    "score_distribution": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  },
+  "items": []
+}

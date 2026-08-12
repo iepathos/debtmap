@@ -632,7 +632,7 @@ Validate your refactoring work with target location tracking:
 debtmap analyze . --format json --output before.json
 
 # Identify critical items to fix
-jq '.items[] | select(.unified_score.final_score >= 60.0)' before.json
+jq '.items[] | select(.score >= 60.0)' before.json
 
 # Refactor the high-priority functions...
 
@@ -868,7 +868,7 @@ jq '.project_health.before' result.json
 jq '.project_health.after' result.json
 
 # Look for critical items in before analysis
-jq '.items[] | select(.unified_score.final_score >= 60.0)' before.json
+jq '.items[] | select(.score >= 60.0)' before.json
 ```
 
 ### JSON Parsing Errors

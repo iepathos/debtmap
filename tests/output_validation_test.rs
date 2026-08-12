@@ -6,7 +6,8 @@
 use debtmap::output::unified::{
     CohesionClassification, CohesionOutput, Dependencies, FileDebtItemOutput, FileImpactOutput,
     FileMetricsOutput, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-    Priority, PurityAnalysis, UnifiedDebtItemOutput, UnifiedLocation, UnifiedOutput,
+    Priority, PurityAnalysis, UNIFIED_FORMAT_VERSION, UnifiedDebtItemOutput, UnifiedLocation,
+    UnifiedOutput,
 };
 use debtmap::priority::{DebtType, FunctionRole};
 use serde_json::Value;
@@ -30,7 +31,7 @@ fn test_function_role() -> FunctionRole {
 fn test_unified_output_has_required_fields() {
     // Create a minimal valid output
     let output = UnifiedOutput {
-        format_version: "2.0".to_string(),
+        format_version: UNIFIED_FORMAT_VERSION.to_string(),
         metadata: debtmap::output::unified::OutputMetadata {
             debtmap_version: "0.9.0".to_string(),
             generated_at: "2025-01-01T00:00:00Z".to_string(),
@@ -67,6 +68,7 @@ fn test_unified_output_has_required_fields() {
     assert!(json["metadata"].is_object());
     assert!(json["summary"].is_object());
     assert!(json["items"].is_array());
+    assert_eq!(json["format_version"], UNIFIED_FORMAT_VERSION);
 
     // Validate metadata fields
     assert!(json["metadata"]["debtmap_version"].is_string());

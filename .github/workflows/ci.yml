@@ -110,6 +110,7 @@ jobs:
           --test output_format_tests \
           --test cli_output_format_integration_test \
           --test config_contract_integration_test \
+          --test json_output_contract_test \
           --test parallel_sequential_equivalence_test \
           --status-level fail --final-status-level slow
 

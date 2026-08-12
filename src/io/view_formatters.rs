@@ -27,9 +27,9 @@ use serde::{Deserialize, Serialize};
 // JSON OUTPUT FORMAT
 // ============================================================================
 
-/// JSON output structure for PreparedDebtView.
+/// Internal JSON output structure for the experimental PreparedDebtView pipeline.
 ///
-/// Provides structured JSON output with metadata, summary, and items.
+/// This is not the canonical `debtmap analyze --format json` v3 contract.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonOutput {
     pub format_version: String,
@@ -176,7 +176,7 @@ pub fn format_json(view: &PreparedDebtView, include_scoring_details: bool) -> St
 /// Converts PreparedDebtView to JsonOutput structure.
 pub fn to_json_output(view: &PreparedDebtView, include_scoring_details: bool) -> JsonOutput {
     JsonOutput {
-        format_version: "3.0".to_string(),
+        format_version: "prepared-view-1".to_string(),
         metadata: JsonMetadata {
             debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             generated_at: chrono::Utc::now().to_rfc3339(),
@@ -715,7 +715,7 @@ mod tests {
         let view = create_empty_view();
         let json = format_json(&view, false);
         // Pretty-printed JSON has spaces after colons
-        assert!(json.contains("\"format_version\": \"3.0\""));
+        assert!(json.contains("\"format_version\": \"prepared-view-1\""));
         assert!(json.contains("\"total_items\": 0"));
     }
 
@@ -741,7 +741,7 @@ mod tests {
     fn test_to_json_output_structure() {
         let view = create_empty_view();
         let output = to_json_output(&view, false);
-        assert_eq!(output.format_version, "3.0");
+        assert_eq!(output.format_version, "prepared-view-1");
         assert!(output.items.is_empty());
     }
 

@@ -322,7 +322,15 @@ JSON output uses **score-based priority** levels with different thresholds than 
       "location": {
         "file": "src/services.rs"
       },
-      "debt_type": "GodObject"
+      "debt_type": {
+        "GodObject": {
+          "methods": 60,
+          "fields": null,
+          "responsibilities": 5,
+          "god_object_score": 127.5,
+          "lines": 2400
+        }
+      }
     },
     {
       "type": "Function",
@@ -333,7 +341,12 @@ JSON output uses **score-based priority** levels with different thresholds than 
         "line": 145,
         "function": "process_data"
       },
-      "debt_type": "UntestableComplexity"
+      "debt_type": {
+        "ComplexityHotspot": {
+          "cyclomatic": 18,
+          "cognitive": 25
+        }
+      }
     }
   ]
 }

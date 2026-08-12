@@ -50,7 +50,7 @@ pub struct OutputConfig {
 // SPEC 252: UNIFIED VIEW OUTPUT (New API)
 // ============================================================================
 
-/// Output unified priorities using the new view pipeline (Spec 252).
+/// Output unified priorities using the experimental view pipeline (Spec 252).
 ///
 /// This function prepares a view once and passes it to the appropriate formatter,
 /// ensuring consistent data across all output formats.
@@ -63,6 +63,7 @@ pub struct OutputConfig {
 /// # Returns
 ///
 /// Result indicating success or failure.
+#[deprecated(note = "Use the canonical output pipeline; prepared-view JSON is experimental")]
 pub fn output_with_prepared_view(
     analysis: &priority::UnifiedAnalysis,
     config: &OutputConfig,

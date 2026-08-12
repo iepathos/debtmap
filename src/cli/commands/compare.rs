@@ -4,7 +4,7 @@
 //! which compares two analysis results and generates a diff report.
 
 use crate::cli::args::OutputFormat;
-use crate::commands::compare_debtmap::DebtmapJsonInput;
+use crate::commands::compare_debtmap::{DebtmapJsonInput, parse_debtmap_json};
 use crate::comparison::{Comparator, ComparisonResult, DebtTrend, PlanParser, TargetStatus};
 use crate::priority::UnifiedAnalysis;
 use anyhow::Result;
@@ -23,7 +23,7 @@ fn resolve_compare_target(
 /// Load a debtmap JSON analysis file and convert it to [`UnifiedAnalysis`].
 fn load_analysis_from_path(path: &Path) -> Result<UnifiedAnalysis> {
     let content = std::fs::read_to_string(path)?;
-    let json: DebtmapJsonInput = serde_json::from_str(&content)?;
+    let json = parse_debtmap_json(&content)?;
     Ok(json_to_analysis(json))
 }
 

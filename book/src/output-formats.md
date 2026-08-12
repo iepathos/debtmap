@@ -184,7 +184,8 @@ debtmap analyze . -vvv
 - `-vv`: Show detailed calculations with formulas and intermediate values
 - `-vvv`: Show all debug information including entropy metrics and role detection
 
-> **Note:** Verbosity flags affect terminal output only. JSON and markdown formats include all data regardless of verbosity level.
+> **Note:** At `-vv`, JSON includes optional `scoring_details`. Default JSON omits those
+> implementation details. Markdown verbosity also controls its rendered detail level.
 
 Each level includes all information from the previous levels, progressively adding more detail to help understand how scores are calculated.
 
@@ -221,7 +222,7 @@ Total debt score: 156 (threshold: 100)
   ... (all level 2 output) ...
   Debug info:
     Entropy metrics analyzed: 42/50 functions
-    Function role detection: BusinessLogic=12, Utility=8, TestHelper=5
+    Function role detection: PureLogic=12, IOWrapper=8, Unknown=5
     Parse time: 245ms
 ```
 
@@ -313,22 +314,37 @@ debtmap analyze . --format json | jq .
 
 > **Note:** JSON output is automatically pretty-printed for readability.
 
+> **Data handling:** JSON reports contain codebase metadata such as paths, symbols, call
+> relationships, and git-derived aggregates. Review or redact reports before uploading them to
+> external dashboards, artifacts, or webhooks.
+
 ### JSON Schema Structure
 
-Debtmap outputs a structured JSON document with the following top-level fields:
+Debtmap emits the versioned unified JSON v3 contract. The authoritative schema and consumer guide
+are checked into the repository:
+
+- [`schemas/debtmap-output-v3.schema.json`](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json)
+- [`docs/json-output-v3.md`](https://github.com/iepathos/debtmap/blob/master/docs/json-output-v3.md)
+
+The top-level envelope is:
 
 ```json
 {
-  "project_path": "/path/to/project",
-  "timestamp": "2025-01-09T12:00:00Z",
-  "complexity": { ... },
-  "technical_debt": { ... },
-  "dependencies": { ... },
-  "duplications": [ ... ]
+  "format_version": "3.0",
+  "metadata": { ... },
+  "summary": { ... },
+  "items": [ ... ]
 }
 ```
 
-### Full Schema Example
+Consumers must reject unsupported `format_version` values. Items use a `type` discriminator of
+`File` or `Function`, lowercase priority values, and nested `location` and `metrics` objects.
+
+### Legacy pre-v3 example (historical)
+
+The example below describes the removed pre-v3 output and is retained temporarily only to explain
+older reports. Do not use these paths for new integrations; use the v3 schema and guide linked
+above.
 
 Here's a complete annotated JSON output example:
 
@@ -444,7 +460,7 @@ Here's a complete annotated JSON output example:
 }
 ```
 
-### Field Descriptions
+### Legacy field descriptions (pre-v3)
 
 **FunctionMetrics Fields:**
 - `name`: Function name
@@ -504,7 +520,7 @@ Here's a complete annotated JSON output example:
 - `TestDuplication`: Duplicated test code
 - `TestQuality`: Test quality issues
 
-### Risk Insights JSON
+### Legacy risk insights JSON (pre-v3)
 
 When coverage data is provided via `--lcov`, risk insights are included as part of the analysis output. The `write_risk_insights` method (found in `src/io/writers/json.rs`, `terminal.rs`, and `markdown/core.rs`) outputs risk analysis data in the following JSON structure:
 
@@ -971,9 +987,9 @@ jobs:
 
       - name: Check thresholds
         run: |
-          DEBT_SCORE=$(jq '.technical_debt.items | length' analysis.json)
-          if [ "$DEBT_SCORE" -gt 100 ]; then
-            echo "❌ Debt score too high: $DEBT_SCORE"
+          DEBT_ITEMS=$(jq '.summary.total_items' analysis.json)
+          if [ "$DEBT_ITEMS" -gt 100 ]; then
+            echo "❌ Too many debt items: $DEBT_ITEMS"
             exit 1
           fi
 
@@ -985,9 +1001,9 @@ jobs:
             const analysis = JSON.parse(fs.readFileSync('analysis.json'));
             const summary = `## Debtmap Analysis
 
-            - **Debt Items:** ${analysis.technical_debt.items.length}
-            - **Average Complexity:** ${analysis.complexity.summary.average_complexity}
-            - **High Complexity Functions:** ${analysis.complexity.summary.high_complexity_count}
+            - **Debt Items:** ${analysis.summary.total_items}
+            - **Debt Score:** ${analysis.summary.total_debt_score}
+            - **High-priority Items:** ${analysis.summary.score_distribution.high}
             `;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -1006,14 +1022,14 @@ code_quality:
     - cargo install debtmap
     - debtmap analyze . --format json --output gl-code-quality.json
     - |
-      DEBT=$(jq '.technical_debt.items | length' gl-code-quality.json)
+      DEBT=$(jq '.summary.total_items' gl-code-quality.json)
       if [ "$DEBT" -gt 50 ]; then
         echo "Debt threshold exceeded"
         exit 1
       fi
   artifacts:
-    reports:
-      codequality: gl-code-quality.json
+    paths:
+      - gl-code-quality.json
 ```
 
 #### Jenkins Pipeline
@@ -1029,7 +1045,7 @@ pipeline {
 
                 script {
                     def json = readJSON file: 'report.json'
-                    def debtScore = json.technical_debt.items.size()
+                    def debtScore = json.summary.total_items
 
                     if (debtScore > 100) {
                         error("Debt score ${debtScore} exceeds threshold")
@@ -1053,34 +1069,31 @@ Common jq queries for analyzing debtmap output:
 
 ```bash
 # Get total debt items
-jq '.technical_debt.items | length' report.json
+jq '.summary.total_items' report.json
 
 # Get high-priority items only
-jq '.technical_debt.items[] | select(.priority == "High")' report.json
+jq '.items[] | select(.priority == "high")' report.json
 
 # Get functions with complexity > 10
-jq '.complexity.metrics[] | select(.cyclomatic > 10)' report.json
+jq '.items[] | select(.type == "Function" and .metrics.cyclomatic_complexity > 10)' report.json
 
-# Calculate average complexity
-jq '.complexity.summary.average_complexity' report.json
+# Get codebase debt density
+jq '.summary.debt_density' report.json
 
 # Get all TODO items
-jq '.technical_debt.items[] | select(.debt_type == "Todo")' report.json
+jq '.items[] | select(.debt_type | has("Todo"))' report.json
 
 # Get top 5 complex functions
-jq '.complexity.metrics | sort_by(-.cyclomatic) | .[0:5] | .[] | {name, file, cyclomatic}' report.json
-
-# Get files with circular dependencies
-jq '.dependencies.circular[] | .cycle' report.json
+jq '.items | map(select(.type == "Function")) | sort_by(-.metrics.cyclomatic_complexity) | .[0:5] | .[] | {function: .location.function, file: .location.file, cyclomatic: .metrics.cyclomatic_complexity}' report.json
 
 # Count debt items by type
-jq '.technical_debt.items | group_by(.debt_type) | map({type: .[0].debt_type, count: length})' report.json
+jq '.items | map(select(.debt_type != null)) | group_by(.debt_type | keys[0]) | map({type: (.[0].debt_type | keys[0]), count: length})' report.json
 
 # Get functions with 0% coverage (when using --lcov)
-jq '.complexity.metrics[] | select(.coverage == 0)' report.json
+jq '.items[] | select(.type == "Function" and .metrics.coverage == 0)' report.json
 
 # Extract file paths with high debt
-jq '.technical_debt.items[] | select(.priority == "High" or .priority == "Critical") | .file' report.json | sort -u
+jq -r '.items[] | select(.priority == "high" or .priority == "critical") | .location.file' report.json | sort -u
 ```
 
 ### Filtering and Transformation Examples
@@ -1098,14 +1111,14 @@ def analyze_debtmap_output(json_file):
 
     # Get high-priority items
     high_priority = [
-        item for item in data['technical_debt']['items']
-        if item['priority'] in ['High', 'Critical']
+        item for item in data['items']
+        if item['priority'] in ['high', 'critical']
     ]
 
     # Group by file
     by_file = {}
     for item in high_priority:
-        file = item['file']
+        file = item['location']['file']
         if file not in by_file:
             by_file[file] = []
         by_file[file].append(item)
@@ -1131,25 +1144,25 @@ set -e
 
 REPORT="$1"
 DEBT_THRESHOLD=100
-COMPLEXITY_THRESHOLD=10
+DEBT_DENSITY_THRESHOLD=10
 
 # Check debt score
-DEBT_SCORE=$(jq '.technical_debt.items | length' "$REPORT")
-if [ "$DEBT_SCORE" -gt "$DEBT_THRESHOLD" ]; then
-    echo "❌ Debt score $DEBT_SCORE exceeds threshold $DEBT_THRESHOLD"
+DEBT_ITEMS=$(jq '.summary.total_items' "$REPORT")
+if [ "$DEBT_ITEMS" -gt "$DEBT_THRESHOLD" ]; then
+    echo "❌ Debt items $DEBT_ITEMS exceeds threshold $DEBT_THRESHOLD"
     exit 1
 fi
 
-# Check average complexity
-AVG_COMPLEXITY=$(jq '.complexity.summary.average_complexity' "$REPORT")
-if (( $(echo "$AVG_COMPLEXITY > $COMPLEXITY_THRESHOLD" | bc -l) )); then
-    echo "❌ Average complexity $AVG_COMPLEXITY exceeds threshold $COMPLEXITY_THRESHOLD"
+# Check debt density
+DEBT_DENSITY=$(jq '.summary.debt_density' "$REPORT")
+if (( $(echo "$DEBT_DENSITY > $DEBT_DENSITY_THRESHOLD" | bc -l) )); then
+    echo "❌ Debt density $DEBT_DENSITY exceeds threshold $DEBT_DENSITY_THRESHOLD"
     exit 1
 fi
 
 echo "✅ All quality checks passed"
-echo "   Debt score: $DEBT_SCORE/$DEBT_THRESHOLD"
-echo "   Avg complexity: $AVG_COMPLEXITY"
+echo "   Debt items: $DEBT_ITEMS/$DEBT_THRESHOLD"
+echo "   Debt density: $DEBT_DENSITY"
 ```
 
 ### Editor Integration
@@ -1227,10 +1240,10 @@ Send debtmap results to webhooks for notifications:
 debtmap analyze . --format json -o report.json
 
 # Send to Slack
-DEBT_SCORE=$(jq '.technical_debt.items | length' report.json)
+DEBT_SCORE=$(jq '.summary.total_debt_score' report.json)
 curl -X POST "$SLACK_WEBHOOK_URL" \
   -H 'Content-Type: application/json' \
-  -d "{\"text\": \"Debtmap Analysis Complete\n• Debt Score: $DEBT_SCORE\n• High Priority: $(jq '[.technical_debt.items[] | select(.priority == "High")] | length' report.json)\"}"
+  -d "{\"text\": \"Debtmap Analysis Complete\n• Debt Score: $DEBT_SCORE\n• High Priority: $(jq '.summary.score_distribution.high' report.json)\"}"
 
 # Send to custom webhook
 curl -X POST "$CUSTOM_WEBHOOK_URL" \
@@ -1392,8 +1405,8 @@ debtmap validate . --config debtmap.toml
 
 # Or parse JSON output for threshold checking
 debtmap analyze . --format json -o report.json
-DEBT_SCORE=$(jq '.technical_debt.items | length' report.json)
-if [ "$DEBT_SCORE" -gt 100 ]; then
+DEBT_ITEMS=$(jq '.summary.total_items' report.json)
+if [ "$DEBT_ITEMS" -gt 100 ]; then
     echo "Debt threshold exceeded"
     exit 1
 fi

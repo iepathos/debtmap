@@ -3,7 +3,7 @@
 //! This module defines all the data structures used in comparing
 //! before and after debtmap analysis results.
 
-use crate::output::unified::UnifiedDebtItemOutput;
+use crate::output::unified::{UNIFIED_FORMAT_VERSION, UnifiedDebtItemOutput, UnifiedOutput};
 use crate::priority::ImpactMetrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,6 +24,28 @@ pub struct DebtmapJsonInput {
     pub total_lines_of_code: usize,
     #[serde(default)]
     pub overall_coverage: Option<f64>,
+}
+
+pub(crate) fn parse_debtmap_json(contents: &str) -> anyhow::Result<DebtmapJsonInput> {
+    let value: serde_json::Value = serde_json::from_str(contents)?;
+    match value.get("format_version") {
+        Some(serde_json::Value::String(version)) if version == UNIFIED_FORMAT_VERSION => {
+            let output: UnifiedOutput = serde_json::from_value(value)?;
+            Ok(DebtmapJsonInput {
+                items: output.items,
+                total_impact: default_impact_metrics(),
+                total_debt_score: output.summary.total_debt_score,
+                debt_density: output.summary.debt_density,
+                total_lines_of_code: output.summary.total_loc,
+                overall_coverage: None,
+            })
+        }
+        Some(serde_json::Value::String(version)) => anyhow::bail!(
+            "Unsupported debtmap format version `{version}`; expected `{UNIFIED_FORMAT_VERSION}`"
+        ),
+        Some(_) => anyhow::bail!("Invalid debtmap format version; expected a string"),
+        None => serde_json::from_value(value).map_err(Into::into),
+    }
 }
 
 fn default_impact_metrics() -> ImpactMetrics {

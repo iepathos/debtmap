@@ -282,8 +282,11 @@ fn test_cli_output_format_unified_produces_valid_structure() {
         // Validate priority is one of the expected values
         let priority = first_item.get("priority").unwrap().as_str().unwrap();
         assert!(
-            priority == "high" || priority == "medium" || priority == "low",
-            "Priority must be 'high', 'medium', or 'low', got: {}",
+            priority == "critical"
+                || priority == "high"
+                || priority == "medium"
+                || priority == "low",
+            "Priority must be 'critical', 'high', 'medium', or 'low', got: {}",
             priority
         );
 

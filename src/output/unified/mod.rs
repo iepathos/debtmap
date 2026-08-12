@@ -57,6 +57,9 @@ pub use types::{
     UnifiedOutput,
 };
 
+/// Version of the canonical `debtmap analyze --format json` contract.
+pub const UNIFIED_FORMAT_VERSION: &str = "3.0";
+
 use std::collections::HashMap;
 
 /// Statistics accumulated from iterating over unified debt items
@@ -222,7 +225,7 @@ fn build_unified_output(items: Vec<UnifiedDebtItemOutput>, total_loc: usize) -> 
     let summary = summarize_items(&items, total_loc);
 
     UnifiedOutput {
-        format_version: "3.0".to_string(),
+        format_version: UNIFIED_FORMAT_VERSION.to_string(),
         metadata: OutputMetadata {
             debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             generated_at: chrono::Utc::now().to_rfc3339(),

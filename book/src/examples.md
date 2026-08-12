@@ -624,53 +624,21 @@ debtmap analyze . --format json --output report.json
 
 ```bash
 # Extract total debt score
-debtmap analyze . --format json | jq '.total_debt_score'
+debtmap analyze . --format json | jq '.summary.total_debt_score'
 
 # Count critical items
-debtmap analyze . --format json | jq '[.items[] | select(.unified_score.final_score >= 8)] | length'
+debtmap analyze . --format json | jq '[.items[] | select(.score >= 100)] | length'
 
 # Get top 5 functions by score
-debtmap analyze . --format json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5] | .[].location'
+debtmap analyze . --format json | jq '.items | sort_by(-.score) | .[0:5] | .[].location'
 
 # Extract all test gap items
-debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap")]'
+debtmap analyze . --format json | jq '[.items[] | select(.debt_type | has("TestingGap"))]'
 ```
 
-Structure:
-```json
-{
-  "items": [
-    {
-      "location": {
-        "file": "src/main.rs",
-        "function": "process_data",
-        "line": 42
-      },
-      "debt_type": "TestGap",
-      "unified_score": {
-        "complexity_factor": 3.2,
-        "coverage_factor": 10.0,
-        "dependency_factor": 2.5,
-        "role_multiplier": 1.2,
-        "final_score": 9.4
-      },
-      "function_role": "BusinessLogic",
-      "recommendation": {
-        "action": "Add unit tests",
-        "details": "Add 6 unit tests for full coverage",
-        "effort_estimate": "2-3 hours"
-      },
-      "expected_impact": {
-        "risk_reduction": 3.9,
-        "complexity_reduction": 0,
-        "coverage_improvement": 100
-      }
-    }
-  ],
-  "overall_coverage": 67.12,
-  "total_debt_score": 4907
-}
-```
+The complete structure is defined by the [unified JSON v3 schema](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json).
+Use the checked [v3 items fixture](https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json)
+as a copyable example.
 
 ### Markdown Report
 

@@ -806,7 +806,7 @@ debtmap validate . --format terminal --top 20 -vv
 ```bash
 # Run analysis to see current metrics
 debtmap analyze . --format json > baseline.json
-cat baseline.json | jq '.unified_analysis.debt_density'
+jq '.summary.debt_density' baseline.json
 ```
 
 **2. Set pragmatic thresholds:**
@@ -917,7 +917,7 @@ Track validation metrics over time:
 debtmap validate . --format json --output "reports/validation-$(date +%Y%m%d).json"
 
 # Compare trends
-jq -s 'map(.unified_analysis.debt_density)' reports/validation-*.json
+jq -s 'map(.summary.debt_density)' reports/validation-*.json
 ```
 
 ### Documentation
