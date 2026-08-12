@@ -229,7 +229,7 @@ pub fn load_multi_source_config_from(
     }
 
     // 4. Load custom config if DEBTMAP_CONFIG is set
-    if let Ok(custom_path) = env::var("DEBTMAP_CONFIG") {
+    if let Some(custom_path) = env::var_os("DEBTMAP_CONFIG") {
         let custom_path = PathBuf::from(custom_path);
         match load_config_from_path(&custom_path) {
             Ok(custom_config) => {
@@ -276,8 +276,7 @@ pub fn load_multi_source_config_validated() -> AnalysisValidation<TracedConfig> 
 
 /// Get the path to the user's config file.
 ///
-/// Returns `~/.config/debtmap/config.toml` on Unix/macOS,
-/// or the equivalent on Windows.
+/// Returns the platform configuration directory joined with `debtmap/config.toml`.
 pub fn user_config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|p| p.join("debtmap").join("config.toml"))
 }

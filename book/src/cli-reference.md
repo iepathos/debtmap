@@ -29,7 +29,7 @@ Options that apply to all commands:
 - `--show-config-sources` - Show where each configuration value came from (spec 201)
   - Displays the source of each configuration value (default, config file, environment, CLI)
   - Useful for debugging configuration precedence issues
-- `--config <PATH>` - Custom config file path (overrides default locations)
+- `--config <PATH>` - Custom config file path (highest-precedence file layer)
   - Can also use `DEBTMAP_CONFIG` environment variable
 
 **Example:**
@@ -485,7 +485,7 @@ debtmap init --force
 
 - `DEBTMAP_CONFIG` - Custom config file path (same as `--config` global flag)
   - Example: `export DEBTMAP_CONFIG=/path/to/debtmap.toml`
-  - Overrides default configuration file locations
+  - Layers above user and project configuration files
   - Useful for CI/CD environments with centralized config
   - Source: src/cli.rs:45
 

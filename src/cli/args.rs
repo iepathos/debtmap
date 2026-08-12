@@ -57,7 +57,7 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub show_config_sources: bool,
 
-    /// Custom config file path (overrides default locations)
+    /// Custom config file path (highest-precedence file layer)
     #[arg(long, global = true, env = "DEBTMAP_CONFIG")]
     pub config: Option<PathBuf>,
 }

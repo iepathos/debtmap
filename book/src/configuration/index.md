@@ -14,8 +14,10 @@ dependency = 0.15
 
 [thresholds]
 complexity = 15
-lines = 80
-coverage = 0.8
+max_function_length = 80
+
+[thresholds.validation]
+min_coverage_percentage = 80.0
 
 [languages]
 enabled = ["rust", "python", "javascript", "typescript"]
@@ -36,18 +38,26 @@ detect_dead_code = true
 - [Advanced Options](advanced.md) - Advanced configuration for power users
 - [Best Practices](best-practices.md) - Guidelines for effective configuration
 
-## Configuration File Location
+## Configuration Sources
 
-Debtmap searches for configuration in the following order:
+Debtmap layers configuration from lowest to highest precedence:
 
-1. Path specified with `--config` flag
-2. `.debtmap.toml` in current directory
-3. `.debtmap.toml` in git repository root
-4. Built-in defaults
+1. Built-in defaults
+2. User config (`~/.config/debtmap/config.toml`, or the platform equivalent)
+3. The nearest `.debtmap.toml` found from the current directory
+4. A custom path from `--config` or `DEBTMAP_CONFIG`
+5. Supported `DEBTMAP_*` field overrides
+
+Higher-precedence files replace only the top-level sections they define; other sections continue
+to come from lower-precedence sources. Within a replaced section, omitted values use that
+section's defaults rather than values from the lower-precedence section. Use
+`debtmap --show-config-sources analyze .` to inspect the effective source order.
+Run `debtmap config check` to reject unknown keys and invalid values before analysis or in CI.
 
 ## Validation
 
-Debtmap validates your configuration on startup. Invalid configurations will produce clear error messages:
+Debtmap validates every discovered configuration before analysis. A malformed or invalid file
+stops the command instead of silently falling back to a weaker configuration:
 
 ```bash
 $ debtmap analyze .
