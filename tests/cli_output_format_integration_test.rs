@@ -13,6 +13,81 @@ fn debtmap_command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_debtmap"))
 }
 
+fn write_parallel_parity_fixture(root: &Path) {
+    fs::write(root.join("clean.rs"), "fn clean() -> usize { 1 }\n").unwrap();
+    let simple_functions = (0..51)
+        .map(|index| format!("fn helper_{index}() -> usize {{ {index} }}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let complex = r#"fn complex(value: usize) -> usize {
+    if value > 10 {
+        if value % 2 == 0 { value / 2 } else { value * 2 }
+    } else {
+        0
+    }
+}"#;
+    fs::write(
+        root.join("god.rs"),
+        format!("{complex}\n{simple_functions}\n"),
+    )
+    .unwrap();
+}
+
+fn analyze_fixture_as_json(root: &Path, output: &Path, extra_args: &[&str]) -> Value {
+    let command_output = debtmap_command()
+        .arg("analyze")
+        .arg(root)
+        .args([
+            "--format",
+            "json",
+            "--quiet",
+            "--no-tui",
+            "--min-score",
+            "0",
+        ])
+        .args(extra_args)
+        .arg("--output")
+        .arg(output)
+        .output()
+        .unwrap();
+    assert!(
+        command_output.status.success(),
+        "analysis failed: {}",
+        String::from_utf8_lossy(&command_output.stderr)
+    );
+    serde_json::from_str(&fs::read_to_string(output).unwrap()).unwrap()
+}
+
+#[test]
+fn parallel_and_sequential_register_same_analyzed_loc() {
+    let fixture = TempDir::new().unwrap();
+    write_parallel_parity_fixture(fixture.path());
+    let parallel = analyze_fixture_as_json(
+        fixture.path(),
+        &fixture.path().join("parallel.json"),
+        &["--jobs", "2"],
+    );
+    let sequential = analyze_fixture_as_json(
+        fixture.path(),
+        &fixture.path().join("sequential.json"),
+        &["--no-parallel"],
+    );
+
+    let expected_loc = fs::read_to_string(fixture.path().join("clean.rs"))
+        .unwrap()
+        .lines()
+        .count()
+        + fs::read_to_string(fixture.path().join("god.rs"))
+            .unwrap()
+            .lines()
+            .count();
+    assert_eq!(parallel["summary"]["total_loc"], expected_loc);
+    assert_eq!(
+        parallel["summary"]["total_loc"],
+        sequential["summary"]["total_loc"]
+    );
+}
+
 /// Test that --format json generates valid unified format output
 #[test]
 fn test_cli_output_format_unified_produces_valid_structure() {

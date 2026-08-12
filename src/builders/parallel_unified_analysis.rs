@@ -1413,11 +1413,11 @@ impl ParallelUnifiedAnalysisBuilder {
     fn initialize_unified_analysis(
         &self,
         data_flow_graph: DataFlowGraph,
-        file_data: &[(FileDebtItem, Vec<FunctionMetrics>)],
+        _file_data: &[(FileDebtItem, Vec<FunctionMetrics>)],
     ) -> UnifiedAnalysis {
         let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
         unified.data_flow_graph = data_flow_graph;
-        register_analyzed_files(&mut unified, file_data);
+        register_analyzed_files(&mut unified, &self.line_count_index);
         unified
     }
 
@@ -1598,14 +1598,11 @@ fn create_final_aggregation_progress(total_file_items: usize) -> indicatif::Prog
 
 fn register_analyzed_files(
     unified: &mut UnifiedAnalysis,
-    file_data: &[(FileDebtItem, Vec<FunctionMetrics>)],
+    line_count_index: &HashMap<PathBuf, usize>,
 ) {
-    for (file_item, _) in file_data {
-        if file_item.metrics.total_lines > 0 {
-            unified.register_analyzed_file(
-                file_item.metrics.path.clone(),
-                file_item.metrics.total_lines,
-            );
+    for (path, line_count) in line_count_index {
+        if *line_count > 0 {
+            unified.register_analyzed_file(path.clone(), *line_count);
         }
     }
 }
