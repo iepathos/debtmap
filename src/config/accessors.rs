@@ -23,9 +23,14 @@ pub fn get_config() -> &'static DebtmapConfig {
     CONFIG.get_or_init(load_config)
 }
 
+/// Install the effective process configuration before analysis starts.
+pub fn install_config(config: DebtmapConfig) -> Result<(), Box<DebtmapConfig>> {
+    CONFIG.set(config).map_err(Box::new)
+}
+
 /// Get the configuration without panicking on errors
 pub fn get_config_safe() -> Result<DebtmapConfig, std::io::Error> {
-    Ok(load_config())
+    Ok(get_config().clone())
 }
 
 /// Get the scoring weights (with defaults if not configured)

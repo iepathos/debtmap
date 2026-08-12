@@ -40,6 +40,13 @@ pub(crate) fn parse_and_validate_config_impl(contents: &str) -> Result<DebtmapCo
     Ok(config)
 }
 
+pub(crate) fn parse_runtime_config(contents: &str) -> Result<DebtmapConfig, String> {
+    let config = toml::from_str::<DebtmapConfig>(contents)
+        .map_err(|error| format!("Failed to parse .debtmap.toml: {error}"))?;
+    super::validation::validate_config_result(&config).map_err(|error| error.to_string())?;
+    Ok(config)
+}
+
 /// Pure function to try loading config from a specific path
 pub(crate) fn try_load_config_from_path(config_path: &Path) -> Option<DebtmapConfig> {
     let contents = match read_config_file(config_path) {
@@ -90,32 +97,36 @@ pub(crate) fn directory_ancestors_impl(
     .take(max_depth)
 }
 
-pub fn load_config() -> DebtmapConfig {
+pub(crate) fn config_search_paths(
+    explicit: Option<PathBuf>,
+    current: Option<PathBuf>,
+) -> Vec<PathBuf> {
     const MAX_TRAVERSAL_DEPTH: usize = 10;
 
-    // Get current directory or return default
-    let current = match std::env::current_dir() {
-        Ok(dir) => dir,
-        Err(e) => {
-            log::warn!(
-                "Failed to get current directory: {}. Using default config.",
-                e
-            );
-            return DebtmapConfig::default();
-        }
-    };
+    match explicit {
+        Some(path) => vec![path],
+        None => current
+            .into_iter()
+            .flat_map(|path| directory_ancestors_impl(path, MAX_TRAVERSAL_DEPTH))
+            .map(|directory| directory.join(".debtmap.toml"))
+            .collect(),
+    }
+}
 
-    // Search for config file in directory hierarchy
-    directory_ancestors_impl(current, MAX_TRAVERSAL_DEPTH)
-        .map(|dir| dir.join(".debtmap.toml"))
+pub fn load_config() -> DebtmapConfig {
+    let explicit = std::env::var_os("DEBTMAP_CONFIG").map(PathBuf::from);
+    let current = (explicit.is_none())
+        .then(std::env::current_dir)
+        .transpose()
+        .unwrap_or_else(|error| {
+            log::warn!("Failed to get current directory: {error}. Using defaults.");
+            None
+        });
+
+    config_search_paths(explicit, current)
+        .into_iter()
         .find_map(|path| try_load_config_from_path(&path))
-        .unwrap_or_else(|| {
-            log::debug!(
-                "No config found after checking {} directories. Using default config.",
-                MAX_TRAVERSAL_DEPTH
-            );
-            DebtmapConfig::default()
-        })
+        .unwrap_or_default()
 }
 
 // ============================================================================
@@ -243,4 +254,27 @@ pub fn load_config_from_path_validated(config_path: &Path) -> AnalysisValidation
 /// Load config from a specific path with backwards-compatible Result API.
 pub fn load_config_from_path_result(config_path: &Path) -> anyhow::Result<DebtmapConfig> {
     run_validation(load_config_from_path_validated(config_path))
+}
+
+#[cfg(test)]
+mod config_search_path_tests {
+    use super::*;
+
+    #[test]
+    fn explicit_path_is_the_only_candidate() {
+        let paths = config_search_paths(
+            Some(PathBuf::from("custom/debtmap.toml")),
+            Some(PathBuf::from("project/src")),
+        );
+
+        assert_eq!(paths, vec![PathBuf::from("custom/debtmap.toml")]);
+    }
+
+    #[test]
+    fn discovery_candidates_start_at_the_current_directory() {
+        let paths = config_search_paths(None, Some(PathBuf::from("project/src")));
+
+        assert_eq!(paths[0], PathBuf::from("project/src/.debtmap.toml"));
+        assert_eq!(paths[1], PathBuf::from("project/.debtmap.toml"));
+    }
 }

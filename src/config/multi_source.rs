@@ -44,7 +44,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use super::core::DebtmapConfig;
-use super::loader::{directory_ancestors_impl, parse_and_validate_config_impl, read_config_file};
+use super::loader::{directory_ancestors_impl, parse_runtime_config, read_config_file};
 use super::scoring::ScoringWeights;
 use super::thresholds::ThresholdsConfig;
 use super::validation::validate_config;
@@ -297,7 +297,7 @@ fn load_config_from_path(path: &Path) -> Result<DebtmapConfig, AnalysisError> {
         AnalysisError::io_with_path(format!("Cannot read config file: {}", e), path)
     })?;
 
-    parse_and_validate_config_impl(&contents).map_err(|e| AnalysisError::config_with_path(e, path))
+    parse_runtime_config(&contents).map_err(|e| AnalysisError::config_with_path(e, path))
 }
 
 /// Merge source config into target config, tracking field sources.
@@ -489,6 +489,47 @@ fn merge_config(
         source_id,
         field_sources
     );
+    merge_optional_field!(
+        target,
+        source,
+        batch_analysis,
+        "batch_analysis",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(target, source, retry, "retry", source_id, field_sources);
+    merge_optional_field!(
+        target,
+        source,
+        analysis,
+        "analysis",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        state_detection,
+        "state_detection",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        data_flow_scoring,
+        "data_flow_scoring",
+        source_id,
+        field_sources
+    );
+    merge_optional_field!(
+        target,
+        source,
+        context_suggestion,
+        "context_suggestion",
+        source_id,
+        field_sources
+    );
 }
 
 /// Apply environment variable overrides to the config.
@@ -569,7 +610,9 @@ pub fn display_config_sources(traced: &TracedConfig) {
     println!("Configuration sources:");
     println!();
 
-    for (path, source) in traced.all_field_sources() {
+    let mut fields: Vec<_> = traced.all_field_sources().iter().collect();
+    fields.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (path, source) in fields {
         println!("  {} = <value>", path);
         println!("    from: {}", source);
         println!();
@@ -586,6 +629,43 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
+
+    #[test]
+    fn merge_config_preserves_every_recent_root_section() {
+        let source = DebtmapConfig {
+            batch_analysis: Some(crate::config::BatchAnalysisConfig::default()),
+            retry: Some(crate::config::RetryConfig::default()),
+            analysis: Some(crate::config::AnalysisSettings::default()),
+            state_detection: Some(
+                crate::analyzers::state_field_detector::StateDetectionConfig::default(),
+            ),
+            data_flow_scoring: Some(crate::config::DataFlowScoringConfig::default()),
+            context_suggestion: Some(crate::priority::context::ContextConfig::default()),
+            ..DebtmapConfig::default()
+        };
+        let mut merged = DebtmapConfig::default();
+        let mut fields = HashMap::new();
+        let origin = ConfigSource::CustomPath(PathBuf::from("custom.toml"));
+
+        merge_config(&mut merged, &source, &origin, &mut fields);
+
+        assert!(merged.batch_analysis.is_some());
+        assert!(merged.retry.is_some());
+        assert!(merged.analysis.is_some());
+        assert!(merged.state_detection.is_some());
+        assert!(merged.data_flow_scoring.is_some());
+        assert!(merged.context_suggestion.is_some());
+        for name in [
+            "batch_analysis",
+            "retry",
+            "analysis",
+            "state_detection",
+            "data_flow_scoring",
+            "context_suggestion",
+        ] {
+            assert_eq!(fields.get(name), Some(&origin));
+        }
+    }
 
     #[test]
     fn test_user_config_path() {

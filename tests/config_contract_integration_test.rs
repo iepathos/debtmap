@@ -2,10 +2,14 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
 
+use serde_json::Value;
+
 fn debtmap_command(current_dir: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_debtmap"));
     command
         .current_dir(current_dir)
+        .env("HOME", current_dir.join(".test-home"))
+        .env("XDG_CONFIG_HOME", current_dir.join(".test-config"))
         .env_remove("DEBTMAP_CONFIG");
     command
 }
@@ -16,6 +20,34 @@ fn output_text(output: &Output) -> String {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     )
+}
+
+fn run_json_analysis(directory: &Path, config: Option<&Path>, output_name: &str) -> Output {
+    let mut command = debtmap_command(directory);
+    if let Some(path) = config {
+        command.arg("--config").arg(path);
+    }
+    command.args([
+        "analyze",
+        ".",
+        "--format",
+        "json",
+        "--quiet",
+        "--no-tui",
+        "--no-context-aware",
+        "--no-parallel",
+        "--min-score",
+        "0",
+        "--output",
+        output_name,
+    ]);
+    command.output().unwrap()
+}
+
+fn report_total_loc(directory: &Path, output_name: &str) -> u64 {
+    let report: Value =
+        serde_json::from_str(&fs::read_to_string(directory.join(output_name)).unwrap()).unwrap();
+    report["summary"]["total_loc"].as_u64().unwrap()
 }
 
 #[test]
@@ -117,4 +149,173 @@ fn shipped_configs_pass_the_executable_contract() {
         .collect();
 
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn explicit_config_controls_ordinary_analysis() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(directory.path().join("sample.rs"), "fn sample() {}\n").unwrap();
+    let config = directory.path().join("custom.toml");
+    fs::write(&config, "[ignore]\npatterns = [\"*.rs\"]\n").unwrap();
+
+    let baseline = run_json_analysis(directory.path(), None, "baseline.json");
+    assert!(baseline.status.success(), "{}", output_text(&baseline));
+    assert_eq!(report_total_loc(directory.path(), "baseline.json"), 1);
+
+    let configured = run_json_analysis(directory.path(), Some(&config), "configured.json");
+    assert!(configured.status.success(), "{}", output_text(&configured));
+    assert_eq!(report_total_loc(directory.path(), "configured.json"), 0);
+}
+
+#[test]
+fn environment_config_controls_ordinary_analysis() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(directory.path().join("sample.rs"), "fn sample() {}\n").unwrap();
+    let config = directory.path().join("custom.toml");
+    fs::write(&config, "[ignore]\npatterns = [\"*.rs\"]\n").unwrap();
+
+    let output = debtmap_command(directory.path())
+        .env("DEBTMAP_CONFIG", &config)
+        .args([
+            "analyze",
+            ".",
+            "--format",
+            "json",
+            "--quiet",
+            "--no-tui",
+            "--no-context-aware",
+            "--no-parallel",
+            "--min-score",
+            "0",
+            "--output",
+            "environment.json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{}", output_text(&output));
+    assert_eq!(report_total_loc(directory.path(), "environment.json"), 0);
+}
+
+#[test]
+fn explicit_config_inherits_reported_lower_precedence_sources() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(directory.path().join("sample.rs"), "fn sample() {}\n").unwrap();
+    fs::write(
+        directory.path().join(".debtmap.toml"),
+        "[ignore]\npatterns = [\"*.rs\"]\n",
+    )
+    .unwrap();
+    let config = directory.path().join("custom.toml");
+    fs::write(&config, "[display]\nitems_per_tier = 7\n").unwrap();
+
+    let output = run_json_analysis(directory.path(), Some(&config), "layered.json");
+
+    assert!(output.status.success(), "{}", output_text(&output));
+    assert_eq!(report_total_loc(directory.path(), "layered.json"), 0);
+}
+
+#[test]
+fn explicit_config_is_used_when_showing_sources() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(
+        directory.path().join(".debtmap.toml"),
+        "[thresholds]\ncomplexity = 11\n",
+    )
+    .unwrap();
+    let config = directory.path().join("custom.toml");
+    fs::write(&config, "[display]\nitems_per_tier = 7\n").unwrap();
+
+    let output = debtmap_command(directory.path())
+        .arg("--config")
+        .arg(&config)
+        .args(["--show-config-sources", "analyze", "."])
+        .env("DEBTMAP_COMPLEXITY_THRESHOLD", "33")
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{}", output_text(&output));
+    assert!(
+        String::from_utf8_lossy(&output.stdout)
+            .contains(&format!("custom config: {}", config.display())),
+        "{}",
+        output_text(&output)
+    );
+
+    let first = String::from_utf8_lossy(&output.stdout);
+    let field_names: Vec<_> = first
+        .lines()
+        .filter(|line| line.starts_with("  ") && line.ends_with(" = <value>"))
+        .map(|line| line.trim().trim_end_matches(" = <value>"))
+        .collect();
+    let mut sorted_names = field_names.clone();
+    sorted_names.sort_unstable();
+    assert_eq!(field_names, sorted_names);
+
+    let default_index = first.find("  1. built-in defaults").unwrap();
+    let project_index = first.find("  2. project config:").unwrap();
+    let custom_index = first.find("  3. custom config:").unwrap();
+    let environment_index = first.find("  4. environment variable:").unwrap();
+    assert!(default_index < project_index);
+    assert!(project_index < custom_index);
+    assert!(custom_index < environment_index);
+}
+
+#[test]
+fn invalid_explicit_config_stops_analysis() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(directory.path().join("sample.rs"), "fn sample() {}\n").unwrap();
+    let config = directory.path().join("invalid.toml");
+    fs::write(&config, "[thresholds\ncomplexity = 17\n").unwrap();
+
+    let output = run_json_analysis(directory.path(), Some(&config), "report.json");
+
+    assert!(!output.status.success(), "{}", output_text(&output));
+    assert!(!directory.path().join("report.json").exists());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Failed to parse .debtmap.toml"),
+        "{}",
+        output_text(&output)
+    );
+}
+
+#[test]
+fn invalid_explicit_scoring_stops_analysis() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(directory.path().join("sample.rs"), "fn sample() {}\n").unwrap();
+    let config = directory.path().join("invalid-scoring.toml");
+    fs::write(
+        &config,
+        "[scoring]\ncoverage = 1.0\ncomplexity = 1.0\ndependency = 1.0\n",
+    )
+    .unwrap();
+
+    let output = run_json_analysis(directory.path(), Some(&config), "scoring.json");
+
+    assert!(!output.status.success(), "{}", output_text(&output));
+    assert!(!directory.path().join("scoring.json").exists());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("must sum to 1.0"),
+        "{}",
+        output_text(&output)
+    );
+}
+
+#[test]
+fn validate_subcommand_config_is_not_ignored() {
+    let directory = tempfile::tempdir().unwrap();
+    let missing = directory.path().join("missing.toml");
+
+    let output = debtmap_command(directory.path())
+        .args(["validate", ".", "--config"])
+        .arg(&missing)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success(), "{}", output_text(&output));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Cannot read config file"),
+        "{}",
+        output_text(&output)
+    );
 }

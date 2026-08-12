@@ -16,6 +16,7 @@ use debtmap::cli::{
 };
 use debtmap::di::create_app_container;
 use debtmap::observability::{extract_thread_panic_message, init_tracing, install_panic_hook};
+use std::path::Path;
 use std::sync::Arc;
 
 /// Extract the number of jobs from a command, defaulting to 0 for commands that don't support it.
@@ -44,6 +45,36 @@ fn parse_cli() -> Cli {
     }
 }
 
+fn selected_config_path(cli: &Cli) -> Option<&Path> {
+    match &cli.command {
+        Commands::Validate {
+            config: Some(path), ..
+        } => Some(path),
+        _ => cli.config.as_deref(),
+    }
+}
+
+fn command_uses_runtime_config(command: &Commands) -> bool {
+    matches!(
+        command,
+        Commands::Analyze { .. } | Commands::Validate { .. }
+    )
+}
+
+fn install_runtime_config() -> Result<()> {
+    let traced = debtmap::config::load_multi_source_config().map_err(|errors| {
+        let details = errors
+            .into_iter()
+            .map(|error| format!("  - {error}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        anyhow::anyhow!("Configuration loading failed:\n{details}")
+    })?;
+
+    debtmap::config::install_config(traced.into_config())
+        .map_err(|_| anyhow::anyhow!("Configuration was already initialized"))
+}
+
 fn main() -> Result<()> {
     // Install custom panic hook FIRST for structured crash reports (spec 207)
     install_panic_hook();
@@ -65,9 +96,13 @@ fn main() -> Result<()> {
 
 fn main_inner() -> Result<()> {
     let cli = parse_cli();
+    let config_path = selected_config_path(&cli).map(ToOwned::to_owned);
 
-    // Configure rayon thread pool early based on CLI arguments
-    configure_thread_pool(get_worker_count(extract_jobs(&cli.command)));
+    // Make the explicit path visible to every configuration loader.
+    if let Some(ref config_path) = config_path {
+        // SAFETY: This runs before the application starts worker threads.
+        unsafe { std::env::set_var("DEBTMAP_CONFIG", config_path) };
+    }
 
     // Handle --show-config-sources flag (spec 201)
     if cli.show_config_sources {
@@ -75,11 +110,12 @@ fn main_inner() -> Result<()> {
         return Ok(());
     }
 
-    // If custom config path provided, set environment variable for loaders
-    if let Some(ref config_path) = cli.config {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("DEBTMAP_CONFIG", config_path) };
+    if command_uses_runtime_config(&cli.command) {
+        install_runtime_config()?;
     }
+
+    // Configure rayon only after all process-environment setup is complete.
+    configure_thread_pool(get_worker_count(extract_jobs(&cli.command)));
 
     // Create the dependency injection container once at startup
     let _container = Arc::new(create_app_container()?);
