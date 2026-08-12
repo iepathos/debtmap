@@ -3,9 +3,9 @@
 //! This module detects functions that are managed by frameworks (test functions,
 //! web handlers, event handlers, etc.) to prevent them from being marked as dead code.
 
+use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
-use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use syn::visit::Visit;
 use syn::{Attribute, File, ItemFn};
@@ -129,10 +129,10 @@ impl FrameworkPatternDetector {
                 self.function_to_patterns
                     .entry(func_id.clone())
                     .or_default()
-                    .push_back(pattern.pattern_type.clone());
+                    .push(pattern.pattern_type.clone());
             }
 
-            self.detected_patterns.push_back(pattern);
+            self.detected_patterns.push(pattern);
         }
 
         Ok(())
@@ -238,9 +238,9 @@ impl FrameworkPatternDetector {
         self.function_to_patterns
             .entry(func_id.clone())
             .or_default()
-            .push_back(PatternType::VisitTrait);
+            .push(PatternType::VisitTrait);
 
-        self.detected_patterns.push_back(pattern);
+        self.detected_patterns.push(pattern);
     }
 
     /// Check if a function is likely a visitor pattern method by name

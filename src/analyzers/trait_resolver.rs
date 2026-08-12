@@ -6,8 +6,8 @@
 use crate::analyzers::trait_implementation_tracker::{
     TraitBound, TraitImplementationTracker, TraitObject,
 };
+use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
-use im::{HashMap, HashSet, Vector};
 use std::sync::Arc;
 
 /// Method resolution order following Rust's rules
@@ -285,7 +285,7 @@ impl TraitResolver {
                     self.tracker
                         .resolve_method(&impl_type, &trait_object.trait_name, method_name)
                 {
-                    results.push_back(ResolvedMethod {
+                    results.push(ResolvedMethod {
                         function_id,
                         trait_name: Some(trait_object.trait_name.clone()),
                         priority: ResolutionPriority::TraitMethodInScope,
@@ -357,11 +357,12 @@ impl TraitResolver {
         for (trait_name, impls) in self.tracker.implementations.iter() {
             for impl_info in impls {
                 if let Some(method) = impl_info.methods.get(method_name) {
-                    methods.push_back((trait_name.clone(), method.function_id.clone()));
+                    methods.push((trait_name.clone(), method.function_id.clone()));
                 }
             }
         }
 
+        methods.sort();
         methods
     }
 
@@ -453,8 +454,7 @@ mod tests {
                     is_async: false,
                     signature: "fn test_method(&self)".to_string(),
                 },
-            ]
-            .into(),
+            ],
             associated_types: Vector::new(),
             supertraits: Vector::new(),
             generic_params: Vector::new(),
@@ -517,10 +517,9 @@ mod tests {
             generic_constraints: vec![
                 crate::analyzers::trait_implementation_tracker::WhereClauseItem {
                     type_param: "T".to_string(),
-                    bounds: vec!["Clone".to_string()].into(),
+                    bounds: vec!["Clone".to_string()],
                 },
-            ]
-            .into(),
+            ],
             is_blanket: true,
             is_negative: false,
             module_path: Vector::new(),
@@ -585,10 +584,9 @@ mod tests {
             generic_constraints: vec![
                 crate::analyzers::trait_implementation_tracker::WhereClauseItem {
                     type_param: "T".to_string(),
-                    bounds: vec!["Clone".to_string(), "Send".to_string()].into(),
+                    bounds: vec!["Clone".to_string(), "Send".to_string()],
                 },
-            ]
-            .into(),
+            ],
             is_blanket: true,
             is_negative: false,
             module_path: Vector::new(),
@@ -722,8 +720,7 @@ mod tests {
                     is_async: false,
                     signature: "fn test_method(&self)".to_string(),
                 },
-            ]
-            .into(),
+            ],
             associated_types: Vector::new(),
             supertraits: Vector::new(),
             generic_params: Vector::new(),
@@ -784,8 +781,7 @@ mod tests {
                     is_async: false,
                     signature: "fn default_method(&self)".to_string(),
                 },
-            ]
-            .into(),
+            ],
             associated_types: Vector::new(),
             supertraits: Vector::new(),
             generic_params: Vector::new(),
@@ -851,8 +847,7 @@ mod tests {
                     is_async: false,
                     signature: "fn default_fn(&self)".to_string(),
                 },
-            ]
-            .into(),
+            ],
             associated_types: Vector::new(),
             supertraits: Vector::new(),
             generic_params: Vector::new(),

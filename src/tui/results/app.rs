@@ -73,13 +73,13 @@ impl ResultsApp {
     ) -> Self {
         // Extract items from PreparedDebtView into UnifiedAnalysis
         // Uses ViewItem's as_function/as_file accessors for idiomatic extraction
-        let prepared_items: im::Vector<UnifiedDebtItem> = view
+        let prepared_items: crate::collections::Vector<UnifiedDebtItem> = view
             .items
             .iter()
             .filter_map(|item| item.as_function().cloned())
             .collect();
 
-        let file_items: im::Vector<crate::priority::FileDebtItem> = view
+        let file_items: crate::collections::Vector<crate::priority::FileDebtItem> = view
             .items
             .iter()
             .filter_map(|item| item.as_file().cloned())

@@ -8,9 +8,9 @@ use super::{
     CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
     DisplayGroup, ImpactLevel, Tier, TieredDisplay, UnifiedAnalysis, UnifiedDebtItem,
 };
+use crate::collections::Vector;
 use crate::priority::filtering::{ClassifiedItem, FilterConfig, FilterResult};
 use crate::priority::tiers::{TierConfig, classify_tier};
-use im::Vector;
 use std::collections::{BTreeMap, HashMap};
 
 /// Extension trait providing query operations for UnifiedAnalysis
@@ -444,7 +444,9 @@ fn create_grouped_display_group(
 }
 
 /// Partition items into critical (ungroupable) and groupable items.
-fn partition_by_criticality(items: im::Vector<DebtItem>) -> (Vec<DebtItem>, Vec<DebtItem>) {
+fn partition_by_criticality(
+    items: crate::collections::Vector<DebtItem>,
+) -> (Vec<DebtItem>, Vec<DebtItem>) {
     items.into_iter().partition(is_critical_item)
 }
 
@@ -923,7 +925,7 @@ mod tests {
     fn create_analysis_with_items(items: Vec<UnifiedDebtItem>) -> UnifiedAnalysis {
         let mut analysis = create_empty_analysis();
         for item in items {
-            analysis.items.push_back(item);
+            analysis.items.push(item);
         }
         analysis
     }
@@ -1332,7 +1334,7 @@ mod tests {
             },
         );
 
-        let items: im::Vector<DebtItem> = vec![
+        let items: crate::collections::Vector<DebtItem> = vec![
             DebtItem::Function(Box::new(critical)),
             DebtItem::Function(Box::new(normal)),
         ]
@@ -1361,9 +1363,10 @@ mod tests {
             },
         );
 
-        let items: im::Vector<DebtItem> = vec![DebtItem::Function(Box::new(god_object))]
-            .into_iter()
-            .collect();
+        let items: crate::collections::Vector<DebtItem> =
+            vec![DebtItem::Function(Box::new(god_object))]
+                .into_iter()
+                .collect();
 
         let (critical_items, groupable_items) = super::partition_by_criticality(items);
 

@@ -82,9 +82,9 @@ pub fn handle_compare_command(
 /// Pure function to convert DebtmapJsonInput to UnifiedAnalysis
 /// Converts output format types back to internal types for comparison
 fn json_to_analysis(json: DebtmapJsonInput) -> UnifiedAnalysis {
+    use crate::collections::Vector;
     use crate::output::unified::UnifiedDebtItemOutput;
     use crate::priority::call_graph::CallGraph;
-    use im::Vector;
 
     let mut items = Vector::new();
     let mut file_items = Vector::new();
@@ -93,10 +93,10 @@ fn json_to_analysis(json: DebtmapJsonInput) -> UnifiedAnalysis {
     for item in json.items {
         match item {
             UnifiedDebtItemOutput::Function(func) => {
-                items.push_back(output_to_internal_function(&func));
+                items.push(output_to_internal_function(&func));
             }
             UnifiedDebtItemOutput::File(file) => {
-                file_items.push_back(output_to_internal_file(&file));
+                file_items.push(output_to_internal_file(&file));
             }
         }
     }

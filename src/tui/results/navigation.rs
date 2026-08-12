@@ -584,7 +584,7 @@ mod tests {
     fn create_test_app(item_count: usize) -> ResultsApp {
         let mut analysis = UnifiedAnalysis::new(CallGraph::new());
         for i in 0..item_count {
-            analysis.items.push_back(create_test_item(
+            analysis.items.push(create_test_item(
                 &format!("test_{}.rs", i),
                 &format!("fn_{}", i),
                 i + 1,
@@ -597,13 +597,13 @@ mod tests {
         let mut analysis = UnifiedAnalysis::new(CallGraph::new());
         analysis
             .items
-            .push_back(create_test_item("same.rs", "same_fn", 10));
+            .push(create_test_item("same.rs", "same_fn", 10));
         analysis
             .items
-            .push_back(create_test_item("same.rs", "same_fn", 10));
+            .push(create_test_item("same.rs", "same_fn", 10));
         analysis
             .items
-            .push_back(create_test_item("other.rs", "other_fn", 20));
+            .push(create_test_item("other.rs", "other_fn", 20));
         ResultsApp::new(analysis)
     }
 

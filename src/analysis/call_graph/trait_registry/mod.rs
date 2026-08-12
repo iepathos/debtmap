@@ -26,9 +26,9 @@ pub use types::{
 
 use crate::analyzers::trait_implementation_tracker::TraitImplementationTracker;
 use crate::analyzers::trait_resolver::TraitResolver;
+use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
-use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use std::sync::Arc;
 use syn::File;
@@ -98,7 +98,7 @@ impl TraitRegistry {
 
         // Add unresolved calls
         for call in result.trait_method_calls {
-            self.unresolved_calls.push_back(call);
+            self.unresolved_calls.push(call);
         }
 
         // Add Visit trait methods
@@ -127,7 +127,7 @@ impl TraitRegistry {
         self.trait_implementations
             .entry(trait_name)
             .or_default()
-            .push_back(trait_impl);
+            .push(trait_impl);
     }
 
     // Query methods
@@ -324,14 +324,13 @@ mod tests {
                 method_name: "default".to_string(),
                 method_id: default_method.clone(),
                 overrides_default: false,
-            }]
-            .into(),
+            }],
             impl_id: None,
         };
 
         registry
             .trait_implementations
-            .insert("Default".to_string(), vec![trait_impl].into());
+            .insert("Default".to_string(), vec![trait_impl]);
 
         registry.detect_common_trait_patterns(&mut call_graph);
 
@@ -360,14 +359,13 @@ mod tests {
                     method_id: clone_box_method.clone(),
                     overrides_default: false,
                 },
-            ]
-            .into(),
+            ],
             impl_id: None,
         };
 
         registry
             .trait_implementations
-            .insert("Clone".to_string(), vec![trait_impl].into());
+            .insert("Clone".to_string(), vec![trait_impl]);
 
         registry.detect_common_trait_patterns(&mut call_graph);
 
@@ -419,21 +417,20 @@ mod tests {
                 method_name: "default".to_string(),
                 method_id: default_impl.clone(),
                 overrides_default: false,
-            }]
-            .into(),
+            }],
             impl_id: None,
         };
 
         registry
             .trait_implementations
-            .insert("Default".to_string(), vec![trait_impl].into());
+            .insert("Default".to_string(), vec![trait_impl]);
 
         registry.type_to_traits.insert(
             "MyConfig".to_string(),
             vec!["Default".to_string()].into_iter().collect(),
         );
 
-        registry.unresolved_calls.push_back(TraitMethodCall {
+        registry.unresolved_calls.push(TraitMethodCall {
             caller: caller.clone(),
             trait_name: "Default".to_string(),
             method_name: "default".to_string(),

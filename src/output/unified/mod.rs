@@ -79,7 +79,7 @@ struct ItemStatistics {
 /// Collect all debt items from unified analysis (pure function)
 fn collect_all_items(
     analysis: &crate::priority::UnifiedAnalysis,
-) -> im::Vector<crate::priority::DebtItem> {
+) -> crate::collections::Vector<crate::priority::DebtItem> {
     analysis
         .items
         .iter()
@@ -95,7 +95,7 @@ fn collect_all_items(
 
 /// Convert items to unified format with invariant validation (pure function)
 fn convert_items(
-    items: &im::Vector<crate::priority::DebtItem>,
+    items: &crate::collections::Vector<crate::priority::DebtItem>,
     include_scoring_details: bool,
     call_graph: &crate::priority::CallGraph,
 ) -> Vec<UnifiedDebtItemOutput> {

@@ -393,10 +393,10 @@ fn is_passing(results: &AnalysisResults) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::collections::Vector;
     use crate::risk::{
         Difficulty, FunctionRisk, RiskCategory, RiskDistribution, TestEffort, TestingRecommendation,
     };
-    use im::Vector;
     use std::path::PathBuf;
 
     fn create_test_risk_insight() -> RiskInsight {

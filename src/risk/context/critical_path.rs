@@ -1,7 +1,7 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
+use crate::collections::{HashSet, Vector};
 use crate::priority::call_graph::CallGraph;
 use anyhow::Result;
-use im::{HashSet, Vector};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -69,7 +69,7 @@ impl CriticalPathAnalyzer {
                         | EntryType::WebHandler
                 );
 
-                self.entry_points.push_back(EntryPoint {
+                self.entry_points.push(EntryPoint {
                     function_name: name.clone(),
                     file_path: path.clone(),
                     entry_type,
@@ -141,7 +141,7 @@ impl CriticalPathAnalyzer {
 
         for entry in &self.entry_points {
             let traversal = self.trace_from_entry(entry);
-            paths.push_back(CriticalPath {
+            paths.push(CriticalPath {
                 entry: entry.clone(),
                 functions: traversal,
                 weight: self.calculate_path_weight(entry),
@@ -165,7 +165,7 @@ impl CriticalPathAnalyzer {
             }
 
             visited.insert(function.clone());
-            path.push_back(function.clone());
+            path.push(function.clone());
 
             // Add callees to stack (reverse order to maintain DFS order)
             let callees: Vec<_> = self.call_graph.get_callees_by_name(&function);
@@ -538,7 +538,7 @@ mod tests {
         let mut analyzer = CriticalPathAnalyzer::new();
 
         // Add an event handler entry point (non-user-facing)
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "handle_event".to_string(),
             file_path: PathBuf::from("src/events.rs"),
             entry_type: EntryType::EventHandler,
@@ -585,7 +585,7 @@ mod tests {
         let mut analyzer = CriticalPathAnalyzer::new();
 
         // Add a main entry point (user-facing)
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "main".to_string(),
             file_path: PathBuf::from("src/main.rs"),
             entry_type: EntryType::Main,
@@ -632,14 +632,14 @@ mod tests {
         let mut analyzer = CriticalPathAnalyzer::new();
 
         // Add multiple entry points with different weights
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "main".to_string(),
             file_path: PathBuf::from("src/main.rs"),
             entry_type: EntryType::Main,
             is_user_facing: true,
         });
 
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "handle_api".to_string(),
             file_path: PathBuf::from("src/api.rs"),
             entry_type: EntryType::ApiEndpoint,
@@ -800,7 +800,7 @@ mod tests {
         // Create a complex dependency chain
         // main -> init -> database_setup -> connection_pool
         //             -> config_loader -> file_reader
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "main".to_string(),
             file_path: PathBuf::from("src/main.rs"),
             entry_type: EntryType::Main,
@@ -869,21 +869,21 @@ mod tests {
         let mut analyzer = CriticalPathAnalyzer::new();
 
         // Add mix of user-facing and non-user-facing entry points
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "main".to_string(),
             file_path: PathBuf::from("src/main.rs"),
             entry_type: EntryType::Main,
             is_user_facing: true,
         });
 
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "background_worker".to_string(),
             file_path: PathBuf::from("src/worker.rs"),
             entry_type: EntryType::EventHandler,
             is_user_facing: false,
         });
 
-        analyzer.entry_points.push_back(EntryPoint {
+        analyzer.entry_points.push(EntryPoint {
             function_name: "api_endpoint".to_string(),
             file_path: PathBuf::from("src/api.rs"),
             entry_type: EntryType::ApiEndpoint,

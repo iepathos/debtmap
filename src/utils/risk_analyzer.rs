@@ -1,6 +1,6 @@
+use crate::collections::Vector;
 use crate::{core::*, debt, risk};
 use anyhow::{Context, Result};
-use im::Vector;
 use std::path::Path;
 
 pub fn analyze_risk_with_coverage(
@@ -57,7 +57,7 @@ pub fn analyze_risk_with_coverage(
             )
         };
 
-        function_risks.push_back(risk);
+        function_risks.push(risk);
     }
 
     let insights = risk::insights::generate_risk_insights(function_risks, &analyzer);
@@ -115,7 +115,7 @@ pub fn analyze_risk_without_coverage(
             )
         };
 
-        function_risks.push_back(risk);
+        function_risks.push(risk);
     }
 
     let insights = risk::insights::generate_risk_insights(function_risks, &analyzer);

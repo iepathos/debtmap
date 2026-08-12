@@ -272,8 +272,8 @@ pub fn calculate_coverage_urgency(
 pub fn propagate_coverage_through_graph(
     call_graph: &CallGraph,
     coverage: &LcovData,
-) -> im::HashMap<FunctionId, TransitiveCoverage> {
-    let mut result = im::HashMap::new();
+) -> crate::collections::HashMap<FunctionId, TransitiveCoverage> {
+    let mut result = crate::collections::HashMap::new();
 
     // Process all functions in the call graph
     for func_id in call_graph.find_all_functions() {

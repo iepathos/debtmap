@@ -1,19 +1,17 @@
 use super::{
     Difficulty, FunctionRisk, RiskAnalyzer, RiskCategory, RiskInsight, TestingRecommendation,
 };
+use crate::collections::Vector;
 use crate::risk::correlation::analyze_risk_insights;
 use crate::risk::priority::prioritize_by_roi;
-use im::Vector;
 
 pub fn generate_risk_insights(
     functions: Vector<FunctionRisk>,
     analyzer: &RiskAnalyzer,
 ) -> RiskInsight {
-    let mut insights = analyze_risk_insights(functions.clone());
-
-    // Generate testing recommendations
-    insights.risk_reduction_opportunities = prioritize_by_roi(&functions, analyzer);
-
+    let opportunities = prioritize_by_roi(&functions, analyzer);
+    let mut insights = analyze_risk_insights(functions);
+    insights.risk_reduction_opportunities = opportunities;
     insights
 }
 

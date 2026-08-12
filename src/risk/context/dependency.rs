@@ -1,6 +1,6 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
+use crate::collections::{HashMap, HashSet, Vector};
 use anyhow::Result;
-use im::{HashMap, HashSet, Vector};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -47,7 +47,7 @@ impl DependencyGraph {
     }
 
     pub fn add_dependency(&mut self, from: String, to: String, coupling_strength: f64) {
-        self.edges.push_back(DependencyEdge {
+        self.edges.push(DependencyEdge {
             from,
             to,
             coupling_strength,
@@ -97,18 +97,17 @@ impl DependencyRiskCalculator {
         const CONVERGENCE_THRESHOLD: f64 = 0.01;
 
         while changed && iterations < MAX_ITERATIONS {
-            changed = false;
-            let mut new_scores = self.risk_scores.clone();
-
-            for module in self.graph.modules() {
-                let old_risk = self.risk_scores.get(&module.name).copied().unwrap_or(0.0);
-                let propagated_risk = self.calculate_propagated_risk(&module.name);
-
-                if (propagated_risk - old_risk).abs() > CONVERGENCE_THRESHOLD {
-                    new_scores.insert(module.name.clone(), propagated_risk);
-                    changed = true;
-                }
-            }
+            let new_scores: HashMap<_, _> = self
+                .graph
+                .modules()
+                .map(|module| {
+                    (
+                        module.name.clone(),
+                        self.calculate_propagated_risk(&module.name),
+                    )
+                })
+                .collect();
+            changed = scores_changed(&self.risk_scores, &new_scores, CONVERGENCE_THRESHOLD);
 
             self.risk_scores = new_scores;
             iterations += 1;
@@ -142,7 +141,7 @@ impl DependencyRiskCalculator {
     /// Calculate the blast radius of a change to a module
     pub fn calculate_blast_radius(&self, module_name: &str) -> usize {
         let mut affected = HashSet::new();
-        let mut to_visit = Vector::new();
+        let mut to_visit = std::collections::VecDeque::new();
 
         to_visit.push_back(module_name.to_string());
 
@@ -175,6 +174,17 @@ impl DependencyRiskCalculator {
             .modules()
             .find(|m| m.functions.contains(&function_name.to_string()))
     }
+}
+
+fn scores_changed(
+    previous: &HashMap<String, f64>,
+    current: &HashMap<String, f64>,
+    threshold: f64,
+) -> bool {
+    current.iter().any(|(name, score)| {
+        let previous_score = previous.get(name).copied().unwrap_or_default();
+        (score - previous_score).abs() > threshold
+    })
 }
 
 /// Context provider for dependency risk analysis
@@ -341,7 +351,12 @@ impl DependencyRiskProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use im::vector;
+
+    macro_rules! vector {
+        ($($item:expr),* $(,)?) => {
+            Vector::from([$($item),*])
+        };
+    }
 
     #[test]
     fn test_dependency_graph() {

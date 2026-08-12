@@ -127,7 +127,7 @@
 //!
 //! - **Parallel Processing** - Uses [`rayon`](https://docs.rs/rayon) for CPU-intensive analysis across multiple files
 //! - **Concurrent Data Structures** - Leverages [`dashmap`](https://docs.rs/dashmap) for lock-free concurrent access
-//! - **Immutable Collections** - Uses [`im`](https://docs.rs/im) crate for persistent data structures
+//! - **Collection Safety** - Uses maintained standard-library collections for graph and result data
 //! - **Performance** - 10-100x faster than Java/Python-based competitors
 //!
 //! ### Coverage Integration
@@ -209,7 +209,7 @@
 //!
 //! 1. **Pure Core** - All analysis logic is pure functions with no side effects
 //! 2. **I/O at Boundaries** - File operations and network calls isolated to edges
-//! 3. **Immutable Data** - Uses persistent data structures for safe concurrent access
+//! 3. **Explicit Data Flow** - Uses owned standard collections and immutable transformations where practical
 //! 4. **Function Composition** - Complex behavior built from simple, testable units
 //! 5. **Parallel Processing** - Embarrassingly parallel analysis across files
 //!
@@ -281,7 +281,7 @@
 //!     Language,
 //! };
 //! use std::path::PathBuf;
-//! use im::Vector;
+//! use debtmap::collections::Vector;
 //!
 //! // Parse coverage and analyze file
 //! let coverage = parse_lcov_file(std::path::Path::new("target/coverage/lcov.info")).unwrap();
@@ -304,7 +304,7 @@
 //!         coverage_pct,
 //!         false,
 //!     );
-//!     risks.push_back(risk);
+//!     risks.push(risk);
 //! }
 //!
 //! // Generate actionable insights
@@ -333,6 +333,7 @@ pub mod analysis_utils;
 pub mod analyzers;
 pub mod builders;
 pub mod cli;
+pub mod collections;
 pub mod commands;
 pub mod common;
 pub mod comparison;

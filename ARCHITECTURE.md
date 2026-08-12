@@ -1578,7 +1578,7 @@ assert_eq!(id1.simple_key(), id2.simple_key());
 
 ##### Primary Index
 ```rust
-nodes: im::HashMap<FunctionId, FunctionNode>
+nodes: std::collections::HashMap<FunctionId, FunctionNode>
 ```
 
 - **Key Type**: Complete `FunctionId`

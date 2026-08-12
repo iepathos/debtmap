@@ -300,7 +300,7 @@ fn process_god_object(
 
 /// Update god object indicators for items in the same file.
 fn update_god_indicators_for_file(
-    items: &mut im::Vector<crate::priority::UnifiedDebtItem>,
+    items: &mut crate::collections::Vector<crate::priority::UnifiedDebtItem>,
     file_path: &std::path::PathBuf,
     enriched_analysis: &crate::organization::GodObjectAnalysis,
 ) {

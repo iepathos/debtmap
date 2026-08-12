@@ -161,10 +161,10 @@ fn create_view_item_at(file: &str, func: &str, line: usize, score: f64) -> ViewI
 
 #[test]
 fn test_combine_items_preserves_all() {
-    let functions: im::Vector<UnifiedDebtItem> = (0..3)
+    let functions: crate::collections::Vector<UnifiedDebtItem> = (0..3)
         .map(|i| create_test_function_item(50.0 + i as f64))
         .collect();
-    let files: im::Vector<FileDebtItem> = (0..2)
+    let files: crate::collections::Vector<FileDebtItem> = (0..2)
         .map(|i| create_test_file_item(60.0 + i as f64))
         .collect();
 
@@ -175,16 +175,19 @@ fn test_combine_items_preserves_all() {
 
 #[test]
 fn test_combine_items_empty() {
-    let combined = combine_items(&im::Vector::new(), &im::Vector::new());
+    let combined = combine_items(
+        &crate::collections::Vector::new(),
+        &crate::collections::Vector::new(),
+    );
     assert!(combined.is_empty());
 }
 
 #[test]
 fn test_combine_items_only_functions() {
-    let functions: im::Vector<UnifiedDebtItem> = (0..3)
+    let functions: crate::collections::Vector<UnifiedDebtItem> = (0..3)
         .map(|i| create_test_function_item(50.0 + i as f64))
         .collect();
-    let files: im::Vector<FileDebtItem> = im::Vector::new();
+    let files: crate::collections::Vector<FileDebtItem> = crate::collections::Vector::new();
 
     let combined = combine_items(&functions, &files);
 
@@ -198,8 +201,8 @@ fn test_combine_items_only_functions() {
 
 #[test]
 fn test_combine_items_only_files() {
-    let functions: im::Vector<UnifiedDebtItem> = im::Vector::new();
-    let files: im::Vector<FileDebtItem> = (0..2)
+    let functions: crate::collections::Vector<UnifiedDebtItem> = crate::collections::Vector::new();
+    let files: crate::collections::Vector<FileDebtItem> = (0..2)
         .map(|i| create_test_file_item(60.0 + i as f64))
         .collect();
 

@@ -5,8 +5,8 @@
 //! which functions should be marked as entry points.
 
 use super::types::TraitImplementation;
+use crate::collections::{HashMap, Vector};
 use crate::priority::call_graph::FunctionId;
-use im::{HashMap, Vector};
 
 /// Result of pattern detection - functions to mark as entry points
 #[derive(Debug, Clone, Default)]
@@ -212,12 +212,11 @@ mod tests {
                 method_name: "default".to_string(),
                 method_id: make_function_id("MyConfig::default", 10),
                 overrides_default: false,
-            }]
-            .into(),
+            }],
             impl_id: None,
         };
 
-        impls.insert("Default".to_string(), vec![trait_impl].into());
+        impls.insert("Default".to_string(), vec![trait_impl]);
 
         let result = detect_default_trait_impls(&impls);
         assert_eq!(result.len(), 1);

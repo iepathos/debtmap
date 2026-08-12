@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use im::HashMap;
+    use crate::collections::HashMap;
     use std::path::PathBuf;
 
     #[test]

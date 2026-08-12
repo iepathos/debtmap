@@ -58,7 +58,7 @@ pub fn write_risk_heat_map<W: Write>(writer: &mut W, results: &AnalysisResults) 
 pub fn write_dependency_graph<W: Write>(writer: &mut W, analysis: &UnifiedAnalysis) -> Result<()> {
     writeln!(writer, "### Module Dependencies\n")?;
 
-    let items: Vec<_> = analysis.items.iter().cloned().collect();
+    let items = analysis.items.to_vec();
     let deps = extract_module_dependencies(&items);
 
     writeln!(writer, "```mermaid")?;

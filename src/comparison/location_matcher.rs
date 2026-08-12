@@ -331,11 +331,11 @@ fn calculate_similarity(a: &str, b: &str) -> f64 {
 mod tests {
     use super::*;
 
+    use crate::collections::Vector;
     use crate::priority::{
         DebtType, FunctionRole, ImpactMetrics,
         unified_scorer::{Location, UnifiedScore},
     };
-    use im::Vector;
     use std::path::PathBuf;
 
     fn create_test_item(file: &str, function: &str, line: usize) -> UnifiedDebtItem {

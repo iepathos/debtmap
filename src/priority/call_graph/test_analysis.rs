@@ -1,7 +1,7 @@
 //! Test-related analysis including test helpers and test-only functions
 
 use super::types::{CallGraph, FunctionId, FunctionNode};
-use im::{HashMap, HashSet};
+use crate::collections::{HashMap, HashSet};
 
 impl CallGraph {
     pub fn find_test_functions(&self) -> Vec<FunctionId> {

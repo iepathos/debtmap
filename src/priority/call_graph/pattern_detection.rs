@@ -1,7 +1,7 @@
 //! Pattern detection algorithms for identifying delegation and other patterns
 
 use super::types::{CallGraph, FunctionId, FunctionNode};
-use im::HashMap;
+use crate::collections::HashMap;
 
 impl CallGraph {
     /// Pure function to check if delegation pattern criteria are met

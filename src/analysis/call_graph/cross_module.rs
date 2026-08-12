@@ -3,9 +3,9 @@
 //! This module tracks cross-module dependencies and public APIs to reduce
 //! false positives in dead code detection for public functions and exports.
 
+use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
-use im::{HashMap, HashSet, Vector};
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
@@ -170,12 +170,12 @@ impl CrossModuleTracker {
 
             // Add cross-module calls
             for call in call_visitor.cross_module_calls {
-                self.cross_module_calls.push_back(call);
+                self.cross_module_calls.push(call);
             }
 
             // Add module imports
             for import in call_visitor.module_imports {
-                self.module_imports.push_back(import);
+                self.module_imports.push(import);
             }
         }
 
@@ -192,7 +192,9 @@ impl CrossModuleTracker {
 
     /// Get all public APIs
     pub fn get_public_apis(&self) -> Vec<PublicApiInfo> {
-        self.public_apis.values().cloned().collect()
+        let mut apis: Vec<_> = self.public_apis.values().cloned().collect();
+        apis.sort_by(|a, b| a.function_id.cmp(&b.function_id));
+        apis
     }
 
     /// Check if a function is a public API

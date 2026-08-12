@@ -93,7 +93,7 @@ pub fn write_dependency_analysis<W: Write>(
 ) -> Result<()> {
     writeln!(writer, "## Dependency Analysis\n")?;
 
-    let items: Vec<_> = analysis.items.iter().cloned().collect();
+    let items = analysis.items.to_vec();
     let deps = extract_module_dependencies(&items);
 
     writeln!(writer, "### Module Coupling\n")?;
@@ -133,7 +133,7 @@ mod tests {
         use crate::data_flow::DataFlowGraph;
         use crate::priority::call_graph::CallGraph;
 
-        use im::Vector;
+        use crate::collections::Vector;
 
         let items = Vector::from(vec![UnifiedDebtItem {
             location: Location {

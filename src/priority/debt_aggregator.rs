@@ -1,5 +1,5 @@
+use crate::collections::HashMap;
 use crate::core::{DebtItem, DebtType};
-use im::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

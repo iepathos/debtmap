@@ -34,9 +34,9 @@ pub mod roi;
 pub mod strategy;
 pub mod thresholds;
 
+use crate::collections::Vector;
 use crate::core::ComplexityMetrics;
 use chrono::{DateTime, Utc};
-use im::Vector;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -379,7 +379,7 @@ mod tests {
         // Create critical path analyzer with entry point
         let mut cp_analyzer = CriticalPathAnalyzer::new();
         cp_analyzer.call_graph = call_graph;
-        cp_analyzer.entry_points.push_back(EntryPoint {
+        cp_analyzer.entry_points.push(EntryPoint {
             function_name: "func_0".to_string(),
             file_path: PathBuf::from("src/main.rs"),
             entry_type: EntryType::Main,
@@ -436,7 +436,7 @@ mod tests {
 
         // Create aggregator
         let mut cp_analyzer = CriticalPathAnalyzer::new();
-        cp_analyzer.entry_points.push_back(EntryPoint {
+        cp_analyzer.entry_points.push(EntryPoint {
             function_name: "main".to_string(),
             file_path: PathBuf::from("src/main.rs"),
             entry_type: EntryType::Main,

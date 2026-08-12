@@ -580,7 +580,7 @@ pub fn generate_executive_summary(
     // Identify quick wins and strategic priorities
     let (quick_wins, strategic_priorities, team_guidance) = if let Some(analysis) = unified_analysis
     {
-        let items: Vec<UnifiedDebtItem> = analysis.items.iter().cloned().collect();
+        let items: Vec<UnifiedDebtItem> = analysis.items.to_vec();
         (
             identify_quick_wins(&items),
             identify_strategic_priorities(&items, 3),

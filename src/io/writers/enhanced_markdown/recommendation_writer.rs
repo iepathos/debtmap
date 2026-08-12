@@ -99,9 +99,9 @@ mod tests {
     use std::path::PathBuf;
 
     fn create_test_analysis() -> UnifiedAnalysis {
+        use crate::collections::Vector;
         use crate::data_flow::DataFlowGraph;
         use crate::priority::call_graph::CallGraph;
-        use im::Vector;
 
         let items = Vector::from(vec![UnifiedDebtItem {
             location: Location {

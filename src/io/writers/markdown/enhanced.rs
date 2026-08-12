@@ -40,7 +40,7 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
             return Ok(());
         }
 
-        let items_vec: Vec<UnifiedDebtItem> = top_items.iter().cloned().collect();
+        let items_vec: Vec<UnifiedDebtItem> = top_items.to_vec();
         let table = build_priority_table(&items_vec);
         write!(self.writer(), "{}", table)?;
 
@@ -99,8 +99,8 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
         writeln!(self.writer())?;
 
         // Get top untested functions with high ROI
-        // Convert im::Vector to slice for compatibility
-        let items_vec: Vec<UnifiedDebtItem> = analysis.items.iter().cloned().collect();
+        // Convert crate::collections::Vector to slice for compatibility
+        let items_vec: Vec<UnifiedDebtItem> = analysis.items.to_vec();
         let testing_gaps = collect_testing_gaps(&items_vec);
 
         // Format and write the recommendations

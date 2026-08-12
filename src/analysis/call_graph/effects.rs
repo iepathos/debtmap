@@ -32,10 +32,10 @@
 
 use super::{AnalysisConfig, DeadCodeAnalysis, RustCallGraph, RustCallGraphBuilder};
 use crate::analysis::effects::{lift_pure, query_config};
+use crate::collections::HashSet;
 use crate::effects::AnalysisEffect;
 use crate::env::RealEnv;
 use crate::errors::AnalysisError;
-use im::HashSet;
 use stillwater::Effect;
 use syn::File;
 

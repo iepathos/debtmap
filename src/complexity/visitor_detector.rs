@@ -3,7 +3,7 @@
 //! This module detects visitor patterns and other trait-based patterns
 //! that should use logarithmic complexity scaling instead of linear.
 
-use im::{HashMap, HashSet};
+use crate::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use syn::{File, Item, ItemFn, ItemImpl, Path as SynPath};
 

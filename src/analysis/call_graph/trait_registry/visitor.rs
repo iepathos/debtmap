@@ -4,8 +4,8 @@
 //! trait definitions, implementations, and method calls.
 
 use super::types::{TraitImplementation, TraitMethod, TraitMethodCall, TraitMethodImplementation};
+use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
-use im::{HashMap, HashSet, Vector};
 use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{File, ImplItem, ItemImpl, ItemTrait, Path as SynPath, TraitItem, Type, TypePath};

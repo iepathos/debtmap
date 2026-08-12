@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Standard Collection API** - Public analysis and risk models now use standard-library `Vec`, `HashMap`, and `HashSet` collection types
+  - This is a source-breaking Rust library API change for callers that constructed public models with `im` collection values
+  - Removes the unmaintained `im`, `bitmaps`, and `sized-chunks` dependency chain and its unsoundness advisory
+  - Makes security CI fail closed on warning-class RustSec advisories
+
 - **Explicit Parallel Configuration** - Analysis execution now uses explicit CLI and library options instead of mutating process-global environment variables
   - Keeps `DEBTMAP_JOBS` as a CLI default, with `--jobs` taking precedence and invalid values failing at argument parsing
   - Makes library-level worker limits effective and directs programmatic callers to `perform_unified_analysis_with_options`

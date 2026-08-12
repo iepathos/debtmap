@@ -141,7 +141,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
 
     for size in [100, 500, 1000, 5000].iter() {
         // Generate test items with varying scores
-        let items: im::Vector<_> = (0..*size)
+        let items: debtmap::collections::Vector<_> = (0..*size)
             .map(|i| {
                 let base_score = (i as f64 % 100.0) + 1.0;
                 let debt_type = match i % 3 {
@@ -169,7 +169,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
 
         let analysis = UnifiedAnalysis {
             items: items.clone(),
-            file_items: im::Vector::new(),
+            file_items: debtmap::collections::Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.0,
                 lines_reduction: 0,
@@ -214,7 +214,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
 
 fn bench_worst_case_sorting(c: &mut Criterion) {
     // Worst case: all items have very similar scores (lots of comparisons)
-    let items: im::Vector<_> = (0..1000)
+    let items: debtmap::collections::Vector<_> = (0..1000)
         .map(|i| {
             let base_score = 50.0 + (i as f64 % 10.0) / 10.0; // Scores clustered around 50
             create_test_item(
@@ -234,7 +234,7 @@ fn bench_worst_case_sorting(c: &mut Criterion) {
 
     let analysis = UnifiedAnalysis {
         items: items.clone(),
-        file_items: im::Vector::new(),
+        file_items: debtmap::collections::Vector::new(),
         total_impact: ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: 0,
@@ -262,7 +262,7 @@ fn bench_worst_case_sorting(c: &mut Criterion) {
 
 fn bench_mixed_debt_types(c: &mut Criterion) {
     // Mix of different debt types with exponential scaling
-    let items: im::Vector<_> = (0..1000)
+    let items: debtmap::collections::Vector<_> = (0..1000)
         .map(|i| {
             let base_score = ((i * 7) % 100) as f64 + 1.0;
             let debt_type = match i % 5 {
@@ -301,7 +301,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
 
     let analysis = UnifiedAnalysis {
         items: items.clone(),
-        file_items: im::Vector::new(),
+        file_items: debtmap::collections::Vector::new(),
         total_impact: ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: 0,
@@ -329,7 +329,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
 
 fn bench_with_risk_boosts(c: &mut Criterion) {
     // Items with varying dependency counts to trigger risk boosts
-    let items: im::Vector<_> = (0..1000)
+    let items: debtmap::collections::Vector<_> = (0..1000)
         .map(|i| {
             let base_score = ((i * 3) % 100) as f64 + 1.0;
             let upstream = (i % 30) as usize;
@@ -357,7 +357,7 @@ fn bench_with_risk_boosts(c: &mut Criterion) {
 
     let analysis = UnifiedAnalysis {
         items: items.clone(),
-        file_items: im::Vector::new(),
+        file_items: debtmap::collections::Vector::new(),
         total_impact: ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: 0,

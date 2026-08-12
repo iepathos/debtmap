@@ -7,8 +7,8 @@ pub mod reduction;
 #[cfg(test)]
 mod tests;
 
+use crate::collections::{HashMap, Vector};
 use crate::core::ComplexityMetrics;
-use im::{HashMap, Vector};
 use std::path::PathBuf;
 
 pub use cascade::{CascadeCalculator, CascadeImpact};

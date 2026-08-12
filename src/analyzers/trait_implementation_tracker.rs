@@ -1,3 +1,4 @@
+use crate::collections::{HashMap, HashSet, Vector};
 /// Comprehensive trait implementation tracking for dynamic dispatch resolution
 ///
 /// This module extends the trait registry with full support for:
@@ -6,7 +7,6 @@
 /// - Blanket implementations
 /// - Associated types and methods
 use crate::priority::call_graph::FunctionId;
-use im::{HashMap, HashSet, Vector};
 use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{
@@ -134,14 +134,14 @@ impl TraitImplementationTracker {
 
         // Track blanket implementations separately
         if implementation.is_blanket {
-            self.blanket_impls.push_back(implementation.clone());
+            self.blanket_impls.push(implementation.clone());
         }
 
         // Add to regular implementations
         self.implementations
             .entry(trait_name.clone())
             .or_default()
-            .push_back(implementation.clone());
+            .push(implementation.clone());
 
         // Track trait object candidates
         if !implementation.is_negative {
@@ -169,7 +169,7 @@ impl TraitImplementationTracker {
         if let Some(implementors) = self.get_implementors(trait_name) {
             for impl_type in implementors {
                 if let Some(method_id) = self.resolve_method(&impl_type, trait_name, method_name) {
-                    implementations.push_back(method_id);
+                    implementations.push(method_id);
                 }
             }
         }
@@ -206,7 +206,7 @@ impl TraitImplementationTracker {
                 // Check if this implementation satisfies the bound
                 // This is simplified - real implementation would need constraint checking
                 if let Some(method) = impl_info.methods.get(method_name) {
-                    implementations.push_back(method.function_id.clone());
+                    implementations.push(method.function_id.clone());
                 }
             }
         }
@@ -216,7 +216,7 @@ impl TraitImplementationTracker {
             if blanket.trait_name == bound.trait_name
                 && let Some(method) = blanket.methods.get(method_name)
             {
-                implementations.push_back(method.function_id.clone());
+                implementations.push(method.function_id.clone());
             }
         }
 
@@ -314,7 +314,7 @@ impl TraitExtractor {
         for trait_item in &item_trait.items {
             match trait_item {
                 TraitItem::Fn(method) => {
-                    methods.push_back(TraitMethod {
+                    methods.push(TraitMethod {
                         name: method.sig.ident.to_string(),
                         has_default: method.default.is_some(),
                         is_async: method.sig.asyncness.is_some(),
@@ -332,7 +332,7 @@ impl TraitExtractor {
                         .as_ref()
                         .map(|(_, ty)| format!("{}", quote::quote! { #ty }));
 
-                    associated_types.push_back(AssociatedType {
+                    associated_types.push(AssociatedType {
                         name: assoc_type.ident.to_string(),
                         bounds,
                         default,
@@ -351,7 +351,7 @@ impl TraitExtractor {
             associated_types,
             supertraits,
             generic_params,
-            module_path: self.module_path.clone().into(),
+            module_path: self.module_path.clone(),
         }
     }
 
@@ -431,7 +431,7 @@ impl TraitExtractor {
             generic_constraints,
             is_blanket,
             is_negative,
-            module_path: self.module_path.clone().into(),
+            module_path: self.module_path.clone(),
         })
     }
 

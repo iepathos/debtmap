@@ -1,14 +1,13 @@
 use debtmap::core::Language;
 use debtmap::data_flow::DataFlowGraph;
 use debtmap::priority::{CallGraph, FilterStatistics, ImpactMetrics, UnifiedAnalysis};
-use im::Vector;
 
 #[test]
 fn test_unified_analysis_json_serialization() {
     // Create a minimal UnifiedAnalysis instance
     let analysis = UnifiedAnalysis {
-        items: Vector::new(),
-        file_items: Vector::new(),
+        items: Vec::new(),
+        file_items: Vec::new(),
         total_impact: ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: 0,

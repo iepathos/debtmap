@@ -96,7 +96,7 @@ Debtmap follows functional programming principles and Rust best practices. Pleas
 ### Key Principles
 
 - **Functional-first design**: Prefer pure functions over stateful methods
-- **Immutable data structures**: Use the `im` crate for persistent collections
+- **Explicit ownership**: Prefer standard collections and immutable transformations where practical
 - **Composable pipelines**: Chain transformations using iterators
 - **Error handling**: Use `Result<T>` with the `?` operator and `anyhow::Context`
 - **Maximum function length**: 20 lines (prefer 5-10)

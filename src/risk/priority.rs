@@ -17,8 +17,8 @@ pub use stages::{
 };
 
 use super::{Difficulty, FunctionRisk, RiskAnalyzer, TestEffort, TestingRecommendation};
+use crate::collections::Vector;
 use crate::core::ComplexityMetrics;
-use im::Vector;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
@@ -72,8 +72,8 @@ impl ROICalculator {
     }
 
     fn create_context(&self, target: &TestTarget) -> super::roi::Context {
-        let mut nodes = im::HashMap::new();
-        let mut edges = im::Vector::new();
+        let mut nodes = crate::collections::HashMap::new();
+        let mut edges = crate::collections::Vector::new();
 
         nodes.insert(
             target.id.clone(),
@@ -86,7 +86,7 @@ impl ROICalculator {
         );
 
         for dependent in &target.dependents {
-            edges.push_back(super::roi::DependencyEdge {
+            edges.push(super::roi::DependencyEdge {
                 from: target.id.clone(),
                 to: dependent.clone(),
                 weight: 0.8,
@@ -269,8 +269,8 @@ fn function_risk_to_target(risk: &FunctionRisk) -> TestTarget {
 }
 
 fn build_dependency_graph(targets: &[TestTarget]) -> crate::risk::roi::DependencyGraph {
-    let mut nodes = im::HashMap::new();
-    let mut edges = im::Vector::new();
+    let mut nodes = crate::collections::HashMap::new();
+    let mut edges = crate::collections::Vector::new();
 
     for target in targets {
         nodes.insert(
@@ -285,7 +285,7 @@ fn build_dependency_graph(targets: &[TestTarget]) -> crate::risk::roi::Dependenc
 
         let edge_weight = calculate_edge_weight(target);
         for dependent in &target.dependents {
-            edges.push_back(crate::risk::roi::DependencyEdge {
+            edges.push(crate::risk::roi::DependencyEdge {
                 from: target.id.clone(),
                 to: dependent.clone(),
                 weight: edge_weight,

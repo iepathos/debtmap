@@ -1078,7 +1078,7 @@ fn member_contextual_risk(
 
 fn enrich_file_item_with_dependencies(
     mut file_item: crate::priority::FileDebtItem,
-    unified_items: &im::Vector<crate::priority::UnifiedDebtItem>,
+    unified_items: &crate::collections::Vector<crate::priority::UnifiedDebtItem>,
 ) -> crate::priority::FileDebtItem {
     use crate::priority::god_object_aggregation::{
         aggregate_dependency_metrics, extract_member_functions,

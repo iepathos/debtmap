@@ -443,11 +443,11 @@ impl Comparator {
 mod tests {
     use super::*;
 
+    use crate::collections::Vector;
     use crate::priority::{
         DebtType, FunctionRole, ImpactMetrics,
         unified_scorer::{Location, UnifiedScore},
     };
-    use im::Vector;
     use std::path::PathBuf;
 
     fn create_test_item(file: &str, function: &str, line: usize, score: f64) -> UnifiedDebtItem {

@@ -4,7 +4,7 @@ use debtmap::analyzers::trait_implementation_tracker::{
 };
 use debtmap::analyzers::trait_resolver::{ResolutionPriority, TraitResolver};
 use debtmap::priority::call_graph::FunctionId;
-use im::HashSet;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 

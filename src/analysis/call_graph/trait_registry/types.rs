@@ -3,8 +3,8 @@
 //! These types represent trait definitions, implementations, and method calls
 //! without any behavior or side effects.
 
+use crate::collections::Vector;
 use crate::priority::call_graph::FunctionId;
-use im::Vector;
 
 /// Information about a trait method
 #[derive(Debug, Clone)]

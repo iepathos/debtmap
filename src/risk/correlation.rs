@@ -1,5 +1,5 @@
 use super::{FunctionRisk, RiskCategory, RiskDistribution, RiskInsight};
-use im::Vector;
+use crate::collections::Vector;
 
 pub fn calculate_complexity_coverage_correlation(functions: &Vector<FunctionRisk>) -> Option<f64> {
     // Only calculate correlation if we have coverage data
@@ -89,14 +89,13 @@ pub fn build_risk_distribution(functions: &Vector<FunctionRisk>) -> RiskDistribu
     dist
 }
 
-pub fn analyze_risk_insights(functions: Vector<FunctionRisk>) -> RiskInsight {
+pub fn analyze_risk_insights(mut functions: Vector<FunctionRisk>) -> RiskInsight {
     let codebase_risk_score = calculate_codebase_risk_score(&functions);
     let complexity_coverage_correlation = calculate_complexity_coverage_correlation(&functions);
     let risk_distribution = build_risk_distribution(&functions);
 
     // Sort functions by risk score to get top risks (Spec 214 fix for determinism)
-    let mut sorted_functions = functions.clone();
-    sorted_functions.sort_by(|a, b| {
+    functions.sort_by(|a, b| {
         b.risk_score
             .partial_cmp(&a.risk_score)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -105,7 +104,7 @@ pub fn analyze_risk_insights(functions: Vector<FunctionRisk>) -> RiskInsight {
             .then_with(|| a.line_range.0.cmp(&b.line_range.0))
     });
 
-    let top_risks = sorted_functions.into_iter().take(10).collect();
+    let top_risks = functions.into_iter().take(10).collect();
 
     RiskInsight {
         top_risks,
@@ -158,8 +157,7 @@ mod tests {
 
     #[test]
     fn test_build_risk_distribution_single_critical() {
-        let mut functions = Vector::new();
-        functions.push_back(create_test_function_risk(RiskCategory::Critical));
+        let functions = vec![create_test_function_risk(RiskCategory::Critical)];
 
         let dist = build_risk_distribution(&functions);
 
@@ -173,12 +171,13 @@ mod tests {
 
     #[test]
     fn test_build_risk_distribution_mixed_categories() {
-        let mut functions = Vector::new();
-        functions.push_back(create_test_function_risk(RiskCategory::Critical));
-        functions.push_back(create_test_function_risk(RiskCategory::High));
-        functions.push_back(create_test_function_risk(RiskCategory::Medium));
-        functions.push_back(create_test_function_risk(RiskCategory::Low));
-        functions.push_back(create_test_function_risk(RiskCategory::WellTested));
+        let functions = vec![
+            create_test_function_risk(RiskCategory::Critical),
+            create_test_function_risk(RiskCategory::High),
+            create_test_function_risk(RiskCategory::Medium),
+            create_test_function_risk(RiskCategory::Low),
+            create_test_function_risk(RiskCategory::WellTested),
+        ];
 
         let dist = build_risk_distribution(&functions);
 
@@ -192,10 +191,11 @@ mod tests {
 
     #[test]
     fn test_build_risk_distribution_multiple_same_category() {
-        let mut functions = Vector::new();
-        functions.push_back(create_test_function_risk(RiskCategory::High));
-        functions.push_back(create_test_function_risk(RiskCategory::High));
-        functions.push_back(create_test_function_risk(RiskCategory::High));
+        let functions = vec![
+            create_test_function_risk(RiskCategory::High),
+            create_test_function_risk(RiskCategory::High),
+            create_test_function_risk(RiskCategory::High),
+        ];
 
         let dist = build_risk_distribution(&functions);
 
@@ -211,7 +211,7 @@ mod tests {
     fn test_build_risk_distribution_all_well_tested() {
         let mut functions = Vector::new();
         for _ in 0..10 {
-            functions.push_back(create_test_function_risk(RiskCategory::WellTested));
+            functions.push(create_test_function_risk(RiskCategory::WellTested));
         }
 
         let dist = build_risk_distribution(&functions);
@@ -237,7 +237,7 @@ mod tests {
                 3 => RiskCategory::Low,
                 _ => RiskCategory::WellTested,
             };
-            functions.push_back(create_test_function_risk(category));
+            functions.push(create_test_function_risk(category));
         }
 
         let dist = build_risk_distribution(&functions);

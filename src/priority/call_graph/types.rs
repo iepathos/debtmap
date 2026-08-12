@@ -1,6 +1,6 @@
 //! Core types and data structures for call graph representation
 
-use im::{HashMap, HashSet, Vector};
+use crate::collections::{HashMap, HashSet, Vector};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -181,7 +181,7 @@ mod function_id_map {
     use std::collections::HashMap as StdHashMap;
 
     pub fn serialize<S, V>(
-        map: &im::HashMap<FunctionId, V>,
+        map: &crate::collections::HashMap<FunctionId, V>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -195,13 +195,15 @@ mod function_id_map {
         string_map.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<im::HashMap<FunctionId, V>, D::Error>
+    pub fn deserialize<'de, D, V>(
+        deserializer: D,
+    ) -> Result<crate::collections::HashMap<FunctionId, V>, D::Error>
     where
         D: Deserializer<'de>,
         V: Deserialize<'de> + Clone,
     {
         let string_map: StdHashMap<String, V> = StdHashMap::deserialize(deserializer)?;
-        let mut result = im::HashMap::new();
+        let mut result = crate::collections::HashMap::new();
         for (key, value) in string_map {
             let parts: Vec<&str> = key.rsplitn(3, ':').collect();
             if parts.len() == 3 {

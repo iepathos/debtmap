@@ -96,7 +96,7 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
             .any(|existing| existing.metrics.path == item.metrics.path);
 
         if !is_duplicate {
-            self.file_items.push_back(item);
+            self.file_items.push(item);
         }
     }
 
@@ -151,15 +151,15 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
         }
 
         // Item passed all filters
-        self.items.push_back(item);
+        self.items.push(item);
         self.stats.items_added += 1;
     }
 
     fn sort_by_priority(&mut self) {
-        // Sort function items by score (highest first) - zero-copy with im::Vector (spec 204)
+        // Sort function items by score (highest first) - zero-copy with crate::collections::Vector (spec 204)
         self.items.sort_by(compare_debt_items_by_score);
 
-        // Sort file items by score (highest first) - zero-copy with im::Vector (spec 204)
+        // Sort file items by score (highest first) - zero-copy with crate::collections::Vector (spec 204)
         self.file_items.sort_by(compare_file_items_by_score);
     }
 

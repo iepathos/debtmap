@@ -1,5 +1,6 @@
 #[cfg(test)]
 use super::*;
+use crate::collections::HashMap;
 use crate::core::ComplexityMetrics;
 use crate::risk::RiskAnalyzer;
 use crate::risk::priority::{ModuleType, TestTarget};
@@ -7,7 +8,6 @@ use crate::risk::roi::effort::{AdvancedEffortModel, ComplexityLevel};
 use crate::risk::roi::learning::{ROIActual, ROIPrediction};
 use crate::risk::roi::reduction::AdvancedRiskReductionModel;
 use chrono::Utc;
-use im::HashMap;
 use std::path::PathBuf;
 
 fn create_test_target(
@@ -54,7 +54,7 @@ fn create_test_context() -> Context {
         },
     );
 
-    let edges = im::Vector::new();
+    let edges = crate::collections::Vector::new();
 
     Context {
         dependency_graph: DependencyGraph { nodes, edges },

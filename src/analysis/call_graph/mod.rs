@@ -11,9 +11,9 @@
 //! 4. Framework pattern recognition
 //! 5. Cross-module dependency analysis
 
+use crate::collections::HashSet;
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use anyhow::Result;
-use im::HashSet;
 use std::path::{Path, PathBuf};
 use syn::File;
 
@@ -331,7 +331,7 @@ impl RustCallGraphBuilder {
         for (trait_name, _) in tracker.traits.iter() {
             let trait_object = crate::analyzers::trait_implementation_tracker::TraitObject {
                 trait_name: trait_name.clone(),
-                additional_bounds: im::Vector::new(),
+                additional_bounds: crate::collections::Vector::new(),
                 lifetime: None,
             };
 

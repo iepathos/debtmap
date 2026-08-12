@@ -9,7 +9,7 @@ Debtmap is a code complexity and technical debt analyzer written in Rust. It ana
 ### Core Beliefs
 
 - **Functional-first design** - Pure functions with minimal side effects
-- **Immutable data structures** - Use `im` crate for persistent collections
+- **Explicit collection ownership** - Use standard collections and immutable transformations where practical
 - **Composable analysis pipelines** - Chain pure transformations
 - **Incremental progress over big bangs** - Small, testable changes
 - **Type-driven development** - Let the type system guide correctness
@@ -303,10 +303,10 @@ fn update_metrics(metrics: FileMetrics, new_function: FunctionMetrics) -> FileMe
     }
 }
 
-// Good: Using im crate for persistent collections
+// Good: Immutable updates with standard collections
 fn add_debt_item(report: TechnicalDebtReport, item: DebtItem) -> TechnicalDebtReport {
     TechnicalDebtReport {
-        items: report.items.push_back(item),
+        items: report.items.into_iter().chain([item]).collect(),
         ..report
     }
 }

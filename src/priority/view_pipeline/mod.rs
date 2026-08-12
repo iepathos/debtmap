@@ -152,8 +152,8 @@ pub fn prepare_view(
 ///
 /// Pure function - operates on input slices, returns new Vec.
 fn combine_items(
-    function_items: &im::Vector<UnifiedDebtItem>,
-    file_items: &im::Vector<FileDebtItem>,
+    function_items: &crate::collections::Vector<UnifiedDebtItem>,
+    file_items: &crate::collections::Vector<FileDebtItem>,
 ) -> Vec<ViewItem> {
     let mut combined = Vec::with_capacity(function_items.len() + file_items.len());
 

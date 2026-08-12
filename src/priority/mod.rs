@@ -88,7 +88,7 @@ pub use view_pipeline::{
 // Re-export debt types from dedicated module (refactored for reduced complexity)
 pub use debt_types::{DebtType, FunctionVisibility};
 
-use im::Vector;
+use crate::collections::Vector;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 

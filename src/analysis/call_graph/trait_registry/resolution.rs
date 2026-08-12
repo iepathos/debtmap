@@ -5,8 +5,8 @@
 
 use super::types::{TraitImplementation, TraitMethodCall};
 use crate::analyzers::trait_implementation_tracker::TraitImplementationTracker;
+use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
-use im::{HashMap, HashSet, Vector};
 use std::sync::Arc;
 
 /// Extract method implementations matching a specific method name
@@ -77,7 +77,7 @@ fn resolve_typed_call(
     if let Some(method_id) =
         enhanced_tracker.resolve_method(receiver_type, &call.trait_name, &call.method_name)
     {
-        return vec![method_id].into();
+        return vec![method_id];
     }
 
     // Fall back to type mapping
@@ -183,8 +183,7 @@ mod tests {
                 method_name: "default".to_string(),
                 method_id: make_function_id("MyType::default", 10),
                 overrides_default: false,
-            }]
-            .into(),
+            }],
             impl_id: None,
         };
 
@@ -195,12 +194,11 @@ mod tests {
                 method_name: "default".to_string(),
                 method_id: make_function_id("OtherType::default", 20),
                 overrides_default: false,
-            }]
-            .into(),
+            }],
             impl_id: None,
         };
 
-        let implementations: Vector<_> = vec![impl1, impl2].into();
+        let implementations: Vector<_> = vec![impl1, impl2];
         let result = extract_matching_methods("default", &implementations, None);
 
         assert_eq!(result.len(), 2);
@@ -215,12 +213,11 @@ mod tests {
                 method_name: "default".to_string(),
                 method_id: make_function_id("MyType::default", 10),
                 overrides_default: false,
-            }]
-            .into(),
+            }],
             impl_id: None,
         };
 
-        let implementations: Vector<_> = vec![impl1].into();
+        let implementations: Vector<_> = vec![impl1];
         let result = extract_matching_methods("default", &implementations, Some("MyType"));
 
         assert_eq!(result.len(), 1);

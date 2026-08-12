@@ -3,9 +3,9 @@
 //! This module tracks function pointers, closures, and higher-order functions
 //! to resolve indirect function calls and reduce false positives in dead code detection.
 
+use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
-use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprClosure, ExprPath, File, Ident, ItemFn, Local, Pat, PatIdent, Type};
@@ -130,7 +130,7 @@ impl FunctionPointerTracker {
 
         // Add function pointer calls
         for call in visitor.pointer_calls {
-            self.pointer_calls.push_back(call);
+            self.pointer_calls.push(call);
         }
 
         // Add higher-order function calls
@@ -139,7 +139,7 @@ impl FunctionPointerTracker {
             for func_arg in &hof_call.function_arguments {
                 self.potential_pointer_targets.insert(func_arg.clone());
             }
-            self.hof_calls.push_back(hof_call);
+            self.hof_calls.push(hof_call);
         }
 
         Ok(())
@@ -425,7 +425,7 @@ impl FunctionPointerVisitor {
                 && let Some(arg_func_name) = self.extract_function_name_from_path(arg_path)
             {
                 let func_arg = FunctionId::new(self.file_path.clone(), arg_func_name, 0);
-                function_arguments.push_back(func_arg);
+                function_arguments.push(func_arg);
             }
         }
 

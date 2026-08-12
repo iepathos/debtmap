@@ -1,7 +1,7 @@
 //! Basic graph operations for adding and querying nodes and edges
 
 use super::types::{CallGraph, CallType, FunctionCall, FunctionId, FunctionNode};
-use im::{HashMap, HashSet, Vector};
+use crate::collections::{HashMap, HashSet, Vector};
 use std::path::PathBuf;
 
 impl CallGraph {
@@ -60,7 +60,7 @@ impl CallGraph {
         let caller = call.caller.clone();
         let callee = call.callee.clone();
 
-        self.edges.push_back(call);
+        self.edges.push(call);
 
         self.callee_index
             .entry(caller.clone())
@@ -277,7 +277,7 @@ impl CallGraph {
         max_depth: usize,
     ) -> HashSet<FunctionId> {
         let mut visited = HashSet::new();
-        let mut to_visit = Vector::new();
+        let mut to_visit = std::collections::VecDeque::new();
         to_visit.push_back((func_id.clone(), 0));
 
         while let Some((current, depth)) = to_visit.pop_front() {
@@ -304,7 +304,7 @@ impl CallGraph {
         max_depth: usize,
     ) -> HashSet<FunctionId> {
         let mut visited = HashSet::new();
-        let mut to_visit = Vector::new();
+        let mut to_visit = std::collections::VecDeque::new();
         to_visit.push_back((func_id.clone(), 0));
 
         while let Some((current, depth)) = to_visit.pop_front() {
@@ -374,8 +374,8 @@ impl CallGraph {
             .nodes
             .keys()
             .filter(|id| {
-                !self.caller_index.contains_key(id)
-                    || self.caller_index.get(id).is_none_or(|set| set.is_empty())
+                !self.caller_index.contains_key(*id)
+                    || self.caller_index.get(*id).is_none_or(|set| set.is_empty())
             })
             .cloned()
             .collect();
@@ -396,7 +396,7 @@ impl CallGraph {
 
     /// Get all function calls in the graph (for testing and debugging)
     pub fn get_all_calls(&self) -> Vec<FunctionCall> {
-        let mut results: Vec<FunctionCall> = self.edges.iter().cloned().collect();
+        let mut results = self.edges.to_vec();
         results.sort();
         results
     }
@@ -572,7 +572,7 @@ impl CallGraph {
         }
 
         // DFS post-order already gives us leaves first, no need to reverse
-        Ok(result.iter().cloned().collect())
+        Ok(result.to_vec())
     }
 
     /// Iterative DFS helper for topological sort.
@@ -617,7 +617,7 @@ impl CallGraph {
                     }
                 }
                 TopoState::Finish(node) => {
-                    result.push_back(node);
+                    result.push(node);
                 }
             }
         }

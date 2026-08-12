@@ -47,7 +47,7 @@ jobs:
         tool: cargo-audit
 
     - name: Run security audit
-      run: cargo audit --json > audit-results.json || true
+      run: cargo audit --deny warnings --json > audit-results.json
 
     - name: Display audit results
       run: |

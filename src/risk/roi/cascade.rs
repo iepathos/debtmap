@@ -181,8 +181,8 @@ impl CascadeCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::collections::HashMap;
     use crate::core::ComplexityMetrics;
-    use im::{HashMap, Vector};
     use std::path::PathBuf;
 
     fn create_test_graph() -> DependencyGraph {
@@ -216,12 +216,11 @@ mod tests {
             },
         );
 
-        let mut edges = Vector::new();
-        edges.push_back(super::super::DependencyEdge {
+        let edges = vec![super::super::DependencyEdge {
             from: "module_a".to_string(),
             to: "module_b".to_string(),
             weight: 0.8,
-        });
+        }];
 
         DependencyGraph { nodes, edges }
     }

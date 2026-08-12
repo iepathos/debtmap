@@ -6,7 +6,7 @@ use debtmap::priority::call_graph::FunctionId;
 use debtmap::priority::scoring::classification::{
     classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
 };
-use im::HashSet;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[test]

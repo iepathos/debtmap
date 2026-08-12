@@ -1,6 +1,6 @@
+use debtmap::collections::Vector;
 use debtmap::risk::insights::*;
 use debtmap::risk::{Difficulty, TestEffort, TestingRecommendation};
-use im::Vector;
 use std::path::PathBuf;
 
 #[test]
@@ -95,8 +95,7 @@ fn test_format_recommendations_empty() {
 
 #[test]
 fn test_format_recommendations_with_single_item() {
-    let mut recommendations = Vector::new();
-    recommendations.push_back(TestingRecommendation {
+    let recommendations = vec![TestingRecommendation {
         function: "test_func".to_string(),
         file: PathBuf::from("test.rs"),
         line: 10,
@@ -112,7 +111,7 @@ fn test_format_recommendations_with_single_item() {
         dependencies: vec![],
         dependents: vec![],
         rationale: "Test rationale".to_string(),
-    });
+    }];
 
     let result = format_recommendations(&recommendations);
 
@@ -130,8 +129,7 @@ fn test_format_recommendations_with_single_item() {
 
 #[test]
 fn test_format_recommendations_with_dependents() {
-    let mut recommendations = Vector::new();
-    recommendations.push_back(TestingRecommendation {
+    let recommendations = vec![TestingRecommendation {
         function: "used_func".to_string(),
         file: PathBuf::from("lib.rs"),
         line: 20,
@@ -147,7 +145,7 @@ fn test_format_recommendations_with_dependents() {
         dependencies: vec!["dep1".to_string(), "dep2".to_string()],
         dependents: vec!["caller1".to_string(), "caller2".to_string()],
         rationale: "Important function".to_string(),
-    });
+    }];
 
     let result = format_recommendations(&recommendations);
 
@@ -160,7 +158,7 @@ fn test_format_recommendations_with_dependents() {
 fn test_format_recommendations_truncates_to_five() {
     let mut recommendations = Vector::new();
     for i in 0..10 {
-        recommendations.push_back(TestingRecommendation {
+        recommendations.push(TestingRecommendation {
             function: format!("func_{i}"),
             file: PathBuf::from(format!("file_{i}.rs")),
             line: i * 10,
@@ -193,8 +191,7 @@ fn test_format_recommendations_truncates_to_five() {
 
 #[test]
 fn test_format_recommendations_with_low_risk() {
-    let mut recommendations = Vector::new();
-    recommendations.push_back(TestingRecommendation {
+    let recommendations = vec![TestingRecommendation {
         function: "low_risk_func".to_string(),
         file: PathBuf::from("safe.rs"),
         line: 5,
@@ -210,7 +207,7 @@ fn test_format_recommendations_with_low_risk() {
         dependencies: vec![],
         dependents: vec![],
         rationale: "Low risk function".to_string(),
-    });
+    }];
 
     let result = format_recommendations(&recommendations);
 
@@ -222,8 +219,7 @@ fn test_format_recommendations_with_low_risk() {
 
 #[test]
 fn test_format_recommendations_with_high_roi() {
-    let mut recommendations = Vector::new();
-    recommendations.push_back(TestingRecommendation {
+    let recommendations = vec![TestingRecommendation {
         function: "high_roi_func".to_string(),
         file: PathBuf::from("critical.rs"),
         line: 100,
@@ -239,7 +235,7 @@ fn test_format_recommendations_with_high_roi() {
         dependencies: vec!["a".to_string(), "b".to_string(), "c".to_string()],
         dependents: vec![],
         rationale: "Critical high-risk function needing immediate attention".to_string(),
-    });
+    }];
 
     let result = format_recommendations(&recommendations);
 
@@ -252,8 +248,7 @@ fn test_format_recommendations_with_high_roi() {
 
 #[test]
 fn test_format_recommendations_with_none_roi() {
-    let mut recommendations = Vector::new();
-    recommendations.push_back(TestingRecommendation {
+    let recommendations = vec![TestingRecommendation {
         function: "no_roi_func".to_string(),
         file: PathBuf::from("unknown.rs"),
         line: 1,
@@ -269,7 +264,7 @@ fn test_format_recommendations_with_none_roi() {
         dependencies: vec![],
         dependents: vec![],
         rationale: "Function with unknown ROI".to_string(),
-    });
+    }];
 
     let result = format_recommendations(&recommendations);
 

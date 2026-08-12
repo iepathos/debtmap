@@ -59,7 +59,7 @@ pub fn calculate_debt_density(total_debt_score: f64, total_lines_of_code: usize)
 /// # Returns
 /// Accumulated metrics from all items
 pub fn accumulate_item_metrics(
-    items: &im::Vector<UnifiedDebtItem>,
+    items: &crate::collections::Vector<UnifiedDebtItem>,
     analyzed_files: &HashMap<PathBuf, usize>,
 ) -> ItemAccumulatedMetrics {
     let mut result = ItemAccumulatedMetrics {
@@ -101,7 +101,9 @@ pub fn accumulate_item_metrics(
 ///
 /// # Returns
 /// Set of file paths that contain god objects
-pub fn collect_god_object_files(items: &im::Vector<UnifiedDebtItem>) -> HashSet<PathBuf> {
+pub fn collect_god_object_files(
+    items: &crate::collections::Vector<UnifiedDebtItem>,
+) -> HashSet<PathBuf> {
     items
         .iter()
         .filter(|item| matches!(item.debt_type, DebtType::GodObject { .. }))
@@ -121,7 +123,7 @@ pub fn collect_god_object_files(items: &im::Vector<UnifiedDebtItem>) -> HashSet<
 /// # Returns
 /// Accumulated metrics from file items
 pub fn accumulate_file_metrics(
-    file_items: &im::Vector<FileDebtItem>,
+    file_items: &crate::collections::Vector<FileDebtItem>,
     god_object_files: &HashSet<PathBuf>,
 ) -> FileAccumulatedMetrics {
     let mut result = FileAccumulatedMetrics::default();

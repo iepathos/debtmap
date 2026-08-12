@@ -2,9 +2,9 @@ pub mod critical_path;
 pub mod dependency;
 pub mod git_history;
 
+use crate::collections::HashMap;
 use anyhow::Result;
 use dashmap::DashMap;
-use im::HashMap;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -319,7 +319,7 @@ mod tests {
         analyzer.call_graph = call_graph;
         analyzer
             .entry_points
-            .push_back(super::critical_path::EntryPoint {
+            .push(super::critical_path::EntryPoint {
                 function_name: "func_0".to_string(),
                 file_path: PathBuf::from("src/main.rs"),
                 entry_type: super::critical_path::EntryType::Main,
@@ -363,7 +363,7 @@ mod tests {
         cp_analyzer.call_graph = call_graph;
         cp_analyzer
             .entry_points
-            .push_back(super::critical_path::EntryPoint {
+            .push(super::critical_path::EntryPoint {
                 function_name: "func_0".to_string(),
                 file_path: PathBuf::from("src/main.rs"),
                 entry_type: super::critical_path::EntryType::Main,
