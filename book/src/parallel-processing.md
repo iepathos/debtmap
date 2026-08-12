@@ -61,19 +61,8 @@ export DEBTMAP_JOBS=4
 debtmap analyze  # Uses 4 threads
 ```
 
-**`DEBTMAP_PARALLEL`** - Enable/disable parallel processing programmatically:
-
-```bash
-export DEBTMAP_PARALLEL=true
-debtmap analyze  # Parallel processing enabled
-
-export DEBTMAP_PARALLEL=1
-debtmap analyze  # Parallel processing enabled (also accepts '1')
-```
-
-The `DEBTMAP_PARALLEL` variable accepts `true` or `1` to enable parallel processing. This is useful for programmatic control in scripts or CI environments.
-
-The CLI flags (`--jobs`, `--no-parallel`) take precedence over environment variables.
+The `--jobs` CLI flag takes precedence over `DEBTMAP_JOBS`. Parallel execution is enabled by
+default and can be disabled explicitly with `--no-parallel`.
 
 ### --no-parallel
 

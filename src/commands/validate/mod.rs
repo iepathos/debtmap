@@ -14,7 +14,7 @@
 //! # Architecture
 //!
 //! The main entry point `validate_project` is a thin I/O shell that:
-//! 1. Sets up parallel processing (I/O: env vars)
+//! 1. Reports the selected parallel processing configuration
 //! 2. Runs project analysis (I/O: file system)
 //! 3. Gets risk insights if coverage provided (I/O)
 //! 4. Generates reports if requested (I/O)
@@ -36,9 +36,7 @@ use crate::io;
 use crate::progress::{ProgressConfig, ProgressManager};
 use crate::utils::risk_analyzer;
 use crate::{config, risk};
-use analysis::{
-    ValidationAnalysisOptions, calculate_unified_analysis, read_parallel_options_from_env,
-};
+use analysis::{calculate_unified_analysis, options_from_config};
 use anyhow::Result;
 use output::{
     display_timing_information, generate_report_if_requested, print_parallel_status,
@@ -64,10 +62,10 @@ pub fn validate_project(config: ValidateConfig) -> Result<()> {
     let complexity_threshold = 10;
     let duplication_threshold = 50;
 
-    // I/O: Configure parallel processing
+    // I/O: Report parallel processing configuration
     let parallel_enabled = !config.no_parallel;
     let jobs = config.jobs;
-    setup_parallel_processing(parallel_enabled, jobs, config.verbosity);
+    print_parallel_status(parallel_enabled, jobs, config.verbosity);
 
     // I/O: Set up progress manager (same as analyze command)
     setup_progress_manager(config.verbosity);
@@ -95,20 +93,6 @@ pub fn validate_project(config: ValidateConfig) -> Result<()> {
 // =============================================================================
 // I/O Setup Functions
 // =============================================================================
-
-/// I/O: Set up parallel processing environment.
-fn setup_parallel_processing(enabled: bool, jobs: usize, verbosity: u8) {
-    if enabled {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
-        print_parallel_status(enabled, jobs, verbosity);
-    }
-
-    if jobs > 0 {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("DEBTMAP_JOBS", jobs.to_string()) };
-    }
-}
 
 /// I/O: Initialize progress manager with TUI support.
 ///
@@ -181,14 +165,7 @@ fn validate_and_report(
     warn_deprecated_thresholds(&deprecated);
 
     // Calculate unified analysis metrics with same options as analyze command
-    let parallel_options = read_parallel_options_from_env();
-    let options = ValidationAnalysisOptions {
-        parallel: parallel_options.parallel,
-        jobs: parallel_options.jobs,
-        enable_context: config.enable_context,
-        context_providers: config.context_providers.clone(),
-        disable_context: config.disable_context.clone(),
-    };
+    let options = options_from_config(config);
     let unified = calculate_unified_analysis(results, config.coverage_file.as_ref(), &options);
 
     // I/O: Clean up progress display before printing results

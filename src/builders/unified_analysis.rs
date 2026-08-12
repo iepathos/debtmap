@@ -34,6 +34,8 @@ use anyhow::Result;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+const ANALYSIS_THREAD_STACK_SIZE: usize = 8 * 1024 * 1024;
+
 /// Main entry point for unified analysis (simple version).
 pub fn perform_unified_analysis(
     results: &AnalysisResults,
@@ -551,13 +553,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     >,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
-    // Use parallel path if enabled
-    let parallel_enabled = parallel
-        || std::env::var("DEBTMAP_PARALLEL")
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(false);
-
-    if parallel_enabled {
+    if parallel {
         return create_parallel_analysis(
             metrics,
             call_graph,
@@ -665,9 +661,7 @@ fn create_parallel_analysis(
     >,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
-    use parallel_unified_analysis::{
-        ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
-    };
+    use parallel_unified_analysis::ParallelUnifiedAnalysisOptions;
 
     let options = ParallelUnifiedAnalysisOptions {
         parallel: true,
@@ -676,6 +670,67 @@ fn create_parallel_analysis(
         progress: std::env::var("DEBTMAP_QUIET").is_err(),
         reference_time,
     };
+
+    with_analysis_pool(jobs, || {
+        execute_parallel_analysis(
+            metrics,
+            call_graph,
+            coverage_data,
+            framework_exclusions,
+            function_pointer_used_functions,
+            debt_items,
+            no_god_object,
+            call_graph_time,
+            coverage_time,
+            risk_analyzer,
+            project_path,
+            extracted_data,
+            options,
+        )
+    })
+}
+
+fn with_analysis_pool<T, F>(jobs: usize, operation: F) -> T
+where
+    T: Send,
+    F: FnOnce() -> T + Send,
+{
+    if jobs == 0 {
+        return operation();
+    }
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(jobs)
+        .stack_size(ANALYSIS_THREAD_STACK_SIZE)
+        .build();
+    match pool {
+        Ok(pool) => pool.install(operation),
+        Err(error) => {
+            log::warn!("Unable to configure {jobs} analysis workers: {error}");
+            operation()
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_parallel_analysis(
+    metrics: &[crate::core::FunctionMetrics],
+    call_graph: &CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    framework_exclusions: &HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
+    debt_items: Option<&[crate::core::DebtItem]>,
+    no_god_object: bool,
+    call_graph_time: std::time::Duration,
+    coverage_time: std::time::Duration,
+    risk_analyzer: Option<risk::RiskAnalyzer>,
+    project_path: &Path,
+    extracted_data: Option<
+        std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+    >,
+    options: parallel_unified_analysis::ParallelUnifiedAnalysisOptions,
+) -> UnifiedAnalysis {
+    use parallel_unified_analysis::ParallelUnifiedAnalysisBuilder;
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options)
         .with_project_path(project_path.to_path_buf());
@@ -1221,6 +1276,13 @@ mod tests {
 
         let result = analyze_file_git_context(&file_path, &risk_analyzer, &project_root);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn analysis_pool_honors_explicit_worker_count() {
+        let workers = with_analysis_pool(2, rayon::current_num_threads);
+
+        assert_eq!(workers, 2);
     }
 
     // Tests for pure helper functions

@@ -85,12 +85,25 @@ fn test_validate_jobs_parameter() {
     )
     .unwrap();
 
-    let output = run_validate(&temp_dir, &["--jobs", "4"]);
+    let output = debtmap_command()
+        .arg("validate")
+        .arg("--jobs")
+        .arg("4")
+        .arg("-v")
+        .arg(temp_dir.path())
+        .env("DEBTMAP_JOBS", "2")
+        .output()
+        .expect("Failed to execute validate command");
 
     // Command should succeed
     assert!(
         output.status.success(),
         "Validate command with --jobs failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("using 4 threads"),
+        "--jobs did not override DEBTMAP_JOBS: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 }
@@ -180,6 +193,7 @@ fn test_debtmap_jobs_env_var() {
 
     let output = debtmap_command()
         .arg("validate")
+        .arg("-v")
         .arg(temp_dir.path())
         .env("DEBTMAP_JOBS", "2")
         .output()
@@ -189,6 +203,29 @@ fn test_debtmap_jobs_env_var() {
     assert!(
         output.status.success(),
         "Validate command with DEBTMAP_JOBS env var failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("using 2 threads"),
+        "Validate did not use DEBTMAP_JOBS: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Invalid worker counts fail at the CLI boundary with a useful error.
+#[test]
+fn test_invalid_debtmap_jobs_env_var_fails_fast() {
+    let output = debtmap_command()
+        .arg("validate")
+        .arg(".")
+        .env("DEBTMAP_JOBS", "invalid")
+        .output()
+        .expect("Failed to execute validate command");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("invalid value 'invalid'"),
+        "Unexpected parse error: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 }

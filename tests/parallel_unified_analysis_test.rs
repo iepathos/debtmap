@@ -289,56 +289,6 @@ fn test_optimized_test_detector() {
 }
 
 #[test]
-fn test_parallel_vs_sequential_consistency() {
-    use debtmap::builders::unified_analysis;
-
-    // Create test data
-    let metrics = create_test_metrics(50);
-    let call_graph = CallGraph::new();
-
-    // Run sequential analysis
-    let sequential_result = unified_analysis::create_unified_analysis_with_exclusions(
-        &metrics,
-        &call_graph,
-        None,
-        &Default::default(),
-        None,
-        None,
-        false,
-        None,
-        None,
-        false,
-        chrono::Utc::now(),
-    );
-
-    // Run parallel analysis
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
-    let parallel_result = unified_analysis::create_unified_analysis_with_exclusions(
-        &metrics,
-        &call_graph,
-        None,
-        &Default::default(),
-        None,
-        None,
-        false,
-        None,
-        None,
-        false,
-        chrono::Utc::now(),
-    );
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var("DEBTMAP_PARALLEL") };
-
-    // Compare results - they should produce the same number of items
-    assert_eq!(sequential_result.items.len(), parallel_result.items.len());
-    assert_eq!(
-        sequential_result.file_items.len(),
-        parallel_result.file_items.len()
-    );
-}
-
-#[test]
 #[ignore = "stress: timing-sensitive parallel performance comparison"]
 fn test_large_codebase_parallel_analysis() {
     use std::time::{Duration, Instant};

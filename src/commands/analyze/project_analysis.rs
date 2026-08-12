@@ -96,7 +96,6 @@ pub fn analyze_project_with_extraction(
 ) -> Result<ProjectAnalysisOutput> {
     time_span!("analyze_project");
 
-    setup_parallel_env(parallel_enabled);
     let config = crate::config::get_config();
     init_global_progress();
 
@@ -127,14 +126,6 @@ pub fn analyze_project_with_extraction(
         results,
         extracted_data,
     })
-}
-
-/// Set up parallel processing environment variable.
-fn setup_parallel_env(parallel_enabled: bool) {
-    if parallel_enabled {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("DEBTMAP_PARALLEL", "true") };
-    }
 }
 
 /// Initialize global progress tracker.

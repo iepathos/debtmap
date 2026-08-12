@@ -210,7 +210,7 @@ pub enum Commands {
         no_parallel: bool,
 
         /// Number of threads for parallel processing (0 = use all cores)
-        #[arg(long = "jobs", short = 'j', default_value = "0")]
+        #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
 
         /// Disable multi-pass analysis (use single-pass for performance)
@@ -374,7 +374,7 @@ pub enum Commands {
         /// Controls thread pool size for parallel call graph construction.
         /// Examples: --jobs 4 (use 4 threads), --jobs 0 (use all available cores).
         /// Environment variable DEBTMAP_JOBS can also be used to set this value.
-        #[arg(long = "jobs", short = 'j', default_value = "0")]
+        #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
 
         /// Show detailed module split recommendations for god objects and large files.

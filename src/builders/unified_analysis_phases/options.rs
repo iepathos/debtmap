@@ -249,28 +249,11 @@ impl UnifiedAnalysisConfigBuilder {
         self
     }
 
-    /// Build the configuration.
-    ///
-    /// Environment variables are read here at the edge, not in pure computation.
+    /// Build the configuration from the explicitly provided values.
     pub fn build(self) -> Result<UnifiedAnalysisConfig, ConfigError> {
         let project_path = self
             .project_path
             .ok_or(ConfigError::MissingField("project_path"))?;
-
-        // Environment variables only read here, at the edge
-        let parallel = self.parallel
-            || std::env::var("DEBTMAP_PARALLEL")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false);
-
-        let jobs = if self.jobs > 0 {
-            self.jobs
-        } else {
-            std::env::var("DEBTMAP_JOBS")
-                .ok()
-                .and_then(|v| v.parse::<usize>().ok())
-                .unwrap_or(0)
-        };
 
         Ok(UnifiedAnalysisConfig {
             coverage_file: self.coverage_file,
@@ -278,8 +261,8 @@ impl UnifiedAnalysisConfigBuilder {
             project_path,
             verbose_macro_warnings: self.verbose_macro_warnings,
             show_macro_stats: self.show_macro_stats,
-            parallel,
-            jobs,
+            parallel: self.parallel,
+            jobs: self.jobs,
             multi_pass: self.multi_pass,
             show_attribution: self.show_attribution,
             aggregate_only: self.aggregate_only,

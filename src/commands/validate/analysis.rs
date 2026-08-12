@@ -4,6 +4,7 @@
 //! during validation. It wraps the shared analysis pipeline with
 //! validation-specific configuration.
 
+use super::types::ValidateConfig;
 use crate::builders::unified_analysis;
 use crate::core::AnalysisResults;
 use crate::priority::UnifiedAnalysis;
@@ -24,40 +25,14 @@ pub struct ValidationAnalysisOptions {
     pub disable_context: Option<Vec<String>>,
 }
 
-/// Parse a parallel flag value.
-///
-/// Returns `true` if the value is "true" or "1".
-fn parse_parallel_flag(value: &str) -> bool {
-    value == "true" || value == "1"
-}
-
-/// Parse a jobs value.
-///
-/// Returns the parsed number, or 0 if invalid.
-fn parse_jobs_value(value: &str) -> usize {
-    value.parse::<usize>().unwrap_or(0)
-}
-
-/// Read parallel processing settings from environment.
-///
-/// This reads DEBTMAP_PARALLEL and DEBTMAP_JOBS environment variables
-/// to determine parallel processing configuration.
-pub fn read_parallel_options_from_env() -> ValidationAnalysisOptions {
-    let parallel = std::env::var("DEBTMAP_PARALLEL")
-        .map(|v| parse_parallel_flag(&v))
-        .unwrap_or(false);
-
-    let jobs = std::env::var("DEBTMAP_JOBS")
-        .ok()
-        .map(|v| parse_jobs_value(&v))
-        .unwrap_or(0);
-
+/// Derive analysis options from the validated CLI configuration.
+pub fn options_from_config(config: &ValidateConfig) -> ValidationAnalysisOptions {
     ValidationAnalysisOptions {
-        parallel,
-        jobs,
-        enable_context: false,
-        context_providers: None,
-        disable_context: None,
+        parallel: !config.no_parallel,
+        jobs: config.jobs,
+        enable_context: config.enable_context,
+        context_providers: config.context_providers.clone(),
+        disable_context: config.disable_context.clone(),
     }
 }
 
@@ -103,6 +78,7 @@ pub fn calculate_unified_analysis(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_default_validation_analysis_options() {
@@ -112,34 +88,32 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_parallel_flag_true() {
-        assert!(parse_parallel_flag("true"));
-    }
+    fn options_from_config_preserves_explicit_execution_settings() {
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: None,
+            enable_context: true,
+            context_providers: Some(vec!["git_history".to_string()]),
+            disable_context: Some(vec!["dependency".to_string()]),
+            max_debt_density: None,
+            top: None,
+            tail: None,
+            semantic_off: false,
+            verbosity: 0,
+            no_parallel: true,
+            jobs: 3,
+            show_splits: false,
+        };
 
-    #[test]
-    fn test_parse_parallel_flag_1() {
-        assert!(parse_parallel_flag("1"));
-    }
+        let options = options_from_config(&config);
 
-    #[test]
-    fn test_parse_parallel_flag_false() {
-        assert!(!parse_parallel_flag("false"));
-        assert!(!parse_parallel_flag("0"));
-        assert!(!parse_parallel_flag(""));
-        assert!(!parse_parallel_flag("yes"));
-    }
-
-    #[test]
-    fn test_parse_jobs_value_valid() {
-        assert_eq!(parse_jobs_value("4"), 4);
-        assert_eq!(parse_jobs_value("1"), 1);
-        assert_eq!(parse_jobs_value("16"), 16);
-    }
-
-    #[test]
-    fn test_parse_jobs_value_invalid() {
-        assert_eq!(parse_jobs_value("invalid"), 0);
-        assert_eq!(parse_jobs_value(""), 0);
-        assert_eq!(parse_jobs_value("-1"), 0);
+        assert!(!options.parallel);
+        assert_eq!(options.jobs, 3);
+        assert!(options.enable_context);
+        assert_eq!(options.context_providers, config.context_providers);
+        assert_eq!(options.disable_context, config.disable_context);
     }
 }

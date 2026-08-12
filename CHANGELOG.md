@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Explicit Parallel Configuration** - Analysis execution now uses explicit CLI and library options instead of mutating process-global environment variables
+  - Keeps `DEBTMAP_JOBS` as a CLI default, with `--jobs` taking precedence and invalid values failing at argument parsing
+  - Makes library-level worker limits effective and directs programmatic callers to `perform_unified_analysis_with_options`
+  - Removes the legacy `DEBTMAP_PARALLEL` switch; parallel execution remains the CLI default and `--no-parallel` disables it
+
 ## [0.21.2] - 2026-07-28
 
 ### Fixed

@@ -97,7 +97,6 @@ fn setup_env_vars(config: &AnalyzeConfig) {
     setup_max_files(config.max_files);
     setup_min_priority(config.min_priority.as_deref());
     setup_min_score(config.min_score);
-    setup_jobs(config.jobs);
     setup_functional_analysis(config);
 }
 
@@ -133,14 +132,6 @@ fn setup_min_priority(min_priority: Option<&str>) {
 
     // TODO: Audit that the environment access only happens in single-threaded code.
     unsafe { std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", threshold.to_string()) };
-}
-
-/// Set jobs environment variable for parallel processing.
-fn setup_jobs(jobs: usize) {
-    if jobs > 0 {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { std::env::set_var("DEBTMAP_JOBS", jobs.to_string()) };
-    }
 }
 
 /// Set functional analysis environment variables.

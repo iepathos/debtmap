@@ -148,9 +148,8 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_jobs_from_analyze_command_default() {
-        let cmd = parse_command(&["analyze", "."]);
-        // Default jobs is 0
+    fn test_extract_jobs_from_analyze_command_explicit_auto() {
+        let cmd = parse_command(&["analyze", ".", "--jobs", "0"]);
         assert_eq!(extract_jobs(&cmd), 0);
     }
 
@@ -167,9 +166,8 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_jobs_from_validate_command_default() {
-        let cmd = parse_command(&["validate", "."]);
-        // Default jobs is 0
+    fn test_extract_jobs_from_validate_command_explicit_auto() {
+        let cmd = parse_command(&["validate", ".", "--jobs", "0"]);
         assert_eq!(extract_jobs(&cmd), 0);
     }
 
