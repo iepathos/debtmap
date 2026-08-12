@@ -1,285 +1,142 @@
-# Example debtmap configuration file
-# Copy this to .debtmap.toml and customize for your project
-
-# Configuration file version (for future compatibility)
-version = "1.0"
-
-# ============================================================================
-# Paths Configuration
-# ============================================================================
-
-[output]
-# Output file path (optional, defaults to stdout)
-# path = "analysis-results.json"
-
-# Coverage file for risk analysis (optional)
-# coverage_file = "coverage.xml"
-
-# Maximum files to analyze (0 = no limit)
-# max_files = 1000
-
-# ============================================================================
-# Thresholds Configuration
-# ============================================================================
+# Debtmap configuration example
+# Copy this file to .debtmap.toml and customize the values you need.
 
 [thresholds]
-# Complexity threshold for flagging functions
-complexity = 50
+complexity = 10
+duplication = 50
+max_file_length = 500
+max_function_length = 50
+minimum_debt_score = 2.0
+minimum_cyclomatic_complexity = 3
+minimum_cognitive_complexity = 5
+minimum_risk_score = 2.0
+min_score_threshold = 3.0
 
-# Duplication threshold (lines)
-duplication = 10
-
-# Maximum file length (lines)
-# max_file_length = 1000
-
-# Maximum function length (lines)
-# max_function_length = 50
-
-# Maximum function parameters
-# max_function_params = 4
-
-# Maximum nesting depth
-# max_nesting_depth = 4
-
-# ============================================================================
-# Scoring Weights Configuration
-# ============================================================================
-# All active weights must sum to 1.0
+[thresholds.validation]
+max_average_complexity = 10.0
+max_debt_density = 50.0
+max_codebase_risk_score = 7.0
+min_coverage_percentage = 0.0
+max_total_debt_score = 10000
 
 [scoring]
-# Coverage weight (how much test coverage affects score)
+# Active weights must sum to 1.0.
 coverage = 0.50
-
-# Complexity weight (cyclomatic + cognitive complexity)
 complexity = 0.35
-
-# Dependency weight (call graph complexity)
 dependency = 0.15
-
-# Inactive weights (set to 0.0)
-semantic = 0.00
-security = 0.00
-organization = 0.00
-
-# ============================================================================
-# Analysis Features
-# ============================================================================
-
-[analysis]
-# Enable context-aware risk analysis
-enable_context = false
-
-# Context providers to use (git, github, critical_path, dependency)
-# context_providers = ["git", "github"]
-
-# Disable specific context providers
-# disable_context = []
-
-# Enable semantic analysis
-semantic_off = false
-
-# Disable pattern detection
-no_pattern_detection = false
-
-# Enabled patterns (observer, singleton, factory, strategy, callback, template_method)
-# patterns = ["singleton", "factory"]
-
-# Pattern confidence threshold (0.0 - 1.0)
-pattern_threshold = 0.7
-
-# Enable AST-based functional composition analysis
-ast_functional_analysis = false
-
-# Validate LOC consistency across analysis modes
-validate_loc = false
-
-# ============================================================================
-# Display Configuration
-# ============================================================================
+semantic = 0.0
+security = 0.0
+organization = 0.0
 
 [display]
-# Output format (json, markdown, terminal, html)
-format = "terminal"
+tiered = true
+items_per_tier = 5
+verbosity = "detailed"
 
-# Verbosity level (0-3)
-# 0 = quiet, 1 = normal, 2 = verbose, 3 = debug
-verbosity = 1
-
-# Use compact output format
-compact = false
-
-# Use summary format with tiered priority display
-summary = false
-
-# Group output by debt category
-group_by_category = false
-
-# Show complexity attribution details
-show_attribution = false
-
-# Detail level (summary, standard, comprehensive, debug)
+[output]
+default_format = "json"
 detail_level = "standard"
+use_color = true
 
-# Disable TUI progress visualization
-no_tui = false
-
-# Plain output mode (ASCII-only, no colors, no emoji)
-plain = false
-
-# ============================================================================
-# Display Formatting
-# ============================================================================
-
-[display.formatting]
-# Show dependency information (callers/callees)
-show_dependencies = false
-
-# Maximum number of callers to display
-max_callers = 5
-
-# Maximum number of callees to display
-max_callees = 5
-
-# Show external crate calls in dependencies
-show_external = false
-
-# Show standard library calls in dependencies
-show_std_lib = false
-
-# Show detailed module split recommendations
-show_splits = false
-
-# ============================================================================
-# Filters
-# ============================================================================
-
-[filters]
-# Minimum priority to display (low, medium, high, critical)
-# min_priority = "medium"
-
-# Minimum score threshold for filtering recommendations
-min_score = 3.0
-
-# Filter by debt categories (comma-separated)
-# filter_categories = ["complexity", "duplication"]
-
-# Minimum number of problematic functions for file aggregation
-# min_problematic = 3
-
-# ============================================================================
-# Performance Configuration
-# ============================================================================
-
-[performance]
-# Enable parallel processing
-parallel = true
-
-# Number of threads for parallel processing (0 = use all cores)
-jobs = 0
-
-# Enable multi-pass analysis
-multi_pass = true
-
-# Show only aggregated file-level scores
-aggregate_only = false
-
-# ============================================================================
-# Debug Configuration
-# ============================================================================
-
-[debug]
-# Show verbose macro parsing warnings
-verbose_macro_warnings = false
-
-# Show macro expansion statistics
-show_macro_stats = false
-
-# Enable call graph debugging
-debug_call_graph = false
-
-# Trace specific functions during call resolution
-# trace_functions = ["function_name"]
-
-# Show only call graph statistics
-call_graph_stats_only = false
-
-# Show pattern warnings for uncertain detections
-show_pattern_warnings = false
-
-# ============================================================================
-# God Object Detection
-# ============================================================================
+[analysis]
+enable_trait_analysis = true
+enable_function_pointer_tracking = true
+enable_framework_patterns = true
+enable_cross_module_analysis = true
+max_analysis_depth = 10
 
 [god_object_detection]
 enabled = true
 
-# Rust-specific thresholds
 [god_object_detection.rust]
 max_methods = 20
 max_fields = 15
+max_traits = 5
+max_lines = 1000
+max_complexity = 200
 
-# Python-specific thresholds
 [god_object_detection.python]
 max_methods = 15
 max_fields = 10
+max_traits = 3
+max_lines = 500
+max_complexity = 150
 
-# JavaScript-specific thresholds
 [god_object_detection.javascript]
 max_methods = 15
 max_fields = 20
-
-# ============================================================================
-# Language Configuration
-# ============================================================================
+max_traits = 3
+max_lines = 500
+max_complexity = 150
 
 [languages]
-# Languages to analyze (rust, python, javascript)
-enabled = ["rust"]
+enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
 
-# Aggregation method (weighted, sum, max)
-# aggregation_method = "weighted"
+[languages.rust]
+detect_dead_code = false
+detect_complexity = true
+detect_duplication = true
 
-# ============================================================================
-# Ignore Patterns
-# ============================================================================
+[languages.python]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.javascript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.typescript]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+
+[languages.go]
+detect_dead_code = true
+detect_complexity = true
+detect_duplication = true
+generated_code = "suppress_debt"
+
+[languages.solidity]
+detect_dead_code = false
+detect_complexity = true
+detect_duplication = true
+vendor_code = "suppress_debt"
+large_contract_threshold = 20
+
+[languages.solidity.security]
+tx_origin = true
+reentrancy_heuristic = true
+unchecked_calls = true
+delegatecall = true
+selfdestruct = true
+assembly_blocks = true
+unbounded_loops = true
+missing_access_control = true
+hardcoded_addresses = true
+floating_pragma = true
+large_contracts = true
+unchecked_arithmetic = true
+unsafe_erc20_transfer = true
+push_without_length_cap = true
+block_timestamp_dependency = true
+tx_gas_price_dependency = true
+encode_packed_collision = true
+delegatecall_in_constructor = true
 
 [ignore]
-# Patterns to ignore during analysis (glob patterns)
 patterns = [
-    "tests/**/*",
-    "examples/**/*",
-    "benches/**/*",
-    "**/target/**",
-    "**/node_modules/**",
+    "target/**",
+    "venv/**",
+    "node_modules/**",
+    "out/**",
+    "cache/**",
+    "artifacts/**",
+    "*.min.js",
 ]
 
-# ============================================================================
-# External API Detection
-# ============================================================================
-
 [external_api]
-# Enable public API detection heuristics
-enabled = true
-
-# Public API confidence threshold (0.0 - 1.0)
-threshold = 0.7
-
-# ============================================================================
-# Validation Thresholds (for CI/CD)
-# ============================================================================
-
-[thresholds.validation]
-# Maximum average complexity allowed
-max_average_complexity = 10.0
-
-# Maximum debt density allowed (per 1000 LOC)
-max_debt_density = 50.0
-
-# Maximum codebase risk score
-max_codebase_risk_score = 7.0
-
-# Minimum coverage percentage
-min_coverage_percentage = 0.0
-
-# Safety net - high ceiling for total debt
-max_total_debt_score = 10000
+detect_external_api = true
+api_functions = []
+api_files = []

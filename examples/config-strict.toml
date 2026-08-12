@@ -2,8 +2,6 @@
 # Use this for projects with high code quality standards
 # Recommended for: New projects, critical systems, high-reliability software
 
-version = "1.0"
-
 # ============================================================================
 # Strict Thresholds - Low tolerance for complexity
 # ============================================================================
@@ -18,10 +16,7 @@ duplication = 5
 # Shorter file and function limits
 max_file_length = 500
 max_function_length = 30
-
-# Strict parameter and nesting limits
-max_function_params = 3
-max_nesting_depth = 3
+min_score_threshold = 2.0
 
 # ============================================================================
 # Strict Scoring - Emphasize coverage
@@ -41,26 +36,20 @@ organization = 0.00
 # ============================================================================
 
 [analysis]
-# Enable all validation checks
-validate_loc = true
-ast_functional_analysis = true
-
-# Lower pattern threshold - more confident detections only
-pattern_threshold = 0.8
+enable_trait_analysis = true
+enable_function_pointer_tracking = true
+enable_framework_patterns = true
+enable_cross_module_analysis = true
+max_analysis_depth = 20
 
 # ============================================================================
 # Strict Display Settings
 # ============================================================================
 
 [display]
-format = "terminal"
-verbosity = 2  # More verbose output
-detail_level = "comprehensive"
-show_attribution = true
-group_by_category = true
-
-[filters]
-min_score = 2.0  # Lower threshold - show more issues
+tiered = true
+items_per_tier = 10
+verbosity = "comprehensive"
 
 # ============================================================================
 # Strict Validation for CI/CD

@@ -10,7 +10,7 @@
 use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{
-    Cli, Commands, MAIN_STACK_SIZE, configure_thread_pool, get_worker_count,
+    Cli, Commands, ConfigCommands, MAIN_STACK_SIZE, configure_thread_pool, get_worker_count,
     handle_analyze_command_with_profiling, handle_compare_command, handle_explain_coverage_command,
     handle_validate_command, handle_validate_improvement_command, show_config_sources,
 };
@@ -95,6 +95,9 @@ fn main_inner() -> Result<()> {
             debtmap::commands::init::init_config(force)?;
             Ok(())
         }
+        Commands::Config {
+            command: ConfigCommands::Check,
+        } => debtmap::commands::config::check_config(cli.config.as_deref()),
         command @ Commands::Validate { .. } => {
             handle_validate_command(command)?;
             Ok(())

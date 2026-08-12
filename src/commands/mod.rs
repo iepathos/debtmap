@@ -18,6 +18,7 @@
 
 pub mod analyze;
 pub mod compare_debtmap;
+pub mod config;
 pub mod diagnose_coverage;
 pub mod explain_coverage;
 pub mod init;
@@ -27,6 +28,7 @@ pub mod validate_improvement;
 
 pub use analyze::handle_analyze;
 pub use compare_debtmap::{CompareConfig, compare_debtmaps};
+pub use config::check_config;
 pub use diagnose_coverage::diagnose_coverage_file;
 pub use explain_coverage::{ExplainCoverageConfig, explain_coverage};
 pub use init::init_config;

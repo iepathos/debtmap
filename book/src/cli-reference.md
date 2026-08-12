@@ -77,6 +77,21 @@ debtmap init [OPTIONS]
 **Description:**
 Creates a `.debtmap.toml` configuration file in the current directory with default settings. Use `--force` to overwrite an existing configuration file.
 
+### `config check`
+
+Check a configuration file for TOML syntax errors, unknown keys, and invalid values.
+
+**Usage:**
+```bash
+# Check the nearest .debtmap.toml
+debtmap config check
+
+# Check an explicit file
+debtmap --config path/to/debtmap.toml config check
+```
+
+Unknown keys are reported together, with a suggested canonical key when there is one clear match. The command exits with a non-zero status when the configuration is invalid, making it suitable for CI.
+
 ### `validate`
 
 Validate code against thresholds defined in configuration file.
@@ -509,6 +524,7 @@ debtmap analyze --help
 debtmap validate --help
 debtmap compare --help
 debtmap init --help
+debtmap config check --help
 ```
 
 ## Common Workflows

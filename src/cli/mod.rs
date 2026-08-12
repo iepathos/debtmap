@@ -13,8 +13,8 @@ pub mod setup;
 
 // Re-export commonly used types for convenience
 pub use args::{
-    Cli, Commands, DebugFormatArg, FunctionalAnalysisProfile, OutputFormat, Priority,
-    ThresholdPreset,
+    Cli, Commands, ConfigCommands, DebugFormatArg, FunctionalAnalysisProfile, OutputFormat,
+    Priority, ThresholdPreset,
 };
 pub use commands::{
     handle_analyze_command, handle_analyze_command_with_profiling, handle_compare_command,

@@ -37,6 +37,13 @@ pub enum FunctionalAnalysisProfile {
     Lenient,
 }
 
+/// Configuration maintenance commands.
+#[derive(Subcommand, Debug)]
+pub enum ConfigCommands {
+    /// Check configuration syntax, keys, and values
+    Check,
+}
+
 /// Debtmap - Code complexity sensor for AI-assisted development
 #[derive(Parser, Debug)]
 #[command(name = "debtmap")]
@@ -291,6 +298,12 @@ pub enum Commands {
         /// Force overwrite existing config
         #[arg(short, long)]
         force: bool,
+    },
+
+    /// Inspect and validate debtmap configuration
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
     },
 
     /// Validate code against thresholds
@@ -620,6 +633,20 @@ mod tests {
             }
             _ => panic!("Expected Init command"),
         }
+    }
+
+    #[test]
+    fn test_cli_parsing_config_check_command() {
+        use clap::Parser;
+
+        let cli = Cli::parse_from(["debtmap", "config", "check"]);
+
+        assert!(matches!(
+            cli.command,
+            Commands::Config {
+                command: ConfigCommands::Check
+            }
+        ));
     }
 
     #[test]

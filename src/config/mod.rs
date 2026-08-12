@@ -26,6 +26,7 @@
 //! acceptable ranges and mutually consistent.
 
 // Sub-modules
+pub(crate) mod check;
 mod classification;
 mod detection;
 mod display;

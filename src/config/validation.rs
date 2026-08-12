@@ -214,9 +214,9 @@ fn validate_validation_thresholds(thresholds: &ValidationThresholds) -> Vec<Anal
         )));
     }
 
-    if thresholds.max_codebase_risk_score < 0.0 {
+    if !(0.0..=10.0).contains(&thresholds.max_codebase_risk_score) {
         errors.push(AnalysisError::config(format!(
-            "Max codebase risk score cannot be negative: {}",
+            "Max codebase risk score must be 0-10: {}",
             thresholds.max_codebase_risk_score
         )));
     }

@@ -2,8 +2,6 @@
 # Use this for legacy codebases or complex domains
 # Recommended for: Legacy projects, complex business logic, gradual migration
 
-version = "1.0"
-
 # ============================================================================
 # Permissive Thresholds - Higher tolerance for complexity
 # ============================================================================
@@ -18,10 +16,7 @@ duplication = 20
 # Longer file and function limits
 max_file_length = 2000
 max_function_length = 100
-
-# Relaxed parameter and nesting limits
-max_function_params = 6
-max_nesting_depth = 5
+min_score_threshold = 5.0
 
 # ============================================================================
 # Permissive Scoring - De-emphasize coverage, focus on complexity
@@ -41,26 +36,20 @@ organization = 0.00
 # ============================================================================
 
 [analysis]
-# Optional validation checks
-validate_loc = false
-ast_functional_analysis = false
-
-# Higher pattern threshold - only very confident detections
-pattern_threshold = 0.6
+enable_trait_analysis = false
+enable_function_pointer_tracking = false
+enable_framework_patterns = true
+enable_cross_module_analysis = false
+max_analysis_depth = 10
 
 # ============================================================================
 # Permissive Display Settings
 # ============================================================================
 
 [display]
-format = "terminal"
-verbosity = 1  # Standard verbosity
-detail_level = "standard"
-show_attribution = false
-group_by_category = false
-
-[filters]
-min_score = 5.0  # Higher threshold - focus on critical issues only
+tiered = true
+items_per_tier = 5
+verbosity = "detailed"
 
 # ============================================================================
 # Permissive Validation for CI/CD

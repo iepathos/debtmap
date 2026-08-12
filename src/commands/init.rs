@@ -85,7 +85,7 @@ patterns = [
 ]
 
 [output]
-default_format = "terminal"
+default_format = "json"
 "#;
 
     io::write_file(&config_path, default_config)?;
