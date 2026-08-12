@@ -61,6 +61,12 @@ test-fast:
         --test analyzer_tests --test complexity_tests --test core_metrics_tests \
         --test debt_tests --test entropy_tests
 
+# Verify installer platform, download, checksum, and release-publication contracts
+test-install:
+    bash -n install.sh tests/install_script_test.sh
+    shellcheck install.sh tests/install_script_test.sh
+    bash tests/install_script_test.sh
+
 # Backwards-compatible fast plus bounded integration suite
 test-safe: test-fast test-integration
 

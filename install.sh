@@ -21,10 +21,26 @@ else
     INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 fi
 GITHUB_API="https://api.github.com/repos/${REPO}"
+TEMP_DIR=""
+STAGED_BINARY=""
+
+cleanup_temp_dir() {
+    if [ -n "$STAGED_BINARY" ] && [ -f "$STAGED_BINARY" ]; then
+        rm -f -- "$STAGED_BINARY"
+    fi
+    STAGED_BINARY=""
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        rm -rf -- "$TEMP_DIR"
+    fi
+    TEMP_DIR=""
+}
+
+trap cleanup_temp_dir EXIT
 
 # Helper functions
 error() {
     echo -e "${RED}Error: $1${NC}" >&2
+    cleanup_temp_dir
     exit 1
 }
 
@@ -71,7 +87,7 @@ get_target() {
             fi
             ;;
         linux-aarch64)
-            TARGET="aarch64-unknown-linux-gnu"
+            error "Linux ARM64 release artifacts are not currently published. Use 'cargo install debtmap' or build from source."
             ;;
         darwin-x86_64)
             TARGET="x86_64-apple-darwin"
@@ -99,9 +115,13 @@ get_latest_release() {
     info "Fetching latest release information..."
     
     if command -v curl >/dev/null 2>&1; then
-        RELEASE_INFO=$(curl -s "${GITHUB_API}/releases/latest")
+        if ! RELEASE_INFO=$(curl -fsSL --retry 3 --retry-delay 1 "${GITHUB_API}/releases/latest"); then
+            error "Failed to fetch latest release information"
+        fi
     elif command -v wget >/dev/null 2>&1; then
-        RELEASE_INFO=$(wget -qO- "${GITHUB_API}/releases/latest")
+        if ! RELEASE_INFO=$(wget -q --tries=3 --timeout=30 -O- "${GITHUB_API}/releases/latest"); then
+            error "Failed to fetch latest release information"
+        fi
     else
         error "Neither curl nor wget found. Please install one of them."
     fi
@@ -115,40 +135,96 @@ get_latest_release() {
     success "Latest version: $LATEST_VERSION"
 }
 
+download_file() {
+    local url="$1"
+    local destination="$2"
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --retry 3 --retry-delay 1 "$url" -o "$destination"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q --tries=3 --timeout=30 "$url" -O "$destination"
+    else
+        error "Neither curl nor wget found. Please install one of them."
+    fi
+}
+
+calculate_sha256() {
+    local file="$1"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$file" | awk '{print $1}'
+    else
+        error "Neither sha256sum nor shasum found. Cannot verify the release archive."
+    fi
+}
+
+verify_checksum() {
+    local archive_file="$1"
+    local checksum_file="$2"
+    local expected_checksum
+    local actual_checksum
+
+    expected_checksum=$(awk 'NR == 1 {print $1}' "$checksum_file" | tr '[:upper:]' '[:lower:]')
+    if ! printf '%s\n' "$expected_checksum" | grep -Eq '^[0-9a-f]{64}$'; then
+        error "Release checksum file is invalid"
+    fi
+
+    actual_checksum=$(calculate_sha256 "$archive_file")
+    if [ "$expected_checksum" != "$actual_checksum" ]; then
+        error "Release archive checksum verification failed"
+    fi
+
+    success "Release archive checksum verified"
+}
+
 # Download and extract binary
 download_and_install() {
-    local download_url="https://github.com/${REPO}/releases/download/${LATEST_VERSION}/debtmap-${TARGET}.${ARCHIVE_EXT}"
-    local temp_dir=$(mktemp -d)
-    local archive_file="${temp_dir}/debtmap.${ARCHIVE_EXT}"
+    local asset_name="debtmap-${TARGET}.${ARCHIVE_EXT}"
+    local download_url="https://github.com/${REPO}/releases/download/${LATEST_VERSION}/${asset_name}"
+    local checksum_url="${download_url}.sha256"
+    local archive_file
+    local checksum_file
+
+    TEMP_DIR=$(mktemp -d)
+    archive_file="${TEMP_DIR}/${asset_name}"
+    checksum_file="${archive_file}.sha256"
     
     info "Downloading debtmap ${LATEST_VERSION} for ${TARGET}..."
     
-    # Download
-    if command -v curl >/dev/null 2>&1; then
-        curl -sL "$download_url" -o "$archive_file" || error "Failed to download release"
-    else
-        wget -q "$download_url" -O "$archive_file" || error "Failed to download release"
-    fi
+    download_file "$download_url" "$archive_file" || error "Failed to download release archive"
+    download_file "$checksum_url" "$checksum_file" || error "Failed to download release checksum"
+    verify_checksum "$archive_file" "$checksum_file"
     
     # Extract
     info "Extracting archive..."
-    cd "$temp_dir"
     if [ "$ARCHIVE_EXT" = "tar.gz" ]; then
-        tar -xzf "$archive_file" || error "Failed to extract archive"
+        tar -xzf "$archive_file" -C "$TEMP_DIR" || error "Failed to extract archive"
     else
-        unzip -q "$archive_file" || error "Failed to extract archive"
+        unzip -q "$archive_file" -d "$TEMP_DIR" || error "Failed to extract archive"
     fi
     
     # Create install directory if it doesn't exist
     mkdir -p "$INSTALL_DIR"
-    
-    # Install binary
+
+    if [ ! -f "${TEMP_DIR}/${BINARY_NAME}" ]; then
+        error "Release archive does not contain ${BINARY_NAME}"
+    fi
+    chmod +x "${TEMP_DIR}/${BINARY_NAME}"
+    if ! "${TEMP_DIR}/${BINARY_NAME}" --version >/dev/null 2>&1; then
+        error "Downloaded debtmap binary failed validation"
+    fi
+
+    STAGED_BINARY=$(mktemp "${INSTALL_DIR}/.${BINARY_NAME}.installing.XXXXXX") || error "Failed to create staging file"
     info "Installing debtmap to ${INSTALL_DIR}..."
-    mv "$BINARY_NAME" "$INSTALL_DIR/" || error "Failed to install binary"
-    chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+    cp "${TEMP_DIR}/${BINARY_NAME}" "$STAGED_BINARY" || error "Failed to stage binary"
+    chmod +x "$STAGED_BINARY"
+    mv -f "$STAGED_BINARY" "${INSTALL_DIR}/${BINARY_NAME}" || error "Failed to install binary"
+    STAGED_BINARY=""
     
     # Cleanup
-    rm -rf "$temp_dir"
+    cleanup_temp_dir
     
     success "debtmap installed successfully!"
 }
@@ -205,9 +281,11 @@ check_path() {
                     if grep -q "fish_add_path.*${INSTALL_DIR}" "$SHELL_CONFIG" 2>/dev/null; then
                         info "PATH entry for ${INSTALL_DIR} already exists in ${SHELL_CONFIG}"
                     else
-                        echo "" >> "$SHELL_CONFIG"
-                        echo "# Added by debtmap installer" >> "$SHELL_CONFIG"
-                        echo "fish_add_path ${INSTALL_DIR}" >> "$SHELL_CONFIG"
+                        {
+                            echo ""
+                            echo "# Added by debtmap installer"
+                            echo "fish_add_path ${INSTALL_DIR}"
+                        } >> "$SHELL_CONFIG"
                         success "Added ${INSTALL_DIR} to PATH in ${SHELL_CONFIG}"
                     fi
                 else
@@ -215,9 +293,11 @@ check_path() {
                     if grep -q "${INSTALL_DIR}" "$SHELL_CONFIG" 2>/dev/null; then
                         info "PATH entry for ${INSTALL_DIR} already exists in ${SHELL_CONFIG}"
                     else
-                        echo "" >> "$SHELL_CONFIG"
-                        echo "# Added by debtmap installer" >> "$SHELL_CONFIG"
-                        echo "export PATH=\"\$PATH:${INSTALL_DIR}\"" >> "$SHELL_CONFIG"
+                        {
+                            echo ""
+                            echo "# Added by debtmap installer"
+                            echo "export PATH=\"\$PATH:${INSTALL_DIR}\""
+                        } >> "$SHELL_CONFIG"
                         success "Added ${INSTALL_DIR} to PATH in ${SHELL_CONFIG}"
                     fi
                 fi
@@ -252,12 +332,20 @@ check_path() {
 
 # Verify installation
 verify_installation() {
-    if command -v debtmap >/dev/null 2>&1; then
-        local version=$(debtmap --version 2>&1 | head -n1)
-        success "Installation verified: $version"
-    else
-        info "Run 'debtmap --version' to verify installation after updating your PATH"
+    local version
+    local version_output
+
+    if [ ! -x "${INSTALL_DIR}/${BINARY_NAME}" ]; then
+        error "Installed binary is missing or not executable: ${INSTALL_DIR}/${BINARY_NAME}"
     fi
+    if ! version_output=$("${INSTALL_DIR}/${BINARY_NAME}" --version 2>&1); then
+        error "Installed binary failed verification"
+    fi
+    version=$(printf '%s\n' "$version_output" | head -n1)
+    if [ -z "$version" ]; then
+        error "Installed binary returned an empty version"
+    fi
+    success "Installation verified: $version"
 }
 
 # Main installation flow
@@ -296,5 +384,7 @@ main() {
     echo ""
 }
 
-# Run main function
-main "$@"
+# The documented `curl ... | bash` path executes from stdin, so tests opt out explicitly.
+if [ "${DEBTMAP_INSTALLER_TEST_MODE:-0}" != "1" ]; then
+    main "$@"
+fi

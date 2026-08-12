@@ -114,6 +114,12 @@ jobs:
           --test parallel_sequential_equivalence_test \
           --status-level fail --final-status-level slow
 
+    - name: Verify installer contract
+      run: |
+        bash -n install.sh tests/install_script_test.sh
+        shellcheck install.sh tests/install_script_test.sh
+        bash tests/install_script_test.sh
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

@@ -6,7 +6,9 @@ This guide will help you install Debtmap and run your first analysis in just a f
 
 Before installing Debtmap, you'll need:
 
-- **For pre-built binaries**: No prerequisites! The install script handles everything.
+- **For pre-built binaries**: A standard downloader (`curl` or `wget`), archive tool, and
+  SHA-256 tool (`sha256sum` or `shasum`). Published binaries support Linux x86-64, macOS
+  x86-64/Apple Silicon, and Windows x86-64.
 - **For cargo install or building from source**:
   - Rust toolchain (rustc and cargo)
   - Supported platforms: Linux, macOS, Windows
@@ -32,10 +34,14 @@ wget -qO- https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh |
 ```
 
 This will:
-- Automatically detect your OS and architecture
+- Detect your supported OS and architecture
 - Download the appropriate pre-built binary from the latest GitHub release
+- Verify the published SHA-256 checksum before installation
 - Install debtmap to `~/.cargo/bin` if it exists, otherwise `~/.local/bin`
 - Offer to automatically add the install directory to your PATH if needed
+
+Linux ARM64 does not currently have a pre-built release artifact; use `cargo install debtmap`
+on that platform.
 
 ### Using Cargo
 
