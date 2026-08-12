@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -205,7 +205,7 @@ debtmap validate . --config debtmap.toml
 <li>Useful for debugging configuration precedence issues</li>
 </ul>
 </li>
-<li><code>--config &lt;PATH&gt;</code> - Custom config file path (overrides default locations)
+<li><code>--config &lt;PATH&gt;</code> - Custom config file path (highest-precedence file layer)
 <ul>
 <li>Can also use <code>DEBTMAP_CONFIG</code> environment variable</li>
 </ul>
@@ -243,6 +243,16 @@ Primary command for code analysis. Supports multiple output formats (json, markd
 </ul>
 <p><strong>Description:</strong>
 Creates a <code>.debtmap.toml</code> configuration file in the current directory with default settings. Use <code>--force</code> to overwrite an existing configuration file.</p>
+<h3 id="config-check"><a class="header" href="#config-check"><code>config check</code></a></h3>
+<p>Check a configuration file for TOML syntax errors, unknown keys, and invalid values.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-bash"># Check the nearest .debtmap.toml
+debtmap config check
+
+# Check an explicit file
+debtmap --config path/to/debtmap.toml config check
+</code></pre>
+<p>Unknown keys are reported together, with a suggested canonical key when there is one clear match. The command exits with a non-zero status when the configuration is invalid, making it suitable for CI.</p>
 <h3 id="validate"><a class="header" href="#validate"><code>validate</code></a></h3>
 <p>Validate code against thresholds defined in configuration file.</p>
 <p><strong>Usage:</strong></p>
@@ -681,7 +691,7 @@ debtmap init --force
 <p><code>DEBTMAP_CONFIG</code> - Custom config file path (same as <code>--config</code> global flag)</p>
 <ul>
 <li>Example: <code>export DEBTMAP_CONFIG=/path/to/debtmap.toml</code></li>
-<li>Overrides default configuration file locations</li>
+<li>Layers above user and project configuration files</li>
 <li>Useful for CI/CD environments with centralized config</li>
 <li>Source: src/cli.rs:45</li>
 </ul>
@@ -732,6 +742,7 @@ debtmap analyze --help
 debtmap validate --help
 debtmap compare --help
 debtmap init --help
+debtmap config check --help
 </code></pre>
 <h2 id="common-workflows"><a class="header" href="#common-workflows">Common Workflows</a></h2>
 <h3 id="basic-analysis"><a class="header" href="#basic-analysis">Basic Analysis</a></h3>
@@ -1162,7 +1173,7 @@ See Prodigy documentation for detailed usage instructions.</p>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

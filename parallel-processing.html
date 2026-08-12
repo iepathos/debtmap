@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -228,15 +228,8 @@ debtmap analyze -j 4
 <pre><code class="language-bash">export DEBTMAP_JOBS=4
 debtmap analyze  # Uses 4 threads
 </code></pre>
-<p><strong><code>DEBTMAP_PARALLEL</code></strong> - Enable/disable parallel processing programmatically:</p>
-<pre><code class="language-bash">export DEBTMAP_PARALLEL=true
-debtmap analyze  # Parallel processing enabled
-
-export DEBTMAP_PARALLEL=1
-debtmap analyze  # Parallel processing enabled (also accepts '1')
-</code></pre>
-<p>The <code>DEBTMAP_PARALLEL</code> variable accepts <code>true</code> or <code>1</code> to enable parallel processing. This is useful for programmatic control in scripts or CI environments.</p>
-<p>The CLI flags (<code>--jobs</code>, <code>--no-parallel</code>) take precedence over environment variables.</p>
+<p>The <code>--jobs</code> CLI flag takes precedence over <code>DEBTMAP_JOBS</code>. Parallel execution is enabled by
+default and can be disabled explicitly with <code>--no-parallel</code>.</p>
 <h3 id="no-parallel"><a class="header" href="#no-parallel">–no-parallel</a></h3>
 <p>Disable parallel call graph construction entirely:</p>
 <pre><code class="language-bash">debtmap analyze . --no-parallel
@@ -1366,7 +1359,7 @@ debtmap analyze . --jobs 4
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

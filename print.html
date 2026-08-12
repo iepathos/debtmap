@@ -16,8 +16,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -523,7 +523,9 @@ debtmap analyze . --lcov coverage.lcov --format terminal -vv
 <h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
 <p>Before installing Debtmap, you’ll need:</p>
 <ul>
-<li><strong>For pre-built binaries</strong>: No prerequisites! The install script handles everything.</li>
+<li><strong>For pre-built binaries</strong>: A standard downloader (<code>curl</code> or <code>wget</code>), archive tool, and
+SHA-256 tool (<code>sha256sum</code> or <code>shasum</code>). Published binaries support Linux x86-64, macOS
+x86-64/Apple Silicon, and Windows x86-64.</li>
 <li><strong>For cargo install or building from source</strong>:
 <ul>
 <li>Rust toolchain (rustc and cargo)</li>
@@ -547,11 +549,14 @@ debtmap analyze . --lcov coverage.lcov --format terminal -vv
 </code></pre>
 <p>This will:</p>
 <ul>
-<li>Automatically detect your OS and architecture</li>
+<li>Detect your supported OS and architecture</li>
 <li>Download the appropriate pre-built binary from the latest GitHub release</li>
+<li>Verify the published SHA-256 checksum before installation</li>
 <li>Install debtmap to <code>~/.cargo/bin</code> if it exists, otherwise <code>~/.local/bin</code></li>
 <li>Offer to automatically add the install directory to your PATH if needed</li>
 </ul>
+<p>Linux ARM64 does not currently have a pre-built release artifact; use <code>cargo install debtmap</code>
+on that platform.</p>
 <h3 id="using-cargo"><a class="header" href="#using-cargo">Using Cargo</a></h3>
 <p>If you have Rust installed:</p>
 <pre><code class="language-bash">cargo install debtmap
@@ -896,66 +901,9 @@ patterns = ["**/target/**", "**/tests/**"]
 <p>For programmatic access and CI/CD integration:</p>
 <pre><code class="language-bash">debtmap analyze . --format json --output debt.json
 </code></pre>
-<p><strong>Structure:</strong></p>
-<pre><code class="language-json">{
-  "format_version": "3.0",
-  "metadata": {
-    "debtmap_version": "0.16.5",
-    "generated_at": "2026-05-18T10:30:00Z",
-    "project_root": ".",
-    "analysis_type": "unified"
-  },
-  "summary": {
-    "total_items": 47,
-    "total_debt_score": 2140.5,
-    "debt_density": 138.8,
-    "total_loc": 15420,
-    "score_distribution": {
-      "critical": 3,
-      "high": 12,
-      "medium": 20,
-      "low": 12
-    }
-  },
-  "items": [
-    {
-      "type": "Function",
-      "score": 128.4,
-      "category": "Testing",
-      "priority": "critical",
-      "location": {
-        "file": "src/parser.rs",
-        "line": 38,
-        "function": "parse_complex_input"
-      },
-      "metrics": {
-        "cyclomatic_complexity": 12,
-        "cognitive_complexity": 18,
-        "length": 47,
-        "nesting_depth": 4,
-        "coverage": 0.0
-      },
-      "dependencies": {
-        "upstream_count": 2,
-        "downstream_count": 4,
-        "blast_radius": 6,
-        "critical_path": true
-      },
-      "context": {
-        "primary": {
-          "file": "src/parser.rs",
-          "start_line": 38,
-          "end_line": 85,
-          "symbol": "parse_complex_input"
-        },
-        "related": [],
-        "total_lines": 48,
-        "completeness_confidence": 0.86
-      }
-    }
-  ]
-}
-</code></pre>
+<p>The canonical structure is defined by the <a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json">unified JSON v3 schema</a>.
+Use the checked <a href="https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json">v3 items fixture</a>
+as a parser and prompt example.</p>
 <h3 id="terminal"><a class="header" href="#terminal">Terminal</a></h3>
 <p>For human exploration (not recommended for AI piping):</p>
 <pre><code class="language-bash">debtmap analyze . --format terminal
@@ -1326,7 +1274,7 @@ debtmap validate . --config debtmap.toml
 <li>Useful for debugging configuration precedence issues</li>
 </ul>
 </li>
-<li><code>--config &lt;PATH&gt;</code> - Custom config file path (overrides default locations)
+<li><code>--config &lt;PATH&gt;</code> - Custom config file path (highest-precedence file layer)
 <ul>
 <li>Can also use <code>DEBTMAP_CONFIG</code> environment variable</li>
 </ul>
@@ -1364,6 +1312,16 @@ Primary command for code analysis. Supports multiple output formats (json, markd
 </ul>
 <p><strong>Description:</strong>
 Creates a <code>.debtmap.toml</code> configuration file in the current directory with default settings. Use <code>--force</code> to overwrite an existing configuration file.</p>
+<h3 id="config-check"><a class="header" href="#config-check"><code>config check</code></a></h3>
+<p>Check a configuration file for TOML syntax errors, unknown keys, and invalid values.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-bash"># Check the nearest .debtmap.toml
+debtmap config check
+
+# Check an explicit file
+debtmap --config path/to/debtmap.toml config check
+</code></pre>
+<p>Unknown keys are reported together, with a suggested canonical key when there is one clear match. The command exits with a non-zero status when the configuration is invalid, making it suitable for CI.</p>
 <h3 id="validate"><a class="header" href="#validate"><code>validate</code></a></h3>
 <p>Validate code against thresholds defined in configuration file.</p>
 <p><strong>Usage:</strong></p>
@@ -1802,7 +1760,7 @@ debtmap init --force
 <p><code>DEBTMAP_CONFIG</code> - Custom config file path (same as <code>--config</code> global flag)</p>
 <ul>
 <li>Example: <code>export DEBTMAP_CONFIG=/path/to/debtmap.toml</code></li>
-<li>Overrides default configuration file locations</li>
+<li>Layers above user and project configuration files</li>
 <li>Useful for CI/CD environments with centralized config</li>
 <li>Source: src/cli.rs:45</li>
 </ul>
@@ -1853,6 +1811,7 @@ debtmap analyze --help
 debtmap validate --help
 debtmap compare --help
 debtmap init --help
+debtmap config check --help
 </code></pre>
 <h2 id="common-workflows"><a class="header" href="#common-workflows">Common Workflows</a></h2>
 <h3 id="basic-analysis"><a class="header" href="#basic-analysis">Basic Analysis</a></h3>
@@ -4042,11 +4001,10 @@ ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight)
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 15,
-      "cognitive": 22,
-      "adjusted_cyclomatic": null
+      "cognitive": 22
     }
   },
-  "function_role": "BusinessLogic",
+  "function_role": "PureLogic",
   "purity_analysis": {
     "is_pure": false,
     "confidence": 0.8,
@@ -4057,14 +4015,6 @@ ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight)
     "downstream_count": 3,
     "upstream_callers": ["main", "process_request"],
     "downstream_callees": ["validate", "save", "notify"]
-  },
-  "recommendation": {
-    "action": "Add test coverage for complex function",
-    "priority": "High",
-    "implementation_steps": [
-      "Write unit tests covering all 15 branches",
-      "Consider extracting validation logic to reduce complexity"
-    ]
   },
   "impact": {
     "coverage_improvement": 0.85,
@@ -4078,7 +4028,7 @@ ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight)
   "complexity_pattern": "validation",
   "pattern_type": "state_machine",
   "pattern_confidence": 0.72,
-  "context": {                            // optional, spec 263
+  "context": {
     "primary": {
       "file": "src/main.rs",
       "start_line": 35,
@@ -4099,12 +4049,14 @@ ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight)
     "total_lines": 120,
     "completeness_confidence": 0.85
   },
-  "git_history": {                        // optional, spec 264
-    "change_frequency": 2.5,              // changes per month
-    "bug_density": 0.15,                  // ratio of bug fixes to total commits
-    "age_days": 180,                      // code age
-    "author_count": 3,                    // unique contributors
-    "stability": "Frequently Changed"     // stability classification
+  "git_history": {
+    "change_frequency": 2.5,
+    "bug_density": 0.15,
+    "age_days": 180,
+    "author_count": 3,
+    "total_commits": 24,
+    "bug_fix_count": 4,
+    "stability": "Frequently Changed"
   }
 }
 </code></pre>
@@ -4127,7 +4079,7 @@ ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight)
 </ul>
 <p><strong>Fields at item level:</strong></p>
 <ul>
-<li><code>function_role</code>: Function importance (<code>"EntryPoint"</code>, <code>"BusinessLogic"</code>, <code>"Utility"</code>, <code>"TestHelper"</code>) - affects score multiplier (src/priority/mod.rs:231)</li>
+<li><code>function_role</code>: Function classification (<code>"PureLogic"</code>, <code>"Orchestrator"</code>, <code>"IOWrapper"</code>, <code>"EntryPoint"</code>, <code>"PatternMatch"</code>, <code>"Debug"</code>, or <code>"Unknown"</code>) - affects score multipliers</li>
 <li><code>purity_analysis</code>: Whether function has side effects (optional) - affects testability assessment
 <ul>
 <li><code>is_pure</code>: Boolean indicating no side effects</li>
@@ -4725,7 +4677,7 @@ Strategy:
 debtmap analyze . --format json --output debt-report.json
 
 # Extract density for trending
-DENSITY=$(jq '.debt_density' debt-report.json)
+DENSITY=$(jq '.summary.debt_density' debt-report.json)
 
 # Store in metrics database
 echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
@@ -4734,7 +4686,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <pre><code class="language-yaml"># .github/workflows/debt-check.yml
 - name: Check debt density
   run: |
-    DENSITY=$(debtmap analyze . --format json | jq '.debt_density')
+    DENSITY=$(debtmap analyze . --format json | jq '.summary.debt_density')
     if (( $(echo "$DENSITY &gt; 150" | bc -l) )); then
       echo "❌ Debt density too high: $DENSITY (limit: 150)"
       exit 1
@@ -5157,7 +5109,7 @@ fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
 <p><strong>Note</strong>: The <code>affected_functions</code> field contains the count of upstream callers. The actual function names can be obtained from the <code>upstream_callers</code> field in the function metadata.</p>
 <p><strong>Using modification impact:</strong></p>
 <pre><code class="language-bash"># Analyze impact before refactoring
-debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_payment_method") | .modification_impact'
+debtmap analyze . --format json | jq '.items[] | select(.type == "Function" and .location.function == "validate_payment_method") | .dependencies'
 </code></pre>
 <p><strong>Impact analysis uses:</strong></p>
 <ul>
@@ -5468,7 +5420,7 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
   "type": "Function",
   "score": 92.5,
   "category": "CodeQuality",
-  "priority": "critical",
+  "priority": "high",
   "location": {
     "file": "src/payments/processor.rs",
     "line": 145,
@@ -5485,8 +5437,7 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 25,
-      "cognitive": 38,
-      "adjusted_cyclomatic": null
+      "cognitive": 38
     }
   },
   "function_role": "Orchestrator",
@@ -5512,15 +5463,6 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
       "log_transaction",
       "check_fraud",
       "notify_user"
-    ]
-  },
-  "recommendation": {
-    "action": "Refactor into 4 smaller, focused functions",
-    "implementation_steps": [
-      "Extract validation logic into validate_payment_request",
-      "Create calculate_payment_totals for fee calculation",
-      "Move side effects to separate transaction recorder",
-      "Keep process_transaction as thin orchestrator"
     ]
   },
   "impact": {
@@ -5610,15 +5552,6 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
     "coupling_score": 0.78,
     "cohesion_score": 0.34
   },
-  "recommendation": {
-    "action": "Split into focused modules by responsibility",
-    "implementation_steps": [
-      "Extract authentication into auth_service.rs",
-      "Move authorization to permission_service.rs",
-      "Create profile_service.rs for user data management",
-      "Separate audit concerns into audit_logger.rs"
-    ]
-  },
   "impact": {
     "complexity_reduction": 45.0,
     "maintainability_improvement": 0.68,
@@ -5644,7 +5577,7 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
   "type": "Function",
   "score": 89.0,
   "category": "Testing",
-  "priority": "critical",
+  "priority": "high",
   "location": {
     "file": "src/analyzers/rust_call_graph.rs",
     "line": 38,
@@ -5685,17 +5618,6 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
       "increment_counter",
       "validate_signature",
       "log_registration"
-    ]
-  },
-  "recommendation": {
-    "action": "Add unit tests for core business logic",
-    "implementation_steps": [
-      "Test happy path with valid function definition",
-      "Test error cases: null input, invalid syntax",
-      "Test edge cases: complex generics, lifetimes",
-      "Test integration with registry updates",
-      "Verify correct handling of visibility modifiers",
-      "Test type resolution edge cases"
     ]
   },
   "impact": {
@@ -5745,8 +5667,7 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 20,
-      "cognitive": 18,
-      "adjusted_cyclomatic": 7
+      "cognitive": 18
     }
   },
   "adjusted_complexity": {
@@ -5754,9 +5675,6 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
     "dampening_factor": 0.65
   },
   "function_role": "PatternMatch",
-  "recommendation": {
-    "action": "Low priority - repetitive validation pattern"
-  },
   "impact": {
     "coverage_improvement": 0.05,
     "complexity_reduction": 0.0,
@@ -5776,7 +5694,7 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
 <p><strong>Source</strong>: <code>adjusted_complexity</code> from <code>src/output/unified/func_item.rs:AdjustedComplexity</code>, entropy dampening spec 182</p>
 <p><strong>Key Points:</strong></p>
 <ul>
-<li><code>adjusted_cyclomatic</code>: Entropy-dampened complexity value (7 vs original 20)</li>
+<li><code>dampened_cyclomatic</code>: Entropy-dampened complexity value (7 vs original 20)</li>
 <li><code>dampening_factor</code>: Amount of reduction applied (0.65 = 65% reduction)</li>
 <li><code>entropy_score</code>: Low value (0.28) indicates repetitive patterns</li>
 <li>Score reduced from 43.5 to 15.2 due to entropy analysis</li>
@@ -6488,7 +6406,7 @@ cat comparison.json | jq '.'
 debtmap analyze . --format json --output before.json
 
 # Identify critical items to fix
-jq '.items[] | select(.unified_score.final_score &gt;= 60.0)' before.json
+jq '.items[] | select(.score &gt;= 60.0)' before.json
 
 # Refactor the high-priority functions...
 
@@ -6700,7 +6618,7 @@ jq '.project_health.before' result.json
 jq '.project_health.after' result.json
 
 # Look for critical items in before analysis
-jq '.items[] | select(.unified_score.final_score &gt;= 60.0)' before.json
+jq '.items[] | select(.score &gt;= 60.0)' before.json
 </code></pre>
 <h3 id="json-parsing-errors"><a class="header" href="#json-parsing-errors">JSON Parsing Errors</a></h3>
 <p><strong>Problem</strong>: <code>Error parsing JSON file</code></p>
@@ -6820,8 +6738,10 @@ dependency = 0.15
 
 [thresholds]
 complexity = 15
-lines = 80
-coverage = 0.8
+max_function_length = 80
+
+[thresholds.validation]
+min_coverage_percentage = 80.0
 
 [languages]
 enabled = ["rust", "python", "javascript", "typescript"]
@@ -6841,16 +6761,23 @@ detect_dead_code = true
 <li><a href="#advanced-options">Advanced Options</a> - Advanced configuration for power users</li>
 <li><a href="#configuration-best-practices">Best Practices</a> - Guidelines for effective configuration</li>
 </ul>
-<h2 id="configuration-file-location"><a class="header" href="#configuration-file-location">Configuration File Location</a></h2>
-<p>Debtmap searches for configuration in the following order:</p>
+<h2 id="configuration-sources"><a class="header" href="#configuration-sources">Configuration Sources</a></h2>
+<p>Debtmap layers configuration from lowest to highest precedence:</p>
 <ol>
-<li>Path specified with <code>--config</code> flag</li>
-<li><code>.debtmap.toml</code> in current directory</li>
-<li><code>.debtmap.toml</code> in git repository root</li>
 <li>Built-in defaults</li>
+<li>User config (<code>~/.config/debtmap/config.toml</code>, or the platform equivalent)</li>
+<li>The nearest <code>.debtmap.toml</code> found from the current directory</li>
+<li>A custom path from <code>--config</code> or <code>DEBTMAP_CONFIG</code></li>
+<li>Supported <code>DEBTMAP_*</code> field overrides</li>
 </ol>
+<p>Higher-precedence files replace only the top-level sections they define; other sections continue
+to come from lower-precedence sources. Within a replaced section, omitted values use that
+section’s defaults rather than values from the lower-precedence section. Use
+<code>debtmap --show-config-sources analyze .</code> to inspect the effective source order.
+Run <code>debtmap config check</code> to reject unknown keys and invalid values before analysis or in CI.</p>
 <h2 id="validation-1"><a class="header" href="#validation-1">Validation</a></h2>
-<p>Debtmap validates your configuration on startup. Invalid configurations will produce clear error messages:</p>
+<p>Debtmap validates every discovered configuration before analysis. A malformed or invalid file
+stops the command instead of silently falling back to a weaker configuration:</p>
 <pre><code class="language-bash">$ debtmap analyze .
 Error: Invalid configuration
   - scoring.coverage + scoring.complexity + scoring.dependency must equal 1.0
@@ -10138,7 +10065,8 @@ debtmap analyze . -vvv
 <li><code>-vvv</code>: Show all debug information including entropy metrics and role detection</li>
 </ul>
 <blockquote>
-<p><strong>Note:</strong> Verbosity flags affect terminal output only. JSON and markdown formats include all data regardless of verbosity level.</p>
+<p><strong>Note:</strong> At <code>-vv</code>, JSON includes optional <code>scoring_details</code>. Default JSON omits those
+implementation details. Markdown verbosity also controls its rendered detail level.</p>
 </blockquote>
 <p>Each level includes all information from the previous levels, progressively adding more detail to help understand how scores are calculated.</p>
 <p><strong>Example Output Differences:</strong></p>
@@ -10166,7 +10094,7 @@ debtmap analyze . -vvv
   ... (all level 2 output) ...
   Debug info:
     Entropy metrics analyzed: 42/50 functions
-    Function role detection: BusinessLogic=12, Utility=8, TestHelper=5
+    Function role detection: PureLogic=12, IOWrapper=8, Unknown=5
     Parse time: 245ms
 </code></pre>
 <h3 id="understanding-metrics-1"><a class="header" href="#understanding-metrics-1">Understanding Metrics</a></h3>
@@ -10250,18 +10178,32 @@ debtmap analyze . --format json | jq .
 <blockquote>
 <p><strong>Note:</strong> JSON output is automatically pretty-printed for readability.</p>
 </blockquote>
+<blockquote>
+<p><strong>Data handling:</strong> JSON reports contain codebase metadata such as paths, symbols, call
+relationships, and git-derived aggregates. Review or redact reports before uploading them to
+external dashboards, artifacts, or webhooks.</p>
+</blockquote>
 <h3 id="json-schema-structure"><a class="header" href="#json-schema-structure">JSON Schema Structure</a></h3>
-<p>Debtmap outputs a structured JSON document with the following top-level fields:</p>
+<p>Debtmap emits the versioned unified JSON v3 contract. The authoritative schema and consumer guide
+are checked into the repository:</p>
+<ul>
+<li><a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json"><code>schemas/debtmap-output-v3.schema.json</code></a></li>
+<li><a href="https://github.com/iepathos/debtmap/blob/master/docs/json-output-v3.md"><code>docs/json-output-v3.md</code></a></li>
+</ul>
+<p>The top-level envelope is:</p>
 <pre><code class="language-json">{
-  "project_path": "/path/to/project",
-  "timestamp": "2025-01-09T12:00:00Z",
-  "complexity": { ... },
-  "technical_debt": { ... },
-  "dependencies": { ... },
-  "duplications": [ ... ]
+  "format_version": "3.0",
+  "metadata": { ... },
+  "summary": { ... },
+  "items": [ ... ]
 }
 </code></pre>
-<h3 id="full-schema-example"><a class="header" href="#full-schema-example">Full Schema Example</a></h3>
+<p>Consumers must reject unsupported <code>format_version</code> values. Items use a <code>type</code> discriminator of
+<code>File</code> or <code>Function</code>, lowercase priority values, and nested <code>location</code> and <code>metrics</code> objects.</p>
+<h3 id="legacy-pre-v3-example-historical"><a class="header" href="#legacy-pre-v3-example-historical">Legacy pre-v3 example (historical)</a></h3>
+<p>The example below describes the removed pre-v3 output and is retained temporarily only to explain
+older reports. Do not use these paths for new integrations; use the v3 schema and guide linked
+above.</p>
 <p>Here’s a complete annotated JSON output example:</p>
 <pre><code class="language-json">{
   // Project metadata
@@ -10373,7 +10315,7 @@ debtmap analyze . --format json | jq .
   ]
 }
 </code></pre>
-<h3 id="field-descriptions"><a class="header" href="#field-descriptions">Field Descriptions</a></h3>
+<h3 id="legacy-field-descriptions-pre-v3"><a class="header" href="#legacy-field-descriptions-pre-v3">Legacy field descriptions (pre-v3)</a></h3>
 <p><strong>FunctionMetrics Fields:</strong></p>
 <ul>
 <li>
@@ -10469,7 +10411,7 @@ debtmap analyze . --format json | jq .
 <li><code>TestDuplication</code>: Duplicated test code</li>
 <li><code>TestQuality</code>: Test quality issues</li>
 </ul>
-<h3 id="risk-insights-json"><a class="header" href="#risk-insights-json">Risk Insights JSON</a></h3>
+<h3 id="legacy-risk-insights-json-pre-v3"><a class="header" href="#legacy-risk-insights-json-pre-v3">Legacy risk insights JSON (pre-v3)</a></h3>
 <p>When coverage data is provided via <code>--lcov</code>, risk insights are included as part of the analysis output. The <code>write_risk_insights</code> method (found in <code>src/io/writers/json.rs</code>, <code>terminal.rs</code>, and <code>markdown/core.rs</code>) outputs risk analysis data in the following JSON structure:</p>
 <pre><code class="language-json">{
   "items": [
@@ -10886,9 +10828,9 @@ jobs:
 
       - name: Check thresholds
         run: |
-          DEBT_SCORE=$(jq '.technical_debt.items | length' analysis.json)
-          if [ "$DEBT_SCORE" -gt 100 ]; then
-            echo "❌ Debt score too high: $DEBT_SCORE"
+          DEBT_ITEMS=$(jq '.summary.total_items' analysis.json)
+          if [ "$DEBT_ITEMS" -gt 100 ]; then
+            echo "❌ Too many debt items: $DEBT_ITEMS"
             exit 1
           fi
 
@@ -10900,9 +10842,9 @@ jobs:
             const analysis = JSON.parse(fs.readFileSync('analysis.json'));
             const summary = `## Debtmap Analysis
 
-            - **Debt Items:** ${analysis.technical_debt.items.length}
-            - **Average Complexity:** ${analysis.complexity.summary.average_complexity}
-            - **High Complexity Functions:** ${analysis.complexity.summary.high_complexity_count}
+            - **Debt Items:** ${analysis.summary.total_items}
+            - **Debt Score:** ${analysis.summary.total_debt_score}
+            - **High-priority Items:** ${analysis.summary.score_distribution.high}
             `;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -10918,14 +10860,14 @@ jobs:
     - cargo install debtmap
     - debtmap analyze . --format json --output gl-code-quality.json
     - |
-      DEBT=$(jq '.technical_debt.items | length' gl-code-quality.json)
+      DEBT=$(jq '.summary.total_items' gl-code-quality.json)
       if [ "$DEBT" -gt 50 ]; then
         echo "Debt threshold exceeded"
         exit 1
       fi
   artifacts:
-    reports:
-      codequality: gl-code-quality.json
+    paths:
+      - gl-code-quality.json
 </code></pre>
 <h4 id="jenkins-pipeline"><a class="header" href="#jenkins-pipeline">Jenkins Pipeline</a></h4>
 <pre><code class="language-groovy">pipeline {
@@ -10938,7 +10880,7 @@ jobs:
 
                 script {
                     def json = readJSON file: 'report.json'
-                    def debtScore = json.technical_debt.items.size()
+                    def debtScore = json.summary.total_items
 
                     if (debtScore &gt; 100) {
                         error("Debt score ${debtScore} exceeds threshold")
@@ -10958,34 +10900,31 @@ jobs:
 <h3 id="querying-json-with-jq"><a class="header" href="#querying-json-with-jq">Querying JSON with jq</a></h3>
 <p>Common jq queries for analyzing debtmap output:</p>
 <pre><code class="language-bash"># Get total debt items
-jq '.technical_debt.items | length' report.json
+jq '.summary.total_items' report.json
 
 # Get high-priority items only
-jq '.technical_debt.items[] | select(.priority == "High")' report.json
+jq '.items[] | select(.priority == "high")' report.json
 
 # Get functions with complexity &gt; 10
-jq '.complexity.metrics[] | select(.cyclomatic &gt; 10)' report.json
+jq '.items[] | select(.type == "Function" and .metrics.cyclomatic_complexity &gt; 10)' report.json
 
-# Calculate average complexity
-jq '.complexity.summary.average_complexity' report.json
+# Get codebase debt density
+jq '.summary.debt_density' report.json
 
 # Get all TODO items
-jq '.technical_debt.items[] | select(.debt_type == "Todo")' report.json
+jq '.items[] | select(.debt_type | has("Todo"))' report.json
 
 # Get top 5 complex functions
-jq '.complexity.metrics | sort_by(-.cyclomatic) | .[0:5] | .[] | {name, file, cyclomatic}' report.json
-
-# Get files with circular dependencies
-jq '.dependencies.circular[] | .cycle' report.json
+jq '.items | map(select(.type == "Function")) | sort_by(-.metrics.cyclomatic_complexity) | .[0:5] | .[] | {function: .location.function, file: .location.file, cyclomatic: .metrics.cyclomatic_complexity}' report.json
 
 # Count debt items by type
-jq '.technical_debt.items | group_by(.debt_type) | map({type: .[0].debt_type, count: length})' report.json
+jq '.items | map(select(.debt_type != null)) | group_by(.debt_type | keys[0]) | map({type: (.[0].debt_type | keys[0]), count: length})' report.json
 
 # Get functions with 0% coverage (when using --lcov)
-jq '.complexity.metrics[] | select(.coverage == 0)' report.json
+jq '.items[] | select(.type == "Function" and .metrics.coverage == 0)' report.json
 
 # Extract file paths with high debt
-jq '.technical_debt.items[] | select(.priority == "High" or .priority == "Critical") | .file' report.json | sort -u
+jq -r '.items[] | select(.priority == "high" or .priority == "critical") | .location.file' report.json | sort -u
 </code></pre>
 <h3 id="filtering-and-transformation-examples"><a class="header" href="#filtering-and-transformation-examples">Filtering and Transformation Examples</a></h3>
 <h4 id="python-script-to-parse-json"><a class="header" href="#python-script-to-parse-json">Python Script to Parse JSON</a></h4>
@@ -10999,14 +10938,14 @@ def analyze_debtmap_output(json_file):
 
     # Get high-priority items
     high_priority = [
-        item for item in data['technical_debt']['items']
-        if item['priority'] in ['High', 'Critical']
+        item for item in data['items']
+        if item['priority'] in ['high', 'critical']
     ]
 
     # Group by file
     by_file = {}
     for item in high_priority:
-        file = item['file']
+        file = item['location']['file']
         if file not in by_file:
             by_file[file] = []
         by_file[file].append(item)
@@ -11029,25 +10968,25 @@ set -e
 
 REPORT="$1"
 DEBT_THRESHOLD=100
-COMPLEXITY_THRESHOLD=10
+DEBT_DENSITY_THRESHOLD=10
 
 # Check debt score
-DEBT_SCORE=$(jq '.technical_debt.items | length' "$REPORT")
-if [ "$DEBT_SCORE" -gt "$DEBT_THRESHOLD" ]; then
-    echo "❌ Debt score $DEBT_SCORE exceeds threshold $DEBT_THRESHOLD"
+DEBT_ITEMS=$(jq '.summary.total_items' "$REPORT")
+if [ "$DEBT_ITEMS" -gt "$DEBT_THRESHOLD" ]; then
+    echo "❌ Debt items $DEBT_ITEMS exceeds threshold $DEBT_THRESHOLD"
     exit 1
 fi
 
-# Check average complexity
-AVG_COMPLEXITY=$(jq '.complexity.summary.average_complexity' "$REPORT")
-if (( $(echo "$AVG_COMPLEXITY &gt; $COMPLEXITY_THRESHOLD" | bc -l) )); then
-    echo "❌ Average complexity $AVG_COMPLEXITY exceeds threshold $COMPLEXITY_THRESHOLD"
+# Check debt density
+DEBT_DENSITY=$(jq '.summary.debt_density' "$REPORT")
+if (( $(echo "$DEBT_DENSITY &gt; $DEBT_DENSITY_THRESHOLD" | bc -l) )); then
+    echo "❌ Debt density $DEBT_DENSITY exceeds threshold $DEBT_DENSITY_THRESHOLD"
     exit 1
 fi
 
 echo "✅ All quality checks passed"
-echo "   Debt score: $DEBT_SCORE/$DEBT_THRESHOLD"
-echo "   Avg complexity: $AVG_COMPLEXITY"
+echo "   Debt items: $DEBT_ITEMS/$DEBT_THRESHOLD"
+echo "   Debt density: $DEBT_DENSITY"
 </code></pre>
 <h3 id="editor-integration"><a class="header" href="#editor-integration">Editor Integration</a></h3>
 <h4 id="vs-code-tasks"><a class="header" href="#vs-code-tasks">VS Code Tasks</a></h4>
@@ -11112,10 +11051,10 @@ echo "   Avg complexity: $AVG_COMPLEXITY"
 debtmap analyze . --format json -o report.json
 
 # Send to Slack
-DEBT_SCORE=$(jq '.technical_debt.items | length' report.json)
+DEBT_SCORE=$(jq '.summary.total_debt_score' report.json)
 curl -X POST "$SLACK_WEBHOOK_URL" \
   -H 'Content-Type: application/json' \
-  -d "{\"text\": \"Debtmap Analysis Complete\n• Debt Score: $DEBT_SCORE\n• High Priority: $(jq '[.technical_debt.items[] | select(.priority == "High")] | length' report.json)\"}"
+  -d "{\"text\": \"Debtmap Analysis Complete\n• Debt Score: $DEBT_SCORE\n• High Priority: $(jq '.summary.score_distribution.high' report.json)\"}"
 
 # Send to custom webhook
 curl -X POST "$CUSTOM_WEBHOOK_URL" \
@@ -11267,8 +11206,8 @@ debtmap validate . --config debtmap.toml
 
 # Or parse JSON output for threshold checking
 debtmap analyze . --format json -o report.json
-DEBT_SCORE=$(jq '.technical_debt.items | length' report.json)
-if [ "$DEBT_SCORE" -gt 100 ]; then
+DEBT_ITEMS=$(jq '.summary.total_items' report.json)
+if [ "$DEBT_ITEMS" -gt 100 ]; then
     echo "Debt threshold exceeded"
     exit 1
 fi
@@ -20286,15 +20225,8 @@ debtmap analyze -j 4
 <pre><code class="language-bash">export DEBTMAP_JOBS=4
 debtmap analyze  # Uses 4 threads
 </code></pre>
-<p><strong><code>DEBTMAP_PARALLEL</code></strong> - Enable/disable parallel processing programmatically:</p>
-<pre><code class="language-bash">export DEBTMAP_PARALLEL=true
-debtmap analyze  # Parallel processing enabled
-
-export DEBTMAP_PARALLEL=1
-debtmap analyze  # Parallel processing enabled (also accepts '1')
-</code></pre>
-<p>The <code>DEBTMAP_PARALLEL</code> variable accepts <code>true</code> or <code>1</code> to enable parallel processing. This is useful for programmatic control in scripts or CI environments.</p>
-<p>The CLI flags (<code>--jobs</code>, <code>--no-parallel</code>) take precedence over environment variables.</p>
+<p>The <code>--jobs</code> CLI flag takes precedence over <code>DEBTMAP_JOBS</code>. Parallel execution is enabled by
+default and can be disabled explicitly with <code>--no-parallel</code>.</p>
 <h3 id="no-parallel"><a class="header" href="#no-parallel">–no-parallel</a></h3>
 <p>Disable parallel call graph construction entirely:</p>
 <pre><code class="language-bash">debtmap analyze . --no-parallel
@@ -21938,10 +21870,8 @@ map:
   max_parallel: 5  # Run up to 5 agents in parallel
 
   # Filter and sort items
-  # Note: NULLS LAST ensures File items (with null Function.unified_score.final_score)
-  # and Function items (with null File.score) sort correctly
-  filter: "File.score &gt;= 10 OR Function.unified_score.final_score &gt;= 10"
-  sort_by: "File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST"
+  filter: "score &gt;= 10"
+  sort_by: "score DESC"
   max_items: 10  # Limit to 10 items per run
 
 # Reduce phase: Aggregate results and verify overall improvements
@@ -22033,12 +21963,8 @@ prodigy run workflows/debtmap-reduce.yml -y
 </table>
 </div>
 <p><strong>Understanding ${item} Structure:</strong></p>
-<p>The <code>${item}</code> variable contains different fields depending on whether it’s a File or Function debt item:</p>
-<ul>
-<li><strong>File items</strong>: Have a <code>File.score</code> field (non-null) and <code>Function.unified_score.final_score</code> is null</li>
-<li><strong>Function items</strong>: Have a <code>Function.unified_score.final_score</code> field (non-null) and <code>File.score</code> is null</li>
-</ul>
-<p>This distinction matters when filtering and sorting items in MapReduce workflows. See the filter/sort_by examples below for proper handling of both types.</p>
+<p>Every <code>${item}</code> has a top-level <code>score</code>; use its <code>type</code> discriminator (<code>File</code> or <code>Function</code>)
+when variant-specific fields are needed. Filters and sorting can use <code>score</code> uniformly.</p>
 <h3 id="mapreduce-architecture"><a class="header" href="#mapreduce-architecture">MapReduce Architecture</a></h3>
 <pre><code>┌─────────────────────────────────────────────────────────┐
 │ Setup Phase (main worktree)                            │
@@ -22428,7 +22354,7 @@ git diff HEAD~1
 </ol>
 <p><strong>Solution</strong>:</p>
 <pre><code class="language-bash"># Check debtmap analysis results
-cat .prodigy/debtmap-before.json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5]'
+cat .prodigy/debtmap-before.json | jq '.items | sort_by(-.score) | .[0:5]'
 
 # Verify coverage was generated
 ls -lh target/coverage/lcov.info
@@ -26153,7 +26079,15 @@ Low (score &lt; 50)
       "location": {
         "file": "src/services.rs"
       },
-      "debt_type": "GodObject"
+      "debt_type": {
+        "GodObject": {
+          "methods": 60,
+          "fields": null,
+          "responsibilities": 5,
+          "god_object_score": 127.5,
+          "lines": 2400
+        }
+      }
     },
     {
       "type": "Function",
@@ -26164,7 +26098,12 @@ Low (score &lt; 50)
         "line": 145,
         "function": "process_data"
       },
-      "debt_type": "UntestableComplexity"
+      "debt_type": {
+        "ComplexityHotspot": {
+          "cyclomatic": 18,
+          "cognitive": 25
+        }
+      }
     }
   ]
 }
@@ -26897,7 +26836,7 @@ cat validation-report.json | jq '.validation_details'
 <p><strong>1. Establish baseline:</strong></p>
 <pre><code class="language-bash"># Run analysis to see current metrics
 debtmap analyze . --format json &gt; baseline.json
-cat baseline.json | jq '.unified_analysis.debt_density'
+jq '.summary.debt_density' baseline.json
 </code></pre>
 <p><strong>2. Set pragmatic thresholds:</strong></p>
 <pre><code class="language-toml">[thresholds.validation]
@@ -26977,7 +26916,7 @@ debtmap validate . --no-parallel
 debtmap validate . --format json --output "reports/validation-$(date +%Y%m%d).json"
 
 # Compare trends
-jq -s 'map(.unified_analysis.debt_density)' reports/validation-*.json
+jq -s 'map(.summary.debt_density)' reports/validation-*.json
 </code></pre>
 <h3 id="documentation"><a class="header" href="#documentation">Documentation</a></h3>
 <p>Document your threshold decisions:</p>
@@ -27893,51 +27832,20 @@ debtmap compare \
 </code></pre>
 <p><strong>Using JSON output programmatically:</strong></p>
 <pre><code class="language-bash"># Extract total debt score
-debtmap analyze . --format json | jq '.total_debt_score'
+debtmap analyze . --format json | jq '.summary.total_debt_score'
 
 # Count critical items
-debtmap analyze . --format json | jq '[.items[] | select(.unified_score.final_score &gt;= 8)] | length'
+debtmap analyze . --format json | jq '[.items[] | select(.score &gt;= 100)] | length'
 
 # Get top 5 functions by score
-debtmap analyze . --format json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5] | .[].location'
+debtmap analyze . --format json | jq '.items | sort_by(-.score) | .[0:5] | .[].location'
 
 # Extract all test gap items
-debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap")]'
+debtmap analyze . --format json | jq '[.items[] | select(.debt_type | has("TestingGap"))]'
 </code></pre>
-<p>Structure:</p>
-<pre><code class="language-json">{
-  "items": [
-    {
-      "location": {
-        "file": "src/main.rs",
-        "function": "process_data",
-        "line": 42
-      },
-      "debt_type": "TestGap",
-      "unified_score": {
-        "complexity_factor": 3.2,
-        "coverage_factor": 10.0,
-        "dependency_factor": 2.5,
-        "role_multiplier": 1.2,
-        "final_score": 9.4
-      },
-      "function_role": "BusinessLogic",
-      "recommendation": {
-        "action": "Add unit tests",
-        "details": "Add 6 unit tests for full coverage",
-        "effort_estimate": "2-3 hours"
-      },
-      "expected_impact": {
-        "risk_reduction": 3.9,
-        "complexity_reduction": 0,
-        "coverage_improvement": 100
-      }
-    }
-  ],
-  "overall_coverage": 67.12,
-  "total_debt_score": 4907
-}
-</code></pre>
+<p>The complete structure is defined by the <a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json">unified JSON v3 schema</a>.
+Use the checked <a href="https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json">v3 items fixture</a>
+as a copyable example.</p>
 <h3 id="markdown-report"><a class="header" href="#markdown-report">Markdown Report</a></h3>
 <pre><code class="language-bash"># Standard markdown report
 debtmap analyze . --format markdown --output DEBT_REPORT.md
@@ -30615,7 +30523,7 @@ debtmap analyze . --threshold-preset lenient
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

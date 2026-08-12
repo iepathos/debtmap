@@ -15,8 +15,8 @@
         <link rel="icon" href="../favicon-de23e50b.svg">
         <link rel="shortcut icon" href="../favicon-8114d1fc.png">
         <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-0392ca55.css">
-        <link rel="stylesheet" href="../css/chrome-fc474251.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
         <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "../searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -281,11 +281,10 @@
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 15,
-      "cognitive": 22,
-      "adjusted_cyclomatic": null
+      "cognitive": 22
     }
   },
-  "function_role": "BusinessLogic",
+  "function_role": "PureLogic",
   "purity_analysis": {
     "is_pure": false,
     "confidence": 0.8,
@@ -296,14 +295,6 @@
     "downstream_count": 3,
     "upstream_callers": ["main", "process_request"],
     "downstream_callees": ["validate", "save", "notify"]
-  },
-  "recommendation": {
-    "action": "Add test coverage for complex function",
-    "priority": "High",
-    "implementation_steps": [
-      "Write unit tests covering all 15 branches",
-      "Consider extracting validation logic to reduce complexity"
-    ]
   },
   "impact": {
     "coverage_improvement": 0.85,
@@ -317,7 +308,7 @@
   "complexity_pattern": "validation",
   "pattern_type": "state_machine",
   "pattern_confidence": 0.72,
-  "context": {                            // optional, spec 263
+  "context": {
     "primary": {
       "file": "src/main.rs",
       "start_line": 35,
@@ -338,12 +329,14 @@
     "total_lines": 120,
     "completeness_confidence": 0.85
   },
-  "git_history": {                        // optional, spec 264
-    "change_frequency": 2.5,              // changes per month
-    "bug_density": 0.15,                  // ratio of bug fixes to total commits
-    "age_days": 180,                      // code age
-    "author_count": 3,                    // unique contributors
-    "stability": "Frequently Changed"     // stability classification
+  "git_history": {
+    "change_frequency": 2.5,
+    "bug_density": 0.15,
+    "age_days": 180,
+    "author_count": 3,
+    "total_commits": 24,
+    "bug_fix_count": 4,
+    "stability": "Frequently Changed"
   }
 }
 </code></pre>
@@ -366,7 +359,7 @@
 </ul>
 <p><strong>Fields at item level:</strong></p>
 <ul>
-<li><code>function_role</code>: Function importance (<code>"EntryPoint"</code>, <code>"BusinessLogic"</code>, <code>"Utility"</code>, <code>"TestHelper"</code>) - affects score multiplier (src/priority/mod.rs:231)</li>
+<li><code>function_role</code>: Function classification (<code>"PureLogic"</code>, <code>"Orchestrator"</code>, <code>"IOWrapper"</code>, <code>"EntryPoint"</code>, <code>"PatternMatch"</code>, <code>"Debug"</code>, or <code>"Unknown"</code>) - affects score multipliers</li>
 <li><code>purity_analysis</code>: Whether function has side effects (optional) - affects testability assessment
 <ul>
 <li><code>is_pure</code>: Boolean indicating no side effects</li>
@@ -964,7 +957,7 @@ Strategy:
 debtmap analyze . --format json --output debt-report.json
 
 # Extract density for trending
-DENSITY=$(jq '.debt_density' debt-report.json)
+DENSITY=$(jq '.summary.debt_density' debt-report.json)
 
 # Store in metrics database
 echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
@@ -973,7 +966,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <pre><code class="language-yaml"># .github/workflows/debt-check.yml
 - name: Check debt density
   run: |
-    DENSITY=$(debtmap analyze . --format json | jq '.debt_density')
+    DENSITY=$(debtmap analyze . --format json | jq '.summary.debt_density')
     if (( $(echo "$DENSITY &gt; 150" | bc -l) )); then
       echo "❌ Debt density too high: $DENSITY (limit: 150)"
       exit 1
@@ -1085,7 +1078,7 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 
         <script src="../clipboard-1626706a.min.js"></script>
         <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-c22b7243.js"></script>
+        <script src="../book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

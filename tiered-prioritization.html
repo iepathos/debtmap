@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -428,7 +428,15 @@ Low (score &lt; 50)
       "location": {
         "file": "src/services.rs"
       },
-      "debt_type": "GodObject"
+      "debt_type": {
+        "GodObject": {
+          "methods": 60,
+          "fields": null,
+          "responsibilities": 5,
+          "god_object_score": 127.5,
+          "lines": 2400
+        }
+      }
     },
     {
       "type": "Function",
@@ -439,7 +447,12 @@ Low (score &lt; 50)
         "line": 145,
         "function": "process_data"
       },
-      "debt_type": "UntestableComplexity"
+      "debt_type": {
+        "ComplexityHotspot": {
+          "cyclomatic": 18,
+          "cognitive": 25
+        }
+      }
     }
   ]
 }
@@ -525,7 +538,7 @@ minimum_cyclomatic_complexity = 2
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -182,7 +182,9 @@
 <h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
 <p>Before installing Debtmap, you’ll need:</p>
 <ul>
-<li><strong>For pre-built binaries</strong>: No prerequisites! The install script handles everything.</li>
+<li><strong>For pre-built binaries</strong>: A standard downloader (<code>curl</code> or <code>wget</code>), archive tool, and
+SHA-256 tool (<code>sha256sum</code> or <code>shasum</code>). Published binaries support Linux x86-64, macOS
+x86-64/Apple Silicon, and Windows x86-64.</li>
 <li><strong>For cargo install or building from source</strong>:
 <ul>
 <li>Rust toolchain (rustc and cargo)</li>
@@ -206,11 +208,14 @@
 </code></pre>
 <p>This will:</p>
 <ul>
-<li>Automatically detect your OS and architecture</li>
+<li>Detect your supported OS and architecture</li>
 <li>Download the appropriate pre-built binary from the latest GitHub release</li>
+<li>Verify the published SHA-256 checksum before installation</li>
 <li>Install debtmap to <code>~/.cargo/bin</code> if it exists, otherwise <code>~/.local/bin</code></li>
 <li>Offer to automatically add the install directory to your PATH if needed</li>
 </ul>
+<p>Linux ARM64 does not currently have a pre-built release artifact; use <code>cargo install debtmap</code>
+on that platform.</p>
 <h3 id="using-cargo"><a class="header" href="#using-cargo">Using Cargo</a></h3>
 <p>If you have Rust installed:</p>
 <pre><code class="language-bash">cargo install debtmap
@@ -541,7 +546,7 @@ patterns = ["**/target/**", "**/tests/**"]
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

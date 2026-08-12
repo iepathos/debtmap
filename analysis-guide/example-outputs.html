@@ -15,8 +15,8 @@
         <link rel="icon" href="../favicon-de23e50b.svg">
         <link rel="shortcut icon" href="../favicon-8114d1fc.png">
         <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-0392ca55.css">
-        <link rel="stylesheet" href="../css/chrome-fc474251.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
         <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "../searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -194,7 +194,7 @@
   "type": "Function",
   "score": 92.5,
   "category": "CodeQuality",
-  "priority": "critical",
+  "priority": "high",
   "location": {
     "file": "src/payments/processor.rs",
     "line": 145,
@@ -211,8 +211,7 @@
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 25,
-      "cognitive": 38,
-      "adjusted_cyclomatic": null
+      "cognitive": 38
     }
   },
   "function_role": "Orchestrator",
@@ -238,15 +237,6 @@
       "log_transaction",
       "check_fraud",
       "notify_user"
-    ]
-  },
-  "recommendation": {
-    "action": "Refactor into 4 smaller, focused functions",
-    "implementation_steps": [
-      "Extract validation logic into validate_payment_request",
-      "Create calculate_payment_totals for fee calculation",
-      "Move side effects to separate transaction recorder",
-      "Keep process_transaction as thin orchestrator"
     ]
   },
   "impact": {
@@ -336,15 +326,6 @@
     "coupling_score": 0.78,
     "cohesion_score": 0.34
   },
-  "recommendation": {
-    "action": "Split into focused modules by responsibility",
-    "implementation_steps": [
-      "Extract authentication into auth_service.rs",
-      "Move authorization to permission_service.rs",
-      "Create profile_service.rs for user data management",
-      "Separate audit concerns into audit_logger.rs"
-    ]
-  },
   "impact": {
     "complexity_reduction": 45.0,
     "maintainability_improvement": 0.68,
@@ -370,7 +351,7 @@
   "type": "Function",
   "score": 89.0,
   "category": "Testing",
-  "priority": "critical",
+  "priority": "high",
   "location": {
     "file": "src/analyzers/rust_call_graph.rs",
     "line": 38,
@@ -411,17 +392,6 @@
       "increment_counter",
       "validate_signature",
       "log_registration"
-    ]
-  },
-  "recommendation": {
-    "action": "Add unit tests for core business logic",
-    "implementation_steps": [
-      "Test happy path with valid function definition",
-      "Test error cases: null input, invalid syntax",
-      "Test edge cases: complex generics, lifetimes",
-      "Test integration with registry updates",
-      "Verify correct handling of visibility modifiers",
-      "Test type resolution edge cases"
     ]
   },
   "impact": {
@@ -471,8 +441,7 @@
   "debt_type": {
     "ComplexityHotspot": {
       "cyclomatic": 20,
-      "cognitive": 18,
-      "adjusted_cyclomatic": 7
+      "cognitive": 18
     }
   },
   "adjusted_complexity": {
@@ -480,9 +449,6 @@
     "dampening_factor": 0.65
   },
   "function_role": "PatternMatch",
-  "recommendation": {
-    "action": "Low priority - repetitive validation pattern"
-  },
   "impact": {
     "coverage_improvement": 0.05,
     "complexity_reduction": 0.0,
@@ -502,7 +468,7 @@
 <p><strong>Source</strong>: <code>adjusted_complexity</code> from <code>src/output/unified/func_item.rs:AdjustedComplexity</code>, entropy dampening spec 182</p>
 <p><strong>Key Points:</strong></p>
 <ul>
-<li><code>adjusted_cyclomatic</code>: Entropy-dampened complexity value (7 vs original 20)</li>
+<li><code>dampened_cyclomatic</code>: Entropy-dampened complexity value (7 vs original 20)</li>
 <li><code>dampening_factor</code>: Amount of reduction applied (0.65 = 65% reduction)</li>
 <li><code>entropy_score</code>: Low value (0.28) indicates repetitive patterns</li>
 <li>Score reduced from 43.5 to 15.2 due to entropy analysis</li>
@@ -701,7 +667,7 @@ Impact:
 
         <script src="../clipboard-1626706a.min.js"></script>
         <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-c22b7243.js"></script>
+        <script src="../book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

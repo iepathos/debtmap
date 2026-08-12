@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -739,10 +739,8 @@ map:
   max_parallel: 5  # Run up to 5 agents in parallel
 
   # Filter and sort items
-  # Note: NULLS LAST ensures File items (with null Function.unified_score.final_score)
-  # and Function items (with null File.score) sort correctly
-  filter: "File.score &gt;= 10 OR Function.unified_score.final_score &gt;= 10"
-  sort_by: "File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST"
+  filter: "score &gt;= 10"
+  sort_by: "score DESC"
   max_items: 10  # Limit to 10 items per run
 
 # Reduce phase: Aggregate results and verify overall improvements
@@ -834,12 +832,8 @@ prodigy run workflows/debtmap-reduce.yml -y
 </table>
 </div>
 <p><strong>Understanding ${item} Structure:</strong></p>
-<p>The <code>${item}</code> variable contains different fields depending on whether it’s a File or Function debt item:</p>
-<ul>
-<li><strong>File items</strong>: Have a <code>File.score</code> field (non-null) and <code>Function.unified_score.final_score</code> is null</li>
-<li><strong>Function items</strong>: Have a <code>Function.unified_score.final_score</code> field (non-null) and <code>File.score</code> is null</li>
-</ul>
-<p>This distinction matters when filtering and sorting items in MapReduce workflows. See the filter/sort_by examples below for proper handling of both types.</p>
+<p>Every <code>${item}</code> has a top-level <code>score</code>; use its <code>type</code> discriminator (<code>File</code> or <code>Function</code>)
+when variant-specific fields are needed. Filters and sorting can use <code>score</code> uniformly.</p>
 <h3 id="mapreduce-architecture"><a class="header" href="#mapreduce-architecture">MapReduce Architecture</a></h3>
 <pre><code>┌─────────────────────────────────────────────────────────┐
 │ Setup Phase (main worktree)                            │
@@ -1229,7 +1223,7 @@ git diff HEAD~1
 </ol>
 <p><strong>Solution</strong>:</p>
 <pre><code class="language-bash"># Check debtmap analysis results
-cat .prodigy/debtmap-before.json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5]'
+cat .prodigy/debtmap-before.json | jq '.items | sort_by(-.score) | .[0:5]'
 
 # Verify coverage was generated
 ls -lh target/coverage/lcov.info
@@ -1479,7 +1473,7 @@ Arguments: --module &lt;module_name&gt;
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

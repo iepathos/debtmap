@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -698,51 +698,20 @@ debtmap compare \
 </code></pre>
 <p><strong>Using JSON output programmatically:</strong></p>
 <pre><code class="language-bash"># Extract total debt score
-debtmap analyze . --format json | jq '.total_debt_score'
+debtmap analyze . --format json | jq '.summary.total_debt_score'
 
 # Count critical items
-debtmap analyze . --format json | jq '[.items[] | select(.unified_score.final_score &gt;= 8)] | length'
+debtmap analyze . --format json | jq '[.items[] | select(.score &gt;= 100)] | length'
 
 # Get top 5 functions by score
-debtmap analyze . --format json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5] | .[].location'
+debtmap analyze . --format json | jq '.items | sort_by(-.score) | .[0:5] | .[].location'
 
 # Extract all test gap items
-debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap")]'
+debtmap analyze . --format json | jq '[.items[] | select(.debt_type | has("TestingGap"))]'
 </code></pre>
-<p>Structure:</p>
-<pre><code class="language-json">{
-  "items": [
-    {
-      "location": {
-        "file": "src/main.rs",
-        "function": "process_data",
-        "line": 42
-      },
-      "debt_type": "TestGap",
-      "unified_score": {
-        "complexity_factor": 3.2,
-        "coverage_factor": 10.0,
-        "dependency_factor": 2.5,
-        "role_multiplier": 1.2,
-        "final_score": 9.4
-      },
-      "function_role": "BusinessLogic",
-      "recommendation": {
-        "action": "Add unit tests",
-        "details": "Add 6 unit tests for full coverage",
-        "effort_estimate": "2-3 hours"
-      },
-      "expected_impact": {
-        "risk_reduction": 3.9,
-        "complexity_reduction": 0,
-        "coverage_improvement": 100
-      }
-    }
-  ],
-  "overall_coverage": 67.12,
-  "total_debt_score": 4907
-}
-</code></pre>
+<p>The complete structure is defined by the <a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json">unified JSON v3 schema</a>.
+Use the checked <a href="https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json">v3 items fixture</a>
+as a copyable example.</p>
 <h3 id="markdown-report"><a class="header" href="#markdown-report">Markdown Report</a></h3>
 <pre><code class="language-bash"># Standard markdown report
 debtmap analyze . --format markdown --output DEBT_REPORT.md
@@ -1309,7 +1278,7 @@ debtmap compare \
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

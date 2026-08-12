@@ -15,8 +15,8 @@
         <link rel="icon" href="../favicon-de23e50b.svg">
         <link rel="shortcut icon" href="../favicon-8114d1fc.png">
         <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-0392ca55.css">
-        <link rel="stylesheet" href="../css/chrome-fc474251.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
         <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "../searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -422,7 +422,7 @@ fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
 <p><strong>Note</strong>: The <code>affected_functions</code> field contains the count of upstream callers. The actual function names can be obtained from the <code>upstream_callers</code> field in the function metadata.</p>
 <p><strong>Using modification impact:</strong></p>
 <pre><code class="language-bash"># Analyze impact before refactoring
-debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_payment_method") | .modification_impact'
+debtmap analyze . --format json | jq '.items[] | select(.type == "Function" and .location.function == "validate_payment_method") | .dependencies'
 </code></pre>
 <p><strong>Impact analysis uses:</strong></p>
 <ul>
@@ -764,7 +764,7 @@ When coverage data is provided, debt scores are dampened for well-tested code:</
 
         <script src="../clipboard-1626706a.min.js"></script>
         <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-c22b7243.js"></script>
+        <script src="../book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

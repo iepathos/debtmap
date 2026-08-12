@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-0392ca55.css">
-        <link rel="stylesheet" href="css/chrome-fc474251.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -872,7 +872,7 @@ cat validation-report.json | jq '.validation_details'
 <p><strong>1. Establish baseline:</strong></p>
 <pre><code class="language-bash"># Run analysis to see current metrics
 debtmap analyze . --format json &gt; baseline.json
-cat baseline.json | jq '.unified_analysis.debt_density'
+jq '.summary.debt_density' baseline.json
 </code></pre>
 <p><strong>2. Set pragmatic thresholds:</strong></p>
 <pre><code class="language-toml">[thresholds.validation]
@@ -952,7 +952,7 @@ debtmap validate . --no-parallel
 debtmap validate . --format json --output "reports/validation-$(date +%Y%m%d).json"
 
 # Compare trends
-jq -s 'map(.unified_analysis.debt_density)' reports/validation-*.json
+jq -s 'map(.summary.debt_density)' reports/validation-*.json
 </code></pre>
 <h3 id="documentation"><a class="header" href="#documentation">Documentation</a></h3>
 <p>Document your threshold decisions:</p>
@@ -1032,7 +1032,7 @@ max_average_complexity = 10.0
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-c22b7243.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

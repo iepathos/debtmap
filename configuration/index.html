@@ -15,8 +15,8 @@
         <link rel="icon" href="../favicon-de23e50b.svg">
         <link rel="shortcut icon" href="../favicon-8114d1fc.png">
         <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-0392ca55.css">
-        <link rel="stylesheet" href="../css/chrome-fc474251.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
         <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-91b3cc53.js";
+            window.path_to_searchindex_js = "../searchindex-a9bcb42c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-41409472.js"></script>
@@ -188,8 +188,10 @@ dependency = 0.15
 
 [thresholds]
 complexity = 15
-lines = 80
-coverage = 0.8
+max_function_length = 80
+
+[thresholds.validation]
+min_coverage_percentage = 80.0
 
 [languages]
 enabled = ["rust", "python", "javascript", "typescript"]
@@ -209,16 +211,23 @@ detect_dead_code = true
 <li><a href="advanced.html">Advanced Options</a> - Advanced configuration for power users</li>
 <li><a href="best-practices.html">Best Practices</a> - Guidelines for effective configuration</li>
 </ul>
-<h2 id="configuration-file-location"><a class="header" href="#configuration-file-location">Configuration File Location</a></h2>
-<p>Debtmap searches for configuration in the following order:</p>
+<h2 id="configuration-sources"><a class="header" href="#configuration-sources">Configuration Sources</a></h2>
+<p>Debtmap layers configuration from lowest to highest precedence:</p>
 <ol>
-<li>Path specified with <code>--config</code> flag</li>
-<li><code>.debtmap.toml</code> in current directory</li>
-<li><code>.debtmap.toml</code> in git repository root</li>
 <li>Built-in defaults</li>
+<li>User config (<code>~/.config/debtmap/config.toml</code>, or the platform equivalent)</li>
+<li>The nearest <code>.debtmap.toml</code> found from the current directory</li>
+<li>A custom path from <code>--config</code> or <code>DEBTMAP_CONFIG</code></li>
+<li>Supported <code>DEBTMAP_*</code> field overrides</li>
 </ol>
+<p>Higher-precedence files replace only the top-level sections they define; other sections continue
+to come from lower-precedence sources. Within a replaced section, omitted values use that
+section’s defaults rather than values from the lower-precedence section. Use
+<code>debtmap --show-config-sources analyze .</code> to inspect the effective source order.
+Run <code>debtmap config check</code> to reject unknown keys and invalid values before analysis or in CI.</p>
 <h2 id="validation"><a class="header" href="#validation">Validation</a></h2>
-<p>Debtmap validates your configuration on startup. Invalid configurations will produce clear error messages:</p>
+<p>Debtmap validates every discovered configuration before analysis. A malformed or invalid file
+stops the command instead of silently falling back to a weaker configuration:</p>
 <pre><code class="language-bash">$ debtmap analyze .
 Error: Invalid configuration
   - scoring.coverage + scoring.complexity + scoring.dependency must equal 1.0
@@ -275,7 +284,7 @@ Error: Invalid configuration
 
         <script src="../clipboard-1626706a.min.js"></script>
         <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-c22b7243.js"></script>
+        <script src="../book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 
