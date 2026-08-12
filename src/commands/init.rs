@@ -17,6 +17,13 @@ duplication = 50
 max_file_length = 500
 max_function_length = 50
 
+[thresholds.validation]
+max_average_complexity = 10.0
+max_debt_density = 50.0
+max_codebase_risk_score = 7.0
+min_coverage_percentage = 0.0
+max_total_debt_score = 10000
+
 [languages]
 enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
 

@@ -37,6 +37,12 @@ fn init_template_passes_strict_config_check() {
         "{}",
         output_text(&check)
     );
+
+    let generated = fs::read_to_string(directory.path().join(".debtmap.toml")).unwrap();
+    let parsed = debtmap::config::parse_and_validate_config(&generated).unwrap();
+    let validation = parsed.thresholds.unwrap().validation.unwrap();
+    assert_eq!(validation.max_debt_density, 50.0);
+    assert_eq!(validation.max_codebase_risk_score, 7.0);
 }
 
 #[test]
