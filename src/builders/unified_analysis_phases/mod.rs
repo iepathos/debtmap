@@ -50,9 +50,10 @@ pub use phases::coverage::{
     load_coverage_file,
 };
 pub use phases::file_analysis::{
-    ProcessedFileData, aggregate_file_metrics, calculate_uncovered_lines, create_file_debt_item,
-    detect_file_context, enhance_metrics_with_line_count, group_functions_by_file,
-    process_file_metrics, should_include_file,
+    FileAnalysisFacts, ProcessedFileData, aggregate_file_metrics, calculate_uncovered_lines,
+    create_file_debt_item, detect_file_context, enhance_metrics_with_line_count,
+    group_functions_by_file, process_file_metrics, process_file_metrics_with_facts,
+    should_include_file,
 };
 pub use phases::god_object::{
     analyze_file_git_context, calculate_god_object_risk, create_god_object_debt_item,

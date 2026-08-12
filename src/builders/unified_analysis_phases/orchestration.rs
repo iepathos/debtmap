@@ -347,10 +347,13 @@ fn process_file_analysis(
             parse_suppression_comments(content, language, &file_path)
         });
 
-        let processed = file_analysis::process_file_metrics(
+        let processed = file_analysis::process_file_metrics_with_facts(
             file_path.clone(),
             functions,
-            file_content.as_deref(),
+            file_analysis::FileAnalysisFacts {
+                content: file_content.as_deref(),
+                ..Default::default()
+            },
             coverage_data,
             no_god_object,
             project_path,

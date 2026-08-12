@@ -372,6 +372,44 @@ impl UnifiedFileAnalyzer {
             0.0
         }
     }
+
+    /// Aggregate function-derived metrics without reading or parsing source files.
+    pub(crate) fn aggregate_function_metrics(
+        &self,
+        functions: &[FunctionMetrics],
+    ) -> FileDebtMetrics {
+        if functions.is_empty() {
+            return FileDebtMetrics::default();
+        }
+
+        let path = functions[0].file.clone();
+        let function_count = functions.len();
+        let complexity = Self::calculate_complexity_metrics(functions);
+        let coverage = self.calculate_coverage_metrics(functions, function_count);
+        let lines =
+            Self::calculate_line_metrics(functions, function_count, coverage.coverage_percent);
+
+        FileDebtMetrics {
+            path,
+            total_lines: lines.total_lines,
+            function_count,
+            class_count: Self::estimate_class_count(functions),
+            avg_complexity: complexity.avg_complexity,
+            max_complexity: complexity.max_complexity,
+            total_complexity: complexity.total_complexity,
+            coverage_percent: coverage.coverage_percent,
+            uncovered_lines: lines.uncovered_lines,
+            god_object_analysis: Self::detect_god_object(function_count, lines.total_lines),
+            function_scores: Self::calculate_function_scores(functions),
+            god_object_type: None,
+            file_type: None,
+            afferent_coupling: 0,
+            efferent_coupling: 0,
+            instability: 0.0,
+            dependents: Vec::new(),
+            dependencies_list: Vec::new(),
+        }
+    }
 }
 
 impl UnifiedFileAnalyzer {
@@ -509,65 +547,26 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
     }
 
     fn aggregate_functions(&self, functions: &[FunctionMetrics]) -> FileDebtMetrics {
+        let mut metrics = self.aggregate_function_metrics(functions);
         if functions.is_empty() {
-            return FileDebtMetrics::default();
+            return metrics;
         }
-
-        let path = functions[0].file.clone();
-        let function_count = functions.len();
-        let complexity_metrics = Self::calculate_complexity_metrics(functions);
-        let class_count = Self::estimate_class_count(functions);
-        let coverage_metrics = self.calculate_coverage_metrics(functions, function_count);
-        let line_metrics = Self::calculate_line_metrics(
-            functions,
-            function_count,
-            coverage_metrics.coverage_percent,
-        );
 
         // BUG FIX: Read file content to properly detect boilerplate patterns
         // This was missing - we need to analyze the actual file content to detect
         // boilerplate (like ripgrep's flags/defs.rs trait implementations)
-        let (god_object_analysis, god_object_type) =
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                self.analyze_god_object(&path, &content)
+        let (god_object_analysis, god_object_type, file_type) =
+            if let Ok(content) = std::fs::read_to_string(&metrics.path) {
+                let analysis = self.analyze_god_object(&metrics.path, &content);
+                let file_type = Some(crate::organization::classify_file(&content, &metrics.path));
+                (analysis.0, analysis.1, file_type)
             } else {
-                // Fallback to simple heuristics if we can't read the file
-                let fallback_analysis =
-                    Self::detect_god_object(function_count, line_metrics.total_lines);
-                (fallback_analysis, None)
+                (metrics.god_object_analysis.take(), None, None)
             };
-
-        // Calculate individual function scores based on complexity
-        let function_scores = Self::calculate_function_scores(functions);
-
-        // Classify file type for context-aware thresholds (spec 135)
-        let file_type = if let Ok(content) = std::fs::read_to_string(&path) {
-            Some(crate::organization::classify_file(&content, &path))
-        } else {
-            None
-        };
-
-        FileDebtMetrics {
-            path,
-            total_lines: line_metrics.total_lines,
-            function_count,
-            class_count,
-            avg_complexity: complexity_metrics.avg_complexity,
-            max_complexity: complexity_metrics.max_complexity,
-            total_complexity: complexity_metrics.total_complexity,
-            coverage_percent: coverage_metrics.coverage_percent,
-            uncovered_lines: line_metrics.uncovered_lines,
-            god_object_analysis,
-            function_scores,
-            god_object_type,
-            file_type,
-            // Spec 201: File-level dependency metrics (populated during analysis aggregation)
-            afferent_coupling: 0,
-            efferent_coupling: 0,
-            instability: 0.0,
-            dependents: Vec::new(),
-            dependencies_list: Vec::new(),
-        }
+        metrics.god_object_analysis = god_object_analysis;
+        metrics.god_object_type = god_object_type;
+        metrics.file_type = file_type;
+        metrics
     }
 }
 

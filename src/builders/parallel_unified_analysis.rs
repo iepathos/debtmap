@@ -1,6 +1,5 @@
 use crate::{
     analysis::ContextDetector,
-    analyzers::FileAnalyzer,
     builders::unified_analysis_phases::phases::scoring::{
         SuppressionContextCache, build_suppression_context_cache,
     },
@@ -26,7 +25,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::{debug_span, warn};
 
 /// Filter out unified debt items that are suppressed via debtmap:ignore annotations (spec 215).
 ///
@@ -51,168 +49,8 @@ fn filter_suppressed_items(
         .collect()
 }
 
-/// Check if a god object should be suppressed based on file annotations.
-/// Same logic as orchestration.rs - checks both file-level and struct-level suppressions.
-fn is_god_object_suppressed_parallel(
-    god_analysis: &crate::organization::GodObjectAnalysis,
-    file_content: &str,
-    file_path: &Path,
-) -> bool {
-    use crate::core::Language;
-    use crate::debt::suppression::parse_suppression_comments;
-    use crate::organization::DetectionType;
-    use crate::priority::DebtType;
-
-    // Determine language from file extension
-    let language = file_path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| match ext {
-            "rs" => Language::Rust,
-            "py" | "pyw" => Language::Python,
-            _ => Language::Rust,
-        })
-        .unwrap_or(Language::Rust);
-
-    let suppression_context = parse_suppression_comments(file_content, language, file_path);
-
-    // Create a representative GodObject debt type for suppression checking
-    let god_object_debt_type = DebtType::GodObject {
-        methods: god_analysis.method_count as u32,
-        fields: Some(god_analysis.field_count as u32),
-        responsibilities: god_analysis.responsibility_count as u32,
-        god_object_score: god_analysis.god_object_score,
-        lines: god_analysis.lines_of_code as u32,
-    };
-
-    // First, always check for file-level suppression at the top of the file
-    // A file-level annotation applies to all god objects in the file
-    for check_line in 1..=6 {
-        if suppression_context.is_suppressed(check_line, &god_object_debt_type) {
-            return true;
-        }
-        if suppression_context.is_function_allowed(check_line, &god_object_debt_type) {
-            return true;
-        }
-    }
-
-    // For GodClass, also check near the struct definition line
-    if let DetectionType::GodClass = god_analysis.detection_type {
-        let struct_line = god_analysis.struct_line.unwrap_or(1);
-        if suppression_context.is_suppressed(struct_line, &god_object_debt_type) {
-            return true;
-        }
-        if suppression_context.is_function_allowed(struct_line, &god_object_debt_type) {
-            return true;
-        }
-    }
-
-    false
-}
-
-// Pure file analysis transformations
-mod file_analysis {
-    use super::*;
-    use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
-    use crate::priority::file_metrics::FileDebtMetrics;
-
-    /// Pure function to aggregate function metrics into file metrics
-    pub fn aggregate_file_metrics(
-        functions: &[FunctionMetrics],
-        coverage_data: Option<&LcovData>,
-    ) -> FileDebtMetrics {
-        let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
-        file_analyzer.aggregate_functions(functions)
-    }
-
-    /// Pure function to analyze god object from file content
-    pub fn analyze_god_object(
-        content: &str,
-        file_path: &Path,
-        coverage_data: Option<&LcovData>,
-    ) -> Result<Option<crate::organization::GodObjectAnalysis>, String> {
-        let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
-        file_analyzer
-            .analyze_file(file_path, content)
-            .map(|analyzed| analyzed.god_object_analysis)
-            .map_err(|e| format!("Failed to analyze god object: {}", e))
-    }
-
-    /// Pure function to determine if file should be included based on score
-    pub fn should_include_file(score: f64) -> bool {
-        score > 50.0
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FileAnalysisDecision {
-    cached_line_count: Option<usize>,
-    estimated_lines: usize,
-    skip_god_object_analysis: bool,
-}
-
 fn clone_function_metrics(functions: &[&FunctionMetrics]) -> Vec<FunctionMetrics> {
     functions.iter().map(|&function| function.clone()).collect()
-}
-
-fn estimate_file_lines(functions: &[FunctionMetrics], cached_line_count: Option<usize>) -> usize {
-    cached_line_count.unwrap_or_else(|| functions.iter().map(|function| function.length).sum())
-}
-
-fn should_skip_god_object_analysis(
-    no_god_object: bool,
-    estimated_lines: usize,
-    function_count: usize,
-) -> bool {
-    no_god_object || (estimated_lines < 500 && function_count < 20)
-}
-
-fn file_analysis_decision(
-    functions: &[FunctionMetrics],
-    function_count: usize,
-    cached_line_count: Option<usize>,
-    no_god_object: bool,
-) -> FileAnalysisDecision {
-    let estimated_lines = estimate_file_lines(functions, cached_line_count);
-
-    FileAnalysisDecision {
-        cached_line_count,
-        estimated_lines,
-        skip_god_object_analysis: should_skip_god_object_analysis(
-            no_god_object,
-            estimated_lines,
-            function_count,
-        ),
-    }
-}
-
-fn uncovered_lines(coverage_percent: f64, total_lines: usize) -> usize {
-    ((1.0 - coverage_percent) * total_lines as f64) as usize
-}
-
-fn update_file_line_metrics(
-    file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
-    total_lines: usize,
-) {
-    file_metrics.total_lines = total_lines;
-    file_metrics.uncovered_lines = uncovered_lines(file_metrics.coverage_percent, total_lines);
-}
-
-fn needs_file_read(decision: FileAnalysisDecision) -> bool {
-    decision.cached_line_count.is_none() || !decision.skip_god_object_analysis
-}
-
-fn contextual_file_item(
-    file_path: &Path,
-    functions: &[FunctionMetrics],
-    file_metrics: crate::priority::file_metrics::FileDebtMetrics,
-) -> FileDebtItem {
-    use crate::analysis::FileContextDetector;
-    use crate::core::Language;
-
-    let detector = FileContextDetector::new(Language::from_path(file_path));
-    let file_context = detector.detect(file_path, functions);
-    crate::priority::FileDebtItem::from_metrics(file_metrics, Some(&file_context))
 }
 
 fn should_emit_file_item(item: &FileDebtItem) -> bool {
@@ -222,7 +60,8 @@ fn should_emit_file_item(item: &FileDebtItem) -> bool {
         .as_ref()
         .is_some_and(|analysis| analysis.is_god_object);
 
-    file_analysis::should_include_file(item.score) || has_god_object
+    crate::builders::unified_analysis_phases::phases::file_analysis::should_include_file(item.score)
+        || has_god_object
 }
 
 /// Options for parallel unified analysis
@@ -1034,206 +873,36 @@ impl ParallelUnifiedAnalysisBuilder {
         no_god_object: bool,
     ) -> Option<FileDebtItem> {
         let functions_owned = clone_function_metrics(functions);
-        let file_metrics =
-            self.analyze_file_metrics(file_path, &functions_owned, coverage_data, no_god_object);
-        let item = contextual_file_item(file_path, &functions_owned, file_metrics);
+        let extracted = self
+            .extracted_data
+            .as_ref()
+            .and_then(|data| data.get(file_path));
+        let file_content = std::fs::read_to_string(file_path).ok();
+        let mut processed =
+            crate::builders::unified_analysis_phases::phases::file_analysis::process_file_metrics_with_facts(
+                file_path.to_path_buf(),
+                functions_owned,
+                crate::builders::unified_analysis_phases::phases::file_analysis::FileAnalysisFacts {
+                    content: file_content.as_deref(),
+                    extracted,
+                    line_count: self.line_count_index.get(file_path).copied(),
+                },
+                coverage_data,
+                no_god_object,
+                &self.project_path,
+            );
+        processed.file_metrics.function_scores.clear();
+        let item =
+            crate::builders::unified_analysis_phases::phases::file_analysis::create_file_debt_item(
+                processed.file_metrics,
+                Some(&processed.file_context),
+            );
 
         if should_emit_file_item(&item) {
             Some(item)
         } else {
             None
         }
-    }
-
-    fn analyze_file_metrics(
-        &self,
-        file_path: &Path,
-        functions: &[FunctionMetrics],
-        coverage_data: Option<&LcovData>,
-        no_god_object: bool,
-    ) -> crate::priority::file_metrics::FileDebtMetrics {
-        let mut file_metrics = file_analysis::aggregate_file_metrics(functions, coverage_data);
-        let decision = file_analysis_decision(
-            functions,
-            file_metrics.function_count,
-            self.line_count_index.get(file_path).copied(),
-            no_god_object,
-        );
-
-        self.populate_file_metrics(
-            file_path,
-            coverage_data,
-            no_god_object,
-            decision,
-            &mut file_metrics,
-        );
-        file_metrics.function_scores = Vec::new();
-        file_metrics
-    }
-
-    fn populate_file_metrics(
-        &self,
-        file_path: &Path,
-        coverage_data: Option<&LcovData>,
-        no_god_object: bool,
-        decision: FileAnalysisDecision,
-        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
-    ) {
-        if let Some(extracted) = self.extracted_file_data(file_path) {
-            self.apply_extracted_file_metrics(file_path, extracted, decision, file_metrics);
-        } else if needs_file_read(decision) {
-            self.apply_source_file_metrics(
-                file_path,
-                coverage_data,
-                no_god_object,
-                decision,
-                file_metrics,
-            );
-        } else {
-            self.apply_cached_line_metrics(decision, file_metrics);
-        }
-    }
-
-    fn extracted_file_data(&self, file_path: &Path) -> Option<&ExtractedFileData> {
-        self.extracted_data
-            .as_ref()
-            .and_then(|data| data.get(file_path))
-    }
-
-    fn apply_extracted_file_metrics(
-        &self,
-        file_path: &Path,
-        extracted: &ExtractedFileData,
-        decision: FileAnalysisDecision,
-        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
-    ) {
-        update_file_line_metrics(file_metrics, extracted.total_lines);
-        file_metrics.god_object_analysis = if decision.skip_god_object_analysis {
-            None
-        } else {
-            crate::extraction::adapters::god_object::analyze_god_object(file_path, extracted)
-        };
-    }
-
-    fn apply_source_file_metrics(
-        &self,
-        file_path: &Path,
-        coverage_data: Option<&LcovData>,
-        no_god_object: bool,
-        decision: FileAnalysisDecision,
-        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
-    ) {
-        match std::fs::read_to_string(file_path) {
-            Ok(content) => self.apply_read_content_metrics(
-                file_path,
-                &content,
-                coverage_data,
-                decision,
-                file_metrics,
-            ),
-            Err(_) => self.apply_read_failure_metrics(
-                file_path,
-                coverage_data,
-                no_god_object,
-                file_metrics,
-            ),
-        }
-    }
-
-    fn apply_read_content_metrics(
-        &self,
-        file_path: &Path,
-        content: &str,
-        coverage_data: Option<&LcovData>,
-        decision: FileAnalysisDecision,
-        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
-    ) {
-        let actual_line_count = content.lines().count();
-        update_file_line_metrics(file_metrics, actual_line_count);
-        file_metrics.god_object_analysis =
-            self.god_object_from_content(file_path, content, coverage_data, decision, file_metrics);
-    }
-
-    fn god_object_from_content(
-        &self,
-        file_path: &Path,
-        content: &str,
-        coverage_data: Option<&LcovData>,
-        decision: FileAnalysisDecision,
-        file_metrics: &crate::priority::file_metrics::FileDebtMetrics,
-    ) -> Option<crate::organization::GodObjectAnalysis> {
-        if decision.skip_god_object_analysis {
-            return None;
-        }
-
-        let analyzed =
-            file_analysis::analyze_god_object(content, file_path, coverage_data).unwrap_or(None);
-        if analyzed
-            .as_ref()
-            .is_some_and(|analysis| analysis.is_god_object)
-        {
-            analyzed
-        } else {
-            crate::organization::god_object::heuristics::fallback_with_preserved_analysis(
-                file_metrics.function_count,
-                file_metrics.total_lines,
-                file_metrics.total_complexity,
-                analyzed.as_ref(),
-            )
-            .or(analyzed)
-        }
-    }
-
-    fn apply_read_failure_metrics(
-        &self,
-        file_path: &Path,
-        coverage_data: Option<&LcovData>,
-        no_god_object: bool,
-        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
-    ) {
-        file_metrics.god_object_analysis = if no_god_object {
-            None
-        } else {
-            self.analyze_god_object_with_io(file_path, coverage_data)
-        };
-    }
-
-    fn apply_cached_line_metrics(
-        &self,
-        decision: FileAnalysisDecision,
-        file_metrics: &mut crate::priority::file_metrics::FileDebtMetrics,
-    ) {
-        let total_lines = decision
-            .cached_line_count
-            .unwrap_or(decision.estimated_lines);
-        update_file_line_metrics(file_metrics, total_lines);
-        file_metrics.god_object_analysis = None;
-    }
-
-    /// I/O wrapper for god object analysis
-    fn analyze_god_object_with_io(
-        &self,
-        file_path: &Path,
-        coverage_data: Option<&LcovData>,
-    ) -> Option<crate::organization::GodObjectAnalysis> {
-        let _span = debug_span!("analyze_god_object", path = %file_path.display()).entered();
-
-        // I/O: Read file content
-        let content = std::fs::read_to_string(file_path)
-            .map_err(|e| {
-                warn!(file = %file_path.display(), error = %e, "Failed to read file");
-                e
-            })
-            .ok()?;
-
-        // Pure: Analyze content
-        file_analysis::analyze_god_object(&content, file_path, coverage_data)
-            .map_err(|e| {
-                warn!(file = %file_path.display(), error = %e, "Failed to analyze god object");
-                e
-            })
-            .ok()
-            .flatten() // Flatten Option<Option<GodObjectAnalysis>> to Option<GodObjectAnalysis>
     }
 
     /// Build the final unified analysis from parallel results
@@ -1286,123 +955,18 @@ impl ParallelUnifiedAnalysisBuilder {
         let total_file_items = file_data.len();
 
         for (index, (file_item, raw_functions)) in file_data.into_iter().enumerate() {
-            let finalized =
-                self.finalize_file_item(unified, file_item, &raw_functions, coverage_data);
+            let finalized = crate::builders::unified_analysis::finalize_file_item(
+                unified,
+                file_item,
+                &raw_functions,
+                coverage_data,
+                self.risk_analyzer.as_ref(),
+                &self.project_path,
+                &self.call_graph,
+            );
             unified.add_file_item(finalized);
             update_finalization_subtask(index + 1, total_file_items);
         }
-    }
-
-    fn finalize_file_item(
-        &self,
-        unified: &mut UnifiedAnalysis,
-        mut file_item: FileDebtItem,
-        raw_functions: &[FunctionMetrics],
-        coverage_data: Option<&LcovData>,
-    ) -> FileDebtItem {
-        self.add_god_object_item_if_needed(unified, &mut file_item, raw_functions, coverage_data);
-        enrich_file_item_with_dependencies(file_item, &unified.items)
-    }
-
-    fn add_god_object_item_if_needed(
-        &self,
-        unified: &mut UnifiedAnalysis,
-        file_item: &mut FileDebtItem,
-        raw_functions: &[FunctionMetrics],
-        coverage_data: Option<&LcovData>,
-    ) {
-        let Some(god_analysis) = god_object_analysis_for_item(file_item) else {
-            return;
-        };
-
-        if is_god_object_suppressed_for_file(file_item, &god_analysis) {
-            file_item.metrics.god_object_analysis = None;
-            return;
-        }
-
-        let god_item = self.create_god_object_item(
-            unified,
-            file_item,
-            &god_analysis,
-            raw_functions,
-            coverage_data,
-        );
-        unified.add_item(god_item);
-    }
-
-    fn create_god_object_item(
-        &self,
-        unified: &UnifiedAnalysis,
-        file_item: &FileDebtItem,
-        god_analysis: &crate::organization::GodObjectAnalysis,
-        raw_functions: &[FunctionMetrics],
-        coverage_data: Option<&LcovData>,
-    ) -> UnifiedDebtItem {
-        use crate::priority::context::{ContextConfig, generate_context_suggestion};
-
-        let aggregated_metrics = self.aggregate_god_object_metrics(
-            unified,
-            &file_item.metrics.path,
-            raw_functions,
-            god_analysis,
-            coverage_data,
-        );
-        let god_analysis = crate::builders::unified_analysis_phases::phases::god_object::
-            enrich_god_analysis_with_aggregates(god_analysis, &aggregated_metrics);
-
-        let mut god_item = crate::builders::unified_analysis::create_god_object_debt_item(
-            &file_item.metrics.path,
-            &file_item.metrics,
-            &god_analysis,
-            aggregated_metrics,
-            coverage_data,
-            Some(&self.call_graph),
-        );
-
-        let context_config = ContextConfig::default();
-        god_item.context_suggestion =
-            generate_context_suggestion(&god_item, &self.call_graph, &context_config);
-        god_item
-    }
-
-    fn aggregate_god_object_metrics(
-        &self,
-        unified: &UnifiedAnalysis,
-        file_path: &Path,
-        raw_functions: &[FunctionMetrics],
-        god_analysis: &crate::organization::GodObjectAnalysis,
-        coverage_data: Option<&LcovData>,
-    ) -> crate::priority::god_object_aggregation::GodObjectAggregatedMetrics {
-        // Scope aggregation to the detected god object:
-        // - GodClass: only methods of the detected struct.
-        // - GodFile/GodModule: every function in the file.
-        // Without this scoping, GodClass items inflate complexity, dependencies,
-        // and coverage with unrelated functions in the same file.
-        let mut aggregated =
-            crate::priority::god_object_aggregation::aggregate_god_object_metrics_with_coverage(
-                raw_functions,
-                god_analysis,
-                coverage_data,
-            );
-
-        aggregated.aggregated_contextual_risk = self
-            .file_contextual_risk(file_path)
-            .or_else(|| member_contextual_risk(unified, file_path));
-
-        aggregated
-    }
-
-    fn file_contextual_risk(
-        &self,
-        file_path: &Path,
-    ) -> Option<crate::risk::context::ContextualRisk> {
-        self.risk_analyzer.as_ref().and_then(|analyzer| {
-            crate::builders::unified_analysis::analyze_file_git_context(
-                file_path,
-                analyzer,
-                &self.project_path,
-            )
-        })
     }
 
     fn record_final_timing(&mut self, elapsed: Duration) {
@@ -1481,41 +1045,6 @@ fn add_unified_items(unified: &mut UnifiedAnalysis, items: Vec<UnifiedDebtItem>)
     }
 }
 
-fn god_object_analysis_for_item(
-    file_item: &FileDebtItem,
-) -> Option<crate::organization::GodObjectAnalysis> {
-    file_item
-        .metrics
-        .god_object_analysis
-        .clone()
-        .filter(|analysis| analysis.is_god_object)
-}
-
-fn is_god_object_suppressed_for_file(
-    file_item: &FileDebtItem,
-    god_analysis: &crate::organization::GodObjectAnalysis,
-) -> bool {
-    std::fs::read_to_string(&file_item.metrics.path)
-        .ok()
-        .is_some_and(|content| {
-            is_god_object_suppressed_parallel(god_analysis, &content, &file_item.metrics.path)
-        })
-}
-
-fn member_contextual_risk(
-    unified: &UnifiedAnalysis,
-    file_path: &Path,
-) -> Option<crate::risk::context::ContextualRisk> {
-    use crate::priority::god_object_aggregation::{
-        aggregate_god_object_metrics, extract_member_functions,
-    };
-
-    let member_functions = extract_member_functions(unified.items.iter(), file_path);
-    (!member_functions.is_empty())
-        .then(|| aggregate_god_object_metrics(&member_functions).aggregated_contextual_risk)
-        .flatten()
-}
-
 fn finalize_unified_analysis(unified: &mut UnifiedAnalysis, coverage_data: Option<&LcovData>) {
     unified.sort_by_priority();
     unified.calculate_total_impact();
@@ -1575,29 +1104,6 @@ fn update_finalization_subtask(current: usize, total: usize) {
     }
 }
 
-/// Enrich file item with dependency metrics aggregated from function-level data (spec 201)
-fn enrich_file_item_with_dependencies(
-    mut file_item: crate::priority::FileDebtItem,
-    unified_items: &im::Vector<crate::priority::UnifiedDebtItem>,
-) -> crate::priority::FileDebtItem {
-    use crate::priority::god_object_aggregation::{
-        aggregate_dependency_metrics, extract_member_functions,
-    };
-
-    let member_functions = extract_member_functions(unified_items.iter(), &file_item.metrics.path);
-    let (callers, callees, afferent, efferent) = aggregate_dependency_metrics(&member_functions);
-
-    // Update file metrics with aggregated dependency data
-    file_item.metrics.afferent_coupling = afferent;
-    file_item.metrics.efferent_coupling = efferent;
-    file_item.metrics.instability =
-        crate::output::unified::calculate_instability(afferent, efferent);
-    file_item.metrics.dependents = callers.into_iter().take(10).collect();
-    file_item.metrics.dependencies_list = callees.into_iter().take(10).collect();
-
-    file_item
-}
-
 /// Trait for parallel analysis
 pub trait ParallelAnalyzer {
     fn analyze_parallel(
@@ -1610,88 +1116,6 @@ pub trait ParallelAnalyzer {
 mod tests {
     use super::*;
     use crate::priority::call_graph::CallType;
-
-    fn metric_with_length(length: usize) -> FunctionMetrics {
-        FunctionMetrics {
-            file: PathBuf::from("src/example.rs"),
-            name: "example".to_string(),
-            line: 1,
-            length,
-            cyclomatic: 1,
-            cognitive: 0,
-            nesting: 0,
-            is_test: false,
-            in_test_module: false,
-            visibility: None,
-            is_trait_method: false,
-            entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
-            detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-            composition_metrics: None,
-            language_specific: None,
-            purity_level: None,
-            error_swallowing_count: None,
-            error_swallowing_patterns: None,
-            entropy_analysis: None,
-            purity_reason: None,
-            call_dependencies: None,
-        }
-    }
-
-    #[test]
-    fn estimate_file_lines_prefers_cached_count() {
-        let functions = vec![metric_with_length(10), metric_with_length(20)];
-
-        assert_eq!(estimate_file_lines(&functions, Some(100)), 100);
-    }
-
-    #[test]
-    fn estimate_file_lines_sums_function_lengths_without_cache() {
-        let functions = vec![metric_with_length(10), metric_with_length(20)];
-
-        assert_eq!(estimate_file_lines(&functions, None), 30);
-    }
-
-    #[test]
-    fn god_object_skip_uses_size_thresholds_and_option() {
-        assert!(should_skip_god_object_analysis(true, 1_000, 50));
-        assert!(should_skip_god_object_analysis(false, 499, 19));
-        assert!(!should_skip_god_object_analysis(false, 500, 19));
-        assert!(!should_skip_god_object_analysis(false, 499, 20));
-    }
-
-    #[test]
-    fn file_read_needed_without_cached_lines_or_when_god_object_runs() {
-        let cached_small = FileAnalysisDecision {
-            cached_line_count: Some(100),
-            estimated_lines: 100,
-            skip_god_object_analysis: true,
-        };
-        let uncached_small = FileAnalysisDecision {
-            cached_line_count: None,
-            estimated_lines: 100,
-            skip_god_object_analysis: true,
-        };
-        let cached_large = FileAnalysisDecision {
-            cached_line_count: Some(600),
-            estimated_lines: 600,
-            skip_god_object_analysis: false,
-        };
-
-        assert!(!needs_file_read(cached_small));
-        assert!(needs_file_read(uncached_small));
-        assert!(needs_file_read(cached_large));
-    }
-
-    #[test]
-    fn uncovered_lines_applies_uncovered_fraction_to_total_lines() {
-        assert_eq!(uncovered_lines(0.75, 200), 50);
-    }
 
     fn function_id(file: &str, name: &str, line: usize) -> FunctionId {
         FunctionId::new(PathBuf::from(file), name.to_string(), line)

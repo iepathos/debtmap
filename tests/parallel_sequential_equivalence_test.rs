@@ -53,7 +53,6 @@ fn analyze(root: &Path, output: &Path, mode: &[&str]) -> Value {
             "--quiet",
             "--no-tui",
             "--no-context-aware",
-            "--no-god-object",
             "--min-score",
             "0",
             "-vv",
@@ -146,12 +145,12 @@ fn parallel_and_sequential_function_items_have_identical_scores() {
     let parallel = analyze(
         fixture.path(),
         &fixture.path().join("parallel.json"),
-        &["--jobs", "2"],
+        &["--jobs", "2", "--no-god-object"],
     );
     let sequential = analyze(
         fixture.path(),
         &fixture.path().join("sequential.json"),
-        &["--no-parallel"],
+        &["--no-parallel", "--no-god-object"],
     );
     let parallel_items = canonical_function_items(&parallel, fixture.path());
     let sequential_items = canonical_function_items(&sequential, fixture.path());
@@ -168,4 +167,111 @@ fn is_scored_production_hotspot(item: &Value) -> bool {
             .as_u64()
             .unwrap_or(0)
             > 0
+}
+
+fn write_god_file_fixture(root: &Path) {
+    let functions = (0..51)
+        .map(|index| {
+            format!(
+                "fn helper_{index:02}(value: usize) -> usize {{ if value > 0 && value > 1 && value > 2 && value > 3 && value > 4 && value > 5 && value > 6 && value > 7 {{ value }} else {{ {index} }} }}"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(root.join("god.rs"), format!("{functions}\n")).unwrap();
+}
+
+fn canonical_god_items(report: &Value, root: &Path) -> Vec<Value> {
+    let mut items: Vec<_> = report["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|item| item["type"] == "File" || !item["debt_type"]["GodObject"].is_null())
+        .cloned()
+        .collect();
+    for item in &mut items {
+        if let Value::Object(fields) = item {
+            fields.remove("context");
+        }
+        canonicalize(item, root);
+    }
+    items.sort_by_key(|item| serde_json::to_string(item).unwrap());
+    items
+}
+
+fn canonical_summary(report: &Value) -> Value {
+    serde_json::json!({
+        "total_items": report["summary"]["total_items"],
+        "total_debt_score": report["summary"]["total_debt_score"],
+        "debt_density": report["summary"]["debt_density"],
+        "total_loc": report["summary"]["total_loc"],
+        "by_type": report["summary"]["by_type"],
+        "by_category": report["summary"]["by_category"],
+        "score_distribution": report["summary"]["score_distribution"],
+        "cohesion": report["summary"]["cohesion"],
+    })
+}
+
+#[test]
+fn parallel_and_sequential_god_file_reports_are_equivalent() {
+    let fixture = TempDir::new().unwrap();
+    write_god_file_fixture(fixture.path());
+    let parallel = analyze(
+        fixture.path(),
+        &fixture.path().join("parallel.json"),
+        &["--jobs", "2"],
+    );
+    let sequential = analyze(
+        fixture.path(),
+        &fixture.path().join("sequential.json"),
+        &["--no-parallel"],
+    );
+    let parallel_items = canonical_god_items(&parallel, fixture.path());
+    let sequential_items = canonical_god_items(&sequential, fixture.path());
+
+    assert_eq!(parallel["summary"]["total_loc"], 51);
+    assert_eq!(parallel["summary"]["by_type"]["File"], 1);
+    assert_eq!(parallel["summary"]["by_type"]["Function"], 1);
+    assert_eq!(parallel_items.len(), 2);
+    assert!(parallel_items.iter().any(|item| item["type"] == "File"));
+    assert!(parallel_items.iter().any(|item| {
+        item["type"] == "Function"
+            && item["location"]["function"] == "[file-scope]"
+            && !item["debt_type"]["GodObject"].is_null()
+    }));
+    assert_eq!(parallel_items, sequential_items);
+    assert_eq!(canonical_summary(&parallel), canonical_summary(&sequential));
+}
+
+#[test]
+fn parallel_and_sequential_god_file_suppression_is_equivalent() {
+    let fixture = TempDir::new().unwrap();
+    write_god_file_fixture(fixture.path());
+    let path = fixture.path().join("god.rs");
+    let source = fs::read_to_string(&path).unwrap();
+    fs::write(
+        &path,
+        format!("// debtmap:ignore[god_object] -- generated registry\n{source}"),
+    )
+    .unwrap();
+    let parallel = analyze(
+        fixture.path(),
+        &fixture.path().join("parallel.json"),
+        &["--jobs", "2"],
+    );
+    let sequential = analyze(
+        fixture.path(),
+        &fixture.path().join("sequential.json"),
+        &["--no-parallel"],
+    );
+    let parallel_items = canonical_god_items(&parallel, fixture.path());
+    let sequential_items = canonical_god_items(&sequential, fixture.path());
+
+    assert!(
+        parallel_items
+            .iter()
+            .all(|item| { item["type"] != "Function" || item["debt_type"]["GodObject"].is_null() })
+    );
+    assert_eq!(parallel_items, sequential_items);
+    assert_eq!(canonical_summary(&parallel), canonical_summary(&sequential));
 }

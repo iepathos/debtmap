@@ -613,15 +613,16 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
 
     // File analysis
-    process_file_analysis(
-        &mut unified,
-        metrics,
+    let file_context = FileAnalysisContext {
+        extracted_data: extracted_data.as_ref(),
+        file_line_counts: &file_line_counts,
         coverage_data,
         no_god_object,
-        risk_analyzer.as_ref(),
+        risk_analyzer: risk_analyzer.as_ref(),
         project_path,
         call_graph,
-    );
+    };
+    process_file_analysis(&mut unified, metrics, &file_context);
 
     // Finalize
     unified.sort_by_priority();
@@ -836,73 +837,82 @@ fn is_god_object_suppressed_unified(
     false
 }
 
+struct FileAnalysisContext<'a> {
+    extracted_data:
+        Option<&'a std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
+    file_line_counts: &'a core::phases::scoring::FileLineCountCache,
+    coverage_data: Option<&'a risk::lcov::LcovData>,
+    no_god_object: bool,
+    risk_analyzer: Option<&'a risk::RiskAnalyzer>,
+    project_path: &'a Path,
+    call_graph: &'a CallGraph,
+}
+
 fn process_file_analysis(
     unified: &mut UnifiedAnalysis,
     metrics: &[crate::core::FunctionMetrics],
-    coverage_data: Option<&risk::lcov::LcovData>,
-    no_god_object: bool,
-    risk_analyzer: Option<&risk::RiskAnalyzer>,
-    project_path: &Path,
-    call_graph: &CallGraph,
+    context: &FileAnalysisContext<'_>,
 ) {
     let file_groups = core::phases::file_analysis::group_functions_by_file(metrics);
 
-    register_analyzed_files(unified, &file_groups);
+    register_analyzed_files(
+        unified,
+        &file_groups,
+        context.extracted_data,
+        context.file_line_counts,
+    );
 
     for (file_path, functions) in file_groups {
-        process_single_file(
-            unified,
-            file_path,
-            functions,
-            coverage_data,
-            no_god_object,
-            risk_analyzer,
-            project_path,
-            call_graph,
-        );
+        process_single_file(unified, file_path, functions, context);
     }
 }
 
 fn register_analyzed_files(
     unified: &mut UnifiedAnalysis,
     file_groups: &std::collections::HashMap<PathBuf, Vec<crate::core::FunctionMetrics>>,
+    extracted_data: Option<
+        &std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+    >,
+    file_line_counts: &core::phases::scoring::FileLineCountCache,
 ) {
-    use crate::metrics::loc_counter::LocCounter;
-    let loc_counter = LocCounter::default();
-
     for file_path in file_groups.keys() {
-        if let Ok(loc_count) = loc_counter.count_file(file_path) {
-            unified.register_analyzed_file(file_path.clone(), loc_count.physical_lines);
+        let extracted_count = extracted_data
+            .and_then(|data| data.get(file_path))
+            .map(|file| file.total_lines);
+        if let Some(line_count) =
+            extracted_count.or_else(|| file_line_counts.get(file_path).copied())
+        {
+            unified.register_analyzed_file(file_path.clone(), line_count);
         }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn process_single_file(
     unified: &mut UnifiedAnalysis,
     file_path: PathBuf,
     functions: Vec<crate::core::FunctionMetrics>,
-    coverage_data: Option<&risk::lcov::LcovData>,
-    no_god_object: bool,
-    risk_analyzer: Option<&risk::RiskAnalyzer>,
-    project_path: &Path,
-    call_graph: &CallGraph,
+    context: &FileAnalysisContext<'_>,
 ) {
+    let extracted = context.extracted_data.and_then(|data| data.get(&file_path));
     let file_content = std::fs::read_to_string(&file_path).ok();
 
-    let mut processed = core::phases::file_analysis::process_file_metrics(
+    let mut processed = core::phases::file_analysis::process_file_metrics_with_facts(
         file_path.clone(),
         functions,
-        file_content.as_deref(),
-        coverage_data,
-        no_god_object,
-        project_path,
+        core::phases::file_analysis::FileAnalysisFacts {
+            content: file_content.as_deref(),
+            extracted,
+            line_count: context.file_line_counts.get(&file_path).copied(),
+        },
+        context.coverage_data,
+        context.no_god_object,
+        context.project_path,
     );
 
     // Clear function_scores for consistency with parallel path
     processed.file_metrics.function_scores = Vec::new();
 
-    let mut file_item = core::phases::file_analysis::create_file_debt_item(
+    let file_item = core::phases::file_analysis::create_file_debt_item(
         processed.file_metrics.clone(),
         Some(&processed.file_context),
     );
@@ -913,52 +923,81 @@ fn process_single_file(
         .is_some_and(|a| a.is_god_object);
 
     if file_item.score > 50.0 || has_god_object {
-        if let Some(god_analysis) = &processed.god_analysis {
-            handle_god_object(
-                unified,
-                god_analysis,
-                &processed,
-                file_content.as_deref(),
-                coverage_data,
-                risk_analyzer,
-                call_graph,
-                &mut file_item,
-            );
-        }
-        unified.add_file_item(file_item);
+        let finalized = finalize_file_item(
+            unified,
+            file_item,
+            &processed.raw_functions,
+            context.coverage_data,
+            context.risk_analyzer,
+            context.project_path,
+            context.call_graph,
+        );
+        unified.add_file_item(finalized);
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn handle_god_object(
+pub(super) fn finalize_file_item(
     unified: &mut UnifiedAnalysis,
-    god_analysis: &crate::organization::GodObjectAnalysis,
-    processed: &core::phases::file_analysis::ProcessedFileData,
-    file_content: Option<&str>,
+    mut file_item: crate::priority::FileDebtItem,
+    raw_functions: &[crate::core::FunctionMetrics],
     coverage_data: Option<&risk::lcov::LcovData>,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
+    project_path: &Path,
     call_graph: &CallGraph,
-    file_item: &mut crate::priority::FileDebtItem,
-) {
-    let is_suppressed = file_content.is_some_and(|content| {
-        is_god_object_suppressed_unified(god_analysis, content, &processed.file_path)
-    });
+) -> crate::priority::FileDebtItem {
+    let god_analysis = file_item
+        .metrics
+        .god_object_analysis
+        .clone()
+        .filter(|analysis| analysis.is_god_object);
 
-    if is_suppressed {
+    if let Some(god_analysis) = god_analysis {
+        add_god_object_item(
+            unified,
+            &mut file_item,
+            &god_analysis,
+            raw_functions,
+            coverage_data,
+            risk_analyzer,
+            project_path,
+            call_graph,
+        );
+    }
+
+    enrich_file_item_with_dependencies(file_item, &unified.items)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_god_object_item(
+    unified: &mut UnifiedAnalysis,
+    file_item: &mut crate::priority::FileDebtItem,
+    god_analysis: &crate::organization::GodObjectAnalysis,
+    raw_functions: &[crate::core::FunctionMetrics],
+    coverage_data: Option<&risk::lcov::LcovData>,
+    risk_analyzer: Option<&risk::RiskAnalyzer>,
+    project_path: &Path,
+    call_graph: &CallGraph,
+) {
+    if is_god_object_suppressed_for_file(file_item, god_analysis) {
         file_item.metrics.god_object_analysis = None;
         return;
     }
 
     let (god_item, enriched) = build_god_object_item(
+        &file_item.metrics.path,
+        &file_item.metrics,
         god_analysis,
-        processed,
+        raw_functions,
         coverage_data,
         risk_analyzer,
+        project_path,
+        unified,
         call_graph,
     );
 
     for item in unified.items.iter_mut() {
-        if item.location.file == processed.file_path {
+        if item.location.file == file_item.metrics.path {
             item.god_object_indicators = Some(enriched.clone());
         }
     }
@@ -966,11 +1005,16 @@ fn handle_god_object(
     unified.add_item(god_item);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_god_object_item(
+    file_path: &Path,
+    file_metrics: &crate::priority::file_metrics::FileDebtMetrics,
     god_analysis: &crate::organization::GodObjectAnalysis,
-    processed: &core::phases::file_analysis::ProcessedFileData,
+    raw_functions: &[crate::core::FunctionMetrics],
     coverage_data: Option<&risk::lcov::LcovData>,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
+    project_path: &Path,
+    unified: &UnifiedAnalysis,
     call_graph: &CallGraph,
 ) -> (UnifiedDebtItem, crate::organization::GodObjectAnalysis) {
     use crate::priority::context::{ContextConfig, generate_context_suggestion};
@@ -979,26 +1023,21 @@ fn build_god_object_item(
     // Scope aggregation to the detected god object's methods (GodClass) or
     // keep file-wide aggregation for GodFile/GodModule. See
     // `filter_god_object_member_metrics` for the scoping rule.
-    let mut aggregated = aggregate_god_object_metrics_with_coverage(
-        &processed.raw_functions,
-        god_analysis,
-        coverage_data,
-    );
+    let mut aggregated =
+        aggregate_god_object_metrics_with_coverage(raw_functions, god_analysis, coverage_data);
 
-    if let Some(analyzer) = risk_analyzer {
-        aggregated.aggregated_contextual_risk = core::phases::god_object::analyze_file_git_context(
-            &processed.file_path,
-            analyzer,
-            &processed.project_root,
-        );
-    }
+    aggregated.aggregated_contextual_risk = risk_analyzer
+        .and_then(|analyzer| {
+            core::phases::god_object::analyze_file_git_context(file_path, analyzer, project_path)
+        })
+        .or_else(|| member_contextual_risk(unified, file_path));
 
     let enriched =
         core::phases::god_object::enrich_god_analysis_with_aggregates(god_analysis, &aggregated);
 
     let mut god_item = core::phases::god_object::create_god_object_debt_item(
-        &processed.file_path,
-        &processed.file_metrics,
+        file_path,
+        file_metrics,
         &enriched,
         aggregated,
         coverage_data,
@@ -1010,6 +1049,54 @@ fn build_god_object_item(
         generate_context_suggestion(&god_item, call_graph, &context_config);
 
     (god_item, enriched)
+}
+
+fn is_god_object_suppressed_for_file(
+    file_item: &crate::priority::FileDebtItem,
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) -> bool {
+    std::fs::read_to_string(&file_item.metrics.path)
+        .ok()
+        .is_some_and(|content| {
+            is_god_object_suppressed_unified(god_analysis, &content, &file_item.metrics.path)
+        })
+}
+
+fn member_contextual_risk(
+    unified: &UnifiedAnalysis,
+    file_path: &Path,
+) -> Option<crate::risk::context::ContextualRisk> {
+    use crate::priority::god_object_aggregation::{
+        aggregate_god_object_metrics, extract_member_functions,
+    };
+
+    let members = extract_member_functions(unified.items.iter(), file_path);
+    (!members.is_empty())
+        .then(|| aggregate_god_object_metrics(&members).aggregated_contextual_risk)
+        .flatten()
+}
+
+fn enrich_file_item_with_dependencies(
+    mut file_item: crate::priority::FileDebtItem,
+    unified_items: &im::Vector<crate::priority::UnifiedDebtItem>,
+) -> crate::priority::FileDebtItem {
+    use crate::priority::god_object_aggregation::{
+        aggregate_dependency_metrics, extract_member_functions,
+    };
+
+    let members = extract_member_functions(unified_items.iter(), &file_item.metrics.path);
+    let (callers, callees, afferent, efferent) = aggregate_dependency_metrics(&members);
+    let mut callers: Vec<_> = callers.into_iter().collect();
+    let mut callees: Vec<_> = callees.into_iter().collect();
+    callers.sort();
+    callees.sort();
+    file_item.metrics.afferent_coupling = afferent;
+    file_item.metrics.efferent_coupling = efferent;
+    file_item.metrics.instability =
+        crate::output::unified::calculate_instability(afferent, efferent);
+    file_item.metrics.dependents = callers.into_iter().take(10).collect();
+    file_item.metrics.dependencies_list = callees.into_iter().take(10).collect();
+    file_item
 }
 
 // --- Progress reporting helpers ---

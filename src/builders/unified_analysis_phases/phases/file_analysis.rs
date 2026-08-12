@@ -7,6 +7,7 @@ use crate::analysis::FileContext;
 use crate::analyzers::FileAnalyzer;
 use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
 use crate::core::{FunctionMetrics, Language};
+use crate::extraction::ExtractedFileData;
 use crate::priority::file_metrics::{FileDebtItem, FileDebtMetrics};
 use crate::risk::lcov::LcovData;
 use std::collections::HashMap;
@@ -82,6 +83,14 @@ pub struct ProcessedFileData {
     pub project_root: PathBuf,
 }
 
+/// Authoritative file facts prepared at the I/O boundary.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FileAnalysisFacts<'a> {
+    pub content: Option<&'a str>,
+    pub extracted: Option<&'a ExtractedFileData>,
+    pub line_count: Option<usize>,
+}
+
 /// Pure function to process a single file's metrics.
 ///
 /// Note: This function requires file content to be passed in (I/O happens at the caller).
@@ -94,26 +103,46 @@ pub fn process_file_metrics(
     project_root: &Path,
 ) -> ProcessedFileData {
     let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
-
-    // Get base file metrics
     let mut file_metrics = file_analyzer.aggregate_functions(&functions);
-
-    // Enhance with actual line count if content available
     if let Some(content) = file_content {
-        let actual_line_count = content.lines().count();
-        file_metrics = enhance_metrics_with_line_count(file_metrics, actual_line_count);
-
-        // Apply god object detection if enabled
+        file_metrics = enhance_metrics_with_line_count(file_metrics, content.lines().count());
         if !no_god_object {
             file_metrics.god_object_analysis =
                 detect_god_object_from_content(&file_analyzer, &file_path, content, &file_metrics);
         }
     }
+    build_processed_file_data(file_path, functions, file_metrics, project_root)
+}
 
-    // Detect file context
+/// Process file metrics from facts prepared at the I/O boundary.
+pub fn process_file_metrics_with_facts(
+    file_path: PathBuf,
+    functions: Vec<FunctionMetrics>,
+    facts: FileAnalysisFacts<'_>,
+    coverage_data: Option<&LcovData>,
+    no_god_object: bool,
+    project_root: &Path,
+) -> ProcessedFileData {
+    let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
+    let mut file_metrics = file_analyzer.aggregate_function_metrics(&functions);
+    apply_file_facts(
+        &file_analyzer,
+        &file_path,
+        facts,
+        no_god_object,
+        &mut file_metrics,
+    );
+
+    build_processed_file_data(file_path, functions, file_metrics, project_root)
+}
+
+fn build_processed_file_data(
+    file_path: PathBuf,
+    functions: Vec<FunctionMetrics>,
+    file_metrics: FileDebtMetrics,
+    project_root: &Path,
+) -> ProcessedFileData {
     let file_context = detect_file_context(&file_path, &functions);
-
-    // Generate god object analysis reference
     let god_analysis = file_metrics.god_object_analysis.clone();
 
     ProcessedFileData {
@@ -124,6 +153,85 @@ pub fn process_file_metrics(
         raw_functions: functions,
         project_root: project_root.to_path_buf(),
     }
+}
+
+fn apply_file_facts(
+    file_analyzer: &UnifiedFileAnalyzer,
+    file_path: &Path,
+    facts: FileAnalysisFacts<'_>,
+    no_god_object: bool,
+    file_metrics: &mut FileDebtMetrics,
+) {
+    if let Some(extracted) = facts.extracted {
+        apply_extracted_facts(file_path, extracted, no_god_object, file_metrics);
+        if let Some(content) = facts.content {
+            apply_content_classification(file_path, content, file_metrics);
+        }
+    } else if let Some(content) = facts.content {
+        apply_content_facts(
+            file_analyzer,
+            file_path,
+            content,
+            no_god_object,
+            file_metrics,
+        );
+    } else if let Some(line_count) = facts.line_count {
+        apply_line_count_facts(line_count, no_god_object, file_metrics);
+    } else if no_god_object {
+        file_metrics.god_object_analysis = None;
+    }
+}
+
+fn apply_content_classification(
+    file_path: &Path,
+    content: &str,
+    file_metrics: &mut FileDebtMetrics,
+) {
+    file_metrics.file_type = Some(crate::organization::classify_file(content, file_path));
+}
+
+fn apply_extracted_facts(
+    file_path: &Path,
+    extracted: &ExtractedFileData,
+    no_god_object: bool,
+    file_metrics: &mut FileDebtMetrics,
+) {
+    *file_metrics = enhance_metrics_with_line_count(file_metrics.clone(), extracted.total_lines);
+    file_metrics.god_object_analysis = (!no_god_object)
+        .then(|| crate::extraction::adapters::god_object::analyze_god_object(file_path, extracted))
+        .flatten();
+}
+
+fn apply_content_facts(
+    file_analyzer: &UnifiedFileAnalyzer,
+    file_path: &Path,
+    content: &str,
+    no_god_object: bool,
+    file_metrics: &mut FileDebtMetrics,
+) {
+    *file_metrics = enhance_metrics_with_line_count(file_metrics.clone(), content.lines().count());
+    apply_content_classification(file_path, content, file_metrics);
+    file_metrics.god_object_analysis = (!no_god_object)
+        .then(|| detect_god_object_from_content(file_analyzer, file_path, content, file_metrics))
+        .flatten();
+}
+
+fn apply_line_count_facts(
+    line_count: usize,
+    no_god_object: bool,
+    file_metrics: &mut FileDebtMetrics,
+) {
+    *file_metrics = enhance_metrics_with_line_count(file_metrics.clone(), line_count);
+    file_metrics.god_object_analysis = (!no_god_object)
+        .then(|| {
+            crate::organization::god_object::heuristics::fallback_god_object_heuristics(
+                file_metrics.function_count,
+                line_count,
+                0,
+                file_metrics.total_complexity,
+            )
+        })
+        .flatten();
 }
 
 /// Pure function to detect god object analysis from file content.

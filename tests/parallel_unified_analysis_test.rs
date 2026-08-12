@@ -2,6 +2,7 @@ use debtmap::builders::parallel_unified_analysis::{
     ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
 };
 use debtmap::core::FunctionMetrics;
+use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::priority::call_graph::CallGraph;
 use std::path::PathBuf;
 
@@ -38,6 +39,76 @@ fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
             call_dependencies: None,
         })
         .collect()
+}
+
+fn metrics_for_file(path: &std::path::Path, count: usize) -> Vec<FunctionMetrics> {
+    create_test_metrics(count)
+        .into_iter()
+        .enumerate()
+        .map(|(index, metric)| FunctionMetrics {
+            file: path.to_path_buf(),
+            name: format!("helper_{index}"),
+            line: index + 1,
+            ..metric
+        })
+        .collect()
+}
+
+fn parallel_options() -> ParallelUnifiedAnalysisOptions {
+    ParallelUnifiedAnalysisOptions {
+        parallel: true,
+        jobs: Some(2),
+        batch_size: 25,
+        progress: false,
+        reference_time: chrono::Utc::now(),
+    }
+}
+
+#[test]
+fn phase3_uses_prepared_facts_when_source_is_unavailable() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("god.rs");
+    let source = (0..51)
+        .map(|index| format!("fn helper_{index}() {{}}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(&path, &source).unwrap();
+
+    let extracted = UnifiedFileExtractor::extract(&path, &source).unwrap();
+    let extracted_lines = extracted.total_lines;
+    let extracted_data = std::collections::HashMap::from([(path.clone(), extracted)]);
+    let cached_lines = std::collections::HashMap::from([(path.clone(), extracted_lines + 100)]);
+    let metrics = metrics_for_file(&path, 51);
+
+    let mut content_builder =
+        ParallelUnifiedAnalysisBuilder::new(CallGraph::new(), parallel_options())
+            .with_extracted_data(extracted_data.clone())
+            .with_line_count_index(cached_lines.clone());
+    let content_items = content_builder.execute_phase3_parallel(&metrics, None, false);
+    assert!(content_items[0].0.metrics.file_type.is_some());
+
+    std::fs::remove_file(&path).unwrap();
+
+    let mut extracted_builder =
+        ParallelUnifiedAnalysisBuilder::new(CallGraph::new(), parallel_options())
+            .with_extracted_data(extracted_data)
+            .with_line_count_index(cached_lines);
+    let extracted_items = extracted_builder.execute_phase3_parallel(&metrics, None, false);
+
+    assert_eq!(extracted_items.len(), 1);
+    assert_eq!(extracted_items[0].0.metrics.total_lines, extracted_lines);
+
+    let cached_line_count = extracted_lines + 200;
+    let mut cached_builder =
+        ParallelUnifiedAnalysisBuilder::new(CallGraph::new(), parallel_options())
+            .with_line_count_index(std::collections::HashMap::from([(
+                path.clone(),
+                cached_line_count,
+            )]));
+    let cached_items = cached_builder.execute_phase3_parallel(&metrics, None, false);
+
+    assert_eq!(cached_items.len(), 1);
+    assert_eq!(cached_items[0].0.metrics.total_lines, cached_line_count);
 }
 
 #[test]
