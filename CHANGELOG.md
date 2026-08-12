@@ -7,12 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-11
+
+### Added
+
+- **Validated Configuration Contract** - Added `debtmap config check` for strict, diagnostic configuration validation
+  - Reports unknown root and nested keys together, with qualified paths and suggestions for clear typos
+  - Validates documented ranges and enum values while keeping the configuration schema and shipped examples aligned
+  - Extends `debtmap init` with the documented validation thresholds
+
+- **Unified JSON v3 Contract** - Published a checked schema, canonical fixtures, and a consumer guide for `debtmap analyze --format json`
+  - Tests the public CLI envelope, version, tagged File and Function items, summaries, optional scoring details, and Serde round trips in CI
+  - Makes comparison input version-aware and preserves v3 summary score, density, and LOC values
+  - Separates the experimental prepared-view JSON shape from canonical v3 output
+
+### Fixed
+
+- **Sequential and Parallel Analysis Parity** - Shared preparation, file analysis, and finalization policies across execution modes
+  - Registers every analyzed file in parallel summaries so project LOC and debt density use the complete analysis scope
+  - Uses the same data-flow, purity, test-only, filtering, aggregation, God-object, suppression, and dependency-enrichment logic
+  - Adds normalized end-to-end parity coverage for function scores, file findings, summaries, and suppression behavior
+
+- **Explicit Configuration Loading** - `--config` and `DEBTMAP_CONFIG` now affect normal analysis and source reporting consistently
+  - Loads and installs one effective typed configuration for runtime consumers instead of rereading divergent sources
+  - Defines deterministic precedence across defaults, user, project, custom-path, and environment sources
+  - Fails closed with contextual diagnostics for missing, malformed, directory, and non-UTF-8 explicit paths
+
+- **Filtered JSON Summaries** - `--top` and `--tail` now recompute item-derived score, density, type, category, and priority distributions
+  - Preserves project-wide LOC and cohesion while ensuring filtered summaries describe the emitted item set
+
+- **Verified Release Installation** - Hardened pre-built release downloads and publication ordering
+  - Verifies published SHA-256 sidecars before extraction and validates a staged executable before replacing an existing install
+  - Uses fail-fast retrying downloads, cleans temporary state on failures, and rejects Linux ARM64 before network access while no artifact is published
+  - Keeps GitHub releases as drafts until every matrix archive and checksum has uploaded successfully
+
 ### Changed
 
 - **Explicit Parallel Configuration** - Analysis execution now uses explicit CLI and library options instead of mutating process-global environment variables
   - Keeps `DEBTMAP_JOBS` as a CLI default, with `--jobs` taking precedence and invalid values failing at argument parsing
   - Makes library-level worker limits effective and directs programmatic callers to `perform_unified_analysis_with_options`
   - Removes the legacy `DEBTMAP_PARALLEL` switch; parallel execution remains the CLI default and `--no-parallel` disables it
+
+- **Configuration Documentation** - Updated initialization, precedence, and output examples to match runtime behavior
+  - Documents root-section merge behavior, supported keys, strict checking, and the effective configuration source order
+  - Corrects stale JSON paths, item shapes, roles, priorities, and dashboard or webhook examples throughout the book
+
+### Dependencies
+
+- Bumped `taiki-e/install-action` from 2 to 2.85.5
+- Refreshed the Cargo lockfile for Rust 1.89-compatible dependency updates, including `clap`, `futures`, `stillwater`, `time`, and `wasm-bindgen`
 
 ## [0.21.2] - 2026-07-28
 
