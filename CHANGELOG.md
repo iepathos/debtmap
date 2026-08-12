@@ -5,9 +5,7 @@ All notable changes to debtmap will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-## [0.22.0] - 2026-08-11
+## [0.22.0] - Unreleased
 
 ### Added
 
@@ -40,13 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Verifies published SHA-256 sidecars before extraction and validates a staged executable before replacing an existing install
   - Uses fail-fast retrying downloads, cleans temporary state on failures, and rejects Linux ARM64 before network access while no artifact is published
   - Keeps GitHub releases as drafts until every matrix archive and checksum has uploaded successfully
+  - Keeps the hermetic installer test compatible with the ShellCheck version used by GitHub Actions
 
 ### Changed
 
 - **Standard Collection API** - Public analysis and risk models now use standard-library `Vec`, `HashMap`, and `HashSet` collection types
   - This is a source-breaking Rust library API change for callers that constructed public models with `im` collection values
-  - Removes the unmaintained `im`, `bitmaps`, and `sized-chunks` dependency chain and its unsoundness advisory
-  - Makes security CI fail closed on warning-class RustSec advisories
 
 - **Explicit Parallel Configuration** - Analysis execution now uses explicit CLI and library options instead of mutating process-global environment variables
   - Keeps `DEBTMAP_JOBS` as a CLI default, with `--jobs` taking precedence and invalid values failing at argument parsing
@@ -56,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configuration Documentation** - Updated initialization, precedence, and output examples to match runtime behavior
   - Documents root-section merge behavior, supported keys, strict checking, and the effective configuration source order
   - Corrects stale JSON paths, item shapes, roles, priorities, and dashboard or webhook examples throughout the book
+
+### Security
+
+- **Maintained Collection Foundation** - Removed the unmaintained `im`, `bitmaps`, and `sized-chunks` dependency chain and its unsoundness advisory
+- **Fail-Closed RustSec Audits** - Security CI now rejects warning-class advisories, including unmaintained and unsound dependencies
 
 ### Dependencies
 
