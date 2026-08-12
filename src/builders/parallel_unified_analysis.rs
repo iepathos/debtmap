@@ -10,7 +10,7 @@ use crate::{
     priority::{
         UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
         call_graph::{CallGraph, FunctionId},
-        debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
+        debt_aggregator::DebtAggregator,
         file_metrics::FileDebtItem,
         scoring::ContextRecommendationEngine,
     },
@@ -108,77 +108,6 @@ fn is_god_object_suppressed_parallel(
     }
 
     false
-}
-
-// Pure functional transformations module
-mod transformations {
-    use super::*;
-
-    /// Pure function to create function mappings from metrics
-    pub fn create_function_mappings(
-        metrics: &[FunctionMetrics],
-    ) -> Vec<(AggregatorFunctionId, usize, usize)> {
-        metrics
-            .iter()
-            .map(|m| {
-                let func_id = AggregatorFunctionId::new(m.file.clone(), m.name.clone(), m.line);
-                (func_id, m.line, m.line + m.length)
-            })
-            .collect()
-    }
-
-    /// Pure function to transform metrics into purity map
-    pub fn metrics_to_purity_map(metrics: &[FunctionMetrics]) -> HashMap<String, bool> {
-        metrics
-            .iter()
-            .map(|m| (m.name.clone(), m.is_pure.unwrap_or(false)))
-            .collect()
-    }
-
-    // Note: extract_purity_analysis removed in spec 213.
-    // The fallback path now uses UnifiedFileExtractor + populate_all_from_extracted instead.
-}
-
-// Pure predicates module for filtering logic
-mod predicates {
-    use super::*;
-
-    /// Pure predicate: should skip test functions
-    pub fn is_test_function(metric: &FunctionMetrics) -> bool {
-        metric.is_test || metric.in_test_module
-    }
-
-    /// Pure predicate: is closure function
-    pub fn is_closure(metric: &FunctionMetrics) -> bool {
-        metric.name.contains("<closure@")
-    }
-
-    /// Pure predicate: is trivial function
-    pub fn is_trivial_function(metric: &FunctionMetrics, callee_count: usize) -> bool {
-        metric.cyclomatic == 1 && metric.cognitive == 0 && metric.length <= 3 && callee_count == 1
-    }
-
-    /// Pure predicate: should process metric
-    pub fn should_process_metric(
-        metric: &FunctionMetrics,
-        test_only_functions: &HashSet<FunctionId>,
-        callee_count: usize,
-    ) -> bool {
-        // Early returns for test functions and closures
-        if is_test_function(metric) || is_closure(metric) {
-            return false;
-        }
-
-        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-
-        // Skip if in test-only functions set
-        if test_only_functions.contains(&func_id) {
-            return false;
-        }
-
-        // Skip trivial functions
-        !is_trivial_function(metric, callee_count)
-    }
 }
 
 // Pure file analysis transformations
@@ -735,88 +664,19 @@ impl ParallelUnifiedAnalysisBuilder {
         scope.spawn(move |_| {
             progress.tick();
             let start = Instant::now();
-            let mut data_flow = DataFlowGraph::from_call_graph((*call_graph).clone());
-
-            // Spec 214: Use extraction adapters to populate data flow from extracted data
-            let (purity_count, mutation_count, io_count, dep_count, trans_count) =
-                if let Some(ref extracted) = extracted_data {
-                    progress.set_message("Populating from extracted data (spec 214)...");
-                    let stats = crate::extraction::adapters::data_flow::populate_data_flow(
-                        &mut data_flow,
-                        extracted,
-                    );
-                    (
-                        stats.purity_entries,
-                        stats.purity_entries, // Mutations counted as part of purity
-                        stats.io_operations,
-                        stats.variable_deps,
-                        stats.transformations,
-                    )
-                } else {
-                    // Fallback: Extract all files first, then populate via adapter
-                    progress.set_message("Extracting file data (fallback path)...");
-
-                    // Collect unique file paths from metrics
-                    let file_paths: HashSet<PathBuf> = metrics.iter().map(|m| m.file.clone()).collect();
-
-                    // Extract all data from files using the unified extractor
-                    let fallback_extracted: HashMap<PathBuf, ExtractedFileData> = file_paths
-                        .into_iter()
-                        .filter(|p| p.extension().map(|e| e == "rs").unwrap_or(false))
-                        .filter_map(|path| {
-                            std::fs::read_to_string(&path)
-                                .ok()
-                                .and_then(|content| {
-                                    crate::extraction::UnifiedFileExtractor::extract(&path, &content).ok()
-                                })
-                                .map(|data| (path, data))
-                        })
-                        .collect();
-
-                    progress.set_message("Populating from extracted data (fallback)...");
-                    let stats = crate::extraction::adapters::data_flow::populate_data_flow(
-                        &mut data_flow,
-                        &fallback_extracted,
-                    );
-                    (
-                        stats.purity_entries,
-                        stats.purity_entries, // Mutations counted as part of purity
-                        stats.io_operations,
-                        stats.variable_deps,
-                        stats.transformations,
-                    )
-                };
-
-            // Populate purity info from metrics as fallback (matches sequential behavior)
-            // This ensures consistent scoring when source files aren't available (e.g., in tests)
-            progress.set_message("Populating purity analysis from metrics...");
-            for metric in metrics.iter() {
-                let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-                let purity_info = crate::data_flow::PurityInfo {
-                    is_pure: metric.is_pure.unwrap_or(false),
-                    confidence: metric.purity_confidence.unwrap_or(0.0),
-                    impurity_reasons: if !metric.is_pure.unwrap_or(false) {
-                        vec!["Function may have side effects".to_string()]
-                    } else {
-                        vec![]
-                    },
-                };
-                data_flow.set_purity_info(func_id, purity_info);
-            }
+            progress.set_message("Preparing shared data-flow facts...");
+            let data_flow = crate::builders::unified_analysis_phases::phases::preparation::build_data_flow_graph(
+                &metrics,
+                &call_graph,
+                extracted_data.as_deref(),
+            );
 
             // parking_lot::Mutex::lock() never fails (no poisoning)
             timings.lock().data_flow_creation = start.elapsed();
 
             // parking_lot::Mutex::lock() never fails (no poisoning)
             *result.lock() = Some(data_flow);
-            progress.finish_with_message(format!(
-                "Data flow complete: {} functions, {} mutations, {} I/O ops, {} deps, {} transforms",
-                purity_count,
-                mutation_count,
-                io_count,
-                dep_count,
-                trans_count
-            ));
+            progress.finish_with_message("Data-flow preparation complete");
         });
     }
 
@@ -831,7 +691,10 @@ impl ParallelUnifiedAnalysisBuilder {
         scope.spawn(move |_| {
             progress.tick();
             let start = Instant::now();
-            let purity_map = transformations::metrics_to_purity_map(&metrics);
+            let purity_map =
+                crate::builders::unified_analysis_phases::phases::scoring::metrics_to_purity_map(
+                    &metrics,
+                );
             // parking_lot::Mutex::lock() never fails (no poisoning)
             timings.lock().purity_analysis = start.elapsed();
             *result.lock() = Some(purity_map);
@@ -850,8 +713,7 @@ impl ParallelUnifiedAnalysisBuilder {
         scope.spawn(move |_| {
             progress.tick();
             let start = Instant::now();
-            let detector = OptimizedTestDetector::new(call_graph);
-            let test_funcs = detector.find_all_test_only_functions();
+            let test_funcs = crate::builders::unified_analysis_phases::phases::call_graph::find_test_only_functions(&call_graph);
             // parking_lot::Mutex::lock() never fails (no poisoning)
             timings.lock().test_detection = start.elapsed();
             *result.lock() = Some(test_funcs);
@@ -871,12 +733,11 @@ impl ParallelUnifiedAnalysisBuilder {
         scope.spawn(move |_| {
             progress.tick();
             let start = Instant::now();
-            let mut debt_aggregator = DebtAggregator::new();
-
-            if let Some(debt_items) = debt_items {
-                let function_mappings = transformations::create_function_mappings(&metrics);
-                debt_aggregator.aggregate_debt(debt_items, &function_mappings);
-            }
+            let debt_aggregator =
+                crate::builders::unified_analysis_phases::phases::scoring::setup_debt_aggregator(
+                    &metrics,
+                    debt_items.as_deref(),
+                );
 
             // parking_lot::Mutex::lock() never fails (no poisoning)
             timings.lock().debt_aggregation = start.elapsed();
@@ -1033,16 +894,11 @@ impl ParallelUnifiedAnalysisBuilder {
         test_only_functions: &HashSet<FunctionId>,
         context: &FunctionAnalysisContext,
     ) -> Vec<UnifiedDebtItem> {
-        // Get callee count for triviality check
-        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-        let callee_count = if self.call_graph.get_function_info(&func_id).is_some() {
-            self.call_graph.get_callees_exact(&func_id).len()
-        } else {
-            self.call_graph.get_callees(&func_id).len()
-        };
-
-        // Apply filtering predicates
-        if !predicates::should_process_metric(metric, test_only_functions, callee_count) {
+        if !crate::builders::unified_analysis_phases::phases::call_graph::should_process_metric(
+            metric,
+            &self.call_graph,
+            test_only_functions,
+        ) {
             return Vec::new();
         }
 
@@ -1873,5 +1729,28 @@ mod tests {
         let detector = OptimizedTestDetector::new(Arc::new(graph));
 
         assert!(!detector.is_test_only(&helper));
+    }
+
+    #[test]
+    fn parallel_phase_uses_canonical_test_only_classification() {
+        let attributed_test = function_id("src/parser.rs", "checks_input", 10);
+        let helper = function_id("src/parser.rs", "build_fixture", 20);
+        let mut graph = CallGraph::new();
+        graph.add_function(attributed_test.clone(), false, true, 2, 5);
+        graph.add_function(helper.clone(), false, false, 5, 20);
+        graph.add_call_parts(attributed_test, helper.clone(), CallType::Direct);
+        let expected = graph.find_test_only_functions().into_iter().collect();
+        let mut builder = ParallelUnifiedAnalysisBuilder::new(
+            graph,
+            ParallelUnifiedAnalysisOptions {
+                progress: false,
+                ..ParallelUnifiedAnalysisOptions::default()
+            },
+        );
+
+        let (_, _, actual, _) = builder.execute_phase1_parallel(&[], None);
+
+        assert!(actual.contains(&helper));
+        assert_eq!(actual, expected);
     }
 }

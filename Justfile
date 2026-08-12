@@ -266,6 +266,7 @@ test-prop:
 test-cli:
     cargo nextest run --profile cli \
         --test clean_dispatcher_output_test --test cli_output_format_integration_test \
+        --test parallel_sequential_equivalence_test \
         --test progress_display_integration_test --test validate_parallel_test
 
 # Run benchmarks

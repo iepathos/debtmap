@@ -469,8 +469,10 @@ pub fn create_unified_analysis_with_exclusions(
     no_god_object: bool,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
+    let enriched_metrics =
+        call_graph_integration::populate_call_graph_data(metrics.to_vec(), call_graph);
     create_unified_analysis_with_exclusions_and_timing(
-        metrics,
+        &enriched_metrics,
         call_graph,
         coverage_data,
         framework_exclusions,
@@ -486,7 +488,7 @@ pub fn create_unified_analysis_with_exclusions(
         Path::new("."),
         false,
         0,
-        None, // No extracted data - fallback to per-function parsing (spec 213)
+        None, // Compatibility path uses metric facts without hidden source I/O
         reference_time,
     )
 }
@@ -576,11 +578,17 @@ fn create_unified_analysis_with_exclusions_and_timing(
     let start = std::time::Instant::now();
 
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
-    unified.populate_purity_analysis(metrics);
+    let data_flow_start = std::time::Instant::now();
+    let data_flow = core::phases::preparation::build_data_flow_graph(
+        metrics,
+        call_graph,
+        extracted_data.as_ref(),
+    );
+    let data_flow_time = data_flow_start.elapsed();
+    unified.data_flow_graph = data_flow.clone();
 
     let test_only_functions = core::phases::call_graph::find_test_only_functions(call_graph);
     let debt_aggregator = core::phases::scoring::setup_debt_aggregator(metrics, debt_items);
-    let data_flow = crate::data_flow::DataFlowGraph::from_call_graph(call_graph.clone());
 
     // Build file line count cache (spec 195: I/O at boundary, once per unique file)
     let file_line_counts = core::phases::scoring::build_file_line_count_cache(metrics);
@@ -628,7 +636,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         call_graph_building: call_graph_time,
         trait_resolution: std::time::Duration::from_secs(0),
         coverage_loading: coverage_time,
-        data_flow_creation: std::time::Duration::from_secs(0),
+        data_flow_creation: data_flow_time,
         purity_analysis: std::time::Duration::from_secs(0),
         test_detection: std::time::Duration::from_secs(0),
         debt_aggregation: std::time::Duration::from_secs(0),
@@ -750,13 +758,11 @@ fn execute_parallel_analysis(
     let (data_flow_graph, purity, test_only_functions, debt_aggregator) =
         builder.execute_phase1_parallel(metrics, debt_items);
 
-    let enriched_metrics =
-        call_graph_integration::populate_call_graph_data(metrics.to_vec(), call_graph);
-    let file_line_counts = core::phases::scoring::build_file_line_count_cache(&enriched_metrics);
+    let file_line_counts = core::phases::scoring::build_file_line_count_cache(metrics);
     builder = builder.with_line_count_index(file_line_counts);
 
     let items = builder.execute_phase2_parallel(
-        &enriched_metrics,
+        metrics,
         &test_only_functions,
         &debt_aggregator,
         &data_flow_graph,
@@ -765,8 +771,7 @@ fn execute_parallel_analysis(
         function_pointer_used_functions,
     );
 
-    let file_items =
-        builder.execute_phase3_parallel(&enriched_metrics, coverage_data, no_god_object);
+    let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
 
     let (mut unified, timings) =
         builder.build(data_flow_graph, purity, items, file_items, coverage_data);
