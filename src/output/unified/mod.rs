@@ -198,14 +198,28 @@ fn calculate_debt_density(total_debt_score: f64, total_loc: usize) -> f64 {
     }
 }
 
+/// Summarize an emitted item set while retaining the analyzed-project LOC denominator.
+pub(crate) fn summarize_items(items: &[UnifiedDebtItemOutput], total_loc: usize) -> DebtSummary {
+    let stats = calculate_item_statistics(items);
+    let cohesion = build_cohesion_summary_from_stats(&stats);
+    DebtSummary {
+        total_items: items.len(),
+        total_debt_score: round_score(stats.total_debt_score),
+        debt_density: calculate_debt_density(stats.total_debt_score, total_loc),
+        total_loc,
+        by_type: TypeBreakdown {
+            file: stats.file_count,
+            function: stats.function_count,
+        },
+        by_category: stats.category_counts,
+        score_distribution: stats.score_distribution,
+        cohesion,
+    }
+}
+
 /// Build the final UnifiedOutput from items and statistics (pure function)
-fn build_unified_output(
-    items: Vec<UnifiedDebtItemOutput>,
-    stats: ItemStatistics,
-    total_loc: usize,
-) -> UnifiedOutput {
-    let debt_density = calculate_debt_density(stats.total_debt_score, total_loc);
-    let cohesion_summary = build_cohesion_summary_from_stats(&stats);
+fn build_unified_output(items: Vec<UnifiedDebtItemOutput>, total_loc: usize) -> UnifiedOutput {
+    let summary = summarize_items(&items, total_loc);
 
     UnifiedOutput {
         format_version: "3.0".to_string(),
@@ -215,19 +229,7 @@ fn build_unified_output(
             project_root: None,
             analysis_type: "unified".to_string(),
         },
-        summary: DebtSummary {
-            total_items: items.len(),
-            total_debt_score: round_score(stats.total_debt_score),
-            debt_density,
-            total_loc,
-            by_type: TypeBreakdown {
-                file: stats.file_count,
-                function: stats.function_count,
-            },
-            by_category: stats.category_counts,
-            score_distribution: stats.score_distribution,
-            cohesion: cohesion_summary,
-        },
+        summary,
         items,
     }
 }
@@ -248,8 +250,7 @@ pub fn convert_to_unified_format(
     let unified_items = convert_items(&all_items, include_scoring_details, &analysis.call_graph);
     let deduplicated = deduplicate_items(unified_items);
     let sorted_items = sort_by_score_descending(deduplicated);
-    let stats = calculate_item_statistics(&sorted_items);
-    build_unified_output(sorted_items, stats, analysis.total_lines_of_code)
+    build_unified_output(sorted_items, analysis.total_lines_of_code)
 }
 
 // ============================================================================

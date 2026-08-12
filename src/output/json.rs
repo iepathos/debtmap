@@ -52,17 +52,32 @@ pub fn output_json_with_format(
 }
 
 fn apply_filters_to_unified_output(
-    mut output: crate::output::unified::UnifiedOutput,
+    output: crate::output::unified::UnifiedOutput,
     top: Option<usize>,
     tail: Option<usize>,
 ) -> crate::output::unified::UnifiedOutput {
-    if top.is_some() || tail.is_some() {
-        output.items = filter_items_by_location_groups(output.items, top, tail);
+    if top.is_none() && tail.is_none() {
+        return output;
     }
 
-    // Update summary to reflect filtered items
-    output.summary.total_items = output.items.len();
-    output
+    let crate::output::unified::UnifiedOutput {
+        format_version,
+        metadata,
+        summary: original_summary,
+        items: original_items,
+    } = output;
+    let total_loc = original_summary.total_loc;
+    let codebase_cohesion = original_summary.cohesion;
+    let items = filter_items_by_location_groups(original_items, top, tail);
+    let mut summary = crate::output::unified::summarize_items(&items, total_loc);
+    summary.cohesion = codebase_cohesion;
+
+    crate::output::unified::UnifiedOutput {
+        format_version,
+        metadata,
+        items,
+        summary,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -327,9 +342,16 @@ mod tests {
                 false,
             ),
         ];
-        let output = create_unified_output(items);
+        let mut output = create_unified_output(items);
+        output.summary.total_loc = 1000;
+        output.summary.cohesion = Some(crate::output::unified::CohesionSummary {
+            average: 0.75,
+            high_cohesion_files: 1,
+            medium_cohesion_files: 0,
+            low_cohesion_files: 0,
+        });
 
-        let filtered = apply_filters_to_unified_output(output, Some(1), None);
+        let filtered = apply_filters_to_unified_output(output.clone(), Some(1), None);
 
         assert_eq!(filtered.items.len(), 2);
         assert!(
@@ -337,6 +359,37 @@ mod tests {
                 .items
                 .iter()
                 .all(|item| get_function_name(item) == Some("grouped".to_string()))
+        );
+        assert_filtered_summary(&filtered, 59.0, 2);
+        let cohesion = filtered.summary.cohesion.as_ref().unwrap();
+        assert_eq!(cohesion.average, 0.75);
+        assert_eq!(cohesion.high_cohesion_files, 1);
+
+        let empty = apply_filters_to_unified_output(output.clone(), Some(0), None);
+        assert!(empty.items.is_empty());
+        assert_filtered_summary(&empty, 0.0, 0);
+
+        let tail = apply_filters_to_unified_output(output, None, Some(1));
+        assert_eq!(tail.items.len(), 1);
+        assert_eq!(get_function_name(&tail.items[0]), Some("other".to_string()));
+        assert_filtered_summary(&tail, 40.0, 1);
+    }
+
+    fn assert_filtered_summary(output: &UnifiedOutput, expected_score: f64, expected_items: usize) {
+        assert_eq!(output.summary.total_items, expected_items);
+        assert_eq!(output.summary.total_debt_score, expected_score);
+        assert_eq!(output.summary.debt_density, expected_score);
+        assert_eq!(output.summary.total_loc, 1000);
+        assert_eq!(output.summary.by_type.file, 0);
+        assert_eq!(output.summary.by_type.function, expected_items);
+        assert_eq!(
+            output.summary.by_category.values().sum::<usize>(),
+            expected_items
+        );
+        let distribution = &output.summary.score_distribution;
+        assert_eq!(
+            distribution.critical + distribution.high + distribution.medium + distribution.low,
+            expected_items
         );
     }
 

@@ -58,6 +58,98 @@ fn analyze_fixture_as_json(root: &Path, output: &Path, extra_args: &[&str]) -> V
     serde_json::from_str(&fs::read_to_string(output).unwrap()).unwrap()
 }
 
+fn analyze_json_with_limit(fixture: &Path, directory: &TempDir, limit: &[&str]) -> Value {
+    let output_path = directory.path().join(format!("{}.json", limit.join("-")));
+    let output = debtmap_command()
+        .current_dir(directory.path())
+        .env_remove("DEBTMAP_CONFIG")
+        .args(["analyze"])
+        .arg(fixture)
+        .args([
+            "--format",
+            "json",
+            "--quiet",
+            "--no-tui",
+            "--no-context-aware",
+            "--min-score",
+            "0",
+            "--no-parallel",
+            "--output",
+        ])
+        .arg(&output_path)
+        .args(limit)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "analysis failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_str(&fs::read_to_string(output_path).unwrap()).unwrap()
+}
+
+fn assert_filtered_json_summary(report: &Value, baseline: &Value) {
+    let items = report["items"].as_array().unwrap();
+    let summary = &report["summary"];
+    let rounded_score = (items
+        .iter()
+        .map(|item| item["score"].as_f64().unwrap())
+        .sum::<f64>()
+        * 100.0)
+        .round()
+        / 100.0;
+    let file_count = items.iter().filter(|item| item["type"] == "File").count();
+
+    assert_eq!(summary["total_items"], items.len());
+    assert_eq!(summary["total_debt_score"], rounded_score);
+    assert_eq!(summary["by_type"]["File"], file_count);
+    assert_eq!(summary["by_type"]["Function"], items.len() - file_count);
+    assert_eq!(
+        summary["by_category"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|count| count.as_u64().unwrap())
+            .sum::<u64>(),
+        items.len() as u64
+    );
+    assert_eq!(
+        summary["score_distribution"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|count| count.as_u64().unwrap())
+            .sum::<u64>(),
+        items.len() as u64
+    );
+    assert_eq!(summary["total_loc"], baseline["summary"]["total_loc"]);
+    assert_eq!(summary["cohesion"], baseline["summary"]["cohesion"]);
+    let total_loc = summary["total_loc"].as_f64().unwrap();
+    let expected_density = ((rounded_score / total_loc) * 1000.0 * 100.0).round() / 100.0;
+    assert_eq!(summary["debt_density"], expected_density);
+}
+
+#[test]
+fn top_and_tail_json_summaries_match_filtered_items() {
+    let fixture =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/zed_editor_fixture.rs");
+    let directory = TempDir::new().unwrap();
+    let baseline = analyze_json_with_limit(&fixture, &directory, &[]);
+    let top = analyze_json_with_limit(&fixture, &directory, &["--top", "1"]);
+    let tail = analyze_json_with_limit(&fixture, &directory, &["--tail", "1"]);
+
+    assert!(baseline["items"].as_array().unwrap().len() > top["items"].as_array().unwrap().len());
+    assert!(
+        baseline["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["type"] == "File")
+    );
+    assert_filtered_json_summary(&top, &baseline);
+    assert_filtered_json_summary(&tail, &baseline);
+}
+
 #[test]
 fn parallel_and_sequential_register_same_analyzed_loc() {
     let fixture = TempDir::new().unwrap();
