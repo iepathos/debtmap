@@ -285,6 +285,7 @@ impl<'a> PythonExtractor<'a> {
                         path: self.node_text(child).to_string(),
                         alias: None,
                         is_glob: false,
+                        kind: crate::extraction::ImportKind::Module,
                     });
                 } else if child.kind() == "aliased_import" {
                     let name_node = child.child_by_field_name("name").unwrap();
@@ -293,6 +294,7 @@ impl<'a> PythonExtractor<'a> {
                         path: self.node_text(name_node).to_string(),
                         alias: Some(self.node_text(alias_node).to_string()),
                         is_glob: false,
+                        kind: crate::extraction::ImportKind::Module,
                     });
                 }
             }
@@ -324,6 +326,7 @@ impl<'a> PythonExtractor<'a> {
                             },
                             alias,
                             is_glob: false,
+                            kind: crate::extraction::ImportKind::Symbol,
                         });
                     }
                     "wildcard_import" => {
@@ -331,6 +334,7 @@ impl<'a> PythonExtractor<'a> {
                             path: format!("{}.*", module_path),
                             alias: None,
                             is_glob: true,
+                            kind: crate::extraction::ImportKind::Glob,
                         });
                     }
                     _ => {}

@@ -271,6 +271,18 @@ pub struct ImportInfo {
     pub alias: Option<String>,
     /// Is glob import: `use foo::*`
     pub is_glob: bool,
+    /// Whether the binding names a module, symbol, or glob.
+    #[serde(default)]
+    pub kind: ImportKind,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ImportKind {
+    #[default]
+    Unknown,
+    Module,
+    Symbol,
+    Glob,
 }
 
 /// Detected I/O operation.
@@ -654,6 +666,7 @@ mod tests {
                 path: "std::collections::HashMap".to_string(),
                 alias: None,
                 is_glob: false,
+                kind: ImportKind::Unknown,
             }],
             total_lines: 100,
             detected_patterns: vec![],
@@ -846,6 +859,7 @@ mod tests {
                     path: format!("std::module_{}", i),
                     alias: None,
                     is_glob: false,
+                    kind: ImportKind::Unknown,
                 })
                 .collect(),
             total_lines: 200,

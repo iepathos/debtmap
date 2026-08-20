@@ -72,6 +72,13 @@ from math import *
 
     let sys_import = data.imports.iter().find(|i| i.path == "sys").unwrap();
     assert_eq!(sys_import.alias, Some("system".to_string()));
+    assert_eq!(sys_import.kind, debtmap::extraction::ImportKind::Module);
+    let hash_map = data
+        .imports
+        .iter()
+        .find(|import| import.path == "collections.HashMap")
+        .unwrap();
+    assert_eq!(hash_map.kind, debtmap::extraction::ImportKind::Symbol);
 }
 
 #[test]

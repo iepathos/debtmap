@@ -433,6 +433,7 @@ mod tests {
                 path: "os".to_string(),
                 alias: None,
                 is_glob: false,
+                kind: crate::extraction::ImportKind::Unknown,
             }],
             total_lines: 50,
             detected_patterns: vec![crate::extraction::types::DetectedPattern::ManyParameters {

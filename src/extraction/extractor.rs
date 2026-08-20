@@ -681,6 +681,7 @@ impl UnifiedFileExtractor {
                     path: full_path,
                     alias: None,
                     is_glob: false,
+                    kind: crate::extraction::ImportKind::Unknown,
                 });
             }
             syn::UseTree::Rename(rename) => {
@@ -693,6 +694,7 @@ impl UnifiedFileExtractor {
                     path: full_path,
                     alias: Some(rename.rename.to_string()),
                     is_glob: false,
+                    kind: crate::extraction::ImportKind::Unknown,
                 });
             }
             syn::UseTree::Glob(_) => {
@@ -704,6 +706,7 @@ impl UnifiedFileExtractor {
                     },
                     alias: None,
                     is_glob: true,
+                    kind: crate::extraction::ImportKind::Glob,
                 });
             }
             syn::UseTree::Group(group) => {

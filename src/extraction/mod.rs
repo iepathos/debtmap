@@ -55,6 +55,6 @@ mod types;
 pub use extractor::UnifiedFileExtractor;
 pub use types::{
     CallSite, CallType, DetectedPattern, ExtractedFileData, ExtractedFunctionData,
-    ExtractedImplData, ExtractedStructData, FieldInfo, ImportInfo, IoOperation, IoType, MethodInfo,
-    PatternType, PurityAnalysisData, PurityLevel, TransformationPattern,
+    ExtractedImplData, ExtractedStructData, FieldInfo, ImportInfo, ImportKind, IoOperation, IoType,
+    MethodInfo, PatternType, PurityAnalysisData, PurityLevel, TransformationPattern,
 };

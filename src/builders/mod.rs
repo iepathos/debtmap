@@ -17,6 +17,7 @@ pub mod call_graph;
 pub mod effect_pipeline;
 pub mod parallel_call_graph;
 pub mod parallel_unified_analysis;
+mod python_call_resolution;
 pub mod unified_analysis;
 pub mod unified_analysis_phases;
 pub mod validated_analysis;

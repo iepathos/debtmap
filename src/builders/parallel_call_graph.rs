@@ -529,6 +529,7 @@ struct CalleeResolutionIndex {
     same_file_functions: HashMap<PathBuf, HashMap<String, Vec<FunctionId>>>,
     qualified_functions: HashMap<String, Vec<FunctionId>>,
     method_functions: HashMap<String, Vec<FunctionId>>,
+    python_imports: super::python_call_resolution::PythonImportIndex,
 }
 
 fn extracted_files_sorted(
@@ -541,12 +542,16 @@ fn extracted_files_sorted(
 
 impl CalleeResolutionIndex {
     fn from_sorted_extracted(sorted_extracted: &[(&PathBuf, &ExtractedFileData)]) -> Self {
-        sorted_extracted
+        let python_imports =
+            super::python_call_resolution::PythonImportIndex::from_extracted(sorted_extracted);
+        let mut index = sorted_extracted
             .iter()
             .fold(Self::empty(), |mut index, item| {
                 index.add_file_functions(item.0, &item.1.functions);
                 index
-            })
+            });
+        index.python_imports = python_imports;
+        index
     }
 
     fn empty() -> Self {
@@ -554,6 +559,7 @@ impl CalleeResolutionIndex {
             same_file_functions: HashMap::new(),
             qualified_functions: HashMap::new(),
             method_functions: HashMap::new(),
+            python_imports: super::python_call_resolution::PythonImportIndex::default(),
         }
     }
 
@@ -652,6 +658,18 @@ fn resolve_python_method(
 ) -> crate::priority::call_graph::ResolutionOutcome {
     use crate::priority::call_graph::{CallEdgeProvenance, ResolutionOutcome};
 
+    let imported = index
+        .python_imports
+        .candidates(caller_file, &call.callee_name);
+    if !imported.is_empty() {
+        return outcome_for_candidates(
+            imported,
+            call,
+            caller_file,
+            CallEdgeProvenance::ImportResolution,
+            90,
+        );
+    }
     let Some((receiver, method)) = call.callee_name.rsplit_once('.') else {
         return ResolutionOutcome::Unresolved {
             query: call.callee_name.clone(),
@@ -707,6 +725,23 @@ fn resolve_direct_callee(
             100,
         );
     }
+    let imported = index
+        .python_imports
+        .candidates(caller_file, &call.callee_name);
+    if !imported.is_empty() {
+        return outcome_for_candidates(
+            imported,
+            call,
+            caller_file,
+            crate::priority::call_graph::CallEdgeProvenance::ImportResolution,
+            90,
+        );
+    }
+    if crate::core::Language::from_path(caller_file) == crate::core::Language::Python {
+        return crate::priority::call_graph::ResolutionOutcome::Unresolved {
+            query: call.callee_name.clone(),
+        };
+    }
     let global = index
         .qualified_functions
         .get(&call.callee_name)
@@ -751,7 +786,9 @@ fn outcome_for_candidates(
 #[cfg(test)]
 mod extracted_call_resolution_tests {
     use super::*;
-    use crate::extraction::{CallType, ExtractedFileData, ExtractedFunctionData};
+    use crate::extraction::{
+        CallType, ExtractedFileData, ExtractedFunctionData, ImportInfo, ImportKind,
+    };
 
     #[test]
     fn direct_calls_prefer_same_file_before_qualified_index() {
@@ -961,6 +998,79 @@ mod extracted_call_resolution_tests {
         assert_eq!(evidence[0].call_site.as_ref().unwrap().line, 2);
     }
 
+    #[test]
+    fn python_import_aliases_resolve_to_unique_module_symbols() {
+        let caller_path = PathBuf::from("src/app.py");
+        let helper_path = PathBuf::from("src/helpers.py");
+        let mut caller_file = ExtractedFileData::empty(caller_path.clone());
+        caller_file.functions = vec![function("entry", "entry", 1)];
+        caller_file.imports = vec![
+            ImportInfo {
+                path: "helpers.work".to_string(),
+                alias: Some("run".to_string()),
+                is_glob: false,
+                kind: ImportKind::Symbol,
+            },
+            ImportInfo {
+                path: "helpers".to_string(),
+                alias: Some("support".to_string()),
+                is_glob: false,
+                kind: ImportKind::Module,
+            },
+        ];
+        let extracted = HashMap::from([
+            (caller_path.clone(), caller_file),
+            (
+                helper_path.clone(),
+                extracted_file(helper_path.clone(), vec![function("work", "work", 10)]),
+            ),
+        ]);
+        let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
+        let caller = FunctionId::new(caller_path.clone(), "entry".to_string(), 1);
+
+        for (name, call_type) in [
+            ("run", CallType::Direct),
+            ("support.work", CallType::Method),
+        ] {
+            let outcome = resolve_callee_from_extracted(
+                &call(name, call_type, 2),
+                &caller,
+                &caller_path,
+                &index,
+            );
+            let crate::priority::call_graph::ResolutionOutcome::Resolved {
+                target,
+                provenance,
+                confidence,
+                ..
+            } = outcome
+            else {
+                panic!("expected imported call to resolve, got {outcome:?}");
+            };
+
+            assert_eq!(
+                target,
+                FunctionId::new(helper_path.clone(), "work".into(), 10)
+            );
+            assert_eq!(
+                provenance,
+                crate::priority::call_graph::CallEdgeProvenance::ImportResolution
+            );
+            assert_eq!(confidence, 90);
+        }
+
+        let unimported = resolve_callee_from_extracted(
+            &call("work", CallType::Direct, 3),
+            &caller,
+            &caller_path,
+            &index,
+        );
+        assert!(matches!(
+            unimported,
+            crate::priority::call_graph::ResolutionOutcome::Unresolved { .. }
+        ));
+    }
+
     fn extracted_files(
         files: Vec<(PathBuf, Vec<ExtractedFunctionData>)>,
     ) -> HashMap<PathBuf, ExtractedFileData> {
@@ -972,6 +1082,12 @@ mod extracted_call_resolution_tests {
                 (path, file_data)
             })
             .collect()
+    }
+
+    fn extracted_file(path: PathBuf, functions: Vec<ExtractedFunctionData>) -> ExtractedFileData {
+        let mut file = ExtractedFileData::empty(path);
+        file.functions = functions;
+        file
     }
 
     fn function(name: &str, qualified_name: &str, line: usize) -> ExtractedFunctionData {
