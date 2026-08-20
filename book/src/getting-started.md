@@ -12,7 +12,7 @@ Before installing Debtmap, you'll need:
 - **For cargo install or building from source**:
   - Rust toolchain (rustc and cargo)
   - Supported platforms: Linux, macOS, Windows
-  - Rust edition 2021 or later
+  - Rust 1.89 or later (the project uses Rust edition 2024)
 
 **Optional** (for coverage-based risk analysis):
 - **Rust projects**: `cargo-tarpaulin` or `cargo-llvm-cov` for coverage data
@@ -118,11 +118,11 @@ debtmap analyze .
 
 **What happens during analysis:**
 
-1. **File Discovery** - Debtmap scans your project for supported source files (Rust `.rs`, Python `.py`, JavaScript `.js`/`.jsx`, TypeScript `.ts`/`.tsx`, Go `.go`)
-2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST) using `syn` for Rust and tree-sitter for Python, JavaScript, TypeScript, and Go
+1. **File Discovery** - Debtmap scans your project for supported source files (Rust `.rs`, Python `.py`, JavaScript `.js`/`.jsx`, TypeScript `.ts`/`.tsx`, Go `.go`, Solidity `.sol`)
+2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST) using `syn` for Rust and tree-sitter for Python, JavaScript, TypeScript, Go, and Solidity
 3. **Metric Extraction** - Complexity, coverage gaps, and coupling are measured
 4. **Prioritization** - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)
-5. **Context Generation** - File ranges are suggested for each debt item
+5. **Context Generation** - File ranges are attached to findings; coverage and git history are included only when explicitly supplied or enabled and successfully loaded
 6. **Output** - Results are displayed in your chosen format
 
 **Expected timing**: Analyzing a 10,000 LOC project typically takes 2-5 seconds.

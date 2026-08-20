@@ -595,18 +595,17 @@ debtmap analyze . --lcov coverage.lcov --top 3
 Example output:
 ```
 ════════════════════════════════════════════
-    PRIORITY TECHNICAL DEBT FIXES
+    PRIORITY TECHNICAL DEBT FINDINGS
 ════════════════════════════════════════════
 
-🎯 TOP 3 RECOMMENDATIONS (by unified priority)
+🎯 TOP 3 FINDINGS (by unified priority)
 
 #1 SCORE: 8.9 [CRITICAL]
 ├─ TEST GAP: ./src/analyzers/rust.rs:38 parse_function()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.7 risk
+├─ IMPACT: High complexity with no loaded line coverage
 ├─ COMPLEXITY: cyclomatic=6, cognitive=8, nesting=2, lines=32
 ├─ DEPENDENCIES: 0 upstream, 11 downstream
-└─ WHY: Business logic with 0% coverage, manageable complexity
+└─ ROLE: Business logic
 
 📊 TOTAL DEBT SCORE: 4907
 📈 OVERALL COVERAGE: 67.12%
@@ -636,8 +635,8 @@ debtmap analyze . --format json | jq '.items | sort_by(-.score) | .[0:5] | .[].l
 debtmap analyze . --format json | jq '[.items[] | select(.debt_type | has("TestingGap"))]'
 ```
 
-The complete structure is defined by the [unified JSON v3 schema](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json).
-Use the checked [v3 items fixture](https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json)
+The complete structure is defined by the [unified JSON v4 schema](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v4.schema.json).
+Use the checked [v4 fixture](https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v4-minimal.json)
 as a copyable example.
 
 ### Markdown Report

@@ -74,8 +74,8 @@ For programmatic access and CI/CD integration:
 debtmap analyze . --format json --output debt.json
 ```
 
-The canonical structure is defined by the [unified JSON v3 schema](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json).
-Use the checked [v3 items fixture](https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json)
+The canonical structure is defined by the [unified JSON v4 schema](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v4.schema.json).
+Use the checked [v4 fixture](https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v4-minimal.json)
 as a parser and prompt example.
 
 ### Terminal

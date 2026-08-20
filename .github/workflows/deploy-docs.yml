@@ -5,12 +5,22 @@ on:
     branches: [main, master]
     paths:
       - 'book/**'
+      - 'docs/**'
+      - 'schemas/**'
+      - 'README.md'
+      - 'ARCHITECTURE.md'
+      - 'src/lib.rs'
       - 'viz-dev/**'
       - '.github/workflows/deploy-docs.yml'
   pull_request:
     branches: [main, master]
     paths:
       - 'book/**'
+      - 'docs/**'
+      - 'schemas/**'
+      - 'README.md'
+      - 'ARCHITECTURE.md'
+      - 'src/lib.rs'
       - 'viz-dev/**'
       - '.github/workflows/deploy-docs.yml'
 

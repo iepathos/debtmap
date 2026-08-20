@@ -92,22 +92,10 @@ The descriptive labels ("accumulated" for sums, "max" for maximum) clearly indic
 - Pattern repetition score
 - Effective complexity (adjusted for boilerplate)
 
-### Page 3: Recommendations
+### Page 3: Context
 
-Provides actionable refactoring guidance:
-
-**Refactoring Strategy:**
-- Recommended approach (Extract Method, Decompose, etc.)
-- Estimated effort (hours)
-- Expected benefit/improvement
-
-**Step-by-Step Actions:**
-1. Specific refactoring steps
-2. Pattern recommendations
-3. Testing strategies
-
-**Code Examples:**
-- Before/after snippets (when applicable)
+Shows the source range and available context needed to investigate the finding. Debtmap does not
+invent refactoring steps for function findings.
 - Suggested function signatures
 - Pattern implementations
 
@@ -211,7 +199,7 @@ Impurity Reasons:
 **Page Indicator:**
 The bottom of the screen shows which page you're viewing:
 ```
-[1/5] Overview   [2/5] Metrics   [3/5] Recommendations   [4/5] Context   [5/5] Data Flow
+[1] Overview  [2] Score  [3] Context  [4] Dependencies  [5-8] Optional evidence pages
 ```
 
 ## Filtering and Sorting
@@ -255,7 +243,7 @@ The exported markdown includes all detail page information in a readable format.
 
 2. **Focus on Top Items:** Start with the highest-priority items (top 5-10) for maximum impact.
 
-3. **Review Recommendations:** Always check Page 3 (Recommendations) for specific refactoring steps before making changes.
+3. **Review Context:** Check Page 3 for the relevant source range before making changes.
 
 4. **Check Context:** Use Page 4 (Context) to understand the function's role before refactoring to avoid breaking critical paths.
 

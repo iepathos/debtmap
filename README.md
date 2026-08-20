@@ -11,13 +11,14 @@ Debtmap analyzes your codebase and ranks technical debt by risk. Use it directly
 
 Large codebases accumulate complexity. You know there's debt, but where do you start?
 
-Debtmap combines static analysis with git history to score technical debt across multiple signals:
+Debtmap combines static analysis with optional evidence such as coverage and git history to score
+technical debt across multiple signals:
 
 | Signal | What It Measures | Why It Matters |
 |--------|------------------|----------------|
 | **Complexity** | Cyclomatic, cognitive, nesting depth | How hard code is to understand |
-| **Coverage** | Test coverage percentage per function | How risky changes are |
-| **Git History** | Change frequency, bug fix rate, author count | Which code keeps breaking |
+| **Coverage** | Optional LCOV coverage per function | How risky untested changes are |
+| **Git History** | Optional change frequency, bug fix rate, author count | Which code keeps breaking |
 | **Coupling** | Dependencies, call graph depth | How changes ripple through the codebase |
 | **Purity** | Side effects, I/O operations | How testable and predictable code is |
 | **Entropy** | Pattern consistency within a codebase | Reduces false positives from intentional complexity |
@@ -75,7 +76,7 @@ Run `debtmap analyze .` to explore results interactively:
 Features:
 - Browse debt items sorted by severity
 - Drill into score breakdowns to understand why code ranks high
-- View git history, dependencies, and test coverage per function
+- View dependencies plus git-history and coverage evidence when supplied
 - Copy context to clipboard for AI assistants when needed
 - Jump to code in your editor
 
@@ -86,7 +87,7 @@ Debtmap works well on its own, and the `--format markdown` output is available w
 - **Context suggestions** - Specific file ranges the LLM should read to understand the problem
 - **Structured metadata** - Scoring factors, dependency context, purity signals, coverage, entropy, and optional git-history risk exposed so the LLM can reason about priorities
 - **Minimal tokens** - Compact format that fits more context into the LLM's window
-- **Deterministic output** - Same input produces same output for reproducible workflows
+- **Stable analysis** - The same source, policy, reference time, and evidence produce the same normalized findings; report timestamps still differ
 
 ```bash
 # Pipe directly to Claude Code

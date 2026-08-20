@@ -103,7 +103,7 @@ The terminal output uses colors and symbols for quick visual scanning:
 - ✗ Red: Failing, critical, high complexity
 - 📊 Blue: Information, metrics
 - 🔧 Orange: Technical debt items
-- 🎯 Cyan: Recommendations
+- 🎯 Cyan: Priority findings
 
 **Complexity Classification:**
 - **LOW** (0-5): Green - Simple, easy to maintain
@@ -278,8 +278,7 @@ Risk Distribution:
 ───────────────────────────────────────────
 1. src/core/parser.rs:142 parse_complex_ast()
    Risk: 85.0 | Complexity: 15 | Coverage: 0%
-   Recommendation: Add 5 unit tests (est: 2-3 hours)
-   Impact: -40 risk reduction
+   Evidence: Complexity 15 with no loaded coverage
 
 💡 RECOMMENDATIONS (by ROI)
 ───────────────────────────────────────────
@@ -320,18 +319,19 @@ debtmap analyze . --format json | jq .
 
 ### JSON Schema Structure
 
-Debtmap emits the versioned unified JSON v3 contract. The authoritative schema and consumer guide
+Debtmap emits the versioned unified JSON v4 contract. The authoritative schema and consumer guide
 are checked into the repository:
 
-- [`schemas/debtmap-output-v3.schema.json`](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json)
-- [`docs/json-output-v3.md`](https://github.com/iepathos/debtmap/blob/master/docs/json-output-v3.md)
+- [`schemas/debtmap-output-v4.schema.json`](https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v4.schema.json)
+- [`docs/json-output-v4.md`](https://github.com/iepathos/debtmap/blob/master/docs/json-output-v4.md)
 
 The top-level envelope is:
 
 ```json
 {
-  "format_version": "3.0",
+  "format_version": "4.0",
   "metadata": { ... },
+  "receipt": { ... },
   "summary": { ... },
   "items": [ ... ]
 }
@@ -340,10 +340,10 @@ The top-level envelope is:
 Consumers must reject unsupported `format_version` values. Items use a `type` discriminator of
 `File` or `Function`, lowercase priority values, and nested `location` and `metrics` objects.
 
-### Legacy pre-v3 example (historical)
+### Legacy pre-v4 example (historical)
 
 The example below describes the removed pre-v3 output and is retained temporarily only to explain
-older reports. Do not use these paths for new integrations; use the v3 schema and guide linked
+older reports. Do not use these paths for new integrations; use the v4 schema and guide linked
 above.
 
 Here's a complete annotated JSON output example:
@@ -595,7 +595,7 @@ Markdown output includes:
 2. **Complexity Analysis** - Detailed complexity breakdown by file
 3. **Technical Debt** - Categorized debt items with priorities
 4. **Dependencies** - Module dependencies and circular references
-5. **Recommendations** - Prioritized action items
+5. **Findings and Guidance** - Ranked evidence plus guidance only where an analyzer computed it
 
 ### Example Markdown Output
 
@@ -631,13 +631,12 @@ Markdown output includes:
 | detect_data_clumps | src/debt/smells.rs:196 | 15 | 20 | Medium |
 | analyze_dependencies | src/core/deps.rs:89 | 14 | 18 | Medium |
 
-### Refactoring Recommendations
+### Priority Findings
 
 **src/analyzers/rust.rs:245** - `parse_function()`
 - **Complexity:** Cyclomatic: 18, Cognitive: 24
-- **Action:** Extract 3-5 pure functions using decompose-then-transform strategy
-- **Patterns:** Decompose into logical units, then apply functional patterns
-- **Benefit:** Improved testability and maintainability
+- **Evidence:** Cyclomatic 18, cognitive 24
+- **Context:** Inspect the reported range before choosing a refactoring
 
 ## Technical Debt
 
@@ -657,17 +656,15 @@ Markdown output includes:
 
 - `risk::scoring` → `core::metrics` → `risk::scoring`
 
-## Recommendations
+## Findings
 
-1. **Refactor parse_function** (High Priority)
-   - Reduce complexity from 18 to <10
-   - Extract helper functions
-   - Estimated effort: 4-6 hours
+1. **parse_function** (High Priority)
+   - Cyclomatic complexity: 18
+   - Reported source range: `src/analyzers/rust.rs:245`
 
-2. **Add tests for scoring module** (High Priority)
-   - Current coverage: 35%
-   - Target coverage: 80%
-   - Estimated effort: 2-3 hours
+2. **scoring module coverage gap** (High Priority)
+   - Loaded coverage: 35%
+   - Review the uncovered range before choosing tests
 
 ## Data Flow Analysis
 
